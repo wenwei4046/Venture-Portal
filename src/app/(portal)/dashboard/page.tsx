@@ -8,21 +8,39 @@ export default async function DashboardPage() {
   await requireAuth()
   const supabase = await createClient()
 
-  // Fetch real counts for the empty-state detection
+  // Fetch real counts for the empty-state detection + free-pool calc
   const [
-    { count: fundSourcesCount },
+    { count: fundSourcesCount, data: activeFundSources },
     { count: loansCount },
     { count: overdueCount },
     { count: pendingApprovalsCount },
+    { data: bufferRow },
   ] = await Promise.all([
-    supabase.from('fund_sources').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+    supabase
+      .from('fund_sources')
+      .select('amount', { count: 'exact' })
+      .eq('status', 'active'),
     supabase.from('loans').select('*', { count: 'exact', head: true }).eq('status', 'active'),
     supabase.from('overdue_records').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('approval_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    supabase
+      .from('treasury_config')
+      .select('config_value')
+      .eq('config_key', 'buffer_amount')
+      .single(),
   ])
 
+  const fundTotal = (activeFundSources ?? []).reduce(
+    (sum, r) => sum + Number(r.amount),
+    0
+  )
+  const bufferAmount = Number(bufferRow?.config_value ?? 0)
+  // TODO Step 8: subtract loans outstanding (needs loan_outstanding view query)
+  const loansOutstanding = 0
+  const freePool = fundTotal - loansOutstanding - bufferAmount
+  const freePoolAboveBuffer = fundTotal - loansOutstanding - bufferAmount
+
   const isEmpty = (fundSourcesCount ?? 0) === 0 && (loansCount ?? 0) === 0
-  const freePool = 0 // real calc comes in Phase 1 Step 9 via dashboard_summary RPC
   const today = dayjs().format('D MMMM YYYY')
 
   return (
@@ -38,7 +56,7 @@ export default async function DashboardPage() {
             {isEmpty ? (
               <>RM <span className="text-muted">—</span></>
             ) : (
-              <>RM {formatMoney(freePool).replace('RM ', '')}</>
+              <>{formatMoney(freePool)}</>
             )}
           </div>
           <div className="font-mono text-xs text-muted">
@@ -76,9 +94,20 @@ export default async function DashboardPage() {
             </div>
           ) : (
             <div className="text-sm text-graphite">
-              Above buffer by{' '}
-              <span className="font-mono tabular text-ledger">RM 0.00</span> · Buffer
-              threshold <span className="font-mono tabular">RM 50,000.00</span>
+              {freePoolAboveBuffer >= 0 ? (
+                <>
+                  Above buffer by{' '}
+                  <span className="font-mono tabular text-ledger">
+                    {formatMoney(freePoolAboveBuffer)}
+                  </span>
+                </>
+              ) : (
+                <em className="font-serif text-danger">
+                  Below buffer by {formatMoney(Math.abs(freePoolAboveBuffer))}
+                </em>
+              )}{' '}
+              · Buffer threshold{' '}
+              <span className="font-mono tabular">{formatMoney(bufferAmount)}</span>
             </div>
           )}
         </div>
