@@ -11,6 +11,7 @@ import {
   canAccessHRCosting,
   canAccessReports,
   canAccessSettings,
+  canApprove,
 } from '@/lib/roles'
 
 interface NavItem {
@@ -24,6 +25,7 @@ const navItems: NavItem[] = [
   { href: '/fund-in', label: 'Fund IN', visible: canAccessTreasury },
   { href: '/fund-out', label: 'Fund OUT', visible: canAccessTreasury },
   { href: '/overdue', label: 'Overdue', visible: canAccessTreasury },
+  { href: '/approvals', label: 'Approvals', visible: canApprove },
   { href: '/dept-pool', label: 'Dept Pool', visible: canAccessDeptPool },
   { href: '/billing', label: 'Billing', visible: canAccessBilling },
   { href: '/director-salary', label: 'Director Salary', visible: canAccessDirectorSalary },

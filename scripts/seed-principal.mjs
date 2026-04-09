@@ -21,7 +21,7 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
 }
 
 // Principal account details — change these as needed
-const PRINCIPAL_EMAIL = 'principal@houzs.my'
+const PRINCIPAL_EMAIL = 'principal@venture.my'
 const PRINCIPAL_PASSWORD = 'changeme123'
 const PRINCIPAL_NAME = 'Principal'
 
@@ -86,7 +86,7 @@ async function main() {
   console.log(`  Role:     principal`)
   console.log('')
   console.log('⚠️  Change the password after first login via Supabase dashboard:')
-  console.log('    → Authentication → Users → principal@houzs.my → Reset password')
+  console.log('    → Authentication → Users → principal@venture.my → Reset password')
   console.log('')
   console.log('Next: npm run dev → http://localhost:3000/login')
 }

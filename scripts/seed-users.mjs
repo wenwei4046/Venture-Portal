@@ -26,19 +26,19 @@ const TEST_PASSWORD = 'changeme123'
 
 const users = [
   {
-    email: 'principal@houzs.my',
+    email: 'principal@venture.my',
     name: 'Principal',
     role: 'principal',
     department_id: null,
   },
   {
-    email: 'finance@houzs.my',
+    email: 'finance@venture.my',
     name: 'Finance Manager',
     role: 'finance',
     department_id: null,
   },
   {
-    email: 'hr@houzs.my',
+    email: 'hr@venture.my',
     name: 'HR Manager',
     role: 'hr',
     department_id: null,
@@ -54,7 +54,7 @@ async function main() {
 
   if (marketingDept) {
     users.push({
-      email: 'marketing@houzs.my',
+      email: 'marketing@venture.my',
       name: 'Marketing Manager',
       role: 'dept_manager',
       department_id: marketingDept.id,
