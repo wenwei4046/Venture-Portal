@@ -1,22 +1,31 @@
 # TODOS — HOUZS Venture Portal
 
-Deferred items from `/autoplan` review on 2026-04-09 (commit 8d8fe62).
+Deferred items from `/autoplan` review on 2026-04-09 (commit 8d8fe62)
+and `/qa` Phase 1 acceptance audit on 2026-04-10 (commit 9a5e663).
+
+**Phase 1 Treasury: ✅ SHIPPED 2026-04-10.** 9-step Forge pipeline complete.
+See `.gstack/qa-reports/qa-report-phase1-2026-04-10.md` for the full audit.
 
 ---
 
-## Phase 1.5 (after MVP ships)
+## Phase 1.5 (data integrity + audit — from /qa findings)
 
-### High-value, high-urgency
+### Medium severity (ship before Phase 2 cutover)
+- [ ] **M1: Wrap loan + approval_request creation in a Postgres function for atomicity.** Currently `createLoan` in `src/app/(portal)/fund-out/actions.ts:69-108` does 2 separate INSERTs; if step 2 fails, orphan `pending_approval` loan that Finance cannot self-heal. Fix: `CREATE FUNCTION create_loan_with_approval(...)` running in a single transaction, called via `supabase.rpc()`. _Effort: S. Source: /qa finding M1._
+- [ ] **M2: Add trigger on `approval_requests` UPDATE to cascade rejection into `loans.status`.** Currently `cancelLoan` rejects the approval but the loan stays stuck in `pending_approval` forever because `loans_principal_update` RLS blocks Finance. Trigger runs `SECURITY DEFINER` to bypass RLS and flip loan to `cancelled` when its approval rejects. _Effort: S. Source: /qa finding M2._
+- [ ] **L2: Settings audit history tables.** Add `treasury_config_history`, `tier_config_history`, `overdue_config_history`, `company_tier_history` — UPDATE triggers write old-row snapshots with `changed_by` + `changed_at`. Without this, in a dispute there's no way to reconstruct "what was the buffer amount on 2026-03-15?" Already referenced in-code at `settings/actions.ts:139-140`. _Effort: S. Source: /qa finding L2 + CEO Exp 6._
+
+### High-value, high-urgency (original autoplan)
 - [ ] **Bank statement CSV import + reconciliation.** Without this, the portal is authoritative but disconnected from actual bank balances. 6-month regret scenario: portal shows RM200K, bank shows RM180K, nobody knows where the gap is. _Effort: S (2-3 days CC / 1 week human). Source: CEO Premise 3._
 - [ ] **Slack webhook notifications.** Principal + Finance don't sit in portal all day. Notify on: new approval request, approval decision, overdue detected, statement issued/paid. _Effort: S. Source: CEO Exp 3._
 - [ ] **Read-access audit log.** Track who viewed sensitive salary/director data. Postgres triggers on SELECT for `director_payouts`, `hr_staff_costs`. LHDN + internal governance compliance. _Effort: S. Source: CEO Sec 3.3._
 - [ ] **Base rate what-if simulator.** Principal plays with "what if I add RM100K paid capital at 0.8%?" before committing. _Effort: M. Source: CEO Exp 5._
 
 ### Medium-value
-- [ ] **Loan portfolio CSV export.** For Principal's external accountant/auditor. _Effort: XS. Source: CEO Exp 4 (was auto-added — may be done in Phase 1 already)._
+- [ ] **Loan portfolio CSV export.** For Principal's external accountant/auditor. Not implemented in Phase 1 (confirmed by /qa audit). _Effort: XS. Source: CEO Exp 4._
 - [ ] **Mobile polish for Loan Create, Settings, Base Rate Calculator.** Phase 1 MVP mobile: Dashboard + Approval only. Desktop-only for complex forms. _Effort: M. Source: Design Pass 6._
-- [ ] **Bespoke PDF statement template design.** Phase 1 ships minimal HV header + table. Upgrade to branded letterhead with logo. _Effort: M (designer work). Source: Design T3._
-- [ ] **Company tier history tracking.** Current schema has `companies.tier` as a single field. Audit needs history: when did HC go from T2 to T3? _Effort: S. Source: CEO Exp 6 / Eng 10.2. Auto-added to Phase 1 schema — verify._
+- [ ] **Bespoke PDF statement template design.** Phase 1 ships minimal HV header + table (actually Phase 1 ships HTML statement page; PDF export deferred to Phase 1.5). Upgrade to branded letterhead with logo. _Effort: M (designer work). Source: Design T3._
+- **Company tier history tracking** → See **L2** above (unified under settings audit history).
 
 ### Low-urgency
 - [ ] **Multi-currency support.** Phase 1 is MYR-only. HOUZS expansion to SG/TH needs this. _Effort: L. Source: CEO Exp 7._

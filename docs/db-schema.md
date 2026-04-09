@@ -1,8 +1,10 @@
 HOUZS Venture Portal — Complete DB Schema
 Overview
 Tech Stack: Next.js + Supabase + Vercel
-Total Tables: 30
-Categories: Core (8), Treasury (5), Service Billing (4), Director Salary (7), HR (4), Statutory (4)
+Total Tables: 32 (verified against migrations 20260101000001..000009 CREATE TABLE counts)
+Categories: Core (4), Treasury (5), Statements (3), Billing (2 — Phase 2), Directors (4 — Phase 3), Pools (3), HR (4 — Phase 3), Statutory (4), Settings (3)
+Total RLS policies: 130 (see `supabase/migrations/20260101000011_rls.sql`)
+Dashboard aggregation: single `dashboard_summary()` RPC returning JSONB (see `20260101000013_functions.sql` + `20260101000016_dashboard_subsidiaries.sql`)
 ---
 1. CORE TABLES
 1.1 users

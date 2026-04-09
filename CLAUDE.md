@@ -27,67 +27,67 @@ src/
 │   │   └── login/page.tsx
 │   ├── (portal)/
 │   │   ├── layout.tsx              ← Sidebar + TopBar
-│   │   ├── dashboard/page.tsx
-│   │   ├── fund-in/
-│   │   ├── fund-out/
-│   │   ├── overdue/
-│   │   ├── dept-pool/
-│   │   ├── billing/
-│   │   ├── director-salary/
-│   │   ├── hr-costing/
-│   │   ├── reports/
-│   │   └── settings/
-│   └── api/
-│       ├── fund-sources/
-│       ├── loans/
-│       ├── overdue/
-│       ├── statements/
-│       ├── billing/
-│       ├── director-salary/
-│       ├── hr/
-│       ├── reports/
-│       └── settings/
+│   │   ├── dashboard/page.tsx      ← wired to dashboard_summary() RPC
+│   │   ├── fund-in/                ← list + new + detail + actions.ts
+│   │   ├── fund-out/                ← list + new + detail + actions.ts
+│   │   ├── overdue/                 ← list + actions.ts (detect/escalate/markPaid)
+│   │   ├── statements/              ← list + detail + actions.ts (generate/issue/markPaid)
+│   │   ├── approvals/               ← Principal queue + detail + approve/reject
+│   │   ├── dept-pool/               (Phase 2)
+│   │   ├── billing/                 (Phase 2)
+│   │   ├── director-salary/         (Phase 3)
+│   │   ├── hr-costing/              (Phase 3)
+│   │   ├── reports/                 (Phase 3)
+│   │   └── settings/                ← 4 tabs: treasury / tier / overdue / company
+│   └── (no api/ folder — uses Server Actions, not Route Handlers)
 ├── components/
-│   ├── ui/                         ← Shared UI components
-│   ├── charts/                     ← Dashboard charts
-│   ├── forms/                      ← Form components
-│   └── layout/                     ← Sidebar, TopBar, etc.
+│   └── layout/                     ← Sidebar, TopBar
 ├── lib/
 │   ├── supabase/
-│   │   ├── client.ts               ← Browser client
-│   │   ├── server.ts               ← Server client
-│   │   └── admin.ts                ← Service role client
-│   ├── statutory/
-│   │   ├── epf.ts                  ← EPF lookup function
-│   │   ├── socso.ts                ← SOCSO lookup function
-│   │   ├── eis.ts                  ← EIS lookup function
-│   │   └── pcb.ts                  ← PCB Jadual lookup function
-│   ├── salary-engine/
-│   │   └── calculate.ts            ← Director Salary full calculation
-│   ├── auth.ts
-│   ├── roles.ts                    ← Role-based access helpers
-│   └── utils.ts
+│   │   ├── client.ts               ← Browser client (anon key + RLS)
+│   │   ├── server.ts               ← Server client (anon key + RLS via SSR cookies)
+│   │   ├── admin.ts                ← Service role client (currently unused, 'server-only' guarded)
+│   │   └── database.types.ts       ← Generated from Supabase
+│   ├── auth.ts                     ← requireAuth / requireRole helpers
+│   ├── roles.ts                    ← canAccess* helpers for sidebar visibility
+│   └── utils.ts                    ← formatMoney / formatDate
 ├── types/
 │   └── index.ts                    ← All TypeScript interfaces
+├── middleware.ts                   ← Supabase Auth session refresh + redirect gating
 supabase/
-├── migrations/                     ← SQL migration files
-├── seed/                           ← Seed data (statutory tables, companies, etc.)
+├── migrations/                     ← 16 SQL migration files (core → Step 9 dashboard RPC)
+├── seed/                           ← (empty — seed scripts in /scripts)
+└── config.toml                     ← Supabase project link
+scripts/
+├── seed-users.mjs                  ← 4 test users (principal/finance/hr/marketing)
+├── seed-principal.mjs              ← Initial principal account
+├── seed-test-data.mjs              ← Step 8 QA test data (backdated loans + savings)
+├── check-loans.mjs                 ← DB inspection helper
+├── check-dashboard.mjs             ← dashboard_summary() RPC smoke test
+└── migrate-emails.mjs              ← @houzs.my → @venture.my domain migration
 docs/
-├── db-schema.md                    ← Database schema reference
+├── DESIGN.md                       ← Design system v2.0 (Anthropic-flavored direction)
+├── db-schema.md                    ← Database schema reference (32 tables)
 ├── access-matrix.md                ← Role permissions reference
-├── module-spec-phase1.md
-├── module-spec-phase2.md
-├── module-spec-phase3.md
-└── api-contracts.md                ← API interface definitions
+├── module-spec-phase1.md           ← ✅ Shipped: Dashboard, Fund IN/OUT, Overdue, Statements
+├── module-spec-phase2.md           ← Phase 2: Dept Pool, Service Billing
+└── module-spec-phase3.md           ← Phase 3: Director Salary Engine, HR Costing, Reports
+.gstack/
+└── qa-reports/                     ← Phase audit reports (gitignored screenshots/)
 ```
 Spec Documents (MUST READ BEFORE CODING)
 All specifications are in `/docs/`. These are the source of truth:
-db-schema.md — 31 tables, all fields, relationships, constraints
+db-schema.md — 32 tables, all fields, relationships, constraints
 access-matrix.md — 4 roles × 9 modules, RLS patterns, data visibility
 module-spec-phase1.md — Dashboard, Fund IN, Fund OUT, Overdue & Netting
 module-spec-phase2.md — Dept Pool, Service Billing (5 modes)
 module-spec-phase3.md — Director Salary Engine, HR Costing, Reports
+DESIGN.md — v2.0 Anthropic-flavored design system (colors, typography, components)
 ALWAYS reference these docs before implementing any feature.
+
+Other project docs (at repo root):
+TODOS.md — Phase 1.5 tech debt, Phase 2/3 prerequisites, compliance gates
+.gstack/qa-reports/qa-report-phase1-2026-04-10.md — Phase 1 acceptance audit (6 findings, 2 fixed, 3 deferred to 1.5)
 4 Roles
 Role	DB Value	Access
 Principal	`principal`	Everything + Approve + Settings
@@ -120,8 +120,10 @@ Finance CANNOT see individual employee salaries — only department lump sum
 Finance CANNOT see individual director salary breakdown — only total payout
 Only HR and Principal can see individual salary details
 Development Phases
-Phase 1 (Current): Treasury Core
-Dashboard, Fund IN, Fund OUT, Overdue & Netting, Settings, Auth
+Phase 1 (✅ Shipped 2026-04-10): Treasury Core
+Dashboard (dashboard_summary RPC), Fund IN, Fund OUT, Overdue & Netting,
+Monthly Statements, Approvals (Finance→Principal workflow), Settings, Auth
+9-step Forge pipeline (see Phase 1 commits a04a7bf..9a5e663)
 Phase 2: Department + Billing
 Dept Pool, Service Billing (5 modes), Invoice Generation
 Phase 3: Salary + HR + Reports
@@ -140,14 +142,15 @@ For each phase:
 ```
 Coding Conventions
 TypeScript strict mode — no `any`
-Server Components by default — Client Components only when needed (forms, charts)
-API Routes — use Next.js Route Handlers (`app/api/`)
-Supabase client — server-side uses service role for admin ops, client-side uses anon key with RLS
-Error handling — always return `{ data, error }` pattern
-Date handling — store as `date` or `timestamptz` in DB, use `dayjs` for formatting
-Money — `decimal(15,2)` in DB, display with `toLocaleString('en-MY')`
+Server Components by default — Client Components only when needed (forms, interactive widgets)
+Writes — use Server Actions (`'use server'`), NOT API Route Handlers. Every action calls `requireRole(...)` at entry.
+Supabase client — server-side (`lib/supabase/server.ts`) uses anon key with RLS via SSR cookies. Service role client (`admin.ts`) is dormant + `'server-only'` guarded; avoid unless you truly need to bypass RLS.
+Aggregate queries — prefer RPC functions (`dashboard_summary`, `get_hr_cost_summary`) over scattered per-field selects. Single round-trip, clearer intent, easier to unit test at SQL level.
+Error handling — Server Actions throw, pages use error boundaries, never return `{ data, error }` to the client
+Date handling — store as `date` or `timestamptz` in DB, use `dayjs` for formatting. Compare by day (`dayjs().isAfter(x, 'day')`) to avoid timezone edge cases.
+Money — `decimal(15,2)` in DB. Display with `formatMoney()` from `lib/utils.ts`. Negative amounts render as red parenthesis notation `(1,000.00)`.
 Naming — DB: snake_case, TypeScript: camelCase, Components: PascalCase
-Files — one component per file, co-locate related files
+Files — one component per file, co-locate related files (`_components/` subfolders per route)
 Testing
 API routes: test with sample data matching real scenarios
 Statutory lookups: test with known values from PDF tables
