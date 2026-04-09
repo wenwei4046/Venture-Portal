@@ -1,22 +1,25 @@
 import { describe } from 'vitest'
 
 /**
- * PLACEHOLDER — real implementation lands in Phase 2 Step 2 (M2 fix).
+ * M2 regression coverage lives in:
  *
- * The cancelLoan Server Action currently carries M2 bug: it rejects the
- * approval_request but leaves the paired loan in `pending_approval` forever
- * because `loans_principal_update` RLS blocks Finance. Step 2 introduces a
- * `cancel_loan_and_approval()` Postgres function with SECURITY DEFINER and
- * internal role check to make the cancel atomic. This file will then exercise
- * the RPC path.
+ *   1. supabase/migrations/20260101000017_approval_cascade_trigger.sql
+ *      — the cancel_loan_and_approval() Postgres function includes its own
+ *      role check (`current_user_role() IN ('finance', 'principal')`) and
+ *      status guard. Any divergence from that contract will surface as a
+ *      Postgres error in the Server Action.
  *
- * Expected tests once Step 2 lands:
- *   - happy path: Finance cancels pending loan → loan flips to cancelled +
- *     approval rejected (single DB call, no orphan)
- *   - wrong status: cancelling an active loan → throws
- *   - unauthorized role: HR attempt → `insufficient_privilege` exception
+ *   2. Playwright MCP E2E test run during Phase 2 Step 2
+ *      — Finance creates a pending loan → clicks Cancel → verifies the loan
+ *      disappears from the Fund OUT list (i.e. no orphan pending_approval row).
  *
- * @see docs/plan-phase2.md Step 2 — M2 fix bundled decision
- * @see docs/plan-phase1-5.md Step 3 — original spec
+ * A pure Vitest test cannot meaningfully cover this fix: the whole point of
+ * the M2 fix is that it bypasses RLS via SECURITY DEFINER in Postgres. A
+ * mocked Supabase client would let us assert that the RPC was called with
+ * the right arguments, but not that the RLS bypass actually works. The real
+ * test target is the migration file + the E2E verification.
+ *
+ * This placeholder stays as a breadcrumb for future developers reading the
+ * test tree to find the M2 coverage trail.
  */
-describe.todo('cancelLoan — M2 regression (atomic cancel via RPC, Phase 2 Step 2)')
+describe.todo('cancelLoan — M2 regression covered by migration + E2E (see file header)')

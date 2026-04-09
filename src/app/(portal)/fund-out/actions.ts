@@ -188,50 +188,29 @@ export async function recordRepayment(formData: FormData) {
 // ─── Cancel loan (Finance — only pending_approval) ───────────────────────────
 
 export async function cancelLoan(formData: FormData) {
-  const user = await requireRole(['finance'])
+  await requireRole(['finance'])
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
   if (!id) throw new Error('Loan id is required')
 
-  // Only allow cancel if still pending_approval (Finance's submission window)
-  const { data: loan } = await supabase
-    .from('loans')
-    .select('status')
-    .eq('id', id)
-    .single()
-
-  if (!loan) throw new Error('Loan not found')
-  if (loan.status !== 'pending_approval') {
-    throw new Error(
-      `Can only cancel pending_approval loans (current status: ${loan.status})`
-    )
-  }
-
-  // Cancel the approval request first
-  const { error: approvalErr } = await supabase
-    .from('approval_requests')
-    .update({ status: 'rejected', workflow_state: 'rejected' })
-    .eq('reference_id', id)
-    .eq('reference_table', 'loans')
-    .eq('status', 'pending')
-
-  if (approvalErr) {
-    throw new Error(`Failed to cancel approval: ${approvalErr.message}`)
-  }
-
-  // Note: loans_principal_update RLS would block Finance from updating loans
-  // directly. The approval rejection path handles the loan status transition
-  // via the approval workflow. For pending_approval loans, Finance cancels
-  // via rejecting the approval_request and Principal-only update policy is
-  // bypassed by the approval_requests update above (Finance CAN update
-  // approvals they submitted).
+  // M2 fix (Phase 2 Step 2): atomic cancel via SECURITY DEFINER RPC.
+  // Both the loan and its paired approval_request are updated in one
+  // transaction. Previously Finance could only reject the approval, leaving
+  // the loan stuck in pending_approval forever because loans_principal_update
+  // RLS blocks Finance from updating loans.
   //
-  // In Phase 1.5, add a trigger on approval_requests to auto-update loan
-  // status when approval is rejected/cancelled.
+  // See supabase/migrations/20260101000017_approval_cascade_trigger.sql
+  const { error: rpcErr } = await supabase.rpc('cancel_loan_and_approval', {
+    p_loan_id: id,
+  })
 
-  void user
+  if (rpcErr) {
+    throw new Error(`Failed to cancel loan: ${rpcErr.message}`)
+  }
+
   revalidatePath('/fund-out')
   revalidatePath('/approvals')
+  revalidatePath('/dashboard')
   redirect('/fund-out')
 }

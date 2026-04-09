@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       approval_requests: {
@@ -1884,6 +1859,10 @@ export type Database = {
         Args: { p_as_of_date?: string; p_loan_id: string }
         Returns: number
       }
+      cancel_loan_and_approval: {
+        Args: { p_cancel_reason?: string; p_loan_id: string }
+        Returns: undefined
+      }
       current_user_department_id: { Args: never; Returns: string }
       current_user_role: {
         Args: never
@@ -2105,9 +2084,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       approval_request_type: [

@@ -4,6 +4,7 @@ import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
+import { cancelLoan } from '../actions'
 import RepaymentForm from '../_components/RepaymentForm'
 
 interface Props {
@@ -58,6 +59,7 @@ export default async function LoanDetailPage({ params }: Props) {
   const repaymentList = repayments ?? []
 
   const canRecordRepayment = user.role === 'finance' && loan.status === 'active'
+  const canCancelLoan = user.role === 'finance' && loan.status === 'pending_approval'
 
   return (
     <div>
@@ -169,6 +171,23 @@ export default async function LoanDetailPage({ params }: Props) {
             </div>
           )}
         </div>
+
+        {canCancelLoan ? (
+          <form action={cancelLoan} className="mt-5">
+            <input type="hidden" name="id" value={loan.id} />
+            <button
+              type="submit"
+              className="text-sm text-alert border border-alert/30 px-4 py-2 rounded-md hover:bg-alert/5 font-sans transition-colors"
+            >
+              Cancel this loan
+            </button>
+            <p className="text-xs text-muted mt-1.5 italic font-serif">
+              Finance can cancel before Principal approves. The loan and its approval request are
+              both marked rejected in one transaction.
+            </p>
+          </form>
+        ) : null}
+
         {loan.repayment_terms ? (
           <div className="mt-4">
             <div className="text-xs uppercase tracking-wide text-muted font-sans mb-1">

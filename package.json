@@ -13,7 +13,8 @@
     "test:ui": "vitest --ui",
     "build:check": "next build",
     "seed:principal": "node --env-file=.env.local scripts/seed-principal.mjs",
-    "seed:users": "node --env-file=.env.local scripts/seed-users.mjs"
+    "seed:users": "node --env-file=.env.local scripts/seed-users.mjs",
+    "seed:hr-staff": "node --env-file=.env.local scripts/seed-hr-staff.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",
