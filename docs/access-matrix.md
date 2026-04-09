@@ -1,0 +1,303 @@
+HOUZS Venture Portal — Access Matrix
+Overview
+4 Roles: Principal, Finance, HR, Dept Manager
+9 Modules + Settings + Approval (横切)
+Permission Types: 看 (Read), 写 (Write), 批 (Approve), 设定 (Configure)
+---
+ROLE SUMMARY
+Role	一句话	典型用户
+Principal	看全局、定规则、批东西	Loo (Chairman)
+Finance	录数据、出票、对账、出钱	Finance Manager / Accountant
+HR	算薪水、allocation、claims 审批	HR Manager
+Dept Manager	管自己部门 pool + 支出	Marketing Manager
+---
+MODULE 1: DASHBOARD
+功能	Principal	Finance	HR	Dept Manager
+Fund Source Breakdown（饼图）	✅ 看	✅ 看	❌	❌
+Fund Allocation Waterfall（瀑布图）	✅ 看	✅ 看	❌	❌
+Free Cash Trend（折线图）	✅ 看	✅ 看	❌	❌
+Loan Portfolio Health（条形图）	✅ 看	✅ 看	❌	❌
+Net Margin Overview（数字卡片）	✅ 看	✅ 看	❌	❌
+Upcoming Cash Flow（时间轴）	✅ 看	✅ 看	❌	❌
+NP 数字卡片（→ P&L 链接）	✅ 看	✅ 看	❌	❌
+Alert Panel（预警）	✅ 看	✅ 看	❌	❌
+Approval Queue	✅ 看	❌	❌	❌
+Settings 入口	✅ 进入	❌	❌	❌
+RLS 规则: `role IN ('principal','finance')` 才能访问 Dashboard。
+---
+MODULE 2: FUND IN
+功能	Principal	Finance	HR	Dept Manager
+查看所有 fund sources	✅ 看	✅ 看	❌	❌
+创建 Subsidiary Savings	❌	✅ 写	❌	❌
+创建 Director Loans	❌	✅ 写	❌	❌
+填 rate / lock-in period	❌	✅ 写	❌	❌
+编辑 / 取消 fund source	❌	✅ 写	❌	❌
+审批新资金来源类型	✅ 批	❌	❌	❌
+查看自动记录（saving/surplus）	✅ 看	✅ 看	❌	❌
+RLS 规则: `fund_sources` 表 — `role IN ('principal','finance')` 可读，`role = 'finance'` 可写。
+---
+MODULE 3: FUND OUT
+功能	Principal	Finance	HR	Dept Manager
+查看所有 loans	✅ 看	✅ 看	❌	❌
+查看 loan detail + repayment history	✅ 看	✅ 看	❌	❌
+创建新 loan	❌	✅ 写	❌	❌
+录入 repayment	❌	✅ 写	❌	❌
+审批新 loan	✅ 批	❌	❌	❌
+查看 Base Rate 计算结果	✅ 看	✅ 看	❌	❌
+审批 Base Rate（每季度）	✅ 批	❌	❌	❌
+设定 Tier 分配（公司→T1/T2/T3/T4）	✅ 设定	❌	❌	❌
+设定 Op Margin	✅ 设定	❌	❌	❌
+设定 Tier Premium Rates	✅ 设定	❌	❌	❌
+RLS 规则:
+`loans` 表 — `role IN ('principal','finance')` 可读，`role = 'finance'` 可写
+`repayments` 表 — 同上
+`tier_config` 表 — `role = 'principal'` 可写，`role = 'finance'` 可读
+---
+MODULE 4: OVERDUE & NETTING
+功能	Principal	Finance	HR	Dept Manager
+查看全局 overdue 状态	✅ 看	✅ 看	❌	❌
+查看 netting 结果	✅ 看	✅ 看	❌	❌
+审核 / 确认 netting	❌	✅ 写	❌	❌
+设定 penalty rates（4 阶段）	✅ 设定	❌	❌	❌
+设定 overdue 天数范围	✅ 设定	❌	❌	❌
+Escalation 处置（tier 降级建议）	✅ 批	❌	❌	❌
+RLS 规则:
+`overdue_records` 表 — `role IN ('principal','finance')` 可读
+`overdue_config` 表 — `role = 'principal'` 可写，`role = 'finance'` 可读
+---
+MODULE 5: DEPT POOL
+功能	Principal	Finance	HR	Dept Manager
+查看所有部门余额	✅ 看	✅ 看	❌	❌
+查看自己部门余额	—	—	❌	✅ 看（自己）
+查看自己部门 NP 进账 history	—	—	❌	✅ 看（自己）
+查看自己部门支出记录	—	—	❌	✅ 看（自己）
+提交部门支出申请	❌	❌	❌	✅ 写
+审批部门支出	✅ 批	❌	❌	❌
+Marketing Dept P&L	✅ 看	✅ 看	❌	✅ 看（自己）
+RLS 规则:
+`dept_pools` 表 — Principal/Finance 看全部，Dept Manager 看 `department_id = user.department_id`
+Dept Manager 只能 INSERT `transaction_type = 'expense_out'`
+---
+MODULE 6: SERVICE BILLING
+功能	Principal	Finance	HR	Dept Manager
+查看所有合同 + invoice	✅ 看	✅ 看	❌	❌
+查看自己部门的合同	—	—	❌	✅ 看（自己）
+创建 Marketing project billing	❌	✅ 写	❌	❌
+接收 HR 提交的 cost summary	❌	✅ 看（lump sum）	❌	❌
+生成 invoice	❌	✅ 写	❌	❌
+对账收款	❌	✅ 写	❌	❌
+录入 Rent / Utility	❌	✅ 写	❌	❌
+录入 Non-billable expense	❌	✅ 写	❌	❌
+审批新合同 / 金额变更	✅ 批	❌	❌	❌
+设定 Rent split %	✅ 设定	❌	❌	❌
+设定 Utility split %	✅ 设定	❌	❌	❌
+生成 Monthly Consolidated Statement	❌	✅ 生成	❌	❌
+查看 Monthly Consolidated Statement	✅ 看	✅ 看	❌	❌
+RLS 规则:
+`service_contracts` / `invoices` — Principal/Finance 全部可读，Dept Manager 按 department_id 过滤
+Finance 只看 HR 提交的 aggregate summary（部门总数 + basic/statutory/allowance 小计 + split %），看不到个别员工薪水明细
+---
+MODULE 7: DIRECTOR SALARY ENGINE
+功能	Principal	Finance	HR	Dept Manager
+录入子公司 CTC（basic/KPI/allowance）	❌	❌	✅ 写	❌
+查看 Pool 分配计算过程	✅ 看	❌	✅ 看	❌
+查看每位 Director 完整明细	✅ 看	❌	✅ 看	❌
+填 PCB 金额（查 Jadual PCB）	❌	❌	✅ 写	❌
+提交计算结果给 Finance	❌	❌	✅ 提交	❌
+查看 total payout（lump sum only）	❌	✅ 看	❌	❌
+执行发放	❌	✅ 写	❌	❌
+设定 Weightage（WL/MK/WS/WW）	✅ 设定	❌	❌	❌
+设定 Min Payout	✅ 设定	❌	❌	❌
+设定 Saving Rate	✅ 设定	❌	❌	❌
+审批 Advance	✅ 批	❌	❌	❌
+生成 Director Monthly Statement	❌	❌	✅ 生成	❌
+查看 HV Operating Fund 余额 + 流水	✅ 看	✅ 看	❌	❌
+查看 Invoice Payout Pool 余额	✅ 看	✅ 看	❌	❌
+Release Invoice Payout Pool	✅ 批	❌	❌	❌
+RLS 规则:
+`director_ctc` / `director_payouts` — Principal 和 HR 看完整明细，Finance 只能通过 aggregate view 看 total
+`salary_pool` — Principal 和 HR 可读
+Finance 看到的是：本月 Director Salary Total Payout = RM XX,XXX（不看个别 Director 拆分）
+Finance 看到的 Director Salary Summary:
+```
+Director Salary — April 2025
+  Total 75% Payroll (Net):     RM XX,XXX
+  Total 75% Statutory (ER+EE): RM XX,XXX
+  Total 75% PCB:               RM XX,XXX
+  Total 25% Invoice:           RM XX,XXX
+  Total Advance:               RM XX,XXX
+  Total Saving:                RM XX,XXX
+```
+---
+MODULE 8: HR COSTING
+功能	Principal	Finance	HR	Dept Manager
+录入员工薪水明细（name + salary）	❌	❌	✅ 写	❌
+查看个别员工薪水明细	✅ 看	❌	✅ 看	❌
+HR Pool split % 设定（每月）	❌	❌	✅ 写	❌
+Finance staff attribution（员工归属）	❌	❌	✅ 写	❌
+Finance mgmt fee split %（每月）	❌	❌	✅ 写	❌
+Marketing staff basic salary 录入	❌	❌	✅ 写	❌
+提交 cost summary 给 Finance	❌	❌	✅ 提交	❌
+查看 cost summary（lump sum by dept）	✅ 看	✅ 看	✅ 看	❌
+Benefit Claim — 提交	❌	❌	员工提交给 HR	❌
+Benefit Claim — 审批	❌	❌	✅ 批	❌
+Benefit Claim — 加进 Payroll	❌	❌	✅ 写	❌
+Project Claim — 提交	❌	员工提交给 Finance	❌	❌
+Project Claim — 审批	❌	✅ 批	❌	❌
+Project Claim — 出钱	❌	✅ 写	❌	❌
+RLS 规则:
+`hr_staff_costs` 表 — 只有 Principal 和 HR 可读。Finance 不能访问此表
+`hr_staff_allocation` 表 — 同上
+Finance 只能看到 HR 提交的 aggregate view:
+Finance 看到的 HR Cost Summary:
+```
+HR Department — April 2025
+  Total Staff Cost:     RM25,000
+    Basic Total:        RM18,000
+    Statutory Total:     RM4,500
+    Allowance Total:     RM2,500
+  Split:
+    The Conts  20%      RM5,000
+    HOUZS      50%      RM12,500
+    Carres     30%      RM7,500
+
+Finance Department — April 2025
+  Total Staff Cost:     RM32,000
+    Basic Total:        RM24,000
+    Statutory Total:     RM5,800
+    Allowance Total:     RM2,200
+  Split:
+    The Conts  30%      RM9,600
+    HOUZS      50%      RM16,000
+    Carres     20%      RM6,400
+
+Marketing Department — April 2025
+  Total Basic Salary:   RM15,000
+  (No statutory breakdown — Marketing bills by project)
+```
+---
+MODULE 9: REPORTS
+报表	Principal	Finance	HR	Dept Manager
+HV P&L（月/季/年）	✅ 看	✅ 看	❌	❌
+Marketing Dept P&L	✅ 看	✅ 看	❌	✅ 看（自己）
+Fund Summary（资金快照）	✅ 看	✅ 看	❌	❌
+Loan Statement（按子公司）	✅ 看	✅ 看	❌	❌
+Monthly Consolidated Statement	✅ 看	✅ 看	❌	❌
+Director Monthly Statement	✅ 看	❌	✅ 生成	❌
+Base Rate Calculator（每季度）	✅ 看 + 批	✅ 看	❌	❌
+Overdue Summary	✅ 看	✅ 看	❌	❌
+Claims Summary	✅ 看	✅ 看	✅ 看	❌
+---
+SETTINGS（Principal 独占写权限）
+设定项	Principal	Finance	HR	Dept Manager
+Op Margin	✅ 改	✅ 看	❌	❌
+Buffer 金额	✅ 改	✅ 看	❌	❌
+Tier Premium Rates (T1-T4)	✅ 改	✅ 看	❌	❌
+
+Company → Tier 分配	✅ 改	✅ 看	❌	❌
+Overdue 天数 + penalty rates	✅ 改	✅ 看	❌	❌
+Director Weightage (WL/MK/WS/WW)	✅ 改	❌	✅ 看	❌
+Min Payout (RM14,400)	✅ 改	❌	✅ 看	❌
+Saving Rate (5%)	✅ 改	❌	✅ 看	❌
+Rent split % (per company)	✅ 改	✅ 看	❌	❌
+Utility split % (per company)	✅ 改	✅ 看	❌	❌
+---
+APPROVAL FLOW（横切所有模块）
+审批类型	谁提交	谁批	触发条件
+新 Loan	Finance	Principal	创建新 loan
+Base Rate 重算	Finance	Principal	每季度
+Tier 变更	Finance	Principal	Escalation 建议
+新合同 / 金额变更	Finance	Principal	新 service contract
+部门支出	Dept Manager	Principal	部门花钱
+Director Advance	HR	Principal	Payroll < min payout
+Escalation 处置	Finance	Principal	Overdue 60d+
+Invoice Pool Release	Finance	Principal	Principal 决定 release
+Profit Withdrawal	Finance	Principal	Principal 决定抽 profit
+规则: 所有审批最终到 Principal。没有多级审批，没有自动审批。
+---
+DATA VISIBILITY MATRIX（敏感数据）
+数据	Principal	Finance	HR	Dept Manager
+个别员工 name + salary	✅	❌	✅	❌
+部门 cost summary (lump sum)	✅	✅	✅	❌
+Director 个别 salary 明细	✅	❌	✅	❌
+Director total payout (lump sum)	✅	✅	✅	❌
+Loan details	✅	✅	❌	❌
+Fund sources	✅	✅	❌	❌
+Overdue status	✅	✅	❌	❌
+HV P&L	✅	✅	❌	❌
+Dept Pool（自己部门）	✅	✅	❌	✅
+Dept Pool（全部）	✅	✅	❌	❌
+Claims	✅	✅	✅	❌
+---
+SUPABASE RLS IMPLEMENTATION GUIDE
+Pattern 1: Principal + Finance only
+```sql
+-- fund_sources, loans, repayments, overdue_records, monthly_statements
+CREATE POLICY "principal_finance_read" ON table_name
+FOR SELECT USING (
+    auth.jwt() ->> 'role' IN ('principal', 'finance')
+);
+```
+Pattern 2: Finance write only
+```sql
+CREATE POLICY "finance_write" ON fund_sources
+FOR INSERT USING (
+    auth.jwt() ->> 'role' = 'finance'
+);
+```
+Pattern 3: Dept Manager — own department only
+```sql
+CREATE POLICY "dept_manager_own_dept" ON dept_pools
+FOR SELECT USING (
+    auth.jwt() ->> 'role' = 'dept_manager'
+    AND department_id = (
+        SELECT department_id FROM users WHERE id = auth.uid()
+    )
+);
+```
+Pattern 4: HR only — sensitive data
+```sql
+CREATE POLICY "hr_staff_read" ON hr_staff_costs
+FOR SELECT USING (
+    auth.jwt() ->> 'role' IN ('principal', 'hr')
+);
+-- Finance 完全不能访问此表
+```
+Pattern 5: Finance sees aggregate view only
+```sql
+-- 创建一个 view 给 Finance 看
+CREATE VIEW finance_cost_summary AS
+SELECT
+    department_id,
+    period_month,
+    SUM(basic_salary) as total_basic,
+    SUM(epf_er + socso_er + eis_er) as total_statutory,
+    SUM(allowances) as total_allowance,
+    SUM(total_ctc) as total_cost
+FROM hr_staff_costs
+WHERE status = 'active'
+GROUP BY department_id, period_month;
+
+-- Finance 只能访问这个 view，不能访问原表
+```
+Pattern 6: Principal write — Settings
+```sql
+CREATE POLICY "principal_config_write" ON treasury_config
+FOR UPDATE USING (
+    auth.jwt() ->> 'role' = 'principal'
+);
+
+CREATE POLICY "principal_finance_config_read" ON treasury_config
+FOR SELECT USING (
+    auth.jwt() ->> 'role' IN ('principal', 'finance')
+);
+```
+---
+NOTES FOR FORGE
+每个 API endpoint 必须检查 role — 不能只靠前端 UI 隐藏
+RLS 是第二道防线 — API 检查 + RLS 双重保护
+Finance 看 HR 数据必须走 aggregate view — 不能直接 query hr_staff_costs 表
+Finance 看 Director Salary 必须走 summary view — 不能看个别 Director 明细
+所有写操作记录 created_by — audit trail
+Settings 修改记录 updated_by + updated_at — 知道谁改了什么
+Approval 是横切 — 任何需要审批的操作先写 approval_requests，Principal 批了才执行
