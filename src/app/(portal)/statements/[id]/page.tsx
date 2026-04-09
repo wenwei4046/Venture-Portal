@@ -194,8 +194,14 @@ export default async function StatementDetailPage({ params }: Props) {
         </div>
         <div className="flex items-baseline justify-between">
           <span className="font-serif italic text-md text-accent">Net payable</span>
-          <span className="font-serif text-2xl text-ink tabular">
-            {formatMoney(Number(statement.net_amount))}
+          <span className="font-serif text-2xl tabular">
+            {Number(statement.net_amount) >= 0 ? (
+              <span className="text-ink">{formatMoney(Number(statement.net_amount))}</span>
+            ) : (
+              <span className="text-danger">
+                ({formatMoney(Math.abs(Number(statement.net_amount))).replace('RM ', '')})
+              </span>
+            )}
           </span>
         </div>
       </div>
