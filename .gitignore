@@ -41,3 +41,6 @@ settings-verified.png
 
 # gstack QA reports (generated artifacts, not source)
 .gstack/qa-reports/screenshots/
+
+# gstack retro snapshots (local history, not source)
+.context/retros/
