@@ -136,9 +136,101 @@ export async function updateCompanyTier(formData: FormData) {
 
   if (error) throw new Error(`Failed to update company tier: ${error.message}`)
 
-  // Audit note: tier changes are significant — CEO review Exp 6 recommended
-  // tracking tier history. Phase 1.5 will add a company_tier_history table.
+  // History: the config_audit_log trigger (Phase 2 Step 8) captures this
+  // UPDATE automatically with old + new values keyed by company id.
   void user
 
   revalidatePath('/settings')
+}
+
+// ─── Rent / Utility Splits (Phase 2 Step 8) ──────────────────────────────────
+
+interface SplitInput {
+  id?: string
+  company_id: string | null
+  is_hv_share: boolean
+  split_pct: number
+}
+
+async function upsertSplits(
+  kind: 'rent' | 'utility',
+  formData: FormData
+): Promise<void> {
+  const user = await requireRole(['principal'])
+  const supabase = await createClient()
+
+  const rawPayload = formData.get('splits') as string | null
+  if (!rawPayload) throw new Error('splits payload is required')
+
+  let splits: SplitInput[]
+  try {
+    const parsed = JSON.parse(rawPayload)
+    if (!Array.isArray(parsed)) throw new Error('Payload must be an array')
+    splits = parsed as SplitInput[]
+  } catch {
+    throw new Error('Invalid splits payload JSON')
+  }
+
+  // Validate total = 1.0 (allow small rounding tolerance)
+  const total = splits.reduce((acc, s) => acc + Number(s.split_pct ?? 0), 0)
+  if (Math.abs(total - 1) > 0.0001) {
+    throw new Error(
+      `${kind} splits must total 100%. Current total: ${(total * 100).toFixed(4)}%`
+    )
+  }
+
+  // Validate at most one HV share row
+  const hvRows = splits.filter((s) => s.is_hv_share)
+  if (hvRows.length > 1) {
+    throw new Error(`Only one HV share row allowed for ${kind}`)
+  }
+  for (const hv of hvRows) {
+    if (hv.company_id !== null) {
+      throw new Error('HV share row must have company_id = null')
+    }
+  }
+
+  const table = kind === 'rent' ? 'rent_splits' : 'utility_splits'
+
+  // Simple approach: delete all existing rows + insert the new payload.
+  // Triggers the log_config_change audit for each UPDATE — for DELETE +
+  // INSERT we lose fine-grained diff granularity in this pass but the
+  // overall "what was the split on date X" is still reconstructible via
+  // the changed_at ordering. A smarter upsert-by-company_id could use
+  // UPDATE where matched, but for a small settings table this is fine.
+  const { error: deleteErr } = await supabase.from(table).delete().neq(
+    'id',
+    '00000000-0000-0000-0000-000000000000'
+  )
+  if (deleteErr) {
+    throw new Error(`Failed to clear ${kind} splits: ${deleteErr.message}`)
+  }
+
+  const rows = splits.map((s) => ({
+    company_id: s.is_hv_share ? null : s.company_id,
+    is_hv_share: s.is_hv_share,
+    split_pct: s.split_pct,
+    updated_by: user.id,
+  }))
+
+  if (rows.length === 0) {
+    revalidatePath('/settings')
+    return
+  }
+
+  const { error: insertErr } = await supabase.from(table).insert(rows)
+  if (insertErr) {
+    throw new Error(`Failed to insert ${kind} splits: ${insertErr.message}`)
+  }
+
+  revalidatePath('/settings')
+  revalidatePath('/billing')
+}
+
+export async function updateRentSplits(formData: FormData) {
+  await upsertSplits('rent', formData)
+}
+
+export async function updateUtilitySplits(formData: FormData) {
+  await upsertSplits('utility', formData)
 }

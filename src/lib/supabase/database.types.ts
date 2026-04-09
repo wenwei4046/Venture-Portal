@@ -265,6 +265,44 @@ export type Database = {
         }
         Relationships: []
       }
+      config_audit_log: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          id: string
+          new_values: Json
+          old_values: Json
+          row_key: string
+          table_name: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          new_values: Json
+          old_values: Json
+          row_key: string
+          table_name: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          new_values?: Json
+          old_values?: Json
+          row_key?: string
+          table_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "config_audit_log_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       departments: {
         Row: {
           created_at: string
@@ -1425,6 +1463,51 @@ export type Database = {
         }
         Relationships: []
       }
+      rent_splits: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          id: string
+          is_hv_share: boolean
+          split_pct: number
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          is_hv_share?: boolean
+          split_pct: number
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          is_hv_share?: boolean
+          split_pct?: number
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rent_splits_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rent_splits_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       repayments: {
         Row: {
           amount: number
@@ -1775,6 +1858,51 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      utility_splits: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          id: string
+          is_hv_share: boolean
+          split_pct: number
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          is_hv_share?: boolean
+          split_pct: number
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          is_hv_share?: boolean
+          split_pct?: number
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "utility_splits_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "utility_splits_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
