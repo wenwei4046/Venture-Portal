@@ -1912,6 +1912,17 @@ export type Database = {
         Args: { p_as_of_date?: string; p_loan_id: string }
         Returns: number
       }
+      calculate_dept_np: {
+        Args: { p_dept_id: string; p_period: string }
+        Returns: {
+          out_department_id: string
+          out_expenses: number
+          out_net_profit: number
+          out_period_month: string
+          out_revenue: number
+          out_staff_cost: number
+        }[]
+      }
       cancel_loan_and_approval: {
         Args: { p_cancel_reason?: string; p_loan_id: string }
         Returns: undefined

@@ -39,13 +39,17 @@ describe('canAccessBilling', () => {
 })
 
 describe('canAccessDeptPool', () => {
-  it('allows principal and dept_manager', () => {
+  // Phase 2: Finance also reads dept pools per module-spec-phase2.
+  // The spec says "Principal: 只读全部 + 审批支出" and "Finance: 只读全部".
+  // Dept Manager gets read+write scoped to their own department — that
+  // restriction is enforced in the page + RPC, not in the role check.
+  it('allows principal, finance, and dept_manager', () => {
     expect(canAccessDeptPool('principal')).toBe(true)
+    expect(canAccessDeptPool('finance')).toBe(true)
     expect(canAccessDeptPool('dept_manager')).toBe(true)
   })
 
-  it('denies finance and hr', () => {
-    expect(canAccessDeptPool('finance')).toBe(false)
+  it('denies hr', () => {
     expect(canAccessDeptPool('hr')).toBe(false)
   })
 })

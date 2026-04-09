@@ -9,7 +9,9 @@ export function canAccessBilling(role: UserRole): boolean {
 }
 
 export function canAccessDeptPool(role: UserRole): boolean {
-  return role === 'principal' || role === 'dept_manager'
+  // Principal + Finance read everything. Dept Manager reads their own dept
+  // only — that restriction is enforced in the page guard + RPC, not here.
+  return role === 'principal' || role === 'finance' || role === 'dept_manager'
 }
 
 export function canAccessDirectorSalary(role: UserRole): boolean {
