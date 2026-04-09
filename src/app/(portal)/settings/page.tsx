@@ -7,12 +7,10 @@ import OverdueStagesSection from './_components/OverdueStagesSection'
 import CompanyTierSection from './_components/CompanyTierSection'
 
 export default async function SettingsPage() {
-  // Enforce Principal-only (access-matrix.md)
   await requireRole(['principal'])
 
   const supabase = await createClient()
 
-  // Fetch all config in parallel (per React best-practices: async-parallel)
   const [
     { data: treasuryRows },
     { data: tierRows },
@@ -30,7 +28,6 @@ export default async function SettingsPage() {
   const overdueStages = (overdueRows ?? []) as OverdueConfig[]
   const companies = (companyRows ?? []) as Company[]
 
-  // Extract treasury config values by key
   const opMargin = Number(treasury.find((r) => r.config_key === 'op_margin')?.config_value ?? 0)
   const bufferAmount = Number(
     treasury.find((r) => r.config_key === 'buffer_amount')?.config_value ?? 0
@@ -40,16 +37,16 @@ export default async function SettingsPage() {
   )
 
   return (
-    <div className="max-w-5xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-slate-900">Settings</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Treasury config, tier premiums, overdue stages, and company tier assignment. Principal
-          only.
+    <div>
+      <div className="mb-10">
+        <h1 className="font-serif text-3xl text-ink">Settings</h1>
+        <p className="font-serif italic text-graphite text-base mt-2">
+          Treasury config, tier premiums, overdue stages, and{' '}
+          <em>company tier assignment</em>. Principal only.
         </p>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         <TreasuryConfigSection
           opMargin={opMargin}
           bufferAmount={bufferAmount}

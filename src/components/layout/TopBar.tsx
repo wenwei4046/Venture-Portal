@@ -1,9 +1,17 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@/types'
 import { getRoleLabel } from '@/lib/roles'
+
+function getGreeting(): string {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
+}
 
 export default function TopBar({ user }: { user: User }) {
   const router = useRouter()
@@ -15,20 +23,26 @@ export default function TopBar({ user }: { user: User }) {
     router.refresh()
   }
 
-  return (
-    <div className="h-14 bg-white border-b border-gray-200 px-6 flex items-center justify-between shrink-0">
-      <div className="text-sm text-gray-500">HOUZS Venture Sdn Bhd</div>
+  const greeting = getGreeting()
+  const now = dayjs()
+  const dateLabel = now.format('ddd D MMM YYYY')
+  const quarter = `Q${Math.floor(now.month() / 3) + 1} ${now.year()}`
+  const displayName = user.name || getRoleLabel(user.role)
 
-      <div className="flex items-center gap-4">
-        <div className="text-sm text-right">
-          <span className="font-medium text-gray-800">{user.name}</span>
-          <span className="ml-2 px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">
-            {getRoleLabel(user.role)}
-          </span>
+  return (
+    <div className="h-[60px] bg-paper border-b border-hairline px-8 flex items-baseline justify-between shrink-0">
+      <div className="font-serif text-[15px] text-graphite">
+        {greeting}, <span className="italic text-accent">{displayName}</span>.
+      </div>
+
+      <div className="flex items-baseline gap-6">
+        <div className="font-mono text-xs text-muted">
+          {dateLabel} · {quarter}
         </div>
         <button
           onClick={handleSignOut}
-          className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          className="text-xs text-muted hover:text-accent font-sans transition-colors"
+          aria-label="Sign out"
         >
           Sign out
         </button>

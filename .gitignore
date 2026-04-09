@@ -36,3 +36,5 @@ settings-verified.png
 *.test-artifact.png
 /test-results/
 /playwright-report/
+/vp-*.png
+/tmp/

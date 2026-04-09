@@ -20,7 +20,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', visible: () => true },
+  { href: '/dashboard', label: 'Overview', visible: () => true },
   { href: '/fund-in', label: 'Fund IN', visible: canAccessTreasury },
   { href: '/fund-out', label: 'Fund OUT', visible: canAccessTreasury },
   { href: '/overdue', label: 'Overdue', visible: canAccessTreasury },
@@ -34,19 +34,24 @@ const navItems: NavItem[] = [
 
 export default function Sidebar({ role }: { role: UserRole }) {
   const pathname = usePathname()
-
   const visible = navItems.filter((item) => item.visible(role))
 
   return (
-    <div className="w-60 shrink-0 bg-gray-900 text-white flex flex-col h-full">
-      <div className="px-6 py-5 border-b border-gray-700">
-        <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">
-          HOUZS Venture
+    <aside className="w-[220px] shrink-0 bg-paper border-r border-hairline flex flex-col h-full">
+      {/* Brand mark */}
+      <div className="px-6 pt-7 pb-5 border-b border-hairline">
+        <div className="font-serif text-[24px] leading-[1.1] text-ink">
+          HOUZS
+          <br />
+          <span className="italic text-accent">Venture</span>
+        </div>
+        <p className="text-[11px] text-muted mt-1.5 tracking-wider">
+          INTERNAL LEDGER · 内部账册
         </p>
-        <h1 className="text-base font-bold text-white">Internal Portal</h1>
       </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+      {/* Nav */}
+      <nav className="flex-1 px-3 py-4 overflow-y-auto">
         {visible.map((item) => {
           const active =
             pathname === item.href || pathname.startsWith(item.href + '/')
@@ -54,11 +59,11 @@ export default function Sidebar({ role }: { role: UserRole }) {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+              className={
                 active
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-              }`}
+                  ? 'block px-3 py-2 mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[15px] transition-colors'
+                  : 'block px-3 py-2 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-sm font-sans transition-colors'
+              }
             >
               {item.label}
             </Link>
@@ -66,9 +71,14 @@ export default function Sidebar({ role }: { role: UserRole }) {
         })}
       </nav>
 
-      <div className="px-6 py-3 border-t border-gray-700">
-        <p className="text-xs text-gray-500">HV Banking Portal v0.1</p>
+      {/* Footer */}
+      <div className="px-6 py-4 border-t border-hairline">
+        <p className="text-[11px] text-muted font-mono">
+          HV Portal v0.2
+          <br />
+          Phase 1 Treasury
+        </p>
       </div>
-    </div>
+    </aside>
   )
 }

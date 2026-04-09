@@ -27,22 +27,34 @@ export default async function LoginPage({
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white rounded-lg shadow-md w-full max-w-md p-8">
+    <div className="min-h-screen flex items-center justify-center bg-paper px-4">
+      <div className="bg-surface border border-hairline rounded-md w-full max-w-md p-10">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">HOUZS Venture Portal</h1>
-          <p className="text-gray-500 mt-1 text-sm">Internal banking portal — authorised users only</p>
+          <div className="font-serif text-[32px] leading-[1.1] text-ink">
+            HOUZS
+            <br />
+            <span className="italic text-accent">Venture</span>
+          </div>
+          <p className="text-[11px] text-muted mt-2 tracking-wider">
+            INTERNAL LEDGER · 内部账册
+          </p>
+          <p className="font-serif italic text-graphite text-base mt-6">
+            Sign in to continue.
+          </p>
         </div>
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-6 text-sm">
+        {error ? (
+          <div className="bg-danger-bg border border-danger text-danger px-4 py-3 rounded-md mb-6 text-sm font-sans">
             {decodeURIComponent(error)}
           </div>
-        )}
+        ) : null}
 
-        <form action={login} className="space-y-4">
+        <form action={login} className="space-y-5">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="email"
+              className="block text-sm font-sans font-medium text-graphite mb-1.5"
+            >
               Email
             </label>
             <input
@@ -51,13 +63,16 @@ export default async function LoginPage({
               type="email"
               required
               autoComplete="email"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="you@houzs.com"
+              className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
+              placeholder="you@houzs.my"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="password"
+              className="block text-sm font-sans font-medium text-graphite mb-1.5"
+            >
               Password
             </label>
             <input
@@ -66,17 +81,21 @@ export default async function LoginPage({
               type="password"
               required
               autoComplete="current-password"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
             />
           </div>
 
           <button
             type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md text-sm transition-colors"
+            className="w-full bg-accent hover:bg-accent-hover text-white font-serif italic text-base py-2.5 px-4 rounded-md transition-colors mt-2"
           >
-            Sign In
+            Sign in
           </button>
         </form>
+
+        <p className="text-[11px] text-muted text-center mt-8 font-sans">
+          Authorised users only · HOUZS Venture Sdn Bhd
+        </p>
       </div>
     </div>
   )

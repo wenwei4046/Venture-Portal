@@ -12,7 +12,7 @@ const TIER_DESCRIPTIONS: Record<CompanyTier, string> = {
   T1: 'Lowest risk — base rate only',
   T2: 'Low-medium risk',
   T3: 'Medium-high risk',
-  T4: 'Highest risk — maximum premium',
+  T4: 'Highest risk',
 }
 
 export default function TierPremiumSection({ tiers }: Props) {
@@ -34,28 +34,27 @@ export default function TierPremiumSection({ tiers }: Props) {
     })
   }
 
-  // Sort tiers T1 → T4 for predictable display order
   const sorted = [...tiers].sort((a, b) => a.tier.localeCompare(b.tier))
 
   return (
-    <section className="bg-white rounded-md border border-slate-200 p-5">
-      <header className="mb-4">
-        <h2 className="text-base font-semibold text-slate-900">Tier Premiums</h2>
-        <p className="text-sm text-slate-500 mt-0.5">
+    <section className="bg-surface border border-hairline rounded-md p-6">
+      <header className="mb-5">
+        <h2 className="font-serif text-xl text-ink">Tier Premiums</h2>
+        <p className="font-serif italic text-graphite text-sm mt-0.5">
           Risk premium added to base rate per company tier. Loans lock the rate at creation.
         </p>
       </header>
 
-      <form action={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <form action={handleSubmit} className="space-y-5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
           {sorted.map((tier) => (
             <div key={tier.tier}>
               <label
                 htmlFor={`tier_${tier.tier}`}
-                className="block text-sm font-medium text-slate-700 mb-1"
+                className="block text-sm font-sans font-medium text-graphite mb-1.5"
               >
                 {tier.tier}
-                <span className="text-xs text-slate-400 ml-1">(% /mo)</span>
+                <span className="text-xs text-muted ml-1 font-normal">(% /mo)</span>
               </label>
               <div className="relative">
                 <input
@@ -67,33 +66,35 @@ export default function TierPremiumSection({ tiers }: Props) {
                   max="99.999"
                   defaultValue={(tier.premium_rate * 100).toFixed(3)}
                   required
-                  className="w-full px-3 py-2 pr-8 border border-slate-300 rounded-md text-sm font-mono tabular-nums focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  className="w-full px-3 py-2 pr-8 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted">
                   %
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-1">{TIER_DESCRIPTIONS[tier.tier]}</p>
+              <p className="text-xs text-muted mt-1.5 font-sans">{TIER_DESCRIPTIONS[tier.tier]}</p>
             </div>
           ))}
         </div>
 
-        <div className="flex items-center gap-3 pt-2">
+        <div className="flex items-center gap-4 pt-2">
           <button
             type="submit"
             disabled={isPending}
-            className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isPending ? 'Saving...' : 'Save Tiers'}
+            {isPending ? 'Saving…' : 'Save Tiers'}
           </button>
           {message ? (
             <span
-              className={`text-sm ${
-                message.type === 'success' ? 'text-green-700' : 'text-red-700'
-              }`}
+              className={
+                message.type === 'success'
+                  ? 'text-sm font-serif italic text-ledger'
+                  : 'text-sm font-serif italic text-danger'
+              }
               role="status"
             >
-              {message.type === 'success' ? '✓' : '✗'} {message.text}
+              {message.text}
             </span>
           ) : null}
         </div>
