@@ -1922,6 +1922,11 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       dashboard_summary: { Args: never; Returns: Json }
+      format_invoice_no: { Args: { p_period: string }; Returns: string }
+      generate_monthly_invoices: {
+        Args: { p_period_month: string }
+        Returns: Json
+      }
       get_current_base_rate: {
         Args: { p_as_of_date?: string }
         Returns: {

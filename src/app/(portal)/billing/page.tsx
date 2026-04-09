@@ -3,6 +3,7 @@ import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import PeriodSelector from './_components/PeriodSelector'
+import GenerateInvoicesButton from './_components/GenerateInvoicesButton'
 import HRPoolSplitSection from './_components/HRPoolSplitSection'
 import FinanceAttributionSection from './_components/FinanceAttributionSection'
 import FinanceMgmtFeeSection from './_components/FinanceMgmtFeeSection'
@@ -25,7 +26,7 @@ interface DeptSummary {
 }
 
 export default async function BillingPage({ searchParams }: Props) {
-  await requireRole(['principal', 'finance'])
+  const user = await requireRole(['principal', 'finance'])
   const supabase = await createClient()
 
   const { period: rawPeriod } = await searchParams
@@ -95,7 +96,12 @@ export default async function BillingPage({ searchParams }: Props) {
             <em>Finance reviews + issues invoices, Principal approves new contracts.</em>
           </p>
         </div>
-        <PeriodSelector currentPeriod={period} />
+        <div className="flex items-center gap-5">
+          <PeriodSelector currentPeriod={period} />
+          {user.role === 'finance' && submitted ? (
+            <GenerateInvoicesButton currentPeriod={period} />
+          ) : null}
+        </div>
       </div>
 
       {/* ───────── Overview hero ───────── */}
