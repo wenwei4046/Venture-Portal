@@ -740,6 +740,50 @@ export type Database = {
           },
         ]
       }
+      hr_cost_submissions: {
+        Row: {
+          dept_summaries: Json
+          id: string
+          notes: string | null
+          period_month: string
+          pool_allocation_snapshot: Json
+          staff_allocation_snapshot: Json
+          staff_snapshot: Json
+          submitted_at: string
+          submitted_by: string
+        }
+        Insert: {
+          dept_summaries: Json
+          id?: string
+          notes?: string | null
+          period_month: string
+          pool_allocation_snapshot: Json
+          staff_allocation_snapshot: Json
+          staff_snapshot: Json
+          submitted_at?: string
+          submitted_by: string
+        }
+        Update: {
+          dept_summaries?: Json
+          id?: string
+          notes?: string | null
+          period_month?: string
+          pool_allocation_snapshot?: Json
+          staff_allocation_snapshot?: Json
+          staff_snapshot?: Json
+          submitted_at?: string
+          submitted_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_cost_submissions_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hr_pool_allocation: {
         Row: {
           company_id: string
@@ -1846,6 +1890,15 @@ export type Database = {
       }
     }
     Functions: {
+      build_hr_cost_submission_payload: {
+        Args: { p_period: string }
+        Returns: {
+          dept_summaries: Json
+          pool_allocation_snapshot: Json
+          staff_allocation_snapshot: Json
+          staff_snapshot: Json
+        }[]
+      }
       calculate_base_rate: {
         Args: never
         Returns: {
@@ -1891,6 +1944,17 @@ export type Database = {
           total_basic: number
           total_ctc: number
           total_statutory: number
+        }[]
+      }
+      get_submitted_hr_summary: {
+        Args: { p_period: string }
+        Returns: {
+          dept_summaries: Json
+          id: string
+          period_month: string
+          submitted_at: string
+          submitted_by: string
+          submitted_by_name: string
         }[]
       }
       lookup_overdue_stage: {

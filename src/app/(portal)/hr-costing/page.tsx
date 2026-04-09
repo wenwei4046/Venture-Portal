@@ -1,11 +1,258 @@
-export default function HRCostingPage() {
+import dayjs from 'dayjs'
+import { requireRole } from '@/lib/auth'
+import { createClient } from '@/lib/supabase/server'
+import { formatMoney, getPeriodMonth } from '@/lib/utils'
+import SubmitHRCostButton from './_components/SubmitHRCostButton'
+
+interface DeptSummary {
+  department_id: string
+  staff_count: number
+  total_basic: number
+  total_statutory: number
+  total_allowance: number
+  total_ctc: number
+}
+
+interface LiveDeptRow {
+  department_id: string | null
+  department_name: string | null
+  staff_count: number | null
+  total_basic: number | null
+  total_statutory: number | null
+  total_allowance: number | null
+  total_ctc: number | null
+}
+
+export default async function HRCostingPage() {
+  const user = await requireRole(['principal', 'hr'])
+  const supabase = await createClient()
+
+  const currentPeriod = getPeriodMonth()
+
+  // Live aggregate via Phase 1 RPC — shows what WOULD be snapshotted right now
+  const { data: liveRows } = await supabase.rpc('get_hr_cost_summary')
+
+  // Submission history (last 12 periods)
+  const { data: submissions } = await supabase
+    .from('hr_cost_submissions')
+    .select('id, period_month, submitted_at, submitted_by, dept_summaries')
+    .order('period_month', { ascending: false })
+    .limit(12)
+
+  const submissionList = submissions ?? []
+  const currentSubmission = submissionList.find(
+    (s) => s.period_month === currentPeriod
+  )
+
+  // Submitter name lookup
+  const submitterIds = Array.from(new Set(submissionList.map((s) => s.submitted_by)))
+  const { data: submitterUsers } = submitterIds.length
+    ? await supabase.from('users').select('id, name').in('id', submitterIds)
+    : { data: [] }
+  const submitterName = new Map(
+    (submitterUsers ?? []).map((u) => [u.id, u.name as string])
+  )
+
+  const liveRowList = (liveRows ?? []) as LiveDeptRow[]
+
+  const liveTotals = liveRowList.reduce(
+    (acc, row) => {
+      acc.staff_count += Number(row.staff_count ?? 0)
+      acc.total_basic += Number(row.total_basic ?? 0)
+      acc.total_statutory += Number(row.total_statutory ?? 0)
+      acc.total_allowance += Number(row.total_allowance ?? 0)
+      acc.total_ctc += Number(row.total_ctc ?? 0)
+      return acc
+    },
+    {
+      staff_count: 0,
+      total_basic: 0,
+      total_statutory: 0,
+      total_allowance: 0,
+      total_ctc: 0,
+    }
+  )
+
+  const canSubmit = user.role === 'hr'
+
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">HR Costing</h1>
-      <p className="text-gray-500 text-sm">Staff costs, department allocation, claims management.</p>
-      <div className="mt-6 bg-white rounded-lg border border-gray-100 shadow-sm p-6 text-center text-gray-400 text-sm">
-        Phase 3 implementation
+      <div className="flex items-baseline justify-between mb-10">
+        <div>
+          <h1 className="font-serif text-3xl text-ink">HR Costing</h1>
+          <p className="font-serif italic text-graphite text-base mt-2">
+            Monthly HR cost snapshots. <em>HR submits the totals Finance uses for billing.</em>
+          </p>
+        </div>
+        {canSubmit && !currentSubmission ? (
+          <SubmitHRCostButton defaultPeriod={currentPeriod} />
+        ) : null}
       </div>
+
+      {/* ───────── Current period hero ───────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
+        <div className="lg:col-span-7">
+          <div className="font-serif italic text-accent text-base mb-1">
+            {currentSubmission ? 'Submitted period' : 'Live preview'}
+          </div>
+          <div className="font-serif text-hero text-ink leading-none">
+            {dayjs(currentPeriod).format('MMMM YYYY')}
+          </div>
+          <div className="font-mono text-xs text-muted mt-2">
+            {currentSubmission
+              ? `Snapshotted ${dayjs(currentSubmission.submitted_at).format('D MMM YYYY HH:mm')} by ${submitterName.get(currentSubmission.submitted_by) ?? '—'}`
+              : `${liveTotals.staff_count} active staff across ${liveRowList.length} departments`}
+          </div>
+        </div>
+
+        <div className="lg:col-span-5 space-y-2">
+          <div className="flex items-baseline justify-between font-mono text-sm">
+            <em className="font-serif text-md text-graphite">basic</em>
+            <span className="text-ink tabular">{formatMoney(liveTotals.total_basic)}</span>
+          </div>
+          <div className="flex items-baseline justify-between font-mono text-sm">
+            <em className="font-serif text-md text-graphite">statutory</em>
+            <span className="text-ink tabular">{formatMoney(liveTotals.total_statutory)}</span>
+          </div>
+          <div className="flex items-baseline justify-between font-mono text-sm">
+            <em className="font-serif text-md text-graphite">allowance</em>
+            <span className="text-ink tabular">{formatMoney(liveTotals.total_allowance)}</span>
+          </div>
+          <div className="flex items-baseline justify-between font-mono text-sm border-t border-hairline pt-2 mt-2">
+            <em className="font-serif text-md text-ink">total CTC</em>
+            <span className="text-ink tabular font-semibold">
+              {formatMoney(liveTotals.total_ctc)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ───────── Live aggregate by department (HR + Principal only) ───────── */}
+      <section className="mb-12">
+        <h2 className="font-serif text-xl text-ink mb-1">By department</h2>
+        <p className="font-serif italic text-graphite text-sm mb-4">
+          Live aggregate from <em>hr_staff_costs</em> — individual salaries visible to HR + Principal only.
+        </p>
+
+        {liveRowList.length === 0 ? (
+          <div className="border border-hairline rounded-md bg-surface p-6 text-center">
+            <p className="font-serif italic text-muted text-sm">
+              No active staff on record. Seed via <code className="font-mono">npm run seed:hr-staff</code>.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
+                  <th className="text-left py-3 pr-4 font-medium">Department</th>
+                  <th className="text-right py-3 pr-4 font-medium">Staff</th>
+                  <th className="text-right py-3 pr-4 font-medium">Basic</th>
+                  <th className="text-right py-3 pr-4 font-medium">Statutory</th>
+                  <th className="text-right py-3 pr-4 font-medium">Allowance</th>
+                  <th className="text-right py-3 font-medium">Total CTC</th>
+                </tr>
+              </thead>
+              <tbody>
+                {liveRowList.map((row) => (
+                  <tr
+                    key={row.department_id ?? row.department_name ?? 'unknown'}
+                    className="border-b border-hairline last:border-0"
+                  >
+                    <td className="py-3 pr-4 font-serif text-md text-ink">
+                      {row.department_name ?? '—'}
+                    </td>
+                    <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                      {row.staff_count ?? 0}
+                    </td>
+                    <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                      {formatMoney(Number(row.total_basic ?? 0))}
+                    </td>
+                    <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                      {formatMoney(Number(row.total_statutory ?? 0))}
+                    </td>
+                    <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                      {formatMoney(Number(row.total_allowance ?? 0))}
+                    </td>
+                    <td className="py-3 text-right font-mono tabular text-ink font-semibold">
+                      {formatMoney(Number(row.total_ctc ?? 0))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* ───────── Submission history ───────── */}
+      <section className="mb-12">
+        <h2 className="font-serif text-xl text-ink mb-1">Submission history</h2>
+        <p className="font-serif italic text-graphite text-sm mb-4">
+          Immutable snapshots. Once submitted, a period cannot be edited — create a new
+          period if corrections are needed.
+        </p>
+
+        {submissionList.length === 0 ? (
+          <div className="border border-hairline rounded-md bg-surface p-6 text-center">
+            <p className="font-serif italic text-muted text-sm">
+              No submissions yet.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
+                  <th className="text-left py-3 pr-4 font-medium">Period</th>
+                  <th className="text-left py-3 pr-4 font-medium">Submitted by</th>
+                  <th className="text-left py-3 pr-4 font-medium">Submitted at</th>
+                  <th className="text-right py-3 pr-4 font-medium">Basic</th>
+                  <th className="text-right py-3 font-medium">Total CTC</th>
+                </tr>
+              </thead>
+              <tbody>
+                {submissionList.map((s) => {
+                  const summaries = ((s.dept_summaries ?? {}) as unknown) as Record<
+                    string,
+                    DeptSummary
+                  >
+                  const totalBasic = Object.values(summaries).reduce(
+                    (acc, d) => acc + Number(d.total_basic ?? 0),
+                    0
+                  )
+                  const totalCtc = Object.values(summaries).reduce(
+                    (acc, d) => acc + Number(d.total_ctc ?? 0),
+                    0
+                  )
+                  return (
+                    <tr
+                      key={s.id}
+                      className="border-b border-hairline last:border-0"
+                    >
+                      <td className="py-3 pr-4 font-serif text-md text-ink">
+                        {dayjs(s.period_month).format('MMMM YYYY')}
+                      </td>
+                      <td className="py-3 pr-4 font-serif italic text-graphite">
+                        {submitterName.get(s.submitted_by) ?? '—'}
+                      </td>
+                      <td className="py-3 pr-4 font-mono text-xs text-muted">
+                        {dayjs(s.submitted_at).format('D MMM YYYY HH:mm')}
+                      </td>
+                      <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                        {formatMoney(totalBasic)}
+                      </td>
+                      <td className="py-3 text-right font-mono tabular text-ink font-semibold">
+                        {formatMoney(totalCtc)}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   )
 }
