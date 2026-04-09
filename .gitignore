@@ -38,3 +38,6 @@ settings-verified.png
 /playwright-report/
 /vp-*.png
 /tmp/
+
+# gstack QA reports (generated artifacts, not source)
+.gstack/qa-reports/screenshots/
