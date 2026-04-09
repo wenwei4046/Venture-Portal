@@ -1,0 +1,107 @@
+import { describe, it, expect } from 'vitest'
+import {
+  canAccessTreasury,
+  canAccessBilling,
+  canAccessDeptPool,
+  canAccessHRCosting,
+  canAccessDirectorSalary,
+  canAccessReports,
+  canAccessSettings,
+  canApprove,
+  canSeeIndividualSalary,
+} from './roles'
+import type { UserRole } from '@/types'
+
+const ALL_ROLES: UserRole[] = ['principal', 'finance', 'hr', 'dept_manager']
+
+describe('canAccessTreasury', () => {
+  it('allows principal and finance', () => {
+    expect(canAccessTreasury('principal')).toBe(true)
+    expect(canAccessTreasury('finance')).toBe(true)
+  })
+
+  it('denies hr and dept_manager', () => {
+    expect(canAccessTreasury('hr')).toBe(false)
+    expect(canAccessTreasury('dept_manager')).toBe(false)
+  })
+})
+
+describe('canAccessBilling', () => {
+  it('allows principal and finance', () => {
+    expect(canAccessBilling('principal')).toBe(true)
+    expect(canAccessBilling('finance')).toBe(true)
+  })
+
+  it('denies hr and dept_manager', () => {
+    expect(canAccessBilling('hr')).toBe(false)
+    expect(canAccessBilling('dept_manager')).toBe(false)
+  })
+})
+
+describe('canAccessDeptPool', () => {
+  it('allows principal and dept_manager', () => {
+    expect(canAccessDeptPool('principal')).toBe(true)
+    expect(canAccessDeptPool('dept_manager')).toBe(true)
+  })
+
+  it('denies finance and hr', () => {
+    expect(canAccessDeptPool('finance')).toBe(false)
+    expect(canAccessDeptPool('hr')).toBe(false)
+  })
+})
+
+describe('canAccessHRCosting', () => {
+  it('allows principal and hr only', () => {
+    expect(canAccessHRCosting('principal')).toBe(true)
+    expect(canAccessHRCosting('hr')).toBe(true)
+    expect(canAccessHRCosting('finance')).toBe(false)
+    expect(canAccessHRCosting('dept_manager')).toBe(false)
+  })
+})
+
+describe('canAccessDirectorSalary', () => {
+  it('allows principal and hr only', () => {
+    expect(canAccessDirectorSalary('principal')).toBe(true)
+    expect(canAccessDirectorSalary('hr')).toBe(true)
+    expect(canAccessDirectorSalary('finance')).toBe(false)
+    expect(canAccessDirectorSalary('dept_manager')).toBe(false)
+  })
+})
+
+describe('canAccessReports', () => {
+  it('allows principal, finance, and hr', () => {
+    expect(canAccessReports('principal')).toBe(true)
+    expect(canAccessReports('finance')).toBe(true)
+    expect(canAccessReports('hr')).toBe(true)
+    expect(canAccessReports('dept_manager')).toBe(false)
+  })
+})
+
+describe('canAccessSettings', () => {
+  it('allows principal only', () => {
+    for (const role of ALL_ROLES) {
+      expect(canAccessSettings(role)).toBe(role === 'principal')
+    }
+  })
+})
+
+describe('canApprove', () => {
+  it('allows principal only', () => {
+    for (const role of ALL_ROLES) {
+      expect(canApprove(role)).toBe(role === 'principal')
+    }
+  })
+})
+
+describe('canSeeIndividualSalary — PDPA gate', () => {
+  // CLAUDE.md: "Finance CANNOT see individual employee salaries — only
+  // department lump sum." This is the most important access boundary in
+  // the whole portal. If this test breaks, someone reduced access on a
+  // data-visibility column and needs a corresponding RLS policy check.
+  it('only principal and hr can see individual salary breakdown', () => {
+    expect(canSeeIndividualSalary('principal')).toBe(true)
+    expect(canSeeIndividualSalary('hr')).toBe(true)
+    expect(canSeeIndividualSalary('finance')).toBe(false)
+    expect(canSeeIndividualSalary('dept_manager')).toBe(false)
+  })
+})

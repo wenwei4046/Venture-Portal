@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { computeDowngradedTier } from '@/lib/tier'
+import type { CompanyTier } from '@/types'
 
 // ─── Approve request (Principal) ──────────────────────────────────────────────
 
@@ -105,12 +107,9 @@ export async function approveRequest(formData: FormData) {
     }
 
     // Downgrade one tier: T1→T2→T3→T4, stop at T4 (lowest).
-    const tierOrder: Array<'T1' | 'T2' | 'T3' | 'T4'> = ['T1', 'T2', 'T3', 'T4']
-    const currentIdx = tierOrder.indexOf(company.tier as 'T1' | 'T2' | 'T3' | 'T4')
-    const nextTier =
-      currentIdx >= 0 && currentIdx < tierOrder.length - 1
-        ? tierOrder[currentIdx + 1]
-        : null
+    // Logic extracted to `src/lib/tier.ts` + unit-tested in `tier.test.ts`
+    // (Phase 1.5 Step 1 — M3 regression lock).
+    const nextTier = computeDowngradedTier(company.tier as CompanyTier)
 
     if (nextTier) {
       const { error: tierError } = await supabase

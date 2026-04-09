@@ -50,7 +50,10 @@ src/
 │   │   └── database.types.ts       ← Generated from Supabase
 │   ├── auth.ts                     ← requireAuth / requireRole helpers
 │   ├── roles.ts                    ← canAccess* helpers for sidebar visibility
+│   ├── tier.ts                     ← TIER_ORDER + computeDowngradedTier (M3 regression)
 │   └── utils.ts                    ← formatMoney / formatDate
+├── test/
+│   └── setup.ts                    ← Vitest + jest-dom matcher setup
 ├── types/
 │   └── index.ts                    ← All TypeScript interfaces
 ├── middleware.ts                   ← Supabase Auth session refresh + redirect gating
@@ -152,10 +155,15 @@ Money — `decimal(15,2)` in DB. Display with `formatMoney()` from `lib/utils.ts
 Naming — DB: snake_case, TypeScript: camelCase, Components: PascalCase
 Files — one component per file, co-locate related files (`_components/` subfolders per route)
 Testing
+Framework: Vitest + happy-dom + @testing-library/react (bootstrapped Phase 1.5 Step 1). Run `npm test` (watch) or `npm run test:ci` (single run). CI runs tests + `next build` on every push (`.github/workflows/test.yml`).
+Layers: unit (pure helpers in `src/lib/*.test.ts`), integration (Supabase RPC — deferred until billing math in Phase 2 Step 5 needs it), RLS audit (manual via `/qa`), E2E (Playwright MCP during per-step verification, not in CI).
+Convention: every bug fix ships with a regression test. Extract pure logic from Server Actions into `src/lib/*.ts` helpers and test the helper (Server Actions themselves pull in next/cache + next/navigation + Supabase SSR cookies, mocking is more trouble than it's worth).
+Placeholder pattern: when a fix is planned but not yet implemented, drop a `describe.todo('...')` stub at the expected test file location so it stays indexed without breaking CI.
 API routes: test with sample data matching real scenarios
 Statutory lookups: test with known values from PDF tables
 Director salary: test with the two datasets provided in specs (verify against calculated results)
-RLS: test each role can only access what Access Matrix allows
+RLS: test each role can only access what Access Matrix allows — see `docs/access-matrix.md`
+See `TESTING.md` at repo root for full layer descriptions + how to add new tests.
 Do NOT
 Do not hardcode any rates (interest, tier premium, penalty, saving %) — all from Settings/DB
 Do not skip RLS — every table must have policies matching Access Matrix
