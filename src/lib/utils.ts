@@ -1,0 +1,28 @@
+import dayjs from 'dayjs'
+
+export function formatMoney(amount: number): string {
+  return `RM ${amount.toLocaleString('en-MY', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
+}
+
+export function formatRate(rate: number): string {
+  return `${(rate * 100).toFixed(2)}%`
+}
+
+export function formatDate(date: string | Date): string {
+  return dayjs(date).format('DD MMM YYYY')
+}
+
+export function formatMonth(date: string | Date): string {
+  return dayjs(date).format('MMM YYYY')
+}
+
+export function getPeriodMonth(date?: Date): string {
+  return dayjs(date).startOf('month').format('YYYY-MM-DD')
+}
+
+export function cn(...classes: (string | undefined | null | false)[]): string {
+  return classes.filter(Boolean).join(' ')
+}

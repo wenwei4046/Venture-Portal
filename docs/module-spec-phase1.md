@@ -79,9 +79,20 @@ Row 4: Net Margin Overview（数字卡片 + 明细）
 ```
 数据源:
 ```sql
--- Interest Income = 所有 active loan 的月利息
-SELECT SUM(l.principal * l.effective_rate) as monthly_interest_income
-FROM loans l WHERE l.status = 'active';
+-- Interest Income = 所有 active loan 的月利息（基于 outstanding，不是原始 principal）
+-- outstanding = principal - sum(principal repayments)
+WITH loan_outstanding AS (
+    SELECT
+        l.id,
+        l.effective_rate,
+        l.principal - COALESCE(SUM(r.amount) FILTER (WHERE r.payment_type = 'principal'), 0) AS outstanding
+    FROM loans l
+    LEFT JOIN repayments r ON r.loan_id = l.id
+    WHERE l.status = 'active'
+    GROUP BY l.id, l.effective_rate, l.principal
+)
+SELECT SUM(outstanding * effective_rate) AS monthly_interest_income
+FROM loan_outstanding;
 
 -- Interest Expense = 所有 active fund source 的月成本
 SELECT SUM(fs.amount * fs.cost_rate) as monthly_interest_expense
