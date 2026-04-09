@@ -5,6 +5,11 @@ import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import {
+  billingModeToCategoryCode,
+  billingModeLabel,
+  type BillingMode,
+} from '@/lib/billing'
 
 // ─── Generate monthly statements (Finance) ───────────────────────────────────
 
@@ -47,6 +52,27 @@ export async function generateStatements(formData: FormData) {
       cost_rate: Number(fs.cost_rate),
     })
     savingsByCompany.set(fs.from_company_id, list)
+  }
+
+  // 2b. Get generated invoices for this period (Step 6 wiring).
+  // Groups them by company so each statement can pick up its own lines.
+  const { data: periodInvoices } = await supabase
+    .from('invoices')
+    .select('id, company_id, billing_mode, total_amount')
+    .eq('period_month', period)
+
+  const invoicesByCompany = new Map<
+    string,
+    Array<{ id: string; billing_mode: BillingMode; total_amount: number }>
+  >()
+  for (const inv of periodInvoices ?? []) {
+    const list = invoicesByCompany.get(inv.company_id) ?? []
+    list.push({
+      id: inv.id,
+      billing_mode: inv.billing_mode as BillingMode,
+      total_amount: Number(inv.total_amount),
+    })
+    invoicesByCompany.set(inv.company_id, list)
   }
 
   let generated = 0
@@ -99,6 +125,7 @@ export async function generateStatements(formData: FormData) {
 
     // Add contra lines: savings interest (HV owes sub)
     const savings = savingsByCompany.get(company.id) ?? []
+    let totalContra = 0
     for (const s of savings) {
       const interest = s.amount * s.cost_rate
       if (interest <= 0) continue
@@ -116,11 +143,54 @@ export async function generateStatements(formData: FormData) {
 
       if (lineError) {
         errors.push(`${company.short_code} contra: ${lineError.message}`)
+      } else {
+        totalContra += interest
       }
     }
 
-    // Phase 2: invoice lines from billing module (HR pool, finance attribution, marketing, rent, utility)
-    // For now, statement only has savings_interest contra lines.
+    // Add invoice lines: one per generated invoice for this period+company.
+    // category_code comes from the billing mode → category lookup helper.
+    // Non-billable invoices (future) would return null and are skipped here.
+    const companyInvoices = invoicesByCompany.get(company.id) ?? []
+    let totalInvoice = 0
+    for (const inv of companyInvoices) {
+      const categoryCode = billingModeToCategoryCode(inv.billing_mode)
+      if (!categoryCode) continue
+      if (inv.total_amount <= 0) continue
+
+      const { error: lineError } = await supabase.from('monthly_statement_lines').insert({
+        statement_id: statementId,
+        line_type: 'invoice',
+        direction: 'receivable',
+        category_code: categoryCode,
+        description: `${billingModeLabel(inv.billing_mode)} — ${dayjs(period).format('MMM YYYY')}`,
+        reference_id: inv.id,
+        reference_table: 'invoices',
+        amount: inv.total_amount,
+      })
+
+      if (lineError) {
+        errors.push(`${company.short_code} invoice line: ${lineError.message}`)
+      } else {
+        totalInvoice += inv.total_amount
+      }
+    }
+
+    // Update statement totals so the totals_match_net constraint is satisfied
+    // and the list views show real numbers.
+    const { error: totalsError } = await supabase
+      .from('monthly_statements')
+      .update({
+        total_invoice: totalInvoice,
+        total_contra: totalContra,
+        net_amount: totalInvoice - totalContra,
+      })
+      .eq('id', statementId)
+      .eq('status', 'draft')
+
+    if (totalsError) {
+      errors.push(`${company.short_code} totals update: ${totalsError.message}`)
+    }
 
     generated++
   }

@@ -62,3 +62,55 @@ export const AUTO_GENERATED_BILLING_MODES: readonly BillingMode[] = [
   'finance_mgmt_fee',
   'marketing_project',
 ] as const
+
+/**
+ * Maps an invoice `billing_mode` (enum) to the corresponding
+ * `monthly_statement_lines.category_code` (lookup table FK) used by the
+ * statement generation flow in Phase 2 Step 6.
+ *
+ * Returns `null` for modes that do not produce a billable statement line
+ * (currently `non_billable` — those flow through hv_operating_fund instead).
+ *
+ * Categories are seeded in `20260101000003_statements.sql`.
+ */
+export function billingModeToCategoryCode(mode: BillingMode): string | null {
+  switch (mode) {
+    case 'hr_pool_split':
+      return 'hr_pool'
+    case 'finance_attribution':
+      return 'finance_staff'
+    case 'finance_mgmt_fee':
+      return 'finance_mgmt_fee'
+    case 'marketing_project':
+      return 'marketing_project'
+    case 'fixed_split':
+      // Fixed split lines are keyed by sub-type at insert time — the invoice
+      // generator knows whether the row is rent or utility. For now, Step 5
+      // does not generate fixed_split invoices (Step 8 adds them with the
+      // sub-type stored on the invoice), so this branch is unreachable.
+      return 'rent'
+    case 'non_billable':
+      return null
+  }
+}
+
+/**
+ * Human-readable label for a billing mode — used in statement line
+ * descriptions and billing preview cards.
+ */
+export function billingModeLabel(mode: BillingMode): string {
+  switch (mode) {
+    case 'hr_pool_split':
+      return 'HR Pool Split'
+    case 'finance_attribution':
+      return 'Finance Attribution'
+    case 'finance_mgmt_fee':
+      return 'Finance Mgmt Fee'
+    case 'marketing_project':
+      return 'Marketing Project'
+    case 'fixed_split':
+      return 'Fixed Split'
+    case 'non_billable':
+      return 'Non-billable'
+  }
+}

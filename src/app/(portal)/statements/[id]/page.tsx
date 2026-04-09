@@ -107,8 +107,8 @@ export default async function StatementDetailPage({ params }: Props) {
         {invoiceLines.length === 0 ? (
           <div className="border border-hairline rounded-md bg-surface p-5 text-center">
             <p className="font-serif italic text-muted text-sm">
-              No invoice items. Phase 2 Billing module wires HR pool, finance attribution,
-              marketing projects, rent/utility splits into statements.
+              No invoice items for this period. Finance generates invoices via <em>/billing</em>
+              before regenerating statements to pick them up.
             </p>
           </div>
         ) : (

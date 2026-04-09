@@ -3,6 +3,8 @@ import {
   normalizeToFirstOfMonth,
   isValidInvoiceNoFormat,
   computeHRPoolInvoiceAmount,
+  billingModeToCategoryCode,
+  billingModeLabel,
   BILLING_MODES,
   AUTO_GENERATED_BILLING_MODES,
 } from './billing'
@@ -102,5 +104,38 @@ describe('BILLING_MODES enum contract', () => {
       'finance_mgmt_fee',
       'marketing_project',
     ])
+  })
+})
+
+describe('billingModeToCategoryCode — Step 6 mapping contract', () => {
+  it('maps hr_pool_split to hr_pool', () => {
+    expect(billingModeToCategoryCode('hr_pool_split')).toBe('hr_pool')
+  })
+
+  it('maps finance_attribution to finance_staff', () => {
+    expect(billingModeToCategoryCode('finance_attribution')).toBe('finance_staff')
+  })
+
+  it('maps finance_mgmt_fee to finance_mgmt_fee', () => {
+    expect(billingModeToCategoryCode('finance_mgmt_fee')).toBe('finance_mgmt_fee')
+  })
+
+  it('maps marketing_project to marketing_project', () => {
+    expect(billingModeToCategoryCode('marketing_project')).toBe('marketing_project')
+  })
+
+  it('returns null for non_billable (flows through hv_operating_fund instead)', () => {
+    expect(billingModeToCategoryCode('non_billable')).toBeNull()
+  })
+})
+
+describe('billingModeLabel — UI display', () => {
+  it('produces human-readable labels for all modes', () => {
+    expect(billingModeLabel('hr_pool_split')).toBe('HR Pool Split')
+    expect(billingModeLabel('finance_attribution')).toBe('Finance Attribution')
+    expect(billingModeLabel('finance_mgmt_fee')).toBe('Finance Mgmt Fee')
+    expect(billingModeLabel('marketing_project')).toBe('Marketing Project')
+    expect(billingModeLabel('fixed_split')).toBe('Fixed Split')
+    expect(billingModeLabel('non_billable')).toBe('Non-billable')
   })
 })
