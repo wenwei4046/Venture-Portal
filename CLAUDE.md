@@ -127,8 +127,13 @@ Phase 1 (✅ Shipped 2026-04-10): Treasury Core
 Dashboard (dashboard_summary RPC), Fund IN, Fund OUT, Overdue & Netting,
 Monthly Statements, Approvals (Finance→Principal workflow), Settings, Auth
 9-step Forge pipeline (see Phase 1 commits a04a7bf..9a5e663)
-Phase 2: Department + Billing
-Dept Pool, Service Billing (5 modes), Invoice Generation
+Phase 2 (✅ Shipped 2026-04-10): Department + Billing
+HR Cost Submission, Dept Pool (Marketing P&L), Service Billing (5 modes),
+Invoice Generation RPC, Invoice→Statement wiring, Rent/Utility templates,
+Unified config audit log (L2 fix), Dashboard KPI extensions (billing float,
+dept pool total, Marketing NP). M2 cancelLoan fix bundled in Step 2.
+9-step Forge pipeline (commits e58a8bb..Step 9). See
+`.gstack/qa-reports/qa-report-phase2-2026-04-10.md`.
 Phase 3: Salary + HR + Reports
 Director Salary Engine, HR Costing, Claims, Reports, Statutory Tables
 GStack Workflow

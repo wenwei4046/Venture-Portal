@@ -31,6 +31,14 @@ type Alert = {
   message: string
 }
 
+type MarketingNp = {
+  period_month: string
+  revenue: number
+  staff_cost: number
+  expenses: number
+  net_profit: number
+}
+
 type DashboardSummary = {
   role: 'principal' | 'finance' | 'hr' | 'dept_manager'
   total_pool: number
@@ -48,6 +56,10 @@ type DashboardSummary = {
   pending_approvals: PendingApproval[] | null
   subsidiaries: Subsidiary[]
   alerts: Alert[]
+  // Phase 2 extensions
+  dept_pool_total: number
+  billing_float: number
+  marketing_np_this_month: MarketingNp
 }
 
 export default async function DashboardPage() {
@@ -383,12 +395,81 @@ export default async function DashboardPage() {
         </section>
       ) : null}
 
+      {/* ───────── Phase 2 — Billing + Dept Pool snapshot ───────── */}
+      <section className="mb-16">
+        <h2 className="font-serif text-2xl text-ink mb-1">Billing &amp; Dept Pool</h2>
+        <p className="font-serif italic text-graphite text-sm mb-6">
+          Phase 2 live view: unpaid invoices, dept pool totals, Marketing P&amp;L{' '}
+          <em>this month</em>
+        </p>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="border border-hairline rounded-md bg-surface p-5">
+            <div className="font-serif italic text-accent text-sm mb-1">
+              Billing float
+            </div>
+            <div className="font-serif text-2xl text-ink leading-none">
+              {formatMoney(Number(summary.billing_float ?? 0))}
+            </div>
+            <p className="font-mono text-xs text-muted mt-2">
+              Unpaid invoices (draft + issued)
+            </p>
+          </div>
+
+          <div className="border border-hairline rounded-md bg-surface p-5">
+            <div className="font-serif italic text-accent text-sm mb-1">
+              Dept pool total
+            </div>
+            <div className="font-serif text-2xl text-ink leading-none">
+              {formatMoney(Number(summary.dept_pool_total ?? 0))}
+            </div>
+            <p className="font-mono text-xs text-muted mt-2">
+              Sum of positive dept pool balances
+            </p>
+          </div>
+
+          <MarketingNpCard mkNp={summary.marketing_np_this_month} />
+        </div>
+      </section>
+
       {/* ───────── Phase status note ───────── */}
       <div className="mt-16 pt-8 border-t border-hairline">
         <p className="font-mono text-xs text-muted">
-          Phase 1 Treasury · Step 9 of 9 · live via{' '}
+          Phase 2 Dept Pool + Billing · 9 steps shipped · live via{' '}
           <em className="font-serif">dashboard_summary()</em> RPC
         </p>
+      </div>
+    </div>
+  )
+}
+
+function MarketingNpCard({ mkNp }: { mkNp: MarketingNp | undefined }) {
+  const revenue = Number(mkNp?.revenue ?? 0)
+  const staffCost = Number(mkNp?.staff_cost ?? 0)
+  const expenses = Number(mkNp?.expenses ?? 0)
+  const netProfit = Number(mkNp?.net_profit ?? 0)
+  const isLoss = netProfit < 0
+
+  return (
+    <div className="border border-hairline rounded-md bg-surface p-5">
+      <div className="font-serif italic text-accent text-sm mb-1">
+        Marketing NP this month
+      </div>
+      <div
+        className={
+          isLoss
+            ? 'font-serif text-2xl text-danger leading-none'
+            : 'font-serif text-2xl text-ink leading-none'
+        }
+      >
+        {isLoss
+          ? `(${formatMoney(Math.abs(netProfit)).replace('RM ', '')})`
+          : formatMoney(netProfit)}
+      </div>
+      <div className="font-mono text-xs text-muted mt-2 space-y-0.5">
+        <div>Revenue {formatMoney(revenue)}</div>
+        <div>− Staff {formatMoney(staffCost)}</div>
+        <div>− Expenses {formatMoney(expenses)}</div>
       </div>
     </div>
   )

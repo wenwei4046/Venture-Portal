@@ -6,14 +6,29 @@ and `/qa` Phase 1 acceptance audit on 2026-04-10 (commit 9a5e663).
 **Phase 1 Treasury: ✅ SHIPPED 2026-04-10.** 9-step Forge pipeline complete.
 See `.gstack/qa-reports/qa-report-phase1-2026-04-10.md` for the full audit.
 
+**Phase 2 Dept Pool + Billing: ✅ SHIPPED 2026-04-10.** 9-step Forge pipeline
+complete. See `.gstack/qa-reports/qa-report-phase2-2026-04-10.md`.
+
 ---
 
-## Phase 1.5 (data integrity + audit — from /qa findings)
+## ✅ Completed (Phase 2)
 
-### Medium severity (ship before Phase 2 cutover)
-- [ ] **M1: Wrap loan + approval_request creation in a Postgres function for atomicity.** Currently `createLoan` in `src/app/(portal)/fund-out/actions.ts:69-108` does 2 separate INSERTs; if step 2 fails, orphan `pending_approval` loan that Finance cannot self-heal. Fix: `CREATE FUNCTION create_loan_with_approval(...)` running in a single transaction, called via `supabase.rpc()`. _Effort: S. Source: /qa finding M1._
-- [ ] **M2: Add trigger on `approval_requests` UPDATE to cascade rejection into `loans.status`.** Currently `cancelLoan` rejects the approval but the loan stays stuck in `pending_approval` forever because `loans_principal_update` RLS blocks Finance. Trigger runs `SECURITY DEFINER` to bypass RLS and flip loan to `cancelled` when its approval rejects. _Effort: S. Source: /qa finding M2._
-- [ ] **L2: Settings audit history tables.** Add `treasury_config_history`, `tier_config_history`, `overdue_config_history`, `company_tier_history` — UPDATE triggers write old-row snapshots with `changed_by` + `changed_at`. Without this, in a dispute there's no way to reconstruct "what was the buffer amount on 2026-03-15?" Already referenced in-code at `settings/actions.ts:139-140`. _Effort: S. Source: /qa finding L2 + CEO Exp 6._
+- **M2: cancelLoan orphan fix** — shipped in Phase 2 Step 2 via
+  `cancel_loan_and_approval(UUID, TEXT)` SECURITY DEFINER RPC +
+  "Cancel this loan" button on the loan detail page. Migration 17.
+- **L2: Settings audit history** — shipped in Phase 2 Step 8 as unified
+  `config_audit_log` table with single trigger function covering
+  treasury_config, tier_config, overdue_config, companies, rent_splits,
+  utility_splits. Migrations 23 + 25.
+- **Test framework bootstrap** — shipped in Phase 2 Step 1. Vitest +
+  happy-dom + CI workflow, 0 → 48 passing tests.
+
+---
+
+## Phase 1.5 (remaining tech debt)
+
+### Medium severity
+- [ ] **M1: Wrap loan + approval_request creation in a Postgres function for atomicity.** Currently `createLoan` in `src/app/(portal)/fund-out/actions.ts` does 2 separate INSERTs; if step 2 fails, orphan `pending_approval` loan that Finance cannot self-heal. Fix: `CREATE FUNCTION create_loan_with_approval(...)` running in a single transaction, called via `supabase.rpc()`. _Effort: S. Deferred per Phase 2 unattended-run decision — rare race, not worth the risk during Phase 2._
 
 ### High-value, high-urgency (original autoplan)
 - [ ] **Bank statement CSV import + reconciliation.** Without this, the portal is authoritative but disconnected from actual bank balances. 6-month regret scenario: portal shows RM200K, bank shows RM180K, nobody knows where the gap is. _Effort: S (2-3 days CC / 1 week human). Source: CEO Premise 3._
@@ -25,7 +40,13 @@ See `.gstack/qa-reports/qa-report-phase1-2026-04-10.md` for the full audit.
 - [ ] **Loan portfolio CSV export.** For Principal's external accountant/auditor. Not implemented in Phase 1 (confirmed by /qa audit). _Effort: XS. Source: CEO Exp 4._
 - [ ] **Mobile polish for Loan Create, Settings, Base Rate Calculator.** Phase 1 MVP mobile: Dashboard + Approval only. Desktop-only for complex forms. _Effort: M. Source: Design Pass 6._
 - [ ] **Bespoke PDF statement template design.** Phase 1 ships minimal HV header + table (actually Phase 1 ships HTML statement page; PDF export deferred to Phase 1.5). Upgrade to branded letterhead with logo. _Effort: M (designer work). Source: Design T3._
-- **Company tier history tracking** → See **L2** above (unified under settings audit history).
+- [x] ~~**Company tier history tracking**~~ → Done via unified `config_audit_log` in Phase 2 Step 8.
+
+### Phase 2 cosmetic follow-ups (non-blocking)
+- [ ] **Dept pool overview balance formatting.** `/dept-pool` list shows Marketing balance as "RM -500.00" instead of `(500.00)` parenthesis notation. Apply the same wrap as other detail pages. Source: Phase 2 QA report.
+- [ ] **Marketing project contract CRUD UI.** `/billing` Marketing Projects section lists contracts but has no create/edit flow. Finance currently inserts contracts via DB. Source: module-spec-phase2.
+- [ ] **Fixed split invoice generation.** `generate_monthly_invoices` does not yet consume `rent_splits` / `utility_splits` templates — extend Step 5 RPC to include rent/utility × monthly total. Source: Phase 2 plan.
+- [ ] **Fold migrations 21 + 25 back into parent migrations.** On a future `supabase db reset`, consolidate migration 20 with its fix (21) and migration 23 with its fix (25).
 
 ### Low-urgency
 - [ ] **Multi-currency support.** Phase 1 is MYR-only. HOUZS expansion to SG/TH needs this. _Effort: L. Source: CEO Exp 7._
