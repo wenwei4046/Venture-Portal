@@ -185,19 +185,25 @@ BEGIN
 
     -- ─── Create advance approval request if total advance > 0 ──────
     IF v_advance_total > 0 THEN
-        INSERT INTO approval_requests (
-            request_type, reference_table,
-            submitted_by, description, amount,
-            status, workflow_state
-        ) VALUES (
-            'advance',
-            'director_payouts',
-            v_user_id,
-            'Director advance top-up for ' || to_char(v_period, 'Mon YYYY') || ': RM' || to_char(v_advance_total, 'FM999,999.00'),
-            v_advance_total,
-            'pending',
-            'submitted'
-        );
+        DECLARE
+            v_pool_id UUID;
+        BEGIN
+            SELECT id INTO v_pool_id FROM salary_pool WHERE period_month = v_period LIMIT 1;
+            INSERT INTO approval_requests (
+                request_type, reference_id, reference_table,
+                submitted_by, description, amount,
+                status, workflow_state
+            ) VALUES (
+                'advance',
+                COALESCE(v_pool_id, gen_random_uuid()),
+                'salary_pool',
+                v_user_id,
+                'Director advance top-up for ' || to_char(v_period, 'Mon YYYY') || ': RM' || to_char(v_advance_total, 'FM999,999.00'),
+                v_advance_total,
+                'pending',
+                'submitted'
+            );
+        END;
     END IF;
 
     RETURN jsonb_build_object(

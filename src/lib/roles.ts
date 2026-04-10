@@ -15,7 +15,8 @@ export function canAccessDeptPool(role: UserRole): boolean {
 }
 
 export function canAccessDirectorSalary(role: UserRole): boolean {
-  return role === 'principal' || role === 'hr'
+  // Finance sees lump-sum only (via get_director_payout_summary RPC)
+  return role === 'principal' || role === 'hr' || role === 'finance'
 }
 
 export function canAccessHRCosting(role: UserRole): boolean {
@@ -23,6 +24,10 @@ export function canAccessHRCosting(role: UserRole): boolean {
 }
 
 export function canAccessReports(role: UserRole): boolean {
+  return role === 'principal' || role === 'finance' || role === 'hr'
+}
+
+export function canAccessClaims(role: UserRole): boolean {
   return role === 'principal' || role === 'finance' || role === 'hr'
 }
 

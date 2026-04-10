@@ -9,6 +9,7 @@ import {
   canAccessBilling,
   canAccessDirectorSalary,
   canAccessHRCosting,
+  canAccessClaims,
   canAccessReports,
   canAccessSettings,
   canApprove,
@@ -31,6 +32,7 @@ const navItems: NavItem[] = [
   { href: '/billing', label: 'Billing', visible: canAccessBilling },
   { href: '/director-salary', label: 'Director Salary', visible: canAccessDirectorSalary },
   { href: '/hr-costing', label: 'HR Costing', visible: canAccessHRCosting },
+  { href: '/claims', label: 'Claims', visible: canAccessClaims },
   { href: '/reports', label: 'Reports', visible: canAccessReports },
   { href: '/settings', label: 'Settings', visible: canAccessSettings },
 ]
