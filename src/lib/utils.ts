@@ -1,7 +1,8 @@
 import dayjs from 'dayjs'
 
-export function formatMoney(amount: number): string {
-  return `RM ${amount.toLocaleString('en-MY', {
+export function formatMoney(amount: number | null | undefined): string {
+  const val = amount ?? 0
+  return `RM ${val.toLocaleString('en-MY', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`
