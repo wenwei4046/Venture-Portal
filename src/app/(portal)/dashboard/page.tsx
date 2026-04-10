@@ -60,6 +60,13 @@ type DashboardSummary = {
   dept_pool_total: number
   billing_float: number
   marketing_np_this_month: MarketingNp
+  // Phase 3 extensions
+  salary_pool_total: number | null
+  payouts_pending: number | null
+  hv_fund_balance: number | null
+  invoice_pool_balance: number | null
+  total_advance: number | null
+  total_saving: number | null
 }
 
 export default async function DashboardPage() {
@@ -432,10 +439,50 @@ export default async function DashboardPage() {
         </div>
       </section>
 
+      {/* ───────── Phase 3 — Director Salary + Pools ───────── */}
+      <section className="mb-12 pb-12 border-b border-hairline">
+        <h2 className="font-serif text-2xl text-ink mb-1">Director Salary</h2>
+        <p className="font-serif italic text-graphite text-sm mb-6">
+          Phase 3 director salary engine, operating fund, invoice pool.
+        </p>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="border border-hairline rounded-md bg-surface p-5">
+            <div className="font-serif italic text-accent text-sm mb-1">Salary Pool</div>
+            <div className="font-serif text-2xl text-ink leading-none">
+              {formatMoney(Number(summary.salary_pool_total ?? 0))}
+            </div>
+            <p className="font-mono text-xs text-muted mt-2">
+              {summary.payouts_pending ?? 0} draft payouts pending
+            </p>
+          </div>
+
+          <div className="border border-hairline rounded-md bg-surface p-5">
+            <div className="font-serif italic text-accent text-sm mb-1">Operating Fund</div>
+            <div className="font-serif text-2xl text-ink leading-none">
+              {formatMoney(Number(summary.hv_fund_balance ?? 0))}
+            </div>
+            <p className="font-mono text-xs text-muted mt-2">
+              5% saving + statutory surplus
+            </p>
+          </div>
+
+          <div className="border border-hairline rounded-md bg-surface p-5">
+            <div className="font-serif italic text-accent text-sm mb-1">Invoice Pool</div>
+            <div className="font-serif text-2xl text-ink leading-none">
+              {formatMoney(Number(summary.invoice_pool_balance ?? 0))}
+            </div>
+            <p className="font-mono text-xs text-muted mt-2">
+              25% director invoice accumulation
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* ───────── Phase status note ───────── */}
       <div className="mt-16 pt-8 border-t border-hairline">
         <p className="font-mono text-xs text-muted">
-          Phase 2 Dept Pool + Billing · 9 steps shipped · live via{' '}
+          Phase 3 Director Salary + HR Costing + Reports · 9 steps shipped · live via{' '}
           <em className="font-serif">dashboard_summary()</em> RPC
         </p>
       </div>
