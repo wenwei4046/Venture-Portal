@@ -8,6 +8,7 @@ import CompanyTierSection from './_components/CompanyTierSection'
 import RentSplitSection from './_components/RentSplitSection'
 import UtilitySplitSection from './_components/UtilitySplitSection'
 import DirectorSalarySection from './_components/DirectorSalarySection'
+import BaseRateSimulator from './_components/BaseRateSimulator'
 
 interface SplitRow {
   id: string
@@ -29,6 +30,8 @@ export default async function SettingsPage() {
     { data: rentRows },
     { data: utilityRows },
     { data: directorRows },
+    { data: fundSourceRows },
+    { data: latestBaseRate },
   ] = await Promise.all([
     supabase.from('treasury_config').select('*'),
     supabase.from('tier_config').select('*'),
@@ -37,6 +40,8 @@ export default async function SettingsPage() {
     supabase.from('rent_splits').select('id, company_id, is_hv_share, split_pct'),
     supabase.from('utility_splits').select('id, company_id, is_hv_share, split_pct'),
     supabase.from('directors').select('id, code, name, weightage, min_payout').eq('status', 'active').order('code'),
+    supabase.from('fund_sources').select('amount, cost_rate').eq('status', 'active'),
+    supabase.from('base_rate_history').select('weighted_cost, op_margin, base_rate').order('approved_at', { ascending: false }).limit(1).maybeSingle(),
   ])
 
   const treasury = (treasuryRows ?? []) as TreasuryConfig[]
@@ -113,6 +118,13 @@ export default async function SettingsPage() {
             weightage: Number(d.weightage),
             min_payout: Number(d.min_payout),
           }))}
+        />
+
+        <BaseRateSimulator
+          currentPaidCapital={(fundSourceRows ?? []).reduce((s, f) => s + Number(f.amount), 0)}
+          currentWeightedCost={Number(latestBaseRate?.weighted_cost ?? 0)}
+          opMargin={Number(latestBaseRate?.op_margin ?? opMargin)}
+          currentBaseRate={Number(latestBaseRate?.base_rate ?? 0)}
         />
       </div>
     </div>
