@@ -2169,6 +2169,7 @@ export type Database = {
         }[]
       }
       mark_matured_fund_sources: { Args: never; Returns: number }
+      save_director_salary_results: { Args: { p_data: Json }; Returns: Json }
     }
     Enums: {
       approval_request_type:
