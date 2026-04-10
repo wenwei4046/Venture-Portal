@@ -1,7 +1,8 @@
 'use client'
 
+import { useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import type { UserRole } from '@/types'
 import {
   canAccessTreasury,
@@ -41,7 +42,17 @@ const navItems: NavItem[] = [
 
 export default function Sidebar({ role }: { role: UserRole }) {
   const pathname = usePathname()
+  const router = useRouter()
   const visible = navItems.filter((item) => item.visible(role))
+
+  // Eagerly prefetch ALL visible routes on mount for instant navigation
+  useEffect(() => {
+    visible.forEach((item) => {
+      if (item.href !== pathname) {
+        router.prefetch(item.href)
+      }
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <aside className="w-[220px] shrink-0 bg-paper border-r border-hairline flex flex-col h-full">
@@ -68,8 +79,8 @@ export default function Sidebar({ role }: { role: UserRole }) {
               href={item.href}
               className={
                 active
-                  ? 'block px-3 py-2 mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[15px] transition-colors'
-                  : 'block px-3 py-2 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-sm font-sans transition-colors'
+                  ? 'nav-link block px-3 py-2 mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[15px]'
+                  : 'nav-link block px-3 py-2 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-sm font-sans'
               }
             >
               {item.label}
@@ -81,9 +92,9 @@ export default function Sidebar({ role }: { role: UserRole }) {
       {/* Footer */}
       <div className="px-6 py-4 border-t border-hairline">
         <p className="text-[11px] text-muted font-mono">
-          HV Portal v0.2
+          HV Portal v0.3
           <br />
-          Phase 1 Treasury
+          Phase 3 Shipped
         </p>
       </div>
     </aside>
