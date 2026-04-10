@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import Link from 'next/link'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
@@ -84,9 +85,17 @@ export default async function HRCostingPage() {
             Monthly HR cost snapshots. <em>HR submits the totals Finance uses for billing.</em>
           </p>
         </div>
-        {canSubmit && !currentSubmission ? (
-          <SubmitHRCostButton defaultPeriod={currentPeriod} />
-        ) : null}
+        <div className="flex items-center gap-3">
+          <Link
+            href="/hr-costing/staff"
+            className="inline-block bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+          >
+            Manage Staff
+          </Link>
+          {canSubmit && !currentSubmission ? (
+            <SubmitHRCostButton defaultPeriod={currentPeriod} />
+          ) : null}
+        </div>
       </div>
 
       {/* ───────── Current period hero ───────── */}
