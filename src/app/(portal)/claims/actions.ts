@@ -68,3 +68,35 @@ export async function rejectClaim(claimId: string) {
 
   revalidatePath('/claims')
 }
+
+export async function markClaimPaid(claimId: string) {
+  const user = await requireRole(['principal', 'finance', 'hr'])
+  const supabase = await createClient()
+
+  const { data: claim } = await supabase
+    .from('claims')
+    .select('claim_type, status')
+    .eq('id', claimId)
+    .single()
+
+  if (!claim) throw new Error('Claim not found')
+  if (claim.status !== 'approved') throw new Error('Only approved claims can be marked as paid')
+
+  // Finance marks project claims paid, HR marks benefit claims paid
+  if (claim.claim_type === 'project' && user.role !== 'finance' && user.role !== 'principal') {
+    throw new Error('Only Finance or Principal can mark project claims as paid')
+  }
+  if (claim.claim_type === 'benefit' && user.role !== 'hr' && user.role !== 'principal') {
+    throw new Error('Only HR or Principal can mark benefit claims as paid')
+  }
+
+  const { error } = await supabase
+    .from('claims')
+    .update({ status: 'paid' })
+    .eq('id', claimId)
+    .eq('status', 'approved')
+
+  if (error) throw new Error(`Failed to mark as paid: ${error.message}`)
+
+  revalidatePath('/claims')
+}

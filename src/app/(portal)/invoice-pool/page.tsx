@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
+import RequestReleaseButton from './_components/RequestReleaseButton'
 
 export default async function InvoicePoolPage() {
   const user = await requireRole(['principal', 'finance'])
@@ -46,6 +47,9 @@ export default async function InvoicePoolPage() {
           <div className="font-mono text-xs text-muted mt-2">
             {(transactions?.length ?? 0)} transactions · not used for lending
           </div>
+        </div>
+        <div className="lg:col-span-5 flex items-start justify-end">
+          <RequestReleaseButton userRole={user.role} balance={balance} />
         </div>
       </div>
 

@@ -1,0 +1,18 @@
+{
+  "version": "2.0.0",
+  "date": "2026-04-10T22:38:00Z",
+  "mode": "daily",
+  "scope": "full",
+  "diff_mode": false,
+  "phases_run": [0,1,2,3,4,6,9,10,11,14],
+  "findings": [
+    {"id":1,"severity":"CRITICAL","confidence":10,"status":"VERIFIED","phase":2,"category":"Secrets","title":"Supabase SERVICE_ROLE_KEY committed in CLAUDE.md","file":"CLAUDE.md","line":16,"description":"Full service_role JWT bypasses all 130 RLS policies. In git history across 4 commits.","exploit_scenario":"Clone repo -> decode JWT -> direct Supabase API calls with full admin access to all 32 tables","impact":"Complete database compromise, read/write/delete all financial records, PII, salary data","recommendation":"1) Rotate key in Supabase dashboard immediately 2) Replace values in CLAUDE.md with placeholders 3) Scrub git history with BFG Repo Cleaner"},
+    {"id":2,"severity":"MEDIUM","confidence":9,"status":"VERIFIED","phase":4,"category":"CI/CD","title":"GitHub Actions pinned to mutable version tags","file":".github/workflows/test.yml","line":16,"description":"actions/checkout@v4 and actions/setup-node@v4 use mutable tags instead of SHA pins","exploit_scenario":"Attacker compromises v4 tag -> CI runs malicious code on next push","impact":"Code execution in CI, potential secret exfiltration","recommendation":"Pin to commit SHAs: actions/checkout@<sha> actions/setup-node@<sha>"},
+    {"id":3,"severity":"MEDIUM","confidence":10,"status":"VERIFIED","phase":4,"category":"CI/CD","title":"No CODEOWNERS file","file":"(missing)","line":0,"description":"No mandatory review gates on sensitive paths (auth, middleware, RLS migrations)","exploit_scenario":"Contributor pushes to sensitive paths without designated reviewer approval","impact":"Unreviewed changes to auth/RLS could introduce access control bypass","recommendation":"Create .github/CODEOWNERS with rules for middleware.ts, supabase/migrations/, src/lib/auth.ts"},
+    {"id":4,"severity":"LOW","confidence":9,"status":"VERIFIED","phase":9,"category":"OWASP-A01","title":"Claims self-approval not prevented","file":"src/app/(portal)/claims/actions.ts","line":27,"description":"approveClaim does not check submitted_by === user.id unlike approvals/actions.ts","exploit_scenario":"Finance user submits project claim then approves it themselves","impact":"Self-approved expense claims without oversight","recommendation":"Add self-approval check: if (claim.created_by === user.id) throw new Error('Cannot approve own claim')"},
+    {"id":5,"severity":"LOW","confidence":9,"status":"VERIFIED","phase":9,"category":"OWASP-A01","title":"Claims RLS excludes Principal from UPDATE","file":"supabase/migrations/20260101000011_rls.sql","line":465,"description":"claims_approvers_update policy allows finance+hr but not principal. Server Action permits principal. DB will silently reject.","exploit_scenario":"Principal tries to approve claim -> 0 rows updated -> silent failure","impact":"Functional bug, not security. Principal approval workflow broken at DB level.","recommendation":"Add principal to claims_approvers_update RLS policy"}
+  ],
+  "totals": {"critical":1,"high":0,"medium":2,"low":2,"tentative":0},
+  "supply_chain_summary": {"direct_deps":8,"critical_cves":0,"high_cves":0,"install_scripts":0,"lockfile_present":true,"lockfile_tracked":true},
+  "filter_stats": {"candidates_scanned":45,"hard_exclusion_filtered":28,"confidence_gate_filtered":12,"reported":5}
+}

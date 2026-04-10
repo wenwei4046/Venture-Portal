@@ -127,6 +127,23 @@ export async function approveRequest(formData: FormData) {
     // If company is already at T4, approval is recorded but no downgrade
     // is possible. Principal sees approval succeeded; next action is manual
     // recovery / write-off (out of Phase 1 scope).
+  } else if (approval.request_type === 'invoice_pool_release') {
+    // Insert release transaction into invoice_payout_pool
+    const { error: releaseError } = await supabase
+      .from('invoice_payout_pool')
+      .insert({
+        transaction_type: 'release',
+        amount: approval.amount,
+        description: approval.description ?? 'Invoice pool release',
+        release_approved_by: user.id,
+        release_approved_at: now,
+      })
+
+    if (releaseError) {
+      throw new Error(
+        `Approval recorded but pool release failed: ${releaseError.message}`
+      )
+    }
   }
   // Other request types (base_rate, tier_change, etc) handled in Phase 1.5+
 
@@ -141,6 +158,7 @@ export async function approveRequest(formData: FormData) {
   revalidatePath('/approvals')
   revalidatePath('/fund-out')
   revalidatePath('/overdue')
+  revalidatePath('/invoice-pool')
   revalidatePath('/dashboard')
   redirect('/approvals')
 }

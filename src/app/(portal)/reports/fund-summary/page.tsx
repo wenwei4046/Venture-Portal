@@ -3,6 +3,7 @@ import { requireRole } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import FundPieChart from './_components/FundPieChart'
 
 export default async function FundSummaryPage() {
   await requireRole(['principal', 'finance'])
@@ -144,6 +145,21 @@ export default async function FundSummaryPage() {
               <span className="font-mono tabular text-sm text-ink">{formatMoney(invoicePoolBalance)}</span>
             </div>
           </div>
+        </section>
+
+        {/* Fund Allocation Chart */}
+        <section>
+          <h2 className="font-sans text-xs uppercase tracking-wide text-muted font-semibold mb-4">Fund Allocation</h2>
+          <FundPieChart
+            slices={[
+              { name: 'Loans Outstanding', value: loansOutstanding },
+              { name: 'Buffer', value: bufferAmount },
+              { name: 'Invoice Pool', value: invoicePoolBalance },
+              { name: 'HV Operating Fund', value: hvFundBalance },
+              { name: 'Dept Pool', value: deptPoolBalance },
+              { name: 'Free Cash', value: Math.max(0, freeCash) },
+            ]}
+          />
         </section>
 
         {/* Free Cash */}

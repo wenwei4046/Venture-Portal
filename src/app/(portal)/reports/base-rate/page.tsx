@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import BaseRateTrendChart from './_components/BaseRateTrendChart'
 
 export default async function BaseRateHistoryPage() {
   await requireRole(['principal', 'finance'])
@@ -25,6 +26,15 @@ export default async function BaseRateHistoryPage() {
           Quarterly weighted cost + op margin = base rate.
         </p>
       </div>
+
+      {/* Trend chart */}
+      <BaseRateTrendChart
+        data={(history ?? []).slice().reverse().map(h => ({
+          quarter: h.quarter,
+          baseRate: Number(h.base_rate),
+          weightedCost: Number(h.weighted_cost),
+        }))}
+      />
 
       {(!history || history.length === 0) ? (
         <div className="py-16 text-center border border-hairline rounded-md bg-surface">

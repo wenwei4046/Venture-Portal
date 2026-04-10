@@ -106,10 +106,11 @@ export default async function ClaimsPage({ searchParams }: Props) {
                     {dayjs(c.created_at).format('D MMM YYYY')}
                   </td>
                   <td className="py-4 text-right">
-                    {c.status === 'pending' && (
+                    {(c.status === 'pending' || c.status === 'approved') && (
                       <ClaimActions
                         claimId={c.id}
                         claimType={c.claim_type as 'project' | 'benefit'}
+                        claimStatus={c.status}
                         userRole={user.role}
                       />
                     )}

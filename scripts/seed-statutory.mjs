@@ -259,104 +259,35 @@ async function seedEIS() {
 }
 
 // ─── PCB Jadual (Monthly Tax Deduction) ────────────────────────────
-function computeMonthlyPCB(annualGross, category, children) {
-  // Malaysian individual tax computation (YA 2018 onwards)
-  // category: KA1=single, KA2=married spouse not working, KA3=married spouse working
+// PCB data extracted from official LHDN Jadual_PCB_2018.pdf (733 pages)
+// using scripts/extract-pcb.py → scripts/pcb-data.json
+// 702,395 rows covering RM3,141 - RM87,755 across 3 categories × 0-10 children
 
-  // Personal relief
-  let relief = 9000 // individual
-  if (category === 'KA2') relief += 4000 // spouse not working
-  // KA3 = spouse working, no additional spouse relief
-
-  // Child relief: RM2,000 per child (under 18 or studying)
-  relief += children * 2000
-
-  // EPF relief (capped at RM4,000 for tax purposes)
-  // Approximate: 11% of gross, capped
-  const epfRelief = Math.min(annualGross * 0.11, 4000)
-  relief += epfRelief
-
-  // SOCSO relief (capped at RM350)
-  relief += Math.min(250, 350)
-
-  // Taxable income
-  const taxable = Math.max(0, annualGross - relief)
-
-  // Tax brackets (YA 2018)
-  let tax = 0
-  const brackets = [
-    [5000, 0],
-    [15000, 0.01],   // 5,001 - 20,000
-    [15000, 0.03],   // 20,001 - 35,000
-    [15000, 0.08],   // 35,001 - 50,000
-    [20000, 0.13],   // 50,001 - 70,000 (was 0.14 pre-2023)
-    [30000, 0.21],   // 70,001 - 100,000
-    [150000, 0.24],  // 100,001 - 250,000
-    [150000, 0.245], // 250,001 - 400,000
-    [200000, 0.25],  // 400,001 - 600,000
-    [400000, 0.26],  // 600,001 - 1,000,000
-    [Infinity, 0.28], // > 1,000,000
-  ]
-
-  let remaining = taxable
-  for (const [width, rate] of brackets) {
-    const taxableInBracket = Math.min(remaining, width)
-    tax += taxableInBracket * rate
-    remaining -= taxableInBracket
-    if (remaining <= 0) break
-  }
-
-  // Tax rebate: RM400 if taxable <= RM35,000
-  if (taxable <= 35000) tax = Math.max(0, tax - 400)
-
-  // Monthly PCB = annual tax / 12, rounded to nearest 0.05
-  const monthly = tax / 12
-  return Math.round(monthly * 20) / 20 // round to 0.05
-}
-
-function generatePCB() {
-  const rows = []
-  // Income bands: RM5 increments from RM1,001 to RM35,000 (covers director salary range)
-  // PCB table uses net remuneration (after EPF deduction)
-  for (let from = 1001; from <= 35000; from += 5) {
-    const to = from + 4
-    const midpoint = (from + to) / 2
-    // Annual gross = monthly net remuneration × 12
-    // (the PCB table input is monthly net remuneration, not gross)
-    const annualGross = midpoint * 12
-
-    for (const category of ['KA1', 'KA2', 'KA3']) {
-      const maxChildren = category === 'KA1' ? 0 : 10
-      for (let children = 0; children <= maxChildren; children++) {
-        const pcb = computeMonthlyPCB(annualGross, category, children)
-        if (pcb > 0) {
-          rows.push({
-            income_from: from,
-            income_to: to,
-            category,
-            children,
-            pcb_amount: pcb,
-            effective_from: PCB_FROM,
-            effective_to: null,
-          })
-        }
-      }
-    }
-  }
-  return rows
+function loadPCB() {
+  const raw = JSON.parse(readFileSync(resolve(__dirname, 'pcb-data.json'), 'utf8'))
+  return raw.map(r => ({
+    income_from: r.income_from,
+    income_to: r.income_to,
+    category: r.category,
+    children: r.children,
+    pcb_amount: r.pcb_amount,
+    effective_from: PCB_FROM,
+    effective_to: null,
+  }))
 }
 
 async function seedPCB() {
-  const rows = generatePCB()
+  const rows = loadPCB()
+  console.log(`  Loading ${rows.length} PCB rows from pcb-data.json...`)
 
   await supabase.from('pcb_jadual')
     .delete()
     .eq('effective_from', PCB_FROM)
 
-  // Insert in batches of 500
+  // Insert in batches of 1000
   let inserted = 0
-  for (let i = 0; i < rows.length; i += 500) {
-    const batch = rows.slice(i, i + 500)
+  for (let i = 0; i < rows.length; i += 1000) {
+    const batch = rows.slice(i, i + 1000)
     const { error } = await supabase.from('pcb_jadual').insert(batch)
     if (error) {
       console.error(`✗ PCB batch ${i}: ${error.message}`)
@@ -364,8 +295,11 @@ async function seedPCB() {
       return inserted
     }
     inserted += batch.length
+    if (inserted % 50000 === 0) {
+      console.log(`  PCB progress: ${inserted}/${rows.length} rows...`)
+    }
   }
-  console.log(`✓ PCB Jadual: ${inserted} rows seeded (income RM1,001-RM35,004)`)
+  console.log(`✓ PCB Jadual: ${inserted} rows seeded (RM${rows[0].income_from}-RM${rows[rows.length-1].income_to})`)
   return inserted
 }
 

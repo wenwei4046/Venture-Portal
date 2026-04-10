@@ -39,6 +39,9 @@ settings-verified.png
 /vp-*.png
 /tmp/
 
+# Large statutory data (generated from PDFs via extract scripts)
+scripts/pcb-data.json
+
 # gstack QA reports (generated artifacts, not source)
 .gstack/qa-reports/screenshots/
 
