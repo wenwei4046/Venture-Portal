@@ -175,16 +175,16 @@ export default async function FundInPage() {
                     <td className="py-4 pr-4 font-serif text-md text-ink">
                       {getFromLabel(source)}
                     </td>
-                    <td className="py-4 pr-4 text-right font-mono tabular text-ink">
+                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
                       {formatMoney(Number(source.amount))}
                     </td>
-                    <td className="py-4 pr-4 text-right font-mono tabular text-ink">
+                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
                       {(Number(source.cost_rate) * 100).toFixed(3)}%
                     </td>
-                    <td className="py-4 pr-4 text-right font-mono tabular text-graphite">
+                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
                       {source.lock_in_months ? `${source.lock_in_months} mo` : '—'}
                     </td>
-                    <td className="py-4 pr-4 text-right font-mono tabular text-graphite">
+                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
                       {source.maturity_date
                         ? dayjs(source.maturity_date).format('D MMM YYYY')
                         : '—'}

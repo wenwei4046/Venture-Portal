@@ -125,13 +125,13 @@ export default async function PnLPage({ searchParams }: Props) {
             {revenueLines.map(l => (
               <div key={l.label} className="flex items-baseline justify-between">
                 <span className="font-serif text-sm text-graphite">{l.label}</span>
-                <span className="font-mono tabular text-sm text-ink">{formatMoney(l.amount)}</span>
+                <span className="font-mono tabular text-sm font-medium text-ink">{formatMoney(l.amount)}</span>
               </div>
             ))}
           </div>
           <div className="flex items-baseline justify-between pt-3 mt-3 border-t border-hairline">
             <span className="font-serif italic text-sm text-ink font-semibold">Total Revenue</span>
-            <span className="font-mono tabular text-md text-ledger font-semibold">{formatMoney(totalRevenue)}</span>
+            <span className="font-mono tabular text-md font-medium text-ledger font-semibold">{formatMoney(totalRevenue)}</span>
           </div>
         </section>
 
@@ -142,13 +142,13 @@ export default async function PnLPage({ searchParams }: Props) {
             {expenseLines.map(l => (
               <div key={l.label} className="flex items-baseline justify-between">
                 <span className="font-serif text-sm text-graphite">{l.label}</span>
-                <span className="font-mono tabular text-sm text-ink">({formatMoney(l.amount).replace('RM ', '')})</span>
+                <span className="font-mono tabular text-sm font-medium text-ink">({formatMoney(l.amount).replace('RM ', '')})</span>
               </div>
             ))}
           </div>
           <div className="flex items-baseline justify-between pt-3 mt-3 border-t border-hairline">
             <span className="font-serif italic text-sm text-ink font-semibold">Total Expenses</span>
-            <span className="font-mono tabular text-md text-danger font-semibold">({formatMoney(totalExpenses).replace('RM ', '')})</span>
+            <span className="font-mono tabular text-md font-medium text-danger font-semibold">({formatMoney(totalExpenses).replace('RM ', '')})</span>
           </div>
         </section>
 

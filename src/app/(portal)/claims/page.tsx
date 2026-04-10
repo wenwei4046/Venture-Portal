@@ -92,7 +92,7 @@ export default async function ClaimsPage({ searchParams }: Props) {
                     <div className="font-serif text-md text-ink">{c.claimant_name}</div>
                   </td>
                   <td className="py-4 pr-4 font-sans text-sm text-graphite">{c.description ?? '—'}</td>
-                  <td className="py-4 pr-4 text-right font-mono tabular text-ink">{formatMoney(c.amount)}</td>
+                  <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">{formatMoney(c.amount)}</td>
                   <td className="py-4 pr-4">
                     <em className={`font-serif text-sm ${
                       c.status === 'approved' ? 'text-ledger' :

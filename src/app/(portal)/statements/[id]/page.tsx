@@ -109,7 +109,7 @@ export default async function StatementDetailPage({ params }: Props) {
       <section className="mb-10">
         <div className="flex items-baseline justify-between mb-4">
           <h2 className="font-serif text-xl text-ink">Invoice items</h2>
-          <span className="font-mono tabular text-sm text-ink">
+          <span className="font-mono tabular text-sm font-medium text-ink">
             {formatMoney(Number(statement.total_invoice))}
           </span>
         </div>
@@ -137,7 +137,7 @@ export default async function StatementDetailPage({ params }: Props) {
                     </div>
                   ) : null}
                 </div>
-                <div className="font-mono tabular text-sm text-ink">
+                <div className="font-mono tabular text-sm font-medium text-ink">
                   {formatMoney(Number(line.amount))}
                 </div>
               </div>
@@ -150,7 +150,7 @@ export default async function StatementDetailPage({ params }: Props) {
       <section className="mb-10">
         <div className="flex items-baseline justify-between mb-4">
           <h2 className="font-serif text-xl text-ink">Contra items</h2>
-          <span className="font-mono tabular text-sm text-ink">
+          <span className="font-mono tabular text-sm font-medium text-ink">
             ({formatMoney(Number(statement.total_contra)).replace('RM ', '')})
           </span>
         </div>
@@ -178,7 +178,7 @@ export default async function StatementDetailPage({ params }: Props) {
                     </div>
                   ) : null}
                 </div>
-                <div className="font-mono tabular text-sm text-ink">
+                <div className="font-mono tabular text-sm font-medium text-ink">
                   ({formatMoney(Number(line.amount)).replace('RM ', '')})
                 </div>
               </div>

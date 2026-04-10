@@ -80,7 +80,7 @@ export default function NewLoanForm({ companies, tiers, baseRate }: Props) {
               <div className="text-xs text-muted uppercase tracking-wide font-sans mb-1">
                 Base rate
               </div>
-              <div className="font-mono tabular text-ink">
+              <div className="font-mono tabular font-medium text-ink">
                 {(baseRate.rate * 100).toFixed(3)}%
               </div>
               <div className="text-xs text-muted font-mono">{baseRate.quarter}</div>
@@ -89,7 +89,7 @@ export default function NewLoanForm({ companies, tiers, baseRate }: Props) {
               <div className="text-xs text-muted uppercase tracking-wide font-sans mb-1">
                 Tier premium
               </div>
-              <div className="font-mono tabular text-ink">
+              <div className="font-mono tabular font-medium text-ink">
                 +{(tierPremium * 100).toFixed(3)}%
               </div>
               <div className="text-xs text-muted font-mono">Tier {selectedTier}</div>
@@ -130,7 +130,7 @@ export default function NewLoanForm({ companies, tiers, baseRate }: Props) {
             min="0.01"
             max="100000000"
             required
-            className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+            className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
             placeholder="100000.00"
           />
         </div>

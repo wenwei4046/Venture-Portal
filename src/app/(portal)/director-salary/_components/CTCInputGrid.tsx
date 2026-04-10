@@ -163,7 +163,7 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
                       value={getValue(selectedDirector, comp.id, field) || ''}
                       onChange={e => setValue(selectedDirector, comp.id, field, parseFloat(e.target.value) || 0)}
                       placeholder="0.00"
-                      className="w-28 px-2 py-1.5 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink text-right focus:outline-none focus:border-accent-border"
+                      className="w-28 px-2 py-1.5 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink text-right focus:outline-none focus:border-accent-border"
                     />
                   </td>
                 ))}
@@ -172,13 +172,13 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
             {/* Total row */}
             <tr className="border-t-2 border-hairline">
               <td className="py-3 pr-4 font-serif italic text-accent text-sm">Total</td>
-              <td className="py-3 pr-4 text-right font-mono tabular text-ink font-semibold">
+              <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">
                 {formatMoney(totalBasic).replace('RM ', '')}
               </td>
-              <td className="py-3 pr-4 text-right font-mono tabular text-ink font-semibold">
+              <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">
                 {formatMoney(totalKpi).replace('RM ', '')}
               </td>
-              <td className="py-3 pr-4 text-right font-mono tabular text-ink font-semibold">
+              <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">
                 {formatMoney(totalAllow).replace('RM ', '')}
               </td>
             </tr>
@@ -206,9 +206,9 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
                 return (
                   <tr key={comp.id} className="border-b border-hairline last:border-0">
                     <td className="py-3 pr-4 font-serif text-md text-graphite">{comp.name}</td>
-                    <td className="py-3 pr-4 text-right font-mono tabular text-graphite">{formatMoney(s.epfEr).replace('RM ', '')}</td>
-                    <td className="py-3 pr-4 text-right font-mono tabular text-graphite">{formatMoney(s.socsoEr).replace('RM ', '')}</td>
-                    <td className="py-3 pr-4 text-right font-mono tabular text-graphite">{formatMoney(s.eisEr).replace('RM ', '')}</td>
+                    <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">{formatMoney(s.epfEr).replace('RM ', '')}</td>
+                    <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">{formatMoney(s.socsoEr).replace('RM ', '')}</td>
+                    <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">{formatMoney(s.eisEr).replace('RM ', '')}</td>
                   </tr>
                 )
               })}

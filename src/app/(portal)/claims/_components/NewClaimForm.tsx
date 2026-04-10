@@ -67,7 +67,7 @@ export default function NewClaimForm() {
             step="0.01"
             min="0.01"
             required
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
           />
         </div>
         <div>

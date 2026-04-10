@@ -47,9 +47,9 @@ export default async function BaseRateHistoryPage() {
               {history.map(h => (
                 <tr key={h.id} className="border-b border-hairline last:border-0">
                   <td className="py-4 pr-4 font-serif text-md text-ink">{h.quarter}</td>
-                  <td className="py-4 pr-4 text-right font-mono tabular text-graphite">{(Number(h.weighted_cost) * 100).toFixed(3)}%</td>
-                  <td className="py-4 pr-4 text-right font-mono tabular text-graphite">{(Number(h.op_margin) * 100).toFixed(3)}%</td>
-                  <td className="py-4 pr-4 text-right font-mono tabular text-ink font-semibold">{(Number(h.base_rate) * 100).toFixed(3)}%</td>
+                  <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">{(Number(h.weighted_cost) * 100).toFixed(3)}%</td>
+                  <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">{(Number(h.op_margin) * 100).toFixed(3)}%</td>
+                  <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">{(Number(h.base_rate) * 100).toFixed(3)}%</td>
                   <td className="py-4 font-mono text-xs text-muted">
                     {h.approved_at ? dayjs(h.approved_at).format('D MMM YYYY') : '—'}
                   </td>

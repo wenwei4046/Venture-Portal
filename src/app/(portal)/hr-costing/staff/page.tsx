@@ -71,10 +71,10 @@ export default async function StaffListPage() {
                       <div className="font-serif text-md text-ink">{s.employee_name}</div>
                     </td>
                     <td className="py-4 pr-4 font-serif italic text-graphite">{dept?.name ?? '—'}</td>
-                    <td className="py-4 pr-4 text-right font-mono tabular text-graphite">{formatMoney(s.basic_salary)}</td>
-                    <td className="py-4 pr-4 text-right font-mono tabular text-graphite">{formatMoney(s.allowances)}</td>
-                    <td className="py-4 pr-4 text-right font-mono tabular text-graphite">{formatMoney(s.epf_er ?? 0)}</td>
-                    <td className="py-4 pr-4 text-right font-mono tabular text-ink font-semibold">{formatMoney(s.total_ctc ?? 0)}</td>
+                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">{formatMoney(s.basic_salary)}</td>
+                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">{formatMoney(s.allowances)}</td>
+                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">{formatMoney(s.epf_er ?? 0)}</td>
+                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">{formatMoney(s.total_ctc ?? 0)}</td>
                     <td className="py-4 pr-4">
                       <em className={`font-serif text-sm ${s.is_mgmt_fee ? 'text-accent' : 'text-graphite'}`}>
                         {s.is_mgmt_fee ? 'Mgmt Fee' : 'Attribution'}

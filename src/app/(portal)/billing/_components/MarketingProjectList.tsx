@@ -91,7 +91,7 @@ export default function MarketingProjectList({ contracts, companyMap, canCreate 
                         {company?.code ?? ''}
                       </div>
                     </td>
-                    <td className="py-3 pr-4 text-right font-mono tabular text-ink">
+                    <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">
                       {c.amount != null ? formatMoney(Number(c.amount)) : '—'}
                     </td>
                     <td className="py-3 pr-4 font-mono text-xs text-muted">

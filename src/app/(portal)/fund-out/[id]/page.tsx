@@ -230,13 +230,13 @@ export default async function LoanDetailPage({ params }: Props) {
                     key={r.id}
                     className="border-b border-hairline last:border-0"
                   >
-                    <td className="py-3 pr-4 font-mono tabular text-ink">
+                    <td className="py-3 pr-4 font-mono tabular font-medium text-ink">
                       {dayjs(r.payment_date).format('D MMM YYYY')}
                     </td>
                     <td className="py-3 pr-4 font-serif italic text-graphite">
                       {r.payment_type}
                     </td>
-                    <td className="py-3 pr-4 text-right font-mono tabular text-ink">
+                    <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">
                       {formatMoney(Number(r.amount))}
                     </td>
                     <td className="py-3 text-sm text-muted italic font-serif">

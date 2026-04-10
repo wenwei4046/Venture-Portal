@@ -177,7 +177,7 @@ export default async function MarketingDeptPoolPage() {
                     <td className="py-3 pr-4 font-serif italic text-graphite">
                       {p.description ?? '—'}
                     </td>
-                    <td className="py-3 text-right font-mono tabular text-alert">
+                    <td className="py-3 text-right font-mono tabular font-medium text-alert">
                       {p.amount != null ? formatMoney(Number(p.amount)) : '—'}
                     </td>
                   </tr>
@@ -226,7 +226,7 @@ export default async function MarketingDeptPoolPage() {
                     <td className="py-3 pr-4 font-mono text-xs text-muted">
                       {row.period_month ? dayjs(row.period_month).format('MMM YYYY') : '—'}
                     </td>
-                    <td className="py-3 text-right font-mono tabular text-ink">
+                    <td className="py-3 text-right font-mono tabular font-medium text-ink">
                       ({formatMoney(Number(row.amount)).replace('RM ', '')})
                     </td>
                   </tr>

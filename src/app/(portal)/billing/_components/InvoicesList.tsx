@@ -105,7 +105,7 @@ export default function InvoicesList({ invoices, companyMap, period }: Props) {
                       <td className="py-3 pr-4 font-serif italic text-graphite text-sm">
                         {inv.billing_mode}
                       </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular text-ink">
+                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">
                         {formatMoney(Number(inv.total_amount))}
                       </td>
                       <td className="py-3">

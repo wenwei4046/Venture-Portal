@@ -169,7 +169,7 @@ export default async function DashboardPage() {
           {hasAnyData ? (
             <div className="text-sm text-graphite">
               Pool{' '}
-              <span className="font-mono tabular text-ink">
+              <span className="font-mono tabular font-medium text-ink">
                 {formatMoney(summary.total_pool)}
               </span>{' '}
               ·{' '}
@@ -187,7 +187,7 @@ export default async function DashboardPage() {
               ) : (
                 <>
                   Above buffer by{' '}
-                  <span className="font-mono tabular text-ledger">
+                  <span className="font-mono tabular font-medium text-ledger">
                     {formatMoney(aboveBuffer + bufferAmount)}
                   </span>
                 </>
@@ -335,12 +335,12 @@ export default async function DashboardPage() {
                         ) : null}
                       </div>
                     </td>
-                    <td className="py-4 pr-4 text-right font-mono tabular text-graphite">
+                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
                       {sub.savings_deposited > 0
                         ? formatMoney(sub.savings_deposited)
                         : '—'}
                     </td>
-                    <td className="py-4 pr-4 text-right font-mono tabular text-graphite">
+                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
                       {sub.loans_outstanding > 0
                         ? formatMoney(sub.loans_outstanding)
                         : '—'}
@@ -552,28 +552,28 @@ function MarginPanel({ summary }: { summary: DashboardSummary }) {
   return (
     <div className="border border-hairline rounded-md bg-surface p-5 space-y-3">
       <div className="flex items-baseline justify-between">
-        <span className="font-serif italic text-sm text-graphite">
+        <span className="font-serif italic text-base text-ink">
           Weighted cost of capital
         </span>
-        <span className="font-mono tabular text-sm text-ink">
+        <span className="font-mono tabular text-base font-medium text-ink">
           {weightedCost != null ? `${(weightedCost * 100).toFixed(3)}%/mo` : '—'}
         </span>
       </div>
       <div className="flex items-baseline justify-between">
-        <span className="font-serif italic text-sm text-graphite">
+        <span className="font-serif italic text-base text-ink">
           Current base rate
         </span>
-        <span className="font-mono tabular text-sm text-ink">
+        <span className="font-mono tabular text-base font-medium text-ink">
           {baseRate != null ? `${(baseRate * 100).toFixed(3)}%/mo` : '—'}
         </span>
       </div>
       <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
-        <span className="font-serif italic text-sm text-accent">Net spread</span>
+        <span className="font-serif italic text-base font-medium text-accent">Net spread</span>
         <span
           className={
             spreadNegative
-              ? 'font-mono tabular text-md text-danger'
-              : 'font-mono tabular text-md text-ledger'
+              ? 'font-mono tabular text-lg font-semibold text-danger'
+              : 'font-mono tabular text-lg font-semibold text-ledger'
           }
         >
           {netSpread != null ? `${(netSpread * 100).toFixed(3)}%/mo` : '—'}
@@ -582,30 +582,30 @@ function MarginPanel({ summary }: { summary: DashboardSummary }) {
 
       <div className="pt-3 border-t border-hairline space-y-2">
         <div className="flex items-baseline justify-between">
-          <span className="font-serif italic text-xs text-graphite">
+          <span className="font-serif italic text-sm text-ink">
             Interest income
           </span>
-          <span className="font-mono tabular text-xs text-ink">
+          <span className="font-mono tabular text-sm font-medium text-ink">
             {formatMoney(summary.monthly_interest_income)}
           </span>
         </div>
         <div className="flex items-baseline justify-between">
-          <span className="font-serif italic text-xs text-graphite">
+          <span className="font-serif italic text-sm text-ink">
             Interest expense
           </span>
-          <span className="font-mono tabular text-xs text-graphite">
+          <span className="font-mono tabular text-sm font-medium text-graphite">
             ({formatMoney(summary.monthly_interest_expense).replace('RM ', '')})
           </span>
         </div>
         <div className="flex items-baseline justify-between pt-1 border-t border-hairline">
-          <span className="font-serif italic text-sm text-accent">
+          <span className="font-serif italic text-base font-medium text-accent">
             Net interest
           </span>
           <span
             className={
               interestNegative
-                ? 'font-mono tabular text-sm text-danger'
-                : 'font-mono tabular text-sm text-ledger'
+                ? 'font-mono tabular text-base font-semibold text-danger'
+                : 'font-mono tabular text-base font-semibold text-ledger'
             }
           >
             {interestNegative

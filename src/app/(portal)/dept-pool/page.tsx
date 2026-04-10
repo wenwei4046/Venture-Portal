@@ -143,16 +143,16 @@ export default async function DeptPoolPage() {
                       <td className="py-3 pr-4 font-serif text-md text-ink">
                         {dept.name}
                       </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular text-ink">
+                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">
                         {formatMoney(balance)}
                       </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
                         {formatMoney(np?.revenue ?? 0)}
                       </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
                         {formatMoney(np?.staff_cost ?? 0)}
                       </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
                         {formatMoney(np?.expenses ?? 0)}
                       </td>
                       <td className="py-3 pr-4 text-right font-mono tabular font-semibold">

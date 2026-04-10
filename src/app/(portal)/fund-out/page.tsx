@@ -169,13 +169,13 @@ export default async function FundOutPage() {
                           {company?.code ?? ''} · {dayjs(loan.created_at).format('D MMM YYYY')}
                         </div>
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular text-ink">
+                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
                         {formatMoney(Number(loan.principal))}
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular text-ink">
+                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
                         {loan.status === 'active' ? formatMoney(outstanding) : '—'}
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular text-ink">
+                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
                         {(Number(loan.effective_rate) * 100).toFixed(3)}%
                       </td>
                       <td className="py-4 pr-4 text-right font-mono text-graphite">

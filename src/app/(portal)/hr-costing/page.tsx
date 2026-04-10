@@ -171,19 +171,19 @@ export default async function HRCostingPage() {
                     <td className="py-3 pr-4 font-serif text-md text-ink">
                       {row.department_name ?? '—'}
                     </td>
-                    <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                    <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
                       {row.staff_count ?? 0}
                     </td>
-                    <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                    <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
                       {formatMoney(Number(row.total_basic ?? 0))}
                     </td>
-                    <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                    <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
                       {formatMoney(Number(row.total_statutory ?? 0))}
                     </td>
-                    <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                    <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
                       {formatMoney(Number(row.total_allowance ?? 0))}
                     </td>
-                    <td className="py-3 text-right font-mono tabular text-ink font-semibold">
+                    <td className="py-3 text-right font-mono tabular font-medium text-ink font-semibold">
                       {formatMoney(Number(row.total_ctc ?? 0))}
                     </td>
                   </tr>
@@ -248,10 +248,10 @@ export default async function HRCostingPage() {
                       <td className="py-3 pr-4 font-mono text-xs text-muted">
                         {dayjs(s.submitted_at).format('D MMM YYYY HH:mm')}
                       </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
                         {formatMoney(totalBasic)}
                       </td>
-                      <td className="py-3 text-right font-mono tabular text-ink font-semibold">
+                      <td className="py-3 text-right font-mono tabular font-medium text-ink font-semibold">
                         {formatMoney(totalCtc)}
                       </td>
                     </tr>

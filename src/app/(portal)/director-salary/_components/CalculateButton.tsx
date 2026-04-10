@@ -33,7 +33,7 @@ export default function CalculateButton({ period }: { period: string }) {
         <p className="font-sans text-sm text-graphite">
           {result.saved} director payouts saved.
           {result.advanceTotal > 0 && (
-            <> Advance total: <span className="font-mono tabular text-alert">{formatMoney(result.advanceTotal)}</span> (pending approval).</>
+            <> Advance total: <span className="font-mono tabular font-medium text-alert">{formatMoney(result.advanceTotal)}</span> (pending approval).</>
           )}
         </p>
       </div>

@@ -45,7 +45,7 @@ export default function PCBInput({ payoutId, currentPcb, suggestedPcb, payrollGr
             min="0"
             value={pcb || ''}
             onChange={e => { setPcb(parseFloat(e.target.value) || 0); setSaved(false) }}
-            className="w-28 px-2 py-1.5 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink text-right focus:outline-none focus:border-accent-border"
+            className="w-28 px-2 py-1.5 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink text-right focus:outline-none focus:border-accent-border"
           />
         </div>
       </div>

@@ -137,17 +137,17 @@ export default async function StatementsPage() {
                             {company?.code}
                           </div>
                         </td>
-                        <td className="py-4 pr-4 text-right font-mono tabular text-graphite">
+                        <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
                           {Number(s.total_invoice) > 0
                             ? formatMoney(Number(s.total_invoice))
                             : '—'}
                         </td>
-                        <td className="py-4 pr-4 text-right font-mono tabular text-graphite">
+                        <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
                           {Number(s.total_contra) > 0
                             ? `(${formatMoney(Number(s.total_contra)).replace('RM ', '')})`
                             : '—'}
                         </td>
-                        <td className="py-4 pr-4 text-right font-mono tabular text-ink font-semibold">
+                        <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">
                           {Number(s.net_amount) >= 0
                             ? formatMoney(Number(s.net_amount))
                             : `(${formatMoney(Math.abs(Number(s.net_amount))).replace('RM ', '')})`}

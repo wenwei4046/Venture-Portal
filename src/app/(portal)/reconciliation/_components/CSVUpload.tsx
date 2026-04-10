@@ -122,13 +122,13 @@ export default function CSVUpload() {
                     <tr key={i} className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors">
                       <td className="py-4 pr-4 font-mono text-xs text-muted">{t.date}</td>
                       <td className="py-4 pr-4 font-sans text-sm text-graphite">{t.description}</td>
-                      <td className="py-4 pr-4 text-right font-mono tabular text-danger">
+                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-danger">
                         {t.debit > 0 ? `(${formatMoney(t.debit).replace('RM ', '')})` : ''}
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular text-ledger">
+                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ledger">
                         {t.credit > 0 ? `+${formatMoney(t.credit).replace('RM ', '')}` : ''}
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular text-ink font-semibold">
+                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">
                         {formatMoney(t.balance)}
                       </td>
                     </tr>

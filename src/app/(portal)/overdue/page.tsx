@@ -150,16 +150,16 @@ export default async function OverduePage() {
                           {company?.code ?? ''} · {dayjs(row.period_month).format('MMM YYYY')}
                         </div>
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular text-ink">
+                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
                         {formatMoney(outstanding)}
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular text-ink">
+                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
                         {row.overdue_days}d
                       </td>
                       <td className="py-4 pr-4">
                         <StageLabel stage={row.overdue_stage} />
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular text-danger">
+                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-danger">
                         {formatMoney(Number(row.penalty_amount ?? 0))}
                       </td>
                       <td className="py-4 text-right">

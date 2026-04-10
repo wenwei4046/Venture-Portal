@@ -72,7 +72,7 @@ export default function DirectorSalarySection({ directors }: { directors: Direct
                   ...prev,
                   [d.id]: { ...prev[d.id], weightage: parseFloat(e.target.value) || 0 },
                 }))}
-                className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+                className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
               />
             </div>
             <div>
@@ -88,7 +88,7 @@ export default function DirectorSalarySection({ directors }: { directors: Direct
                   ...prev,
                   [d.id]: { ...prev[d.id], minPayout: parseFloat(e.target.value) || 0 },
                 }))}
-                className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+                className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
               />
             </div>
           </div>
