@@ -85,6 +85,130 @@ export default async function DashboardPage() {
 
   // RPC returns { error: 'Access denied' } for HR/dept_manager (not a Supabase error)
   if (raw && typeof raw === 'object' && 'error' in raw && (raw as Record<string, unknown>).error === 'Access denied') {
+    // Determine role for role-specific dashboard
+    const { data: currentUser } = await supabase.from('users').select('role, name').eq('id', user.id).single()
+    const userRole = currentUser?.role
+
+    if (userRole === 'hr') {
+      // HR Dashboard — show HR-relevant data
+      const [
+        { data: hrSummary },
+        { data: pendingClaims },
+        { data: dirPayouts },
+        { data: hrSubmission },
+      ] = await Promise.all([
+        supabase.rpc('get_hr_cost_summary'),
+        supabase.from('claims').select('id, claim_type, status').eq('status', 'pending'),
+        supabase.from('director_payouts').select('id, status').eq('period_month', dayjs().startOf('month').format('YYYY-MM-DD')),
+        supabase.from('hr_cost_submissions').select('id, period_month, submitted_at')
+          .eq('period_month', dayjs().startOf('month').format('YYYY-MM-DD')).maybeSingle(),
+      ])
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const depts = (hrSummary as any[]) ?? []
+      const totalStaff = depts.reduce((s: number, d: { staff_count: number }) => s + Number(d.staff_count ?? 0), 0)
+      const totalCTC = depts.reduce((s: number, d: { total_ctc: number }) => s + Number(d.total_ctc ?? 0), 0)
+      const pendingBenefit = (pendingClaims ?? []).filter(c => c.claim_type === 'benefit').length
+      const pendingPool = (pendingClaims ?? []).filter(c => c.claim_type === 'project').length
+      const payoutStatus = (dirPayouts ?? []).length > 0
+        ? (dirPayouts ?? []).every(p => p.status === 'confirmed') ? 'confirmed' : 'draft'
+        : 'not calculated'
+      const hrSubmitted = !!hrSubmission
+
+      return (
+        <div>
+          <div className="mb-10">
+            <div className="font-serif italic text-accent text-base mb-1">HR Overview</div>
+            <h1 className="font-serif text-3xl text-ink mb-1">{dayjs().format('MMMM YYYY')}</h1>
+            <p className="font-mono text-xs text-muted">{dayjs().format('dddd, D MMMM YYYY')}</p>
+          </div>
+
+          {/* KPI Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+            <div className="border border-hairline rounded-md bg-surface p-5">
+              <div className="font-serif italic text-sm text-accent mb-1">Total Headcount</div>
+              <div className="font-serif text-3xl text-ink">{totalStaff}</div>
+              <div className="font-mono text-xs text-muted mt-1">{depts.length} departments</div>
+            </div>
+            <div className="border border-hairline rounded-md bg-surface p-5">
+              <div className="font-serif italic text-sm text-accent mb-1">Monthly Payroll</div>
+              <div className="font-serif text-2xl text-ink">{formatMoney(totalCTC)}</div>
+              <div className="font-mono text-xs text-muted mt-1">total CTC (basic + statutory + allowances)</div>
+            </div>
+            <div className="border border-hairline rounded-md bg-surface p-5">
+              <div className="font-serif italic text-sm text-accent mb-1">Pending Claims</div>
+              <div className="font-serif text-3xl text-ink">{pendingBenefit + pendingPool}</div>
+              <div className="font-mono text-xs text-muted mt-1">
+                {pendingBenefit} benefit, {pendingPool} pool
+              </div>
+            </div>
+            <div className="border border-hairline rounded-md bg-surface p-5">
+              <div className="font-serif italic text-sm text-accent mb-1">Director Salary</div>
+              <div className="font-serif text-xl text-ink">{payoutStatus}</div>
+              <div className="font-mono text-xs text-muted mt-1">
+                {(dirPayouts ?? []).length} directors this period
+              </div>
+            </div>
+          </div>
+
+          {/* Department Breakdown */}
+          <section className="mb-12">
+            <h2 className="font-serif text-2xl text-ink mb-1">By Department</h2>
+            <p className="font-serif italic text-graphite text-sm mb-4">Staff count and total CTC per department</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
+                    <th className="text-left py-3 pr-4 font-medium">Department</th>
+                    <th className="text-right py-3 pr-4 font-medium">Staff</th>
+                    <th className="text-right py-3 pr-4 font-medium">Basic</th>
+                    <th className="text-right py-3 pr-4 font-medium">Statutory</th>
+                    <th className="text-right py-3 pr-4 font-medium">Total CTC</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {depts.map((d: { department_id: string; department_name: string; staff_count: number; total_basic: number; total_statutory: number; total_ctc: number }) => (
+                    <tr key={d.department_id} className="border-b border-hairline last:border-0">
+                      <td className="py-3 pr-4 font-serif text-md text-ink">{d.department_name}</td>
+                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">{d.staff_count}</td>
+                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">{formatMoney(d.total_basic)}</td>
+                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">{formatMoney(d.total_statutory)}</td>
+                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">{formatMoney(d.total_ctc)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {/* Status Indicators */}
+          <section className="mb-12">
+            <h2 className="font-serif text-2xl text-ink mb-4">Monthly Status</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="border border-hairline rounded-md bg-surface p-5">
+                <div className="font-serif italic text-sm text-graphite mb-2">HR Cost Submission</div>
+                <div className={`font-serif text-lg ${hrSubmitted ? 'text-ledger' : 'text-alert'}`}>
+                  {hrSubmitted ? 'Submitted' : 'Not yet submitted'}
+                </div>
+                {hrSubmitted && (
+                  <div className="font-mono text-xs text-muted mt-1">
+                    {dayjs(hrSubmission?.submitted_at).format('D MMM YYYY HH:mm')}
+                  </div>
+                )}
+              </div>
+              <div className="border border-hairline rounded-md bg-surface p-5">
+                <div className="font-serif italic text-sm text-graphite mb-2">Director Salary Status</div>
+                <div className={`font-serif text-lg ${payoutStatus === 'confirmed' ? 'text-ledger' : payoutStatus === 'draft' ? 'text-alert' : 'text-muted'}`}>
+                  {payoutStatus === 'confirmed' ? 'Confirmed' : payoutStatus === 'draft' ? 'Draft (pending confirm)' : 'Not calculated'}
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      )
+    }
+
+    // dept_manager or other non-treasury roles
     return (
       <div className="py-16 text-center">
         <p className="font-serif italic text-2xl text-ink mb-2">Dashboard</p>
