@@ -2078,6 +2078,28 @@ export type Database = {
           weighted_cost: number
         }[]
       }
+      get_director_payout_summary: {
+        Args: { p_period: string }
+        Returns: {
+          out_payout_count: number
+          out_period_month: string
+          out_pool_total: number
+          out_status: string
+          out_total_advance: number
+          out_total_eis_ee: number
+          out_total_eis_er: number
+          out_total_epf_ee: number
+          out_total_epf_er: number
+          out_total_invoice: number
+          out_total_payroll_gross: number
+          out_total_payroll_net: number
+          out_total_pcb: number
+          out_total_saving: number
+          out_total_socso_ee: number
+          out_total_socso_er: number
+          out_total_statutory_surplus: number
+        }[]
+      }
       get_hr_cost_summary: {
         Args: never
         Returns: {
@@ -2101,11 +2123,49 @@ export type Database = {
           submitted_by_name: string
         }[]
       }
+      lookup_eis: {
+        Args: { p_period?: string; p_wages: number }
+        Returns: {
+          employee: number
+          employer: number
+        }[]
+      }
+      lookup_epf: {
+        Args: {
+          p_part?: Database["public"]["Enums"]["epf_part"]
+          p_period?: string
+          p_wages: number
+        }
+        Returns: {
+          employee: number
+          employer: number
+        }[]
+      }
       lookup_overdue_stage: {
         Args: { p_days_overdue: number }
         Returns: {
           penalty_rate: number
           stage: Database["public"]["Enums"]["overdue_stage"]
+        }[]
+      }
+      lookup_pcb: {
+        Args: {
+          p_category?: Database["public"]["Enums"]["pcb_category"]
+          p_children?: number
+          p_income: number
+          p_period?: string
+        }
+        Returns: number
+      }
+      lookup_socso: {
+        Args: {
+          p_category?: Database["public"]["Enums"]["socso_category"]
+          p_period?: string
+          p_wages: number
+        }
+        Returns: {
+          employee: number
+          employer: number
         }[]
       }
       mark_matured_fund_sources: { Args: never; Returns: number }
