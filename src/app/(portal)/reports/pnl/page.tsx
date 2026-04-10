@@ -16,85 +16,59 @@ export default async function PnLPage({ searchParams }: Props) {
   const period = dayjs(rawPeriod ?? getPeriodMonth()).startOf('month').format('YYYY-MM-DD')
   const periodLabel = dayjs(period).format('MMMM YYYY')
 
-  // Fetch revenue data
   const [
     { data: loanInterest },
     { data: penalties },
     { data: invoices },
-    { data: hvFund },
-    { data: directorPayouts },
     { data: fundSources },
+    { data: deptPools },
+    { data: hrSummary },
   ] = await Promise.all([
-    // Loan interest income (active loans × effective_rate × outstanding)
     supabase.from('loans').select('principal, effective_rate').eq('status', 'active'),
-    // Overdue penalty income
     supabase.from('overdue_records').select('penalty_amount').eq('period_month', period),
-    // Billing invoices by mode
     supabase.from('invoices').select('billing_mode, total_amount').eq('period_month', period).in('status', ['issued', 'paid']),
-    // HV Operating Fund transactions
-    supabase.from('hv_operating_fund').select('transaction_type, amount'),
-    // Director payouts for this period
-    supabase.rpc('get_director_payout_summary', { p_period: period }),
-    // Savings interest expense
     supabase.from('fund_sources').select('amount, cost_rate').eq('status', 'active'),
+    supabase.from('dept_pools').select('department_id, transaction_type, amount'),
+    supabase.rpc('get_hr_cost_summary'),
   ])
 
-  // Calculate revenue
-  const loanInterestIncome = (loanInterest ?? []).reduce(
+  // ── TREASURY (Bank Model) ──
+  const interestIncome = (loanInterest ?? []).reduce(
     (s, l) => s + Number(l.principal) * Number(l.effective_rate), 0
   )
   const penaltyIncome = (penalties ?? []).reduce((s, p) => s + Number(p.penalty_amount ?? 0), 0)
-
-  const invoiceByMode = (mode: string) =>
-    (invoices ?? []).filter(i => i.billing_mode === mode).reduce((s, i) => s + Number(i.total_amount ?? 0), 0)
-
-  const hrBilling = invoiceByMode('hr_pool_split')
-  const financeBilling = invoiceByMode('finance_attribution') + invoiceByMode('finance_mgmt_fee')
-  const marketingBilling = invoiceByMode('marketing_project')
-  const rentBillback = invoiceByMode('fixed_split') // includes both rent and utility
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const dirSummary = (directorPayouts as any)?.[0]
-  const savingIncome = Number(dirSummary?.out_total_saving ?? 0)
-  const surplusIncome = Math.max(0, Number(dirSummary?.out_total_statutory_surplus ?? 0))
-
-  const totalRevenue = loanInterestIncome + penaltyIncome + hrBilling + financeBilling +
-    marketingBilling + rentBillback + savingIncome + surplusIncome
-
-  // Calculate expenses
-  const savingsInterestExpense = (fundSources ?? []).reduce(
+  const interestExpense = (fundSources ?? []).reduce(
     (s, f) => s + Number(f.amount) * Number(f.cost_rate), 0
   )
-  const dirPayrollExpense = Number(dirSummary?.out_total_payroll_gross ?? 0) +
-    Number(dirSummary?.out_total_epf_er ?? 0) + Number(dirSummary?.out_total_socso_er ?? 0) +
-    Number(dirSummary?.out_total_eis_er ?? 0)
-  const dirInvoiceExpense = Number(dirSummary?.out_total_invoice ?? 0)
-  const dirAdvanceExpense = Number(dirSummary?.out_total_advance ?? 0)
-  const deficitExpense = Math.abs(Math.min(0, Number(dirSummary?.out_total_statutory_surplus ?? 0)))
+  const netInterest = interestIncome + penaltyIncome - interestExpense
 
-  const totalExpenses = savingsInterestExpense + dirPayrollExpense + dirInvoiceExpense +
-    dirAdvanceExpense + deficitExpense
+  // ── MARKETING (Only dept with real P&L) ──
+  const invoiceByMode = (mode: string) =>
+    (invoices ?? []).filter(i => i.billing_mode === mode).reduce((s, i) => s + Number(i.total_amount ?? 0), 0)
+  const marketingRevenue = invoiceByMode('marketing_project')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mkRow = (hrSummary as any[])?.find((r: { department_name: string }) => r.department_name === 'Marketing')
+  const marketingStaffCost = Number(mkRow?.total_basic ?? 0)
+  const marketingExpenses = (deptPools ?? [])
+    .filter(d => d.transaction_type === 'expense_out')
+    .reduce((s, d) => s + Number(d.amount), 0)
+  const marketingNP = marketingRevenue - marketingStaffCost - marketingExpenses
 
-  const netProfit = totalRevenue - totalExpenses
+  // ── SHARED SERVICES (Pass-through — billed to subs to recover cost) ──
+  const hrBilling = invoiceByMode('hr_pool_split')
+  const financeBilling = invoiceByMode('finance_attribution') + invoiceByMode('finance_mgmt_fee')
+  const rentUtilityBilling = invoiceByMode('fixed_split')
+  const totalBillback = hrBilling + financeBilling + rentUtilityBilling
 
-  const revenueLines = [
-    { label: 'Loan Interest Income', amount: loanInterestIncome },
-    { label: 'Overdue Penalty Income', amount: penaltyIncome },
-    { label: 'HR Billing', amount: hrBilling },
-    { label: 'Finance Billing', amount: financeBilling },
-    { label: 'Marketing Billing', amount: marketingBilling },
-    { label: 'Rent & Utility Bill Back', amount: rentBillback },
-    { label: 'Director 5% Saving', amount: savingIncome },
-    { label: 'Statutory Surplus', amount: surplusIncome },
-  ]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const hrRow = (hrSummary as any[])?.find((r: { department_name: string }) => r.department_name === 'HR')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const finRow = (hrSummary as any[])?.find((r: { department_name: string }) => r.department_name === 'Finance')
+  const sharedServicesCost = Number(hrRow?.total_basic ?? 0) + Number(finRow?.total_basic ?? 0)
+  const netBillback = totalBillback - sharedServicesCost
 
-  const expenseLines = [
-    { label: 'Savings Interest to Subs', amount: savingsInterestExpense },
-    { label: 'Director Payroll (75% total cost)', amount: dirPayrollExpense },
-    { label: 'Director Invoice (25% pool)', amount: dirInvoiceExpense },
-    { label: 'Director Advance', amount: dirAdvanceExpense },
-    { label: 'Statutory Deficit', amount: deficitExpense },
-  ]
+  // ── HV NET PROFIT ──
+  const hvNetProfit = netInterest + marketingNP + netBillback
 
   return (
     <div>
@@ -105,7 +79,9 @@ export default async function PnLPage({ searchParams }: Props) {
       <div className="flex items-baseline justify-between mt-6 mb-10">
         <div>
           <h1 className="font-serif text-3xl text-ink">HV Profit & Loss</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">{periodLabel}</p>
+          <p className="font-serif italic text-graphite text-base mt-2">
+            {periodLabel} — Bank model: interest spread + marketing + shared services
+          </p>
         </div>
         <form>
           <input
@@ -117,52 +93,126 @@ export default async function PnLPage({ searchParams }: Props) {
         </form>
       </div>
 
-      <div className="max-w-3xl">
-        {/* REVENUE */}
-        <section className="mb-8">
-          <h2 className="font-sans text-xs uppercase tracking-wide text-ledger font-semibold mb-4">Revenue</h2>
+      <div className="max-w-3xl space-y-10">
+        {/* ── SECTION 1: Treasury / Interest Spread ── */}
+        <section>
+          <h2 className="font-sans text-xs uppercase tracking-wide text-ledger font-semibold mb-4">
+            Treasury — Interest Spread
+          </h2>
           <div className="space-y-2">
-            {revenueLines.map(l => (
-              <div key={l.label} className="flex items-baseline justify-between">
-                <span className="font-serif text-sm text-graphite">{l.label}</span>
-                <span className="font-mono tabular text-sm font-medium text-ink">{formatMoney(l.amount)}</span>
-              </div>
-            ))}
+            <div className="flex items-baseline justify-between">
+              <span className="font-serif text-base text-ink">Interest income (from loans)</span>
+              <span className="font-mono tabular text-base font-medium text-ink">{formatMoney(interestIncome)}</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="font-serif text-base text-ink">Penalty income</span>
+              <span className="font-mono tabular text-base font-medium text-ink">{formatMoney(penaltyIncome)}</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="font-serif text-base text-ink">Interest expense (to depositors)</span>
+              <span className="font-mono tabular text-base font-medium text-danger">({formatMoney(interestExpense).replace('RM ', '')})</span>
+            </div>
           </div>
           <div className="flex items-baseline justify-between pt-3 mt-3 border-t border-hairline">
-            <span className="font-serif italic text-sm text-ink font-semibold">Total Revenue</span>
-            <span className="font-mono tabular text-md font-medium text-ledger font-semibold">{formatMoney(totalRevenue)}</span>
-          </div>
-        </section>
-
-        {/* EXPENSES */}
-        <section className="mb-8">
-          <h2 className="font-sans text-xs uppercase tracking-wide text-danger font-semibold mb-4">Expenses</h2>
-          <div className="space-y-2">
-            {expenseLines.map(l => (
-              <div key={l.label} className="flex items-baseline justify-between">
-                <span className="font-serif text-sm text-graphite">{l.label}</span>
-                <span className="font-mono tabular text-sm font-medium text-ink">({formatMoney(l.amount).replace('RM ', '')})</span>
-              </div>
-            ))}
-          </div>
-          <div className="flex items-baseline justify-between pt-3 mt-3 border-t border-hairline">
-            <span className="font-serif italic text-sm text-ink font-semibold">Total Expenses</span>
-            <span className="font-mono tabular text-md font-medium text-danger font-semibold">({formatMoney(totalExpenses).replace('RM ', '')})</span>
-          </div>
-        </section>
-
-        {/* NET PROFIT */}
-        <div className="border-t-2 border-hairline pt-6">
-          <div className="flex items-baseline justify-between">
-            <span className="font-serif text-2xl text-ink">Net Profit</span>
-            <span className={`font-serif text-2xl font-semibold ${netProfit >= 0 ? 'text-ledger' : 'text-danger'}`}>
-              {netProfit >= 0 ? formatMoney(netProfit) : `(${formatMoney(Math.abs(netProfit)).replace('RM ', '')})`}
+            <span className="font-serif italic text-base text-ink font-medium">Net Interest Income</span>
+            <span className={`font-mono tabular text-lg font-semibold ${netInterest >= 0 ? 'text-ledger' : 'text-danger'}`}>
+              {netInterest >= 0 ? formatMoney(netInterest) : `(${formatMoney(Math.abs(netInterest)).replace('RM ', '')})`}
             </span>
           </div>
-          {dirSummary?.out_status === 'no_data' && (
-            <p className="font-serif italic text-muted text-sm mt-2">(pending) — Director salary not yet calculated for this period.</p>
-          )}
+        </section>
+
+        {/* ── SECTION 2: Marketing P&L ── */}
+        <section>
+          <h2 className="font-sans text-xs uppercase tracking-wide text-ledger font-semibold mb-4">
+            Marketing Department — P&L
+          </h2>
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <span className="font-serif text-base text-ink">Project revenue</span>
+              <span className="font-mono tabular text-base font-medium text-ink">{formatMoney(marketingRevenue)}</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="font-serif text-base text-ink">Staff cost</span>
+              <span className="font-mono tabular text-base font-medium text-danger">({formatMoney(marketingStaffCost).replace('RM ', '')})</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="font-serif text-base text-ink">Department expenses</span>
+              <span className="font-mono tabular text-base font-medium text-danger">({formatMoney(marketingExpenses).replace('RM ', '')})</span>
+            </div>
+          </div>
+          <div className="flex items-baseline justify-between pt-3 mt-3 border-t border-hairline">
+            <span className="font-serif italic text-base text-ink font-medium">Marketing Net Profit</span>
+            <span className={`font-mono tabular text-lg font-semibold ${marketingNP >= 0 ? 'text-ledger' : 'text-danger'}`}>
+              {marketingNP >= 0 ? formatMoney(marketingNP) : `(${formatMoney(Math.abs(marketingNP)).replace('RM ', '')})`}
+            </span>
+          </div>
+        </section>
+
+        {/* ── SECTION 3: Shared Services (Pass-through) ── */}
+        <section>
+          <h2 className="font-sans text-xs uppercase tracking-wide text-info font-semibold mb-4">
+            Shared Services — Bill-back to Subsidiaries
+          </h2>
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <span className="font-serif text-base text-ink">HR pool split billing</span>
+              <span className="font-mono tabular text-base font-medium text-ink">{formatMoney(hrBilling)}</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="font-serif text-base text-ink">Finance billing</span>
+              <span className="font-mono tabular text-base font-medium text-ink">{formatMoney(financeBilling)}</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="font-serif text-base text-ink">Rent & utility bill-back</span>
+              <span className="font-mono tabular text-base font-medium text-ink">{formatMoney(rentUtilityBilling)}</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="font-serif text-base text-ink">Shared services staff cost</span>
+              <span className="font-mono tabular text-base font-medium text-danger">({formatMoney(sharedServicesCost).replace('RM ', '')})</span>
+            </div>
+          </div>
+          <div className="flex items-baseline justify-between pt-3 mt-3 border-t border-hairline">
+            <span className="font-serif italic text-base text-ink font-medium">Net Bill-back</span>
+            <span className={`font-mono tabular text-lg font-semibold ${netBillback >= 0 ? 'text-ledger' : 'text-danger'}`}>
+              {netBillback >= 0 ? formatMoney(netBillback) : `(${formatMoney(Math.abs(netBillback)).replace('RM ', '')})`}
+            </span>
+          </div>
+          <p className="font-serif italic text-muted text-xs mt-2">
+            Pass-through: HV bills subsidiaries to recover HR + Finance staff costs. Net should be ~RM 0.
+          </p>
+        </section>
+
+        {/* ── HV NET PROFIT ── */}
+        <div className="border-t-2 border-hairline pt-6">
+          <div className="flex items-baseline justify-between mb-4">
+            <span className="font-serif text-2xl text-ink">HV Net Profit</span>
+            <span className={`font-serif text-2xl font-semibold ${hvNetProfit >= 0 ? 'text-ledger' : 'text-danger'}`}>
+              {hvNetProfit >= 0 ? formatMoney(hvNetProfit) : `(${formatMoney(Math.abs(hvNetProfit)).replace('RM ', '')})`}
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-4 text-sm">
+            <div className="text-center">
+              <div className="font-serif italic text-graphite">Treasury</div>
+              <div className={`font-mono tabular font-medium ${netInterest >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                {netInterest >= 0 ? formatMoney(netInterest) : `(${formatMoney(Math.abs(netInterest)).replace('RM ', '')})`}
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="font-serif italic text-graphite">Marketing</div>
+              <div className={`font-mono tabular font-medium ${marketingNP >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                {marketingNP >= 0 ? formatMoney(marketingNP) : `(${formatMoney(Math.abs(marketingNP)).replace('RM ', '')})`}
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="font-serif italic text-graphite">Shared Svc</div>
+              <div className={`font-mono tabular font-medium ${netBillback >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                {netBillback >= 0 ? formatMoney(netBillback) : `(${formatMoney(Math.abs(netBillback)).replace('RM ', '')})`}
+              </div>
+            </div>
+          </div>
+          <p className="font-serif italic text-muted text-xs mt-4">
+            Director salary is pass-through (CTC in from subs → payouts to directors). Not included in HV P&L.
+          </p>
         </div>
       </div>
     </div>
