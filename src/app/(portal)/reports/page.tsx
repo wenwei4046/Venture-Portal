@@ -20,7 +20,7 @@ const reports = [
   {
     href: '/reports/claims',
     title: 'Claims Summary',
-    description: 'Benefit and project claims by status and amount.',
+    description: 'Benefit and pool claims by status and amount.',
   },
 ]
 

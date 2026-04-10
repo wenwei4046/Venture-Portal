@@ -32,7 +32,7 @@ export default async function ClaimsPage({ searchParams }: Props) {
         <div>
           <h1 className="font-serif text-3xl text-ink">Claims</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
-            Benefit claims (HR approves) and project claims (Finance approves).
+            Benefit claims (HR approves) and pool claims (Finance approves).
           </p>
         </div>
         <NewClaimForm />
@@ -58,7 +58,7 @@ export default async function ClaimsPage({ searchParams }: Props) {
               : 'pb-3 -mb-px font-serif text-graphite hover:text-ink transition-colors'
           }
         >
-          Project Claims <span className="font-mono text-xs text-muted ml-1">{projectCount}</span>
+          Pool Claims <span className="font-mono text-xs text-muted ml-1">{projectCount}</span>
         </a>
       </div>
 
