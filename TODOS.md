@@ -57,7 +57,7 @@ complete. See `.gstack/qa-reports/qa-report-phase2-2026-04-10.md`.
 
 ## Phase 2 prerequisites (before Phase 2 starts)
 
-- [ ] **Rename `monthly_statement_lines.category` enum to text + lookup table.** Current enum hardcodes Phase 2 categories. When Phase 3 adds a new category, it's a DB migration. Change to `category_code text` + `statement_categories` reference table. _Effort: S. Source: CEO Subagent. Critical to avoid Phase 2 DB migration pain._
+- [x] ~~**Rename `monthly_statement_lines.category` enum to text + lookup table.**~~ → Already implemented in migration 3. Schema uses `category_code TEXT REFERENCES statement_categories(code)` with a lookup table from the start. No enum was ever created.
 
 ---
 
