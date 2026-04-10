@@ -36,6 +36,7 @@ const navItems: NavItem[] = [
   { href: '/invoice-pool', label: 'Invoice Pool', visible: canAccessTreasury },
   { href: '/hr-costing', label: 'HR Costing', visible: canAccessHRCosting },
   { href: '/claims', label: 'Claims', visible: canAccessClaims },
+  { href: '/reconciliation', label: 'Reconciliation', visible: canAccessTreasury },
   { href: '/reports', label: 'Reports', visible: canAccessReports },
   { href: '/settings', label: 'Settings', visible: canAccessSettings },
 ]
