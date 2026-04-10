@@ -214,3 +214,36 @@ export async function cancelLoan(formData: FormData) {
   revalidatePath('/dashboard')
   redirect('/fund-out')
 }
+
+// ─── Export loan portfolio as CSV ─────────────────────────────────────────────
+
+export async function exportLoansCSV(): Promise<string> {
+  await requireRole(['principal', 'finance'])
+  const supabase = await createClient()
+
+  const { data: loans } = await supabase
+    .from('loans')
+    .select('*, companies(name, short_code)')
+    .order('status')
+    .order('disbursement_date', { ascending: false })
+
+  if (!loans || loans.length === 0) throw new Error('No loans to export')
+
+  const header = 'Company,Short Code,Principal (RM),Base Rate (%/mo),Risk Premium (%/mo),Effective Rate (%/mo),Disbursement Date,Status'
+  const rows = loans.map(l => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const co = (l as any).companies
+    return [
+      `"${co?.name ?? ''}"`,
+      co?.short_code ?? '',
+      Number(l.principal).toFixed(2),
+      (Number(l.base_rate) * 100).toFixed(3),
+      (Number(l.risk_premium) * 100).toFixed(3),
+      (Number(l.effective_rate) * 100).toFixed(3),
+      l.disbursement_date ?? '',
+      l.status,
+    ].join(',')
+  })
+
+  return [header, ...rows].join('\n')
+}

@@ -3,6 +3,7 @@ import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
+import ExportCSVButton from './_components/ExportCSVButton'
 
 type LoanRow = {
   id: string
@@ -72,12 +73,15 @@ export default async function FundOutPage() {
             <em>Rates lock at creation, never change.</em>
           </p>
         </div>
-        <Link
-          href="/fund-out/new"
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-        >
-          Record new loan
-        </Link>
+        <div className="flex items-center gap-3">
+          <ExportCSVButton />
+          <Link
+            href="/fund-out/new"
+            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+          >
+            Record new loan
+          </Link>
+        </div>
       </div>
 
       {/* ───────── Hero: outstanding + rate ───────── */}
