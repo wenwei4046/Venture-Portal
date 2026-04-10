@@ -8,7 +8,7 @@ interface Props {
   staffName: string
 }
 
-export default function StaffActions({ staffId, staffName }: Props) {
+export default function StaffActions({ staffId }: Props) {
   const [isPending, startTransition] = useTransition()
   const [confirming, setConfirming] = useState(false)
 

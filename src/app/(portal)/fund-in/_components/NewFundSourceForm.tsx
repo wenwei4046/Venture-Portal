@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import dayjs from 'dayjs'
+import Link from 'next/link'
 import { createFundSource } from '../actions'
 import type { Company, Director, FundSourceType } from '@/types'
 
@@ -245,12 +246,12 @@ export default function NewFundSourceForm({ companies, directors }: Props) {
         >
           {isPending ? 'Saving…' : 'Record fund source'}
         </button>
-        <a
+        <Link
           href="/fund-in"
           className="text-sm text-graphite hover:text-ink font-sans transition-colors"
         >
           Cancel
-        </a>
+        </Link>
         <span className="text-xs text-muted italic font-serif ml-auto">
           Rate locks at save
         </span>
