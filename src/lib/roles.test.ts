@@ -73,10 +73,10 @@ describe('canAccessDirectorSalary', () => {
 })
 
 describe('canAccessReports', () => {
-  it('allows principal, finance, and hr', () => {
+  it('allows principal and finance only', () => {
     expect(canAccessReports('principal')).toBe(true)
     expect(canAccessReports('finance')).toBe(true)
-    expect(canAccessReports('hr')).toBe(true)
+    expect(canAccessReports('hr')).toBe(false)
     expect(canAccessReports('dept_manager')).toBe(false)
   })
 })
