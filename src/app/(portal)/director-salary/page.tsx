@@ -6,6 +6,7 @@ import dayjs from 'dayjs'
 import Link from 'next/link'
 import CTCInputGrid from './_components/CTCInputGrid'
 import CalculateButton from './_components/CalculateButton'
+import ConfirmPayoutsButton from './_components/ConfirmPayoutsButton'
 
 interface Props {
   searchParams: Promise<{ period?: string }>
@@ -47,6 +48,8 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
   const hasPayouts = (payouts?.length ?? 0) > 0
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const summary = (financeSummary as any)?.[0] ?? null
+  // Finance doesn't fetch payouts directly — use summary count instead
+  const hasSummaryData = summary && summary.out_payout_count > 0
 
   return (
     <div>
@@ -72,7 +75,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
       </div>
 
       {/* Hero section — Pool summary */}
-      {hasPayouts && summary && (
+      {(hasPayouts || hasSummaryData) && summary && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
           <div className="lg:col-span-7">
             <div className="font-serif italic text-accent text-base mb-1">
@@ -120,7 +123,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
       {/* Finance view — lump sum only */}
       {!isHROrPrincipal && (
         <div>
-          {(!hasPayouts || summary?.out_status === 'no_data') && (
+          {(!hasSummaryData) && (
             <div className="py-16 text-center border border-hairline rounded-md bg-surface">
               <p className="font-serif italic text-graphite text-lg mb-1">
                 本月尚未提交 Director Salary。
@@ -131,7 +134,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
             </div>
           )}
 
-          {hasPayouts && summary && (
+          {hasSummaryData && summary && (
             <section className="mb-16">
               <h2 className="font-serif text-2xl text-ink mb-1">Statutory Remittance</h2>
               <p className="font-serif italic text-graphite text-sm mb-6">法定扣款汇总。</p>
@@ -220,10 +223,18 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
           {/* Per-Director Payouts Table */}
           {hasPayouts && (
             <section className="mb-16">
-              <h2 className="font-serif text-2xl text-ink mb-1">Per-Director Payouts</h2>
-              <p className="font-serif italic text-graphite text-sm mb-6">
-                点击 Director 查看完整明细。
-              </p>
+              <div className="flex items-baseline justify-between mb-6">
+                <div>
+                  <h2 className="font-serif text-2xl text-ink mb-1">Per-Director Payouts</h2>
+                  <p className="font-serif italic text-graphite text-sm">
+                    点击 Director 查看完整明细。
+                  </p>
+                </div>
+                <ConfirmPayoutsButton
+                  period={period}
+                  draftCount={payouts?.filter(p => p.status === 'draft').length ?? 0}
+                />
+              </div>
 
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

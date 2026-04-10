@@ -234,3 +234,24 @@ export async function updateRentSplits(formData: FormData) {
 export async function updateUtilitySplits(formData: FormData) {
   await upsertSplits('utility', formData)
 }
+
+// ─── Director Salary Config ────────────────────────────────────────
+
+export async function updateDirectorConfig(
+  updates: { id: string; weightage: number; min_payout: number }[]
+) {
+  await requireRole(['principal'])
+  const supabase = await createClient()
+
+  for (const u of updates) {
+    const { error } = await supabase
+      .from('directors')
+      .update({ weightage: u.weightage, min_payout: u.min_payout })
+      .eq('id', u.id)
+
+    if (error) throw new Error(`Failed to update director: ${error.message}`)
+  }
+
+  revalidatePath('/settings')
+  revalidatePath('/director-salary')
+}

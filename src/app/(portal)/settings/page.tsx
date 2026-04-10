@@ -7,6 +7,7 @@ import OverdueStagesSection from './_components/OverdueStagesSection'
 import CompanyTierSection from './_components/CompanyTierSection'
 import RentSplitSection from './_components/RentSplitSection'
 import UtilitySplitSection from './_components/UtilitySplitSection'
+import DirectorSalarySection from './_components/DirectorSalarySection'
 
 interface SplitRow {
   id: string
@@ -27,6 +28,7 @@ export default async function SettingsPage() {
     { data: companyRows },
     { data: rentRows },
     { data: utilityRows },
+    { data: directorRows },
   ] = await Promise.all([
     supabase.from('treasury_config').select('*'),
     supabase.from('tier_config').select('*'),
@@ -34,6 +36,7 @@ export default async function SettingsPage() {
     supabase.from('companies').select('*').order('short_code'),
     supabase.from('rent_splits').select('id, company_id, is_hv_share, split_pct'),
     supabase.from('utility_splits').select('id, company_id, is_hv_share, split_pct'),
+    supabase.from('directors').select('id, code, name, weightage, min_payout').eq('status', 'active').order('code'),
   ])
 
   const treasury = (treasuryRows ?? []) as TreasuryConfig[]
@@ -100,6 +103,16 @@ export default async function SettingsPage() {
             short_code: c.short_code,
           }))}
           initial={utilitySplits}
+        />
+
+        <DirectorSalarySection
+          directors={(directorRows ?? []).map((d) => ({
+            id: d.id,
+            code: d.code,
+            name: d.name ?? d.code,
+            weightage: Number(d.weightage),
+            min_payout: Number(d.min_payout),
+          }))}
         />
       </div>
     </div>
