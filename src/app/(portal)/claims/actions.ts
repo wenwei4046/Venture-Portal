@@ -30,16 +30,16 @@ export async function approveClaim(claimId: string) {
 
   const { data: claim } = await supabase
     .from('claims')
-    .select('claim_type, status')
+    .select('claim_type, status, amount, claimant_name, description')
     .eq('id', claimId)
     .single()
 
   if (!claim) throw new Error('Claim not found')
   if (claim.status !== 'pending') throw new Error('Claim is not pending')
 
-  // Finance approves project claims, HR approves benefit claims
+  // Finance approves pool claims, HR approves benefit claims
   if (claim.claim_type === 'project' && user.role !== 'finance' && user.role !== 'principal') {
-    throw new Error('Only Finance or Principal can approve project claims')
+    throw new Error('Only Finance or Principal can approve pool claims')
   }
   if (claim.claim_type === 'benefit' && user.role !== 'hr' && user.role !== 'principal') {
     throw new Error('Only HR or Principal can approve benefit claims')
@@ -52,7 +52,18 @@ export async function approveClaim(claimId: string) {
 
   if (error) throw new Error(`Failed to approve: ${error.message}`)
 
+  // Pool claims (project type) deduct from Director Saving Pool
+  if (claim.claim_type === 'project' && Number(claim.amount) > 0) {
+    await supabase.from('hv_operating_fund').insert({
+      transaction_type: 'claim_out',
+      amount: Number(claim.amount),
+      description: `Pool claim: ${claim.claimant_name} — ${claim.description ?? ''}`.trim(),
+      period_month: new Date().toISOString().slice(0, 8) + '01',
+    })
+  }
+
   revalidatePath('/claims')
+  revalidatePath('/director-pool')
 }
 
 export async function rejectClaim(claimId: string) {
