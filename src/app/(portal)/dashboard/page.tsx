@@ -86,7 +86,8 @@ export default async function DashboardPage() {
   // RPC returns { error: 'Access denied' } for HR/dept_manager (not a Supabase error)
   if (raw && typeof raw === 'object' && 'error' in raw && (raw as Record<string, unknown>).error === 'Access denied') {
     // Determine role for role-specific dashboard
-    const { data: currentUser } = await supabase.from('users').select('role, name').eq('id', user.id).single()
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    const { data: currentUser } = await supabase.from('users').select('role, name').eq('id', authUser?.id ?? '').single()
     const userRole = currentUser?.role
 
     if (userRole === 'hr') {
