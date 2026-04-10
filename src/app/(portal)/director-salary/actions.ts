@@ -303,3 +303,55 @@ export async function calculateDirectorSalary(period: string): Promise<Calculate
     period: r.period,
   }
 }
+
+// ─── Update PCB ────────────────────────────────────────────────────
+
+export async function updatePCB(payoutId: string, pcbAmount: number) {
+  await requireRole(['hr', 'principal'])
+  const supabase = await createClient()
+
+  // Fetch current payout to recalculate net
+  const { data: payout, error: fetchErr } = await supabase
+    .from('director_payouts')
+    .select('payroll_gross, payroll_epf_er, payroll_epf_ee, payroll_socso_er, payroll_socso_ee, payroll_eis_er, payroll_eis_ee, status')
+    .eq('id', payoutId)
+    .single()
+
+  if (fetchErr || !payout) throw new Error('Payout not found')
+  if (payout.status !== 'draft') throw new Error('Cannot update PCB on a confirmed/paid payout')
+
+  const totalDeductions = Number(payout.payroll_epf_er ?? 0) + Number(payout.payroll_epf_ee ?? 0)
+    + Number(payout.payroll_socso_er ?? 0) + Number(payout.payroll_socso_ee ?? 0)
+    + Number(payout.payroll_eis_er ?? 0) + Number(payout.payroll_eis_ee ?? 0)
+  const payrollNet = Number(payout.payroll_gross ?? 0) - totalDeductions - pcbAmount
+
+  const { error } = await supabase
+    .from('director_payouts')
+    .update({ payroll_pcb: pcbAmount, payroll_net: payrollNet })
+    .eq('id', payoutId)
+
+  if (error) throw new Error(`Failed to update PCB: ${error.message}`)
+
+  revalidatePath('/director-salary')
+}
+
+// ─── Confirm Payouts ───────────────────────────────────────────────
+
+export async function confirmPayouts(period: string) {
+  await requireRole(['hr', 'principal'])
+  const supabase = await createClient()
+
+  const periodNorm = dayjs(period).startOf('month').format('YYYY-MM-DD')
+
+  const { error, count } = await supabase
+    .from('director_payouts')
+    .update({ status: 'confirmed' })
+    .eq('period_month', periodNorm)
+    .eq('status', 'draft')
+
+  if (error) throw new Error(`Failed to confirm payouts: ${error.message}`)
+
+  revalidatePath('/director-salary')
+  revalidatePath('/dashboard')
+  return { confirmed: count ?? 0 }
+}
