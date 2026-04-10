@@ -177,7 +177,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
           <section className="mb-16">
             <h2 className="font-serif text-2xl text-ink mb-1">CTC Input</h2>
             <p className="font-serif italic text-graphite text-sm mb-6">
-              录入每位 Director 在每间子公司的 CTC。<em>Statutory ER 由 trigger 自动计算。</em>
+              录入每间子公司的 Director Portion。<em>Statutory ER 由 trigger 自动计算，Pool 按 Weightage 分配。</em>
             </p>
 
             <CTCInputGrid
