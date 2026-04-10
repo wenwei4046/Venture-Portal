@@ -22,6 +22,14 @@ export default async function PrintPayoutPage({ params, searchParams }: Props) {
     supabase.from('director_payouts').select('*').eq('director_id', directorId).eq('period_month', period).maybeSingle(),
   ])
 
+  // Fire-and-forget access log for sensitive print action
+  void supabase.rpc('log_data_access', {
+    p_resource_type: 'director_salary_print',
+    p_resource_id: directorId,
+    p_action: 'print',
+    p_metadata: { period },
+  })
+
   if (!director || !payout) {
     return <div className="p-10 font-serif text-danger">Data not found.</div>
   }

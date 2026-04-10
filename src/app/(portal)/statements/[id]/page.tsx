@@ -55,7 +55,7 @@ export default async function StatementDetailPage({ params }: Props) {
       </Link>
 
       {/* ───────── Header ───────── */}
-      <div className="flex items-baseline justify-between mt-3 mb-10">
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mt-3 mb-10">
         <div>
           <p className="font-serif italic text-accent text-base mb-1">
             {dayjs(statement.period_month).format('MMMM YYYY')} statement
@@ -66,7 +66,16 @@ export default async function StatementDetailPage({ params }: Props) {
             {dayjs(statement.created_at).format('D MMM YYYY')}
           </p>
         </div>
-        <StatementStatus status={statement.status} />
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/statements/${id}/print`}
+            target="_blank"
+            className="btn-secondary"
+          >
+            Print Statement
+          </Link>
+          <StatementStatus status={statement.status} />
+        </div>
       </div>
 
       {/* ───────── Hero net amount ───────── */}

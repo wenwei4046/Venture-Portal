@@ -38,6 +38,7 @@ const navItems: NavItem[] = [
   { href: '/claims', label: 'Claims', visible: canAccessClaims },
   { href: '/reconciliation', label: 'Reconciliation', visible: canAccessTreasury },
   { href: '/reports', label: 'Reports', visible: canAccessReports },
+  { href: '/audit-log', label: 'Audit Log', visible: canAccessSettings },
   { href: '/settings', label: 'Settings', visible: canAccessSettings },
 ]
 

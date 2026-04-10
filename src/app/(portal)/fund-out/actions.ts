@@ -10,7 +10,7 @@ import type { PaymentType } from '@/types'
 // ─── Create new loan (Finance) ────────────────────────────────────────────────
 
 export async function createLoan(formData: FormData) {
-  const user = await requireRole(['finance'])
+  await requireRole(['finance'])
   const supabase = await createClient()
 
   const companyId = (formData.get('company_id') as string) ?? ''
@@ -66,51 +66,29 @@ export async function createLoan(formData: FormData) {
   const premium = Number(tierConfig.premium_rate)
   const effective = base + premium
 
-  // ─── INSERT loan (pending_approval) ───
-  const { data: loan, error: loanError } = await supabase
-    .from('loans')
-    .insert({
-      company_id: companyId,
-      principal,
-      base_rate: base,
-      risk_premium: premium,
-      effective_rate: effective,
-      repayment_terms: repaymentTerms || null,
-      status: 'pending_approval',
-      created_by: user.id,
-    })
-    .select('id')
-    .single()
+  // ─── Atomic loan + approval creation (M1 fix) ───
+  const { data: loanId, error: rpcError } = await supabase.rpc(
+    'create_loan_with_approval',
+    {
+      p_company_id: companyId,
+      p_principal: principal,
+      p_base_rate: base,
+      p_risk_premium: premium,
+      p_effective_rate: effective,
+      p_repayment_terms: repaymentTerms || null,
+      p_company_name: company.name,
+      p_company_tier: company.tier,
+    }
+  )
 
-  if (loanError || !loan) {
-    throw new Error(`Failed to create loan: ${loanError?.message ?? 'unknown'}`)
-  }
-
-  // ─── INSERT approval request ───
-  // NOTE: Not atomic with loan insert. If this fails, we have an orphan
-  // loan in pending_approval. Phase 1.5 should add a Postgres function
-  // with SECURITY DEFINER to make this atomic.
-  const { error: approvalError } = await supabase.from('approval_requests').insert({
-    request_type: 'new_loan',
-    reference_id: loan.id,
-    reference_table: 'loans',
-    submitted_by: user.id,
-    description: `New loan to ${company.name} (${company.tier})`,
-    amount: principal,
-    status: 'pending',
-    workflow_state: 'submitted',
-  })
-
-  if (approvalError) {
-    throw new Error(
-      `Loan created but approval request failed: ${approvalError.message}. Contact admin.`
-    )
+  if (rpcError || !loanId) {
+    throw new Error(`Failed to create loan: ${rpcError?.message ?? 'unknown'}`)
   }
 
   revalidatePath('/fund-out')
   revalidatePath('/approvals')
   revalidatePath('/dashboard')
-  redirect(`/fund-out/${loan.id}`)
+  redirect(`/fund-out/${loanId}`)
 }
 
 // ─── Record repayment (Finance) ───────────────────────────────────────────────

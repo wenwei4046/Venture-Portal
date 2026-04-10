@@ -27,6 +27,14 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
     supabase.from('director_payouts').select('*').eq('director_id', directorId).eq('period_month', period).maybeSingle(),
   ])
 
+  // Fire-and-forget access log for sensitive director data
+  void supabase.rpc('log_data_access', {
+    p_resource_type: 'director_payouts',
+    p_resource_id: directorId,
+    p_action: 'view',
+    p_metadata: { period },
+  })
+
   if (!director) {
     return (
       <div className="py-16 text-center">

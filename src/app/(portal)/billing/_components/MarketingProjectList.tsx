@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
 
@@ -15,6 +16,7 @@ interface Contract {
 interface Props {
   contracts: Contract[]
   companyMap: Map<string, { name: string; code: string }>
+  canCreate?: boolean
 }
 
 // Marketing project billing: Finance creates a service_contract per project
@@ -22,12 +24,22 @@ interface Props {
 // flows through Principal approval (new_contract approval type → Step 2
 // approval_cascade trigger activates it). Per spec, Marketing is the only
 // dept with real P&L — these contracts feed the Marketing dept pool.
-export default function MarketingProjectList({ contracts, companyMap }: Props) {
+export default function MarketingProjectList({ contracts, companyMap, canCreate }: Props) {
   return (
     <section className="border-t border-hairline pt-8">
       <div className="flex items-baseline justify-between mb-4">
-        <h2 className="font-serif text-xl text-ink">Marketing Projects</h2>
-        <span className="font-serif italic text-muted text-xs">marketing_project</span>
+        <div className="flex items-baseline gap-4">
+          <h2 className="font-serif text-xl text-ink">Marketing Projects</h2>
+          <span className="font-serif italic text-muted text-xs">marketing_project</span>
+        </div>
+        {canCreate && (
+          <Link
+            href="/billing/contracts/new"
+            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+          >
+            + New contract
+          </Link>
+        )}
       </div>
       <p className="font-serif italic text-graphite text-sm mb-4">
         Project-based service contracts between Marketing and subsidiaries. Fixed
@@ -37,8 +49,14 @@ export default function MarketingProjectList({ contracts, companyMap }: Props) {
       {contracts.length === 0 ? (
         <div className="border border-hairline rounded-md bg-surface p-6 text-center">
           <p className="font-serif italic text-muted text-sm">
-            No Marketing project contracts yet. Finance creates contracts via the
-            service_contracts flow (CRUD UI lands in a later phase).
+            No Marketing project contracts yet.{' '}
+            {canCreate ? (
+              <Link href="/billing/contracts/new" className="text-accent hover:underline">
+                Create the first contract
+              </Link>
+            ) : (
+              'Finance creates contracts via the Billing module.'
+            )}
           </p>
         </div>
       ) : (
@@ -50,7 +68,8 @@ export default function MarketingProjectList({ contracts, companyMap }: Props) {
                 <th className="text-left py-3 pr-4 font-medium">Company</th>
                 <th className="text-right py-3 pr-4 font-medium">Amount</th>
                 <th className="text-left py-3 pr-4 font-medium">Dates</th>
-                <th className="text-left py-3 font-medium">Status</th>
+                <th className="text-left py-3 pr-4 font-medium">Status</th>
+                {canCreate && <th className="text-left py-3 font-medium"></th>}
               </tr>
             </thead>
             <tbody>
@@ -79,9 +98,19 @@ export default function MarketingProjectList({ contracts, companyMap }: Props) {
                       {c.start_date ? dayjs(c.start_date).format('D MMM YY') : '—'}
                       {c.end_date ? ` → ${dayjs(c.end_date).format('D MMM YY')}` : ''}
                     </td>
-                    <td className="py-3">
+                    <td className="py-3 pr-4">
                       <ContractStatus status={c.status} approvedBy={c.approved_by} />
                     </td>
+                    {canCreate && (
+                      <td className="py-3">
+                        <Link
+                          href={`/billing/contracts/${c.id}/edit`}
+                          className="text-xs text-accent hover:underline font-sans"
+                        >
+                          Edit
+                        </Link>
+                      </td>
+                    )}
                   </tr>
                 )
               })}

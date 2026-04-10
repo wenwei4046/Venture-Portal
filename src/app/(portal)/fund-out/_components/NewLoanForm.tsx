@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useMemo } from 'react'
+import Link from 'next/link'
 import { createLoan } from '../actions'
 import type { Company, CompanyTier, TierConfig } from '@/types'
 
@@ -44,7 +45,7 @@ export default function NewLoanForm({ companies, tiers, baseRate }: Props) {
   return (
     <form
       action={handleSubmit}
-      className="bg-surface border border-hairline rounded-md p-8 max-w-3xl"
+      className="bg-surface border border-hairline rounded-md p-4 sm:p-8 max-w-3xl"
     >
       {/* ───────── Company ───────── */}
       <div className="mb-6">
@@ -177,21 +178,21 @@ export default function NewLoanForm({ companies, tiers, baseRate }: Props) {
       ) : null}
 
       {/* ───────── Actions ───────── */}
-      <div className="flex items-center gap-4 pt-4 border-t border-hairline">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 pt-4 border-t border-hairline">
         <button
           type="submit"
           disabled={isPending || !companyId}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2.5 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isPending ? 'Submitting…' : 'Submit for approval'}
         </button>
-        <a
+        <Link
           href="/fund-out"
-          className="text-sm text-graphite hover:text-ink font-sans transition-colors"
+          className="text-sm text-graphite hover:text-ink font-sans transition-colors text-center sm:text-left"
         >
           Cancel
-        </a>
-        <span className="text-xs text-muted italic font-serif ml-auto">
+        </Link>
+        <span className="text-xs text-muted italic font-serif sm:ml-auto">
           Principal must approve before disbursement
         </span>
       </div>

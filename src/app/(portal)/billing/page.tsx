@@ -88,7 +88,7 @@ export default async function BillingPage({ searchParams }: Props) {
   return (
     <div>
       {/* ───────── Header ───────── */}
-      <div className="flex items-baseline justify-between mb-10">
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10">
         <div>
           <h1 className="font-serif text-3xl text-ink">Service Billing</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
@@ -96,7 +96,7 @@ export default async function BillingPage({ searchParams }: Props) {
             <em>Finance reviews + issues invoices, Principal approves new contracts.</em>
           </p>
         </div>
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-5 shrink-0">
           <PeriodSelector currentPeriod={period} />
           {user.role === 'finance' && submitted ? (
             <GenerateInvoicesButton currentPeriod={period} />
@@ -161,8 +161,9 @@ export default async function BillingPage({ searchParams }: Props) {
         contracts={(marketingContracts ?? [])
           .filter((c): c is typeof c & { company_id: string } => c.company_id !== null)}
         companyMap={companyMap}
+        canCreate={user.role === 'finance'}
       />
-      <FixedSplitPanel />
+      <FixedSplitPanel currentPeriod={period} canGenerate={user.role === 'finance'} />
       <NonBillableList />
     </div>
   )

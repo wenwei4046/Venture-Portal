@@ -5,7 +5,7 @@ import Link from 'next/link'
 import AddStaffForm from './_components/AddStaffForm'
 
 export default async function StaffListPage() {
-  const user = await requireRole(['principal', 'hr'])
+  await requireRole(['principal', 'hr'])
   const supabase = await createClient()
 
   const [
@@ -18,6 +18,13 @@ export default async function StaffListPage() {
       .order('employee_name'),
     supabase.from('departments').select('id, name').order('name'),
   ])
+
+  // Fire-and-forget access log for sensitive HR staff data
+  void supabase.rpc('log_data_access', {
+    p_resource_type: 'hr_staff_costs',
+    p_action: 'view',
+    p_metadata: { staff_count: staff?.length ?? 0 },
+  })
 
   return (
     <div>
