@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default async function ClaimsPage({ searchParams }: Props) {
-  const user = await requireRole(['principal', 'finance', 'hr'])
+  const user = await requireRole(['principal', 'finance', 'hr', 'dept_manager'])
   const supabase = await createClient()
 
   const { tab } = await searchParams

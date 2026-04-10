@@ -28,7 +28,7 @@ export function canAccessReports(role: UserRole): boolean {
 }
 
 export function canAccessClaims(role: UserRole): boolean {
-  return role === 'principal' || role === 'finance' || role === 'hr'
+  return role === 'principal' || role === 'finance' || role === 'hr' || role === 'dept_manager'
 }
 
 export function canAccessSettings(role: UserRole): boolean {

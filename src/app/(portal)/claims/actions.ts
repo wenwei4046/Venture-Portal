@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 
 export async function submitClaim(formData: FormData) {
-  const user = await requireRole(['principal', 'finance', 'hr'])
+  const user = await requireRole(['principal', 'finance', 'hr', 'dept_manager'])
   const supabase = await createClient()
 
   const claimType = formData.get('claim_type') as 'project' | 'benefit'
