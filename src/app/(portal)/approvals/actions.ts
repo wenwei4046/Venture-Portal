@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { computeDowngradedTier } from '@/lib/tier'
+import { notifyApprovalDecision } from '@/lib/slack'
 import type { CompanyTier } from '@/types'
 
 // ─── Approve request (Principal) ──────────────────────────────────────────────
@@ -128,6 +129,14 @@ export async function approveRequest(formData: FormData) {
     // recovery / write-off (out of Phase 1 scope).
   }
   // Other request types (base_rate, tier_change, etc) handled in Phase 1.5+
+
+  // Slack notification (non-blocking)
+  notifyApprovalDecision(
+    approval.request_type,
+    'approved',
+    approval.description ?? '',
+    user.name
+  ).catch(() => {})
 
   revalidatePath('/approvals')
   revalidatePath('/fund-out')

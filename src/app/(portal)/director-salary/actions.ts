@@ -10,6 +10,7 @@ import {
   type DirectorConfig,
   type StatutoryLookup,
 } from '@/lib/salary'
+import { notifyDirectorSalaryCalculated } from '@/lib/slack'
 import dayjs from 'dayjs'
 
 // ─── Save CTC ──────────────────────────────────────────────────────
@@ -294,6 +295,13 @@ export async function calculateDirectorSalary(period: string): Promise<Calculate
 
   const r = result as { success: boolean; saved: number; skipped: number; advance_total: number; period: string; error?: string }
   if (!r.success) throw new Error(r.error ?? 'Unknown error during save')
+
+  // Slack notification (non-blocking)
+  notifyDirectorSalaryCalculated(
+    dayjs(periodNorm).format('MMMM YYYY'),
+    r.saved,
+    totalSaving
+  ).catch(() => {})
 
   return {
     success: true,
