@@ -83,6 +83,21 @@ export default async function DashboardPage() {
     )
   }
 
+  // RPC returns { error: 'Access denied' } for HR/dept_manager (not a Supabase error)
+  if (raw && typeof raw === 'object' && 'error' in raw && (raw as Record<string, unknown>).error === 'Access denied') {
+    return (
+      <div className="py-16 text-center">
+        <p className="font-serif italic text-2xl text-ink mb-2">Dashboard</p>
+        <p className="font-serif italic text-graphite">
+          Treasury data is available to Principal and Finance only.
+        </p>
+        <p className="font-mono text-xs text-muted mt-4">
+          Use the sidebar to navigate to your modules.
+        </p>
+      </div>
+    )
+  }
+
   const summary = raw as unknown as DashboardSummary
   const today = dayjs().format('D MMMM YYYY')
 
