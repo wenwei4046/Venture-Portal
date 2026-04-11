@@ -2,10 +2,13 @@ import dayjs from 'dayjs'
 
 export function formatMoney(amount: number | null | undefined): string {
   const val = amount ?? 0
-  return `RM ${val.toLocaleString('en-MY', {
+  const formatted = Math.abs(val).toLocaleString('en-MY', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  })}`
+  })
+  // Negatives render as parenthesis notation per DESIGN.md money format spec.
+  // Callers that need color should wrap in text-danger conditional on val < 0.
+  return val < 0 ? `RM (${formatted})` : `RM ${formatted}`
 }
 
 export function formatRate(rate: number): string {

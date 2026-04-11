@@ -14,11 +14,19 @@ describe('formatMoney', () => {
     expect(formatMoney(0)).toBe('RM 0.00')
   })
 
-  it('formats a negative amount with a leading minus', () => {
-    // Note: the UI layer renders negatives as (X) parenthesis notation —
-    // formatMoney itself returns the raw Intl format. See the statements
-    // detail page for the parenthesis wrapper.
-    expect(formatMoney(-1000)).toBe('RM -1,000.00')
+  it('formats a negative amount in parenthesis notation (DESIGN.md contra format)', () => {
+    // Negatives use accounting parenthesis, NOT a leading minus.
+    // DESIGN.md: "| Negative (contra) | `(1,234.56)` | mono + `--danger` color |"
+    expect(formatMoney(-1000)).toBe('RM (1,000.00)')
+  })
+
+  it('formats a negative fractional amount in parenthesis notation', () => {
+    expect(formatMoney(-5847.7)).toBe('RM (5,847.70)')
+  })
+
+  it('formats null and undefined as zero (not a negative)', () => {
+    expect(formatMoney(null)).toBe('RM 0.00')
+    expect(formatMoney(undefined)).toBe('RM 0.00')
   })
 
   it('formats large seven-figure amounts with thousand separators', () => {
