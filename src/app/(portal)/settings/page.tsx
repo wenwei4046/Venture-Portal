@@ -9,6 +9,7 @@ import RentSplitSection from './_components/RentSplitSection'
 import UtilitySplitSection from './_components/UtilitySplitSection'
 import DirectorSalarySection from './_components/DirectorSalarySection'
 import BaseRateSimulator from './_components/BaseRateSimulator'
+import SettingsTabs, { type SettingsTab, isSettingsTab } from './_components/SettingsTabs'
 
 interface SplitRow {
   id: string
@@ -17,8 +18,15 @@ interface SplitRow {
   split_pct: number
 }
 
-export default async function SettingsPage() {
+interface Props {
+  searchParams: Promise<{ tab?: string }>
+}
+
+export default async function SettingsPage({ searchParams }: Props) {
   await requireRole(['principal'])
+
+  const { tab: rawTab } = await searchParams
+  const activeTab: SettingsTab = isSettingsTab(rawTab) ? rawTab : 'treasury'
 
   const supabase = await createClient()
 
@@ -71,7 +79,7 @@ export default async function SettingsPage() {
 
   return (
     <div>
-      <div className="mb-10">
+      <div className="mb-6">
         <h1 className="font-serif text-3xl text-ink">Settings</h1>
         <p className="font-serif italic text-graphite text-base mt-2">
           Treasury config, tier premiums, overdue stages, and{' '}
@@ -79,37 +87,49 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      <div className="space-y-6">
+      <SettingsTabs active={activeTab} />
+
+      {activeTab === 'treasury' && (
         <TreasuryConfigSection
           opMargin={opMargin}
           bufferAmount={bufferAmount}
           savingRate={savingRate}
         />
+      )}
 
-        <TierPremiumSection tiers={tiers} />
+      {activeTab === 'tiers' && (
+        <div className="space-y-6">
+          <TierPremiumSection tiers={tiers} />
+          <CompanyTierSection companies={companies} />
+        </div>
+      )}
 
+      {activeTab === 'overdue' && (
         <OverdueStagesSection stages={overdueStages} />
+      )}
 
-        <CompanyTierSection companies={companies} />
+      {activeTab === 'splits' && (
+        <div className="space-y-6">
+          <RentSplitSection
+            companies={companies.map((c) => ({
+              id: c.id,
+              name: c.name,
+              short_code: c.short_code,
+            }))}
+            initial={rentSplits}
+          />
+          <UtilitySplitSection
+            companies={companies.map((c) => ({
+              id: c.id,
+              name: c.name,
+              short_code: c.short_code,
+            }))}
+            initial={utilitySplits}
+          />
+        </div>
+      )}
 
-        <RentSplitSection
-          companies={companies.map((c) => ({
-            id: c.id,
-            name: c.name,
-            short_code: c.short_code,
-          }))}
-          initial={rentSplits}
-        />
-
-        <UtilitySplitSection
-          companies={companies.map((c) => ({
-            id: c.id,
-            name: c.name,
-            short_code: c.short_code,
-          }))}
-          initial={utilitySplits}
-        />
-
+      {activeTab === 'directors' && (
         <DirectorSalarySection
           directors={(directorRows ?? []).map((d) => ({
             id: d.id,
@@ -119,14 +139,16 @@ export default async function SettingsPage() {
             min_payout: Number(d.min_payout),
           }))}
         />
+      )}
 
+      {activeTab === 'simulator' && (
         <BaseRateSimulator
           currentPaidCapital={(fundSourceRows ?? []).reduce((s, f) => s + Number(f.amount), 0)}
           currentWeightedCost={Number(latestBaseRate?.weighted_cost ?? 0)}
           opMargin={Number(latestBaseRate?.op_margin ?? opMargin)}
           currentBaseRate={Number(latestBaseRate?.base_rate ?? 0)}
         />
-      </div>
+      )}
     </div>
   )
 }
