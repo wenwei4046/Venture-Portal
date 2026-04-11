@@ -50,3 +50,6 @@ settings-verified.png
 
 # E2E test screenshot artifacts (local only)
 /e2e-screenshots/
+
+# Design audit screenshots (local session only)
+/design-audit/
