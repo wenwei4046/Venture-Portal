@@ -47,7 +47,7 @@ export default async function DirectorPoolPage() {
         <div className="border border-hairline rounded-md bg-surface p-5">
           <div className="font-serif italic text-sm text-accent mb-1">Director Saving</div>
           <div className={`font-serif text-2xl ${savingBalance >= 0 ? 'text-ink' : 'text-danger'}`}>
-            {savingBalance >= 0 ? formatMoney(savingBalance) : `(${formatMoney(Math.abs(savingBalance)).replace('RM ', '')})`}
+            {formatMoney(savingBalance)}
           </div>
           <div className="font-mono text-xs text-muted mt-1">
             5% saving + statutory surplus/deficit
@@ -63,7 +63,7 @@ export default async function DirectorPoolPage() {
         <div className="border border-hairline rounded-md bg-surface p-5">
           <div className="font-serif italic text-sm text-accent mb-1">Claims Deducted</div>
           <div className="font-serif text-2xl text-danger">
-            {totalClaimed > 0 ? `(${formatMoney(totalClaimed).replace('RM ', '')})` : 'RM 0.00'}
+            {formatMoney(-totalClaimed)}
           </div>
           <div className="font-mono text-xs text-muted mt-1">
             Approved director claims from saving pool
