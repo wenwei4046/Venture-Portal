@@ -47,7 +47,16 @@ export default function RootLayout({
     <html
       lang="en-MY"
       className={`${instrumentSerif.variable} ${inter.variable} ${jetbrainsMono.variable} ${notoSerifTc.variable}`}
+      suppressHydrationWarning
     >
+      <head>
+        {/* Theme script — runs before paint to prevent FOUC */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||t==='light'){document.documentElement.setAttribute('data-theme',t)}else if(window.matchMedia('(prefers-color-scheme:dark)').matches){document.documentElement.setAttribute('data-theme','dark')}}catch(e){}})()`,
+          }}
+        />
+      </head>
       <body>{children}</body>
     </html>
   )

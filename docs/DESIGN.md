@@ -36,7 +36,7 @@ HOUZS Venture Portal (VP) 是 HOUZS Venture Sdn Bhd 的内部银行系统。User
 - Inter as display font (Inter is body-only in VP)
 
 **Not doing:**
-- Dark mode in Phase 1 — VP is a daytime instrument
+- ~~Dark mode in Phase 1~~ — Shipped. Warm charcoal palette, not cold inversion
 - Chart-first dashboard — type-led, number-first
 - Multi-color status rainbows — single rust accent + muted gold + muted green
 
@@ -157,16 +157,43 @@ All 4 fonts are free. No licensing cost.
 - `--danger` is reserved for escalation-stage overdue only. Don't burn it on small errors.
 - Overdue label format: `<em class="text-alert">overdue 15d</em>` — italic graphite-warm, not a red pill
 
-### Dark mode
+### Dark mode — Shipped
 
-**Not in Phase 1.** VP is a daytime workspace. Dark mode is TODO for Phase 1.5 — requires palette redesign, not just inverted tokens.
+**Warm charcoal palette** — not cold inversion. Maintains the journal aesthetic in low light.
+
+**Architecture:** CSS variables (RGB triplets) in `globals.css` → Tailwind references via `rgb(var(--xxx) / <alpha-value>)`. Theme toggle in TopBar. System preference respected by default, manual override via `data-theme` attribute on `<html>`.
+
+**Dark palette:**
+| Token | Light (RGB) | Dark (RGB) |
+|-------|-------------|------------|
+| paper | 245 239 228 | 26 23 20 |
+| surface | 251 248 242 | 36 32 25 |
+| surface-2 | 238 230 214 | 46 41 34 |
+| hairline | 223 212 190 | 61 54 44 |
+| ink | 26 22 19 | 232 224 212 |
+| graphite | 107 95 82 | 168 155 140 |
+| muted | 158 143 127 | 115 103 88 |
+| accent | 204 90 46 | 224 107 58 |
+
+**FOUC prevention:** Inline `<script>` in `<head>` reads localStorage before paint.
+
+**Known limitations:**
+- Recharts components (PnLChart, FundPieChart, BaseRateTrendChart) use hardcoded hex colors — chart elements may have reduced contrast in dark mode
+- Print pages (statements, director salary) stay light-only (intended for physical printing)
 
 ### Contrast verification
 
 All foreground/background combinations must pass WCAG AA:
-- `--ink` (#1A1613) on `--bg` (#F5EFE4) = **12.8:1** ✓
-- `--graphite` (#6B5F52) on `--bg` = **5.4:1** ✓
-- `--accent` (#CC5A2E) on `--bg` = **4.7:1** ✓ (AA normal text)
+
+**Light mode:**
+- `--ink` (#1A1613) on `--paper` (#F5EFE4) = **12.8:1** ✓
+- `--graphite` (#6B5F52) on `--paper` = **5.4:1** ✓
+- `--accent` (#CC5A2E) on `--paper` = **4.7:1** ✓ (AA normal text)
+
+**Dark mode:**
+- `--ink` (E8E0D4) on `--paper` (1A1714) = **12.1:1** ✓
+- `--graphite` (A89B8C) on `--paper` = **5.9:1** ✓
+- `--accent` (E06B3A) on `--paper` = **4.9:1** ✓ (AA normal text)
 - `--accent` on `--accent-bg` (#FBE8DE) = **4.9:1** ✓
 - `--muted` (#9E8F7F) on `--bg` = **3.2:1** — **large text only** (≥18px)
 

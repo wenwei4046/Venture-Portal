@@ -5,6 +5,7 @@ import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@/types'
 import { getRoleLabel } from '@/lib/roles'
+import ThemeToggle from './ThemeToggle'
 
 function getGreeting(): string {
   const hour = new Date().getHours()
@@ -66,10 +67,11 @@ export default function TopBar({ user, onMenuClick }: TopBarProps) {
         </div>
       </div>
 
-      <div className="flex items-baseline gap-4 md:gap-6 shrink-0">
+      <div className="flex items-center gap-4 md:gap-6 shrink-0">
         <div className="hidden sm:block font-mono text-xs text-muted">
           {dateLabel} · {quarter}
         </div>
+        <ThemeToggle />
         <button
           onClick={handleSignOut}
           className="text-xs text-muted hover:text-accent font-sans transition-colors"

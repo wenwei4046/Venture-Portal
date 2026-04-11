@@ -8,43 +8,96 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* Color — warm paper */
-  --paper: #F5EFE4;
-  --surface: #FBF8F2;
-  --surface-2: #EEE6D6;
-  --hairline: #DFD4BE;
-  --ink: #1A1613;
-  --graphite: #6B5F52;
-  --muted: #9E8F7F;
+  /* Color — warm paper (RGB triplets for Tailwind opacity support) */
+  --paper: 245 239 228;
+  --surface: 251 248 242;
+  --surface-2: 238 230 214;
+  --hairline: 223 212 190;
+  --ink: 26 22 19;
+  --graphite: 107 95 82;
+  --muted: 158 143 127;
 
   /* Accent — single rust seal */
-  --accent: #CC5A2E;
-  --accent-bg: #FBE8DE;
-  --accent-border: #E8B098;
-  --accent-hover: #B54A22;
+  --accent: 204 90 46;
+  --accent-bg: 251 232 222;
+  --accent-border: 232 176 152;
+  --accent-hover: 181 74 34;
 
   /* Semantic — muted */
-  --ledger: #3D6B45;
-  --ledger-bg: #E7EFE6;
-  --alert: #A07020;
-  --alert-bg: #F5EBD3;
-  --danger: #A3371A;
-  --danger-bg: #F8E1D8;
-  --info: #5A6B8A;
-  --info-bg: #EBEEF3;
+  --ledger: 61 107 69;
+  --ledger-bg: 231 239 230;
+  --alert: 160 112 32;
+  --alert-bg: 245 235 211;
+  --danger: 163 55 26;
+  --danger-bg: 248 225 216;
+  --info: 90 107 138;
+  --info-bg: 235 238 243;
+}
+
+/* ─── Dark mode — warm charcoal, not cold ─── */
+[data-theme="dark"] {
+  --paper: 26 23 20;
+  --surface: 36 32 25;
+  --surface-2: 46 41 34;
+  --hairline: 61 54 44;
+  --ink: 232 224 212;
+  --graphite: 168 155 140;
+  --muted: 115 103 88;
+
+  --accent: 224 107 58;
+  --accent-bg: 61 37 23;
+  --accent-border: 139 90 58;
+  --accent-hover: 240 122 72;
+
+  --ledger: 90 155 98;
+  --ledger-bg: 30 46 31;
+  --alert: 200 144 48;
+  --alert-bg: 46 37 16;
+  --danger: 212 80 48;
+  --danger-bg: 46 24 18;
+  --info: 123 144 181;
+  --info-bg: 26 30 40;
+}
+
+/* System preference fallback (when no explicit toggle) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: 26 23 20;
+    --surface: 36 32 25;
+    --surface-2: 46 41 34;
+    --hairline: 61 54 44;
+    --ink: 232 224 212;
+    --graphite: 168 155 140;
+    --muted: 115 103 88;
+
+    --accent: 224 107 58;
+    --accent-bg: 61 37 23;
+    --accent-border: 139 90 58;
+    --accent-hover: 240 122 72;
+
+    --ledger: 90 155 98;
+    --ledger-bg: 30 46 31;
+    --alert: 200 144 48;
+    --alert-bg: 46 37 16;
+    --danger: 212 80 48;
+    --danger-bg: 46 24 18;
+    --info: 123 144 181;
+    --info-bg: 26 30 40;
+  }
 }
 
 html {
   font-family: var(--font-sans), 'Inter', -apple-system, sans-serif;
-  background: var(--paper);
-  color: var(--ink);
+  background: rgb(var(--paper));
+  color: rgb(var(--ink));
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  transition: background 200ms ease-out, color 200ms ease-out;
 }
 
 body {
-  background: var(--paper);
-  color: var(--ink);
+  background: rgb(var(--paper));
+  color: rgb(var(--ink));
   font-size: 14px;
   line-height: 1.5;
 }
@@ -53,7 +106,7 @@ body {
 h1, h2, h3, h4 {
   font-family: var(--font-serif), 'Instrument Serif', Georgia, serif;
   font-weight: 400;
-  color: var(--ink);
+  color: rgb(var(--ink));
 }
 
 /* Tabular numbers for money + data */
@@ -97,7 +150,7 @@ h1, h2, h3, h4 {
 }
 
 .skeleton {
-  background: var(--hairline);
+  background: rgb(var(--hairline));
   border-radius: 4px;
   animation: skeleton-pulse 1.5s ease-in-out infinite;
 }
@@ -115,7 +168,7 @@ h1, h2, h3, h4 {
   transition: background 150ms ease-out, box-shadow 150ms ease-out;
 }
 .card-hover:hover {
-  box-shadow: 0 1px 4px rgba(26, 22, 19, 0.06);
+  box-shadow: 0 1px 4px rgb(var(--ink) / 0.06);
 }
 
 /* Button press feedback */
@@ -133,7 +186,7 @@ h1, h2, h3, h4 {
 /* ───────── Component classes (pure CSS, no @apply) ───────── */
 
 .btn-seal {
-  background: var(--accent);
+  background: rgb(var(--accent));
   color: white;
   border: none;
   padding: 8px 16px;
@@ -145,7 +198,7 @@ h1, h2, h3, h4 {
   transition: background 120ms ease-out;
 }
 .btn-seal:hover:not(:disabled) {
-  background: var(--accent-hover);
+  background: rgb(var(--accent-hover));
 }
 .btn-seal:disabled {
   opacity: 0.5;
@@ -154,8 +207,8 @@ h1, h2, h3, h4 {
 
 .btn-secondary {
   background: transparent;
-  color: var(--graphite);
-  border: 1px solid var(--hairline);
+  color: rgb(var(--graphite));
+  border: 1px solid rgb(var(--hairline));
   padding: 8px 16px;
   border-radius: 6px;
   font-family: var(--font-sans), 'Inter', sans-serif;
@@ -165,12 +218,12 @@ h1, h2, h3, h4 {
   transition: background 120ms ease-out, color 120ms ease-out;
 }
 .btn-secondary:hover {
-  background: var(--surface-2);
-  color: var(--ink);
+  background: rgb(var(--surface-2));
+  color: rgb(var(--ink));
 }
 
 .card-base {
-  background: var(--surface);
-  border: 1px solid var(--hairline);
+  background: rgb(var(--surface));
+  border: 1px solid rgb(var(--hairline));
   border-radius: 6px;
 }

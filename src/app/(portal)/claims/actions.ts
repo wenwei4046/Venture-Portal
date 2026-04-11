@@ -30,12 +30,17 @@ export async function approveClaim(claimId: string) {
 
   const { data: claim } = await supabase
     .from('claims')
-    .select('claim_type, status, amount, claimant_name, description')
+    .select('claim_type, status, amount, claimant_name, description, created_by')
     .eq('id', claimId)
     .single()
 
   if (!claim) throw new Error('Claim not found')
   if (claim.status !== 'pending') throw new Error('Claim is not pending')
+
+  // Security: prevent self-approval (defense in depth — RLS enforces too)
+  if (claim.created_by === user.id) {
+    throw new Error('Cannot approve your own claim')
+  }
 
   // Finance approves pool claims, HR approves benefit claims
   if (claim.claim_type === 'project' && user.role !== 'finance' && user.role !== 'principal') {

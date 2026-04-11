@@ -133,7 +133,7 @@ export async function approveRequest(formData: FormData) {
       .from('invoice_payout_pool')
       .insert({
         transaction_type: 'release',
-        amount: approval.amount,
+        amount: Number(approval.amount ?? 0),
         description: approval.description ?? 'Invoice pool release',
         release_approved_by: user.id,
         release_approved_at: now,

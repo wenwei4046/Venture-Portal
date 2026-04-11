@@ -61,7 +61,7 @@ export default function ContractForm({ companies, contract }: Props) {
           name="company_id"
           defaultValue={contract?.company_id ?? ''}
           required
-          className="w-full border border-hairline rounded-md px-3 py-2 font-sans text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+          className="w-full border border-hairline rounded-md px-3 py-2 font-sans text-sm text-ink bg-surface focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
         >
           <option value="">Select company...</option>
           {companies.map((c) => (
@@ -83,7 +83,7 @@ export default function ContractForm({ companies, contract }: Props) {
           defaultValue={contract?.description ?? ''}
           required
           placeholder="e.g. Q2 2026 Social Media Campaign"
-          className="w-full border border-hairline rounded-md px-3 py-2 font-sans text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+          className="w-full border border-hairline rounded-md px-3 py-2 font-sans text-sm text-ink bg-surface focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
         />
       </div>
 
@@ -100,7 +100,7 @@ export default function ContractForm({ companies, contract }: Props) {
           min="0.01"
           step="0.01"
           placeholder="e.g. 5000.00"
-          className="w-full border border-hairline rounded-md px-3 py-2 font-mono text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+          className="w-full border border-hairline rounded-md px-3 py-2 font-mono text-sm text-ink bg-surface focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
         />
       </div>
 
@@ -114,7 +114,7 @@ export default function ContractForm({ companies, contract }: Props) {
             type="date"
             name="start_date"
             defaultValue={contract?.start_date ?? ''}
-            className="w-full border border-hairline rounded-md px-3 py-2 font-mono text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+            className="w-full border border-hairline rounded-md px-3 py-2 font-mono text-sm text-ink bg-surface focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
           />
         </div>
         <div>
@@ -125,7 +125,7 @@ export default function ContractForm({ companies, contract }: Props) {
             type="date"
             name="end_date"
             defaultValue={contract?.end_date ?? ''}
-            className="w-full border border-hairline rounded-md px-3 py-2 font-mono text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+            className="w-full border border-hairline rounded-md px-3 py-2 font-mono text-sm text-ink bg-surface focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
           />
         </div>
       </div>

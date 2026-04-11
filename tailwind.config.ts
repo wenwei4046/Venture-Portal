@@ -8,41 +8,38 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      // ─── Colors (DESIGN.md v2.0 — warm paper + rust accent) ──────────────
+      // ─── Colors (DESIGN.md v2.0 — CSS variables for dark mode support) ──
       colors: {
-        // Base warm paper (renamed from "bg" to avoid Tailwind utility prefix collision)
-        paper: '#F5EFE4',
-        surface: '#FBF8F2',
-        'surface-2': '#EEE6D6',
-        hairline: '#DFD4BE',
-        ink: '#1A1613',
-        graphite: '#6B5F52',
-        muted: '#9E8F7F',
+        paper: 'rgb(var(--paper) / <alpha-value>)',
+        surface: 'rgb(var(--surface) / <alpha-value>)',
+        'surface-2': 'rgb(var(--surface-2) / <alpha-value>)',
+        hairline: 'rgb(var(--hairline) / <alpha-value>)',
+        ink: 'rgb(var(--ink) / <alpha-value>)',
+        graphite: 'rgb(var(--graphite) / <alpha-value>)',
+        muted: 'rgb(var(--muted) / <alpha-value>)',
 
-        // Single rust accent
         accent: {
-          DEFAULT: '#CC5A2E',
-          bg: '#FBE8DE',
-          border: '#E8B098',
-          hover: '#B54A22',
+          DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
+          bg: 'rgb(var(--accent-bg) / <alpha-value>)',
+          border: 'rgb(var(--accent-border) / <alpha-value>)',
+          hover: 'rgb(var(--accent-hover) / <alpha-value>)',
         },
 
-        // Semantic (muted)
         ledger: {
-          DEFAULT: '#3D6B45',
-          bg: '#E7EFE6',
+          DEFAULT: 'rgb(var(--ledger) / <alpha-value>)',
+          bg: 'rgb(var(--ledger-bg) / <alpha-value>)',
         },
         alert: {
-          DEFAULT: '#A07020',
-          bg: '#F5EBD3',
+          DEFAULT: 'rgb(var(--alert) / <alpha-value>)',
+          bg: 'rgb(var(--alert-bg) / <alpha-value>)',
         },
         danger: {
-          DEFAULT: '#A3371A',
-          bg: '#F8E1D8',
+          DEFAULT: 'rgb(var(--danger) / <alpha-value>)',
+          bg: 'rgb(var(--danger-bg) / <alpha-value>)',
         },
         info: {
-          DEFAULT: '#5A6B8A',
-          bg: '#EBEEF3',
+          DEFAULT: 'rgb(var(--info) / <alpha-value>)',
+          bg: 'rgb(var(--info-bg) / <alpha-value>)',
         },
       },
 
@@ -84,8 +81,8 @@ const config: Config = {
 
       // ─── Shadows (subtle, warm) ───────────────────────────────────────────
       boxShadow: {
-        modal: '0 10px 40px rgba(26, 22, 19, 0.15)',
-        dropdown: '0 4px 12px rgba(26, 22, 19, 0.08)',
+        modal: '0 10px 40px rgb(var(--ink) / 0.15)',
+        dropdown: '0 4px 12px rgb(var(--ink) / 0.08)',
       },
 
       // ─── Animation ────────────────────────────────────────────────────────

@@ -9,6 +9,9 @@ See `.gstack/qa-reports/qa-report-phase1-2026-04-10.md` for the full audit.
 **Phase 2 Dept Pool + Billing: ✅ SHIPPED 2026-04-10.** 9-step Forge pipeline
 complete. See `.gstack/qa-reports/qa-report-phase2-2026-04-10.md`.
 
+**Phase 3 Salary + HR + Reports: ✅ SHIPPED 2026-04-10.** 9-step Forge pipeline
+complete. QA audit on 2026-04-11. See `.gstack/qa-reports/qa-report-phase3-2026-04-11.md`.
+
 ---
 
 ## ✅ Completed (Phase 2)
@@ -50,7 +53,7 @@ complete. See `.gstack/qa-reports/qa-report-phase2-2026-04-10.md`.
 
 ### Low-urgency
 - [ ] **Multi-currency support.** Phase 1 is MYR-only. HOUZS expansion to SG/TH needs this. _Effort: L. Source: CEO Exp 7._
-- [ ] **Dark mode.** _Effort: M. Source: Design Pass 6._
+- [x] ~~**Dark mode.**~~ → Done on 2026-04-11. Warm charcoal palette via CSS variables (RGB triplets). System preference + manual toggle in TopBar. FOUC prevention script. See DESIGN.md dark mode section.
 - [ ] **Complex animations / page transitions.** Add sparingly later. _Effort: S. Source: Design Pass 4._
 
 ---
