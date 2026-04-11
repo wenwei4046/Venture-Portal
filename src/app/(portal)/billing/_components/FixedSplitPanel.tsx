@@ -29,10 +29,7 @@ export default function FixedSplitPanel({ currentPeriod, canGenerate }: Props) {
 
   return (
     <section className="border-t border-hairline pt-8">
-      <div className="flex items-baseline justify-between mb-4">
-        <h2 className="font-serif text-xl text-ink">Fixed Split</h2>
-        <span className="font-serif italic text-muted text-xs">fixed_split</span>
-      </div>
+      <h2 className="font-serif text-xl text-ink mb-4">Fixed Split</h2>
       <p className="font-serif italic text-graphite text-sm mb-4">
         Rent and utility monthly totals split across subsidiaries by percentage.
         HV&apos;s own share is <em>non-billable</em> and is deducted from the

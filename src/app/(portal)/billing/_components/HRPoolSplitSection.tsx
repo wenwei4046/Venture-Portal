@@ -24,10 +24,7 @@ export default function HRPoolSplitSection({ deptSummaries, submitted }: Props) 
 
   return (
     <section className="border-t border-hairline pt-8">
-      <div className="flex items-baseline justify-between mb-4">
-        <h2 className="font-serif text-xl text-ink">HR Pool Split</h2>
-        <span className="font-serif italic text-muted text-xs">hr_pool_split</span>
-      </div>
+      <h2 className="font-serif text-xl text-ink mb-4">HR Pool Split</h2>
       <p className="font-serif italic text-graphite text-sm mb-4">
         HR and Finance department totals are <em>cost-to-cost</em> — split across
         subsidiaries per company allocation %.

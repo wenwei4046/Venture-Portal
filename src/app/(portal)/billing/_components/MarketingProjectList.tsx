@@ -28,10 +28,7 @@ export default function MarketingProjectList({ contracts, companyMap, canCreate 
   return (
     <section className="border-t border-hairline pt-8">
       <div className="flex items-baseline justify-between mb-4">
-        <div className="flex items-baseline gap-4">
-          <h2 className="font-serif text-xl text-ink">Marketing Projects</h2>
-          <span className="font-serif italic text-muted text-xs">marketing_project</span>
-        </div>
+        <h2 className="font-serif text-xl text-ink">Marketing Projects</h2>
         {canCreate && (
           <Link
             href="/billing/contracts/new"
