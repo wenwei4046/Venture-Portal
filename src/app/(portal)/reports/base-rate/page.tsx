@@ -29,35 +29,49 @@ export default async function BaseRateHistoryPage() {
       {(!history || history.length === 0) ? (
         <div className="py-16 text-center border border-hairline rounded-md bg-surface">
           <p className="font-serif italic text-graphite text-lg mb-1">No base rate history yet.</p>
-          <p className="font-serif italic text-muted text-sm">Principal approves base rate changes in Settings.</p>
+          <p className="font-serif italic text-muted text-sm mb-4">Principal approves base rate changes in Settings.</p>
+          <Link
+            href="/settings"
+            className="font-serif italic text-sm text-accent hover:text-accent-hover"
+          >
+            Simulate a new base rate →
+          </Link>
         </div>
       ) : (
-        <div className="overflow-x-auto max-w-3xl">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                <th className="text-left py-3 pr-4 font-medium">Quarter</th>
-                <th className="text-right py-3 pr-4 font-medium">Wtd Cost</th>
-                <th className="text-right py-3 pr-4 font-medium">Margin</th>
-                <th className="text-right py-3 pr-4 font-medium">Base Rate</th>
-                <th className="text-left py-3 font-medium">Approved</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map(h => (
-                <tr key={h.id} className="border-b border-hairline last:border-0">
-                  <td className="py-4 pr-4 font-serif text-md text-ink">{h.quarter}</td>
-                  <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">{(Number(h.weighted_cost) * 100).toFixed(3)}%</td>
-                  <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">{(Number(h.op_margin) * 100).toFixed(3)}%</td>
-                  <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">{(Number(h.base_rate) * 100).toFixed(3)}%</td>
-                  <td className="py-4 font-mono text-xs text-muted">
-                    {h.approved_at ? dayjs(h.approved_at).format('D MMM YYYY') : '—'}
-                  </td>
+        <>
+          <div className="overflow-x-auto max-w-3xl">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
+                  <th className="text-left py-3 pr-4 font-medium">Quarter</th>
+                  <th className="text-right py-3 pr-4 font-medium">Wtd Cost</th>
+                  <th className="text-right py-3 pr-4 font-medium">Margin</th>
+                  <th className="text-right py-3 pr-4 font-medium">Base Rate</th>
+                  <th className="text-left py-3 font-medium">Approved</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {history.map(h => (
+                  <tr key={h.id} className="border-b border-hairline last:border-0">
+                    <td className="py-4 pr-4 font-serif text-md text-ink">{h.quarter}</td>
+                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">{(Number(h.weighted_cost) * 100).toFixed(3)}%</td>
+                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">{(Number(h.op_margin) * 100).toFixed(3)}%</td>
+                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">{(Number(h.base_rate) * 100).toFixed(3)}%</td>
+                    <td className="py-4 font-mono text-xs text-muted">
+                      {h.approved_at ? dayjs(h.approved_at).format('D MMM YYYY') : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="max-w-3xl mt-6 font-serif italic text-muted text-sm">
+            Want to try a different rate?{' '}
+            <Link href="/settings" className="text-accent hover:text-accent-hover not-italic font-medium">
+              Run the simulator in Settings →
+            </Link>
+          </p>
+        </>
       )}
     </div>
   )
