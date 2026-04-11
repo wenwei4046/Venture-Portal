@@ -259,7 +259,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
                             <div className="font-mono text-xs text-muted">{dir?.name}</div>
                           </td>
                           <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">{formatMoney(p.gross_amount ?? 0)}</td>
-                          <td className="py-4 pr-4 text-right font-mono tabular font-medium text-danger">({formatMoney(p.saving_amount ?? 0).replace('RM ', '')})</td>
+                          <td className="py-4 pr-4 text-right font-mono tabular font-medium text-danger">{formatMoney(-(p.saving_amount ?? 0))}</td>
                           <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">{formatMoney(p.payroll_gross ?? 0)}</td>
                           <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">{formatMoney(p.invoice_total ?? 0)}</td>
                           <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">{formatMoney(p.payroll_net ?? 0)}</td>

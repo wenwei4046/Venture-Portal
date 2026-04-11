@@ -140,13 +140,13 @@ export default async function HRCostingPage() {
       <section className="mb-12">
         <h2 className="font-serif text-xl text-ink mb-1">By department</h2>
         <p className="font-serif italic text-graphite text-sm mb-4">
-          Live aggregate from <em>hr_staff_costs</em> — individual salaries visible to HR + Principal only.
+          Live aggregate from staff records. <em>Individual salaries visible to HR + Principal only.</em>
         </p>
 
         {liveRowList.length === 0 ? (
           <div className="border border-hairline rounded-md bg-surface p-6 text-center">
             <p className="font-serif italic text-muted text-sm">
-              No active staff on record. Seed via <code className="font-mono">npm run seed:hr-staff</code>.
+              No active staff on record. Add your first employee from the Staff page.
             </p>
           </div>
         ) : (

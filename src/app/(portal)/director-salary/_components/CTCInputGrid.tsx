@@ -122,10 +122,6 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
 
   return (
     <div>
-      <p className="font-serif italic text-graphite text-sm mb-4">
-        录入每间子公司的 Director Portion（Basic + KPI + Allowance），系统按 Director Weightage 自动分配。
-      </p>
-
       {/* CTC Input Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
