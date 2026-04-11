@@ -31,7 +31,7 @@ export default async function BaseRateHistoryPage() {
           <p className="font-serif italic text-graphite text-lg mb-1">No base rate history yet.</p>
           <p className="font-serif italic text-muted text-sm mb-4">Principal approves base rate changes in Settings.</p>
           <Link
-            href="/settings"
+            href="/settings#base-rate-simulator"
             className="font-serif italic text-sm text-accent hover:text-accent-hover"
           >
             Simulate a new base rate →
@@ -67,7 +67,7 @@ export default async function BaseRateHistoryPage() {
           </div>
           <p className="max-w-3xl mt-6 font-serif italic text-muted text-sm">
             Want to try a different rate?{' '}
-            <Link href="/settings" className="text-accent hover:text-accent-hover not-italic font-medium">
+            <Link href="/settings#base-rate-simulator" className="text-accent hover:text-accent-hover not-italic font-medium">
               Run the simulator in Settings →
             </Link>
           </p>
