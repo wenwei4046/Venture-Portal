@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatMoney, formatRate, cn } from './utils'
+import { formatMoney, formatMoneyBare, formatRate, cn } from './utils'
 
 describe('formatMoney', () => {
   it('formats a positive integer with two decimal places', () => {
@@ -31,6 +31,33 @@ describe('formatMoney', () => {
 
   it('formats large seven-figure amounts with thousand separators', () => {
     expect(formatMoney(1_234_567.89)).toBe('RM 1,234,567.89')
+  })
+})
+
+describe('formatMoneyBare — no RM prefix', () => {
+  it('formats a positive integer without RM prefix', () => {
+    expect(formatMoneyBare(1234)).toBe('1,234.00')
+  })
+
+  it('formats zero without RM prefix', () => {
+    expect(formatMoneyBare(0)).toBe('0.00')
+  })
+
+  it('formats a negative amount in parenthesis notation without RM', () => {
+    expect(formatMoneyBare(-1000)).toBe('(1,000.00)')
+  })
+
+  it('formats a negative fractional amount without RM', () => {
+    expect(formatMoneyBare(-5847.7)).toBe('(5,847.70)')
+  })
+
+  it('formats null and undefined as zero without RM', () => {
+    expect(formatMoneyBare(null)).toBe('0.00')
+    expect(formatMoneyBare(undefined)).toBe('0.00')
+  })
+
+  it('formats large seven-figure amounts with thousand separators', () => {
+    expect(formatMoneyBare(1_234_567.89)).toBe('1,234,567.89')
   })
 })
 

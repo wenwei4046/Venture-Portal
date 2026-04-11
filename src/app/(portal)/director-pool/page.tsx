@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import dayjs from 'dayjs'
 
 export default async function DirectorPoolPage() {
@@ -108,7 +108,7 @@ export default async function DirectorPoolPage() {
                       <td className="py-3 pr-4 font-serif text-sm text-ink">{t.description ?? '—'}</td>
                       <td className="py-3 pr-4 text-right font-mono tabular font-medium">
                         <span className={isInflow ? 'text-ledger' : 'text-danger'}>
-                          {isInflow ? '+' : '('}{formatMoney(Number(t.amount)).replace('RM ', '')}{isInflow ? '' : ')'}
+                          {isInflow ? '+' : '('}{formatMoneyBare(Number(t.amount))}{isInflow ? '' : ')'}
                         </span>
                       </td>
                     </tr>
@@ -157,7 +157,7 @@ export default async function DirectorPoolPage() {
                       <td className="py-3 pr-4 font-serif text-sm text-ink">{t.description ?? '—'}</td>
                       <td className="py-3 pr-4 text-right font-mono tabular font-medium">
                         <span className={isInflow ? 'text-ledger' : 'text-accent'}>
-                          {isInflow ? '+' : '-'}{formatMoney(Number(t.amount)).replace('RM ', '')}
+                          {isInflow ? '+' : '-'}{formatMoneyBare(Number(t.amount))}
                         </span>
                       </td>
                     </tr>

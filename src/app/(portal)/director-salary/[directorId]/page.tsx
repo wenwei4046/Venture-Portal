@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { formatMoney, getPeriodMonth } from '@/lib/utils'
+import { formatMoney, formatMoneyBare, getPeriodMonth } from '@/lib/utils'
 import dayjs from 'dayjs'
 import Link from 'next/link'
 import PCBInput from './_components/PCBInput'
@@ -111,7 +111,7 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">5% Saving</span>
-              <span className="font-mono tabular text-sm font-medium text-danger">({formatMoney(n(payout.saving_amount)).replace('RM ', '')})</span>
+              <span className="font-mono tabular text-sm font-medium text-danger">({formatMoneyBare(n(payout.saving_amount))})</span>
             </div>
             <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
               <span className="font-serif italic text-sm text-accent">After Saving</span>
@@ -128,8 +128,8 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
             </div>
             {n(payout.advance_amount) > 0 && (
               <div className="flex items-baseline justify-between">
-                <span className="font-serif italic text-sm text-alert">Advance (below min RM{formatMoney(director.min_payout).replace('RM ', '')})</span>
-                <span className="font-mono tabular text-sm font-medium text-alert">+{formatMoney(n(payout.advance_amount)).replace('RM ', '')}</span>
+                <span className="font-serif italic text-sm text-alert">Advance (below min RM {formatMoneyBare(director.min_payout)})</span>
+                <span className="font-mono tabular text-sm font-medium text-alert">+{formatMoneyBare(n(payout.advance_amount))}</span>
               </div>
             )}
             <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
@@ -141,27 +141,27 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
               <p className="font-sans text-xs uppercase tracking-wide text-muted">Deductions</p>
               <div className="flex items-baseline justify-between">
                 <span className="font-serif italic text-sm text-graphite">EPF ER</span>
-                <span className="font-mono tabular text-sm font-medium text-graphite">({formatMoney(n(payout.payroll_epf_er)).replace('RM ', '')})</span>
+                <span className="font-mono tabular text-sm font-medium text-graphite">({formatMoneyBare(n(payout.payroll_epf_er))})</span>
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="font-serif italic text-sm text-graphite">EPF EE</span>
-                <span className="font-mono tabular text-sm font-medium text-graphite">({formatMoney(n(payout.payroll_epf_ee)).replace('RM ', '')})</span>
+                <span className="font-mono tabular text-sm font-medium text-graphite">({formatMoneyBare(n(payout.payroll_epf_ee))})</span>
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="font-serif italic text-sm text-graphite">SOCSO ER</span>
-                <span className="font-mono tabular text-sm font-medium text-graphite">({formatMoney(n(payout.payroll_socso_er)).replace('RM ', '')})</span>
+                <span className="font-mono tabular text-sm font-medium text-graphite">({formatMoneyBare(n(payout.payroll_socso_er))})</span>
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="font-serif italic text-sm text-graphite">SOCSO EE</span>
-                <span className="font-mono tabular text-sm font-medium text-graphite">({formatMoney(n(payout.payroll_socso_ee)).replace('RM ', '')})</span>
+                <span className="font-mono tabular text-sm font-medium text-graphite">({formatMoneyBare(n(payout.payroll_socso_ee))})</span>
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="font-serif italic text-sm text-graphite">EIS ER</span>
-                <span className="font-mono tabular text-sm font-medium text-graphite">({formatMoney(n(payout.payroll_eis_er)).replace('RM ', '')})</span>
+                <span className="font-mono tabular text-sm font-medium text-graphite">({formatMoneyBare(n(payout.payroll_eis_er))})</span>
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="font-serif italic text-sm text-graphite">EIS EE</span>
-                <span className="font-mono tabular text-sm font-medium text-graphite">({formatMoney(n(payout.payroll_eis_ee)).replace('RM ', '')})</span>
+                <span className="font-mono tabular text-sm font-medium text-graphite">({formatMoneyBare(n(payout.payroll_eis_ee))})</span>
               </div>
             </div>
 
@@ -219,9 +219,7 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
             <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
               <span className="font-serif italic text-sm text-accent">Surplus</span>
               <span className={`font-mono tabular text-md font-semibold ${n(payout.statutory_surplus) >= 0 ? 'text-ledger' : 'text-danger'}`}>
-                {n(payout.statutory_surplus) >= 0
-                  ? formatMoney(n(payout.statutory_surplus))
-                  : `(${formatMoney(Math.abs(n(payout.statutory_surplus))).replace('RM ', '')})`}
+                {formatMoney(n(payout.statutory_surplus))}
               </span>
             </div>
           </div>
@@ -232,13 +230,13 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">This month advance</span>
               <span className="font-mono tabular text-sm font-medium text-alert">
-                {n(payout.advance_amount) > 0 ? `+${formatMoney(n(payout.advance_amount)).replace('RM ', '')}` : '—'}
+                {n(payout.advance_amount) > 0 ? `+${formatMoneyBare(n(payout.advance_amount))}` : '—'}
               </span>
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">Repaid</span>
               <span className="font-mono tabular text-sm font-medium text-ledger">
-                {n(payout.advance_repaid) > 0 ? `-${formatMoney(n(payout.advance_repaid)).replace('RM ', '')}` : '—'}
+                {n(payout.advance_repaid) > 0 ? `-${formatMoneyBare(n(payout.advance_repaid))}` : '—'}
               </span>
             </div>
             <div className="flex items-baseline justify-between pt-2 border-t border-hairline">

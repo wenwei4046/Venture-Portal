@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, formatMoneyBare } from '@/lib/utils'
 
 export default async function InvoicePoolPage() {
   const user = await requireRole(['principal', 'finance'])
@@ -89,7 +89,7 @@ export default async function InvoicePoolPage() {
                     <td className="py-4 pr-4 font-serif text-md text-ink">{dir?.code ?? '—'}</td>
                     <td className="py-4 pr-4 font-sans text-sm text-graphite">{t.description}</td>
                     <td className={`py-4 pr-4 text-right font-mono tabular font-semibold ${isIn ? 'text-ledger' : 'text-danger'}`}>
-                      {isIn ? '+' : '-'}{formatMoney(t.amount).replace('RM ', '')}
+                      {isIn ? '+' : '-'}{formatMoneyBare(t.amount)}
                     </td>
                   </tr>
                 )

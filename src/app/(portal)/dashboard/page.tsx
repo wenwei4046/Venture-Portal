@@ -2,7 +2,7 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, formatMoneyBare } from '@/lib/utils'
 
 type Subsidiary = {
   id: string
@@ -272,7 +272,7 @@ export default async function DashboardPage() {
                           >
                             {delta === 0
                               ? '—'
-                              : `${delta > 0 ? '↑' : '↓'} ${formatMoney(Math.abs(delta)).replace('RM ', '')}${deltaPct != null ? ` (${deltaPct > 0 ? '+' : ''}${deltaPct.toFixed(1)}%)` : ''}`}
+                              : `${delta > 0 ? '↑' : '↓'} ${formatMoneyBare(Math.abs(delta))}${deltaPct != null ? ` (${deltaPct > 0 ? '+' : ''}${deltaPct.toFixed(1)}%)` : ''}`}
                           </div>
                         ) : (
                           <div className="font-mono text-xs text-muted w-24 text-right">baseline</div>
@@ -951,11 +951,11 @@ export default async function DashboardPage() {
                         <span className="text-muted">—</span>
                       ) : sub.net_position > 0 ? (
                         <span className="text-ledger font-semibold">
-                          +{formatMoney(sub.net_position).replace('RM ', '')}
+                          +{formatMoneyBare(sub.net_position)}
                         </span>
                       ) : (
                         <span className="text-danger font-semibold">
-                          ({formatMoney(Math.abs(sub.net_position)).replace('RM ', '')})
+                          {formatMoneyBare(sub.net_position)}
                         </span>
                       )}
                     </td>

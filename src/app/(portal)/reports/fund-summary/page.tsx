@@ -151,7 +151,7 @@ export default async function FundSummaryPage() {
           <div className="flex items-baseline justify-between">
             <span className="font-serif text-2xl text-ink">Free Cash</span>
             <span className={`font-serif text-2xl font-semibold ${freeCash >= 0 ? 'text-ledger' : 'text-danger'}`}>
-              {freeCash >= 0 ? formatMoney(freeCash) : `(${formatMoney(Math.abs(freeCash)).replace('RM ', '')})`}
+              {formatMoney(freeCash)}
             </span>
           </div>
         </div>

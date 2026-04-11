@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { batchSaveCTC, type BatchCTCInput } from '../actions'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, formatMoneyBare } from '@/lib/utils'
 
 interface Director {
   id: string
@@ -159,7 +159,7 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
                     </td>
                   ))}
                   <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">
-                    {(b + k + a) > 0 ? formatMoney(b + k + a).replace('RM ', '') : '—'}
+                    {(b + k + a) > 0 ? formatMoneyBare(b + k + a) : '—'}
                   </td>
                 </tr>
               )
@@ -168,16 +168,16 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
             <tr className="border-t-2 border-hairline">
               <td className="py-3 pr-4 font-serif italic text-accent text-base">Director Pool Total</td>
               <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">
-                {formatMoney(totalBasic).replace('RM ', '')}
+                {formatMoneyBare(totalBasic)}
               </td>
               <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">
-                {formatMoney(totalKpi).replace('RM ', '')}
+                {formatMoneyBare(totalKpi)}
               </td>
               <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">
-                {formatMoney(totalAllow).replace('RM ', '')}
+                {formatMoneyBare(totalAllow)}
               </td>
               <td className="py-3 pr-4 text-right font-mono tabular font-medium text-accent font-semibold">
-                {formatMoney(grandTotal).replace('RM ', '')}
+                {formatMoneyBare(grandTotal)}
               </td>
             </tr>
           </tbody>
