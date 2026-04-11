@@ -567,7 +567,13 @@ export default async function DashboardPage() {
             <div className="font-serif italic text-accent text-sm mb-1">
               Dept pool total
             </div>
-            <div className="font-serif text-2xl text-ink leading-none">
+            <div
+              className={
+                Number(summary.dept_pool_total ?? 0) < 0
+                  ? 'font-serif text-2xl text-danger leading-none'
+                  : 'font-serif text-2xl text-ink leading-none'
+              }
+            >
               {formatMoney(Number(summary.dept_pool_total ?? 0))}
             </div>
             <p className="font-mono text-xs text-muted mt-2">
@@ -579,11 +585,19 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      {/* ───────── Phase 3 — Director Salary + Pools ───────── */}
+      {/* ───────── Phase 3 — Director Salary + Director Pool ───────── */}
       <section className="mb-12 pb-12 border-b border-hairline">
-        <h2 className="font-serif text-2xl text-ink mb-1">Director Salary</h2>
+        <div className="flex items-baseline justify-between mb-1">
+          <h2 className="font-serif text-2xl text-ink">Director Salary</h2>
+          <Link
+            href="/director-pool"
+            className="font-serif italic text-sm text-accent hover:text-accent-hover"
+          >
+            Director Pool →
+          </Link>
+        </div>
         <p className="font-serif italic text-graphite text-sm mb-6">
-          Phase 3 director salary engine, operating fund, invoice pool.
+          Monthly payroll plus the unified Director Pool: <em>saving + invoice accumulation</em>
         </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -598,8 +612,14 @@ export default async function DashboardPage() {
           </div>
 
           <div className="border border-hairline rounded-md bg-surface p-5">
-            <div className="font-serif italic text-accent text-sm mb-1">Operating Fund</div>
-            <div className="font-serif text-2xl text-ink leading-none">
+            <div className="font-serif italic text-accent text-sm mb-1">Director Saving</div>
+            <div
+              className={
+                Number(summary.hv_fund_balance ?? 0) < 0
+                  ? 'font-serif text-2xl text-danger leading-none'
+                  : 'font-serif text-2xl text-ink leading-none'
+              }
+            >
               {formatMoney(Number(summary.hv_fund_balance ?? 0))}
             </div>
             <p className="font-mono text-xs text-muted mt-2">
@@ -608,7 +628,7 @@ export default async function DashboardPage() {
           </div>
 
           <div className="border border-hairline rounded-md bg-surface p-5">
-            <div className="font-serif italic text-accent text-sm mb-1">Invoice Pool</div>
+            <div className="font-serif italic text-accent text-sm mb-1">Director Invoice</div>
             <div className="font-serif text-2xl text-ink leading-none">
               {formatMoney(Number(summary.invoice_pool_balance ?? 0))}
             </div>
@@ -619,13 +639,6 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      {/* ───────── Phase status note ───────── */}
-      <div className="mt-16 pt-8 border-t border-hairline">
-        <p className="font-mono text-xs text-muted">
-          Phase 3 Director Salary + HR Costing + Reports · 9 steps shipped · live via{' '}
-          <em className="font-serif">dashboard_summary()</em> RPC
-        </p>
-      </div>
     </div>
   )
 }
