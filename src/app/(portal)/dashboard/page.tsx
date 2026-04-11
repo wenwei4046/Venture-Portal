@@ -91,18 +91,32 @@ export default async function DashboardPage() {
     const userRole = currentUser?.role
 
     if (userRole === 'hr') {
-      // HR Dashboard — show HR-relevant data
+      // HR Dashboard — show HR-relevant data.
+      // Claims and trend queries power the "Needs your review" drill-down and
+      // the 6-month payroll trend added in Phase 3.5 HRMS polish.
+      const sixMonthsAgo = dayjs().subtract(5, 'month').startOf('month').format('YYYY-MM-DD')
       const [
         { data: hrSummary },
         { data: pendingClaims },
         { data: dirPayouts },
         { data: hrSubmission },
+        { data: trendSubmissions },
       ] = await Promise.all([
         supabase.rpc('get_hr_cost_summary'),
-        supabase.from('claims').select('id, claim_type, status').eq('status', 'pending'),
+        supabase
+          .from('claims')
+          .select('id, claim_type, status, claimant_name, amount, description, created_at')
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(10),
         supabase.from('director_payouts').select('id, status').eq('period_month', dayjs().startOf('month').format('YYYY-MM-DD')),
         supabase.from('hr_cost_submissions').select('id, period_month, submitted_at')
           .eq('period_month', dayjs().startOf('month').format('YYYY-MM-DD')).maybeSingle(),
+        supabase
+          .from('hr_cost_submissions')
+          .select('period_month, dept_summaries')
+          .gte('period_month', sixMonthsAgo)
+          .order('period_month', { ascending: true }),
       ])
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -115,6 +129,23 @@ export default async function DashboardPage() {
         ? (dirPayouts ?? []).every(p => p.status === 'confirmed') ? 'confirmed' : 'draft'
         : 'not calculated'
       const hrSubmitted = !!hrSubmission
+
+      // Compute payroll trend from dept_summaries JSONB. Each submission's
+      // dept_summaries is an object keyed by dept name — sum total_ctc across
+      // all departments to get the monthly total.
+      type DeptSummary = { total_ctc?: number | string }
+      const trend = (trendSubmissions ?? []).map((s) => {
+        const summaries = (s.dept_summaries ?? {}) as Record<string, DeptSummary>
+        const total = Object.values(summaries).reduce(
+          (sum, d) => sum + Number(d.total_ctc ?? 0),
+          0,
+        )
+        return {
+          period: s.period_month as string,
+          label: dayjs(s.period_month).format('MMM YYYY'),
+          total,
+        }
+      })
 
       return (
         <div>
@@ -151,6 +182,108 @@ export default async function DashboardPage() {
               </div>
             </div>
           </div>
+
+          {/* Needs your review — pending claims drill-down */}
+          <section className="mb-12">
+            <h2 className="font-serif text-2xl text-ink mb-1">Needs your review</h2>
+            <p className="font-serif italic text-graphite text-sm mb-4">
+              Claims awaiting approval. <em>Benefit claims go to HR, pool claims to Finance.</em>
+            </p>
+            {(pendingClaims ?? []).length === 0 ? (
+              <div className="border border-hairline rounded-md bg-surface p-6">
+                <p className="font-serif italic text-ledger text-base">All caught up.</p>
+                <p className="font-mono text-xs text-muted mt-1">No claims waiting on anyone.</p>
+              </div>
+            ) : (
+              <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
+                {(pendingClaims ?? []).slice(0, 5).map((c) => (
+                  <Link
+                    key={c.id}
+                    href="/claims"
+                    className="flex items-baseline justify-between px-5 py-4 hover:bg-surface-2/40 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0 pr-4">
+                      <div className="flex items-baseline gap-2 mb-1">
+                        <span className="font-mono text-[10px] uppercase tracking-wider text-accent">
+                          {c.claim_type === 'project' ? 'POOL' : 'BENEFIT'}
+                        </span>
+                        <span className="font-serif text-sm text-ink truncate">
+                          {c.claimant_name}
+                        </span>
+                      </div>
+                      <div className="font-serif italic text-graphite text-sm truncate">
+                        {c.description ?? '—'}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-mono tabular font-medium text-ink text-sm">
+                        {formatMoney(Number(c.amount))}
+                      </div>
+                      <div className="font-mono text-xs text-muted">
+                        {dayjs(c.created_at).format('D MMM')}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+                {(pendingClaims ?? []).length > 5 ? (
+                  <Link
+                    href="/claims"
+                    className="block text-center px-5 py-3 font-serif italic text-sm text-accent hover:text-accent-hover"
+                  >
+                    See all {(pendingClaims ?? []).length} →
+                  </Link>
+                ) : null}
+              </div>
+            )}
+          </section>
+
+          {/* Payroll trend — last 6 months. Skips render if only 1 submission
+              (a trend with one data point is not a trend). */}
+          {trend.length >= 2 ? (
+            <section className="mb-12">
+              <h2 className="font-serif text-2xl text-ink mb-1">Payroll trend</h2>
+              <p className="font-serif italic text-graphite text-sm mb-4">
+                Total CTC across all departments, <em>last {trend.length} months</em>
+              </p>
+              <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
+                {trend.map((t, i) => {
+                  const prev = i > 0 ? trend[i - 1]!.total : null
+                  const delta = prev != null ? t.total - prev : null
+                  const deltaPct = prev != null && prev !== 0 ? (delta! / prev) * 100 : null
+                  return (
+                    <div
+                      key={t.period}
+                      className="flex items-baseline justify-between px-5 py-3"
+                    >
+                      <div className="font-serif text-sm text-ink">{t.label}</div>
+                      <div className="flex items-baseline gap-4">
+                        <div className="font-mono tabular font-medium text-ink text-sm">
+                          {formatMoney(t.total)}
+                        </div>
+                        {delta != null ? (
+                          <div
+                            className={`font-mono tabular text-xs w-24 text-right ${
+                              delta > 0
+                                ? 'text-alert'
+                                : delta < 0
+                                  ? 'text-ledger'
+                                  : 'text-muted'
+                            }`}
+                          >
+                            {delta === 0
+                              ? '—'
+                              : `${delta > 0 ? '↑' : '↓'} ${formatMoney(Math.abs(delta)).replace('RM ', '')}${deltaPct != null ? ` (${deltaPct > 0 ? '+' : ''}${deltaPct.toFixed(1)}%)` : ''}`}
+                          </div>
+                        ) : (
+                          <div className="font-mono text-xs text-muted w-24 text-right">baseline</div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          ) : null}
 
           {/* Department Breakdown */}
           <section className="mb-12">
