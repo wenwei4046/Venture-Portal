@@ -75,7 +75,7 @@ export async function createLoan(formData: FormData) {
       p_base_rate: base,
       p_risk_premium: premium,
       p_effective_rate: effective,
-      p_repayment_terms: repaymentTerms || null,
+      p_repayment_terms: repaymentTerms || undefined,
       p_company_name: company.name,
       p_company_tier: company.tier,
     }

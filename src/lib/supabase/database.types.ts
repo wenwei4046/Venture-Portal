@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_log: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          resource_id: string | null
+          resource_type: string
+          user_email: string | null
+          user_id: string
+          user_role: Database["public"]["Enums"]["user_role"] | null
+        }
+        Insert: {
+          action?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          resource_id?: string | null
+          resource_type: string
+          user_email?: string | null
+          user_id: string
+          user_role?: Database["public"]["Enums"]["user_role"] | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          resource_id?: string | null
+          resource_type?: string
+          user_email?: string | null
+          user_id?: string
+          user_role?: Database["public"]["Enums"]["user_role"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       approval_requests: {
         Row: {
           amount: number | null
@@ -938,6 +982,7 @@ export type Database = {
           epf_er: number | null
           id: string
           is_mgmt_fee: boolean
+          non_statutory_allowance: number
           socso_er: number | null
           status: Database["public"]["Enums"]["hr_staff_status"]
           total_ctc: number | null
@@ -954,6 +999,7 @@ export type Database = {
           epf_er?: number | null
           id?: string
           is_mgmt_fee?: boolean
+          non_statutory_allowance?: number
           socso_er?: number | null
           status?: Database["public"]["Enums"]["hr_staff_status"]
           total_ctc?: number | null
@@ -970,6 +1016,7 @@ export type Database = {
           epf_er?: number | null
           id?: string
           is_mgmt_fee?: boolean
+          non_statutory_allowance?: number
           socso_er?: number | null
           status?: Database["public"]["Enums"]["hr_staff_status"]
           total_ctc?: number | null
@@ -2055,6 +2102,19 @@ export type Database = {
         Args: { p_cancel_reason?: string; p_loan_id: string }
         Returns: undefined
       }
+      create_loan_with_approval: {
+        Args: {
+          p_base_rate: number
+          p_company_id: string
+          p_company_name?: string
+          p_company_tier?: string
+          p_effective_rate: number
+          p_principal: number
+          p_repayment_terms?: string
+          p_risk_premium: number
+        }
+        Returns: string
+      }
       current_user_department_id: { Args: never; Returns: string }
       current_user_role: {
         Args: never
@@ -2062,6 +2122,14 @@ export type Database = {
       }
       dashboard_summary: { Args: never; Returns: Json }
       format_invoice_no: { Args: { p_period: string }; Returns: string }
+      generate_fixed_split_invoices: {
+        Args: {
+          p_period_month: string
+          p_rent_total?: number
+          p_utility_total?: number
+        }
+        Returns: Json
+      }
       generate_monthly_invoices: {
         Args: { p_period_month: string }
         Returns: Json
@@ -2122,6 +2190,15 @@ export type Database = {
           submitted_by: string
           submitted_by_name: string
         }[]
+      }
+      log_data_access: {
+        Args: {
+          p_action?: string
+          p_metadata?: Json
+          p_resource_id?: string
+          p_resource_type: string
+        }
+        Returns: undefined
       }
       lookup_eis: {
         Args: { p_period?: string; p_wages: number }
@@ -2215,6 +2292,7 @@ export type Database = {
         | "deficit_out"
         | "expense_out"
         | "profit_in"
+        | "claim_out"
       invoice_pool_txn_type: "accumulate" | "release"
       invoice_status: "draft" | "issued" | "paid" | "paid_via_netting"
       loan_status: "pending_approval" | "active" | "fully_repaid" | "cancelled"
@@ -2401,6 +2479,7 @@ export const Constants = {
         "deficit_out",
         "expense_out",
         "profit_in",
+        "claim_out",
       ],
       invoice_pool_txn_type: ["accumulate", "release"],
       invoice_status: ["draft", "issued", "paid", "paid_via_netting"],

@@ -52,13 +52,17 @@ export async function approveClaim(claimId: string) {
 
   if (error) throw new Error(`Failed to approve: ${error.message}`)
 
-  // Pool claims (project type) deduct from Director Saving Pool
+  // Pool claims (project type) deduct from Director Saving Pool.
+  // hv_operating_fund has no period_month column — it's a running ledger,
+  // balance = SUM(in types) − SUM(out types). reference_id ties back to the
+  // approved claim for audit.
   if (claim.claim_type === 'project' && Number(claim.amount) > 0) {
     await supabase.from('hv_operating_fund').insert({
       transaction_type: 'claim_out',
       amount: Number(claim.amount),
       description: `Pool claim: ${claim.claimant_name} — ${claim.description ?? ''}`.trim(),
-      period_month: new Date().toISOString().slice(0, 8) + '01',
+      reference_id: claimId,
+      reference_table: 'claims',
     })
   }
 
