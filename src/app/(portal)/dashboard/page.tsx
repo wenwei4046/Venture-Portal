@@ -70,7 +70,7 @@ type DashboardSummary = {
 }
 
 export default async function DashboardPage() {
-  await requireAuth()
+  const user = await requireAuth()
   const supabase = await createClient()
 
   const { data: raw, error } = await supabase.rpc('dashboard_summary')
@@ -342,7 +342,257 @@ export default async function DashboardPage() {
       )
     }
 
-    // dept_manager or other non-treasury roles
+    if (userRole === 'dept_manager') {
+      // Dept Manager Dashboard — role-specific overview. Currently only
+      // Marketing has a real P&L; HR/Finance dept pools are cost-to-cost
+      // and balance at zero by design. Either way, the dept_manager sees
+      // their own department's pool state + their own submitted expense
+      // requests awaiting Principal sign-off.
+      if (!user.department_id) {
+        return (
+          <div className="py-16 text-center">
+            <p className="font-serif italic text-2xl text-ink mb-2">Dashboard</p>
+            <p className="font-serif italic text-graphite">
+              No department assigned. Contact Principal to set this up.
+            </p>
+          </div>
+        )
+      }
+
+      const period = dayjs().startOf('month').format('YYYY-MM-DD')
+
+      const { data: dept } = await supabase
+        .from('departments')
+        .select('id, name')
+        .eq('id', user.department_id)
+        .single()
+
+      if (!dept) {
+        return (
+          <div className="py-16 text-center">
+            <p className="font-serif italic text-2xl text-ink mb-2">Dashboard</p>
+            <p className="font-serif italic text-graphite">Department not found.</p>
+          </div>
+        )
+      }
+
+      const [
+        { data: npData },
+        { data: balanceRow },
+        { data: pendingSubmissions },
+        { data: recentExpenses },
+      ] = await Promise.all([
+        supabase.rpc('calculate_dept_np', { p_dept_id: dept.id, p_period: period }),
+        supabase.from('dept_pool_balances').select('balance').eq('department_id', dept.id).maybeSingle(),
+        supabase
+          .from('approval_requests')
+          .select('id, request_type, description, amount, created_at')
+          .eq('submitted_by', user.id)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(10),
+        supabase
+          .from('dept_pools')
+          .select('id, amount, description, created_at')
+          .eq('department_id', dept.id)
+          .eq('transaction_type', 'expense_out')
+          .order('created_at', { ascending: false })
+          .limit(5),
+      ])
+
+      type NpRow = {
+        out_revenue: number | string
+        out_staff_cost: number | string
+        out_expenses: number | string
+        out_net_profit: number | string
+      }
+      const npRow = ((npData ?? []) as unknown as NpRow[])[0]
+      const np = {
+        revenue: Number(npRow?.out_revenue ?? 0),
+        staff_cost: Number(npRow?.out_staff_cost ?? 0),
+        expenses: Number(npRow?.out_expenses ?? 0),
+        net_profit: Number(npRow?.out_net_profit ?? 0),
+      }
+      const balance = Number(balanceRow?.balance ?? 0)
+      const pendingList = pendingSubmissions ?? []
+      const pendingCount = pendingList.length
+      const pendingTotal = pendingList.reduce((s, r) => s + Number(r.amount ?? 0), 0)
+      const recentList = recentExpenses ?? []
+      const deptDetailHref =
+        dept.name.toLowerCase() === 'marketing' ? '/dept-pool/marketing' : '/dept-pool'
+
+      return (
+        <div>
+          <div className="mb-10">
+            <div className="font-serif italic text-accent text-base mb-1">
+              {dept.name} Overview
+            </div>
+            <h1 className="font-serif text-3xl text-ink mb-1">
+              {dayjs().format('MMMM YYYY')}
+            </h1>
+            <p className="font-mono text-xs text-muted">
+              {dayjs().format('dddd, D MMMM YYYY')}
+            </p>
+          </div>
+
+          {/* KPI Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+            <div className="border border-hairline rounded-md bg-surface p-5">
+              <div className="font-serif italic text-sm text-accent mb-1">
+                Pool balance
+              </div>
+              <div
+                className={`font-serif text-2xl leading-none ${balance < 0 ? 'text-danger' : 'text-ink'}`}
+              >
+                {formatMoney(balance)}
+              </div>
+              <div className="font-mono text-xs text-muted mt-2">
+                running NP − approved expenses
+              </div>
+            </div>
+            <div className="border border-hairline rounded-md bg-surface p-5">
+              <div className="font-serif italic text-sm text-accent mb-1">
+                Revenue {dayjs(period).format('MMM')}
+              </div>
+              <div className="font-serif text-2xl text-ink leading-none">
+                {formatMoney(np.revenue)}
+              </div>
+              <div className="font-mono text-xs text-muted mt-2">
+                from approved project invoices
+              </div>
+            </div>
+            <div className="border border-hairline rounded-md bg-surface p-5">
+              <div className="font-serif italic text-sm text-accent mb-1">
+                This month NP
+              </div>
+              <div
+                className={`font-serif text-2xl leading-none ${np.net_profit < 0 ? 'text-danger' : 'text-ink'}`}
+              >
+                {formatMoney(np.net_profit)}
+              </div>
+              <div className="font-mono text-xs text-muted mt-2">
+                revenue − staff cost − expenses
+              </div>
+            </div>
+            <div className="border border-hairline rounded-md bg-surface p-5">
+              <div className="font-serif italic text-sm text-accent mb-1">
+                Awaiting Principal
+              </div>
+              <div className="font-serif text-3xl text-ink leading-none">
+                {pendingCount}
+              </div>
+              <div className="font-mono text-xs text-muted mt-2">
+                {pendingCount > 0
+                  ? `${formatMoney(pendingTotal)} total`
+                  : 'Nothing waiting'}
+              </div>
+            </div>
+          </div>
+
+          {/* Your submissions awaiting Principal sign-off */}
+          <section className="mb-12">
+            <h2 className="font-serif text-2xl text-ink mb-1">
+              Awaiting Principal sign-off
+            </h2>
+            <p className="font-serif italic text-graphite text-sm mb-4">
+              Your submitted expense requests. <em>They post to the pool once approved.</em>
+            </p>
+            {pendingCount === 0 ? (
+              <div className="border border-hairline rounded-md bg-surface p-6">
+                <p className="font-serif italic text-ledger text-base">All caught up.</p>
+                <p className="font-mono text-xs text-muted mt-1">
+                  Nothing waiting on Principal.
+                </p>
+              </div>
+            ) : (
+              <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
+                {pendingList.slice(0, 5).map((r) => (
+                  <Link
+                    key={r.id}
+                    href={deptDetailHref}
+                    className="flex items-baseline justify-between px-5 py-4 hover:bg-surface-2/40 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0 pr-4">
+                      <div className="font-mono text-[10px] uppercase tracking-wider text-accent mb-1">
+                        {r.request_type.replace(/_/g, ' ')}
+                      </div>
+                      <div className="font-serif italic text-graphite text-sm truncate">
+                        {r.description ?? '—'}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-mono tabular font-medium text-ink text-sm">
+                        {formatMoney(Number(r.amount))}
+                      </div>
+                      <div className="font-mono text-xs text-muted">
+                        {dayjs(r.created_at).format('D MMM')}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+                {pendingList.length > 5 ? (
+                  <Link
+                    href={deptDetailHref}
+                    className="block text-center px-5 py-3 font-serif italic text-sm text-accent hover:text-accent-hover"
+                  >
+                    See all {pendingList.length} →
+                  </Link>
+                ) : null}
+              </div>
+            )}
+          </section>
+
+          {/* Recent approved expenses */}
+          <section className="mb-12">
+            <div className="flex items-baseline justify-between mb-1">
+              <h2 className="font-serif text-2xl text-ink">Recent approved</h2>
+              <Link
+                href={deptDetailHref}
+                className="font-serif italic text-sm text-accent hover:text-accent-hover"
+              >
+                See full pool →
+              </Link>
+            </div>
+            <p className="font-serif italic text-graphite text-sm mb-4">
+              Last {Math.min(5, recentList.length || 5)} expenses posted to the pool.
+            </p>
+            {recentList.length === 0 ? (
+              <div className="border border-hairline rounded-md bg-surface p-6">
+                <p className="font-serif italic text-graphite text-base">
+                  No approved expenses yet.
+                </p>
+              </div>
+            ) : (
+              <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
+                {recentList.map((e) => (
+                  <div
+                    key={e.id}
+                    className="flex items-baseline justify-between px-5 py-4"
+                  >
+                    <div className="flex-1 min-w-0 pr-4">
+                      <div className="font-serif italic text-graphite text-sm truncate">
+                        {e.description ?? '—'}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-mono tabular font-medium text-ink text-sm">
+                        {formatMoney(-Number(e.amount))}
+                      </div>
+                      <div className="font-mono text-xs text-muted">
+                        {dayjs(e.created_at).format('D MMM YYYY')}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      )
+    }
+
+    // Any other non-treasury role (future-proofing — currently only hr/dept_manager hit
+    // the Access denied branch, so this is dead-ish code but keeps the type checker happy)
     return (
       <div className="py-16 text-center">
         <p className="font-serif italic text-2xl text-ink mb-2">Dashboard</p>
@@ -366,10 +616,26 @@ export default async function DashboardPage() {
   const bufferAmount = Number(summary.buffer_amount ?? 0)
 
   const isPrincipal = summary.role === 'principal'
+  const isFinance = summary.role === 'finance'
   const pendingApprovals = summary.pending_approvals ?? []
   const pendingCount = summary.pending_approvals_count ?? 0
   const subsidiaries = summary.subsidiaries ?? []
   const alerts = summary.alerts ?? []
+
+  // Finance sees "Awaiting Principal sign-off" — their own submitted approval_requests
+  // (new_loan, new_contract, advance, etc) still pending Principal decision. This is
+  // the mirror image of Principal's "Pending your hand" — Finance submits, Principal
+  // approves, each sees their own queue on the dashboard.
+  const { data: financePending } = isFinance
+    ? await supabase
+        .from('approval_requests')
+        .select('id, request_type, description, amount, created_at')
+        .eq('submitted_by', user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(10)
+    : { data: null }
+  const financePendingList = financePending ?? []
 
   return (
     <div>
@@ -571,6 +837,62 @@ export default async function DashboardPage() {
             Weighted cost vs. lending rate, <em>this month</em>
           </p>
           <MarginPanel summary={summary} />
+        </section>
+      ) : null}
+
+      {/* ───────── Awaiting Principal (Finance only) ───────── */}
+      {isFinance ? (
+        <section className="mb-16">
+          <div className="flex items-baseline justify-between mb-1">
+            <h2 className="font-serif text-2xl text-ink">Awaiting Principal sign-off</h2>
+            <span className="font-mono text-xs text-muted">
+              {financePendingList.length}{' '}
+              {financePendingList.length === 1 ? 'item' : 'items'}
+            </span>
+          </div>
+          <p className="font-serif italic text-graphite text-sm mb-6">
+            Your submitted requests. <em>Principal approves these; you can track them here.</em>
+          </p>
+          {financePendingList.length === 0 ? (
+            <div className="border border-hairline rounded-md bg-surface p-6">
+              <p className="font-serif italic text-ledger text-base">All caught up.</p>
+              <p className="font-mono text-xs text-muted mt-1">
+                Nothing waiting on Principal from your side.
+              </p>
+            </div>
+          ) : (
+            <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
+              {financePendingList.slice(0, 5).map((req) => (
+                <Link
+                  key={req.id}
+                  href={`/approvals/${req.id}`}
+                  className="flex items-baseline justify-between px-5 py-4 hover:bg-surface-2/40 transition-colors"
+                >
+                  <div className="flex-1 min-w-0 pr-4">
+                    <div className="font-mono text-[10px] uppercase tracking-wider text-accent mb-1">
+                      {req.request_type.replace(/_/g, ' ')}
+                    </div>
+                    <div className="font-serif italic text-graphite text-sm truncate">
+                      {req.description ?? '—'}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="font-mono tabular font-medium text-ink text-sm">
+                      {req.amount != null ? formatMoney(Number(req.amount)) : '—'}
+                    </div>
+                    <div className="font-mono text-xs text-muted">
+                      {dayjs(req.created_at).format('D MMM')}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+              {financePendingList.length > 5 ? (
+                <div className="block text-center px-5 py-3 font-serif italic text-sm text-muted">
+                  + {financePendingList.length - 5} more pending
+                </div>
+              ) : null}
+            </div>
+          )}
         </section>
       ) : null}
 
