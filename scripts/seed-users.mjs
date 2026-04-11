@@ -22,7 +22,7 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 })
 
-const TEST_PASSWORD = 'changeme123'
+const TEST_PASSWORD = '123456'
 
 const users = [
   {
