@@ -84,13 +84,9 @@ export default async function StatementDetailPage({ params }: Props) {
           Net amount
         </div>
         <div className="font-serif text-hero text-ink leading-none">
-          {Number(statement.net_amount) >= 0 ? (
-            formatMoney(Number(statement.net_amount))
-          ) : (
-            <span className="text-danger">
-              ({formatMoney(Math.abs(Number(statement.net_amount))).replace('RM ', '')})
-            </span>
-          )}
+          <span className={Number(statement.net_amount) < 0 ? 'text-danger' : ''}>
+            {formatMoney(Number(statement.net_amount))}
+          </span>
         </div>
         <div className="font-mono text-xs text-muted mt-2">
           {Number(statement.net_amount) >= 0 ? (
@@ -151,7 +147,7 @@ export default async function StatementDetailPage({ params }: Props) {
         <div className="flex items-baseline justify-between mb-4">
           <h2 className="font-serif text-xl text-ink">Contra items</h2>
           <span className="font-mono tabular text-sm font-medium text-ink">
-            ({formatMoney(Number(statement.total_contra)).replace('RM ', '')})
+            {formatMoney(-Number(statement.total_contra))}
           </span>
         </div>
         {contraLines.length === 0 ? (
@@ -179,7 +175,7 @@ export default async function StatementDetailPage({ params }: Props) {
                   ) : null}
                 </div>
                 <div className="font-mono tabular text-sm font-medium text-ink">
-                  ({formatMoney(Number(line.amount)).replace('RM ', '')})
+                  {formatMoney(-Number(line.amount))}
                 </div>
               </div>
             ))}
@@ -198,19 +194,13 @@ export default async function StatementDetailPage({ params }: Props) {
         <div className="flex justify-between font-mono text-sm text-graphite mb-2 pb-2 border-b border-hairline">
           <span>Subtotal contra</span>
           <span className="tabular text-ink">
-            ({formatMoney(Number(statement.total_contra)).replace('RM ', '')})
+            {formatMoney(-Number(statement.total_contra))}
           </span>
         </div>
         <div className="flex items-baseline justify-between">
           <span className="font-serif italic text-md text-accent">Net payable</span>
-          <span className="font-serif text-2xl tabular">
-            {Number(statement.net_amount) >= 0 ? (
-              <span className="text-ink">{formatMoney(Number(statement.net_amount))}</span>
-            ) : (
-              <span className="text-danger">
-                ({formatMoney(Math.abs(Number(statement.net_amount))).replace('RM ', '')})
-              </span>
-            )}
+          <span className={`font-serif text-2xl tabular ${Number(statement.net_amount) < 0 ? 'text-danger' : 'text-ink'}`}>
+            {formatMoney(Number(statement.net_amount))}
           </span>
         </div>
       </div>

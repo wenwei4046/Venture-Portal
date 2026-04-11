@@ -144,13 +144,11 @@ export default async function StatementsPage() {
                         </td>
                         <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
                           {Number(s.total_contra) > 0
-                            ? `(${formatMoney(Number(s.total_contra)).replace('RM ', '')})`
+                            ? formatMoney(-Number(s.total_contra))
                             : '—'}
                         </td>
                         <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">
-                          {Number(s.net_amount) >= 0
-                            ? formatMoney(Number(s.net_amount))
-                            : `(${formatMoney(Math.abs(Number(s.net_amount))).replace('RM ', '')})`}
+                          {formatMoney(Number(s.net_amount))}
                         </td>
                         <td className="py-4 pr-4">
                           <StatementStatus status={s.status} />
