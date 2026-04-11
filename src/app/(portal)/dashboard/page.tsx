@@ -382,13 +382,9 @@ export default async function DashboardPage() {
           </div>
           <div className="font-serif text-hero text-ink leading-none mb-3">
             {hasAnyData ? (
-              summary.free_cash < 0 ? (
-                <span className="text-danger">
-                  ({formatMoney(Math.abs(summary.free_cash)).replace('RM ', '')})
-                </span>
-              ) : (
-                formatMoney(summary.free_cash)
-              )
+              <span className={summary.free_cash < 0 ? 'text-danger' : ''}>
+                {formatMoney(summary.free_cash)}
+              </span>
             ) : (
               <>
                 RM <span className="text-muted">—</span>
@@ -397,7 +393,7 @@ export default async function DashboardPage() {
           </div>
           <div className="font-mono text-xs text-muted">
             As of {today}
-            {hasAnyData ? ' · live from dashboard_summary' : ' · no fund sources yet'}
+            {hasAnyData ? ' · live ledger' : ' · no fund sources yet'}
           </div>
 
           {/* Sparkline placeholder — 12-month trend belongs to /reports */}
@@ -441,11 +437,13 @@ export default async function DashboardPage() {
 
           {hasAnyData ? (
             <div className="text-sm text-graphite">
-              Pool{' '}
-              <span className="font-mono tabular font-medium text-ink">
-                {formatMoney(summary.total_pool)}
-              </span>{' '}
-              ·{' '}
+              <em className="font-serif text-graphite">
+                Pool{' '}
+                <span className="font-mono tabular not-italic font-medium text-ink">
+                  {formatMoney(summary.total_pool)}
+                </span>
+              </em>
+              {' · '}
               <em className="font-serif text-graphite">
                 lent{' '}
                 <span className="font-mono tabular not-italic">
@@ -455,18 +453,26 @@ export default async function DashboardPage() {
               {' · '}
               {summary.buffer_breach ? (
                 <em className="font-serif text-danger">
-                  Below buffer by {formatMoney(Math.abs(aboveBuffer))}
+                  Below buffer by{' '}
+                  <span className="font-mono tabular not-italic">
+                    {formatMoney(Math.abs(aboveBuffer))}
+                  </span>
                 </em>
               ) : (
-                <>
+                <em className="font-serif text-graphite">
                   Above buffer by{' '}
-                  <span className="font-mono tabular font-medium text-ledger">
+                  <span className="font-mono tabular not-italic font-medium text-ledger">
                     {formatMoney(aboveBuffer + bufferAmount)}
                   </span>
-                </>
-              )}{' '}
-              · Buffer{' '}
-              <span className="font-mono tabular">{formatMoney(bufferAmount)}</span>
+                </em>
+              )}
+              {' · '}
+              <em className="font-serif text-graphite">
+                Buffer{' '}
+                <span className="font-mono tabular not-italic">
+                  {formatMoney(bufferAmount)}
+                </span>
+              </em>
             </div>
           ) : (
             <div className="mt-4">
@@ -679,8 +685,7 @@ export default async function DashboardPage() {
       <section className="mb-16">
         <h2 className="font-serif text-2xl text-ink mb-1">Billing &amp; Dept Pool</h2>
         <p className="font-serif italic text-graphite text-sm mb-6">
-          Phase 2 live view: unpaid invoices, dept pool totals, Marketing P&amp;L{' '}
-          <em>this month</em>
+          Unpaid invoices, dept pool totals, Marketing P&amp;L <em>this month</em>
         </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -740,7 +745,9 @@ export default async function DashboardPage() {
               {formatMoney(Number(summary.salary_pool_total ?? 0))}
             </div>
             <p className="font-mono text-xs text-muted mt-2">
-              {summary.payouts_pending ?? 0} draft payouts pending
+              {(summary.payouts_pending ?? 0) === 0
+                ? 'No draft payouts'
+                : `${summary.payouts_pending} draft payout${summary.payouts_pending === 1 ? '' : 's'} pending`}
             </p>
           </div>
 
@@ -795,9 +802,7 @@ function MarketingNpCard({ mkNp }: { mkNp: MarketingNp | undefined }) {
             : 'font-serif text-2xl text-ink leading-none'
         }
       >
-        {isLoss
-          ? `(${formatMoney(Math.abs(netProfit)).replace('RM ', '')})`
-          : formatMoney(netProfit)}
+        {formatMoney(netProfit)}
       </div>
       <div className="font-mono text-xs text-muted mt-2 space-y-0.5">
         <div>Revenue {formatMoney(revenue)}</div>
@@ -880,7 +885,7 @@ function MarginPanel({ summary }: { summary: DashboardSummary }) {
             Interest expense
           </span>
           <span className="font-mono tabular text-sm font-medium text-graphite">
-            ({formatMoney(summary.monthly_interest_expense).replace('RM ', '')})
+            {formatMoney(-Math.abs(summary.monthly_interest_expense))}
           </span>
         </div>
         <div className="flex items-baseline justify-between pt-1 border-t border-hairline">
@@ -894,9 +899,7 @@ function MarginPanel({ summary }: { summary: DashboardSummary }) {
                 : 'font-mono tabular text-base font-semibold text-ledger'
             }
           >
-            {interestNegative
-              ? `(${formatMoney(Math.abs(netInterest)).replace('RM ', '')})`
-              : formatMoney(netInterest)}
+            {formatMoney(netInterest)}
           </span>
         </div>
       </div>
