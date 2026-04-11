@@ -110,13 +110,13 @@ export default async function PnLPage({ searchParams }: Props) {
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif text-base text-ink">Interest expense (to depositors)</span>
-              <span className="font-mono tabular text-base font-medium text-danger">({formatMoney(interestExpense).replace('RM ', '')})</span>
+              <span className="font-mono tabular text-base font-medium text-danger">{formatMoney(-interestExpense)}</span>
             </div>
           </div>
           <div className="flex items-baseline justify-between pt-3 mt-3 border-t border-hairline">
             <span className="font-serif italic text-base text-ink font-medium">Net Interest Income</span>
             <span className={`font-mono tabular text-lg font-semibold ${netInterest >= 0 ? 'text-ledger' : 'text-danger'}`}>
-              {netInterest >= 0 ? formatMoney(netInterest) : `(${formatMoney(Math.abs(netInterest)).replace('RM ', '')})`}
+              {formatMoney(netInterest)}
             </span>
           </div>
         </section>
@@ -133,17 +133,17 @@ export default async function PnLPage({ searchParams }: Props) {
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif text-base text-ink">Staff cost</span>
-              <span className="font-mono tabular text-base font-medium text-danger">({formatMoney(marketingStaffCost).replace('RM ', '')})</span>
+              <span className="font-mono tabular text-base font-medium text-danger">{formatMoney(-marketingStaffCost)}</span>
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif text-base text-ink">Department expenses</span>
-              <span className="font-mono tabular text-base font-medium text-danger">({formatMoney(marketingExpenses).replace('RM ', '')})</span>
+              <span className="font-mono tabular text-base font-medium text-danger">{formatMoney(-marketingExpenses)}</span>
             </div>
           </div>
           <div className="flex items-baseline justify-between pt-3 mt-3 border-t border-hairline">
             <span className="font-serif italic text-base text-ink font-medium">Marketing Net Profit</span>
             <span className={`font-mono tabular text-lg font-semibold ${marketingNP >= 0 ? 'text-ledger' : 'text-danger'}`}>
-              {marketingNP >= 0 ? formatMoney(marketingNP) : `(${formatMoney(Math.abs(marketingNP)).replace('RM ', '')})`}
+              {formatMoney(marketingNP)}
             </span>
           </div>
         </section>
@@ -168,13 +168,13 @@ export default async function PnLPage({ searchParams }: Props) {
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif text-base text-ink">Shared services staff cost</span>
-              <span className="font-mono tabular text-base font-medium text-danger">({formatMoney(sharedServicesCost).replace('RM ', '')})</span>
+              <span className="font-mono tabular text-base font-medium text-danger">{formatMoney(-sharedServicesCost)}</span>
             </div>
           </div>
           <div className="flex items-baseline justify-between pt-3 mt-3 border-t border-hairline">
             <span className="font-serif italic text-base text-ink font-medium">Net Bill-back</span>
             <span className={`font-mono tabular text-lg font-semibold ${netBillback >= 0 ? 'text-ledger' : 'text-danger'}`}>
-              {netBillback >= 0 ? formatMoney(netBillback) : `(${formatMoney(Math.abs(netBillback)).replace('RM ', '')})`}
+              {formatMoney(netBillback)}
             </span>
           </div>
           <p className="font-serif italic text-muted text-xs mt-2">
@@ -187,26 +187,26 @@ export default async function PnLPage({ searchParams }: Props) {
           <div className="flex items-baseline justify-between mb-4">
             <span className="font-serif text-2xl text-ink">HV Net Profit</span>
             <span className={`font-serif text-2xl font-semibold ${hvNetProfit >= 0 ? 'text-ledger' : 'text-danger'}`}>
-              {hvNetProfit >= 0 ? formatMoney(hvNetProfit) : `(${formatMoney(Math.abs(hvNetProfit)).replace('RM ', '')})`}
+              {formatMoney(hvNetProfit)}
             </span>
           </div>
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div className="text-center">
               <div className="font-serif italic text-graphite">Treasury</div>
               <div className={`font-mono tabular font-medium ${netInterest >= 0 ? 'text-ledger' : 'text-danger'}`}>
-                {netInterest >= 0 ? formatMoney(netInterest) : `(${formatMoney(Math.abs(netInterest)).replace('RM ', '')})`}
+                {formatMoney(netInterest)}
               </div>
             </div>
             <div className="text-center">
               <div className="font-serif italic text-graphite">Marketing</div>
               <div className={`font-mono tabular font-medium ${marketingNP >= 0 ? 'text-ledger' : 'text-danger'}`}>
-                {marketingNP >= 0 ? formatMoney(marketingNP) : `(${formatMoney(Math.abs(marketingNP)).replace('RM ', '')})`}
+                {formatMoney(marketingNP)}
               </div>
             </div>
             <div className="text-center">
               <div className="font-serif italic text-graphite">Shared Svc</div>
               <div className={`font-mono tabular font-medium ${netBillback >= 0 ? 'text-ledger' : 'text-danger'}`}>
-                {netBillback >= 0 ? formatMoney(netBillback) : `(${formatMoney(Math.abs(netBillback)).replace('RM ', '')})`}
+                {formatMoney(netBillback)}
               </div>
             </div>
           </div>
