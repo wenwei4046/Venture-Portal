@@ -5,7 +5,7 @@ const reports = [
   {
     href: '/reports/pnl',
     title: 'HV Profit & Loss',
-    description: 'Revenue vs expenses. Monthly, quarterly, or yearly view.',
+    description: 'Monthly view. Bank model: treasury spread, marketing, shared services bill-back.',
   },
   {
     href: '/reports/fund-summary',
@@ -20,7 +20,7 @@ const reports = [
   {
     href: '/reports/claims',
     title: 'Claims Summary',
-    description: 'Benefit and project claims by status and amount.',
+    description: 'Benefit and pool claims by status and amount.',
   },
 ]
 

@@ -65,7 +65,7 @@ export default async function FundOutPage() {
   return (
     <div>
       {/* ───────── Header ───────── */}
-      <div className="flex items-baseline justify-between mb-10">
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10">
         <div>
           <h1 className="font-serif text-3xl text-ink">Fund OUT</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
@@ -90,7 +90,7 @@ export default async function FundOutPage() {
           <div className="font-serif italic text-accent text-base mb-1">
             Total outstanding
           </div>
-          <div className="font-serif text-hero text-ink leading-none">
+          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
             {totalOutstanding > 0 ? (
               formatMoney(totalOutstanding)
             ) : (
@@ -169,13 +169,13 @@ export default async function FundOutPage() {
                           {company?.code ?? ''} · {dayjs(loan.created_at).format('D MMM YYYY')}
                         </div>
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular text-ink">
+                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
                         {formatMoney(Number(loan.principal))}
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular text-ink">
+                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
                         {loan.status === 'active' ? formatMoney(outstanding) : '—'}
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular text-ink">
+                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
                         {(Number(loan.effective_rate) * 100).toFixed(3)}%
                       </td>
                       <td className="py-4 pr-4 text-right font-mono text-graphite">

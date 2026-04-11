@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatMoney, formatRate, cn } from './utils'
+import { formatMoney, formatMoneyBare, formatRate, cn } from './utils'
 
 describe('formatMoney', () => {
   it('formats a positive integer with two decimal places', () => {
@@ -14,15 +14,50 @@ describe('formatMoney', () => {
     expect(formatMoney(0)).toBe('RM 0.00')
   })
 
-  it('formats a negative amount with a leading minus', () => {
-    // Note: the UI layer renders negatives as (X) parenthesis notation —
-    // formatMoney itself returns the raw Intl format. See the statements
-    // detail page for the parenthesis wrapper.
-    expect(formatMoney(-1000)).toBe('RM -1,000.00')
+  it('formats a negative amount in parenthesis notation (DESIGN.md contra format)', () => {
+    // Negatives use accounting parenthesis, NOT a leading minus.
+    // DESIGN.md: "| Negative (contra) | `(1,234.56)` | mono + `--danger` color |"
+    expect(formatMoney(-1000)).toBe('RM (1,000.00)')
+  })
+
+  it('formats a negative fractional amount in parenthesis notation', () => {
+    expect(formatMoney(-5847.7)).toBe('RM (5,847.70)')
+  })
+
+  it('formats null and undefined as zero (not a negative)', () => {
+    expect(formatMoney(null)).toBe('RM 0.00')
+    expect(formatMoney(undefined)).toBe('RM 0.00')
   })
 
   it('formats large seven-figure amounts with thousand separators', () => {
     expect(formatMoney(1_234_567.89)).toBe('RM 1,234,567.89')
+  })
+})
+
+describe('formatMoneyBare — no RM prefix', () => {
+  it('formats a positive integer without RM prefix', () => {
+    expect(formatMoneyBare(1234)).toBe('1,234.00')
+  })
+
+  it('formats zero without RM prefix', () => {
+    expect(formatMoneyBare(0)).toBe('0.00')
+  })
+
+  it('formats a negative amount in parenthesis notation without RM', () => {
+    expect(formatMoneyBare(-1000)).toBe('(1,000.00)')
+  })
+
+  it('formats a negative fractional amount without RM', () => {
+    expect(formatMoneyBare(-5847.7)).toBe('(5,847.70)')
+  })
+
+  it('formats null and undefined as zero without RM', () => {
+    expect(formatMoneyBare(null)).toBe('0.00')
+    expect(formatMoneyBare(undefined)).toBe('0.00')
+  })
+
+  it('formats large seven-figure amounts with thousand separators', () => {
+    expect(formatMoneyBare(1_234_567.89)).toBe('1,234,567.89')
   })
 })
 

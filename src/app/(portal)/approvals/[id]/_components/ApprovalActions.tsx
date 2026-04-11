@@ -1,13 +1,45 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import type { ApprovalRequestType } from '@/types'
 import { approveRequest, rejectRequest } from '../../actions'
 
 interface Props {
   approvalId: string
+  requestType: ApprovalRequestType
 }
 
-export default function ApprovalActions({ approvalId }: Props) {
+// Per-request-type dialog copy. Each entry is the lead clause — the common
+// suffix ("and records your decision in the audit trail" / "A written reason
+// is required") is appended in the JSX below. Record<> enforces exhaustiveness
+// so new enum values can't sneak past the type checker.
+const APPROVE_LEAD: Record<ApprovalRequestType, string> = {
+  new_loan: 'Approving activates the loan',
+  new_contract: 'Approving stamps the service contract as approved',
+  contract_change: 'Approving applies the contract change',
+  dept_expense: 'Approving posts the expense to the department pool',
+  advance: 'Approving releases the director advance',
+  base_rate: 'Approving applies the new base rate',
+  tier_change: 'Approving applies the tier change',
+  escalation: 'Approving acknowledges the escalation',
+  invoice_pool_release: 'Approving releases the invoice pool funds',
+  profit_withdrawal: 'Approving authorises the profit withdrawal',
+}
+
+const REJECT_LEAD: Record<ApprovalRequestType, string> = {
+  new_loan: 'Rejecting cancels the loan',
+  new_contract: 'Rejecting cancels the contract',
+  contract_change: 'Rejecting keeps the contract as-is',
+  dept_expense: 'Rejecting discards the expense — the pool is unchanged',
+  advance: 'Rejecting cancels the advance request',
+  base_rate: 'Rejecting keeps the current base rate',
+  tier_change: 'Rejecting keeps the current tier',
+  escalation: 'Rejecting dismisses the escalation',
+  invoice_pool_release: 'Rejecting keeps the funds in the invoice pool',
+  profit_withdrawal: 'Rejecting denies the withdrawal',
+}
+
+export default function ApprovalActions({ approvalId, requestType }: Props) {
   const [isPending, startTransition] = useTransition()
   const [mode, setMode] = useState<'idle' | 'approving' | 'rejecting'>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -66,13 +98,12 @@ export default function ApprovalActions({ approvalId }: Props) {
       <p className="font-serif italic text-graphite text-sm mb-4">
         {mode === 'approving' ? (
           <>
-            Approving activates the loan and records your decision in the audit
+            {APPROVE_LEAD[requestType]} and records your decision in the audit
             trail. <em>This cannot be undone.</em>
           </>
         ) : (
           <>
-            Rejecting cancels the loan. A written reason is{' '}
-            <em>required</em>.
+            {REJECT_LEAD[requestType]}. A written reason is <em>required</em>.
           </>
         )}
       </p>

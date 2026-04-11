@@ -174,7 +174,10 @@ export default async function ApprovalDetailPage({ params }: Props) {
             </p>
           </div>
         ) : (
-          <ApprovalActions approvalId={approval.id} />
+          <ApprovalActions
+            approvalId={approval.id}
+            requestType={approval.request_type}
+          />
         )
       ) : (
         <div className="bg-surface border border-hairline rounded-md p-4 max-w-3xl">

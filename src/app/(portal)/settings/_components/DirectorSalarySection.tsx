@@ -53,7 +53,7 @@ export default function DirectorSalarySection({ directors }: { directors: Direct
 
       <div className="space-y-4">
         {directors.map(d => (
-          <div key={d.id} className="grid grid-cols-3 gap-4 items-end">
+          <div key={d.id} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
             <div>
               <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
                 {d.code} <span className="text-xs text-muted font-normal">({d.name})</span>
@@ -72,7 +72,7 @@ export default function DirectorSalarySection({ directors }: { directors: Direct
                   ...prev,
                   [d.id]: { ...prev[d.id], weightage: parseFloat(e.target.value) || 0 },
                 }))}
-                className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+                className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
               />
             </div>
             <div>
@@ -88,7 +88,7 @@ export default function DirectorSalarySection({ directors }: { directors: Direct
                   ...prev,
                   [d.id]: { ...prev[d.id], minPayout: parseFloat(e.target.value) || 0 },
                 }))}
-                className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+                className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
               />
             </div>
           </div>

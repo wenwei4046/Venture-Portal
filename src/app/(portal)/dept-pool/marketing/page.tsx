@@ -103,14 +103,10 @@ export default async function MarketingDeptPoolPage() {
           <div className="font-serif italic text-graphite text-sm mb-1">
             Pool balance
           </div>
-          <div className="font-serif text-hero text-ink leading-none">
-            {balance >= 0 ? (
-              formatMoney(balance)
-            ) : (
-              <span className="text-danger">
-                ({formatMoney(Math.abs(balance)).replace('RM ', '')})
-              </span>
-            )}
+          <div className="font-serif text-[44px] md:text-hero leading-none">
+            <span className={balance < 0 ? 'text-danger' : 'text-ink'}>
+              {formatMoney(balance)}
+            </span>
           </div>
           <div className="font-mono text-xs text-muted mt-2">
             {balance === 0
@@ -128,22 +124,16 @@ export default async function MarketingDeptPoolPage() {
           </div>
           <div className="flex items-baseline justify-between font-mono text-sm">
             <em className="font-serif text-graphite text-md">Staff cost</em>
-            <span className="text-ink tabular">({formatMoney(np.staff_cost).replace('RM ', '')})</span>
+            <span className="text-ink tabular">{formatMoney(-np.staff_cost)}</span>
           </div>
           <div className="flex items-baseline justify-between font-mono text-sm">
             <em className="font-serif text-graphite text-md">Dept expenses</em>
-            <span className="text-ink tabular">({formatMoney(np.expenses).replace('RM ', '')})</span>
+            <span className="text-ink tabular">{formatMoney(-np.expenses)}</span>
           </div>
           <div className="flex items-baseline justify-between font-mono text-sm border-t border-hairline pt-2 mt-2">
             <em className="font-serif text-ink text-md">Net profit</em>
-            <span className="font-serif italic text-md">
-              {np.net_profit >= 0 ? (
-                <span className="text-ink">{formatMoney(np.net_profit)}</span>
-              ) : (
-                <span className="text-danger">
-                  ({formatMoney(Math.abs(np.net_profit)).replace('RM ', '')})
-                </span>
-              )}
+            <span className={`font-serif italic text-md ${np.net_profit < 0 ? 'text-danger' : 'text-ink'}`}>
+              {formatMoney(np.net_profit)}
             </span>
           </div>
         </div>
@@ -177,7 +167,7 @@ export default async function MarketingDeptPoolPage() {
                     <td className="py-3 pr-4 font-serif italic text-graphite">
                       {p.description ?? '—'}
                     </td>
-                    <td className="py-3 text-right font-mono tabular text-alert">
+                    <td className="py-3 text-right font-mono tabular font-medium text-alert">
                       {p.amount != null ? formatMoney(Number(p.amount)) : '—'}
                     </td>
                   </tr>
@@ -226,8 +216,8 @@ export default async function MarketingDeptPoolPage() {
                     <td className="py-3 pr-4 font-mono text-xs text-muted">
                       {row.period_month ? dayjs(row.period_month).format('MMM YYYY') : '—'}
                     </td>
-                    <td className="py-3 text-right font-mono tabular text-ink">
-                      ({formatMoney(Number(row.amount)).replace('RM ', '')})
+                    <td className="py-3 text-right font-mono tabular font-medium text-ink">
+                      {formatMoney(-Number(row.amount))}
                     </td>
                   </tr>
                 ))}

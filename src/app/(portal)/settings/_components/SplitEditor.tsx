@@ -118,7 +118,7 @@ export default function SplitEditor({ kind, companies, initial }: Props) {
                     max="100"
                     value={(row.split_pct * 100).toString()}
                     onChange={(e) => updatePct(idx, e.target.value)}
-                    className="w-24 px-3 py-1.5 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-right text-ink focus:outline-none focus:border-accent-border"
+                    className="w-24 px-3 py-1.5 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-right text-ink focus:outline-none focus:border-accent-border"
                     disabled={isPending}
                   />
                   <span className="text-muted font-mono text-xs ml-1">%</span>
@@ -127,7 +127,7 @@ export default function SplitEditor({ kind, companies, initial }: Props) {
             ))}
             <tr className="border-t-2 border-ink/40">
               <td className="py-3 pr-4 font-serif italic text-md text-ink">Total</td>
-              <td className="py-3 text-right font-mono tabular text-md">
+              <td className="py-3 text-right font-mono tabular font-medium text-md">
                 <span className={isValid ? 'text-ledger' : 'text-danger'}>
                   {totalPercent.toFixed(2)}%
                 </span>

@@ -72,7 +72,7 @@ export default async function FundInPage() {
   return (
     <div>
       {/* ───────── Header ───────── */}
-      <div className="flex items-baseline justify-between mb-10">
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10">
         <div>
           <h1 className="font-serif text-3xl text-ink">Fund IN</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
@@ -93,7 +93,7 @@ export default async function FundInPage() {
           <div className="font-serif italic text-accent text-base mb-1">
             Total paid capital
           </div>
-          <div className="font-serif text-hero text-ink leading-none">
+          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
             {totalPaid > 0 ? (
               <>
                 RM {formatMoney(totalPaid).replace('RM ', '').replace(/\.\d{2}$/, '')}
@@ -175,16 +175,16 @@ export default async function FundInPage() {
                     <td className="py-4 pr-4 font-serif text-md text-ink">
                       {getFromLabel(source)}
                     </td>
-                    <td className="py-4 pr-4 text-right font-mono tabular text-ink">
+                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
                       {formatMoney(Number(source.amount))}
                     </td>
-                    <td className="py-4 pr-4 text-right font-mono tabular text-ink">
+                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
                       {(Number(source.cost_rate) * 100).toFixed(3)}%
                     </td>
-                    <td className="py-4 pr-4 text-right font-mono tabular text-graphite">
+                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
                       {source.lock_in_months ? `${source.lock_in_months} mo` : '—'}
                     </td>
-                    <td className="py-4 pr-4 text-right font-mono tabular text-graphite">
+                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
                       {source.maturity_date
                         ? dayjs(source.maturity_date).format('D MMM YYYY')
                         : '—'}

@@ -19,6 +19,7 @@ export async function addStaff(formData: FormData) {
     department_id: dept?.id ?? (formData.get('department_id') as string),
     basic_salary: parseFloat(formData.get('basic_salary') as string) || 0,
     allowances: parseFloat(formData.get('allowances') as string) || 0,
+    non_statutory_allowance: parseFloat(formData.get('non_statutory_allowance') as string) || 0,
     is_mgmt_fee: formData.get('is_mgmt_fee') === 'true',
     created_by: user.id,
   })
@@ -41,11 +42,26 @@ export async function updateStaff(id: string, formData: FormData) {
       employee_name: formData.get('name') as string,
       basic_salary: parseFloat(formData.get('basic_salary') as string) || 0,
       allowances: parseFloat(formData.get('allowances') as string) || 0,
+      non_statutory_allowance: parseFloat(formData.get('non_statutory_allowance') as string) || 0,
       is_mgmt_fee: formData.get('is_mgmt_fee') === 'true',
     })
     .eq('id', id)
 
   if (error) throw new Error(`Failed to update: ${error.message}`)
+
+  revalidatePath('/hr-costing')
+}
+
+export async function deleteStaff(id: string) {
+  await requireRole(['hr', 'principal'])
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('hr_staff_costs')
+    .delete()
+    .eq('id', id)
+
+  if (error) throw new Error(`Failed to delete: ${error.message}`)
 
   revalidatePath('/hr-costing')
 }

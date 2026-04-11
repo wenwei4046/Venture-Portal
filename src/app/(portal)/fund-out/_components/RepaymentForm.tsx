@@ -95,7 +95,7 @@ export default function RepaymentForm({ loanId, outstanding }: Props) {
               min="0.01"
               max={paymentType === 'principal' ? outstanding : undefined}
               required
-              className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+              className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
               placeholder="0.00"
             />
           </div>

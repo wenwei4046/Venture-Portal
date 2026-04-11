@@ -2,7 +2,7 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, formatMoneyBare } from '@/lib/utils'
 
 type Subsidiary = {
   id: string
@@ -70,7 +70,7 @@ type DashboardSummary = {
 }
 
 export default async function DashboardPage() {
-  await requireAuth()
+  const user = await requireAuth()
   const supabase = await createClient()
 
   const { data: raw, error } = await supabase.rpc('dashboard_summary')
@@ -79,6 +79,529 @@ export default async function DashboardPage() {
       <div className="py-16 text-center">
         <p className="font-serif italic text-danger">Failed to load dashboard.</p>
         <p className="font-mono text-xs text-muted mt-2">{error.message}</p>
+      </div>
+    )
+  }
+
+  // RPC returns { error: 'Access denied' } for HR/dept_manager (not a Supabase error)
+  if (raw && typeof raw === 'object' && 'error' in raw && (raw as Record<string, unknown>).error === 'Access denied') {
+    // Determine role for role-specific dashboard
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    const { data: currentUser } = await supabase.from('users').select('role, name').eq('id', authUser?.id ?? '').single()
+    const userRole = currentUser?.role
+
+    if (userRole === 'hr') {
+      // HR Dashboard — show HR-relevant data.
+      // Claims and trend queries power the "Needs your review" drill-down and
+      // the 6-month payroll trend added in Phase 3.5 HRMS polish.
+      const sixMonthsAgo = dayjs().subtract(5, 'month').startOf('month').format('YYYY-MM-DD')
+      const [
+        { data: hrSummary },
+        { data: pendingClaims },
+        { data: dirPayouts },
+        { data: hrSubmission },
+        { data: trendSubmissions },
+      ] = await Promise.all([
+        supabase.rpc('get_hr_cost_summary'),
+        supabase
+          .from('claims')
+          .select('id, claim_type, status, claimant_name, amount, description, created_at')
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(10),
+        supabase.from('director_payouts').select('id, status').eq('period_month', dayjs().startOf('month').format('YYYY-MM-DD')),
+        supabase.from('hr_cost_submissions').select('id, period_month, submitted_at')
+          .eq('period_month', dayjs().startOf('month').format('YYYY-MM-DD')).maybeSingle(),
+        supabase
+          .from('hr_cost_submissions')
+          .select('period_month, dept_summaries')
+          .gte('period_month', sixMonthsAgo)
+          .order('period_month', { ascending: true }),
+      ])
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const depts = (hrSummary as any[]) ?? []
+      const totalStaff = depts.reduce((s: number, d: { staff_count: number }) => s + Number(d.staff_count ?? 0), 0)
+      const totalCTC = depts.reduce((s: number, d: { total_ctc: number }) => s + Number(d.total_ctc ?? 0), 0)
+      const pendingBenefit = (pendingClaims ?? []).filter(c => c.claim_type === 'benefit').length
+      const pendingPool = (pendingClaims ?? []).filter(c => c.claim_type === 'project').length
+      const payoutStatus = (dirPayouts ?? []).length > 0
+        ? (dirPayouts ?? []).every(p => p.status === 'confirmed') ? 'confirmed' : 'draft'
+        : 'not calculated'
+      const hrSubmitted = !!hrSubmission
+
+      // Compute payroll trend from dept_summaries JSONB. Each submission's
+      // dept_summaries is an object keyed by dept name — sum total_ctc across
+      // all departments to get the monthly total.
+      type DeptSummary = { total_ctc?: number | string }
+      const trend = (trendSubmissions ?? []).map((s) => {
+        const summaries = (s.dept_summaries ?? {}) as Record<string, DeptSummary>
+        const total = Object.values(summaries).reduce(
+          (sum, d) => sum + Number(d.total_ctc ?? 0),
+          0,
+        )
+        return {
+          period: s.period_month as string,
+          label: dayjs(s.period_month).format('MMM YYYY'),
+          total,
+        }
+      })
+
+      return (
+        <div>
+          <div className="mb-10">
+            <div className="font-serif italic text-accent text-base mb-1">HR Overview</div>
+            <h1 className="font-serif text-3xl text-ink mb-1">{dayjs().format('MMMM YYYY')}</h1>
+            <p className="font-mono text-xs text-muted">{dayjs().format('dddd, D MMMM YYYY')}</p>
+          </div>
+
+          {/* KPI Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+            <div className="border border-hairline rounded-md bg-surface p-5">
+              <div className="font-serif italic text-sm text-accent mb-1">Total Headcount</div>
+              <div className="font-serif text-3xl text-ink">{totalStaff}</div>
+              <div className="font-mono text-xs text-muted mt-1">{depts.length} departments</div>
+            </div>
+            <div className="border border-hairline rounded-md bg-surface p-5">
+              <div className="font-serif italic text-sm text-accent mb-1">Monthly Payroll</div>
+              <div className="font-serif text-2xl text-ink">{formatMoney(totalCTC)}</div>
+              <div className="font-mono text-xs text-muted mt-1">total CTC (basic + statutory + allowances)</div>
+            </div>
+            <div className="border border-hairline rounded-md bg-surface p-5">
+              <div className="font-serif italic text-sm text-accent mb-1">Pending Claims</div>
+              <div className="font-serif text-3xl text-ink">{pendingBenefit + pendingPool}</div>
+              <div className="font-mono text-xs text-muted mt-1">
+                {pendingBenefit} benefit, {pendingPool} pool
+              </div>
+            </div>
+            <div className="border border-hairline rounded-md bg-surface p-5">
+              <div className="font-serif italic text-sm text-accent mb-1">Director Salary</div>
+              <div className="font-serif text-xl text-ink">{payoutStatus}</div>
+              <div className="font-mono text-xs text-muted mt-1">
+                {(dirPayouts ?? []).length} directors this period
+              </div>
+            </div>
+          </div>
+
+          {/* Needs your review — pending claims drill-down */}
+          <section className="mb-12">
+            <h2 className="font-serif text-2xl text-ink mb-1">Needs your review</h2>
+            <p className="font-serif italic text-graphite text-sm mb-4">
+              Claims awaiting approval. <em>Benefit claims go to HR, pool claims to Finance.</em>
+            </p>
+            {(pendingClaims ?? []).length === 0 ? (
+              <div className="border border-hairline rounded-md bg-surface p-6">
+                <p className="font-serif italic text-ledger text-base">All caught up.</p>
+                <p className="font-mono text-xs text-muted mt-1">No claims waiting on anyone.</p>
+              </div>
+            ) : (
+              <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
+                {(pendingClaims ?? []).slice(0, 5).map((c) => (
+                  <Link
+                    key={c.id}
+                    href="/claims"
+                    className="flex items-baseline justify-between px-5 py-4 hover:bg-surface-2/40 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0 pr-4">
+                      <div className="flex items-baseline gap-2 mb-1">
+                        <span className="font-mono text-[10px] uppercase tracking-wider text-accent">
+                          {c.claim_type === 'project' ? 'POOL' : 'BENEFIT'}
+                        </span>
+                        <span className="font-serif text-sm text-ink truncate">
+                          {c.claimant_name}
+                        </span>
+                      </div>
+                      <div className="font-serif italic text-graphite text-sm truncate">
+                        {c.description ?? '—'}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-mono tabular font-medium text-ink text-sm">
+                        {formatMoney(Number(c.amount))}
+                      </div>
+                      <div className="font-mono text-xs text-muted">
+                        {dayjs(c.created_at).format('D MMM')}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+                {(pendingClaims ?? []).length > 5 ? (
+                  <Link
+                    href="/claims"
+                    className="block text-center px-5 py-3 font-serif italic text-sm text-accent hover:text-accent-hover"
+                  >
+                    See all {(pendingClaims ?? []).length} →
+                  </Link>
+                ) : null}
+              </div>
+            )}
+          </section>
+
+          {/* Payroll trend — last 6 months. Skips render if only 1 submission
+              (a trend with one data point is not a trend). */}
+          {trend.length >= 2 ? (
+            <section className="mb-12">
+              <h2 className="font-serif text-2xl text-ink mb-1">Payroll trend</h2>
+              <p className="font-serif italic text-graphite text-sm mb-4">
+                Total CTC across all departments, <em>last {trend.length} months</em>
+              </p>
+              <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
+                {trend.map((t, i) => {
+                  const prev = i > 0 ? trend[i - 1]!.total : null
+                  const delta = prev != null ? t.total - prev : null
+                  const deltaPct = prev != null && prev !== 0 ? (delta! / prev) * 100 : null
+                  return (
+                    <div
+                      key={t.period}
+                      className="flex items-baseline justify-between px-5 py-3"
+                    >
+                      <div className="font-serif text-sm text-ink">{t.label}</div>
+                      <div className="flex items-baseline gap-4">
+                        <div className="font-mono tabular font-medium text-ink text-sm">
+                          {formatMoney(t.total)}
+                        </div>
+                        {delta != null ? (
+                          <div
+                            className={`font-mono tabular text-xs w-24 text-right ${
+                              delta > 0
+                                ? 'text-alert'
+                                : delta < 0
+                                  ? 'text-ledger'
+                                  : 'text-muted'
+                            }`}
+                          >
+                            {delta === 0
+                              ? '—'
+                              : `${delta > 0 ? '↑' : '↓'} ${formatMoneyBare(Math.abs(delta))}${deltaPct != null ? ` (${deltaPct > 0 ? '+' : ''}${deltaPct.toFixed(1)}%)` : ''}`}
+                          </div>
+                        ) : (
+                          <div className="font-mono text-xs text-muted w-24 text-right">baseline</div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          ) : null}
+
+          {/* Department Breakdown */}
+          <section className="mb-12">
+            <h2 className="font-serif text-2xl text-ink mb-1">By Department</h2>
+            <p className="font-serif italic text-graphite text-sm mb-4">Staff count and total CTC per department</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
+                    <th className="text-left py-3 pr-4 font-medium">Department</th>
+                    <th className="text-right py-3 pr-4 font-medium">Staff</th>
+                    <th className="text-right py-3 pr-4 font-medium">Basic</th>
+                    <th className="text-right py-3 pr-4 font-medium">Statutory</th>
+                    <th className="text-right py-3 pr-4 font-medium">Total CTC</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {depts.map((d: { department_id: string; department_name: string; staff_count: number; total_basic: number; total_statutory: number; total_ctc: number }) => (
+                    <tr key={d.department_id} className="border-b border-hairline last:border-0">
+                      <td className="py-3 pr-4 font-serif text-md text-ink">{d.department_name}</td>
+                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">{d.staff_count}</td>
+                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">{formatMoney(d.total_basic)}</td>
+                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">{formatMoney(d.total_statutory)}</td>
+                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">{formatMoney(d.total_ctc)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {/* Status Indicators */}
+          <section className="mb-12">
+            <h2 className="font-serif text-2xl text-ink mb-4">Monthly Status</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="border border-hairline rounded-md bg-surface p-5">
+                <div className="font-serif italic text-sm text-graphite mb-2">HR Cost Submission</div>
+                <div className={`font-serif text-lg ${hrSubmitted ? 'text-ledger' : 'text-alert'}`}>
+                  {hrSubmitted ? 'Submitted' : 'Not yet submitted'}
+                </div>
+                {hrSubmitted && (
+                  <div className="font-mono text-xs text-muted mt-1">
+                    {dayjs(hrSubmission?.submitted_at).format('D MMM YYYY HH:mm')}
+                  </div>
+                )}
+              </div>
+              <div className="border border-hairline rounded-md bg-surface p-5">
+                <div className="font-serif italic text-sm text-graphite mb-2">Director Salary Status</div>
+                <div className={`font-serif text-lg ${payoutStatus === 'confirmed' ? 'text-ledger' : payoutStatus === 'draft' ? 'text-alert' : 'text-muted'}`}>
+                  {payoutStatus === 'confirmed' ? 'Confirmed' : payoutStatus === 'draft' ? 'Draft (pending confirm)' : 'Not calculated'}
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      )
+    }
+
+    if (userRole === 'dept_manager') {
+      // Dept Manager Dashboard — role-specific overview. Currently only
+      // Marketing has a real P&L; HR/Finance dept pools are cost-to-cost
+      // and balance at zero by design. Either way, the dept_manager sees
+      // their own department's pool state + their own submitted expense
+      // requests awaiting Principal sign-off.
+      if (!user.department_id) {
+        return (
+          <div className="py-16 text-center">
+            <p className="font-serif italic text-2xl text-ink mb-2">Dashboard</p>
+            <p className="font-serif italic text-graphite">
+              No department assigned. Contact Principal to set this up.
+            </p>
+          </div>
+        )
+      }
+
+      const period = dayjs().startOf('month').format('YYYY-MM-DD')
+
+      const { data: dept } = await supabase
+        .from('departments')
+        .select('id, name')
+        .eq('id', user.department_id)
+        .single()
+
+      if (!dept) {
+        return (
+          <div className="py-16 text-center">
+            <p className="font-serif italic text-2xl text-ink mb-2">Dashboard</p>
+            <p className="font-serif italic text-graphite">Department not found.</p>
+          </div>
+        )
+      }
+
+      const [
+        { data: npData },
+        { data: balanceRow },
+        { data: pendingSubmissions },
+        { data: recentExpenses },
+      ] = await Promise.all([
+        supabase.rpc('calculate_dept_np', { p_dept_id: dept.id, p_period: period }),
+        supabase.from('dept_pool_balances').select('balance').eq('department_id', dept.id).maybeSingle(),
+        supabase
+          .from('approval_requests')
+          .select('id, request_type, description, amount, created_at')
+          .eq('submitted_by', user.id)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(10),
+        supabase
+          .from('dept_pools')
+          .select('id, amount, description, created_at')
+          .eq('department_id', dept.id)
+          .eq('transaction_type', 'expense_out')
+          .order('created_at', { ascending: false })
+          .limit(5),
+      ])
+
+      type NpRow = {
+        out_revenue: number | string
+        out_staff_cost: number | string
+        out_expenses: number | string
+        out_net_profit: number | string
+      }
+      const npRow = ((npData ?? []) as unknown as NpRow[])[0]
+      const np = {
+        revenue: Number(npRow?.out_revenue ?? 0),
+        staff_cost: Number(npRow?.out_staff_cost ?? 0),
+        expenses: Number(npRow?.out_expenses ?? 0),
+        net_profit: Number(npRow?.out_net_profit ?? 0),
+      }
+      const balance = Number(balanceRow?.balance ?? 0)
+      const pendingList = pendingSubmissions ?? []
+      const pendingCount = pendingList.length
+      const pendingTotal = pendingList.reduce((s, r) => s + Number(r.amount ?? 0), 0)
+      const recentList = recentExpenses ?? []
+      const deptDetailHref =
+        dept.name.toLowerCase() === 'marketing' ? '/dept-pool/marketing' : '/dept-pool'
+
+      return (
+        <div>
+          <div className="mb-10">
+            <div className="font-serif italic text-accent text-base mb-1">
+              {dept.name} Overview
+            </div>
+            <h1 className="font-serif text-3xl text-ink mb-1">
+              {dayjs().format('MMMM YYYY')}
+            </h1>
+            <p className="font-mono text-xs text-muted">
+              {dayjs().format('dddd, D MMMM YYYY')}
+            </p>
+          </div>
+
+          {/* KPI Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+            <div className="border border-hairline rounded-md bg-surface p-5">
+              <div className="font-serif italic text-sm text-accent mb-1">
+                Pool balance
+              </div>
+              <div
+                className={`font-serif text-2xl leading-none ${balance < 0 ? 'text-danger' : 'text-ink'}`}
+              >
+                {formatMoney(balance)}
+              </div>
+              <div className="font-mono text-xs text-muted mt-2">
+                running NP − approved expenses
+              </div>
+            </div>
+            <div className="border border-hairline rounded-md bg-surface p-5">
+              <div className="font-serif italic text-sm text-accent mb-1">
+                Revenue {dayjs(period).format('MMM')}
+              </div>
+              <div className="font-serif text-2xl text-ink leading-none">
+                {formatMoney(np.revenue)}
+              </div>
+              <div className="font-mono text-xs text-muted mt-2">
+                from approved project invoices
+              </div>
+            </div>
+            <div className="border border-hairline rounded-md bg-surface p-5">
+              <div className="font-serif italic text-sm text-accent mb-1">
+                This month NP
+              </div>
+              <div
+                className={`font-serif text-2xl leading-none ${np.net_profit < 0 ? 'text-danger' : 'text-ink'}`}
+              >
+                {formatMoney(np.net_profit)}
+              </div>
+              <div className="font-mono text-xs text-muted mt-2">
+                revenue − staff cost − expenses
+              </div>
+            </div>
+            <div className="border border-hairline rounded-md bg-surface p-5">
+              <div className="font-serif italic text-sm text-accent mb-1">
+                Awaiting Principal
+              </div>
+              <div className="font-serif text-3xl text-ink leading-none">
+                {pendingCount}
+              </div>
+              <div className="font-mono text-xs text-muted mt-2">
+                {pendingCount > 0
+                  ? `${formatMoney(pendingTotal)} total`
+                  : 'Nothing waiting'}
+              </div>
+            </div>
+          </div>
+
+          {/* Your submissions awaiting Principal sign-off */}
+          <section className="mb-12">
+            <h2 className="font-serif text-2xl text-ink mb-1">
+              Awaiting Principal sign-off
+            </h2>
+            <p className="font-serif italic text-graphite text-sm mb-4">
+              Your submitted expense requests. <em>They post to the pool once approved.</em>
+            </p>
+            {pendingCount === 0 ? (
+              <div className="border border-hairline rounded-md bg-surface p-6">
+                <p className="font-serif italic text-ledger text-base">All caught up.</p>
+                <p className="font-mono text-xs text-muted mt-1">
+                  Nothing waiting on Principal.
+                </p>
+              </div>
+            ) : (
+              <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
+                {pendingList.slice(0, 5).map((r) => (
+                  <Link
+                    key={r.id}
+                    href={deptDetailHref}
+                    className="flex items-baseline justify-between px-5 py-4 hover:bg-surface-2/40 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0 pr-4">
+                      <div className="font-mono text-[10px] uppercase tracking-wider text-accent mb-1">
+                        {r.request_type.replace(/_/g, ' ')}
+                      </div>
+                      <div className="font-serif italic text-graphite text-sm truncate">
+                        {r.description ?? '—'}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-mono tabular font-medium text-ink text-sm">
+                        {formatMoney(Number(r.amount))}
+                      </div>
+                      <div className="font-mono text-xs text-muted">
+                        {dayjs(r.created_at).format('D MMM')}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+                {pendingList.length > 5 ? (
+                  <Link
+                    href={deptDetailHref}
+                    className="block text-center px-5 py-3 font-serif italic text-sm text-accent hover:text-accent-hover"
+                  >
+                    See all {pendingList.length} →
+                  </Link>
+                ) : null}
+              </div>
+            )}
+          </section>
+
+          {/* Recent approved expenses */}
+          <section className="mb-12">
+            <div className="flex items-baseline justify-between mb-1">
+              <h2 className="font-serif text-2xl text-ink">Recent approved</h2>
+              <Link
+                href={deptDetailHref}
+                className="font-serif italic text-sm text-accent hover:text-accent-hover"
+              >
+                See full pool →
+              </Link>
+            </div>
+            <p className="font-serif italic text-graphite text-sm mb-4">
+              Last {Math.min(5, recentList.length || 5)} expenses posted to the pool.
+            </p>
+            {recentList.length === 0 ? (
+              <div className="border border-hairline rounded-md bg-surface p-6">
+                <p className="font-serif italic text-graphite text-base">
+                  No approved expenses yet.
+                </p>
+              </div>
+            ) : (
+              <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
+                {recentList.map((e) => (
+                  <div
+                    key={e.id}
+                    className="flex items-baseline justify-between px-5 py-4"
+                  >
+                    <div className="flex-1 min-w-0 pr-4">
+                      <div className="font-serif italic text-graphite text-sm truncate">
+                        {e.description ?? '—'}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-mono tabular font-medium text-ink text-sm">
+                        {formatMoney(-Number(e.amount))}
+                      </div>
+                      <div className="font-mono text-xs text-muted">
+                        {dayjs(e.created_at).format('D MMM YYYY')}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      )
+    }
+
+    // Any other non-treasury role (future-proofing — currently only hr/dept_manager hit
+    // the Access denied branch, so this is dead-ish code but keeps the type checker happy)
+    return (
+      <div className="py-16 text-center">
+        <p className="font-serif italic text-2xl text-ink mb-2">Dashboard</p>
+        <p className="font-serif italic text-graphite">
+          Treasury data is available to Principal and Finance only.
+        </p>
+        <p className="font-mono text-xs text-muted mt-4">
+          Use the sidebar to navigate to your modules.
+        </p>
       </div>
     )
   }
@@ -93,10 +616,26 @@ export default async function DashboardPage() {
   const bufferAmount = Number(summary.buffer_amount ?? 0)
 
   const isPrincipal = summary.role === 'principal'
+  const isFinance = summary.role === 'finance'
   const pendingApprovals = summary.pending_approvals ?? []
   const pendingCount = summary.pending_approvals_count ?? 0
   const subsidiaries = summary.subsidiaries ?? []
   const alerts = summary.alerts ?? []
+
+  // Finance sees "Awaiting Principal sign-off" — their own submitted approval_requests
+  // (new_loan, new_contract, advance, etc) still pending Principal decision. This is
+  // the mirror image of Principal's "Pending your hand" — Finance submits, Principal
+  // approves, each sees their own queue on the dashboard.
+  const { data: financePending } = isFinance
+    ? await supabase
+        .from('approval_requests')
+        .select('id, request_type, description, amount, created_at')
+        .eq('submitted_by', user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(10)
+    : { data: null }
+  const financePendingList = financePending ?? []
 
   return (
     <div>
@@ -107,15 +646,11 @@ export default async function DashboardPage() {
           <div className="font-serif italic text-accent text-base mb-1">
             Free pool
           </div>
-          <div className="font-serif text-hero text-ink leading-none mb-3">
+          <div className="font-serif text-[44px] md:text-hero text-ink leading-none mb-3">
             {hasAnyData ? (
-              summary.free_cash < 0 ? (
-                <span className="text-danger">
-                  ({formatMoney(Math.abs(summary.free_cash)).replace('RM ', '')})
-                </span>
-              ) : (
-                formatMoney(summary.free_cash)
-              )
+              <span className={summary.free_cash < 0 ? 'text-danger' : ''}>
+                {formatMoney(summary.free_cash)}
+              </span>
             ) : (
               <>
                 RM <span className="text-muted">—</span>
@@ -124,7 +659,7 @@ export default async function DashboardPage() {
           </div>
           <div className="font-mono text-xs text-muted">
             As of {today}
-            {hasAnyData ? ' · live from dashboard_summary' : ' · no fund sources yet'}
+            {hasAnyData ? ' · live ledger' : ' · no fund sources yet'}
           </div>
 
           {/* Sparkline placeholder — 12-month trend belongs to /reports */}
@@ -168,11 +703,13 @@ export default async function DashboardPage() {
 
           {hasAnyData ? (
             <div className="text-sm text-graphite">
-              Pool{' '}
-              <span className="font-mono tabular text-ink">
-                {formatMoney(summary.total_pool)}
-              </span>{' '}
-              ·{' '}
+              <em className="font-serif text-graphite">
+                Pool{' '}
+                <span className="font-mono tabular not-italic font-medium text-ink">
+                  {formatMoney(summary.total_pool)}
+                </span>
+              </em>
+              {' · '}
               <em className="font-serif text-graphite">
                 lent{' '}
                 <span className="font-mono tabular not-italic">
@@ -182,18 +719,26 @@ export default async function DashboardPage() {
               {' · '}
               {summary.buffer_breach ? (
                 <em className="font-serif text-danger">
-                  Below buffer by {formatMoney(Math.abs(aboveBuffer))}
+                  Below buffer by{' '}
+                  <span className="font-mono tabular not-italic">
+                    {formatMoney(Math.abs(aboveBuffer))}
+                  </span>
                 </em>
               ) : (
-                <>
+                <em className="font-serif text-graphite">
                   Above buffer by{' '}
-                  <span className="font-mono tabular text-ledger">
+                  <span className="font-mono tabular not-italic font-medium text-ledger">
                     {formatMoney(aboveBuffer + bufferAmount)}
                   </span>
-                </>
-              )}{' '}
-              · Buffer{' '}
-              <span className="font-mono tabular">{formatMoney(bufferAmount)}</span>
+                </em>
+              )}
+              {' · '}
+              <em className="font-serif text-graphite">
+                Buffer{' '}
+                <span className="font-mono tabular not-italic">
+                  {formatMoney(bufferAmount)}
+                </span>
+              </em>
             </div>
           ) : (
             <div className="mt-4">
@@ -295,6 +840,62 @@ export default async function DashboardPage() {
         </section>
       ) : null}
 
+      {/* ───────── Awaiting Principal (Finance only) ───────── */}
+      {isFinance ? (
+        <section className="mb-16">
+          <div className="flex items-baseline justify-between mb-1">
+            <h2 className="font-serif text-2xl text-ink">Awaiting Principal sign-off</h2>
+            <span className="font-mono text-xs text-muted">
+              {financePendingList.length}{' '}
+              {financePendingList.length === 1 ? 'item' : 'items'}
+            </span>
+          </div>
+          <p className="font-serif italic text-graphite text-sm mb-6">
+            Your submitted requests. <em>Principal approves these; you can track them here.</em>
+          </p>
+          {financePendingList.length === 0 ? (
+            <div className="border border-hairline rounded-md bg-surface p-6">
+              <p className="font-serif italic text-ledger text-base">All caught up.</p>
+              <p className="font-mono text-xs text-muted mt-1">
+                Nothing waiting on Principal from your side.
+              </p>
+            </div>
+          ) : (
+            <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
+              {financePendingList.slice(0, 5).map((req) => (
+                <Link
+                  key={req.id}
+                  href={`/approvals/${req.id}`}
+                  className="flex items-baseline justify-between px-5 py-4 hover:bg-surface-2/40 transition-colors"
+                >
+                  <div className="flex-1 min-w-0 pr-4">
+                    <div className="font-mono text-[10px] uppercase tracking-wider text-accent mb-1">
+                      {req.request_type.replace(/_/g, ' ')}
+                    </div>
+                    <div className="font-serif italic text-graphite text-sm truncate">
+                      {req.description ?? '—'}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="font-mono tabular font-medium text-ink text-sm">
+                      {req.amount != null ? formatMoney(Number(req.amount)) : '—'}
+                    </div>
+                    <div className="font-mono text-xs text-muted">
+                      {dayjs(req.created_at).format('D MMM')}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+              {financePendingList.length > 5 ? (
+                <div className="block text-center px-5 py-3 font-serif italic text-sm text-muted">
+                  + {financePendingList.length - 5} more pending
+                </div>
+              ) : null}
+            </div>
+          )}
+        </section>
+      ) : null}
+
       {/* ───────── Subsidiaries ───────── */}
       <section className="mb-16">
         <h2 className="font-serif text-2xl text-ink mb-1">Subsidiaries</h2>
@@ -335,12 +936,12 @@ export default async function DashboardPage() {
                         ) : null}
                       </div>
                     </td>
-                    <td className="py-4 pr-4 text-right font-mono tabular text-graphite">
+                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
                       {sub.savings_deposited > 0
                         ? formatMoney(sub.savings_deposited)
                         : '—'}
                     </td>
-                    <td className="py-4 pr-4 text-right font-mono tabular text-graphite">
+                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
                       {sub.loans_outstanding > 0
                         ? formatMoney(sub.loans_outstanding)
                         : '—'}
@@ -350,11 +951,11 @@ export default async function DashboardPage() {
                         <span className="text-muted">—</span>
                       ) : sub.net_position > 0 ? (
                         <span className="text-ledger font-semibold">
-                          +{formatMoney(sub.net_position).replace('RM ', '')}
+                          +{formatMoneyBare(sub.net_position)}
                         </span>
                       ) : (
                         <span className="text-danger font-semibold">
-                          ({formatMoney(Math.abs(sub.net_position)).replace('RM ', '')})
+                          {formatMoneyBare(sub.net_position)}
                         </span>
                       )}
                     </td>
@@ -406,8 +1007,7 @@ export default async function DashboardPage() {
       <section className="mb-16">
         <h2 className="font-serif text-2xl text-ink mb-1">Billing &amp; Dept Pool</h2>
         <p className="font-serif italic text-graphite text-sm mb-6">
-          Phase 2 live view: unpaid invoices, dept pool totals, Marketing P&amp;L{' '}
-          <em>this month</em>
+          Unpaid invoices, dept pool totals, Marketing P&amp;L <em>this month</em>
         </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -427,7 +1027,13 @@ export default async function DashboardPage() {
             <div className="font-serif italic text-accent text-sm mb-1">
               Dept pool total
             </div>
-            <div className="font-serif text-2xl text-ink leading-none">
+            <div
+              className={
+                Number(summary.dept_pool_total ?? 0) < 0
+                  ? 'font-serif text-2xl text-danger leading-none'
+                  : 'font-serif text-2xl text-ink leading-none'
+              }
+            >
               {formatMoney(Number(summary.dept_pool_total ?? 0))}
             </div>
             <p className="font-mono text-xs text-muted mt-2">
@@ -439,11 +1045,19 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      {/* ───────── Phase 3 — Director Salary + Pools ───────── */}
+      {/* ───────── Phase 3 — Director Salary + Director Pool ───────── */}
       <section className="mb-12 pb-12 border-b border-hairline">
-        <h2 className="font-serif text-2xl text-ink mb-1">Director Salary</h2>
+        <div className="flex items-baseline justify-between mb-1">
+          <h2 className="font-serif text-2xl text-ink">Director Salary</h2>
+          <Link
+            href="/director-pool"
+            className="font-serif italic text-sm text-accent hover:text-accent-hover"
+          >
+            Director Pool →
+          </Link>
+        </div>
         <p className="font-serif italic text-graphite text-sm mb-6">
-          Phase 3 director salary engine, operating fund, invoice pool.
+          Monthly payroll plus the unified Director Pool: <em>saving + invoice accumulation</em>
         </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -453,13 +1067,21 @@ export default async function DashboardPage() {
               {formatMoney(Number(summary.salary_pool_total ?? 0))}
             </div>
             <p className="font-mono text-xs text-muted mt-2">
-              {summary.payouts_pending ?? 0} draft payouts pending
+              {(summary.payouts_pending ?? 0) === 0
+                ? 'No draft payouts'
+                : `${summary.payouts_pending} draft payout${summary.payouts_pending === 1 ? '' : 's'} pending`}
             </p>
           </div>
 
           <div className="border border-hairline rounded-md bg-surface p-5">
-            <div className="font-serif italic text-accent text-sm mb-1">Operating Fund</div>
-            <div className="font-serif text-2xl text-ink leading-none">
+            <div className="font-serif italic text-accent text-sm mb-1">Director Saving</div>
+            <div
+              className={
+                Number(summary.hv_fund_balance ?? 0) < 0
+                  ? 'font-serif text-2xl text-danger leading-none'
+                  : 'font-serif text-2xl text-ink leading-none'
+              }
+            >
               {formatMoney(Number(summary.hv_fund_balance ?? 0))}
             </div>
             <p className="font-mono text-xs text-muted mt-2">
@@ -468,7 +1090,7 @@ export default async function DashboardPage() {
           </div>
 
           <div className="border border-hairline rounded-md bg-surface p-5">
-            <div className="font-serif italic text-accent text-sm mb-1">Invoice Pool</div>
+            <div className="font-serif italic text-accent text-sm mb-1">Director Invoice</div>
             <div className="font-serif text-2xl text-ink leading-none">
               {formatMoney(Number(summary.invoice_pool_balance ?? 0))}
             </div>
@@ -479,13 +1101,6 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      {/* ───────── Phase status note ───────── */}
-      <div className="mt-16 pt-8 border-t border-hairline">
-        <p className="font-mono text-xs text-muted">
-          Phase 3 Director Salary + HR Costing + Reports · 9 steps shipped · live via{' '}
-          <em className="font-serif">dashboard_summary()</em> RPC
-        </p>
-      </div>
     </div>
   )
 }
@@ -509,9 +1124,7 @@ function MarketingNpCard({ mkNp }: { mkNp: MarketingNp | undefined }) {
             : 'font-serif text-2xl text-ink leading-none'
         }
       >
-        {isLoss
-          ? `(${formatMoney(Math.abs(netProfit)).replace('RM ', '')})`
-          : formatMoney(netProfit)}
+        {formatMoney(netProfit)}
       </div>
       <div className="font-mono text-xs text-muted mt-2 space-y-0.5">
         <div>Revenue {formatMoney(revenue)}</div>
@@ -552,28 +1165,28 @@ function MarginPanel({ summary }: { summary: DashboardSummary }) {
   return (
     <div className="border border-hairline rounded-md bg-surface p-5 space-y-3">
       <div className="flex items-baseline justify-between">
-        <span className="font-serif italic text-sm text-graphite">
+        <span className="font-serif italic text-base text-ink">
           Weighted cost of capital
         </span>
-        <span className="font-mono tabular text-sm text-ink">
+        <span className="font-mono tabular text-base font-medium text-ink">
           {weightedCost != null ? `${(weightedCost * 100).toFixed(3)}%/mo` : '—'}
         </span>
       </div>
       <div className="flex items-baseline justify-between">
-        <span className="font-serif italic text-sm text-graphite">
+        <span className="font-serif italic text-base text-ink">
           Current base rate
         </span>
-        <span className="font-mono tabular text-sm text-ink">
+        <span className="font-mono tabular text-base font-medium text-ink">
           {baseRate != null ? `${(baseRate * 100).toFixed(3)}%/mo` : '—'}
         </span>
       </div>
       <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
-        <span className="font-serif italic text-sm text-accent">Net spread</span>
+        <span className="font-serif italic text-base font-medium text-accent">Net spread</span>
         <span
           className={
             spreadNegative
-              ? 'font-mono tabular text-md text-danger'
-              : 'font-mono tabular text-md text-ledger'
+              ? 'font-mono tabular text-lg font-semibold text-danger'
+              : 'font-mono tabular text-lg font-semibold text-ledger'
           }
         >
           {netSpread != null ? `${(netSpread * 100).toFixed(3)}%/mo` : '—'}
@@ -582,35 +1195,33 @@ function MarginPanel({ summary }: { summary: DashboardSummary }) {
 
       <div className="pt-3 border-t border-hairline space-y-2">
         <div className="flex items-baseline justify-between">
-          <span className="font-serif italic text-xs text-graphite">
+          <span className="font-serif italic text-sm text-ink">
             Interest income
           </span>
-          <span className="font-mono tabular text-xs text-ink">
+          <span className="font-mono tabular text-sm font-medium text-ink">
             {formatMoney(summary.monthly_interest_income)}
           </span>
         </div>
         <div className="flex items-baseline justify-between">
-          <span className="font-serif italic text-xs text-graphite">
+          <span className="font-serif italic text-sm text-ink">
             Interest expense
           </span>
-          <span className="font-mono tabular text-xs text-graphite">
-            ({formatMoney(summary.monthly_interest_expense).replace('RM ', '')})
+          <span className="font-mono tabular text-sm font-medium text-graphite">
+            {formatMoney(-Math.abs(summary.monthly_interest_expense))}
           </span>
         </div>
         <div className="flex items-baseline justify-between pt-1 border-t border-hairline">
-          <span className="font-serif italic text-sm text-accent">
+          <span className="font-serif italic text-base font-medium text-accent">
             Net interest
           </span>
           <span
             className={
               interestNegative
-                ? 'font-mono tabular text-sm text-danger'
-                : 'font-mono tabular text-sm text-ledger'
+                ? 'font-mono tabular text-base font-semibold text-danger'
+                : 'font-mono tabular text-base font-semibold text-ledger'
             }
           >
-            {interestNegative
-              ? `(${formatMoney(Math.abs(netInterest)).replace('RM ', '')})`
-              : formatMoney(netInterest)}
+            {formatMoney(netInterest)}
           </span>
         </div>
       </div>

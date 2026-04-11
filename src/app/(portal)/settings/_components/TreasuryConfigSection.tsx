@@ -58,7 +58,7 @@ export default function TreasuryConfigSection({
                 max="99.999"
                 defaultValue={(opMargin * 100).toFixed(3)}
                 required
-                className="w-full px-3 py-2 pr-8 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+                className="w-full px-3 py-2 pr-8 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted">%</span>
             </div>
@@ -82,7 +82,7 @@ export default function TreasuryConfigSection({
                 min="0"
                 defaultValue={bufferAmount.toFixed(2)}
                 required
-                className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+                className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
               />
             </div>
             <p className="text-xs text-muted mt-1.5 font-sans">
@@ -105,7 +105,7 @@ export default function TreasuryConfigSection({
                 max="99.9"
                 defaultValue={(savingRate * 100).toFixed(1)}
                 required
-                className="w-full px-3 py-2 pr-8 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+                className="w-full px-3 py-2 pr-8 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted">%</span>
             </div>

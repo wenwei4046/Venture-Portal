@@ -47,3 +47,12 @@ scripts/pcb-data.json
 
 # gstack retro snapshots (local history, not source)
 .context/retros/
+
+# Claude Code local settings (per-user, not shared)
+.claude/
+
+# E2E test screenshot artifacts (local only)
+/e2e-screenshots/
+
+# Design audit screenshots (local session only)
+/design-audit/

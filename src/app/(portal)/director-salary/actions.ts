@@ -282,9 +282,9 @@ export async function calculateDirectorSalary(period: string): Promise<Calculate
     })),
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: result, error: rpcErr } = await supabase.rpc(
     'save_director_salary_results',
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     { p_data: rpcPayload as any }
   )
 

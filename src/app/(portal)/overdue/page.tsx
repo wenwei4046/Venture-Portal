@@ -59,7 +59,7 @@ export default async function OverduePage() {
   return (
     <div>
       {/* ───────── Header ───────── */}
-      <div className="flex items-baseline justify-between mb-10">
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10">
         <div>
           <h1 className="font-serif text-3xl text-ink">Overdue &amp; Netting</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
@@ -75,7 +75,7 @@ export default async function OverduePage() {
           <div className="font-serif italic text-accent text-base mb-1">
             Penalty outstanding
           </div>
-          <div className="font-serif text-hero text-ink leading-none">
+          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
             {totalPenalty > 0 ? (
               formatMoney(totalPenalty)
             ) : (
@@ -150,16 +150,16 @@ export default async function OverduePage() {
                           {company?.code ?? ''} · {dayjs(row.period_month).format('MMM YYYY')}
                         </div>
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular text-ink">
+                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
                         {formatMoney(outstanding)}
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular text-ink">
+                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
                         {row.overdue_days}d
                       </td>
                       <td className="py-4 pr-4">
                         <StageLabel stage={row.overdue_stage} />
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular text-danger">
+                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-danger">
                         {formatMoney(Number(row.penalty_amount ?? 0))}
                       </td>
                       <td className="py-4 text-right">

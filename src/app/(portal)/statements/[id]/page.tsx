@@ -55,7 +55,7 @@ export default async function StatementDetailPage({ params }: Props) {
       </Link>
 
       {/* ───────── Header ───────── */}
-      <div className="flex items-baseline justify-between mt-3 mb-10">
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mt-3 mb-10">
         <div>
           <p className="font-serif italic text-accent text-base mb-1">
             {dayjs(statement.period_month).format('MMMM YYYY')} statement
@@ -66,7 +66,16 @@ export default async function StatementDetailPage({ params }: Props) {
             {dayjs(statement.created_at).format('D MMM YYYY')}
           </p>
         </div>
-        <StatementStatus status={statement.status} />
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/statements/${id}/print`}
+            target="_blank"
+            className="btn-secondary"
+          >
+            Print Statement
+          </Link>
+          <StatementStatus status={statement.status} />
+        </div>
       </div>
 
       {/* ───────── Hero net amount ───────── */}
@@ -74,14 +83,10 @@ export default async function StatementDetailPage({ params }: Props) {
         <div className="font-serif italic text-graphite text-sm mb-1">
           Net amount
         </div>
-        <div className="font-serif text-hero text-ink leading-none">
-          {Number(statement.net_amount) >= 0 ? (
-            formatMoney(Number(statement.net_amount))
-          ) : (
-            <span className="text-danger">
-              ({formatMoney(Math.abs(Number(statement.net_amount))).replace('RM ', '')})
-            </span>
-          )}
+        <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
+          <span className={Number(statement.net_amount) < 0 ? 'text-danger' : ''}>
+            {formatMoney(Number(statement.net_amount))}
+          </span>
         </div>
         <div className="font-mono text-xs text-muted mt-2">
           {Number(statement.net_amount) >= 0 ? (
@@ -100,7 +105,7 @@ export default async function StatementDetailPage({ params }: Props) {
       <section className="mb-10">
         <div className="flex items-baseline justify-between mb-4">
           <h2 className="font-serif text-xl text-ink">Invoice items</h2>
-          <span className="font-mono tabular text-sm text-ink">
+          <span className="font-mono tabular text-sm font-medium text-ink">
             {formatMoney(Number(statement.total_invoice))}
           </span>
         </div>
@@ -128,7 +133,7 @@ export default async function StatementDetailPage({ params }: Props) {
                     </div>
                   ) : null}
                 </div>
-                <div className="font-mono tabular text-sm text-ink">
+                <div className="font-mono tabular text-sm font-medium text-ink">
                   {formatMoney(Number(line.amount))}
                 </div>
               </div>
@@ -141,8 +146,8 @@ export default async function StatementDetailPage({ params }: Props) {
       <section className="mb-10">
         <div className="flex items-baseline justify-between mb-4">
           <h2 className="font-serif text-xl text-ink">Contra items</h2>
-          <span className="font-mono tabular text-sm text-ink">
-            ({formatMoney(Number(statement.total_contra)).replace('RM ', '')})
+          <span className="font-mono tabular text-sm font-medium text-ink">
+            {formatMoney(-Number(statement.total_contra))}
           </span>
         </div>
         {contraLines.length === 0 ? (
@@ -169,8 +174,8 @@ export default async function StatementDetailPage({ params }: Props) {
                     </div>
                   ) : null}
                 </div>
-                <div className="font-mono tabular text-sm text-ink">
-                  ({formatMoney(Number(line.amount)).replace('RM ', '')})
+                <div className="font-mono tabular text-sm font-medium text-ink">
+                  {formatMoney(-Number(line.amount))}
                 </div>
               </div>
             ))}
@@ -189,19 +194,13 @@ export default async function StatementDetailPage({ params }: Props) {
         <div className="flex justify-between font-mono text-sm text-graphite mb-2 pb-2 border-b border-hairline">
           <span>Subtotal contra</span>
           <span className="tabular text-ink">
-            ({formatMoney(Number(statement.total_contra)).replace('RM ', '')})
+            {formatMoney(-Number(statement.total_contra))}
           </span>
         </div>
         <div className="flex items-baseline justify-between">
           <span className="font-serif italic text-md text-accent">Net payable</span>
-          <span className="font-serif text-2xl tabular">
-            {Number(statement.net_amount) >= 0 ? (
-              <span className="text-ink">{formatMoney(Number(statement.net_amount))}</span>
-            ) : (
-              <span className="text-danger">
-                ({formatMoney(Math.abs(Number(statement.net_amount))).replace('RM ', '')})
-              </span>
-            )}
+          <span className={`font-serif text-2xl tabular ${Number(statement.net_amount) < 0 ? 'text-danger' : 'text-ink'}`}>
+            {formatMoney(Number(statement.net_amount))}
           </span>
         </div>
       </div>

@@ -24,14 +24,11 @@ export default function FinanceAttributionSection({ deptSummaries, submitted }: 
 
   return (
     <section className="border-t border-hairline pt-8">
-      <div className="flex items-baseline justify-between mb-4">
-        <h2 className="font-serif text-xl text-ink">Finance Attribution</h2>
-        <span className="font-serif italic text-muted text-xs">finance_attribution</span>
-      </div>
+      <h2 className="font-serif text-xl text-ink mb-4">Finance Attribution</h2>
       <p className="font-serif italic text-graphite text-sm mb-4">
-        Finance department non-manager staff — each person&apos;s CTC is split per
-        <em>hr_staff_allocation</em>. Per-staff detail is HR + Principal only; the
-        aggregate is Finance-safe.
+        Finance department non-manager staff — each person&apos;s CTC is split
+        per-company by their <em>staff allocation %</em>. Per-staff detail is
+        HR + Principal only; the aggregate is Finance-safe.
       </p>
 
       {!submitted ? (

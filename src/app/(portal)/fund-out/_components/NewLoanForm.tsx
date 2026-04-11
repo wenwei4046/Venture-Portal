@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useMemo } from 'react'
+import Link from 'next/link'
 import { createLoan } from '../actions'
 import type { Company, CompanyTier, TierConfig } from '@/types'
 
@@ -44,7 +45,7 @@ export default function NewLoanForm({ companies, tiers, baseRate }: Props) {
   return (
     <form
       action={handleSubmit}
-      className="bg-surface border border-hairline rounded-md p-8 max-w-3xl"
+      className="bg-surface border border-hairline rounded-md p-4 sm:p-8 max-w-3xl"
     >
       {/* ───────── Company ───────── */}
       <div className="mb-6">
@@ -79,7 +80,7 @@ export default function NewLoanForm({ companies, tiers, baseRate }: Props) {
               <div className="text-xs text-muted uppercase tracking-wide font-sans mb-1">
                 Base rate
               </div>
-              <div className="font-mono tabular text-ink">
+              <div className="font-mono tabular font-medium text-ink">
                 {(baseRate.rate * 100).toFixed(3)}%
               </div>
               <div className="text-xs text-muted font-mono">{baseRate.quarter}</div>
@@ -88,7 +89,7 @@ export default function NewLoanForm({ companies, tiers, baseRate }: Props) {
               <div className="text-xs text-muted uppercase tracking-wide font-sans mb-1">
                 Tier premium
               </div>
-              <div className="font-mono tabular text-ink">
+              <div className="font-mono tabular font-medium text-ink">
                 +{(tierPremium * 100).toFixed(3)}%
               </div>
               <div className="text-xs text-muted font-mono">Tier {selectedTier}</div>
@@ -129,7 +130,7 @@ export default function NewLoanForm({ companies, tiers, baseRate }: Props) {
             min="0.01"
             max="100000000"
             required
-            className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+            className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
             placeholder="100000.00"
           />
         </div>
@@ -177,21 +178,21 @@ export default function NewLoanForm({ companies, tiers, baseRate }: Props) {
       ) : null}
 
       {/* ───────── Actions ───────── */}
-      <div className="flex items-center gap-4 pt-4 border-t border-hairline">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 pt-4 border-t border-hairline">
         <button
           type="submit"
           disabled={isPending || !companyId}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2.5 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isPending ? 'Submitting…' : 'Submit for approval'}
         </button>
-        <a
+        <Link
           href="/fund-out"
-          className="text-sm text-graphite hover:text-ink font-sans transition-colors"
+          className="text-sm text-graphite hover:text-ink font-sans transition-colors text-center sm:text-left"
         >
           Cancel
-        </a>
-        <span className="text-xs text-muted italic font-serif ml-auto">
+        </Link>
+        <span className="text-xs text-muted italic font-serif sm:ml-auto">
           Principal must approve before disbursement
         </span>
       </div>

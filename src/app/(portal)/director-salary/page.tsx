@@ -54,7 +54,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-baseline justify-between mb-10">
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10">
         <div>
           <h1 className="font-serif text-3xl text-ink">Director Salary</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
@@ -81,7 +81,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
             <div className="font-serif italic text-accent text-base mb-1">
               Salary Pool — {periodLabel}
             </div>
-            <div className="font-serif text-hero text-ink leading-none">
+            <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
               {formatMoney(Number(poolData?.total_pool ?? summary.out_pool_total ?? 0))}
             </div>
             <div className="font-mono text-xs text-muted mt-2">
@@ -98,23 +98,23 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
           <div className="lg:col-span-5 space-y-3">
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">Total Payroll (75%)</span>
-              <span className="font-mono tabular text-sm text-ink">{formatMoney(Number(summary.out_total_payroll_gross))}</span>
+              <span className="font-mono tabular text-sm font-medium text-ink">{formatMoney(Number(summary.out_total_payroll_gross))}</span>
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">Total Invoice (25%)</span>
-              <span className="font-mono tabular text-sm text-ink">{formatMoney(Number(summary.out_total_invoice))}</span>
+              <span className="font-mono tabular text-sm font-medium text-ink">{formatMoney(Number(summary.out_total_invoice))}</span>
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">Total 5% Saving</span>
-              <span className="font-mono tabular text-sm text-ledger">{formatMoney(Number(summary.out_total_saving))}</span>
+              <span className="font-mono tabular text-sm font-medium text-ledger">{formatMoney(Number(summary.out_total_saving))}</span>
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">Total Advance</span>
-              <span className="font-mono tabular text-sm text-alert">{formatMoney(Number(summary.out_total_advance))}</span>
+              <span className="font-mono tabular text-sm font-medium text-alert">{formatMoney(Number(summary.out_total_advance))}</span>
             </div>
             <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
               <span className="font-serif italic text-sm text-graphite">Net to Directors</span>
-              <span className="font-mono tabular text-md text-ink font-semibold">{formatMoney(Number(summary.out_total_payroll_net))}</span>
+              <span className="font-mono tabular text-md font-medium text-ink font-semibold">{formatMoney(Number(summary.out_total_payroll_net))}</span>
             </div>
           </div>
         </div>
@@ -142,25 +142,25 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
               <div className="border border-hairline rounded-md bg-surface p-5 space-y-3 max-w-xl">
                 <div className="flex items-baseline justify-between">
                   <span className="font-serif italic text-sm text-graphite">EPF (ER+EE)</span>
-                  <span className="font-mono tabular text-sm text-ink">
+                  <span className="font-mono tabular text-sm font-medium text-ink">
                     {formatMoney(Number(summary.out_total_epf_er) + Number(summary.out_total_epf_ee))}
                   </span>
                 </div>
                 <div className="flex items-baseline justify-between">
                   <span className="font-serif italic text-sm text-graphite">SOCSO (ER+EE)</span>
-                  <span className="font-mono tabular text-sm text-ink">
+                  <span className="font-mono tabular text-sm font-medium text-ink">
                     {formatMoney(Number(summary.out_total_socso_er) + Number(summary.out_total_socso_ee))}
                   </span>
                 </div>
                 <div className="flex items-baseline justify-between">
                   <span className="font-serif italic text-sm text-graphite">EIS (ER+EE)</span>
-                  <span className="font-mono tabular text-sm text-ink">
+                  <span className="font-mono tabular text-sm font-medium text-ink">
                     {formatMoney(Number(summary.out_total_eis_er) + Number(summary.out_total_eis_ee))}
                   </span>
                 </div>
                 <div className="flex items-baseline justify-between">
                   <span className="font-serif italic text-sm text-graphite">PCB</span>
-                  <span className="font-mono tabular text-sm text-ink">
+                  <span className="font-mono tabular text-sm font-medium text-ink">
                     {formatMoney(Number(summary.out_total_pcb))}
                   </span>
                 </div>
@@ -177,7 +177,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
           <section className="mb-16">
             <h2 className="font-serif text-2xl text-ink mb-1">CTC Input</h2>
             <p className="font-serif italic text-graphite text-sm mb-6">
-              录入每位 Director 在每间子公司的 CTC。<em>Statutory ER 由 trigger 自动计算。</em>
+              录入每间子公司的 Director Portion。<em>Statutory ER 由 trigger 自动计算，Pool 按 Weightage 分配。</em>
             </p>
 
             <CTCInputGrid
@@ -258,11 +258,11 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
                             <div className="font-serif text-md text-ink">{dir?.code ?? '?'}</div>
                             <div className="font-mono text-xs text-muted">{dir?.name}</div>
                           </td>
-                          <td className="py-4 pr-4 text-right font-mono tabular text-graphite">{formatMoney(p.gross_amount ?? 0)}</td>
-                          <td className="py-4 pr-4 text-right font-mono tabular text-danger">({formatMoney(p.saving_amount ?? 0).replace('RM ', '')})</td>
-                          <td className="py-4 pr-4 text-right font-mono tabular text-ink">{formatMoney(p.payroll_gross ?? 0)}</td>
-                          <td className="py-4 pr-4 text-right font-mono tabular text-graphite">{formatMoney(p.invoice_total ?? 0)}</td>
-                          <td className="py-4 pr-4 text-right font-mono tabular text-ink font-semibold">{formatMoney(p.payroll_net ?? 0)}</td>
+                          <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">{formatMoney(p.gross_amount ?? 0)}</td>
+                          <td className="py-4 pr-4 text-right font-mono tabular font-medium text-danger">{formatMoney(-(p.saving_amount ?? 0))}</td>
+                          <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">{formatMoney(p.payroll_gross ?? 0)}</td>
+                          <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">{formatMoney(p.invoice_total ?? 0)}</td>
+                          <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">{formatMoney(p.payroll_net ?? 0)}</td>
                           <td className="py-4 text-right">
                             <Link
                               href={`/director-salary/${p.director_id}?period=${period}`}

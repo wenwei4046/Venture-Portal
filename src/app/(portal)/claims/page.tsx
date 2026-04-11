@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default async function ClaimsPage({ searchParams }: Props) {
-  const user = await requireRole(['principal', 'finance', 'hr'])
+  const user = await requireRole(['principal', 'finance', 'hr', 'dept_manager'])
   const supabase = await createClient()
 
   const { tab } = await searchParams
@@ -32,14 +32,14 @@ export default async function ClaimsPage({ searchParams }: Props) {
         <div>
           <h1 className="font-serif text-3xl text-ink">Claims</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
-            Benefit claims (HR approves) and project claims (Finance approves).
+            Benefit claims (HR approves) and pool claims (Finance approves).
           </p>
         </div>
         <NewClaimForm />
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-6 border-b border-hairline mb-8">
+      <div className="flex gap-6 border-b border-hairline mb-8 overflow-x-auto">
         <a
           href="/claims?tab=benefit"
           className={
@@ -58,7 +58,7 @@ export default async function ClaimsPage({ searchParams }: Props) {
               : 'pb-3 -mb-px font-serif text-graphite hover:text-ink transition-colors'
           }
         >
-          Project Claims <span className="font-mono text-xs text-muted ml-1">{projectCount}</span>
+          Pool Claims <span className="font-mono text-xs text-muted ml-1">{projectCount}</span>
         </a>
       </div>
 
@@ -92,7 +92,7 @@ export default async function ClaimsPage({ searchParams }: Props) {
                     <div className="font-serif text-md text-ink">{c.claimant_name}</div>
                   </td>
                   <td className="py-4 pr-4 font-sans text-sm text-graphite">{c.description ?? '—'}</td>
-                  <td className="py-4 pr-4 text-right font-mono tabular text-ink">{formatMoney(c.amount)}</td>
+                  <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">{formatMoney(c.amount)}</td>
                   <td className="py-4 pr-4">
                     <em className={`font-serif text-sm ${
                       c.status === 'approved' ? 'text-ledger' :

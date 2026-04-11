@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 
 export async function submitClaim(formData: FormData) {
-  const user = await requireRole(['principal', 'finance', 'hr'])
+  const user = await requireRole(['principal', 'finance', 'hr', 'dept_manager'])
   const supabase = await createClient()
 
   const claimType = formData.get('claim_type') as 'project' | 'benefit'
@@ -30,16 +30,16 @@ export async function approveClaim(claimId: string) {
 
   const { data: claim } = await supabase
     .from('claims')
-    .select('claim_type, status')
+    .select('claim_type, status, amount, claimant_name, description')
     .eq('id', claimId)
     .single()
 
   if (!claim) throw new Error('Claim not found')
   if (claim.status !== 'pending') throw new Error('Claim is not pending')
 
-  // Finance approves project claims, HR approves benefit claims
+  // Finance approves pool claims, HR approves benefit claims
   if (claim.claim_type === 'project' && user.role !== 'finance' && user.role !== 'principal') {
-    throw new Error('Only Finance or Principal can approve project claims')
+    throw new Error('Only Finance or Principal can approve pool claims')
   }
   if (claim.claim_type === 'benefit' && user.role !== 'hr' && user.role !== 'principal') {
     throw new Error('Only HR or Principal can approve benefit claims')
@@ -52,7 +52,22 @@ export async function approveClaim(claimId: string) {
 
   if (error) throw new Error(`Failed to approve: ${error.message}`)
 
+  // Pool claims (project type) deduct from Director Saving Pool.
+  // hv_operating_fund has no period_month column — it's a running ledger,
+  // balance = SUM(in types) − SUM(out types). reference_id ties back to the
+  // approved claim for audit.
+  if (claim.claim_type === 'project' && Number(claim.amount) > 0) {
+    await supabase.from('hv_operating_fund').insert({
+      transaction_type: 'claim_out',
+      amount: Number(claim.amount),
+      description: `Pool claim: ${claim.claimant_name} — ${claim.description ?? ''}`.trim(),
+      reference_id: claimId,
+      reference_table: 'claims',
+    })
+  }
+
   revalidatePath('/claims')
+  revalidatePath('/director-pool')
 }
 
 export async function rejectClaim(claimId: string) {

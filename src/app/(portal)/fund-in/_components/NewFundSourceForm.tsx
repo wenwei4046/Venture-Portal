@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import dayjs from 'dayjs'
+import Link from 'next/link'
 import { createFundSource } from '../actions'
 import type { Company, Director, FundSourceType } from '@/types'
 
@@ -123,7 +124,7 @@ export default function NewFundSourceForm({ companies, directors }: Props) {
               step="0.01"
               min="0.01"
               required
-              className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+              className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
               placeholder="100000.00"
             />
           </div>
@@ -148,7 +149,7 @@ export default function NewFundSourceForm({ companies, directors }: Props) {
               min="0"
               max="99.999"
               required
-              className="w-full px-3 py-2 pr-12 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+              className="w-full px-3 py-2 pr-12 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
               placeholder="0.800"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted font-mono">
@@ -179,7 +180,7 @@ export default function NewFundSourceForm({ companies, directors }: Props) {
               min="0"
               defaultValue="12"
               required
-              className="w-full px-3 py-2 pr-12 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+              className="w-full px-3 py-2 pr-12 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted font-mono">
               months
@@ -245,12 +246,12 @@ export default function NewFundSourceForm({ companies, directors }: Props) {
         >
           {isPending ? 'Saving…' : 'Record fund source'}
         </button>
-        <a
+        <Link
           href="/fund-in"
           className="text-sm text-graphite hover:text-ink font-sans transition-colors"
         >
           Cancel
-        </a>
+        </Link>
         <span className="text-xs text-muted italic font-serif ml-auto">
           Rate locks at save
         </span>

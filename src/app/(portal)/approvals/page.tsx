@@ -81,7 +81,7 @@ export default async function ApprovalsPage() {
                 </div>
                 <div className="flex items-baseline gap-4 mt-2">
                   {req.amount ? (
-                    <div className="font-mono tabular text-md text-ink">
+                    <div className="font-mono tabular text-md font-medium text-ink">
                       {formatMoney(Number(req.amount))}
                     </div>
                   ) : null}
@@ -128,7 +128,7 @@ export default async function ApprovalsPage() {
                   </div>
                 </div>
                 {req.amount ? (
-                  <div className="font-mono tabular text-sm text-graphite">
+                  <div className="font-mono tabular text-sm font-medium text-graphite">
                     {formatMoney(Number(req.amount))}
                   </div>
                 ) : null}

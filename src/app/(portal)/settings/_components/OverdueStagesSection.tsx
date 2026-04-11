@@ -74,7 +74,7 @@ export default function OverdueStagesSection({ stages }: Props) {
                       min="0"
                       defaultValue={stage.days_from}
                       required
-                      className="w-24 px-2 py-1.5 bg-paper border border-hairline rounded text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+                      className="w-24 px-2 py-1.5 bg-paper border border-hairline rounded text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
                     />
                   </td>
                   <td className="py-3 pr-3">
@@ -85,7 +85,7 @@ export default function OverdueStagesSection({ stages }: Props) {
                       min="0"
                       defaultValue={stage.days_to ?? ''}
                       placeholder={stage.stage === 'escalation' ? 'no limit' : ''}
-                      className="w-24 px-2 py-1.5 bg-paper border border-hairline rounded text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border placeholder:text-muted placeholder:italic"
+                      className="w-24 px-2 py-1.5 bg-paper border border-hairline rounded text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border placeholder:text-muted placeholder:italic"
                     />
                   </td>
                   <td className="py-3">
@@ -98,7 +98,7 @@ export default function OverdueStagesSection({ stages }: Props) {
                         max="99.999"
                         defaultValue={(stage.penalty_rate * 100).toFixed(3)}
                         required
-                        className="w-full px-2 py-1.5 pr-7 bg-paper border border-hairline rounded text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+                        className="w-full px-2 py-1.5 pr-7 bg-paper border border-hairline rounded text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
                       />
                       <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted">
                         %

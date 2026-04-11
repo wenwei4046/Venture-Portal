@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, formatMoneyBare } from '@/lib/utils'
 
 export default async function OperatingFundPage() {
   const user = await requireRole(['principal', 'finance'])
@@ -40,8 +40,8 @@ export default async function OperatingFundPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
         <div className="lg:col-span-7">
           <div className="font-serif italic text-accent text-base mb-1">Current Balance</div>
-          <div className={`font-serif text-hero leading-none ${balance >= 0 ? 'text-ink' : 'text-danger'}`}>
-            {balance >= 0 ? formatMoney(balance) : `(${formatMoney(Math.abs(balance)).replace('RM ', '')})`}
+          <div className={`font-serif text-[44px] md:text-hero leading-none ${balance >= 0 ? 'text-ink' : 'text-danger'}`}>
+            {formatMoney(balance)}
           </div>
           <div className="font-mono text-xs text-muted mt-2">
             {(transactions?.length ?? 0)} transactions
@@ -85,7 +85,7 @@ export default async function OperatingFundPage() {
                     </td>
                     <td className="py-4 pr-4 font-sans text-sm text-graphite">{t.description}</td>
                     <td className={`py-4 pr-4 text-right font-mono tabular font-semibold ${isIn ? 'text-ledger' : 'text-danger'}`}>
-                      {isIn ? '+' : '('}{formatMoney(t.amount).replace('RM ', '')}{isIn ? '' : ')'}
+                      {isIn ? '+' : '('}{formatMoneyBare(t.amount)}{isIn ? '' : ')'}
                     </td>
                   </tr>
                 )

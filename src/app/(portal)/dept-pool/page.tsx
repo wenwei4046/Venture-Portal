@@ -92,7 +92,7 @@ export default async function DeptPoolPage() {
           <div className="font-serif italic text-accent text-base mb-1">
             Total pool deployed to Treasury
           </div>
-          <div className="font-serif text-hero text-ink leading-none">
+          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
             {formatMoney(totalDeployed)}
           </div>
           <div className="font-mono text-xs text-muted mt-2">
@@ -143,27 +143,23 @@ export default async function DeptPoolPage() {
                       <td className="py-3 pr-4 font-serif text-md text-ink">
                         {dept.name}
                       </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular text-ink">
+                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">
                         {formatMoney(balance)}
                       </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
                         {formatMoney(np?.revenue ?? 0)}
                       </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
                         {formatMoney(np?.staff_cost ?? 0)}
                       </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
                         {formatMoney(np?.expenses ?? 0)}
                       </td>
                       <td className="py-3 pr-4 text-right font-mono tabular font-semibold">
                         {np ? (
-                          np.net_profit >= 0 ? (
-                            <span className="text-ink">{formatMoney(np.net_profit)}</span>
-                          ) : (
-                            <span className="text-danger">
-                              ({formatMoney(Math.abs(np.net_profit)).replace('RM ', '')})
-                            </span>
-                          )
+                          <span className={np.net_profit >= 0 ? 'text-ink' : 'text-danger'}>
+                            {formatMoney(np.net_profit)}
+                          </span>
                         ) : (
                           <span className="text-muted">—</span>
                         )}

@@ -41,7 +41,7 @@ export default async function StatementsPage() {
 
   return (
     <div>
-      <div className="flex items-baseline justify-between mb-10">
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10">
         <div>
           <h1 className="font-serif text-3xl text-ink">Statements</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
@@ -58,7 +58,7 @@ export default async function StatementsPage() {
           <div className="font-serif italic text-accent text-base mb-1">
             {latestPeriod ? `Latest period` : 'No statements yet'}
           </div>
-          <div className="font-serif text-hero text-ink leading-none">
+          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
             {latestPeriod ? (
               dayjs(latestPeriod).format('MMMM YYYY')
             ) : (
@@ -137,20 +137,18 @@ export default async function StatementsPage() {
                             {company?.code}
                           </div>
                         </td>
-                        <td className="py-4 pr-4 text-right font-mono tabular text-graphite">
+                        <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
                           {Number(s.total_invoice) > 0
                             ? formatMoney(Number(s.total_invoice))
                             : '—'}
                         </td>
-                        <td className="py-4 pr-4 text-right font-mono tabular text-graphite">
+                        <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
                           {Number(s.total_contra) > 0
-                            ? `(${formatMoney(Number(s.total_contra)).replace('RM ', '')})`
+                            ? formatMoney(-Number(s.total_contra))
                             : '—'}
                         </td>
-                        <td className="py-4 pr-4 text-right font-mono tabular text-ink font-semibold">
-                          {Number(s.net_amount) >= 0
-                            ? formatMoney(Number(s.net_amount))
-                            : `(${formatMoney(Math.abs(Number(s.net_amount))).replace('RM ', '')})`}
+                        <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">
+                          {formatMoney(Number(s.net_amount))}
                         </td>
                         <td className="py-4 pr-4">
                           <StatementStatus status={s.status} />

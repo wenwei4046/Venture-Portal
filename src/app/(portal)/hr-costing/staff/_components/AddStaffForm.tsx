@@ -30,7 +30,7 @@ export default function AddStaffForm({ departments }: Props) {
 
   return (
     <form id="add-staff-form" action={handleSubmit} className="bg-surface border border-hairline rounded-md p-6 max-w-2xl">
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
         <div>
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Name</label>
           <input
@@ -53,7 +53,7 @@ export default function AddStaffForm({ departments }: Props) {
           </select>
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <div>
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
             Basic Salary <span className="text-xs text-muted ml-1 font-normal">(RM)</span>
@@ -64,12 +64,12 @@ export default function AddStaffForm({ departments }: Props) {
             step="0.01"
             min="0"
             required
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
           />
         </div>
         <div>
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Allowances <span className="text-xs text-muted ml-1 font-normal">(RM)</span>
+            Statutory Allow. <span className="text-xs text-muted ml-1 font-normal">(RM, attracts EPF)</span>
           </label>
           <input
             name="allowances"
@@ -77,7 +77,20 @@ export default function AddStaffForm({ departments }: Props) {
             step="0.01"
             min="0"
             defaultValue="0"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+            Non-Stat. Allow. <span className="text-xs text-muted ml-1 font-normal">(RM, no EPF)</span>
+          </label>
+          <input
+            name="non_statutory_allowance"
+            type="number"
+            step="0.01"
+            min="0"
+            defaultValue="0"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
           />
         </div>
         <div>

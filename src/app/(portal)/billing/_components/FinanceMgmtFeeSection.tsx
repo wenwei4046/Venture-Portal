@@ -12,10 +12,7 @@ interface Props {
 export default function FinanceMgmtFeeSection({ submitted }: Props) {
   return (
     <section className="border-t border-hairline pt-8">
-      <div className="flex items-baseline justify-between mb-4">
-        <h2 className="font-serif text-xl text-ink">Finance Mgmt Fee</h2>
-        <span className="font-serif italic text-muted text-xs">finance_mgmt_fee</span>
-      </div>
+      <h2 className="font-serif text-xl text-ink mb-4">Finance Mgmt Fee</h2>
       <p className="font-serif italic text-graphite text-sm mb-4">
         Manager-only slice from the Finance department. Billed as a separate invoice
         line from regular Finance Attribution. Per-staff detail remains HR +

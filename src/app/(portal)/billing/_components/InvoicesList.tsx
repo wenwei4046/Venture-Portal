@@ -11,6 +11,25 @@ interface Invoice {
   status: string
 }
 
+// Humanize the 5 billing mode enum values. Shown in the invoice table and
+// the per-mode totals breakdown — raw snake_case reads like a dev dump.
+function formatBillingMode(mode: string): string {
+  switch (mode) {
+    case 'hr_pool_split':
+      return 'HR pool split'
+    case 'finance_attribution':
+      return 'Finance attribution'
+    case 'finance_mgmt_fee':
+      return 'Finance mgmt fee'
+    case 'marketing_project':
+      return 'Marketing project'
+    case 'fixed_split':
+      return 'Rent & utility split'
+    default:
+      return mode
+  }
+}
+
 interface Props {
   invoices: Invoice[]
   companyMap: Map<string, { name: string; code: string }>
@@ -55,7 +74,7 @@ export default function InvoicesList({ invoices, companyMap, period }: Props) {
               <div className="font-serif italic text-accent text-base mb-1">
                 Total for {dayjs(period).format('MMMM YYYY')}
               </div>
-              <div className="font-serif text-hero text-ink leading-none">
+              <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
                 {formatMoney(grandTotal)}
               </div>
             </div>
@@ -65,7 +84,7 @@ export default function InvoicesList({ invoices, companyMap, period }: Props) {
                   key={mode}
                   className="flex items-baseline justify-between font-mono text-sm"
                 >
-                  <em className="font-serif text-graphite text-sm">{mode}</em>
+                  <em className="font-serif text-graphite text-sm">{formatBillingMode(mode)}</em>
                   <span className="text-graphite tabular">{formatMoney(total)}</span>
                 </div>
               ))}
@@ -103,9 +122,9 @@ export default function InvoicesList({ invoices, companyMap, period }: Props) {
                         </div>
                       </td>
                       <td className="py-3 pr-4 font-serif italic text-graphite text-sm">
-                        {inv.billing_mode}
+                        {formatBillingMode(inv.billing_mode)}
                       </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular text-ink">
+                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">
                         {formatMoney(Number(inv.total_amount))}
                       </td>
                       <td className="py-3">

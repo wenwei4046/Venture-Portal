@@ -37,7 +37,7 @@ export default async function ClaimsSummaryPage() {
       <div className="mt-6 mb-10">
         <h1 className="font-serif text-3xl text-ink">Claims Summary</h1>
         <p className="font-serif italic text-graphite text-base mt-2">
-          Benefit and project claims overview.
+          Benefit and pool claims overview.
         </p>
       </div>
 
@@ -47,42 +47,42 @@ export default async function ClaimsSummaryPage() {
           <h3 className="font-serif text-lg text-ink mb-2">Benefit Claims</h3>
           <div className="flex items-baseline justify-between">
             <span className="font-serif italic text-sm text-ledger">Approved</span>
-            <span className="font-mono tabular text-sm text-ink">
+            <span className="font-mono tabular text-sm font-medium text-ink">
               {stats.benefit.approved} claims, {formatMoney(stats.benefit.approvedAmt)}
             </span>
           </div>
           <div className="flex items-baseline justify-between">
             <span className="font-serif italic text-sm text-alert">Pending</span>
-            <span className="font-mono tabular text-sm text-ink">
+            <span className="font-mono tabular text-sm font-medium text-ink">
               {stats.benefit.pending} claims, {formatMoney(stats.benefit.pendingAmt)}
             </span>
           </div>
           <div className="flex items-baseline justify-between">
             <span className="font-serif italic text-sm text-danger">Rejected</span>
-            <span className="font-mono tabular text-sm text-muted">
+            <span className="font-mono tabular text-sm font-medium text-muted">
               {stats.benefit.rejected} claims
             </span>
           </div>
         </div>
 
-        {/* Project Claims */}
+        {/* Pool Claims */}
         <div className="border border-hairline rounded-md bg-surface p-5 space-y-3">
-          <h3 className="font-serif text-lg text-ink mb-2">Project Claims</h3>
+          <h3 className="font-serif text-lg text-ink mb-2">Pool Claims</h3>
           <div className="flex items-baseline justify-between">
             <span className="font-serif italic text-sm text-ledger">Approved</span>
-            <span className="font-mono tabular text-sm text-ink">
+            <span className="font-mono tabular text-sm font-medium text-ink">
               {stats.project.approved} claims, {formatMoney(stats.project.approvedAmt)}
             </span>
           </div>
           <div className="flex items-baseline justify-between">
             <span className="font-serif italic text-sm text-alert">Pending</span>
-            <span className="font-mono tabular text-sm text-ink">
+            <span className="font-mono tabular text-sm font-medium text-ink">
               {stats.project.pending} claims, {formatMoney(stats.project.pendingAmt)}
             </span>
           </div>
           <div className="flex items-baseline justify-between">
             <span className="font-serif italic text-sm text-danger">Rejected</span>
-            <span className="font-mono tabular text-sm text-muted">
+            <span className="font-mono tabular text-sm font-medium text-muted">
               {stats.project.rejected} claims
             </span>
           </div>

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import RequestReleaseButton from './_components/RequestReleaseButton'
 
 export default async function InvoicePoolPage() {
@@ -41,7 +41,7 @@ export default async function InvoicePoolPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
         <div className="lg:col-span-7">
           <div className="font-serif italic text-accent text-base mb-1">Pool Balance</div>
-          <div className="font-serif text-hero text-ink leading-none">
+          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
             {formatMoney(balance)}
           </div>
           <div className="font-mono text-xs text-muted mt-2">
@@ -93,7 +93,7 @@ export default async function InvoicePoolPage() {
                     <td className="py-4 pr-4 font-serif text-md text-ink">{dir?.code ?? '—'}</td>
                     <td className="py-4 pr-4 font-sans text-sm text-graphite">{t.description}</td>
                     <td className={`py-4 pr-4 text-right font-mono tabular font-semibold ${isIn ? 'text-ledger' : 'text-danger'}`}>
-                      {isIn ? '+' : '-'}{formatMoney(t.amount).replace('RM ', '')}
+                      {isIn ? '+' : '-'}{formatMoneyBare(t.amount)}
                     </td>
                   </tr>
                 )

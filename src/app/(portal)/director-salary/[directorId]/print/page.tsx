@@ -1,7 +1,7 @@
 import PrintButton from './PrintButton'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { formatMoney, getPeriodMonth } from '@/lib/utils'
+import { formatMoney, formatMoneyBare, getPeriodMonth } from '@/lib/utils'
 import dayjs from 'dayjs'
 
 interface Props {
@@ -21,6 +21,14 @@ export default async function PrintPayoutPage({ params, searchParams }: Props) {
     supabase.from('directors').select('*').eq('id', directorId).single(),
     supabase.from('director_payouts').select('*').eq('director_id', directorId).eq('period_month', period).maybeSingle(),
   ])
+
+  // Fire-and-forget access log for sensitive print action
+  void supabase.rpc('log_data_access', {
+    p_resource_type: 'director_salary_print',
+    p_resource_id: directorId,
+    p_action: 'print',
+    p_metadata: { period },
+  })
 
   if (!director || !payout) {
     return <div className="p-10 font-serif text-danger">Data not found.</div>
@@ -84,7 +92,7 @@ export default async function PrintPayoutPage({ params, searchParams }: Props) {
             </tr>
             <tr>
               <td>5% Saving</td>
-              <td className="negative">-{formatMoney(n(payout.saving_amount)).replace('RM ', '')}</td>
+              <td className="negative">-{formatMoneyBare(n(payout.saving_amount))}</td>
             </tr>
           </tbody>
         </table>
@@ -96,10 +104,10 @@ export default async function PrintPayoutPage({ params, searchParams }: Props) {
               <td>Payroll Gross</td>
               <td>{formatMoney(n(payout.payroll_gross))}</td>
             </tr>
-            <tr><td>- EPF (ER+EE)</td><td className="negative">-{formatMoney(n(payout.payroll_epf_er) + n(payout.payroll_epf_ee)).replace('RM ', '')}</td></tr>
-            <tr><td>- SOCSO (ER+EE)</td><td className="negative">-{formatMoney(n(payout.payroll_socso_er) + n(payout.payroll_socso_ee)).replace('RM ', '')}</td></tr>
-            <tr><td>- EIS (ER+EE)</td><td className="negative">-{formatMoney(n(payout.payroll_eis_er) + n(payout.payroll_eis_ee)).replace('RM ', '')}</td></tr>
-            <tr><td>- PCB</td><td className="negative">-{formatMoney(n(payout.payroll_pcb)).replace('RM ', '')}</td></tr>
+            <tr><td>- EPF (ER+EE)</td><td className="negative">-{formatMoneyBare(n(payout.payroll_epf_er) + n(payout.payroll_epf_ee))}</td></tr>
+            <tr><td>- SOCSO (ER+EE)</td><td className="negative">-{formatMoneyBare(n(payout.payroll_socso_er) + n(payout.payroll_socso_ee))}</td></tr>
+            <tr><td>- EIS (ER+EE)</td><td className="negative">-{formatMoneyBare(n(payout.payroll_eis_er) + n(payout.payroll_eis_ee))}</td></tr>
+            <tr><td>- PCB</td><td className="negative">-{formatMoneyBare(n(payout.payroll_pcb))}</td></tr>
             <tr className="separator total">
               <td>Net Take Home</td>
               <td>{formatMoney(n(payout.payroll_net))}</td>
