@@ -157,13 +157,9 @@ export default async function DeptPoolPage() {
                       </td>
                       <td className="py-3 pr-4 text-right font-mono tabular font-semibold">
                         {np ? (
-                          np.net_profit >= 0 ? (
-                            <span className="text-ink">{formatMoney(np.net_profit)}</span>
-                          ) : (
-                            <span className="text-danger">
-                              ({formatMoney(Math.abs(np.net_profit)).replace('RM ', '')})
-                            </span>
-                          )
+                          <span className={np.net_profit >= 0 ? 'text-ink' : 'text-danger'}>
+                            {formatMoney(np.net_profit)}
+                          </span>
                         ) : (
                           <span className="text-muted">—</span>
                         )}
