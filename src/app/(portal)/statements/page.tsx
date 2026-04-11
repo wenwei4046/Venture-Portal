@@ -41,7 +41,7 @@ export default async function StatementsPage() {
 
   return (
     <div>
-      <div className="flex items-baseline justify-between mb-10">
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10">
         <div>
           <h1 className="font-serif text-3xl text-ink">Statements</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
