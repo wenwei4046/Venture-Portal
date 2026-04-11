@@ -190,7 +190,7 @@ export default async function PnLPage({ searchParams }: Props) {
               {formatMoney(hvNetProfit)}
             </span>
           </div>
-          <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
             <div className="text-center">
               <div className="font-serif italic text-graphite">Treasury</div>
               <div className={`font-mono tabular font-medium ${netInterest >= 0 ? 'text-ledger' : 'text-danger'}`}>

@@ -41,7 +41,13 @@ const navItems: NavItem[] = [
   { href: '/settings', label: 'Settings', visible: canAccessSettings },
 ]
 
-export default function Sidebar({ role }: { role: UserRole }) {
+interface SidebarProps {
+  role: UserRole
+  mobileOpen?: boolean
+  onClose?: () => void
+}
+
+export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const visible = navItems.filter((item) => item.visible(role))
@@ -55,18 +61,49 @@ export default function Sidebar({ role }: { role: UserRole }) {
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-close the mobile drawer when the route changes (user clicked a link).
+  useEffect(() => {
+    if (mobileOpen && onClose) {
+      onClose()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
+
   return (
-    <aside className="w-[220px] shrink-0 bg-paper border-r border-hairline flex flex-col h-full">
+    <aside
+      className={
+        // Desktop (md+): static 220px column, always visible.
+        // Mobile: fixed-position drawer, slides in from the left when mobileOpen.
+        `w-[240px] shrink-0 bg-paper border-r border-hairline flex flex-col h-full ` +
+        `fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-out ` +
+        (mobileOpen ? 'translate-x-0' : '-translate-x-full') +
+        ` md:relative md:translate-x-0 md:transition-none md:w-[220px] md:z-auto`
+      }
+      aria-label="Main navigation"
+    >
       {/* Brand mark */}
-      <div className="px-6 pt-7 pb-5 border-b border-hairline">
-        <div className="font-serif text-[24px] leading-[1.1] text-ink">
-          HOUZS
-          <br />
-          <span className="italic text-accent">Venture</span>
+      <div className="px-6 pt-7 pb-5 border-b border-hairline flex items-start justify-between">
+        <div>
+          <div className="font-serif text-[24px] leading-[1.1] text-ink">
+            HOUZS
+            <br />
+            <span className="italic text-accent">Venture</span>
+          </div>
+          <p className="text-[11px] text-muted mt-1.5 tracking-wider">
+            INTERNAL LEDGER · 内部账册
+          </p>
         </div>
-        <p className="text-[11px] text-muted mt-1.5 tracking-wider">
-          INTERNAL LEDGER · 内部账册
-        </p>
+        {/* Close button — mobile only */}
+        {onClose ? (
+          <button
+            type="button"
+            onClick={onClose}
+            className="md:hidden text-muted hover:text-ink text-2xl leading-none pt-1 px-2"
+            aria-label="Close navigation"
+          >
+            ×
+          </button>
+        ) : null}
       </div>
 
       {/* Nav */}

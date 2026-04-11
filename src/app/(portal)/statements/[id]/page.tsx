@@ -83,7 +83,7 @@ export default async function StatementDetailPage({ params }: Props) {
         <div className="font-serif italic text-graphite text-sm mb-1">
           Net amount
         </div>
-        <div className="font-serif text-hero text-ink leading-none">
+        <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
           <span className={Number(statement.net_amount) < 0 ? 'text-danger' : ''}>
             {formatMoney(Number(statement.net_amount))}
           </span>

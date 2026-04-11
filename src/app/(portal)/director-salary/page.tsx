@@ -81,7 +81,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
             <div className="font-serif italic text-accent text-base mb-1">
               Salary Pool — {periodLabel}
             </div>
-            <div className="font-serif text-hero text-ink leading-none">
+            <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
               {formatMoney(Number(poolData?.total_pool ?? summary.out_pool_total ?? 0))}
             </div>
             <div className="font-mono text-xs text-muted mt-2">

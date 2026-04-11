@@ -74,7 +74,7 @@ export default function InvoicesList({ invoices, companyMap, period }: Props) {
               <div className="font-serif italic text-accent text-base mb-1">
                 Total for {dayjs(period).format('MMMM YYYY')}
               </div>
-              <div className="font-serif text-hero text-ink leading-none">
+              <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
                 {formatMoney(grandTotal)}
               </div>
             </div>

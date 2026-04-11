@@ -39,7 +39,7 @@ export default async function ClaimsPage({ searchParams }: Props) {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-6 border-b border-hairline mb-8">
+      <div className="flex gap-6 border-b border-hairline mb-8 overflow-x-auto">
         <a
           href="/claims?tab=benefit"
           className={

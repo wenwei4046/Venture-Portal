@@ -30,7 +30,7 @@ export default function AddStaffForm({ departments }: Props) {
 
   return (
     <form id="add-staff-form" action={handleSubmit} className="bg-surface border border-hairline rounded-md p-6 max-w-2xl">
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
         <div>
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Name</label>
           <input

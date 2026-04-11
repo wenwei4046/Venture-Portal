@@ -56,7 +56,7 @@ export default function BaseRateSimulator({
         </p>
       </header>
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div>
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
             New Capital Amount <span className="text-xs text-muted ml-1 font-normal">(RM)</span>

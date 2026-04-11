@@ -53,7 +53,7 @@ export default function DirectorSalarySection({ directors }: { directors: Direct
 
       <div className="space-y-4">
         {directors.map(d => (
-          <div key={d.id} className="grid grid-cols-3 gap-4 items-end">
+          <div key={d.id} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
             <div>
               <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
                 {d.code} <span className="text-xs text-muted font-normal">({d.name})</span>

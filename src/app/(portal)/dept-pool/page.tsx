@@ -92,7 +92,7 @@ export default async function DeptPoolPage() {
           <div className="font-serif italic text-accent text-base mb-1">
             Total pool deployed to Treasury
           </div>
-          <div className="font-serif text-hero text-ink leading-none">
+          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
             {formatMoney(totalDeployed)}
           </div>
           <div className="font-mono text-xs text-muted mt-2">

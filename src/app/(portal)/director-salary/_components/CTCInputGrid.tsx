@@ -188,7 +188,7 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
       {companyStatutory.some(s => s.epfEr > 0) && (
         <div className="mt-6 border-t border-hairline pt-4">
           <h3 className="font-serif italic text-sm text-graphite mb-2">Employer Statutory (auto-calculated after save)</h3>
-          <div className="flex gap-6 text-sm font-mono tabular font-medium text-graphite">
+          <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm font-mono tabular font-medium text-graphite">
             <span>EPF ER: {formatMoney(companyStatutory.reduce((s, c) => s + c.epfEr, 0))}</span>
             <span>SOCSO ER: {formatMoney(companyStatutory.reduce((s, c) => s + c.socsoEr, 0))}</span>
             <span>EIS ER: {formatMoney(companyStatutory.reduce((s, c) => s + c.eisEr, 0))}</span>

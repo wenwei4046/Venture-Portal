@@ -40,7 +40,7 @@ export default async function OperatingFundPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
         <div className="lg:col-span-7">
           <div className="font-serif italic text-accent text-base mb-1">Current Balance</div>
-          <div className={`font-serif text-hero leading-none ${balance >= 0 ? 'text-ink' : 'text-danger'}`}>
+          <div className={`font-serif text-[44px] md:text-hero leading-none ${balance >= 0 ? 'text-ink' : 'text-danger'}`}>
             {formatMoney(balance)}
           </div>
           <div className="font-mono text-xs text-muted mt-2">

@@ -646,7 +646,7 @@ export default async function DashboardPage() {
           <div className="font-serif italic text-accent text-base mb-1">
             Free pool
           </div>
-          <div className="font-serif text-hero text-ink leading-none mb-3">
+          <div className="font-serif text-[44px] md:text-hero text-ink leading-none mb-3">
             {hasAnyData ? (
               <span className={summary.free_cash < 0 ? 'text-danger' : ''}>
                 {formatMoney(summary.free_cash)}

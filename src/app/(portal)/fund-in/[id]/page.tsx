@@ -93,7 +93,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
           <div className="font-serif italic text-graphite text-sm mb-1">
             Principal amount
           </div>
-          <div className="font-serif text-hero text-ink leading-none">
+          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
             RM {formatMoney(Number(source.amount)).replace('RM ', '').replace(/\.\d{2}$/, '')}
             <span className="text-[32px] text-graphite">
               {formatMoney(Number(source.amount)).slice(-3)}

@@ -103,7 +103,7 @@ export default async function MarketingDeptPoolPage() {
           <div className="font-serif italic text-graphite text-sm mb-1">
             Pool balance
           </div>
-          <div className="font-serif text-hero leading-none">
+          <div className="font-serif text-[44px] md:text-hero leading-none">
             <span className={balance < 0 ? 'text-danger' : 'text-ink'}>
               {formatMoney(balance)}
             </span>
