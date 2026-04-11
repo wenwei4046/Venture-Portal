@@ -149,9 +149,16 @@ export async function repayFundSource(formData: FormData) {
   const id = formData.get('id') as string
   if (!id) throw new Error('Fund source id is required')
 
+  const nowIso = new Date().toISOString()
+
   const { error } = await supabase
     .from('fund_sources')
-    .update({ status: 'repaid', updated_at: new Date().toISOString() })
+    .update({
+      status: 'repaid',
+      repaid_at: nowIso,
+      repaid_by: user.id,
+      updated_at: nowIso,
+    })
     .eq('id', id)
     .in('status', ['active', 'matured'])
 
@@ -159,7 +166,6 @@ export async function repayFundSource(formData: FormData) {
     throw new Error(`Failed to mark repaid: ${error.message}`)
   }
 
-  void user
   revalidatePath('/fund-in')
   revalidatePath(`/fund-in/${id}`)
   revalidatePath('/dashboard')

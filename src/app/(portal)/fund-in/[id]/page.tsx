@@ -3,8 +3,9 @@ import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import { markFundSourceMatured, cancelFundSource, repayFundSource } from '../actions'
+import { ConfirmButton } from './_components/ConfirmButton'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -51,8 +52,22 @@ export default async function FundSourceDetailPage({ params }: Props) {
     }
   }
 
+  // Resolve repaid_by → user name for the audit block
+  let repaidByName: string | null = null
+  if (source.status === 'repaid' && source.repaid_by) {
+    const { data: u } = await supabase
+      .from('users')
+      .select('name, email')
+      .eq('id', source.repaid_by)
+      .single()
+    if (u) {
+      repaidByName = u.name ?? u.email
+    }
+  }
+
   const isActive = source.status === 'active'
   const isMatured = source.status === 'matured'
+  const isRepaid = source.status === 'repaid'
   const canFinanceEdit = user.role === 'finance'
 
   const maturityDays = source.maturity_date
@@ -163,6 +178,33 @@ export default async function FundSourceDetailPage({ params }: Props) {
         </section>
       ) : null}
 
+      {/* ───────── Repayment audit ───────── */}
+      {isRepaid && source.repaid_at ? (
+        <section className="mb-12 border-l-2 border-ledger pl-4 py-2 max-w-3xl">
+          <h2 className="font-serif text-xl text-ink mb-1">Repayment</h2>
+          <p className="font-serif text-md text-ink">
+            Principal of{' '}
+            <span className="font-mono tabular">
+              {formatMoney(Number(source.amount))}
+            </span>{' '}
+            marked repaid on{' '}
+            <em className="font-serif italic text-ledger">
+              {dayjs(source.repaid_at).format('D MMM YYYY')}
+            </em>
+            {repaidByName ? (
+              <>
+                {' '}by <em className="font-serif italic text-ledger">{repaidByName}</em>
+              </>
+            ) : null}
+            .
+          </p>
+          <p className="font-mono text-xs text-muted mt-2">
+            Recorded {dayjs(source.repaid_at).format('D MMM YYYY, HH:mm')} · Full
+            state-transition history in <code>config_audit_log</code>
+          </p>
+        </section>
+      ) : null}
+
       {/* ───────── Interest payment history (placeholder for now) ───────── */}
       <section className="mb-12">
         <h2 className="font-serif text-xl text-ink mb-1">Interest payments</h2>
@@ -197,15 +239,14 @@ export default async function FundSourceDetailPage({ params }: Props) {
               </form>
             ) : null}
 
-            <form action={repayFundSource}>
-              <input type="hidden" name="id" value={source.id} />
-              <button
-                type="submit"
-                className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-              >
-                Mark as repaid
-              </button>
-            </form>
+            <ConfirmButton
+              id={source.id}
+              action={repayFundSource}
+              confirmMessage={`Confirm: HV has actually wired RM ${formatMoneyBare(Number(source.amount))} back to ${fromLabel}?\n\nThis cannot be undone. The source will no longer count toward HV's paid-capital pool or weighted cost.`}
+              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            >
+              Mark as repaid
+            </ConfirmButton>
 
             {isActive ? (
               <form action={cancelFundSource}>

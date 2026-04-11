@@ -753,6 +753,8 @@ export type Database = {
           maturity_date: string | null
           notes: string | null
           penalty_on_early: number | null
+          repaid_at: string | null
+          repaid_by: string | null
           source_type: Database["public"]["Enums"]["fund_source_type"]
           status: Database["public"]["Enums"]["fund_source_status"]
           updated_at: string
@@ -773,6 +775,8 @@ export type Database = {
           maturity_date?: string | null
           notes?: string | null
           penalty_on_early?: number | null
+          repaid_at?: string | null
+          repaid_by?: string | null
           source_type: Database["public"]["Enums"]["fund_source_type"]
           status?: Database["public"]["Enums"]["fund_source_status"]
           updated_at?: string
@@ -793,6 +797,8 @@ export type Database = {
           maturity_date?: string | null
           notes?: string | null
           penalty_on_early?: number | null
+          repaid_at?: string | null
+          repaid_by?: string | null
           source_type?: Database["public"]["Enums"]["fund_source_type"]
           status?: Database["public"]["Enums"]["fund_source_status"]
           updated_at?: string
