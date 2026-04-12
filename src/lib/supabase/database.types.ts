@@ -1908,6 +1908,54 @@ export type Database = {
           },
         ]
       }
+      payment_categories: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          gl_account_code: string | null
+          is_active: boolean
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          gl_account_code?: string | null
+          is_active?: boolean
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          gl_account_code?: string | null
+          is_active?: boolean
+          label?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_categories_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_categories_gl_account_code_fkey"
+            columns: ["gl_account_code"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
       payment_vouchers: {
         Row: {
           amount: number
@@ -1915,6 +1963,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           bank_account_id: string | null
+          category_code: string | null
           created_at: string
           created_by: string
           currency: string
@@ -1933,6 +1982,7 @@ export type Database = {
           reference_id: string | null
           reference_type: string | null
           status: Database["public"]["Enums"]["payment_voucher_status"]
+          target_pool: string | null
           updated_at: string
           version: number
           voucher_no: string | null
@@ -1944,6 +1994,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           bank_account_id?: string | null
+          category_code?: string | null
           created_at?: string
           created_by: string
           currency?: string
@@ -1962,6 +2013,7 @@ export type Database = {
           reference_id?: string | null
           reference_type?: string | null
           status?: Database["public"]["Enums"]["payment_voucher_status"]
+          target_pool?: string | null
           updated_at?: string
           version?: number
           voucher_no?: string | null
@@ -1973,6 +2025,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           bank_account_id?: string | null
+          category_code?: string | null
           created_at?: string
           created_by?: string
           currency?: string
@@ -1991,6 +2044,7 @@ export type Database = {
           reference_id?: string | null
           reference_type?: string | null
           status?: Database["public"]["Enums"]["payment_voucher_status"]
+          target_pool?: string | null
           updated_at?: string
           version?: number
           voucher_no?: string | null
@@ -2024,6 +2078,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "bank_accounts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_vouchers_category_code_fkey"
+            columns: ["category_code"]
+            isOneToOne: false
+            referencedRelation: "payment_categories"
+            referencedColumns: ["code"]
           },
           {
             foreignKeyName: "payment_vouchers_created_by_fkey"

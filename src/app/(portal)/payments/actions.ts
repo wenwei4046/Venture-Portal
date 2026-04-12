@@ -24,6 +24,8 @@ export async function createPaymentVoucher(formData: FormData) {
   const description = (formData.get('description') as string)?.trim() ?? ''
   const paymentMethod = (formData.get('payment_method') as string) || 'bank_transfer'
   const direction = (formData.get('direction') as string) || 'debit'
+  const categoryCode = (formData.get('category_code') as string) || null
+  const targetPool = (formData.get('target_pool') as string) || null
   const notes = (formData.get('notes') as string) || null
 
   // Validation
@@ -47,6 +49,8 @@ export async function createPaymentVoucher(formData: FormData) {
       voucher_no: voucherNo,
       voucher_type: voucherType as 'loan_repayment' | 'billing_payment' | 'claim_payout' | 'expense' | 'internal_transfer' | 'salary_payout' | 'other' | 'receive_payment',
       direction,
+      category_code: categoryCode,
+      target_pool: targetPool,
       status: 'draft' as const,
       amount,
       payee_name: payeeName,
@@ -392,4 +396,24 @@ export async function voidVoucher(formData: FormData) {
   revalidatePath('/payments')
   revalidatePath('/approvals')
   redirect('/payments')
+}
+
+// ─── Create payment category (Finance) ──────────────────────────────────────
+
+export async function createPaymentCategory(formData: FormData) {
+  await requireRole(['finance', 'principal'])
+  const supabase = await createClient()
+
+  const code = (formData.get('code') as string)?.trim() ?? ''
+  const label = (formData.get('label') as string)?.trim() ?? ''
+
+  if (!code || !label) throw new Error('Code and label are required')
+
+  const { error } = await supabase
+    .from('payment_categories')
+    .upsert({ code, label }, { onConflict: 'code' })
+
+  if (error) throw new Error(`Failed to create category: ${error.message}`)
+
+  revalidatePath('/payments/new')
 }

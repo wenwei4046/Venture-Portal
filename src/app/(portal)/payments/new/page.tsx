@@ -12,11 +12,15 @@ export default async function NewPaymentPage() {
     { data: bankAccounts },
     { data: activeFundSources },
     { data: activeLoans },
+    { data: categories },
+    { data: departments },
   ] = await Promise.all([
     supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('name'),
     supabase.from('bank_accounts').select('id, bank_name, account_number, current_balance').eq('status', 'active').order('is_primary', { ascending: false }),
     supabase.from('fund_sources').select('id, source_type, amount, from_company_id, from_director_id').in('status', ['active', 'matured']).order('effective_date', { ascending: false }),
     supabase.from('loans').select('id, company_id, principal').eq('status', 'active').order('created_at', { ascending: false }),
+    supabase.from('payment_categories').select('code, label').eq('is_active', true).order('sort_order'),
+    supabase.from('departments').select('id, name').order('name'),
   ])
 
   return (
@@ -40,6 +44,8 @@ export default async function NewPaymentPage() {
         bankAccounts={bankAccounts ?? []}
         fundSources={activeFundSources ?? []}
         loans={activeLoans ?? []}
+        categories={categories ?? []}
+        departments={departments ?? []}
       />
     </div>
   )

@@ -2,14 +2,25 @@
 
 import { useState, useTransition, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { createPaymentVoucher } from '../actions'
+import { createPaymentVoucher, createPaymentCategory } from '../actions'
 
 interface Props {
   companies: { id: string; name: string; short_code: string }[]
   bankAccounts: { id: string; bank_name: string; account_number: string; current_balance: number }[]
   fundSources: { id: string; source_type: string; amount: number; from_company_id: string | null; from_director_id: string | null }[]
   loans: { id: string; company_id: string; principal: number }[]
+  categories: { code: string; label: string }[]
+  departments: { id: string; name: string }[]
 }
+
+const POOL_OPTIONS = [
+  { value: 'hv_operating_fund', label: 'HV Operating Fund' },
+  { value: 'salary_pool', label: 'Director Salary Pool' },
+  { value: 'dept_pool_marketing', label: 'Marketing Dept Pool' },
+  { value: 'dept_pool_finance', label: 'Finance Dept Pool' },
+  { value: 'dept_pool_hr', label: 'HR Dept Pool' },
+  { value: 'invoice_payout_pool', label: 'Invoice Payout Pool' },
+]
 
 const DEBIT_TYPES = [
   { value: 'loan_repayment', label: 'Loan repayment', hint: 'Repay a fund source (subsidiary/director loan)' },
@@ -32,12 +43,17 @@ const PAYMENT_METHODS = [
   { value: 'netting', label: 'Netting / offset' },
 ]
 
-export default function NewPaymentForm({ companies, bankAccounts, fundSources, loans }: Props) {
+export default function NewPaymentForm({ companies, bankAccounts, fundSources, loans, categories, departments }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [direction, setDirection] = useState<'debit' | 'credit'>('debit')
   const [voucherType, setVoucherType] = useState('expense')
+  const [categoryCode, setCategoryCode] = useState('')
+  const [targetPool, setTargetPool] = useState('')
   const [files, setFiles] = useState<File[]>([])
+  const [showNewCategory, setShowNewCategory] = useState(false)
+  const [newCatLabel, setNewCatLabel] = useState('')
+  const [catList, setCatList] = useState(categories)
   const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
@@ -244,6 +260,99 @@ export default function NewPaymentForm({ companies, bankAccounts, fundSources, l
             <option key={m.value} value={m.value}>{m.label}</option>
           ))}
         </select>
+      </div>
+
+      {/* ── Target pool (Credit only) ── */}
+      {direction === 'credit' ? (
+        <div className="mb-6">
+          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+            Receive into pool <span className="text-danger">*</span>
+          </label>
+          <select
+            name="target_pool"
+            value={targetPool}
+            onChange={(e) => setTargetPool(e.target.value)}
+            required
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+          >
+            <option value="">Select pool…</option>
+            {POOL_OPTIONS.map((p) => (
+              <option key={p.value} value={p.value}>{p.label}</option>
+            ))}
+          </select>
+          <p className="font-serif italic text-muted text-xs mt-1.5">
+            Which pool should this incoming payment be recorded under?
+          </p>
+        </div>
+      ) : (
+        <input type="hidden" name="target_pool" value="" />
+      )}
+
+      {/* ── Category ── */}
+      <div className="mb-6">
+        <div className="flex items-baseline justify-between mb-1.5">
+          <label className="block text-sm font-sans font-medium text-graphite">
+            Category
+          </label>
+          <button
+            type="button"
+            onClick={() => setShowNewCategory(!showNewCategory)}
+            className="text-xs text-accent hover:text-accent-hover font-serif italic"
+          >
+            {showNewCategory ? 'Cancel' : '+ Create new'}
+          </button>
+        </div>
+
+        {showNewCategory ? (
+          <div className="flex gap-2 mb-2">
+            <input
+              type="text"
+              value={newCatLabel}
+              onChange={(e) => setNewCatLabel(e.target.value)}
+              placeholder="e.g. Logistics, Insurance..."
+              className="flex-1 px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+            />
+            <button
+              type="button"
+              onClick={async () => {
+                if (!newCatLabel.trim()) return
+                const code = newCatLabel.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_')
+                const fd = new FormData()
+                fd.set('code', code)
+                fd.set('label', newCatLabel.trim())
+                try {
+                  await createPaymentCategory(fd)
+                  setCatList((prev) => [...prev, { code, label: newCatLabel.trim() }])
+                  setCategoryCode(code)
+                  setNewCatLabel('')
+                  setShowNewCategory(false)
+                } catch {
+                  // ignore — category might already exist
+                  setCategoryCode(code)
+                  setShowNewCategory(false)
+                }
+              }}
+              className="px-3 py-2 bg-accent text-white text-sm font-serif italic rounded-md hover:bg-accent-hover"
+            >
+              Add
+            </button>
+          </div>
+        ) : null}
+
+        <select
+          name="category_code"
+          value={categoryCode}
+          onChange={(e) => setCategoryCode(e.target.value)}
+          className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+        >
+          <option value="">Select category…</option>
+          {catList.map((c) => (
+            <option key={c.code} value={c.code}>{c.label}</option>
+          ))}
+        </select>
+        <p className="font-serif italic text-muted text-xs mt-1.5">
+          For P&L classification. Create new categories as needed.
+        </p>
       </div>
 
       {/* ── Description ── */}
