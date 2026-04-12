@@ -7,7 +7,7 @@ import { formatMoney } from '@/lib/utils'
 import FundSourceTabs from './_components/FundSourceTabs'
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
-  subsidiary_savings: 'Subsidiary',
+  subsidiary: 'Subsidiary',
   director_loan: 'Director loan',
   department_pool: 'Dept pool',
   director_saving: 'Director saving',

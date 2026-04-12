@@ -2973,7 +2973,7 @@ export type Database = {
       epf_part: "A" | "C" | "E" | "F"
       fund_source_status: "active" | "matured" | "repaid" | "cancelled"
       fund_source_type:
-        | "subsidiary_savings"
+        | "subsidiary"
         | "director_loan"
         | "department_pool"
         | "director_saving"
@@ -3181,7 +3181,7 @@ export const Constants = {
       epf_part: ["A", "C", "E", "F"],
       fund_source_status: ["active", "matured", "repaid", "cancelled"],
       fund_source_type: [
-        "subsidiary_savings",
+        "subsidiary",
         "director_loan",
         "department_pool",
         "director_saving",

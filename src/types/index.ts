@@ -63,7 +63,7 @@ export interface ApprovalRequest {
 
 // ─── Treasury ─────────────────────────────────────────────────────────────────
 
-export type FundSourceType = 'subsidiary_savings' | 'director_loan' | 'department_pool' | 'director_saving'
+export type FundSourceType = 'subsidiary' | 'director_loan' | 'department_pool' | 'director_saving'
 export type FundSourceStatus = 'active' | 'matured' | 'repaid' | 'cancelled'
 
 export interface FundSource {
@@ -217,8 +217,8 @@ export type LineCategory =
   | 'rent'
   | 'utility'
   | 'loan_repayment'
-  | 'savings_interest'
-  | 'savings_principal'
+  | 'loan_interest'
+  | 'loan_principal'
   | 'other'
 
 export interface MonthlyStatementLine {

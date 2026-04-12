@@ -266,8 +266,8 @@ function formatCategory(code: string): string {
     rent: 'Rent',
     utility: 'Utility',
     loan_repayment: 'Loan Repayment',
-    savings_interest: 'Savings Interest',
-    savings_principal: 'Savings Principal',
+    loan_interest: 'Loan Interest',
+    loan_principal: 'Loan Principal',
     other: 'Other',
   }
   return labels[code] ?? code

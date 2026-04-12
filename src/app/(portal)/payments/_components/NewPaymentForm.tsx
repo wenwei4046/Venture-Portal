@@ -55,8 +55,9 @@ export default function NewPaymentForm({ companies, bankAccounts, fundSources, l
   async function handleSubmit(formData: FormData) {
     setError(null)
 
-    if (files.length === 0) {
-      setError('At least one attachment is required (invoice, contract, receipt, or photo).')
+    // Attachment required for Credit (receive), optional for Debit (pay out)
+    if (direction === 'credit' && files.length === 0) {
+      setError('At least one attachment is required for incoming payments (transfer slip, invoice, etc.).')
       return
     }
 
@@ -263,7 +264,7 @@ export default function NewPaymentForm({ companies, bankAccounts, fundSources, l
       {/* ── Attachments (mandatory) ── */}
       <div className="mb-6">
         <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-          Attachments <span className="text-danger">*</span>
+          Attachments {direction === 'credit' ? <span className="text-danger">*</span> : <span className="text-muted font-normal">(optional)</span>}
         </label>
         <div className="border border-hairline rounded-md bg-paper p-4">
           <input
@@ -277,7 +278,9 @@ export default function NewPaymentForm({ companies, bankAccounts, fundSources, l
             className="text-sm text-ink file:mr-4 file:py-2 file:px-4 file:rounded-md file:border file:border-hairline file:text-sm file:font-serif file:italic file:text-accent file:bg-accent-bg file:cursor-pointer hover:file:bg-surface-2"
           />
           <p className="font-serif italic text-muted text-xs mt-2">
-            Attach invoice, contract, receipt, or photo. At least one attachment is required.
+            {direction === 'credit'
+              ? 'Attach transfer slip, invoice, or receipt. Required for incoming payments.'
+              : 'Attach invoice, contract, or approval code. Optional for outgoing payments.'}
           </p>
           {files.length > 0 ? (
             <div className="mt-3 space-y-1">

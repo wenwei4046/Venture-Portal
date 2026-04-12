@@ -18,7 +18,7 @@ interface Props {
 }
 
 const SOURCE_TYPES: { value: FundSourceType; label: string; hint: string }[] = [
-  { value: 'subsidiary_savings', label: 'Subsidiary', hint: 'Loan from a subsidiary company' },
+  { value: 'subsidiary', label: 'Subsidiary', hint: 'Loan from a subsidiary company' },
   { value: 'director_loan', label: 'Director Loan', hint: 'Personal loan from a director' },
   { value: 'department_pool', label: 'Dept Pool', hint: 'Idle funds from a department pool' },
 ]
@@ -26,7 +26,7 @@ const SOURCE_TYPES: { value: FundSourceType; label: string; hint: string }[] = [
 export default function NewFundSourceForm({ companies, directors, departments }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const [sourceType, setSourceType] = useState<FundSourceType>('subsidiary_savings')
+  const [sourceType, setSourceType] = useState<FundSourceType>('subsidiary')
   const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export default function NewFundSourceForm({ companies, directors, departments }:
   const today = dayjs().format('YYYY-MM-DD')
 
   // Determine which "from" options to show based on source type
-  const needsCompanySelect = sourceType === 'subsidiary_savings'
+  const needsCompanySelect = sourceType === 'subsidiary'
   const needsDirectorSelect = sourceType === 'director_loan'
   const needsDeptSelect = sourceType === 'department_pool'
 

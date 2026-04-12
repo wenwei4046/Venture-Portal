@@ -34,24 +34,24 @@ export async function generateStatements(formData: FormData) {
     throw new Error('No active companies found')
   }
 
-  // 2. Get active fund sources (for savings_interest contra lines)
+  // 2. Get active fund sources (for loan interest contra lines)
   const { data: fundSources } = await supabase
     .from('fund_sources')
     .select('id, from_company_id, amount, cost_rate')
     .eq('status', 'active')
-    .eq('source_type', 'subsidiary_savings')
+    .in('source_type', ['subsidiary', 'director_loan', 'department_pool'])
     .not('from_company_id', 'is', null)
 
-  const savingsByCompany = new Map<string, Array<{ id: string; amount: number; cost_rate: number }>>()
+  const loansByCompany = new Map<string, Array<{ id: string; amount: number; cost_rate: number }>>()
   for (const fs of fundSources ?? []) {
     if (!fs.from_company_id) continue
-    const list = savingsByCompany.get(fs.from_company_id) ?? []
+    const list = loansByCompany.get(fs.from_company_id) ?? []
     list.push({
       id: fs.id,
       amount: Number(fs.amount),
       cost_rate: Number(fs.cost_rate),
     })
-    savingsByCompany.set(fs.from_company_id, list)
+    loansByCompany.set(fs.from_company_id, list)
   }
 
   // 2b. Get generated invoices for this period (Step 6 wiring).
@@ -123,10 +123,10 @@ export async function generateStatements(formData: FormData) {
       await supabase.from('monthly_statement_lines').delete().eq('statement_id', statementId)
     }
 
-    // Add contra lines: savings interest (HV owes sub)
-    const savings = savingsByCompany.get(company.id) ?? []
+    // Add contra lines: loan interest (HV owes sub)
+    const loans = loansByCompany.get(company.id) ?? []
     let totalContra = 0
-    for (const s of savings) {
+    for (const s of loans) {
       const interest = s.amount * s.cost_rate
       if (interest <= 0) continue
 
@@ -134,8 +134,8 @@ export async function generateStatements(formData: FormData) {
         statement_id: statementId,
         line_type: 'contra',
         direction: 'payable',
-        category_code: 'savings_interest',
-        description: `Savings interest RM ${s.amount.toLocaleString('en-MY')} @ ${(s.cost_rate * 100).toFixed(3)}%/mo`,
+        category_code: 'loan_repayment',
+        description: `Loan interest RM ${s.amount.toLocaleString('en-MY')} @ ${(s.cost_rate * 100).toFixed(3)}%/mo`,
         reference_id: s.id,
         reference_table: 'fund_sources',
         amount: interest,

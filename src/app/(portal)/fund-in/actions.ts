@@ -18,7 +18,7 @@ interface CreateFundSourceInput {
 }
 
 // Only 3 types now (director_saving removed per user feedback)
-const VALID_TYPES: FundSourceType[] = ['subsidiary_savings', 'director_loan', 'department_pool']
+const VALID_TYPES: FundSourceType[] = ['subsidiary', 'director_loan', 'department_pool']
 
 export async function createFundSource(formData: FormData) {
   const user = await requireRole(['finance'])
@@ -39,7 +39,7 @@ export async function createFundSource(formData: FormData) {
   }
 
   // Validate from_id based on type
-  if (raw.source_type === 'subsidiary_savings' && !raw.from_id) {
+  if (raw.source_type === 'subsidiary' && !raw.from_id) {
     throw new Error('Company is required for subsidiary')
   }
   if (raw.source_type === 'director_loan' && !raw.from_id) {
@@ -104,7 +104,7 @@ export async function createFundSource(formData: FormData) {
 
   // Polymorphic FK based on type
   let payload
-  if (raw.source_type === 'subsidiary_savings' || raw.source_type === 'department_pool') {
+  if (raw.source_type === 'subsidiary' || raw.source_type === 'department_pool') {
     payload = { ...basePayload, from_company_id: raw.from_id || null, from_director_id: null }
   } else {
     payload = { ...basePayload, from_company_id: null, from_director_id: raw.from_id || null }
