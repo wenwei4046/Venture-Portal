@@ -56,3 +56,6 @@ scripts/pcb-data.json
 
 # Design audit screenshots (local session only)
 /design-audit/
+
+# Superpowers brainstorm visual companion (local mockup persistence)
+.superpowers/
