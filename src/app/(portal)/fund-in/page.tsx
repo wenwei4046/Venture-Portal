@@ -161,10 +161,11 @@ export default async function FundInPage() {
                   <th className="py-3 text-right"></th>
                 </tr>
               </thead>
-              <tbody>
-                {sources.map((source) => (
+              <tbody className="row-stagger">
+                {sources.map((source, i) => (
                   <tr
                     key={source.id}
+                    style={{ '--i': i } as React.CSSProperties}
                     className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors"
                   >
                     <td className="py-4 pr-4 font-serif italic text-graphite">

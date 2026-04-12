@@ -121,12 +121,13 @@ export default async function StatementsPage() {
                     <th className="py-3 text-right"></th>
                   </tr>
                 </thead>
-                <tbody>
-                  {periodStatements.map((s) => {
+                <tbody className="row-stagger">
+                  {periodStatements.map((s, i) => {
                     const company = companyMap.get(s.company_id)
                     return (
                       <tr
                         key={s.id}
+                        style={{ '--i': i } as React.CSSProperties}
                         className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors"
                       >
                         <td className="py-4 pr-4">

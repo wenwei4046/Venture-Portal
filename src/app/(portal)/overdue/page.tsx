@@ -132,14 +132,15 @@ export default async function OverduePage() {
                   <th className="py-3 text-right"></th>
                 </tr>
               </thead>
-              <tbody>
-                {active.map((row) => {
+              <tbody className="row-stagger">
+                {active.map((row, i) => {
                   const loan = loanMap.get(row.loan_id)
                   const company = loan ? companyMap.get(loan.company_id) : undefined
                   const outstanding = outstandingMap.get(row.loan_id) ?? Number(loan?.principal ?? 0)
                   return (
                     <tr
                       key={row.id}
+                      style={{ '--i': i } as React.CSSProperties}
                       className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors"
                     >
                       <td className="py-4 pr-4">
@@ -208,15 +209,16 @@ export default async function OverduePage() {
                   <th className="text-left py-3 pr-4 font-medium">Status</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="row-stagger">
                 {rows
                   .filter((r) => r.status !== 'pending')
-                  .map((row) => {
+                  .map((row, i) => {
                     const loan = loanMap.get(row.loan_id)
                     const company = loan ? companyMap.get(loan.company_id) : undefined
                     return (
                       <tr
                         key={row.id}
+                        style={{ '--i': i } as React.CSSProperties}
                         className="border-b border-hairline last:border-0 text-muted"
                       >
                         <td className="py-3 pr-4 font-serif">{company?.name ?? '—'}</td>

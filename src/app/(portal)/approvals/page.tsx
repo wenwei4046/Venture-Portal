@@ -61,11 +61,12 @@ export default async function ApprovalsPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {pending.map((req) => (
+          <div className="space-y-3 row-stagger">
+            {pending.map((req, i) => (
               <Link
                 key={req.id}
                 href={`/approvals/${req.id}`}
+                style={{ '--i': i } as React.CSSProperties}
                 className="block border border-hairline rounded-md bg-surface p-5 hover:bg-surface-2/40 transition-colors"
               >
                 <div className="flex items-baseline justify-between mb-2">
@@ -105,10 +106,11 @@ export default async function ApprovalsPage() {
           <p className="font-serif italic text-graphite text-sm mb-4">
             Last 10 resolved requests
           </p>
-          <div className="border-t border-hairline">
-            {recent.map((req) => (
+          <div className="border-t border-hairline row-stagger">
+            {recent.map((req, i) => (
               <div
                 key={req.id}
+                style={{ '--i': i } as React.CSSProperties}
                 className="py-3 border-b border-hairline last:border-0 flex items-baseline justify-between"
               >
                 <div>

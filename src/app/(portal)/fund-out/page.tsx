@@ -151,14 +151,15 @@ export default async function FundOutPage() {
                   <th className="py-3 text-right"></th>
                 </tr>
               </thead>
-              <tbody>
-                {loanList.map((loan) => {
+              <tbody className="row-stagger">
+                {loanList.map((loan, i) => {
                   const company = companyMap.get(loan.company_id)
                   const out = outstandingMap.get(loan.id)
                   const outstanding = Number(out?.outstanding ?? loan.principal)
                   return (
                     <tr
                       key={loan.id}
+                      style={{ '--i': i } as React.CSSProperties}
                       className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors"
                     >
                       <td className="py-4 pr-4">
