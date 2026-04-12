@@ -37,7 +37,7 @@ export default function SubmitHRCostButton({ defaultPeriod }: Props) {
 
   if (confirming) {
     return (
-      <div className="bg-surface border border-hairline rounded-md p-5 w-[26rem]">
+      <div className="confirm-slide-in bg-surface border border-hairline rounded-md p-5 w-[26rem]">
         <h3 className="font-serif text-lg text-ink mb-2">Submit HR cost summary</h3>
         <p className="font-serif italic text-graphite text-sm mb-4">
           Creates an immutable snapshot of the live HR staff data for the

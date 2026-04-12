@@ -36,7 +36,7 @@ export default function EscalateButton({ overdueId }: { overdueId: string }) {
   }
 
   return (
-    <div className="inline-flex items-center gap-2 text-xs">
+    <div className="confirm-slide-in inline-flex items-center gap-2 text-xs">
       {error ? (
         <span className="text-danger font-serif italic">{error}</span>
       ) : (

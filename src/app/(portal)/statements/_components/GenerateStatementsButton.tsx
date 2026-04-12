@@ -34,7 +34,7 @@ export default function GenerateStatementsButton() {
 
   if (confirming) {
     return (
-      <div className="bg-surface border border-hairline rounded-md p-5 w-96">
+      <div className="confirm-slide-in bg-surface border border-hairline rounded-md p-5 w-96">
         <h3 className="font-serif text-lg text-ink mb-2">Generate statements</h3>
         <p className="font-serif italic text-graphite text-sm mb-4">
           Creates or regenerates draft statements for all 8 subsidiaries.{' '}
