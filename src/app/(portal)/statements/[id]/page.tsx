@@ -249,12 +249,12 @@ export default async function StatementDetailPage({ params }: Props) {
 
 function StatementStatus({ status }: { status: string }) {
   if (status === 'draft')
-    return <span className="font-serif italic text-graphite text-md">draft</span>
+    return <span className="status-morph font-serif italic text-graphite text-md">draft</span>
   if (status === 'issued')
-    return <span className="font-serif italic text-alert text-md">issued</span>
+    return <span className="status-morph font-serif italic text-alert text-md">issued</span>
   if (status === 'paid')
-    return <span className="font-serif italic text-ledger text-md">paid</span>
-  return <span className="font-serif italic text-muted text-md">{status}</span>
+    return <span className="status-morph font-serif italic text-ledger text-md">paid</span>
+  return <span className="status-morph font-serif italic text-muted text-md">{status}</span>
 }
 
 function formatCategory(code: string): string {

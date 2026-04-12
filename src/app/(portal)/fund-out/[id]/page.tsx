@@ -274,13 +274,13 @@ export default async function LoanDetailPage({ params }: Props) {
 
 function LoanStatus({ status }: { status: string }) {
   if (status === 'active') {
-    return <span className="font-serif italic text-graphite text-md">active</span>
+    return <span className="status-morph font-serif italic text-graphite text-md">active</span>
   }
   if (status === 'pending_approval') {
-    return <span className="font-serif italic text-alert text-md">pending approval</span>
+    return <span className="status-morph font-serif italic text-alert text-md">pending approval</span>
   }
   if (status === 'fully_repaid') {
-    return <span className="font-serif italic text-ledger text-md">fully repaid</span>
+    return <span className="status-morph font-serif italic text-ledger text-md">fully repaid</span>
   }
-  return <span className="font-serif italic text-muted text-md">cancelled</span>
+  return <span className="status-morph font-serif italic text-muted text-md">cancelled</span>
 }

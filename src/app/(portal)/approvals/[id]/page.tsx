@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
-import { requireRole } from '@/lib/auth'
+import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import ApprovalActions from './_components/ApprovalActions'
@@ -11,7 +11,7 @@ interface Props {
 }
 
 export default async function ApprovalDetailPage({ params }: Props) {
-  const user = await requireRole(['principal'])
+  const user = await requireAuth()
   const { id } = await params
   const supabase = await createClient()
 
@@ -66,10 +66,10 @@ export default async function ApprovalDetailPage({ params }: Props) {
   return (
     <div>
       <Link
-        href="/approvals"
+        href={user.role === 'principal' ? '/approvals' : '/dashboard'}
         className="text-sm text-muted hover:text-accent font-sans transition-colors"
       >
-        ← Back to Approvals
+        ← {user.role === 'principal' ? 'Back to Approvals' : 'Back to Overview'}
       </Link>
 
       <div className="flex items-baseline justify-between mt-3 mb-10">
@@ -165,9 +165,15 @@ export default async function ApprovalDetailPage({ params }: Props) {
         </div>
       ) : null}
 
-      {/* ───────── Action buttons ───────── */}
+      {/* ───────── Action buttons / read-only status ───────── */}
       {isPending ? (
-        isSelfSubmitted ? (
+        user.role !== 'principal' ? (
+          <div className="bg-surface border border-hairline rounded-md p-4 max-w-3xl">
+            <p className="font-serif italic text-graphite text-sm">
+              Awaiting Principal sign-off. <em>You can track the status here.</em>
+            </p>
+          </div>
+        ) : isSelfSubmitted ? (
           <div className="bg-alert-bg border border-alert rounded-md p-4 max-w-3xl">
             <p className="font-serif italic text-alert text-sm">
               You submitted this request and cannot approve your own submission.
@@ -196,12 +202,12 @@ export default async function ApprovalDetailPage({ params }: Props) {
 
 function ApprovalStatus({ status }: { status: string }) {
   if (status === 'pending') {
-    return <span className="font-serif italic text-alert text-md">pending</span>
+    return <span className="status-morph font-serif italic text-alert text-md">pending</span>
   }
   if (status === 'approved') {
-    return <span className="font-serif italic text-ledger text-md">approved</span>
+    return <span className="status-morph font-serif italic text-ledger text-md">approved</span>
   }
-  return <span className="font-serif italic text-danger text-md">rejected</span>
+  return <span className="status-morph font-serif italic text-danger text-md">rejected</span>
 }
 
 function formatRequestType(type: string): string {

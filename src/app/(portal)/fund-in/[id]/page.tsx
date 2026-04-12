@@ -268,13 +268,13 @@ export default async function FundSourceDetailPage({ params }: Props) {
 
 function StatusBadge({ status }: { status: string }) {
   if (status === 'active') {
-    return <span className="font-serif italic text-graphite text-md">active</span>
+    return <span className="status-morph font-serif italic text-graphite text-md">active</span>
   }
   if (status === 'matured') {
-    return <span className="font-serif italic text-alert text-md">matured</span>
+    return <span className="status-morph font-serif italic text-alert text-md">matured</span>
   }
   if (status === 'repaid') {
-    return <span className="font-serif italic text-ledger text-md">repaid</span>
+    return <span className="status-morph font-serif italic text-ledger text-md">repaid</span>
   }
-  return <span className="font-serif italic text-muted text-md">cancelled</span>
+  return <span className="status-morph font-serif italic text-muted text-md">cancelled</span>
 }
