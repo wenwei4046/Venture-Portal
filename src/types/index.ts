@@ -42,6 +42,7 @@ export type ApprovalRequestType =
   | 'escalation'
   | 'invoice_pool_release'
   | 'profit_withdrawal'
+  | 'payment_voucher'
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 
@@ -62,7 +63,7 @@ export interface ApprovalRequest {
 
 // ─── Treasury ─────────────────────────────────────────────────────────────────
 
-export type FundSourceType = 'subsidiary_savings' | 'director_loan'
+export type FundSourceType = 'subsidiary_savings' | 'director_loan' | 'department_pool' | 'director_saving'
 export type FundSourceStatus = 'active' | 'matured' | 'repaid' | 'cancelled'
 
 export interface FundSource {

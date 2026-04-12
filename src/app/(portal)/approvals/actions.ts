@@ -144,6 +144,24 @@ export async function approveRequest(formData: FormData) {
         `Approval recorded but pool release failed: ${releaseError.message}`
       )
     }
+  } else if (approval.request_type === 'payment_voucher') {
+    // Phase 4: approve the linked payment voucher
+    const { error: pvError } = await supabase
+      .from('payment_vouchers')
+      .update({
+        status: 'approved',
+        approved_by: user.id,
+        approved_at: now,
+        notes,
+      })
+      .eq('id', approval.reference_id)
+      .eq('status', 'pending_approval')
+
+    if (pvError) {
+      throw new Error(
+        `Approval recorded but voucher update failed: ${pvError.message}`
+      )
+    }
   }
   // Other request types (base_rate, tier_change, etc) handled in Phase 1.5+
 
@@ -159,6 +177,7 @@ export async function approveRequest(formData: FormData) {
   revalidatePath('/fund-out')
   revalidatePath('/overdue')
   revalidatePath('/invoice-pool')
+  revalidatePath('/payments')
   revalidatePath('/dashboard')
   redirect('/approvals')
 }
@@ -221,10 +240,18 @@ export async function rejectRequest(formData: FormData) {
         `Rejection recorded but loan cancel failed: ${loanError.message}`
       )
     }
+  } else if (approval.request_type === 'payment_voucher') {
+    // Phase 4: void the linked payment voucher on rejection
+    await supabase
+      .from('payment_vouchers')
+      .update({ status: 'voided' })
+      .eq('id', approval.reference_id)
+      .eq('status', 'pending_approval')
   }
 
   revalidatePath('/approvals')
   revalidatePath('/fund-out')
+  revalidatePath('/payments')
   revalidatePath('/dashboard')
   redirect('/approvals')
 }

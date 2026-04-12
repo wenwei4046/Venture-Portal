@@ -1,0 +1,254 @@
+'use client'
+
+import { useState, useTransition } from 'react'
+import dayjs from 'dayjs'
+
+interface Props {
+  voucherId: string
+  status: string
+  isPrincipal: boolean
+  isFinance: boolean
+  submitForApproval: (formData: FormData) => Promise<void>
+  approveVoucher: (formData: FormData) => Promise<void>
+  executeVoucher: (formData: FormData) => Promise<void>
+  voidVoucher: (formData: FormData) => Promise<void>
+}
+
+export default function VoucherActions({
+  voucherId,
+  status,
+  isPrincipal,
+  isFinance,
+  submitForApproval,
+  approveVoucher,
+  executeVoucher,
+  voidVoucher,
+}: Props) {
+  const [isPending, startTransition] = useTransition()
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [confirmAction, setConfirmAction] = useState<'approve' | 'execute' | null>(null)
+  const [notes, setNotes] = useState('')
+
+  const today = dayjs().format('YYYY-MM-DD')
+
+  async function handleAction(action: (fd: FormData) => Promise<void>, extraFields?: Record<string, string>) {
+    setMessage(null)
+    const fd = new FormData()
+    fd.set('id', voucherId)
+    if (extraFields) {
+      Object.entries(extraFields).forEach(([k, v]) => fd.set(k, v))
+    }
+    startTransition(async () => {
+      try {
+        await action(fd)
+        setMessage({ type: 'success', text: 'Done.' })
+        setConfirmAction(null)
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) throw err
+        setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Unknown error' })
+      }
+    })
+  }
+
+  // Status-driven rendering
+  if (status === 'paid' || status === 'voided') {
+    return (
+      <div className="bg-surface border border-hairline rounded-md p-4 max-w-3xl">
+        <p className="font-serif italic text-graphite text-sm">
+          This voucher has been <em className={status === 'paid' ? 'text-ledger' : 'text-danger'}>{status}</em>.
+          No further actions available.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <section className="border-t border-hairline pt-8 max-w-3xl">
+      <h2 className="font-serif text-xl text-ink mb-4">Actions</h2>
+
+      {/* Draft: Finance can submit or void */}
+      {status === 'draft' && isFinance ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => handleAction(submitForApproval)}
+            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50"
+          >
+            {isPending ? 'Submitting…' : 'Submit for approval'}
+          </button>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => handleAction(voidVoucher)}
+            className="text-sm text-muted hover:text-danger font-sans transition-colors px-2"
+          >
+            Void
+          </button>
+        </div>
+      ) : null}
+
+      {/* Pending: Principal can approve; Finance can void */}
+      {status === 'pending_approval' ? (
+        <>
+          {isPrincipal && !confirmAction ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmAction('approve')}
+                className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors"
+              >
+                Approve
+              </button>
+            </div>
+          ) : null}
+
+          {isPrincipal && confirmAction === 'approve' ? (
+            <div className="bg-surface border border-hairline rounded-md p-6">
+              <h3 className="font-serif text-lg text-ink mb-2">Confirm approval</h3>
+              <p className="font-serif italic text-graphite text-sm mb-4">
+                Approving authorises Finance to execute this payment. <em>This cannot be undone.</em>
+              </p>
+              <div className="mb-4">
+                <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+                  Notes <span className="text-muted font-normal">(optional)</span>
+                </label>
+                <textarea
+                  rows={2}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+                  placeholder="Any context for the audit trail"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => handleAction(approveVoucher, { notes })}
+                  className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50"
+                >
+                  {isPending ? 'Approving…' : 'Yes, approve'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setConfirmAction(null); setNotes('') }}
+                  className="text-sm text-graphite hover:text-ink font-sans transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {isFinance ? (
+            <div className={isPrincipal ? 'mt-4' : ''}>
+              {!isPrincipal ? (
+                <div className="bg-surface border border-hairline rounded-md p-4 mb-3">
+                  <p className="font-serif italic text-graphite text-sm">
+                    Awaiting Principal approval. <em>You can track the status here.</em>
+                  </p>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => handleAction(voidVoucher)}
+                className="text-sm text-muted hover:text-danger font-sans transition-colors px-2"
+              >
+                Void this voucher
+              </button>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {/* Approved: Finance can execute */}
+      {status === 'approved' && isFinance ? (
+        confirmAction !== 'execute' ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setConfirmAction('execute')}
+              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors"
+            >
+              Execute payment
+            </button>
+          </div>
+        ) : (
+          <div className="bg-surface border border-hairline rounded-md p-6">
+            <h3 className="font-serif text-lg text-ink mb-2">Confirm execution</h3>
+            <p className="font-serif italic text-graphite text-sm mb-4">
+              Confirm you have transferred the funds. Bank balance will be auto-deducted.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+                  Payment date
+                </label>
+                <input
+                  id="exec_payment_date"
+                  type="date"
+                  defaultValue={today}
+                  max={today}
+                  className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+                  Bank reference <span className="text-muted font-normal">(optional)</span>
+                </label>
+                <input
+                  id="exec_payment_ref"
+                  type="text"
+                  className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+                  placeholder="Transfer ref #"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => {
+                  const dateEl = document.getElementById('exec_payment_date') as HTMLInputElement
+                  const refEl = document.getElementById('exec_payment_ref') as HTMLInputElement
+                  handleAction(executeVoucher, {
+                    payment_date: dateEl?.value ?? today,
+                    payment_reference: refEl?.value ?? '',
+                  })
+                }}
+                className="bg-ledger hover:opacity-90 text-white font-serif italic text-sm px-5 py-2 rounded-md transition-opacity disabled:opacity-50"
+              >
+                {isPending ? 'Executing…' : 'Confirm paid'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmAction(null)}
+                className="text-sm text-graphite hover:text-ink font-sans transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )
+      ) : null}
+
+      {/* Approved but not Finance: read-only */}
+      {status === 'approved' && !isFinance ? (
+        <div className="bg-surface border border-hairline rounded-md p-4">
+          <p className="font-serif italic text-graphite text-sm">
+            Approved. Finance will execute the payment.
+          </p>
+        </div>
+      ) : null}
+
+      {/* Message */}
+      {message ? (
+        <div className={`mt-4 text-sm font-serif italic ${message.type === 'success' ? 'text-ledger' : 'text-danger'}`}>
+          {message.text}
+        </div>
+      ) : null}
+    </section>
+  )
+}

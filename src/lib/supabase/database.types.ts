@@ -143,6 +143,75 @@ export type Database = {
           },
         ]
       }
+      bank_accounts: {
+        Row: {
+          account_holder: string
+          account_number: string
+          account_type: string
+          bank_name: string
+          created_at: string
+          created_by: string
+          currency: string
+          current_balance: number
+          gl_account_code: string | null
+          id: string
+          is_primary: boolean
+          notes: string | null
+          opening_balance: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          account_holder?: string
+          account_number: string
+          account_type?: string
+          bank_name: string
+          created_at?: string
+          created_by: string
+          currency?: string
+          current_balance?: number
+          gl_account_code?: string | null
+          id?: string
+          is_primary?: boolean
+          notes?: string | null
+          opening_balance?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          account_holder?: string
+          account_number?: string
+          account_type?: string
+          bank_name?: string
+          created_at?: string
+          created_by?: string
+          currency?: string
+          current_balance?: number
+          gl_account_code?: string | null
+          id?: string
+          is_primary?: boolean
+          notes?: string | null
+          opening_balance?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_accounts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_accounts_gl_account_code_fkey"
+            columns: ["gl_account_code"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
       base_rate_history: {
         Row: {
           approved_at: string | null
@@ -196,6 +265,47 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      chart_of_accounts: {
+        Row: {
+          code: string
+          created_at: string
+          is_active: boolean
+          name: string
+          parent_code: string | null
+          sort_order: number
+          type: Database["public"]["Enums"]["account_type"]
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          is_active?: boolean
+          name: string
+          parent_code?: string | null
+          sort_order?: number
+          type: Database["public"]["Enums"]["account_type"]
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          is_active?: boolean
+          name?: string
+          parent_code?: string | null
+          sort_order?: number
+          type?: Database["public"]["Enums"]["account_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chart_of_accounts_parent_code_fkey"
+            columns: ["parent_code"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["code"]
           },
         ]
       }
@@ -343,6 +453,90 @@ export type Database = {
             columns: ["changed_by"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_notes: {
+        Row: {
+          amount: number
+          applied_to_statement_id: string | null
+          approved_at: string | null
+          approved_by: string | null
+          company_id: string
+          created_at: string
+          created_by: string
+          credit_note_no: string | null
+          id: string
+          invoice_id: string
+          reason: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          applied_to_statement_id?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id: string
+          created_at?: string
+          created_by: string
+          credit_note_no?: string | null
+          id?: string
+          invoice_id: string
+          reason: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          applied_to_statement_id?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          credit_note_no?: string | null
+          id?: string
+          invoice_id?: string
+          reason?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_notes_applied_to_statement_id_fkey"
+            columns: ["applied_to_statement_id"]
+            isOneToOne: false
+            referencedRelation: "monthly_statements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_notes_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_notes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_notes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_notes_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
         ]
@@ -737,6 +931,71 @@ export type Database = {
         }
         Relationships: []
       }
+      fund_source_repayments: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string
+          fund_source_id: string
+          id: string
+          notes: string | null
+          payment_date: string
+          payment_type: Database["public"]["Enums"]["repayment_type"]
+          payment_voucher_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by: string
+          fund_source_id: string
+          id?: string
+          notes?: string | null
+          payment_date: string
+          payment_type: Database["public"]["Enums"]["repayment_type"]
+          payment_voucher_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string
+          fund_source_id?: string
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_type?: Database["public"]["Enums"]["repayment_type"]
+          payment_voucher_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fund_source_repayments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fund_source_repayments_fund_source_id_fkey"
+            columns: ["fund_source_id"]
+            isOneToOne: false
+            referencedRelation: "fund_source_outstanding"
+            referencedColumns: ["fund_source_id"]
+          },
+          {
+            foreignKeyName: "fund_source_repayments_fund_source_id_fkey"
+            columns: ["fund_source_id"]
+            isOneToOne: false
+            referencedRelation: "fund_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fund_source_repayments_payment_voucher_id_fkey"
+            columns: ["payment_voucher_id"]
+            isOneToOne: false
+            referencedRelation: "payment_vouchers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fund_sources: {
         Row: {
           amount: number
@@ -824,6 +1083,13 @@ export type Database = {
             columns: ["from_company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fund_sources_repaid_by_fkey"
+            columns: ["repaid_by"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -1145,6 +1411,8 @@ export type Database = {
           id: string
           invoice_no: string | null
           period_month: string
+          sst_amount: number | null
+          sst_rate: number | null
           status: Database["public"]["Enums"]["invoice_status"]
           total_amount: number
           version: number
@@ -1159,6 +1427,8 @@ export type Database = {
           id?: string
           invoice_no?: string | null
           period_month: string
+          sst_amount?: number | null
+          sst_rate?: number | null
           status?: Database["public"]["Enums"]["invoice_status"]
           total_amount: number
           version?: number
@@ -1173,6 +1443,8 @@ export type Database = {
           id?: string
           invoice_no?: string | null
           period_month?: string
+          sst_amount?: number | null
+          sst_rate?: number | null
           status?: Database["public"]["Enums"]["invoice_status"]
           total_amount?: number
           version?: number
@@ -1197,6 +1469,111 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journal_entries: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string
+          entry_no: string | null
+          id: string
+          is_reversed: boolean
+          period_month: string
+          reference_id: string | null
+          reference_type: string | null
+          reversed_by_id: string | null
+          total_amount: number
+          transaction_date: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description: string
+          entry_no?: string | null
+          id?: string
+          is_reversed?: boolean
+          period_month: string
+          reference_id?: string | null
+          reference_type?: string | null
+          reversed_by_id?: string | null
+          total_amount: number
+          transaction_date: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string
+          entry_no?: string | null
+          id?: string
+          is_reversed?: boolean
+          period_month?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          reversed_by_id?: string | null
+          total_amount?: number
+          transaction_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journal_entries_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_entries_reversed_by_id_fkey"
+            columns: ["reversed_by_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journal_lines: {
+        Row: {
+          account_code: string
+          created_at: string
+          credit: number | null
+          debit: number | null
+          description: string | null
+          entry_id: string
+          id: string
+        }
+        Insert: {
+          account_code: string
+          created_at?: string
+          credit?: number | null
+          debit?: number | null
+          description?: string | null
+          entry_id: string
+          id?: string
+        }
+        Update: {
+          account_code?: string
+          created_at?: string
+          credit?: number | null
+          debit?: number | null
+          description?: string | null
+          entry_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journal_lines_account_code_fkey"
+            columns: ["account_code"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "journal_lines_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
             referencedColumns: ["id"]
           },
         ]
@@ -1480,6 +1857,201 @@ export type Database = {
           },
         ]
       }
+      payment_attachments: {
+        Row: {
+          description: string | null
+          file_name: string
+          file_size: number | null
+          file_type: string
+          id: string
+          storage_path: string
+          uploaded_at: string
+          uploaded_by: string
+          voucher_id: string
+        }
+        Insert: {
+          description?: string | null
+          file_name: string
+          file_size?: number | null
+          file_type: string
+          id?: string
+          storage_path: string
+          uploaded_at?: string
+          uploaded_by: string
+          voucher_id: string
+        }
+        Update: {
+          description?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_type?: string
+          id?: string
+          storage_path?: string
+          uploaded_at?: string
+          uploaded_by?: string
+          voucher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_attachments_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "payment_vouchers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_vouchers: {
+        Row: {
+          amount: number
+          approval_id: string | null
+          approved_at: string | null
+          approved_by: string | null
+          bank_account_id: string | null
+          created_at: string
+          created_by: string
+          currency: string
+          description: string
+          executed_at: string | null
+          executed_by: string | null
+          id: string
+          journal_entry_id: string | null
+          notes: string | null
+          payee_company_id: string | null
+          payee_name: string
+          payment_date: string | null
+          payment_method: string
+          payment_reference: string | null
+          reference_id: string | null
+          reference_type: string | null
+          status: Database["public"]["Enums"]["payment_voucher_status"]
+          updated_at: string
+          version: number
+          voucher_no: string | null
+          voucher_type: Database["public"]["Enums"]["payment_voucher_type"]
+        }
+        Insert: {
+          amount: number
+          approval_id?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          bank_account_id?: string | null
+          created_at?: string
+          created_by: string
+          currency?: string
+          description: string
+          executed_at?: string | null
+          executed_by?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          notes?: string | null
+          payee_company_id?: string | null
+          payee_name: string
+          payment_date?: string | null
+          payment_method?: string
+          payment_reference?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          status?: Database["public"]["Enums"]["payment_voucher_status"]
+          updated_at?: string
+          version?: number
+          voucher_no?: string | null
+          voucher_type: Database["public"]["Enums"]["payment_voucher_type"]
+        }
+        Update: {
+          amount?: number
+          approval_id?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          bank_account_id?: string | null
+          created_at?: string
+          created_by?: string
+          currency?: string
+          description?: string
+          executed_at?: string | null
+          executed_by?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          notes?: string | null
+          payee_company_id?: string | null
+          payee_name?: string
+          payment_date?: string | null
+          payment_method?: string
+          payment_reference?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          status?: Database["public"]["Enums"]["payment_voucher_status"]
+          updated_at?: string
+          version?: number
+          voucher_no?: string | null
+          voucher_type?: Database["public"]["Enums"]["payment_voucher_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_vouchers_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_vouchers_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_with_target"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_vouchers_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_vouchers_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_vouchers_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_vouchers_executed_by_fkey"
+            columns: ["executed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_vouchers_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_vouchers_payee_company_id_fkey"
+            columns: ["payee_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pcb_jadual: {
         Row: {
           category: Database["public"]["Enums"]["pcb_category"]
@@ -1515,6 +2087,54 @@ export type Database = {
           pcb_amount?: number
         }
         Relationships: []
+      }
+      period_locks: {
+        Row: {
+          closed_at: string
+          closed_by: string
+          id: string
+          is_locked: boolean
+          notes: string | null
+          period_month: string
+          reopened_at: string | null
+          reopened_by: string | null
+        }
+        Insert: {
+          closed_at?: string
+          closed_by: string
+          id?: string
+          is_locked?: boolean
+          notes?: string | null
+          period_month: string
+          reopened_at?: string | null
+          reopened_by?: string | null
+        }
+        Update: {
+          closed_at?: string
+          closed_by?: string
+          id?: string
+          is_locked?: boolean
+          notes?: string | null
+          period_month?: string
+          reopened_at?: string | null
+          reopened_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "period_locks_closed_by_fkey"
+            columns: ["closed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "period_locks_reopened_by_fkey"
+            columns: ["reopened_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rent_splits: {
         Row: {
@@ -2027,6 +2647,42 @@ export type Database = {
           },
         ]
       }
+      fund_source_outstanding: {
+        Row: {
+          cost_rate: number | null
+          effective_date: string | null
+          from_company_id: string | null
+          from_director_id: string | null
+          fund_source_id: string | null
+          lock_in_months: number | null
+          maturity_date: string | null
+          monthly_payment: number | null
+          original_amount: number | null
+          outstanding: number | null
+          source_type: Database["public"]["Enums"]["fund_source_type"] | null
+          status: Database["public"]["Enums"]["fund_source_status"] | null
+          total_interest_due: number | null
+          total_interest_paid: number | null
+          total_penalty_paid: number | null
+          total_principal_paid: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_fund_sources_director"
+            columns: ["from_director_id"]
+            isOneToOne: false
+            referencedRelation: "directors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fund_sources_from_company_id_fkey"
+            columns: ["from_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fund_sources_weighted_cost: {
         Row: {
           total_paid_capital: number | null
@@ -2066,6 +2722,26 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      trial_balance: {
+        Row: {
+          account_code: string | null
+          account_name: string | null
+          account_type: Database["public"]["Enums"]["account_type"] | null
+          balance: number | null
+          period_month: string | null
+          total_credit: number | null
+          total_debit: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journal_lines_account_code_fkey"
+            columns: ["account_code"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["code"]
           },
         ]
       }
@@ -2197,6 +2873,7 @@ export type Database = {
           submitted_by_name: string
         }[]
       }
+      is_period_locked: { Args: { p_date: string }; Returns: boolean }
       log_data_access: {
         Args: {
           p_action?: string
@@ -2255,6 +2932,7 @@ export type Database = {
       save_director_salary_results: { Args: { p_data: Json }; Returns: Json }
     }
     Enums: {
+      account_type: "asset" | "liability" | "equity" | "revenue" | "expense"
       approval_request_type:
         | "new_loan"
         | "base_rate"
@@ -2266,6 +2944,7 @@ export type Database = {
         | "escalation"
         | "invoice_pool_release"
         | "profit_withdrawal"
+        | "payment_voucher"
       approval_status: "pending" | "approved" | "rejected"
       approval_workflow_state:
         | "submitted"
@@ -2290,7 +2969,11 @@ export type Database = {
       director_status: "active" | "inactive"
       epf_part: "A" | "C" | "E" | "F"
       fund_source_status: "active" | "matured" | "repaid" | "cancelled"
-      fund_source_type: "subsidiary_savings" | "director_loan"
+      fund_source_type:
+        | "subsidiary_savings"
+        | "director_loan"
+        | "department_pool"
+        | "director_saving"
       hr_staff_status: "active" | "inactive"
       hv_fund_txn_type:
         | "saving_in"
@@ -2304,6 +2987,20 @@ export type Database = {
       loan_status: "pending_approval" | "active" | "fully_repaid" | "cancelled"
       overdue_stage: "grace" | "late_1" | "late_2" | "escalation"
       overdue_status: "pending" | "paid" | "escalated"
+      payment_voucher_status:
+        | "draft"
+        | "pending_approval"
+        | "approved"
+        | "paid"
+        | "voided"
+      payment_voucher_type:
+        | "loan_repayment"
+        | "billing_payment"
+        | "claim_payout"
+        | "expense"
+        | "internal_transfer"
+        | "salary_payout"
+        | "other"
       payout_status: "draft" | "confirmed" | "paid"
       pcb_category: "KA1" | "KA2" | "KA3"
       repayment_type: "principal" | "interest" | "penalty" | "netting"
@@ -2439,6 +3136,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      account_type: ["asset", "liability", "equity", "revenue", "expense"],
       approval_request_type: [
         "new_loan",
         "base_rate",
@@ -2450,6 +3148,7 @@ export const Constants = {
         "escalation",
         "invoice_pool_release",
         "profit_withdrawal",
+        "payment_voucher",
       ],
       approval_status: ["pending", "approved", "rejected"],
       approval_workflow_state: [
@@ -2477,7 +3176,12 @@ export const Constants = {
       director_status: ["active", "inactive"],
       epf_part: ["A", "C", "E", "F"],
       fund_source_status: ["active", "matured", "repaid", "cancelled"],
-      fund_source_type: ["subsidiary_savings", "director_loan"],
+      fund_source_type: [
+        "subsidiary_savings",
+        "director_loan",
+        "department_pool",
+        "director_saving",
+      ],
       hr_staff_status: ["active", "inactive"],
       hv_fund_txn_type: [
         "saving_in",
@@ -2492,6 +3196,22 @@ export const Constants = {
       loan_status: ["pending_approval", "active", "fully_repaid", "cancelled"],
       overdue_stage: ["grace", "late_1", "late_2", "escalation"],
       overdue_status: ["pending", "paid", "escalated"],
+      payment_voucher_status: [
+        "draft",
+        "pending_approval",
+        "approved",
+        "paid",
+        "voided",
+      ],
+      payment_voucher_type: [
+        "loan_repayment",
+        "billing_payment",
+        "claim_payout",
+        "expense",
+        "internal_transfer",
+        "salary_payout",
+        "other",
+      ],
       payout_status: ["draft", "confirmed", "paid"],
       pcb_category: ["KA1", "KA2", "KA3"],
       repayment_type: ["principal", "interest", "penalty", "netting"],

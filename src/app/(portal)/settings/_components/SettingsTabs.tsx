@@ -9,6 +9,7 @@ export type SettingsTab =
   | 'overdue'
   | 'splits'
   | 'directors'
+  | 'banks'
   | 'simulator'
 
 const TABS: TabItem[] = [
@@ -17,6 +18,7 @@ const TABS: TabItem[] = [
   { key: 'overdue', label: 'Overdue' },
   { key: 'splits', label: 'Splits' },
   { key: 'directors', label: 'Directors' },
+  { key: 'banks', label: 'Bank Accounts' },
   { key: 'simulator', label: 'Simulator' },
 ]
 

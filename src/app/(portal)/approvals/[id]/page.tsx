@@ -222,6 +222,7 @@ function formatRequestType(type: string): string {
     advance: 'Advance',
     invoice_pool_release: 'Invoice pool release',
     profit_withdrawal: 'Profit withdrawal',
+    payment_voucher: 'Payment voucher',
   }
   return labels[type] ?? type
 }

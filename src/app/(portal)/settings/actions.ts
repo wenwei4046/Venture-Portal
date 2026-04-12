@@ -255,3 +255,54 @@ export async function updateDirectorConfig(
   revalidatePath('/settings')
   revalidatePath('/director-salary')
 }
+
+// ─── Period Closing (Principal only) ────────────────────────────────────────
+
+export async function closePeriod(formData: FormData) {
+  const user = await requireRole(['principal'])
+  const supabase = await createClient()
+
+  const periodMonth = formData.get('period_month') as string
+  if (!periodMonth) throw new Error('Period month is required')
+
+  const notes = (formData.get('notes') as string) || null
+
+  const { error } = await supabase
+    .from('period_locks')
+    .upsert(
+      {
+        period_month: periodMonth,
+        closed_by: user.id,
+        closed_at: new Date().toISOString(),
+        is_locked: true,
+        notes,
+      },
+      { onConflict: 'period_month' }
+    )
+
+  if (error) throw new Error(`Failed to close period: ${error.message}`)
+
+  revalidatePath('/settings')
+}
+
+export async function reopenPeriod(formData: FormData) {
+  const user = await requireRole(['principal'])
+  const supabase = await createClient()
+
+  const periodMonth = formData.get('period_month') as string
+  if (!periodMonth) throw new Error('Period month is required')
+
+  const { error } = await supabase
+    .from('period_locks')
+    .update({
+      is_locked: false,
+      reopened_by: user.id,
+      reopened_at: new Date().toISOString(),
+    })
+    .eq('period_month', periodMonth)
+    .eq('is_locked', true)
+
+  if (error) throw new Error(`Failed to reopen period: ${error.message}`)
+
+  revalidatePath('/settings')
+}

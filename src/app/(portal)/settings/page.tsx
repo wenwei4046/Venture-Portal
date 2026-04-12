@@ -10,6 +10,7 @@ import RentSplitSection from './_components/RentSplitSection'
 import UtilitySplitSection from './_components/UtilitySplitSection'
 import DirectorSalarySection from './_components/DirectorSalarySection'
 import BaseRateSimulator from './_components/BaseRateSimulator'
+import BankAccountsSection from './_components/BankAccountsSection'
 import SettingsTabs, { type SettingsTab, isSettingsTab } from './_components/SettingsTabs'
 
 interface SplitRow {
@@ -41,6 +42,7 @@ export default async function SettingsPage({ searchParams }: Props) {
     { data: directorRows },
     { data: fundSourceRows },
     { data: latestBaseRate },
+    { data: bankAccountRows },
   ] = await Promise.all([
     supabase.from('treasury_config').select('*'),
     supabase.from('tier_config').select('*'),
@@ -51,6 +53,7 @@ export default async function SettingsPage({ searchParams }: Props) {
     supabase.from('directors').select('id, code, name, weightage, min_payout').eq('status', 'active').order('code'),
     supabase.from('fund_sources').select('amount, cost_rate').eq('status', 'active'),
     supabase.from('base_rate_history').select('weighted_cost, op_margin, base_rate').order('approved_at', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('bank_accounts').select('*').order('is_primary', { ascending: false }),
   ])
 
   const treasury = (treasuryRows ?? []) as TreasuryConfig[]
@@ -140,6 +143,24 @@ export default async function SettingsPage({ searchParams }: Props) {
             name: d.name ?? d.code,
             weightage: Number(d.weightage),
             min_payout: Number(d.min_payout),
+          }))}
+        />
+      )}
+
+      {activeTab === 'banks' && (
+        <BankAccountsSection
+          accounts={(bankAccountRows ?? []).map((a) => ({
+            id: a.id,
+            bank_name: a.bank_name,
+            account_number: a.account_number,
+            account_holder: a.account_holder,
+            account_type: a.account_type,
+            is_primary: a.is_primary,
+            current_balance: Number(a.current_balance),
+            opening_balance: Number(a.opening_balance),
+            gl_account_code: a.gl_account_code,
+            status: a.status,
+            notes: a.notes,
           }))}
         />
       )}

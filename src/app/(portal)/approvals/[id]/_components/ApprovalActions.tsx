@@ -24,6 +24,7 @@ const APPROVE_LEAD: Record<ApprovalRequestType, string> = {
   escalation: 'Approving acknowledges the escalation',
   invoice_pool_release: 'Approving releases the invoice pool funds',
   profit_withdrawal: 'Approving authorises the profit withdrawal',
+  payment_voucher: 'Approving authorises the payment for execution',
 }
 
 const REJECT_LEAD: Record<ApprovalRequestType, string> = {
@@ -37,6 +38,7 @@ const REJECT_LEAD: Record<ApprovalRequestType, string> = {
   escalation: 'Rejecting dismisses the escalation',
   invoice_pool_release: 'Rejecting keeps the funds in the invoice pool',
   profit_withdrawal: 'Rejecting denies the withdrawal',
+  payment_voucher: 'Rejecting cancels the payment — no funds will be transferred',
 }
 
 export default function ApprovalActions({ approvalId, requestType }: Props) {

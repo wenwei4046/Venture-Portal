@@ -47,17 +47,16 @@ export async function requestRelease(formData: FormData) {
   }
 
   // ─── Insert approval request ───
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: approvalError } = await supabase.from('approval_requests').insert({
-    request_type: 'invoice_pool_release',
+    request_type: 'invoice_pool_release' as const,
     submitted_by: user.id,
     description,
     amount,
-    status: 'pending',
-    workflow_state: 'submitted',
+    status: 'pending' as const,
+    workflow_state: 'submitted' as const,
     reference_id: 'invoice_pool',
     reference_table: 'invoice_payout_pool',
-  } as any)
+  })
 
   if (approvalError) {
     throw new Error(`Failed to submit release request: ${approvalError.message}`)

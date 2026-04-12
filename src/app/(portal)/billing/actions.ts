@@ -217,3 +217,79 @@ export async function updateContract(formData: FormData) {
   revalidatePath('/billing')
   redirect('/billing')
 }
+
+// ─── Credit Notes (Finance creates, Principal approves) ─────────────────────
+
+export async function createCreditNote(formData: FormData) {
+  const user = await requireRole(['finance'])
+  const supabase = await createClient()
+
+  const invoiceId = (formData.get('invoice_id') as string) ?? ''
+  const amount = parseFloat((formData.get('amount') as string) ?? '0')
+  const reason = (formData.get('reason') as string)?.trim() ?? ''
+
+  if (!invoiceId) throw new Error('Invoice is required')
+  if (isNaN(amount) || amount <= 0) throw new Error('Amount must be greater than 0')
+  if (!reason) throw new Error('Reason is required')
+
+  // Fetch invoice to get company_id and validate amount
+  const { data: invoice, error: invErr } = await supabase
+    .from('invoices')
+    .select('id, company_id, total_amount')
+    .eq('id', invoiceId)
+    .single()
+
+  if (invErr || !invoice) throw new Error('Invoice not found')
+  if (amount > Number(invoice.total_amount)) {
+    throw new Error(`Credit note amount cannot exceed invoice total (RM ${Number(invoice.total_amount).toFixed(2)})`)
+  }
+
+  // Generate credit note number
+  const period = dayjs().format('YYYYMM')
+  const { count } = await supabase
+    .from('credit_notes')
+    .select('*', { count: 'exact', head: true })
+  const seq = (count ?? 0) + 1
+  const creditNoteNo = `HV-CN-${period}-${String(seq).padStart(4, '0')}`
+
+  const { data, error } = await supabase
+    .from('credit_notes')
+    .insert({
+      credit_note_no: creditNoteNo,
+      invoice_id: invoiceId,
+      company_id: invoice.company_id,
+      amount,
+      reason,
+      status: 'draft',
+      created_by: user.id,
+    })
+    .select('id')
+    .single()
+
+  if (error) throw new Error(`Failed to create credit note: ${error.message}`)
+
+  revalidatePath('/billing')
+  return data.id
+}
+
+export async function approveCreditNote(formData: FormData) {
+  const user = await requireRole(['principal'])
+  const supabase = await createClient()
+
+  const id = formData.get('id') as string
+  if (!id) throw new Error('Credit note id is required')
+
+  const { error } = await supabase
+    .from('credit_notes')
+    .update({
+      status: 'approved',
+      approved_by: user.id,
+      approved_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .eq('status', 'draft')
+
+  if (error) throw new Error(`Failed to approve credit note: ${error.message}`)
+
+  revalidatePath('/billing')
+}

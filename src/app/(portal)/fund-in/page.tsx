@@ -1,12 +1,21 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
 import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
+import FundSourceTabs from './_components/FundSourceTabs'
+
+const SOURCE_TYPE_LABELS: Record<string, string> = {
+  subsidiary_savings: 'Subsidiary',
+  director_loan: 'Director loan',
+  department_pool: 'Dept pool',
+  director_saving: 'Director saving',
+}
 
 type FundSourceRow = {
   id: string
-  source_type: 'subsidiary_savings' | 'director_loan'
+  source_type: string
   from_company_id: string | null
   from_director_id: string | null
   amount: number
@@ -18,11 +27,15 @@ type FundSourceRow = {
   notes: string | null
 }
 
-export default async function FundInPage() {
+interface Props {
+  searchParams: Promise<{ status?: string }>
+}
+
+export default async function FundInPage({ searchParams }: Props) {
   await requireRole(['principal', 'finance'])
   const supabase = await createClient()
+  const { status: statusFilter } = await searchParams
 
-  // Fetch fund sources + denormalized from-name via two joins
   const [
     { data: fundSources },
     { data: companies },
@@ -44,6 +57,7 @@ export default async function FundInPage() {
     (directors ?? []).map((d) => [d.id, { name: d.name, code: d.code }])
   )
 
+  // Active sources for hero metrics (always based on active, regardless of tab)
   const active = sources.filter((s) => s.status === 'active')
   const totalPaid = active.reduce((sum, s) => sum + Number(s.amount), 0)
   const weightedCost =
@@ -56,6 +70,19 @@ export default async function FundInPage() {
     const days = dayjs(s.maturity_date).diff(dayjs(), 'day')
     return days >= 0 && days <= 30
   })
+
+  // Filter sources by tab
+  const tab = statusFilter ?? 'active'
+  const filtered = tab === 'all' ? sources : sources.filter((s) => s.status === tab)
+
+  // Status counts for tab badges
+  const counts = {
+    active: sources.filter((s) => s.status === 'active').length,
+    matured: sources.filter((s) => s.status === 'matured').length,
+    repaid: sources.filter((s) => s.status === 'repaid').length,
+    cancelled: sources.filter((s) => s.status === 'cancelled').length,
+    all: sources.length,
+  }
 
   const getFromLabel = (s: FundSourceRow) => {
     if (s.from_company_id) {
@@ -76,7 +103,7 @@ export default async function FundInPage() {
         <div>
           <h1 className="font-serif text-3xl text-ink">Fund IN</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
-            Subsidiary savings + director loans deposited into HV pool.
+            Capital borrowed from subsidiaries, directors, department pools, and director savings.
           </p>
         </div>
         <Link
@@ -108,9 +135,7 @@ export default async function FundInPage() {
             )}
           </div>
           <div className="font-mono text-xs text-muted mt-2">
-            {active.length} active{' '}
-            {active.length === 1 ? 'source' : 'sources'} ·{' '}
-            {sources.length - active.length} inactive
+            {counts.active} active · {counts.matured} matured · {counts.repaid} repaid · {counts.cancelled} cancelled
           </div>
         </div>
 
@@ -137,75 +162,85 @@ export default async function FundInPage() {
         </div>
       </div>
 
-      {/* ───────── Sources list ───────── */}
+      {/* ───────── Status tabs ───────── */}
       {sources.length === 0 ? (
         <EmptyState />
       ) : (
         <section>
           <h2 className="font-serif text-2xl text-ink mb-1">Fund sources</h2>
           <p className="font-serif italic text-graphite text-sm mb-6">
-            Sorted by effective date, <em>most recent first</em>
+            {filtered.length} {tab === 'all' ? 'total' : tab} source{filtered.length === 1 ? '' : 's'}
           </p>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                  <th className="text-left py-3 pr-4 font-medium">Type</th>
-                  <th className="text-left py-3 pr-4 font-medium">From</th>
-                  <th className="text-right py-3 pr-4 font-medium">Amount</th>
-                  <th className="text-right py-3 pr-4 font-medium">Rate</th>
-                  <th className="text-right py-3 pr-4 font-medium">Lock-in</th>
-                  <th className="text-right py-3 pr-4 font-medium">Maturity</th>
-                  <th className="text-left py-3 pr-4 font-medium">Status</th>
-                  <th className="py-3 text-right"></th>
-                </tr>
-              </thead>
-              <tbody className="row-stagger">
-                {sources.map((source, i) => (
-                  <tr
-                    key={source.id}
-                    style={{ '--i': i } as React.CSSProperties}
-                    className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors"
-                  >
-                    <td className="py-4 pr-4 font-serif italic text-graphite">
-                      {source.source_type === 'subsidiary_savings'
-                        ? 'Subsidiary savings'
-                        : 'Director loan'}
-                    </td>
-                    <td className="py-4 pr-4 font-serif text-md text-ink">
-                      {getFromLabel(source)}
-                    </td>
-                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
-                      {formatMoney(Number(source.amount))}
-                    </td>
-                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
-                      {(Number(source.cost_rate) * 100).toFixed(3)}%
-                    </td>
-                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
-                      {source.lock_in_months ? `${source.lock_in_months} mo` : '—'}
-                    </td>
-                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
-                      {source.maturity_date
-                        ? dayjs(source.maturity_date).format('D MMM YYYY')
-                        : '—'}
-                    </td>
-                    <td className="py-4 pr-4">
-                      <StatusLabel status={source.status} maturityDate={source.maturity_date} />
-                    </td>
-                    <td className="py-4 text-right">
-                      <Link
-                        href={`/fund-in/${source.id}`}
-                        className="text-sm text-accent hover:text-accent-hover font-serif italic"
-                      >
-                        View
-                      </Link>
-                    </td>
+          <Suspense fallback={null}>
+            <FundSourceTabs />
+          </Suspense>
+
+          {filtered.length === 0 ? (
+            <div className="border border-hairline rounded-md bg-surface p-8 text-center">
+              <p className="font-serif italic text-muted text-sm">
+                No {tab} fund sources.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
+                    <th className="text-left py-3 pr-4 font-medium">Type</th>
+                    <th className="text-left py-3 pr-4 font-medium">From</th>
+                    <th className="text-right py-3 pr-4 font-medium">Amount</th>
+                    <th className="text-right py-3 pr-4 font-medium">Rate</th>
+                    <th className="text-right py-3 pr-4 font-medium">Lock-in</th>
+                    <th className="text-right py-3 pr-4 font-medium">Maturity</th>
+                    <th className="text-left py-3 pr-4 font-medium">Status</th>
+                    <th className="py-3 text-right"></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="row-stagger">
+                  {filtered.map((source, i) => (
+                    <tr
+                      key={source.id}
+                      style={{ '--i': i } as React.CSSProperties}
+                      className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors"
+                    >
+                      <td className="py-4 pr-4 font-serif italic text-graphite">
+                        {SOURCE_TYPE_LABELS[source.source_type] ?? source.source_type}
+                      </td>
+                      <td className="py-4 pr-4 font-serif text-md text-ink">
+                        {getFromLabel(source)}
+                      </td>
+                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
+                        {formatMoney(Number(source.amount))}
+                      </td>
+                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
+                        {(Number(source.cost_rate) * 100).toFixed(3)}%
+                      </td>
+                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
+                        {source.lock_in_months ? `${source.lock_in_months} mo` : '—'}
+                      </td>
+                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
+                        {source.maturity_date
+                          ? dayjs(source.maturity_date).format('D MMM YYYY')
+                          : '—'}
+                      </td>
+                      <td className="py-4 pr-4">
+                        <StatusLabel status={source.status} maturityDate={source.maturity_date} />
+                      </td>
+                      <td className="py-4 text-right">
+                        <Link
+                          href={`/fund-in/${source.id}`}
+                          className="text-sm text-accent hover:text-accent-hover font-serif italic"
+                        >
+                          View
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       )}
     </div>
@@ -220,7 +255,6 @@ function StatusLabel({
   maturityDate: string | null
 }) {
   if (status === 'active') {
-    // Check if maturing soon
     if (maturityDate) {
       const days = dayjs(maturityDate).diff(dayjs(), 'day')
       if (days >= 0 && days <= 30) {
@@ -252,7 +286,7 @@ function EmptyState() {
         No fund sources yet.
       </p>
       <p className="font-serif italic text-muted text-sm mb-6">
-        Finance can record the first subsidiary savings deposit or director loan.
+        Finance can record the first fund source — subsidiary loan, director loan, or internal pool transfer.
       </p>
       <Link
         href="/fund-in/new"

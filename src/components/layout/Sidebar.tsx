@@ -28,6 +28,7 @@ const navItems: NavItem[] = [
   { href: '/fund-out', label: 'Fund OUT', visible: canAccessTreasury },
   { href: '/overdue', label: 'Overdue', visible: canAccessTreasury },
   { href: '/statements', label: 'Statements', visible: canAccessTreasury },
+  { href: '/payments', label: 'Payments', visible: canAccessTreasury },
   { href: '/approvals', label: 'Approvals', visible: canApprove },
   { href: '/dept-pool', label: 'Dept Pool', visible: canAccessDeptPool },
   { href: '/billing', label: 'Billing', visible: canAccessBilling },

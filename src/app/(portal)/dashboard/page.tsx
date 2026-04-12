@@ -39,9 +39,29 @@ type MarketingNp = {
   net_profit: number
 }
 
+type PoolBreakdown = {
+  fund_sources: number
+  dept_pool: number
+  hv_operating_fund: number
+  total: number
+}
+
+type FundSourceBreakdownItem = {
+  source_type: string
+  count: number
+  amount: number
+}
+
+type DeptPoolBreakdownItem = {
+  department_id: string
+  department_name: string
+  balance: number
+}
+
 type DashboardSummary = {
   role: 'principal' | 'finance' | 'hr' | 'dept_manager'
   total_pool: number
+  fund_sources_total: number
   loans_outstanding: number
   free_cash: number
   buffer_amount: number | null
@@ -67,6 +87,10 @@ type DashboardSummary = {
   invoice_pool_balance: number | null
   total_advance: number | null
   total_saving: number | null
+  // Phase 4 extensions
+  pool_breakdown: PoolBreakdown
+  fund_source_breakdown: FundSourceBreakdownItem[]
+  dept_pool_breakdown: DeptPoolBreakdownItem[]
 }
 
 export default async function DashboardPage() {
@@ -609,6 +633,15 @@ export default async function DashboardPage() {
   const summary = raw as unknown as DashboardSummary
   const today = dayjs().format('D MMMM YYYY')
 
+  // Bank accounts (Phase 4: direct query, RLS-gated)
+  const { data: bankAccounts } = await supabase
+    .from('bank_accounts')
+    .select('id, bank_name, account_number, current_balance, is_primary, status')
+    .eq('status', 'active')
+    .order('is_primary', { ascending: false })
+  const banks = bankAccounts ?? []
+  const totalBankBalance = banks.reduce((sum, b) => sum + Number(b.current_balance), 0)
+
   const hasAnyData =
     summary.total_pool > 0 || summary.loans_outstanding > 0
 
@@ -702,44 +735,104 @@ export default async function DashboardPage() {
           </svg>
 
           {hasAnyData ? (
-            <div className="text-sm text-graphite">
-              <em className="font-serif text-graphite">
-                Pool{' '}
-                <span className="font-mono tabular not-italic font-medium text-ink">
-                  {formatMoney(summary.total_pool)}
-                </span>
-              </em>
-              {' · '}
-              <em className="font-serif text-graphite">
-                lent{' '}
-                <span className="font-mono tabular not-italic">
-                  {formatMoney(summary.loans_outstanding)}
-                </span>
-              </em>
-              {' · '}
-              {summary.buffer_breach ? (
-                <em className="font-serif text-danger">
-                  Below buffer by{' '}
-                  <span className="font-mono tabular not-italic">
-                    {formatMoney(Math.abs(aboveBuffer))}
-                  </span>
-                </em>
-              ) : (
+            <>
+              <div className="text-sm text-graphite">
                 <em className="font-serif text-graphite">
-                  Above buffer by{' '}
-                  <span className="font-mono tabular not-italic font-medium text-ledger">
-                    {formatMoney(aboveBuffer + bufferAmount)}
+                  Pool{' '}
+                  <span className="font-mono tabular not-italic font-medium text-ink">
+                    {formatMoney(summary.total_pool)}
                   </span>
                 </em>
-              )}
-              {' · '}
-              <em className="font-serif text-graphite">
-                Buffer{' '}
-                <span className="font-mono tabular not-italic">
-                  {formatMoney(bufferAmount)}
-                </span>
-              </em>
-            </div>
+                {' · '}
+                <em className="font-serif text-graphite">
+                  lent{' '}
+                  <span className="font-mono tabular not-italic">
+                    {formatMoney(summary.loans_outstanding)}
+                  </span>
+                </em>
+                {' · '}
+                {summary.buffer_breach ? (
+                  <em className="font-serif text-danger">
+                    Below buffer by{' '}
+                    <span className="font-mono tabular not-italic">
+                      {formatMoney(Math.abs(aboveBuffer))}
+                    </span>
+                  </em>
+                ) : (
+                  <em className="font-serif text-graphite">
+                    Above buffer by{' '}
+                    <span className="font-mono tabular not-italic font-medium text-ledger">
+                      {formatMoney(aboveBuffer + bufferAmount)}
+                    </span>
+                  </em>
+                )}
+                {' · '}
+                <em className="font-serif text-graphite">
+                  Buffer{' '}
+                  <span className="font-mono tabular not-italic">
+                    {formatMoney(bufferAmount)}
+                  </span>
+                </em>
+              </div>
+
+              {/* ── Pool breakdown detail ── */}
+              {summary.pool_breakdown ? (
+                <details className="mt-4">
+                  <summary className="font-serif italic text-accent text-sm cursor-pointer hover:text-accent-hover">
+                    Pool breakdown
+                  </summary>
+                  <div className="mt-3 border border-hairline rounded-md bg-surface p-4 space-y-3">
+                    {/* Source categories */}
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <div className="font-mono text-xs text-muted uppercase tracking-wide mb-1">Fund Sources</div>
+                        <div className="font-mono tabular font-medium text-ink">{formatMoney(summary.pool_breakdown.fund_sources)}</div>
+                      </div>
+                      <div>
+                        <div className="font-mono text-xs text-muted uppercase tracking-wide mb-1">Dept Pool</div>
+                        <div className="font-mono tabular font-medium text-ink">{formatMoney(summary.pool_breakdown.dept_pool)}</div>
+                      </div>
+                      <div>
+                        <div className="font-mono text-xs text-muted uppercase tracking-wide mb-1">HV Operating Fund</div>
+                        <div className="font-mono tabular font-medium text-ink">{formatMoney(summary.pool_breakdown.hv_operating_fund)}</div>
+                      </div>
+                    </div>
+
+                    {/* Fund source type breakdown */}
+                    {summary.fund_source_breakdown?.length > 0 ? (
+                      <div className="border-t border-hairline pt-3">
+                        <div className="font-mono text-xs text-muted uppercase tracking-wide mb-2">By fund source type</div>
+                        {summary.fund_source_breakdown.map((fs) => (
+                          <div key={fs.source_type} className="flex justify-between text-sm py-0.5">
+                            <span className="font-serif italic text-graphite">
+                              {fs.source_type.replace(/_/g, ' ')} ({fs.count})
+                            </span>
+                            <span className="font-mono tabular font-medium text-ink">
+                              {formatMoney(Number(fs.amount))}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {/* Dept pool by department */}
+                    {summary.dept_pool_breakdown?.length > 0 ? (
+                      <div className="border-t border-hairline pt-3">
+                        <div className="font-mono text-xs text-muted uppercase tracking-wide mb-2">Dept pool by department</div>
+                        {summary.dept_pool_breakdown.map((dp) => (
+                          <div key={dp.department_id} className="flex justify-between text-sm py-0.5">
+                            <span className="font-serif italic text-graphite">{dp.department_name}</span>
+                            <span className="font-mono tabular font-medium text-ink">
+                              {formatMoney(Number(dp.balance))}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                </details>
+              ) : null}
+            </>
           ) : (
             <div className="mt-4">
               <p className="font-serif italic text-graphite text-base mb-4">
@@ -999,6 +1092,44 @@ export default async function DashboardPage() {
                 </span>
               </div>
             ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* ───────── Phase 4 — Bank Accounts ───────── */}
+      {banks.length > 0 ? (
+        <section className="mb-16">
+          <h2 className="font-serif text-2xl text-ink mb-1">Bank Accounts</h2>
+          <p className="font-serif italic text-graphite text-sm mb-6">
+            HV operating accounts, <em>balance as of last executed payment</em>
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {banks.map((b) => (
+              <div
+                key={b.id}
+                className="border border-hairline rounded-md bg-surface p-5"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="font-serif text-md text-ink">{b.bank_name}</div>
+                  {b.is_primary ? (
+                    <span className="font-mono text-[9px] uppercase tracking-wider text-accent bg-accent-bg px-1.5 py-0.5 rounded">
+                      Primary
+                    </span>
+                  ) : null}
+                </div>
+                <div className="font-mono text-xs text-muted mb-3">{b.account_number}</div>
+                <div className="font-serif text-2xl text-ink">
+                  {formatMoney(Number(b.current_balance))}
+                </div>
+              </div>
+            ))}
+            <div className="border border-hairline rounded-md bg-surface p-5">
+              <div className="font-serif text-md text-graphite mb-2">Total balance</div>
+              <div className="font-mono text-xs text-muted mb-3">across all accounts</div>
+              <div className="font-serif text-2xl text-ink font-medium">
+                {formatMoney(totalBankBalance)}
+              </div>
+            </div>
           </div>
         </section>
       ) : null}
