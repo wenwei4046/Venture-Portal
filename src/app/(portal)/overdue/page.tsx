@@ -5,6 +5,7 @@ import { formatMoney } from '@/lib/utils'
 import { markOverduePaid } from './actions'
 import DetectOverdueButton from './_components/DetectOverdueButton'
 import EscalateButton from './_components/EscalateButton'
+import { OverdueBadge } from '@/components/motion/OverdueBadge'
 
 type OverdueRow = {
   id: string
@@ -158,7 +159,11 @@ export default async function OverduePage() {
                         {row.overdue_days}d
                       </td>
                       <td className="py-4 pr-4">
-                        <StageLabel stage={row.overdue_stage} />
+                        <OverdueBadge
+                          id={row.id}
+                          label={stageLabel(row.overdue_stage)}
+                          className={stageLabelClass(row.overdue_stage)}
+                        />
                       </td>
                       <td className="py-4 pr-4 text-right font-mono tabular font-medium text-danger">
                         {formatMoney(Number(row.penalty_amount ?? 0))}
@@ -245,15 +250,6 @@ export default async function OverduePage() {
   )
 }
 
-function StageLabel({ stage }: { stage: OverdueRow['overdue_stage'] }) {
-  if (stage === 'grace')
-    return <em className="font-serif text-graphite text-sm">grace</em>
-  if (stage === 'late_1')
-    return <em className="font-serif text-alert text-sm">late 1</em>
-  if (stage === 'late_2')
-    return <em className="font-serif text-alert text-sm">late 2</em>
-  return <em className="font-serif text-danger text-sm">escalation</em>
-}
 
 function stageLabel(stage: string): string {
   if (stage === 'grace') return 'grace'
@@ -261,6 +257,13 @@ function stageLabel(stage: string): string {
   if (stage === 'late_2') return 'late 2'
   if (stage === 'escalation') return 'escalation'
   return stage
+}
+
+function stageLabelClass(stage: string): string {
+  if (stage === 'grace') return 'text-graphite text-sm'
+  if (stage === 'late_1') return 'text-alert text-sm'
+  if (stage === 'late_2') return 'text-alert text-sm'
+  return 'text-danger text-sm'
 }
 
 function AllClearState({ canFinanceAct }: { canFinanceAct: boolean }) {
