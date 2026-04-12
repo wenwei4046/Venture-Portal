@@ -66,6 +66,17 @@ export default async function PaymentDetailPage({ params }: Props) {
     .eq('voucher_id', id)
     .order('uploaded_at', { ascending: false })
 
+  // Bank balance for approval check display
+  let bankBalance: number | null = null
+  if (bankName && voucher.bank_account_id) {
+    const { data: bankData } = await supabase
+      .from('bank_accounts')
+      .select('current_balance')
+      .eq('id', voucher.bank_account_id)
+      .single()
+    if (bankData) bankBalance = Number(bankData.current_balance)
+  }
+
   const isPrincipal = user.role === 'principal'
   const isFinance = user.role === 'finance'
 
@@ -198,6 +209,9 @@ export default async function PaymentDetailPage({ params }: Props) {
       <VoucherActions
         voucherId={voucher.id}
         status={voucher.status}
+        amount={Number(voucher.amount)}
+        bankBalance={bankBalance}
+        bankName={bankName}
         isPrincipal={isPrincipal}
         isFinance={isFinance}
         submitForApproval={submitForApproval}

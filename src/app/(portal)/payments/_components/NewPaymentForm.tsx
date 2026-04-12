@@ -32,6 +32,7 @@ export default function NewPaymentForm({ companies, bankAccounts, fundSources, l
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [voucherType, setVoucherType] = useState('expense')
+  const [files, setFiles] = useState<File[]>([])
   const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
@@ -48,6 +49,16 @@ export default function NewPaymentForm({ companies, bankAccounts, fundSources, l
 
   async function handleSubmit(formData: FormData) {
     setError(null)
+
+    if (files.length === 0) {
+      setError('At least one attachment is required (invoice, contract, receipt, or photo).')
+      return
+    }
+
+    // Append files to formData for server action
+    files.forEach((f, i) => formData.append(`attachment_${i}`, f))
+    formData.set('attachment_count', String(files.length))
+
     startTransition(async () => {
       try {
         await createPaymentVoucher(formData)
@@ -214,6 +225,45 @@ export default function NewPaymentForm({ companies, bankAccounts, fundSources, l
           className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
           placeholder="What is this payment for? Include reference numbers, invoice numbers, etc."
         />
+      </div>
+
+      {/* ── Attachments (mandatory) ── */}
+      <div className="mb-6">
+        <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+          Attachments <span className="text-danger">*</span>
+        </label>
+        <div className="border border-hairline rounded-md bg-paper p-4">
+          <input
+            type="file"
+            multiple
+            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+            onChange={(e) => {
+              const selected = Array.from(e.target.files ?? [])
+              setFiles((prev) => [...prev, ...selected])
+            }}
+            className="text-sm text-ink file:mr-4 file:py-2 file:px-4 file:rounded-md file:border file:border-hairline file:text-sm file:font-serif file:italic file:text-accent file:bg-accent-bg file:cursor-pointer hover:file:bg-surface-2"
+          />
+          <p className="font-serif italic text-muted text-xs mt-2">
+            Attach invoice, contract, receipt, or photo. At least one attachment is required.
+          </p>
+          {files.length > 0 ? (
+            <div className="mt-3 space-y-1">
+              {files.map((f, i) => (
+                <div key={i} className="flex items-center justify-between text-sm">
+                  <span className="font-mono text-xs text-ink truncate max-w-[300px]">{f.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
+                    className="text-xs text-muted hover:text-danger ml-2"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <p className="font-mono text-xs text-muted mt-1">{files.length} file{files.length === 1 ? '' : 's'} selected</p>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       {/* ── Notes ── */}

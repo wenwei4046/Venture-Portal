@@ -6,6 +6,9 @@ import dayjs from 'dayjs'
 interface Props {
   voucherId: string
   status: string
+  amount: number
+  bankBalance: number | null
+  bankName: string | null
   isPrincipal: boolean
   isFinance: boolean
   submitForApproval: (formData: FormData) => Promise<void>
@@ -17,6 +20,9 @@ interface Props {
 export default function VoucherActions({
   voucherId,
   status,
+  amount,
+  bankBalance,
+  bankName,
   isPrincipal,
   isFinance,
   submitForApproval,
@@ -92,14 +98,32 @@ export default function VoucherActions({
       {status === 'pending_approval' ? (
         <>
           {isPrincipal && !confirmAction ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setConfirmAction('approve')}
-                className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors"
-              >
-                Approve
-              </button>
+            <div>
+              {/* Bank balance info for Principal */}
+              {bankBalance !== null && bankName ? (
+                <div className={`mb-4 p-3 rounded-md text-sm ${bankBalance < amount ? 'bg-danger-bg border border-danger' : 'bg-surface border border-hairline'}`}>
+                  <span className="font-serif text-graphite">{bankName} balance: </span>
+                  <span className={`font-mono tabular font-medium ${bankBalance < amount ? 'text-danger' : 'text-ledger'}`}>
+                    RM {bankBalance.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
+                  </span>
+                  {bankBalance < amount ? (
+                    <span className="font-serif italic text-danger ml-2">
+                      — insufficient for RM {amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} payment
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  disabled={bankBalance !== null && bankBalance < amount}
+                  onClick={() => setConfirmAction('approve')}
+                  className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {bankBalance !== null && bankBalance < amount ? 'Insufficient balance' : 'Approve'}
+                </button>
+              </div>
             </div>
           ) : null}
 

@@ -645,9 +645,6 @@ export default async function DashboardPage() {
   const hasAnyData =
     summary.total_pool > 0 || summary.loans_outstanding > 0
 
-  const aboveBuffer = summary.free_cash
-  const bufferAmount = Number(summary.buffer_amount ?? 0)
-
   const isPrincipal = summary.role === 'principal'
   const isFinance = summary.role === 'finance'
   const pendingApprovals = summary.pending_approvals ?? []
@@ -751,26 +748,10 @@ export default async function DashboardPage() {
                   </span>
                 </em>
                 {' · '}
-                {summary.buffer_breach ? (
-                  <em className="font-serif text-danger">
-                    Below buffer by{' '}
-                    <span className="font-mono tabular not-italic">
-                      {formatMoney(Math.abs(aboveBuffer))}
-                    </span>
-                  </em>
-                ) : (
-                  <em className="font-serif text-graphite">
-                    Above buffer by{' '}
-                    <span className="font-mono tabular not-italic font-medium text-ledger">
-                      {formatMoney(aboveBuffer + bufferAmount)}
-                    </span>
-                  </em>
-                )}
-                {' · '}
                 <em className="font-serif text-graphite">
-                  Buffer{' '}
-                  <span className="font-mono tabular not-italic">
-                    {formatMoney(bufferAmount)}
+                  free{' '}
+                  <span className={`font-mono tabular not-italic font-medium ${summary.free_cash >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                    {formatMoney(summary.free_cash)}
                   </span>
                 </em>
               </div>

@@ -4,9 +4,8 @@ import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
-import { markFundSourceMatured, cancelFundSource, repayFundSource } from '../actions'
+import { cancelFundSource } from '../actions'
 import { ConfirmButton } from './_components/ConfirmButton'
-import FundSourceRepaymentForm from '../_components/FundSourceRepaymentForm'
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
   subsidiary_savings: 'Subsidiary',
@@ -266,26 +265,23 @@ export default async function FundSourceDetailPage({ params }: Props) {
         )}
       </section>
 
-      {/* ───────── Record repayment form (Finance, active/matured only) ───────── */}
-      {canFinanceEdit && (isActive || isMatured) ? (
-        <section className="mb-12">
-          <h2 className="font-serif text-xl text-ink mb-1">Record repayment</h2>
-          <p className="font-serif italic text-graphite text-sm mb-4">
-            Record a principal or interest payment made to the fund source provider.
+      {/* ───────── Repayment info (read-only — payments happen in /payments) ───────── */}
+      {(isActive || isMatured) ? (
+        <section className="mb-12 bg-accent-bg border border-accent-border rounded-md p-4 max-w-3xl">
+          <p className="font-serif italic text-accent text-sm">
+            To make a repayment on this fund source, go to{' '}
+            <Link href="/payments/new" className="underline hover:text-accent-hover">Payments → Create payment</Link>{' '}
+            and select &quot;Loan repayment&quot;. All payments require Principal approval.
           </p>
-          <FundSourceRepaymentForm
-            fundSourceId={source.id}
-            outstanding={outstanding}
-          />
         </section>
       ) : null}
 
-      {/* ───────── Legacy repayment audit (if repaid via old one-click button) ───────── */}
+      {/* ───────── Fully repaid audit ───────── */}
       {isRepaid && source.repaid_at ? (
         <section className="mb-12 border-l-2 border-ledger pl-4 py-2 max-w-3xl">
-          <h2 className="font-serif text-xl text-ink mb-1">Full repayment</h2>
+          <h2 className="font-serif text-xl text-ink mb-1">Fully repaid</h2>
           <p className="font-serif text-md text-ink">
-            Marked fully repaid on{' '}
+            Repaid on{' '}
             <em className="font-serif italic text-ledger">
               {dayjs(source.repaid_at).format('D MMM YYYY')}
             </em>
@@ -297,47 +293,21 @@ export default async function FundSourceDetailPage({ params }: Props) {
         </section>
       ) : null}
 
-      {/* ───────── Quick actions (Finance only) ───────── */}
-      {canFinanceEdit && (isActive || isMatured) ? (
+      {/* ───────── Actions (Finance only) ───────── */}
+      {canFinanceEdit && isActive ? (
         <section className="border-t border-hairline pt-8">
           <h2 className="font-serif text-xl text-ink mb-1">Actions</h2>
           <p className="font-serif italic text-graphite text-sm mb-4">
-            Finance only. Changes are recorded in the audit trail.
+            Cancellation requires Principal approval.
           </p>
-          <div className="flex flex-wrap items-center gap-3">
-            {isActive && source.maturity_date && maturityDays !== null && maturityDays <= 0 ? (
-              <form action={markFundSourceMatured}>
-                <input type="hidden" name="id" value={source.id} />
-                <button
-                  type="submit"
-                  className="bg-alert hover:opacity-90 text-white font-serif italic text-sm px-4 py-2 rounded-md transition-opacity"
-                >
-                  Mark as matured
-                </button>
-              </form>
-            ) : null}
-
-            <ConfirmButton
-              id={source.id}
-              action={repayFundSource}
-              confirmMessage={`Confirm: Mark this fund source as fully repaid?\n\nOutstanding: RM ${formatMoneyBare(outstanding)}\n\nThis will remove it from the active capital pool.`}
-              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-            >
-              Mark as fully repaid
-            </ConfirmButton>
-
-            {isActive ? (
-              <form action={cancelFundSource}>
-                <input type="hidden" name="id" value={source.id} />
-                <button
-                  type="submit"
-                  className="text-sm text-muted hover:text-danger font-sans transition-colors px-2"
-                >
-                  Cancel this entry
-                </button>
-              </form>
-            ) : null}
-          </div>
+          <ConfirmButton
+            id={source.id}
+            action={cancelFundSource}
+            confirmMessage={`Cancel this fund source?\n\nThis will submit a cancellation request for Principal approval. The fund source remains active until approved.`}
+            className="text-sm text-muted hover:text-danger font-sans transition-colors border border-hairline px-4 py-2 rounded-md"
+          >
+            Request cancellation
+          </ConfirmButton>
         </section>
       ) : null}
     </div>

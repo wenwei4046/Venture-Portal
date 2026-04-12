@@ -59,3 +59,5 @@ scripts/pcb-data.json
 
 # Superpowers brainstorm visual companion (local mockup persistence)
 .superpowers/
+qa-*.png
+motion-*.png

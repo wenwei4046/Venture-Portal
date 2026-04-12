@@ -62,6 +62,32 @@ export async function createPaymentVoucher(formData: FormData) {
 
   if (error) throw new Error(`Failed to create voucher: ${error.message}`)
 
+  // ── Upload attachments to Supabase Storage ──
+  const attachmentCount = parseInt((formData.get('attachment_count') as string) ?? '0', 10)
+  for (let i = 0; i < attachmentCount; i++) {
+    const file = formData.get(`attachment_${i}`) as File | null
+    if (!file || file.size === 0) continue
+
+    const ext = file.name.split('.').pop() ?? 'bin'
+    const storagePath = `${data.id}/${Date.now()}-${i}.${ext}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('payment-attachments')
+      .upload(storagePath, file, { contentType: file.type })
+
+    if (!uploadError) {
+      // Record in payment_attachments table
+      await supabase.from('payment_attachments').insert({
+        voucher_id: data.id,
+        file_name: file.name,
+        file_type: file.type,
+        file_size: file.size,
+        storage_path: storagePath,
+        uploaded_by: user.id,
+      })
+    }
+  }
+
   revalidatePath('/payments')
   revalidatePath('/dashboard')
   redirect(`/payments/${data.id}`)
@@ -128,6 +154,35 @@ export async function approveVoucher(formData: FormData) {
   if (!id) throw new Error('Voucher id is required')
 
   const nowIso = new Date().toISOString()
+
+  // Fetch the voucher to check bank balance
+  const { data: voucher, error: fetchErr } = await supabase
+    .from('payment_vouchers')
+    .select('amount, bank_account_id, voucher_type')
+    .eq('id', id)
+    .eq('status', 'pending_approval')
+    .single()
+
+  if (fetchErr || !voucher) throw new Error('Voucher not found or not pending approval')
+
+  // ── Bank balance check — cannot approve if insufficient funds ──
+  if (voucher.bank_account_id) {
+    const { data: bank } = await supabase
+      .from('bank_accounts')
+      .select('current_balance, bank_name')
+      .eq('id', voucher.bank_account_id)
+      .single()
+
+    if (bank) {
+      const balance = Number(bank.current_balance)
+      const amount = Number(voucher.amount)
+      if (balance < amount) {
+        throw new Error(
+          `Insufficient bank balance. ${bank.bank_name} has RM ${balance.toFixed(2)} but payment requires RM ${amount.toFixed(2)}.`
+        )
+      }
+    }
+  }
 
   // Update voucher
   const { error: voucherError } = await supabase
