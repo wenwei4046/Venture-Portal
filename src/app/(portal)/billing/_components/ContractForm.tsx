@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
 import { createContract, updateContract } from '../actions'
 
 interface Company {
@@ -26,6 +26,19 @@ interface Props {
 export default function ContractForm({ companies, contract }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+
+  useEffect(() => {
+    if (error && formRef.current) {
+      formRef.current.classList.remove('shake-once')
+      void formRef.current.offsetWidth
+      formRef.current.classList.add('shake-once')
+      const el = formRef.current
+      const handler = () => el.classList.remove('shake-once')
+      el.addEventListener('animationend', handler, { once: true })
+      return () => el.removeEventListener('animationend', handler)
+    }
+  }, [error])
 
   function handleSubmit(formData: FormData) {
     setError(null)
@@ -43,7 +56,7 @@ export default function ContractForm({ companies, contract }: Props) {
   }
 
   return (
-    <form action={handleSubmit} className="max-w-2xl space-y-6">
+    <form ref={formRef} action={handleSubmit} className="max-w-2xl space-y-6">
       {contract && <input type="hidden" name="id" value={contract.id} />}
 
       {error && (

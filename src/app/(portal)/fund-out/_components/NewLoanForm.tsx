@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useMemo } from 'react'
+import { useState, useTransition, useMemo, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { createLoan } from '../actions'
 import type { Company, CompanyTier, TierConfig } from '@/types'
@@ -15,6 +15,19 @@ export default function NewLoanForm({ companies, tiers, baseRate }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string>('')
+  const formRef = useRef<HTMLFormElement>(null)
+
+  useEffect(() => {
+    if (error && formRef.current) {
+      formRef.current.classList.remove('shake-once')
+      void formRef.current.offsetWidth
+      formRef.current.classList.add('shake-once')
+      const el = formRef.current
+      const handler = () => el.classList.remove('shake-once')
+      el.addEventListener('animationend', handler, { once: true })
+      return () => el.removeEventListener('animationend', handler)
+    }
+  }, [error])
 
   // Build tier → premium map
   const tierMap = useMemo(() => {
@@ -44,6 +57,7 @@ export default function NewLoanForm({ companies, tiers, baseRate }: Props) {
 
   return (
     <form
+      ref={formRef}
       action={handleSubmit}
       className="bg-surface border border-hairline rounded-md p-4 sm:p-8 max-w-3xl"
     >

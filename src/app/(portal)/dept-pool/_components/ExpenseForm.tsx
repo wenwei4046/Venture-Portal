@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
 import { submitDeptExpense } from '../actions'
 
 export default function ExpenseForm() {
@@ -8,6 +8,19 @@ export default function ExpenseForm() {
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+
+  useEffect(() => {
+    if (error && formRef.current) {
+      formRef.current.classList.remove('shake-once')
+      void formRef.current.offsetWidth
+      formRef.current.classList.add('shake-once')
+      const el = formRef.current
+      const handler = () => el.classList.remove('shake-once')
+      el.addEventListener('animationend', handler, { once: true })
+      return () => el.removeEventListener('animationend', handler)
+    }
+  }, [error])
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -34,7 +47,7 @@ export default function ExpenseForm() {
     description.trim().length > 0 && parseFloat(amount) > 0 && !isPending
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 max-w-md">
       <div>
         <label
           htmlFor="description"

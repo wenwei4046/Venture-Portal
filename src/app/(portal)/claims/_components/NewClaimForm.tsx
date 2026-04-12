@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
 import { submitClaim } from '../actions'
 
 export default function NewClaimForm() {
@@ -8,6 +8,19 @@ export default function NewClaimForm() {
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
+
+  useEffect(() => {
+    if (error && formRef.current) {
+      formRef.current.classList.remove('shake-once')
+      void formRef.current.offsetWidth
+      formRef.current.classList.add('shake-once')
+      const el = formRef.current
+      const handler = () => el.classList.remove('shake-once')
+      el.addEventListener('animationend', handler, { once: true })
+      return () => el.removeEventListener('animationend', handler)
+    }
+  }, [error])
 
   if (!showForm) {
     return (
@@ -35,7 +48,7 @@ export default function NewClaimForm() {
   }
 
   return (
-    <form action={handleSubmit} className="bg-surface border border-hairline rounded-md p-6 max-w-lg">
+    <form ref={formRef} action={handleSubmit} className="bg-surface border border-hairline rounded-md p-6 max-w-lg">
       <h3 className="font-serif text-lg text-ink mb-4">New Claim</h3>
       <div className="space-y-4">
         <div>

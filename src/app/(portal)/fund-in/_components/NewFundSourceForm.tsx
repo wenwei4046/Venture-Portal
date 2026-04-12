@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
 import dayjs from 'dayjs'
 import Link from 'next/link'
 import { createFundSource } from '../actions'
@@ -15,6 +15,19 @@ export default function NewFundSourceForm({ companies, directors }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [sourceType, setSourceType] = useState<FundSourceType>('subsidiary_savings')
+  const formRef = useRef<HTMLFormElement>(null)
+
+  useEffect(() => {
+    if (error && formRef.current) {
+      formRef.current.classList.remove('shake-once')
+      void formRef.current.offsetWidth
+      formRef.current.classList.add('shake-once')
+      const el = formRef.current
+      const handler = () => el.classList.remove('shake-once')
+      el.addEventListener('animationend', handler, { once: true })
+      return () => el.removeEventListener('animationend', handler)
+    }
+  }, [error])
 
   const today = dayjs().format('YYYY-MM-DD')
 
@@ -35,7 +48,7 @@ export default function NewFundSourceForm({ companies, directors }: Props) {
   }
 
   return (
-    <form action={handleSubmit} className="bg-surface border border-hairline rounded-md p-8 max-w-3xl">
+    <form ref={formRef} action={handleSubmit} className="bg-surface border border-hairline rounded-md p-8 max-w-3xl">
       {/* ───────── Type toggle ───────── */}
       <div className="mb-6">
         <label className="block text-sm font-sans font-medium text-graphite mb-2">
