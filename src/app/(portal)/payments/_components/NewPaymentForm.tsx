@@ -7,10 +7,7 @@ import { createPaymentVoucher, createPaymentCategory } from '../actions'
 interface Props {
   companies: { id: string; name: string; short_code: string }[]
   bankAccounts: { id: string; bank_name: string; account_number: string; current_balance: number }[]
-  fundSources: { id: string; source_type: string; amount: number; from_company_id: string | null; from_director_id: string | null }[]
-  loans: { id: string; company_id: string; principal: number }[]
   categories: { code: string; label: string }[]
-  departments: { id: string; name: string }[]
 }
 
 const POOL_OPTIONS = [
@@ -22,20 +19,6 @@ const POOL_OPTIONS = [
   { value: 'invoice_payout_pool', label: 'Invoice Payout Pool' },
 ]
 
-const DEBIT_TYPES = [
-  { value: 'loan_repayment', label: 'Loan repayment', hint: 'Repay a fund source (subsidiary/director loan)' },
-  { value: 'billing_payment', label: 'Billing payment', hint: 'Pay a subsidiary invoice' },
-  { value: 'claim_payout', label: 'Claim payout', hint: 'Reimburse an approved claim' },
-  { value: 'expense', label: 'Expense', hint: 'General expense or operational cost' },
-  { value: 'internal_transfer', label: 'Internal transfer', hint: 'Transfer between bank accounts (e.g., main → HR)' },
-  { value: 'salary_payout', label: 'Salary payout', hint: 'Director salary net payment' },
-  { value: 'other', label: 'Other', hint: 'Any other payment' },
-]
-
-const CREDIT_TYPES = [
-  { value: 'receive_payment', label: 'Receive payment', hint: 'Record payment received from a subsidiary (billing collection, loan repayment to HV)' },
-]
-
 const PAYMENT_METHODS = [
   { value: 'bank_transfer', label: 'Bank transfer' },
   { value: 'cheque', label: 'Cheque' },
@@ -43,12 +26,12 @@ const PAYMENT_METHODS = [
   { value: 'netting', label: 'Netting / offset' },
 ]
 
-export default function NewPaymentForm({ companies, bankAccounts, fundSources, loans, categories, departments }: Props) {
+export default function NewPaymentForm({ companies, bankAccounts, categories }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [direction, setDirection] = useState<'debit' | 'credit'>('debit')
-  const [voucherType, setVoucherType] = useState('expense')
   const [categoryCode, setCategoryCode] = useState('')
+  const [sourcePool, setSourcePool] = useState('')
   const [targetPool, setTargetPool] = useState('')
   const [files, setFiles] = useState<File[]>([])
   const [showNewCategory, setShowNewCategory] = useState(false)
@@ -91,9 +74,6 @@ export default function NewPaymentForm({ companies, bankAccounts, fundSources, l
     })
   }
 
-  const showCompanySelect = ['billing_payment', 'loan_repayment'].includes(voucherType)
-  const showFundSourceSelect = voucherType === 'loan_repayment'
-
   return (
     <form ref={formRef} action={handleSubmit} className="bg-surface border border-hairline rounded-md p-8 max-w-3xl">
       {/* ── Direction toggle (Debit / Credit) ── */}
@@ -104,7 +84,7 @@ export default function NewPaymentForm({ companies, bankAccounts, fundSources, l
         <div className="flex gap-0 border border-hairline rounded-md overflow-hidden w-fit">
           <button
             type="button"
-            onClick={() => { setDirection('debit'); setVoucherType('expense') }}
+            onClick={() => { setDirection('debit'); setTargetPool('') }}
             className={direction === 'debit'
               ? 'px-5 py-2 bg-accent-bg text-accent font-serif italic text-sm'
               : 'px-5 py-2 text-graphite font-sans text-sm hover:bg-surface-2'}
@@ -113,7 +93,7 @@ export default function NewPaymentForm({ companies, bankAccounts, fundSources, l
           </button>
           <button
             type="button"
-            onClick={() => { setDirection('credit'); setVoucherType('receive_payment') }}
+            onClick={() => { setDirection('credit'); setSourcePool('') }}
             className={direction === 'credit'
               ? 'px-5 py-2 bg-accent-bg text-accent font-serif italic text-sm border-l border-hairline'
               : 'px-5 py-2 text-graphite font-sans text-sm hover:bg-surface-2 border-l border-hairline'}
@@ -122,33 +102,15 @@ export default function NewPaymentForm({ companies, bankAccounts, fundSources, l
           </button>
         </div>
         <input type="hidden" name="direction" value={direction} />
-      </div>
-
-      {/* ── Voucher type ── */}
-      <div className="mb-6">
-        <label className="block text-sm font-sans font-medium text-graphite mb-2">
-          {direction === 'debit' ? 'Payment type' : 'Receipt type'}
-        </label>
-        <select
-          name="voucher_type"
-          value={voucherType}
-          onChange={(e) => setVoucherType(e.target.value)}
-          className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-        >
-          {(direction === 'debit' ? DEBIT_TYPES : CREDIT_TYPES).map((t) => (
-            <option key={t.value} value={t.value}>{t.label}</option>
-          ))}
-        </select>
-        <p className="font-serif italic text-muted text-xs mt-1.5">
-          {[...DEBIT_TYPES, ...CREDIT_TYPES].find((t) => t.value === voucherType)?.hint}
-        </p>
+        {/* Auto-set voucher_type based on direction */}
+        <input type="hidden" name="voucher_type" value={direction === 'debit' ? 'expense' : 'receive_payment'} />
       </div>
 
       {/* ── Payee ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
         <div>
           <label htmlFor="payee_name" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Payee name
+            {direction === 'debit' ? 'Pay to' : 'Received from'}
           </label>
           <input
             id="payee_name"
@@ -156,56 +118,30 @@ export default function NewPaymentForm({ companies, bankAccounts, fundSources, l
             type="text"
             required
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-            placeholder="Recipient name"
+            placeholder={direction === 'debit' ? 'Recipient name' : 'Payer name'}
           />
         </div>
 
-        {showCompanySelect ? (
-          <div>
-            <label htmlFor="payee_company_id" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-              Company
-            </label>
-            <select
-              id="payee_company_id"
-              name="payee_company_id"
-              className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-            >
-              <option value="">Select company…</option>
-              {companies.map((c) => (
-                <option key={c.id} value={c.id}>{c.name} ({c.short_code})</option>
-              ))}
-            </select>
-          </div>
-        ) : (
-          <input type="hidden" name="payee_company_id" value="" />
-        )}
-      </div>
-
-      {/* ── Reference (fund source for repayment) ── */}
-      {showFundSourceSelect ? (
-        <div className="mb-6">
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Fund source to repay
+        <div>
+          <label htmlFor="payee_company_id" className="block text-sm font-sans font-medium text-graphite mb-1.5">
+            Company <span className="text-muted font-normal">(optional)</span>
           </label>
           <select
-            name="reference_id"
+            id="payee_company_id"
+            name="payee_company_id"
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
           >
-            <option value="">Select fund source…</option>
-            {fundSources.map((fs) => (
-              <option key={fs.id} value={fs.id}>
-                {fs.source_type.replace('_', ' ')} — RM {Number(fs.amount).toLocaleString('en-MY', { minimumFractionDigits: 2 })}
-              </option>
+            <option value="">Select company…</option>
+            {companies.map((c) => (
+              <option key={c.id} value={c.id}>{c.name} ({c.short_code})</option>
             ))}
           </select>
-          <input type="hidden" name="reference_type" value="fund_source" />
         </div>
-      ) : (
-        <>
-          <input type="hidden" name="reference_type" value="" />
-          <input type="hidden" name="reference_id" value="" />
-        </>
-      )}
+      </div>
+
+      {/* Hidden reference fields (no longer type-driven) */}
+      <input type="hidden" name="reference_type" value="" />
+      <input type="hidden" name="reference_id" value="" />
 
       {/* ── Amount + Bank account ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
@@ -262,8 +198,30 @@ export default function NewPaymentForm({ companies, bankAccounts, fundSources, l
         </select>
       </div>
 
-      {/* ── Target pool (Credit only) ── */}
-      {direction === 'credit' ? (
+      {/* ── Source pool (Debit) / Target pool (Credit) ── */}
+      {direction === 'debit' ? (
+        <div className="mb-6">
+          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+            Deduct from pool <span className="text-danger">*</span>
+          </label>
+          <select
+            name="source_pool"
+            value={sourcePool}
+            onChange={(e) => setSourcePool(e.target.value)}
+            required
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+          >
+            <option value="">Select pool…</option>
+            {POOL_OPTIONS.map((p) => (
+              <option key={p.value} value={p.value}>{p.label}</option>
+            ))}
+          </select>
+          <p className="font-serif italic text-muted text-xs mt-1.5">
+            Which pool should this payment be deducted from?
+          </p>
+          <input type="hidden" name="target_pool" value="" />
+        </div>
+      ) : (
         <div className="mb-6">
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
             Receive into pool <span className="text-danger">*</span>
@@ -283,9 +241,8 @@ export default function NewPaymentForm({ companies, bankAccounts, fundSources, l
           <p className="font-serif italic text-muted text-xs mt-1.5">
             Which pool should this incoming payment be recorded under?
           </p>
+          <input type="hidden" name="source_pool" value="" />
         </div>
-      ) : (
-        <input type="hidden" name="target_pool" value="" />
       )}
 
       {/* ── Category ── */}
@@ -370,7 +327,7 @@ export default function NewPaymentForm({ companies, bankAccounts, fundSources, l
         />
       </div>
 
-      {/* ── Attachments (mandatory) ── */}
+      {/* ── Attachments ── */}
       <div className="mb-6">
         <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
           Attachments {direction === 'credit' ? <span className="text-danger">*</span> : <span className="text-muted font-normal">(optional)</span>}

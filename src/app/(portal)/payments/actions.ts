@@ -25,6 +25,7 @@ export async function createPaymentVoucher(formData: FormData) {
   const paymentMethod = (formData.get('payment_method') as string) || 'bank_transfer'
   const direction = (formData.get('direction') as string) || 'debit'
   const categoryCode = (formData.get('category_code') as string) || null
+  const sourcePool = (formData.get('source_pool') as string) || null
   const targetPool = (formData.get('target_pool') as string) || null
   const notes = (formData.get('notes') as string) || null
 
@@ -50,6 +51,7 @@ export async function createPaymentVoucher(formData: FormData) {
       voucher_type: voucherType as 'loan_repayment' | 'billing_payment' | 'claim_payout' | 'expense' | 'internal_transfer' | 'salary_payout' | 'other' | 'receive_payment',
       direction,
       category_code: categoryCode,
+      source_pool: sourcePool,
       target_pool: targetPool,
       status: 'draft' as const,
       amount,
@@ -232,7 +234,7 @@ export async function approveVoucher(formData: FormData) {
   revalidatePath('/dashboard')
 }
 
-// ─── Execute payment (Finance — marks as paid, deducts bank balance) ─────────
+// ─── Execute payment (Finance — marks as paid, adjusts bank + pool) ─────────
 
 export async function executeVoucher(formData: FormData) {
   const user = await requireRole(['finance'])
@@ -253,7 +255,7 @@ export async function executeVoucher(formData: FormData) {
   // Fetch the voucher
   const { data: voucher, error: fetchError } = await supabase
     .from('payment_vouchers')
-    .select('*, direction')
+    .select('*')
     .eq('id', id)
     .eq('status', 'approved')
     .single()
@@ -277,7 +279,7 @@ export async function executeVoucher(formData: FormData) {
 
   if (updateError) throw new Error(`Failed to execute voucher: ${updateError.message}`)
 
-  // Auto-adjust bank balance (debit = subtract, credit = add)
+  // ── Auto-adjust bank balance (debit = subtract, credit = add) ──
   const isCredit = voucher.direction === 'credit'
   let bankGlCode = '1010' // default: Hong Leong
   if (voucher.bank_account_id) {
@@ -299,9 +301,28 @@ export async function executeVoucher(formData: FormData) {
     }
   }
 
+  // ── Auto-adjust pool balance ──
+  const amount = r2(Number(voucher.amount))
+  const poolDescription = `PV ${voucher.voucher_no}: ${voucher.description}`
+
+  // Find linked approval_request (needed for dept_pool expense_out)
+  const { data: linkedApproval } = await supabase
+    .from('approval_requests')
+    .select('id')
+    .eq('reference_id', id)
+    .eq('reference_table', 'payment_vouchers')
+    .eq('status', 'approved')
+    .single()
+
+  if (!isCredit && voucher.source_pool) {
+    // DEBIT: deduct from source pool
+    await adjustPool(supabase, voucher.source_pool, 'out', amount, poolDescription, user.id, linkedApproval?.id ?? null, nowIso)
+  } else if (isCredit && voucher.target_pool) {
+    // CREDIT: add to target pool
+    await adjustPool(supabase, voucher.target_pool, 'in', amount, poolDescription, user.id, linkedApproval?.id ?? null, nowIso)
+  }
+
   // ── Post GL journal entry (double-entry) ──
-  // Debit: expense/payable account (based on voucher type)
-  // Credit: bank account
   const expenseAccount: Record<string, string> = {
     loan_repayment: '2010',      // Fund Sources Payable
     billing_payment: '2060',     // AP General
@@ -313,7 +334,6 @@ export async function executeVoucher(formData: FormData) {
   }
 
   const debitAccount = expenseAccount[voucher.voucher_type] ?? '5050'
-  const amount = r2(Number(voucher.amount))
 
   try {
     // For credit (receive), reverse: debit bank, credit revenue/receivable
@@ -343,13 +363,80 @@ export async function executeVoucher(formData: FormData) {
       .eq('id', id)
   } catch {
     // GL posting is non-blocking — voucher is already marked paid
-    // Log but don't fail the execution
     console.error('GL journal posting failed for voucher', id)
   }
 
   revalidatePath(`/payments/${id}`)
   revalidatePath('/payments')
   revalidatePath('/dashboard')
+}
+
+// ─── Pool adjustment helper ─────────────────────────────────────────────────
+
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>
+
+async function adjustPool(
+  supabase: SupabaseClient,
+  pool: string,
+  direction: 'in' | 'out',
+  amount: number,
+  description: string,
+  userId: string,
+  approvalId: string | null,
+  nowIso: string,
+) {
+  try {
+    if (pool === 'hv_operating_fund') {
+      await supabase.from('hv_operating_fund').insert({
+        transaction_type: direction === 'out' ? 'expense_out' : 'profit_in',
+        amount,
+        description,
+        reference_table: 'payment_vouchers',
+        created_by: userId,
+      })
+    } else if (pool === 'invoice_payout_pool') {
+      if (direction === 'out') {
+        await supabase.from('invoice_payout_pool').insert({
+          transaction_type: 'release' as const,
+          amount,
+          description,
+          release_approved_by: userId,
+          release_approved_at: nowIso,
+        })
+      } else {
+        await supabase.from('invoice_payout_pool').insert({
+          transaction_type: 'accumulate' as const,
+          amount,
+          description,
+        })
+      }
+    } else if (pool === 'salary_pool') {
+      // salary_pool is a monthly snapshot table — skip auto-adjustment
+      // Salary pool adjustments happen through the Director Salary Engine
+    } else if (pool.startsWith('dept_pool_')) {
+      // e.g. dept_pool_marketing → department name = "Marketing"
+      const deptName = pool.replace('dept_pool_', '')
+      const { data: dept } = await supabase
+        .from('departments')
+        .select('id')
+        .ilike('name', deptName)
+        .single()
+
+      if (dept) {
+        await supabase.from('dept_pools').insert({
+          department_id: dept.id,
+          transaction_type: direction === 'out' ? 'expense_out' : 'np_in',
+          amount,
+          description,
+          approval_id: direction === 'out' ? approvalId : null,
+          created_by: userId,
+        })
+      }
+    }
+  } catch (err) {
+    // Pool adjustment is non-blocking — payment already executed
+    console.error('Pool adjustment failed:', pool, err)
+  }
 }
 
 // ─── Void voucher (Finance, only draft/pending) ─────────────────────────────

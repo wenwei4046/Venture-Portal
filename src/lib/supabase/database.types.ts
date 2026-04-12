@@ -1981,6 +1981,7 @@ export type Database = {
           payment_reference: string | null
           reference_id: string | null
           reference_type: string | null
+          source_pool: string | null
           status: Database["public"]["Enums"]["payment_voucher_status"]
           target_pool: string | null
           updated_at: string
@@ -2012,6 +2013,7 @@ export type Database = {
           payment_reference?: string | null
           reference_id?: string | null
           reference_type?: string | null
+          source_pool?: string | null
           status?: Database["public"]["Enums"]["payment_voucher_status"]
           target_pool?: string | null
           updated_at?: string
@@ -2043,6 +2045,7 @@ export type Database = {
           payment_reference?: string | null
           reference_id?: string | null
           reference_type?: string | null
+          source_pool?: string | null
           status?: Database["public"]["Enums"]["payment_voucher_status"]
           target_pool?: string | null
           updated_at?: string

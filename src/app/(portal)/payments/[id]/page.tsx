@@ -7,14 +7,13 @@ import { formatMoney } from '@/lib/utils'
 import { submitForApproval, approveVoucher, executeVoucher, voidVoucher } from '../actions'
 import VoucherActions from './_components/VoucherActions'
 
-const TYPE_LABELS: Record<string, string> = {
-  loan_repayment: 'Loan repayment',
-  billing_payment: 'Billing payment',
-  claim_payout: 'Claim payout',
-  expense: 'Expense',
-  internal_transfer: 'Internal transfer',
-  salary_payout: 'Salary payout',
-  other: 'Other',
+const POOL_LABELS: Record<string, string> = {
+  hv_operating_fund: 'HV Operating Fund',
+  salary_pool: 'Director Salary Pool',
+  dept_pool_marketing: 'Marketing Dept Pool',
+  dept_pool_finance: 'Finance Dept Pool',
+  dept_pool_hr: 'HR Dept Pool',
+  invoice_payout_pool: 'Invoice Payout Pool',
 }
 
 interface Props {
@@ -28,7 +27,7 @@ export default async function PaymentDetailPage({ params }: Props) {
 
   const { data: voucher, error } = await supabase
     .from('payment_vouchers')
-    .select('*')
+    .select('*, payment_categories(label)')
     .eq('id', id)
     .single()
 
@@ -80,6 +79,12 @@ export default async function PaymentDetailPage({ params }: Props) {
   const isPrincipal = user.role === 'principal'
   const isFinance = user.role === 'finance'
 
+  // Derive display values
+  const categoryLabel = (voucher.payment_categories as { label: string } | null)?.label
+    ?? (voucher.category_code ? voucher.category_code.replace(/_/g, ' ') : null)
+  const poolKey = voucher.direction === 'credit' ? voucher.target_pool : voucher.source_pool
+  const poolLabel = poolKey ? (POOL_LABELS[poolKey] ?? poolKey.replace(/_/g, ' ')) : null
+
   return (
     <div>
       <Link href="/payments" className="text-sm text-muted hover:text-accent font-sans transition-colors">
@@ -89,9 +94,11 @@ export default async function PaymentDetailPage({ params }: Props) {
       {/* ── Header ── */}
       <div className="flex items-baseline justify-between mt-3 mb-10">
         <div>
-          <p className="font-serif italic text-accent text-base mb-1">
-            {TYPE_LABELS[voucher.voucher_type] ?? voucher.voucher_type}
-          </p>
+          {categoryLabel ? (
+            <p className="font-serif italic text-accent text-base mb-1 capitalize">
+              {categoryLabel}
+            </p>
+          ) : null}
           <h1 className="font-serif text-3xl text-ink">{voucher.voucher_no ?? 'Draft'}</h1>
           <p className="font-mono text-xs text-muted mt-1">
             Created by {createdByName ?? 'Unknown'} on {dayjs(voucher.created_at).format('D MMM YYYY HH:mm')}
@@ -105,18 +112,28 @@ export default async function PaymentDetailPage({ params }: Props) {
         <div className="lg:col-span-5">
           <div className="font-serif italic text-graphite text-sm mb-1">Amount</div>
           <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
-            {formatMoney(Number(voucher.amount))}
+            {voucher.direction === 'credit' ? '+' : ''}{formatMoney(Number(voucher.amount))}
           </div>
-          {bankName ? (
-            <div className="font-mono text-xs text-muted mt-2">
-              Pay from: {bankName}
-            </div>
-          ) : null}
+          <div className="mt-3 space-y-1">
+            {bankName ? (
+              <div className="font-mono text-xs text-muted">
+                {voucher.direction === 'debit' ? 'Pay from:' : 'Receive into:'} {bankName}
+              </div>
+            ) : null}
+            {poolLabel ? (
+              <div className="font-mono text-xs text-muted">
+                {voucher.direction === 'debit' ? 'Deduct from pool:' : 'Credit to pool:'}{' '}
+                <span className="text-ink">{poolLabel}</span>
+              </div>
+            ) : null}
+          </div>
         </div>
 
         <div className="lg:col-span-7 space-y-4">
           <div>
-            <div className="font-serif italic text-graphite text-sm mb-1">Payee</div>
+            <div className="font-serif italic text-graphite text-sm mb-1">
+              {voucher.direction === 'debit' ? 'Pay to' : 'Received from'}
+            </div>
             <div className="font-serif text-xl text-ink">{voucher.payee_name}</div>
             {payeeCompanyName ? (
               <div className="font-mono text-xs text-muted mt-1">{payeeCompanyName}</div>
