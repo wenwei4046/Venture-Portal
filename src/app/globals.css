@@ -134,8 +134,7 @@ h1, h2, h3, h4 {
 
   /* Functional: status morph — keep color transition (not motion per WCAG) */
   .status-morph {
-    transition-duration: 480ms !important;
-    transition-property: color, background-color !important;
+    transition: color 480ms ease-out, background-color 480ms ease-out !important;
   }
 
   /* Functional: overdue pulse — static ring, no animated spread */
