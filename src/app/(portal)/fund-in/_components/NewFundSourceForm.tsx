@@ -21,7 +21,6 @@ const SOURCE_TYPES: { value: FundSourceType; label: string; hint: string }[] = [
   { value: 'subsidiary_savings', label: 'Subsidiary', hint: 'Loan from a subsidiary company' },
   { value: 'director_loan', label: 'Director Loan', hint: 'Personal loan from a director' },
   { value: 'department_pool', label: 'Dept Pool', hint: 'Idle funds from a department pool' },
-  { value: 'director_saving', label: 'Director Saving', hint: '5% salary saving transferred in' },
 ]
 
 export default function NewFundSourceForm({ companies, directors, departments }: Props) {
@@ -48,7 +47,6 @@ export default function NewFundSourceForm({ companies, directors, departments }:
   const needsCompanySelect = sourceType === 'subsidiary_savings'
   const needsDirectorSelect = sourceType === 'director_loan'
   const needsDeptSelect = sourceType === 'department_pool'
-  // director_saving doesn't need a "from" select — it comes from the HV Operating Fund
 
   async function handleSubmit(formData: FormData) {
     setError(null)
@@ -160,16 +158,7 @@ export default function NewFundSourceForm({ companies, directors, departments }:
             Transfer idle funds from this department pool into HV operating fund
           </p>
         </div>
-      ) : (
-        // director_saving — no from select needed
-        <div className="mb-6 bg-accent-bg border border-accent-border rounded-md p-4">
-          <p className="font-serif italic text-accent text-sm">
-            Director Saving — funds come from the 5% salary deduction pool in HV Operating Fund.
-            No subsidiary or director selection needed.
-          </p>
-          <input type="hidden" name="from_id" value="" />
-        </div>
-      )}
+      ) : null}
 
       {/* ───────── Amount + Rate (row) ───────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">

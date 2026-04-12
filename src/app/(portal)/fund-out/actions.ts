@@ -66,6 +66,17 @@ export async function createLoan(formData: FormData) {
   const premium = Number(tierConfig.premium_rate)
   const effective = base + premium
 
+  // ─── Check HV has sufficient pool to lend ───
+  const { data: poolData } = await supabase.rpc('dashboard_summary')
+  if (poolData && typeof poolData === 'object' && 'free_cash' in poolData) {
+    const freeCash = Number((poolData as Record<string, unknown>).free_cash ?? 0)
+    if (freeCash < principal) {
+      throw new Error(
+        `Insufficient free pool. Available: RM ${freeCash.toLocaleString('en-MY', { minimumFractionDigits: 2 })}, requested: RM ${principal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}.`
+      )
+    }
+  }
+
   // ─── Atomic loan + approval creation (M1 fix) ───
   const { data: loanId, error: rpcError } = await supabase.rpc(
     'create_loan_with_approval',

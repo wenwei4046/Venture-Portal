@@ -23,10 +23,11 @@ export async function createPaymentVoucher(formData: FormData) {
   const referenceId = (formData.get('reference_id') as string) || null
   const description = (formData.get('description') as string)?.trim() ?? ''
   const paymentMethod = (formData.get('payment_method') as string) || 'bank_transfer'
+  const direction = (formData.get('direction') as string) || 'debit'
   const notes = (formData.get('notes') as string) || null
 
   // Validation
-  const VALID_TYPES = ['loan_repayment', 'billing_payment', 'claim_payout', 'expense', 'internal_transfer', 'salary_payout', 'other']
+  const VALID_TYPES = ['loan_repayment', 'billing_payment', 'claim_payout', 'expense', 'internal_transfer', 'salary_payout', 'other', 'receive_payment']
   if (!VALID_TYPES.includes(voucherType)) throw new Error('Invalid voucher type')
   if (isNaN(amount) || amount <= 0) throw new Error('Amount must be greater than 0')
   if (!payeeName) throw new Error('Payee name is required')
@@ -44,7 +45,8 @@ export async function createPaymentVoucher(formData: FormData) {
     .from('payment_vouchers')
     .insert({
       voucher_no: voucherNo,
-      voucher_type: voucherType as 'loan_repayment' | 'billing_payment' | 'claim_payout' | 'expense' | 'internal_transfer' | 'salary_payout' | 'other',
+      voucher_type: voucherType as 'loan_repayment' | 'billing_payment' | 'claim_payout' | 'expense' | 'internal_transfer' | 'salary_payout' | 'other' | 'receive_payment',
+      direction,
       status: 'draft' as const,
       amount,
       payee_name: payeeName,
@@ -247,7 +249,7 @@ export async function executeVoucher(formData: FormData) {
   // Fetch the voucher
   const { data: voucher, error: fetchError } = await supabase
     .from('payment_vouchers')
-    .select('*')
+    .select('*, direction')
     .eq('id', id)
     .eq('status', 'approved')
     .single()
@@ -271,7 +273,8 @@ export async function executeVoucher(formData: FormData) {
 
   if (updateError) throw new Error(`Failed to execute voucher: ${updateError.message}`)
 
-  // Auto-deduct bank balance
+  // Auto-adjust bank balance (debit = subtract, credit = add)
+  const isCredit = voucher.direction === 'credit'
   let bankGlCode = '1010' // default: Hong Leong
   if (voucher.bank_account_id) {
     const { data: bank } = await supabase
@@ -282,11 +285,12 @@ export async function executeVoucher(formData: FormData) {
 
     if (bank) {
       bankGlCode = bank.gl_account_code ?? '1010'
+      const newBalance = isCredit
+        ? Number(bank.current_balance) + Number(voucher.amount)
+        : Number(bank.current_balance) - Number(voucher.amount)
       await supabase
         .from('bank_accounts')
-        .update({
-          current_balance: Number(bank.current_balance) - Number(voucher.amount),
-        })
+        .update({ current_balance: newBalance })
         .eq('id', voucher.bank_account_id)
     }
   }
@@ -308,15 +312,23 @@ export async function executeVoucher(formData: FormData) {
   const amount = r2(Number(voucher.amount))
 
   try {
+    // For credit (receive), reverse: debit bank, credit revenue/receivable
+    const lines = isCredit
+      ? [
+          { accountCode: bankGlCode, debit: amount, description: `Bank deposit — ${voucher.voucher_no}` },
+          { accountCode: '1040', credit: amount, description: `Payment received — ${voucher.payee_name}` },
+        ]
+      : [
+          { accountCode: debitAccount, debit: amount, description: `${voucher.voucher_type} — ${voucher.payee_name}` },
+          { accountCode: bankGlCode, credit: amount, description: `Bank payment — ${voucher.voucher_no}` },
+        ]
+
     const journalId = await postJournalEntry(supabase, {
       transactionDate: paymentDate,
       description: `PV ${voucher.voucher_no}: ${voucher.description}`,
       referenceType: 'payment_voucher',
       referenceId: id,
-      lines: [
-        { accountCode: debitAccount, debit: amount, description: `${voucher.voucher_type} — ${voucher.payee_name}` },
-        { accountCode: bankGlCode, credit: amount, description: `Bank payment — ${voucher.voucher_no}` },
-      ],
+      lines,
       createdBy: user.id,
     })
 

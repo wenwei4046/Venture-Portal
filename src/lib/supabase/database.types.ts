@@ -1919,6 +1919,7 @@ export type Database = {
           created_by: string
           currency: string
           description: string
+          direction: string
           executed_at: string | null
           executed_by: string | null
           id: string
@@ -1947,6 +1948,7 @@ export type Database = {
           created_by: string
           currency?: string
           description: string
+          direction?: string
           executed_at?: string | null
           executed_by?: string | null
           id?: string
@@ -1975,6 +1977,7 @@ export type Database = {
           created_by?: string
           currency?: string
           description?: string
+          direction?: string
           executed_at?: string | null
           executed_by?: string | null
           id?: string
@@ -3001,6 +3004,7 @@ export type Database = {
         | "internal_transfer"
         | "salary_payout"
         | "other"
+        | "receive_payment"
       payout_status: "draft" | "confirmed" | "paid"
       pcb_category: "KA1" | "KA2" | "KA3"
       repayment_type: "principal" | "interest" | "penalty" | "netting"
@@ -3211,6 +3215,7 @@ export const Constants = {
         "internal_transfer",
         "salary_payout",
         "other",
+        "receive_payment",
       ],
       payout_status: ["draft", "confirmed", "paid"],
       pcb_category: ["KA1", "KA2", "KA3"],

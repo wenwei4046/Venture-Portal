@@ -11,7 +11,7 @@ interface Props {
   loans: { id: string; company_id: string; principal: number }[]
 }
 
-const VOUCHER_TYPES = [
+const DEBIT_TYPES = [
   { value: 'loan_repayment', label: 'Loan repayment', hint: 'Repay a fund source (subsidiary/director loan)' },
   { value: 'billing_payment', label: 'Billing payment', hint: 'Pay a subsidiary invoice' },
   { value: 'claim_payout', label: 'Claim payout', hint: 'Reimburse an approved claim' },
@@ -19,6 +19,10 @@ const VOUCHER_TYPES = [
   { value: 'internal_transfer', label: 'Internal transfer', hint: 'Transfer between bank accounts (e.g., main → HR)' },
   { value: 'salary_payout', label: 'Salary payout', hint: 'Director salary net payment' },
   { value: 'other', label: 'Other', hint: 'Any other payment' },
+]
+
+const CREDIT_TYPES = [
+  { value: 'receive_payment', label: 'Receive payment', hint: 'Record payment received from a subsidiary (billing collection, loan repayment to HV)' },
 ]
 
 const PAYMENT_METHODS = [
@@ -31,6 +35,7 @@ const PAYMENT_METHODS = [
 export default function NewPaymentForm({ companies, bankAccounts, fundSources, loans }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [direction, setDirection] = useState<'debit' | 'credit'>('debit')
   const [voucherType, setVoucherType] = useState('expense')
   const [files, setFiles] = useState<File[]>([])
   const formRef = useRef<HTMLFormElement>(null)
@@ -74,10 +79,38 @@ export default function NewPaymentForm({ companies, bankAccounts, fundSources, l
 
   return (
     <form ref={formRef} action={handleSubmit} className="bg-surface border border-hairline rounded-md p-8 max-w-3xl">
+      {/* ── Direction toggle (Debit / Credit) ── */}
+      <div className="mb-6">
+        <label className="block text-sm font-sans font-medium text-graphite mb-2">
+          Direction
+        </label>
+        <div className="flex gap-0 border border-hairline rounded-md overflow-hidden w-fit">
+          <button
+            type="button"
+            onClick={() => { setDirection('debit'); setVoucherType('expense') }}
+            className={direction === 'debit'
+              ? 'px-5 py-2 bg-accent-bg text-accent font-serif italic text-sm'
+              : 'px-5 py-2 text-graphite font-sans text-sm hover:bg-surface-2'}
+          >
+            Debit (pay out)
+          </button>
+          <button
+            type="button"
+            onClick={() => { setDirection('credit'); setVoucherType('receive_payment') }}
+            className={direction === 'credit'
+              ? 'px-5 py-2 bg-accent-bg text-accent font-serif italic text-sm border-l border-hairline'
+              : 'px-5 py-2 text-graphite font-sans text-sm hover:bg-surface-2 border-l border-hairline'}
+          >
+            Credit (receive)
+          </button>
+        </div>
+        <input type="hidden" name="direction" value={direction} />
+      </div>
+
       {/* ── Voucher type ── */}
       <div className="mb-6">
         <label className="block text-sm font-sans font-medium text-graphite mb-2">
-          Payment type
+          {direction === 'debit' ? 'Payment type' : 'Receipt type'}
         </label>
         <select
           name="voucher_type"
@@ -85,12 +118,12 @@ export default function NewPaymentForm({ companies, bankAccounts, fundSources, l
           onChange={(e) => setVoucherType(e.target.value)}
           className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
         >
-          {VOUCHER_TYPES.map((t) => (
+          {(direction === 'debit' ? DEBIT_TYPES : CREDIT_TYPES).map((t) => (
             <option key={t.value} value={t.value}>{t.label}</option>
           ))}
         </select>
         <p className="font-serif italic text-muted text-xs mt-1.5">
-          {VOUCHER_TYPES.find((t) => t.value === voucherType)?.hint}
+          {[...DEBIT_TYPES, ...CREDIT_TYPES].find((t) => t.value === voucherType)?.hint}
         </p>
       </div>
 
@@ -180,7 +213,7 @@ export default function NewPaymentForm({ companies, bankAccounts, fundSources, l
 
         <div>
           <label htmlFor="bank_account_id" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Pay from account
+            {direction === 'debit' ? 'Pay from account' : 'Receive into account'}
           </label>
           <select
             id="bank_account_id"

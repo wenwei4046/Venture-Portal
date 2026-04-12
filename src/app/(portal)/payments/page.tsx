@@ -13,6 +13,7 @@ const TYPE_LABELS: Record<string, string> = {
   expense: 'Expense',
   internal_transfer: 'Internal transfer',
   salary_payout: 'Salary payout',
+  receive_payment: 'Receive payment',
   other: 'Other',
 }
 
@@ -159,8 +160,10 @@ export default async function PaymentsPage({ searchParams }: Props) {
                       <td className="py-4 pr-4 font-serif text-ink truncate max-w-[200px]">
                         {v.payee_name}
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
-                        {formatMoney(Number(v.amount))}
+                      <td className="py-4 pr-4 text-right font-mono tabular font-medium">
+                        <span className={v.direction === 'credit' ? 'text-ledger' : 'text-ink'}>
+                          {v.direction === 'credit' ? '+' : '−'}{formatMoney(Number(v.amount)).replace('RM ', '')}
+                        </span>
                       </td>
                       <td className="py-4 pr-4">
                         <em className={`font-serif text-sm ${STATUS_STYLES[v.status] ?? 'text-muted'}`}>

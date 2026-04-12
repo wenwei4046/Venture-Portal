@@ -5,25 +5,25 @@ import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import type { FundSourceType, PaymentType } from '@/types'
-import { postJournalEntry, r2 } from '@/lib/journal'
-import { assertPeriodOpen } from '@/lib/period-lock'
+import type { FundSourceType } from '@/types'
 
 interface CreateFundSourceInput {
   source_type: FundSourceType
-  from_id: string // company_id or director_id depending on type
+  from_id: string
   amount: number
-  cost_rate_percent: number // entered as percent, stored as decimal
+  cost_rate_percent: number
   lock_in_months: number
-  effective_date: string // ISO date
+  effective_date: string
   notes?: string
 }
+
+// Only 3 types now (director_saving removed per user feedback)
+const VALID_TYPES: FundSourceType[] = ['subsidiary_savings', 'director_loan', 'department_pool']
 
 export async function createFundSource(formData: FormData) {
   const user = await requireRole(['finance'])
   const supabase = await createClient()
 
-  // Parse + validate
   const raw: CreateFundSourceInput = {
     source_type: formData.get('source_type') as FundSourceType,
     from_id: (formData.get('from_id') as string) ?? '',
@@ -34,45 +34,61 @@ export async function createFundSource(formData: FormData) {
     notes: (formData.get('notes') as string) || undefined,
   }
 
-  const VALID_TYPES: FundSourceType[] = ['subsidiary_savings', 'director_loan', 'department_pool', 'director_saving']
   if (!VALID_TYPES.includes(raw.source_type)) {
     throw new Error('Invalid source type')
   }
 
-  // from_id is required for subsidiary_savings and director_loan;
-  // for department_pool and director_saving, the from_id maps to internal pools
-  const needsCompany = raw.source_type === 'subsidiary_savings'
-  const needsDirector = raw.source_type === 'director_loan'
-  if ((needsCompany || needsDirector) && !raw.from_id) {
-    throw new Error(
-      needsCompany
-        ? 'Company is required for subsidiary savings'
-        : 'Director is required for director loan'
-    )
+  // Validate from_id based on type
+  if (raw.source_type === 'subsidiary_savings' && !raw.from_id) {
+    throw new Error('Company is required for subsidiary')
   }
-  // department_pool and director_saving don't need from_id (source is internal)
-  // but we still accept an optional from_id for traceability
+  if (raw.source_type === 'director_loan' && !raw.from_id) {
+    throw new Error('Director is required for director loan')
+  }
+  if (raw.source_type === 'department_pool' && !raw.from_id) {
+    throw new Error('Department is required for department pool transfer')
+  }
+
   if (isNaN(raw.amount) || raw.amount <= 0) {
     throw new Error('Amount must be greater than 0')
   }
   if (isNaN(raw.cost_rate_percent) || raw.cost_rate_percent < 0 || raw.cost_rate_percent >= 100) {
-    throw new Error('Cost rate must be between 0 and 100%')
+    throw new Error('Interest rate must be between 0 and 100%')
   }
-  if (isNaN(raw.lock_in_months) || raw.lock_in_months < 0) {
-    throw new Error('Lock-in months must be a non-negative integer')
+  if (isNaN(raw.lock_in_months) || raw.lock_in_months < 1) {
+    throw new Error('Repayment period must be at least 1 month')
   }
   if (!raw.effective_date) {
     throw new Error('Effective date is required')
   }
-  // Compare by day to avoid timezone edge cases (user in UTC+8 vs server UTC)
   if (dayjs(raw.effective_date).isAfter(dayjs(), 'day')) {
     throw new Error('Effective date cannot be in the future')
   }
 
-  // Convert percent to decimal for DB storage
+  // ── Balance validation for department_pool ──
+  if (raw.source_type === 'department_pool') {
+    // Find department_id from from_id, then check dept_pool balance
+    const { data: deptBalance } = await supabase
+      .from('dept_pools')
+      .select('amount, transaction_type')
+      .eq('department_id', raw.from_id)
+
+    const balance = (deptBalance ?? []).reduce((sum, row) => {
+      return sum + (row.transaction_type === 'np_in' ? Number(row.amount) : -Number(row.amount))
+    }, 0)
+
+    if (balance < raw.amount) {
+      // Get department name for error message
+      const { data: dept } = await supabase.from('departments').select('name').eq('id', raw.from_id).single()
+      const deptName = dept?.name ?? 'Department'
+      throw new Error(
+        `Insufficient balance. ${deptName} pool has RM ${balance.toFixed(2)} but you are requesting RM ${raw.amount.toFixed(2)}.`
+      )
+    }
+  }
+
   const cost_rate = raw.cost_rate_percent / 100
 
-  // Build insert payload based on source_type (CHECK constraint enforces exactly one)
   const basePayload = {
     source_type: raw.source_type,
     capital_type: 'paid' as const,
@@ -86,12 +102,7 @@ export async function createFundSource(formData: FormData) {
     created_by: user.id,
   }
 
-  // Build polymorphic FK: exactly one of from_company_id or from_director_id (CHECK constraint)
-  // department_pool and director_saving use from_company_id=null, from_director_id=null
-  // but the DB CHECK constraint requires exactly one to be set, so we map:
-  //   department_pool → from_company_id (the dept pool doesn't have a company, use null marker)
-  //   director_saving → from_director_id (the saving pool doesn't have a director, use null marker)
-  // For Phase 4 these types use approval-based transfers, not direct FK links
+  // Polymorphic FK based on type
   let payload
   if (raw.source_type === 'subsidiary_savings' || raw.source_type === 'department_pool') {
     payload = { ...basePayload, from_company_id: raw.from_id || null, from_director_id: null }
@@ -114,6 +125,8 @@ export async function createFundSource(formData: FormData) {
   redirect(`/fund-in/${data.id}`)
 }
 
+// ─── Cancel Fund Source (requires Principal approval) ────────────────────────
+
 export async function cancelFundSource(formData: FormData) {
   const user = await requireRole(['finance'])
   const supabase = await createClient()
@@ -121,20 +134,38 @@ export async function cancelFundSource(formData: FormData) {
   const id = formData.get('id') as string
   if (!id) throw new Error('Fund source id is required')
 
-  const { error } = await supabase
+  // Fetch fund source for description
+  const { data: source, error: fetchErr } = await supabase
     .from('fund_sources')
-    .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+    .select('id, amount, source_type, status')
     .eq('id', id)
     .eq('status', 'active')
+    .single()
 
-  if (error) {
-    throw new Error(`Failed to cancel fund source: ${error.message}`)
+  if (fetchErr || !source) throw new Error('Fund source not found or not active')
+
+  // Create approval request for cancellation
+  const { error: approvalErr } = await supabase
+    .from('approval_requests')
+    .insert({
+      request_type: 'tier_change' as const, // reuse existing type for now; semantically "fund source cancel"
+      reference_id: id,
+      reference_table: 'fund_sources',
+      submitted_by: user.id,
+      description: `Cancel fund source: ${source.source_type.replace('_', ' ')} — RM ${Number(source.amount).toLocaleString('en-MY', { minimumFractionDigits: 2 })}`,
+      amount: Number(source.amount),
+      status: 'pending' as const,
+      workflow_state: 'submitted' as const,
+    })
+
+  if (approvalErr) {
+    throw new Error(`Failed to submit cancellation request: ${approvalErr.message}`)
   }
 
-  void user
   revalidatePath('/fund-in')
+  revalidatePath(`/fund-in/${id}`)
+  revalidatePath('/approvals')
   revalidatePath('/dashboard')
-  redirect('/fund-in')
 }
 
 export async function markFundSourceMatured(formData: FormData) {
@@ -157,131 +188,5 @@ export async function markFundSourceMatured(formData: FormData) {
   void user
   revalidatePath('/fund-in')
   revalidatePath(`/fund-in/${id}`)
-  revalidatePath('/dashboard')
-}
-
-export async function repayFundSource(formData: FormData) {
-  const user = await requireRole(['finance'])
-  const supabase = await createClient()
-
-  const id = formData.get('id') as string
-  if (!id) throw new Error('Fund source id is required')
-
-  const nowIso = new Date().toISOString()
-
-  const { error } = await supabase
-    .from('fund_sources')
-    .update({
-      status: 'repaid',
-      repaid_at: nowIso,
-      repaid_by: user.id,
-      updated_at: nowIso,
-    })
-    .eq('id', id)
-    .in('status', ['active', 'matured'])
-
-  if (error) {
-    throw new Error(`Failed to mark repaid: ${error.message}`)
-  }
-
-  revalidatePath('/fund-in')
-  revalidatePath(`/fund-in/${id}`)
-  revalidatePath('/dashboard')
-  redirect('/fund-in')
-}
-
-// ─── Record fund source repayment (monthly principal/interest) ───────────────
-
-const VALID_PAYMENT_TYPES: PaymentType[] = ['principal', 'interest', 'penalty', 'netting']
-
-export async function recordFundSourceRepayment(formData: FormData) {
-  const user = await requireRole(['finance'])
-  const supabase = await createClient()
-
-  const fundSourceId = (formData.get('fund_source_id') as string) ?? ''
-  const paymentType = (formData.get('payment_type') as PaymentType) ?? 'interest'
-  const amount = parseFloat((formData.get('amount') as string) ?? '0')
-  const paymentDate = (formData.get('payment_date') as string) ?? ''
-  const notes = (formData.get('notes') as string) || null
-
-  if (!fundSourceId) throw new Error('Fund source id is required')
-  if (!VALID_PAYMENT_TYPES.includes(paymentType)) throw new Error('Invalid payment type')
-  if (isNaN(amount) || amount <= 0) throw new Error('Amount must be greater than 0')
-  if (!paymentDate) throw new Error('Payment date is required')
-  if (dayjs(paymentDate).isAfter(dayjs(), 'day')) {
-    throw new Error('Payment date cannot be in the future')
-  }
-
-  // Check period is open
-  await assertPeriodOpen(supabase, paymentDate)
-
-  // Verify fund source is active/matured
-  const { data: source, error: fetchError } = await supabase
-    .from('fund_sources')
-    .select('id, amount, status')
-    .eq('id', fundSourceId)
-    .single()
-
-  if (fetchError || !source) throw new Error('Fund source not found')
-  if (!['active', 'matured'].includes(source.status)) {
-    throw new Error(`Cannot record repayment on fund source with status "${source.status}"`)
-  }
-
-  // For principal payments, check amount ≤ outstanding
-  if (paymentType === 'principal') {
-    const { data: outstanding } = await supabase
-      .from('fund_source_outstanding')
-      .select('outstanding')
-      .eq('fund_source_id', fundSourceId)
-      .single()
-
-    const currentOutstanding = Number(outstanding?.outstanding ?? source.amount)
-    if (amount > currentOutstanding + 0.01) {
-      throw new Error(
-        `Principal payment (RM ${amount.toFixed(2)}) exceeds outstanding balance (RM ${currentOutstanding.toFixed(2)})`
-      )
-    }
-  }
-
-  const { error: insertError } = await supabase
-    .from('fund_source_repayments')
-    .insert({
-      fund_source_id: fundSourceId,
-      amount,
-      payment_type: paymentType,
-      payment_date: paymentDate,
-      notes,
-      created_by: user.id,
-    })
-
-  if (insertError) {
-    throw new Error(`Failed to record repayment: ${insertError.message}`)
-  }
-
-  // ── Post GL journal entry (double-entry) ──
-  // Principal repayment: debit Fund Sources Payable (2010), credit Bank (1010)
-  // Interest payment:    debit Interest Expense (5010), credit Bank (1010)
-  const debitAccount = paymentType === 'principal' ? '2010' : '5010'
-  const roundedAmount = r2(amount)
-
-  try {
-    await postJournalEntry(supabase, {
-      transactionDate: paymentDate,
-      description: `Fund source repayment (${paymentType}): RM ${roundedAmount.toFixed(2)}`,
-      referenceType: 'fund_source',
-      referenceId: fundSourceId,
-      lines: [
-        { accountCode: debitAccount, debit: roundedAmount, description: `${paymentType} repayment` },
-        { accountCode: '1010', credit: roundedAmount, description: 'Bank payment' },
-      ],
-      createdBy: user.id,
-    })
-  } catch {
-    // GL posting non-blocking
-    console.error('GL journal posting failed for fund source repayment', fundSourceId)
-  }
-
-  revalidatePath(`/fund-in/${fundSourceId}`)
-  revalidatePath('/fund-in')
   revalidatePath('/dashboard')
 }

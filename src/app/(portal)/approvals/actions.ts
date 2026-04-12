@@ -74,6 +74,26 @@ export async function approveRequest(formData: FormData) {
         `Approval recorded but loan activation failed: ${loanError.message}`
       )
     }
+
+    // Auto-deduct primary bank account for loan disbursement
+    const { data: primaryBank } = await supabase
+      .from('bank_accounts')
+      .select('id, current_balance')
+      .eq('is_primary', true)
+      .eq('status', 'active')
+      .single()
+
+    if (primaryBank) {
+      const loanAmount = Number(approval.amount ?? 0)
+      if (Number(primaryBank.current_balance) < loanAmount) {
+        // Don't block loan approval, but log the warning
+        console.warn(`Loan approved but bank balance insufficient: balance=${primaryBank.current_balance}, loan=${loanAmount}`)
+      }
+      await supabase
+        .from('bank_accounts')
+        .update({ current_balance: Number(primaryBank.current_balance) - loanAmount })
+        .eq('id', primaryBank.id)
+    }
   } else if (approval.request_type === 'escalation') {
     // Escalation approval → tier downgrade on the related company.
     // reference_id points at overdue_records; trace back to company via loan.
