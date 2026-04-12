@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import type { TreasuryConfig, TierConfig, OverdueConfig, Company } from '@/types'
@@ -87,7 +88,9 @@ export default async function SettingsPage({ searchParams }: Props) {
         </p>
       </div>
 
-      <SettingsTabs active={activeTab} />
+      <Suspense fallback={null}>
+        <SettingsTabs active={activeTab} />
+      </Suspense>
 
       {activeTab === 'treasury' && (
         <TreasuryConfigSection
