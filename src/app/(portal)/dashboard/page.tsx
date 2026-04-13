@@ -667,6 +667,18 @@ export default async function DashboardPage() {
     : { data: null }
   const financePendingList = financePending ?? []
 
+  // Finance sees "Recent actions" — their submitted requests that have been decided
+  const { data: financeRecent } = isFinance
+    ? await supabase
+        .from('approval_requests')
+        .select('id, request_type, description, amount, status, approved_at, created_at')
+        .eq('submitted_by', user.id)
+        .in('status', ['approved', 'rejected'])
+        .order('approved_at', { ascending: false })
+        .limit(5)
+    : { data: null }
+  const financeRecentList = financeRecent ?? []
+
   return (
     <div>
       {/* ───────── Hero grid: 7+5 broadsheet ───────── */}
@@ -914,59 +926,124 @@ export default async function DashboardPage() {
         </section>
       ) : null}
 
-      {/* ───────── Awaiting Principal (Finance only) ───────── */}
+      {/* ───────── Awaiting + Recent Actions (Finance only) ───────── */}
       {isFinance ? (
         <section className="mb-16">
-          <div className="flex items-baseline justify-between mb-1">
-            <h2 className="font-serif text-2xl text-ink">Awaiting Principal sign-off</h2>
-            <span className="font-mono text-xs text-muted">
-              {financePendingList.length}{' '}
-              {financePendingList.length === 1 ? 'item' : 'items'}
-            </span>
-          </div>
-          <p className="font-serif italic text-graphite text-sm mb-6">
-            Your submitted requests. <em>Principal approves these; you can track them here.</em>
-          </p>
-          {financePendingList.length === 0 ? (
-            <div className="border border-hairline rounded-md bg-surface p-6">
-              <p className="font-serif italic text-ledger text-base">All caught up.</p>
-              <p className="font-mono text-xs text-muted mt-1">
-                Nothing waiting on Principal from your side.
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* LEFT — Awaiting Principal sign-off */}
+            <div>
+              <div className="flex items-baseline justify-between mb-1">
+                <h2 className="font-serif text-xl text-ink">Awaiting Principal sign-off</h2>
+                <span className="font-mono text-xs text-muted">
+                  {financePendingList.length}{' '}
+                  {financePendingList.length === 1 ? 'item' : 'items'}
+                </span>
+              </div>
+              <p className="font-serif italic text-graphite text-sm mb-4">
+                Pending requests you submitted.
               </p>
-            </div>
-          ) : (
-            <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
-              {financePendingList.slice(0, 5).map((req) => (
-                <Link
-                  key={req.id}
-                  href={`/approvals/${req.id}`}
-                  className="flex items-baseline justify-between px-5 py-4 hover:bg-surface-2/40 transition-colors"
-                >
-                  <div className="flex-1 min-w-0 pr-4">
-                    <div className="font-mono text-[10px] uppercase tracking-wider text-accent mb-1">
-                      {req.request_type.replace(/_/g, ' ')}
-                    </div>
-                    <div className="font-serif italic text-graphite text-sm truncate">
-                      {req.description ?? '—'}
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="font-mono tabular font-medium text-ink text-sm">
-                      {req.amount != null ? formatMoney(Number(req.amount)) : '—'}
-                    </div>
-                    <div className="font-mono text-xs text-muted">
-                      {dayjs(req.created_at).format('D MMM')}
-                    </div>
-                  </div>
-                </Link>
-              ))}
-              {financePendingList.length > 5 ? (
-                <div className="block text-center px-5 py-3 font-serif italic text-sm text-muted">
-                  + {financePendingList.length - 5} more pending
+              {financePendingList.length === 0 ? (
+                <div className="border border-hairline rounded-md bg-surface p-6">
+                  <p className="font-serif italic text-ledger text-base">All caught up.</p>
+                  <p className="font-mono text-xs text-muted mt-1">
+                    Nothing waiting on Principal.
+                  </p>
                 </div>
-              ) : null}
+              ) : (
+                <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
+                  {financePendingList.slice(0, 5).map((req) => (
+                    <Link
+                      key={req.id}
+                      href={`/approvals/${req.id}`}
+                      className="flex items-baseline justify-between px-5 py-4 hover:bg-surface-2/40 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0 pr-4">
+                        <div className="font-mono text-[10px] uppercase tracking-wider text-accent mb-1">
+                          {req.request_type.replace(/_/g, ' ')}
+                        </div>
+                        <div className="font-serif italic text-graphite text-sm truncate">
+                          {req.description ?? '—'}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="font-mono tabular font-medium text-ink text-sm">
+                          {req.amount != null ? formatMoney(Number(req.amount)) : '—'}
+                        </div>
+                        <div className="font-mono text-xs text-muted">
+                          {dayjs(req.created_at).format('D MMM')}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                  {financePendingList.length > 5 ? (
+                    <div className="block text-center px-5 py-3 font-serif italic text-sm text-muted">
+                      + {financePendingList.length - 5} more pending
+                    </div>
+                  ) : null}
+                </div>
+              )}
             </div>
-          )}
+
+            {/* RIGHT — Recent actions (approved / rejected) */}
+            <div>
+              <div className="flex items-baseline justify-between mb-1">
+                <h2 className="font-serif text-xl text-ink">Recent actions</h2>
+                <span className="font-mono text-xs text-muted">
+                  {financeRecentList.length}{' '}
+                  {financeRecentList.length === 1 ? 'item' : 'items'}
+                </span>
+              </div>
+              <p className="font-serif italic text-graphite text-sm mb-4">
+                Latest decisions from Principal.
+              </p>
+              {financeRecentList.length === 0 ? (
+                <div className="border border-hairline rounded-md bg-surface p-6">
+                  <p className="font-serif italic text-muted text-base">No recent actions.</p>
+                  <p className="font-mono text-xs text-muted mt-1">
+                    Decisions will appear here once Principal acts.
+                  </p>
+                </div>
+              ) : (
+                <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
+                  {financeRecentList.map((req) => (
+                    <Link
+                      key={req.id}
+                      href={`/approvals/${req.id}`}
+                      className="flex items-baseline justify-between px-5 py-4 hover:bg-surface-2/40 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0 pr-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="font-mono text-[10px] uppercase tracking-wider text-accent">
+                            {req.request_type.replace(/_/g, ' ')}
+                          </div>
+                          <span
+                            className={`font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                              req.status === 'approved'
+                                ? 'bg-ledger/10 text-ledger'
+                                : 'bg-danger/10 text-danger'
+                            }`}
+                          >
+                            {req.status}
+                          </span>
+                        </div>
+                        <div className="font-serif italic text-graphite text-sm truncate">
+                          {req.description ?? '—'}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="font-mono tabular font-medium text-ink text-sm">
+                          {req.amount != null ? formatMoney(Number(req.amount)) : '—'}
+                        </div>
+                        <div className="font-mono text-xs text-muted">
+                          {req.approved_at ? dayjs(req.approved_at).format('D MMM') : dayjs(req.created_at).format('D MMM')}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </section>
       ) : null}
 

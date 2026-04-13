@@ -1,20 +1,20 @@
 'use client'
 
-import { useState, useTransition, useMemo, useRef, useEffect } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { createLoan } from '../actions'
-import type { Company, CompanyTier, TierConfig } from '@/types'
+import type { Company } from '@/types'
 
 interface Props {
   companies: Company[]
-  tiers: TierConfig[]
   baseRate: { rate: number; quarter: string }
 }
 
-export default function NewLoanForm({ companies, tiers, baseRate }: Props) {
+export default function NewLoanForm({ companies, baseRate }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string>('')
+  const [customRate, setCustomRate] = useState<string>('0.000')
   const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
@@ -29,17 +29,9 @@ export default function NewLoanForm({ companies, tiers, baseRate }: Props) {
     }
   }, [error])
 
-  // Build tier → premium map
-  const tierMap = useMemo(() => {
-    const map = new Map<CompanyTier, number>()
-    tiers.forEach((t) => map.set(t.tier, Number(t.premium_rate)))
-    return map
-  }, [tiers])
-
   const selectedCompany = companies.find((c) => c.id === companyId)
-  const selectedTier = selectedCompany?.tier
-  const tierPremium = selectedTier ? (tierMap.get(selectedTier) ?? 0) : 0
-  const effectiveRate = baseRate.rate + tierPremium
+  const customRateDecimal = parseFloat(customRate || '0') / 100
+  const effectiveRate = baseRate.rate + customRateDecimal
 
   async function handleSubmit(formData: FormData) {
     setError(null)
@@ -80,16 +72,16 @@ export default function NewLoanForm({ companies, tiers, baseRate }: Props) {
           <option value="">Select a subsidiary…</option>
           {companies.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name} ({c.short_code}) · Tier {c.tier}
+              {c.name} ({c.short_code})
             </option>
           ))}
         </select>
       </div>
 
-      {/* ───────── Rate preview (read-only) ───────── */}
+      {/* ───────── Rate panel ───────── */}
       {selectedCompany ? (
         <div className="mb-6 p-4 bg-paper border border-hairline rounded-md">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
             <div>
               <div className="text-xs text-muted uppercase tracking-wide font-sans mb-1">
                 Base rate
@@ -101,14 +93,28 @@ export default function NewLoanForm({ companies, tiers, baseRate }: Props) {
             </div>
             <div>
               <div className="text-xs text-muted uppercase tracking-wide font-sans mb-1">
-                Tier premium
+                Interest rate (custom)
               </div>
-              <div className="font-mono tabular font-medium text-ink">
-                +{(tierPremium * 100).toFixed(3)}%
+              <div className="relative max-w-[140px]">
+                <input
+                  type="number"
+                  name="custom_rate_percent"
+                  step="0.001"
+                  min="0"
+                  max="99.999"
+                  value={customRate}
+                  onChange={(e) => setCustomRate(e.target.value)}
+                  className="w-full px-3 py-1.5 pr-14 bg-surface border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted font-mono">
+                  % /mo
+                </span>
               </div>
-              <div className="text-xs text-muted font-mono">Tier {selectedTier}</div>
+              <div className="text-xs text-muted italic font-serif mt-1">
+                Additional monthly rate
+              </div>
             </div>
-            <div className="sm:col-span-2">
+            <div>
               <div className="text-xs text-accent uppercase tracking-wide font-sans mb-1">
                 Locked effective rate
               </div>

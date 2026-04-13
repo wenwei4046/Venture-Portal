@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import type { UserRole } from '@/types'
@@ -22,11 +22,31 @@ interface NavItem {
   visible: (role: UserRole) => boolean
 }
 
-const navItems: NavItem[] = [
+interface NavGroup {
+  label: string
+  visible: (role: UserRole) => boolean
+  children: NavItem[]
+}
+
+type NavEntry = NavItem | NavGroup
+
+function isGroup(entry: NavEntry): entry is NavGroup {
+  return 'children' in entry
+}
+
+const LOAN_PREFIXES = ['/fund-in', '/fund-out', '/overdue']
+
+const navEntries: NavEntry[] = [
   { href: '/dashboard', label: 'Overview', visible: () => true },
-  { href: '/fund-in', label: 'Fund IN', visible: canAccessTreasury },
-  { href: '/fund-out', label: 'Fund OUT', visible: canAccessTreasury },
-  { href: '/overdue', label: 'Overdue', visible: canAccessTreasury },
+  {
+    label: 'Loan',
+    visible: canAccessTreasury,
+    children: [
+      { href: '/fund-in', label: 'Fund IN', visible: canAccessTreasury },
+      { href: '/fund-out', label: 'Fund OUT', visible: canAccessTreasury },
+      { href: '/overdue', label: 'Overdue', visible: canAccessTreasury },
+    ],
+  },
   { href: '/statements', label: 'Statements', visible: canAccessTreasury },
   { href: '/payments', label: 'Payments', visible: canAccessTreasury },
   { href: '/approvals', label: 'Approvals', visible: canApprove },
@@ -51,16 +71,30 @@ interface SidebarProps {
 export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const visible = navItems.filter((item) => item.visible(role))
+
+  // Auto-open Loan group if current path is a loan sub-page
+  const isLoanPath = LOAN_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + '/'))
+  const [loanOpen, setLoanOpen] = useState(isLoanPath)
+
+  const visible = navEntries.filter((entry) => entry.visible(role))
 
   // Eagerly prefetch ALL visible routes on mount for instant navigation
   useEffect(() => {
-    visible.forEach((item) => {
-      if (item.href !== pathname) {
-        router.prefetch(item.href)
+    visible.forEach((entry) => {
+      if (isGroup(entry)) {
+        entry.children.forEach((child) => {
+          if (child.href !== pathname) router.prefetch(child.href)
+        })
+      } else if (entry.href !== pathname) {
+        router.prefetch(entry.href)
       }
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep Loan group open when navigating between loan pages
+  useEffect(() => {
+    if (isLoanPath) setLoanOpen(true)
+  }, [isLoanPath])
 
   // Auto-close the mobile drawer when the route changes (user clicked a link).
   useEffect(() => {
@@ -109,7 +143,55 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto">
-        {visible.map((item) => {
+        {visible.map((entry) => {
+          if (isGroup(entry)) {
+            const groupActive = entry.children.some(
+              (c) => pathname === c.href || pathname.startsWith(c.href + '/')
+            )
+            return (
+              <div key={entry.label}>
+                <button
+                  type="button"
+                  onClick={() => setLoanOpen(!loanOpen)}
+                  className={
+                    groupActive && !loanOpen
+                      ? 'w-full flex items-center justify-between px-3 py-2 mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[15px]'
+                      : 'w-full flex items-center justify-between px-3 py-2 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-sm font-sans'
+                  }
+                >
+                  {entry.label}
+                  <span className={`text-[10px] transition-transform ${loanOpen ? 'rotate-180' : ''}`}>
+                    ▼
+                  </span>
+                </button>
+                {loanOpen ? (
+                  <div className="ml-3 border-l border-hairline pl-2">
+                    {entry.children
+                      .filter((c) => c.visible(role))
+                      .map((child) => {
+                        const active =
+                          pathname === child.href || pathname.startsWith(child.href + '/')
+                        return (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            className={
+                              active
+                                ? 'nav-link block px-3 py-1.5 mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[14px]'
+                                : 'nav-link block px-3 py-1.5 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-[13px] font-sans'
+                            }
+                          >
+                            {child.label}
+                          </Link>
+                        )
+                      })}
+                  </div>
+                ) : null}
+              </div>
+            )
+          }
+
+          const item = entry as NavItem
           const active =
             pathname === item.href || pathname.startsWith(item.href + '/')
           return (

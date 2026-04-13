@@ -54,12 +54,6 @@ export default function NewPaymentForm({ companies, bankAccounts, categories }: 
   async function handleSubmit(formData: FormData) {
     setError(null)
 
-    // Attachment required for Credit (receive), optional for Debit (pay out)
-    if (direction === 'credit' && files.length === 0) {
-      setError('At least one attachment is required for incoming payments (transfer slip, invoice, etc.).')
-      return
-    }
-
     // Append files to formData for server action
     files.forEach((f, i) => formData.append(`attachment_${i}`, f))
     formData.set('attachment_count', String(files.length))
@@ -330,7 +324,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories }: 
       {/* ── Attachments ── */}
       <div className="mb-6">
         <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-          Attachments {direction === 'credit' ? <span className="text-danger">*</span> : <span className="text-muted font-normal">(optional)</span>}
+          Attachments <span className="text-muted font-normal">(optional)</span>
         </label>
         <div className="border border-hairline rounded-md bg-paper p-4">
           <input
@@ -344,9 +338,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories }: 
             className="text-sm text-ink file:mr-4 file:py-2 file:px-4 file:rounded-md file:border file:border-hairline file:text-sm file:font-serif file:italic file:text-accent file:bg-accent-bg file:cursor-pointer hover:file:bg-surface-2"
           />
           <p className="font-serif italic text-muted text-xs mt-2">
-            {direction === 'credit'
-              ? 'Attach transfer slip, invoice, or receipt. Required for incoming payments.'
-              : 'Attach invoice, contract, or approval code. Optional for outgoing payments.'}
+            Attach transfer slip, invoice, receipt, or approval code. Optional for all payments.
           </p>
           {files.length > 0 ? (
             <div className="mt-3 space-y-1">

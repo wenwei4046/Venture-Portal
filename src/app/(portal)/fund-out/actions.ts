@@ -42,7 +42,7 @@ export async function createLoan(formData: FormData) {
     )
   }
 
-  // ─── Look up company's tier + premium ───
+  // ─── Look up company ───
   const { data: company, error: cError } = await supabase
     .from('companies')
     .select('name, tier')
@@ -52,18 +52,15 @@ export async function createLoan(formData: FormData) {
 
   if (cError || !company) throw new Error('Company not found or inactive')
 
-  const { data: tierConfig, error: tcError } = await supabase
-    .from('tier_config')
-    .select('premium_rate')
-    .eq('tier', company.tier)
-    .single()
-
-  if (tcError || !tierConfig) {
-    throw new Error(`Tier premium for ${company.tier} not configured`)
+  // Custom interest rate from form (% per month → decimal)
+  const customRatePercent = parseFloat((formData.get('custom_rate_percent') as string) ?? '0')
+  if (isNaN(customRatePercent) || customRatePercent < 0 || customRatePercent >= 100) {
+    throw new Error('Custom interest rate must be between 0 and 100%')
   }
+  const customRate = customRatePercent / 100
 
   const base = Number(baseRate.base_rate)
-  const premium = Number(tierConfig.premium_rate)
+  const premium = customRate
   const effective = base + premium
 
   // ─── Check HV has sufficient pool to lend ───

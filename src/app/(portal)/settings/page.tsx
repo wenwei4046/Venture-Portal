@@ -11,7 +11,13 @@ import UtilitySplitSection from './_components/UtilitySplitSection'
 import DirectorSalarySection from './_components/DirectorSalarySection'
 import BaseRateSimulator from './_components/BaseRateSimulator'
 import BankAccountsSection from './_components/BankAccountsSection'
-import SettingsTabs, { type SettingsTab, isSettingsTab } from './_components/SettingsTabs'
+import CompaniesSection from './_components/CompaniesSection'
+import SettingsTabs, { type SettingsTab } from './_components/SettingsTabs'
+
+const VALID_TABS: SettingsTab[] = ['treasury', 'tiers', 'overdue', 'splits', 'directors', 'companies', 'banks', 'simulator']
+function isValidTab(s: string | undefined): s is SettingsTab {
+  return !!s && (VALID_TABS as string[]).includes(s)
+}
 
 interface SplitRow {
   id: string
@@ -28,7 +34,7 @@ export default async function SettingsPage({ searchParams }: Props) {
   await requireRole(['principal'])
 
   const { tab: rawTab } = await searchParams
-  const activeTab: SettingsTab = isSettingsTab(rawTab) ? rawTab : 'treasury'
+  const activeTab: SettingsTab = isValidTab(rawTab) ? rawTab : 'treasury'
 
   const supabase = await createClient()
 
@@ -143,6 +149,18 @@ export default async function SettingsPage({ searchParams }: Props) {
             name: d.name ?? d.code,
             weightage: Number(d.weightage),
             min_payout: Number(d.min_payout),
+          }))}
+        />
+      )}
+
+      {activeTab === 'companies' && (
+        <CompaniesSection
+          companies={companies.map((c) => ({
+            id: c.id,
+            name: c.name,
+            short_code: c.short_code,
+            tier: c.tier,
+            is_active: c.is_active,
           }))}
         />
       )}

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import type { Company, TierConfig } from '@/types'
+import type { Company } from '@/types'
 import NewLoanForm from '../_components/NewLoanForm'
 
 export default async function NewLoanPage() {
@@ -11,11 +11,9 @@ export default async function NewLoanPage() {
 
   const [
     { data: companyRows },
-    { data: tierRows },
     { data: baseRateRow },
   ] = await Promise.all([
     supabase.from('companies').select('*').eq('is_active', true).order('short_code'),
-    supabase.from('tier_config').select('*'),
     supabase
       .from('base_rate_history')
       .select('base_rate, quarter, effective_from')
@@ -27,7 +25,6 @@ export default async function NewLoanPage() {
   ])
 
   const companies = (companyRows ?? []) as Company[]
-  const tiers = (tierRows ?? []) as TierConfig[]
 
   const baseRate = baseRateRow
     ? {
@@ -48,12 +45,12 @@ export default async function NewLoanPage() {
         <h1 className="font-serif text-3xl text-ink mt-3">New loan</h1>
         <p className="font-serif italic text-graphite text-base mt-2">
           Submit a new loan for <em>Principal approval</em>. Rate locks at
-          submission using the active base rate + tier premium.
+          submission using the active base rate + your custom interest rate.
         </p>
       </div>
 
       {baseRate ? (
-        <NewLoanForm companies={companies} tiers={tiers} baseRate={baseRate} />
+        <NewLoanForm companies={companies} baseRate={baseRate} />
       ) : (
         <div className="bg-alert-bg border border-alert rounded-md p-6 max-w-3xl">
           <p className="font-serif text-lg text-alert mb-1">

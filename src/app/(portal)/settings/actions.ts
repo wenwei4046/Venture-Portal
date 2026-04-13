@@ -306,3 +306,74 @@ export async function reopenPeriod(formData: FormData) {
 
   revalidatePath('/settings')
 }
+
+// ─── Company Management (add / edit / toggle active) ─────────────────────────
+
+export async function addCompany(formData: FormData) {
+  await requireRole(['principal'])
+  const supabase = await createClient()
+
+  const name = (formData.get('name') as string)?.trim()
+  const shortCode = (formData.get('short_code') as string)?.trim().toUpperCase()
+
+  if (!name) throw new Error('Company name is required')
+  if (!shortCode || shortCode.length > 10) throw new Error('Short code is required (max 10 chars)')
+
+  const { error } = await supabase.from('companies').insert({
+    name,
+    short_code: shortCode,
+    tier: 'T3' as CompanyTier, // default tier for new companies
+    is_active: true,
+  })
+
+  if (error) {
+    if (error.code === '23505') throw new Error(`Short code "${shortCode}" already exists`)
+    throw new Error(`Failed to add company: ${error.message}`)
+  }
+
+  revalidatePath('/settings')
+}
+
+export async function updateCompany(formData: FormData) {
+  await requireRole(['principal'])
+  const supabase = await createClient()
+
+  const id = formData.get('id') as string
+  const name = (formData.get('name') as string)?.trim()
+  const shortCode = (formData.get('short_code') as string)?.trim().toUpperCase()
+
+  if (!id) throw new Error('Company ID is required')
+  if (!name) throw new Error('Company name is required')
+  if (!shortCode || shortCode.length > 10) throw new Error('Short code is required (max 10 chars)')
+
+  const { error } = await supabase
+    .from('companies')
+    .update({ name, short_code: shortCode, updated_at: new Date().toISOString() })
+    .eq('id', id)
+
+  if (error) {
+    if (error.code === '23505') throw new Error(`Short code "${shortCode}" already exists`)
+    throw new Error(`Failed to update company: ${error.message}`)
+  }
+
+  revalidatePath('/settings')
+}
+
+export async function toggleCompanyActive(formData: FormData) {
+  await requireRole(['principal'])
+  const supabase = await createClient()
+
+  const id = formData.get('id') as string
+  const isActive = formData.get('is_active') === 'true'
+
+  if (!id) throw new Error('Company ID is required')
+
+  const { error } = await supabase
+    .from('companies')
+    .update({ is_active: isActive, updated_at: new Date().toISOString() })
+    .eq('id', id)
+
+  if (error) throw new Error(`Failed to update company: ${error.message}`)
+
+  revalidatePath('/settings')
+}
