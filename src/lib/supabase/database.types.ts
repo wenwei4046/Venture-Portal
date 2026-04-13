@@ -396,7 +396,6 @@ export type Database = {
           is_active: boolean
           name: string
           short_code: string
-          tier: Database["public"]["Enums"]["company_tier"]
           updated_at: string
         }
         Insert: {
@@ -405,7 +404,6 @@ export type Database = {
           is_active?: boolean
           name: string
           short_code: string
-          tier: Database["public"]["Enums"]["company_tier"]
           updated_at?: string
         }
         Update: {
@@ -414,7 +412,6 @@ export type Database = {
           is_active?: boolean
           name?: string
           short_code?: string
-          tier?: Database["public"]["Enums"]["company_tier"]
           updated_at?: string
         }
         Relationships: []
@@ -2494,38 +2491,6 @@ export type Database = {
         }
         Relationships: []
       }
-      tier_config: {
-        Row: {
-          id: string
-          premium_rate: number
-          tier: Database["public"]["Enums"]["company_tier"]
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          id?: string
-          premium_rate: number
-          tier: Database["public"]["Enums"]["company_tier"]
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          id?: string
-          premium_rate?: number
-          tier?: Database["public"]["Enums"]["company_tier"]
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tier_config_updated_by_fkey"
-            columns: ["updated_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       treasury_config: {
         Row: {
           config_key: string
@@ -2856,7 +2821,6 @@ export type Database = {
           p_base_rate: number
           p_company_id: string
           p_company_name?: string
-          p_company_tier?: string
           p_effective_rate: number
           p_principal: number
           p_repayment_terms?: string
@@ -3030,7 +2994,6 @@ export type Database = {
         | "non_billable"
       claim_status: "pending" | "approved" | "rejected" | "paid"
       claim_type: "project" | "benefit"
-      company_tier: "T1" | "T2" | "T3" | "T4"
       contract_status: "active" | "completed" | "cancelled"
       dept_pool_txn_type: "np_in" | "expense_out"
       director_status: "active" | "inactive"
@@ -3049,6 +3012,9 @@ export type Database = {
         | "expense_out"
         | "profit_in"
         | "claim_out"
+        | "fund_in"
+        | "fund_out"
+        | "loan_repayment_in"
       invoice_pool_txn_type: "accumulate" | "release"
       invoice_status: "draft" | "issued" | "paid" | "paid_via_netting"
       loan_status: "pending_approval" | "active" | "fully_repaid" | "cancelled"
@@ -3238,7 +3204,6 @@ export const Constants = {
       ],
       claim_status: ["pending", "approved", "rejected", "paid"],
       claim_type: ["project", "benefit"],
-      company_tier: ["T1", "T2", "T3", "T4"],
       contract_status: ["active", "completed", "cancelled"],
       dept_pool_txn_type: ["np_in", "expense_out"],
       director_status: ["active", "inactive"],
@@ -3258,6 +3223,9 @@ export const Constants = {
         "expense_out",
         "profit_in",
         "claim_out",
+        "fund_in",
+        "fund_out",
+        "loan_repayment_in",
       ],
       invoice_pool_txn_type: ["accumulate", "release"],
       invoice_status: ["draft", "issued", "paid", "paid_via_netting"],

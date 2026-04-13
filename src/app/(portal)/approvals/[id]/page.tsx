@@ -32,7 +32,6 @@ export default async function ApprovalDetailPage({ params }: Props) {
   // Load reference object if new_loan
   let loanContext: {
     company_name?: string
-    company_tier?: string
     principal?: number
     effective_rate?: number
     base_rate?: number
@@ -43,14 +42,13 @@ export default async function ApprovalDetailPage({ params }: Props) {
   if (approval.request_type === 'new_loan' && approval.reference_id) {
     const { data: loan } = await supabase
       .from('loans')
-      .select('*, companies(name, short_code, tier)')
+      .select('*, companies(name, short_code)')
       .eq('id', approval.reference_id)
       .single()
 
     if (loan) {
       loanContext = {
         company_name: loan.companies?.name,
-        company_tier: loan.companies?.tier,
         principal: Number(loan.principal),
         effective_rate: Number(loan.effective_rate),
         base_rate: Number(loan.base_rate),
@@ -104,9 +102,6 @@ export default async function ApprovalDetailPage({ params }: Props) {
               <div className="font-serif text-lg text-ink">
                 {loanContext.company_name}
               </div>
-              <div className="font-mono text-xs text-muted">
-                Tier {loanContext.company_tier}
-              </div>
             </div>
 
             <div>
@@ -128,7 +123,7 @@ export default async function ApprovalDetailPage({ params }: Props) {
               </div>
               <div className="font-mono text-xs text-muted">
                 {((loanContext.base_rate ?? 0) * 100).toFixed(3)}% base +{' '}
-                {((loanContext.risk_premium ?? 0) * 100).toFixed(3)}% tier
+                {((loanContext.risk_premium ?? 0) * 100).toFixed(3)}% custom
               </div>
             </div>
 

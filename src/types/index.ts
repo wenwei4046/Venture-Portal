@@ -13,13 +13,10 @@ export interface User {
   updated_at: string
 }
 
-export type CompanyTier = 'T1' | 'T2' | 'T3' | 'T4'
-
 export interface Company {
   id: string
   name: string
   short_code: string
-  tier: CompanyTier
   is_active: boolean
   created_at: string
   updated_at: string
@@ -384,14 +381,6 @@ export interface TreasuryConfig {
   config_key: string
   config_value: number
   description?: string
-  updated_by?: string
-  updated_at: string
-}
-
-export interface TierConfig {
-  id: string
-  tier: CompanyTier
-  premium_rate: number
   updated_by?: string
   updated_at: string
 }

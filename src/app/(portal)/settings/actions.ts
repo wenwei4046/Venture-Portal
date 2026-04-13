@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import type { CompanyTier, OverdueConfigStage } from '@/types'
+import type { OverdueConfigStage } from '@/types'
 
 // ─── Treasury Config (op_margin, buffer_amount, saving_rate) ──────────────────
 
@@ -39,33 +39,6 @@ export async function updateTreasuryConfig(formData: FormData) {
       .update({ config_value: value, updated_by: user.id })
       .eq('config_key', key)
     if (error) throw new Error(`Failed to update ${key}: ${error.message}`)
-  }
-
-  revalidatePath('/settings')
-}
-
-// ─── Tier Premiums (T1-T4) ────────────────────────────────────────────────────
-
-export async function updateTierPremiums(formData: FormData) {
-  const user = await requireRole(['principal'])
-  const supabase = await createClient()
-
-  const tiers: CompanyTier[] = ['T1', 'T2', 'T3', 'T4']
-
-  for (const tier of tiers) {
-    const raw = formData.get(`tier_${tier}`) as string | null
-    if (!raw) continue
-
-    const percent = parseFloat(raw)
-    if (isNaN(percent) || percent < 0 || percent >= 100) {
-      throw new Error(`Tier ${tier} premium must be between 0 and 100%`)
-    }
-
-    const { error } = await supabase
-      .from('tier_config')
-      .update({ premium_rate: percent / 100, updated_by: user.id })
-      .eq('tier', tier)
-    if (error) throw new Error(`Failed to update tier ${tier}: ${error.message}`)
   }
 
   revalidatePath('/settings')
@@ -111,34 +84,6 @@ export async function updateOverdueStages(formData: FormData) {
       .eq('stage', stage)
     if (error) throw new Error(`Failed to update ${stage}: ${error.message}`)
   }
-
-  revalidatePath('/settings')
-}
-
-// ─── Company Tier Assignment ──────────────────────────────────────────────────
-
-export async function updateCompanyTier(formData: FormData) {
-  const user = await requireRole(['principal'])
-  const supabase = await createClient()
-
-  const companyId = formData.get('company_id') as string
-  const tier = formData.get('tier') as CompanyTier
-
-  if (!companyId) throw new Error('Company id is required')
-  if (!['T1', 'T2', 'T3', 'T4'].includes(tier)) {
-    throw new Error('Invalid tier')
-  }
-
-  const { error } = await supabase
-    .from('companies')
-    .update({ tier, updated_at: new Date().toISOString() })
-    .eq('id', companyId)
-
-  if (error) throw new Error(`Failed to update company tier: ${error.message}`)
-
-  // History: the config_audit_log trigger (Phase 2 Step 8) captures this
-  // UPDATE automatically with old + new values keyed by company id.
-  void user
 
   revalidatePath('/settings')
 }
@@ -322,7 +267,6 @@ export async function addCompany(formData: FormData) {
   const { error } = await supabase.from('companies').insert({
     name,
     short_code: shortCode,
-    tier: 'T3' as CompanyTier, // default tier for new companies
     is_active: true,
   })
 

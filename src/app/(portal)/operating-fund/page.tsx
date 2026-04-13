@@ -17,10 +17,11 @@ export default async function OperatingFundPage() {
     .from('hv_operating_fund')
     .select('transaction_type, amount')
 
+  const IN_TYPES = ['saving_in', 'surplus_in', 'profit_in', 'fund_in', 'loan_repayment_in']
   let balance = 0
   for (const t of allTxns ?? []) {
     const amt = Number(t.amount)
-    if (t.transaction_type === 'saving_in' || t.transaction_type === 'surplus_in' || t.transaction_type === 'profit_in') {
+    if (IN_TYPES.includes(t.transaction_type)) {
       balance += amt
     } else {
       balance -= amt
@@ -32,7 +33,7 @@ export default async function OperatingFundPage() {
       <div className="mb-10">
         <h1 className="font-serif text-3xl text-ink">HV Operating Fund</h1>
         <p className="font-serif italic text-graphite text-base mt-2">
-          5% director saving + statutory surplus. <em>Free capital for HV operations.</em>
+          Fund deposits, loan disbursements, director savings, and statutory surplus.
         </p>
       </div>
 
@@ -72,7 +73,7 @@ export default async function OperatingFundPage() {
             </thead>
             <tbody>
               {transactions.map(t => {
-                const isIn = t.transaction_type === 'saving_in' || t.transaction_type === 'surplus_in' || t.transaction_type === 'profit_in'
+                const isIn = IN_TYPES.includes(t.transaction_type)
                 return (
                   <tr key={t.id} className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors">
                     <td className="py-4 pr-4 font-mono text-xs text-muted">

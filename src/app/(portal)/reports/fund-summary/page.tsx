@@ -34,7 +34,7 @@ export default async function FundSummaryPage() {
   // Free Capital
   let hvFundBalance = 0
   for (const t of hvFundTxns ?? []) {
-    const isIn = ['saving_in', 'surplus_in', 'profit_in'].includes(t.transaction_type)
+    const isIn = ['saving_in', 'surplus_in', 'profit_in', 'fund_in', 'loan_repayment_in'].includes(t.transaction_type)
     hvFundBalance += isIn ? Number(t.amount) : -Number(t.amount)
   }
 

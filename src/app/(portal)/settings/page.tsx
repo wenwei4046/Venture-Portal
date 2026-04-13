@@ -1,11 +1,9 @@
 import { Suspense } from 'react'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import type { TreasuryConfig, TierConfig, OverdueConfig, Company } from '@/types'
+import type { TreasuryConfig, OverdueConfig, Company } from '@/types'
 import TreasuryConfigSection from './_components/TreasuryConfigSection'
-import TierPremiumSection from './_components/TierPremiumSection'
 import OverdueStagesSection from './_components/OverdueStagesSection'
-import CompanyTierSection from './_components/CompanyTierSection'
 import RentSplitSection from './_components/RentSplitSection'
 import UtilitySplitSection from './_components/UtilitySplitSection'
 import DirectorSalarySection from './_components/DirectorSalarySection'
@@ -14,7 +12,7 @@ import BankAccountsSection from './_components/BankAccountsSection'
 import CompaniesSection from './_components/CompaniesSection'
 import SettingsTabs, { type SettingsTab } from './_components/SettingsTabs'
 
-const VALID_TABS: SettingsTab[] = ['treasury', 'tiers', 'overdue', 'splits', 'directors', 'companies', 'banks', 'simulator']
+const VALID_TABS: SettingsTab[] = ['treasury', 'overdue', 'splits', 'directors', 'companies', 'banks', 'simulator']
 function isValidTab(s: string | undefined): s is SettingsTab {
   return !!s && (VALID_TABS as string[]).includes(s)
 }
@@ -40,7 +38,6 @@ export default async function SettingsPage({ searchParams }: Props) {
 
   const [
     { data: treasuryRows },
-    { data: tierRows },
     { data: overdueRows },
     { data: companyRows },
     { data: rentRows },
@@ -51,7 +48,6 @@ export default async function SettingsPage({ searchParams }: Props) {
     { data: bankAccountRows },
   ] = await Promise.all([
     supabase.from('treasury_config').select('*'),
-    supabase.from('tier_config').select('*'),
     supabase.from('overdue_config').select('*'),
     supabase.from('companies').select('*').order('short_code'),
     supabase.from('rent_splits').select('id, company_id, is_hv_share, split_pct'),
@@ -63,7 +59,6 @@ export default async function SettingsPage({ searchParams }: Props) {
   ])
 
   const treasury = (treasuryRows ?? []) as TreasuryConfig[]
-  const tiers = (tierRows ?? []) as TierConfig[]
   const overdueStages = (overdueRows ?? []) as OverdueConfig[]
   const companies = (companyRows ?? []) as Company[]
   const rentSplits = ((rentRows ?? []) as SplitRow[]).map((r) => ({
@@ -92,8 +87,7 @@ export default async function SettingsPage({ searchParams }: Props) {
       <div className="mb-6">
         <h1 className="font-serif text-3xl text-ink">Settings</h1>
         <p className="font-serif italic text-graphite text-base mt-2">
-          Treasury config, tier premiums, overdue stages, and{' '}
-          <em>company tier assignment</em>. Principal only.
+          Treasury config, overdue stages, splits, and subsidiaries. Principal only.
         </p>
       </div>
 
@@ -107,13 +101,6 @@ export default async function SettingsPage({ searchParams }: Props) {
           bufferAmount={bufferAmount}
           savingRate={savingRate}
         />
-      )}
-
-      {activeTab === 'tiers' && (
-        <div className="space-y-6">
-          <TierPremiumSection tiers={tiers} />
-          <CompanyTierSection companies={companies} />
-        </div>
       )}
 
       {activeTab === 'overdue' && (
@@ -159,7 +146,6 @@ export default async function SettingsPage({ searchParams }: Props) {
             id: c.id,
             name: c.name,
             short_code: c.short_code,
-            tier: c.tier,
             is_active: c.is_active,
           }))}
         />

@@ -24,7 +24,7 @@ export default async function StatementPrintPage({ params }: Props) {
   const [{ data: company }, { data: lines }] = await Promise.all([
     supabase
       .from('companies')
-      .select('name, short_code, tier')
+      .select('name, short_code')
       .eq('id', statement.company_id)
       .single(),
     supabase
@@ -173,7 +173,7 @@ export default async function StatementPrintPage({ params }: Props) {
         <div className="meta">
           <div className="meta-left">
             <div><span className="meta-label">To: </span><span className="meta-value">{company?.name}</span></div>
-            <div><span className="meta-label">Code: </span>{company?.short_code} · Tier {company?.tier}</div>
+            <div><span className="meta-label">Code: </span>{company?.short_code}</div>
           </div>
           <div className="meta-right" style={{ textAlign: 'right' }}>
             <div><span className="meta-label">Period: </span><span className="meta-value">{dayjs(statement.period_month).format('MMMM YYYY')}</span></div>

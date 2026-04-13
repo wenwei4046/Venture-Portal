@@ -34,13 +34,13 @@ export default async function FundOutPage() {
     { data: outstandingRows },
   ] = await Promise.all([
     supabase.from('loans').select('*').order('created_at', { ascending: false }),
-    supabase.from('companies').select('id, name, short_code, tier'),
+    supabase.from('companies').select('id, name, short_code'),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid, total_interest_paid'),
   ])
 
   const loanList = (loans ?? []) as LoanRow[]
   const companyMap = new Map(
-    (companies ?? []).map((c) => [c.id, { name: c.name, code: c.short_code, tier: c.tier }])
+    (companies ?? []).map((c) => [c.id, { name: c.name, code: c.short_code }])
   )
   const outstandingMap = new Map(
     (outstandingRows ?? []).map((o) => [o.loan_id, o as OutstandingRow])
@@ -146,7 +146,7 @@ export default async function FundOutPage() {
                   <th className="text-right py-3 pr-4 font-medium">Principal</th>
                   <th className="text-right py-3 pr-4 font-medium">Outstanding</th>
                   <th className="text-right py-3 pr-4 font-medium">Rate</th>
-                  <th className="text-right py-3 pr-4 font-medium">Tier</th>
+                  <th className="text-right py-3 pr-4 font-medium">Rate</th>
                   <th className="text-left py-3 pr-4 font-medium">Status</th>
                   <th className="py-3 text-right"></th>
                 </tr>
@@ -180,7 +180,7 @@ export default async function FundOutPage() {
                         {(Number(loan.effective_rate) * 100).toFixed(3)}%
                       </td>
                       <td className="py-4 pr-4 text-right font-mono text-graphite">
-                        {company?.tier ?? '—'}
+                        {(Number(loan.effective_rate) * 100).toFixed(1)}%
                       </td>
                       <td className="py-4 pr-4">
                         <LoanStatusLabel status={loan.status} />

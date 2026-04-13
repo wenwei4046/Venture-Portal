@@ -120,6 +120,19 @@ export async function createFundSource(formData: FormData) {
     throw new Error(`Failed to create fund source: ${error.message}`)
   }
 
+  // Auto-add to Operation Pool (fund_in entry)
+  const typeLabel = raw.source_type === 'subsidiary' ? 'subsidiary deposit'
+    : raw.source_type === 'director_loan' ? 'director loan'
+    : 'dept pool transfer'
+  await supabase.from('hv_operating_fund').insert({
+    transaction_type: 'fund_in' as const,
+    amount: raw.amount,
+    description: `Fund source: ${typeLabel}`,
+    reference_id: data.id,
+    reference_table: 'fund_sources',
+    created_by: user.id,
+  })
+
   revalidatePath('/fund-in')
   revalidatePath('/dashboard')
   redirect(`/fund-in/${data.id}`)

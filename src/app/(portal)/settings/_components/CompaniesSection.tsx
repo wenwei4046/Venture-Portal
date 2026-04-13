@@ -7,7 +7,6 @@ interface CompanyRow {
   id: string
   name: string
   short_code: string
-  tier: string
   is_active: boolean
 }
 

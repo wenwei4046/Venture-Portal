@@ -33,7 +33,7 @@ export default async function LoanDetailPage({ params }: Props) {
   ] = await Promise.all([
     supabase
       .from('companies')
-      .select('name, short_code, tier')
+      .select('name, short_code')
       .eq('id', loan.company_id)
       .single(),
     supabase
@@ -76,7 +76,7 @@ export default async function LoanDetailPage({ params }: Props) {
           <p className="font-serif italic text-accent text-base mb-1">Loan to</p>
           <h1 className="font-serif text-3xl text-ink">{company?.name ?? '—'}</h1>
           <p className="font-mono text-xs text-muted mt-1">
-            {company?.short_code} · Tier {company?.tier} · Created{' '}
+            {company?.short_code} · Created{' '}
             {dayjs(loan.created_at).format('D MMM YYYY')}
           </p>
         </div>
@@ -117,7 +117,7 @@ export default async function LoanDetailPage({ params }: Props) {
             </div>
             <div className="font-mono text-xs text-muted mt-1">
               {(Number(loan.base_rate) * 100).toFixed(3)}% base +{' '}
-              {(Number(loan.risk_premium) * 100).toFixed(3)}% tier
+              {(Number(loan.risk_premium) * 100).toFixed(3)}% custom
             </div>
           </div>
 

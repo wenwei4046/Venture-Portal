@@ -26,7 +26,7 @@ export default async function StatementDetailPage({ params }: Props) {
   const [{ data: company }, { data: lines }] = await Promise.all([
     supabase
       .from('companies')
-      .select('name, short_code, tier')
+      .select('name, short_code')
       .eq('id', statement.company_id)
       .single(),
     supabase
@@ -62,7 +62,7 @@ export default async function StatementDetailPage({ params }: Props) {
           </p>
           <h1 className="font-serif text-3xl text-ink">{company?.name ?? '—'}</h1>
           <p className="font-mono text-xs text-muted mt-1">
-            {company?.short_code} · Tier {company?.tier} · Created{' '}
+            {company?.short_code} · Created{' '}
             {dayjs(statement.created_at).format('D MMM YYYY')}
           </p>
         </div>

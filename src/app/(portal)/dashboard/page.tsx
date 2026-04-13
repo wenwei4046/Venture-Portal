@@ -1081,7 +1081,7 @@ export default async function DashboardPage() {
                     <td className="py-4 pr-4">
                       <div className="font-serif text-md text-ink">{sub.name}</div>
                       <div className="font-mono text-xs text-muted">
-                        {sub.short_code} · Tier {sub.tier}
+                        {sub.short_code}
                         {sub.has_overdue ? (
                           <span className="text-danger"> · overdue</span>
                         ) : null}

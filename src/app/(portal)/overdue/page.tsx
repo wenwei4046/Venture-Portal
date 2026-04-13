@@ -31,14 +31,14 @@ export default async function OverduePage() {
         .order('period_month', { ascending: false })
         .order('overdue_days', { ascending: false }),
       supabase.from('loans').select('id, company_id, principal, effective_rate, status'),
-      supabase.from('companies').select('id, name, short_code, tier'),
+      supabase.from('companies').select('id, name, short_code'),
       supabase.from('loan_outstanding').select('loan_id, outstanding'),
     ])
 
   const rows = (overdueRows ?? []) as OverdueRow[]
   const loanMap = new Map((loans ?? []).map((l) => [l.id, l]))
   const companyMap = new Map(
-    (companies ?? []).map((c) => [c.id, { name: c.name, code: c.short_code, tier: c.tier }])
+    (companies ?? []).map((c) => [c.id, { name: c.name, code: c.short_code }])
   )
   const outstandingMap = new Map(
     (outstandingRows ?? []).map((o) => [o.loan_id, Number(o.outstanding)])

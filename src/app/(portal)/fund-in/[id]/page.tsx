@@ -46,12 +46,12 @@ export default async function FundSourceDetailPage({ params }: Props) {
   if (source.from_company_id) {
     const { data: c } = await supabase
       .from('companies')
-      .select('name, short_code, tier')
+      .select('name, short_code')
       .eq('id', source.from_company_id)
       .single()
     if (c) {
       fromLabel = c.name
-      fromSubLabel = `${c.short_code} · Tier ${c.tier}`
+      fromSubLabel = c.short_code
     }
   } else if (source.from_director_id) {
     const { data: d } = await supabase

@@ -20,7 +20,7 @@ export default async function DirectorPoolPage() {
 
   // Director Saving Pool balance
   const savingBalance = (savingTxns ?? []).reduce((s, t) => {
-    if (['saving_in', 'surplus_in', 'profit_in'].includes(t.transaction_type)) return s + Number(t.amount)
+    if (['saving_in', 'surplus_in', 'profit_in', 'fund_in', 'loan_repayment_in'].includes(t.transaction_type)) return s + Number(t.amount)
     return s - Number(t.amount)
   }, 0)
 
@@ -94,7 +94,7 @@ export default async function DirectorPoolPage() {
               </thead>
               <tbody>
                 {(savingTxns ?? []).map(t => {
-                  const isInflow = ['saving_in', 'surplus_in', 'profit_in'].includes(t.transaction_type)
+                  const isInflow = ['saving_in', 'surplus_in', 'profit_in', 'fund_in', 'loan_repayment_in'].includes(t.transaction_type)
                   return (
                     <tr key={t.id} className="border-b border-hairline last:border-0">
                       <td className="py-3 pr-4 font-mono text-xs text-muted">

@@ -5,7 +5,6 @@ import { SlidingTabs, type TabItem } from '@/components/motion/SlidingTabs'
 
 export type SettingsTab =
   | 'treasury'
-  | 'tiers'
   | 'overdue'
   | 'splits'
   | 'directors'
@@ -15,7 +14,6 @@ export type SettingsTab =
 
 const TABS: TabItem[] = [
   { key: 'treasury', label: 'Treasury' },
-  { key: 'tiers', label: 'Tiers' },
   { key: 'overdue', label: 'Overdue' },
   { key: 'splits', label: 'Splits' },
   { key: 'directors', label: 'Directors' },

@@ -45,7 +45,7 @@ export async function createLoan(formData: FormData) {
   // ─── Look up company ───
   const { data: company, error: cError } = await supabase
     .from('companies')
-    .select('name, tier')
+    .select('name')
     .eq('id', companyId)
     .eq('is_active', true)
     .single()
@@ -85,7 +85,6 @@ export async function createLoan(formData: FormData) {
       p_effective_rate: effective,
       p_repayment_terms: repaymentTerms || undefined,
       p_company_name: company.name,
-      p_company_tier: company.tier,
     }
   )
 
@@ -153,17 +152,36 @@ export async function recordRepayment(formData: FormData) {
     }
   }
 
-  const { error: insertError } = await supabase.from('repayments').insert({
+  const { error: insertError, data: repaymentRow } = await supabase.from('repayments').insert({
     loan_id: loanId,
     amount,
     payment_type: paymentType,
     payment_date: paymentDate,
     notes,
     created_by: user.id,
-  })
+  }).select('id').single()
 
   if (insertError) {
     throw new Error(`Failed to record repayment: ${insertError.message}`)
+  }
+
+  // Auto-add principal repayments back to Operation Pool
+  if (paymentType === 'principal' && repaymentRow) {
+    const { data: loanForPool } = await supabase
+      .from('loans')
+      .select('company_id, companies(name)')
+      .eq('id', loanId)
+      .single()
+
+    const companyName = (loanForPool?.companies as { name: string } | null)?.name ?? 'Unknown'
+    await supabase.from('hv_operating_fund').insert({
+      transaction_type: 'loan_repayment_in' as const,
+      amount,
+      description: `Loan repayment (principal): ${companyName}`,
+      reference_id: repaymentRow.id,
+      reference_table: 'repayments',
+      created_by: user.id,
+    })
   }
 
   revalidatePath(`/fund-out/${loanId}`)

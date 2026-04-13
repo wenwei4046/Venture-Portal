@@ -52,7 +52,7 @@ export default async function BillingPage({ searchParams }: Props) {
       .select('id, invoice_no, company_id, period_month, billing_mode, total_amount, status')
       .eq('period_month', period)
       .order('billing_mode', { ascending: true }),
-    supabase.from('companies').select('id, name, short_code, tier').eq('is_active', true),
+    supabase.from('companies').select('id, name, short_code').eq('is_active', true),
   ])
 
   // hrSummary errors (e.g. RLS / RPC failure) — log but render empty state

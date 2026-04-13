@@ -120,7 +120,7 @@ export async function submitEscalation(formData: FormData) {
 
   const { data: loan } = await supabase
     .from('loans')
-    .select('company_id, principal, companies(name, short_code, tier)')
+    .select('company_id, principal, companies(name, short_code)')
     .eq('id', overdue.loan_id)
     .single()
 

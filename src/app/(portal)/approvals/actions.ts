@@ -4,9 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { computeDowngradedTier } from '@/lib/tier'
 import { notifyApprovalDecision } from '@/lib/slack'
-import type { CompanyTier } from '@/types'
 
 // ─── Approve request (Principal) ──────────────────────────────────────────────
 
@@ -75,6 +73,25 @@ export async function approveRequest(formData: FormData) {
       )
     }
 
+    // Auto-deduct from Operation Pool (fund_out entry)
+    const { data: loanForPool } = await supabase
+      .from('loans')
+      .select('company_id, principal, companies(name)')
+      .eq('id', approval.reference_id)
+      .single()
+
+    if (loanForPool) {
+      const companyName = (loanForPool.companies as { name: string } | null)?.name ?? 'Unknown'
+      await supabase.from('hv_operating_fund').insert({
+        transaction_type: 'fund_out' as const,
+        amount: Number(loanForPool.principal),
+        description: `Loan disbursement: ${companyName}`,
+        reference_id: approval.reference_id,
+        reference_table: 'loans',
+        created_by: user.id,
+      })
+    }
+
     // Auto-deduct primary bank account for loan disbursement
     const { data: primaryBank } = await supabase
       .from('bank_accounts')
@@ -94,59 +111,6 @@ export async function approveRequest(formData: FormData) {
         .update({ current_balance: Number(primaryBank.current_balance) - loanAmount })
         .eq('id', primaryBank.id)
     }
-  } else if (approval.request_type === 'escalation') {
-    // Escalation approval → tier downgrade on the related company.
-    // reference_id points at overdue_records; trace back to company via loan.
-    const { data: overdue } = await supabase
-      .from('overdue_records')
-      .select('loan_id')
-      .eq('id', approval.reference_id)
-      .single()
-
-    if (!overdue) {
-      throw new Error('Escalation approval recorded but overdue record not found')
-    }
-
-    const { data: loan } = await supabase
-      .from('loans')
-      .select('company_id')
-      .eq('id', overdue.loan_id)
-      .single()
-
-    if (!loan) {
-      throw new Error('Escalation approval recorded but loan not found')
-    }
-
-    const { data: company } = await supabase
-      .from('companies')
-      .select('tier, name')
-      .eq('id', loan.company_id)
-      .single()
-
-    if (!company) {
-      throw new Error('Escalation approval recorded but company not found')
-    }
-
-    // Downgrade one tier: T1→T2→T3→T4, stop at T4 (lowest).
-    // Logic extracted to `src/lib/tier.ts` + unit-tested in `tier.test.ts`
-    // (Phase 1.5 Step 1 — M3 regression lock).
-    const nextTier = computeDowngradedTier(company.tier as CompanyTier)
-
-    if (nextTier) {
-      const { error: tierError } = await supabase
-        .from('companies')
-        .update({ tier: nextTier, updated_at: now })
-        .eq('id', loan.company_id)
-
-      if (tierError) {
-        throw new Error(
-          `Escalation approved but tier downgrade failed: ${tierError.message}`
-        )
-      }
-    }
-    // If company is already at T4, approval is recorded but no downgrade
-    // is possible. Principal sees approval succeeded; next action is manual
-    // recovery / write-off (out of Phase 1 scope).
   } else if (approval.request_type === 'invoice_pool_release') {
     // Insert release transaction into invoice_payout_pool
     const { error: releaseError } = await supabase
