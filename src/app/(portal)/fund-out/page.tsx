@@ -146,7 +146,6 @@ export default async function FundOutPage() {
                   <th className="text-right py-3 pr-4 font-medium">Principal</th>
                   <th className="text-right py-3 pr-4 font-medium">Outstanding</th>
                   <th className="text-right py-3 pr-4 font-medium">Rate</th>
-                  <th className="text-right py-3 pr-4 font-medium">Rate</th>
                   <th className="text-left py-3 pr-4 font-medium">Status</th>
                   <th className="py-3 text-right"></th>
                 </tr>
@@ -178,9 +177,6 @@ export default async function FundOutPage() {
                       </td>
                       <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
                         {(Number(loan.effective_rate) * 100).toFixed(3)}%
-                      </td>
-                      <td className="py-4 pr-4 text-right font-mono text-graphite">
-                        {(Number(loan.effective_rate) * 100).toFixed(1)}%
                       </td>
                       <td className="py-4 pr-4">
                         <LoanStatusLabel status={loan.status} />
