@@ -2,9 +2,20 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import dayjs from 'dayjs'
+import DirectorPinGate from '@/components/DirectorPinGate'
+import { isDirectorPinVerified } from '../director-salary/pin-actions'
 
 export default async function DirectorPoolPage() {
-  await requireRole(['principal', 'hr', 'finance'])
+  const user = await requireRole(['principal', 'hr', 'finance'])
+
+  // Finance needs PIN verification
+  if (user.role === 'finance') {
+    const verified = await isDirectorPinVerified()
+    if (!verified) {
+      return <DirectorPinGate verified={false}><div /></DirectorPinGate>
+    }
+  }
+
   const supabase = await createClient()
 
   // Fetch both pools

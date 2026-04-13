@@ -33,7 +33,7 @@ export default function FixedSplitPanel({ currentPeriod, canGenerate }: Props) {
       <p className="font-serif italic text-graphite text-sm mb-4">
         Rent and utility monthly totals split across subsidiaries by percentage.
         HV&apos;s own share is <em>non-billable</em> and is deducted from the
-        operating fund. Split percentages are configured in{' '}
+        Venture Pool. Split percentages are configured in{' '}
         <em>Settings</em>.
       </p>
 

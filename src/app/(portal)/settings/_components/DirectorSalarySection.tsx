@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { updateDirectorConfig } from '../actions'
+import { setDirectorPin } from '../../director-salary/pin-actions'
 
 interface Director {
   id: string
@@ -115,6 +116,66 @@ export default function DirectorSalarySection({ directors }: { directors: Direct
           </span>
         )}
       </div>
+
+      {/* Director PIN Management */}
+      <DirectorPinManager />
     </section>
+  )
+}
+
+function DirectorPinManager() {
+  const [isPending, startTransition] = useTransition()
+  const [pin, setPin] = useState('')
+  const [pinMsg, setPinMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  function handleSetPin() {
+    setPinMsg(null)
+    startTransition(async () => {
+      const formData = new FormData()
+      formData.append('pin', pin)
+      const result = await setDirectorPin(formData)
+      if (result.ok) {
+        setPinMsg({ type: 'success', text: 'PIN updated.' })
+        setPin('')
+      } else {
+        setPinMsg({ type: 'error', text: result.error ?? 'Failed' })
+      }
+    })
+  }
+
+  return (
+    <div className="mt-6 pt-6 border-t border-hairline">
+      <h3 className="font-serif text-lg text-ink mb-1">Director Access PIN</h3>
+      <p className="font-serif italic text-graphite text-sm mb-4">
+        6-digit PIN required for Finance Manager to access Director Salary and Director Pool.
+        Only you (Principal) can set or change this PIN.
+      </p>
+      <div className="flex items-end gap-3">
+        <div>
+          <label className="block text-xs font-sans text-muted mb-1">New PIN (6 digits)</label>
+          <input
+            type="password"
+            inputMode="numeric"
+            maxLength={6}
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="••••••"
+            className="w-32 px-3 py-2 bg-paper border border-hairline rounded-md text-center font-mono text-lg tracking-widest text-ink focus:outline-none focus:border-accent-border"
+          />
+        </div>
+        <button
+          onClick={handleSetPin}
+          disabled={isPending || pin.length !== 6}
+          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isPending ? 'Setting…' : 'Set PIN'}
+        </button>
+        {pinMsg && (
+          <span className={`text-sm font-serif italic ${pinMsg.type === 'success' ? 'text-ledger' : 'text-danger'}`}>
+            {pinMsg.text}
+          </span>
+        )}
+      </div>
+    </div>
   )
 }

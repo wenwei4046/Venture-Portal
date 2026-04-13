@@ -7,6 +7,8 @@ import Link from 'next/link'
 import CTCInputGrid from './_components/CTCInputGrid'
 import CalculateButton from './_components/CalculateButton'
 import ConfirmPayoutsButton from './_components/ConfirmPayoutsButton'
+import DirectorPinGate from '@/components/DirectorPinGate'
+import { isDirectorPinVerified } from './pin-actions'
 
 interface Props {
   searchParams: Promise<{ period?: string }>
@@ -14,6 +16,14 @@ interface Props {
 
 export default async function DirectorSalaryPage({ searchParams }: Props) {
   const user = await requireRole(['principal', 'hr', 'finance'])
+
+  // Finance needs PIN verification to access Director section
+  if (user.role === 'finance') {
+    const verified = await isDirectorPinVerified()
+    if (!verified) {
+      return <DirectorPinGate verified={false}><div /></DirectorPinGate>
+    }
+  }
   const supabase = await createClient()
 
   const { period: rawPeriod } = await searchParams

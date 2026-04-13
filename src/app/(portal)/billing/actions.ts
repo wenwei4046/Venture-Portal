@@ -36,8 +36,13 @@ export async function generateMonthlyInvoices(
 
   const period = dayjs(rawPeriod).startOf('month').format('YYYY-MM-DD')
 
+  // Optional: generate only specific billing modes
+  const modesRaw = formData.get('modes') as string | null
+  const modes = modesRaw ? modesRaw.split(',').filter(Boolean) : null
+
   const { data, error } = await supabase.rpc('generate_monthly_invoices', {
     p_period_month: period,
+    ...(modes ? { p_modes: modes } : {}),
   })
 
   if (error) {
@@ -97,16 +102,41 @@ export async function generateFixedSplitInvoices(
 
   const result = data as unknown as FixedSplitResult
 
+  // Auto-deduct HV's non-billable share from Venture Pool
+  const hvRent = Number(result.hv_rent_share ?? 0)
+  const hvUtility = Number(result.hv_utility_share ?? 0)
+  const user = await requireRole(['finance', 'principal'])
+
+  if (hvRent > 0) {
+    await supabase.from('hv_operating_fund').insert({
+      transaction_type: 'expense_out' as const,
+      amount: hvRent,
+      description: `HV rent share — ${dayjs(period).format('MMM YYYY')}`,
+      reference_table: 'invoices',
+      created_by: user.id,
+    })
+  }
+  if (hvUtility > 0) {
+    await supabase.from('hv_operating_fund').insert({
+      transaction_type: 'expense_out' as const,
+      amount: hvUtility,
+      description: `HV utility share — ${dayjs(period).format('MMM YYYY')}`,
+      reference_table: 'invoices',
+      created_by: user.id,
+    })
+  }
+
   revalidatePath('/billing')
   revalidatePath('/statements')
   revalidatePath('/dashboard')
+  revalidatePath('/operating-fund')
 
   return {
     generated: Number(result.generated ?? 0),
     rent_invoices: Number(result.rent_invoices ?? 0),
     utility_invoices: Number(result.utility_invoices ?? 0),
-    hv_rent_share: Number(result.hv_rent_share ?? 0),
-    hv_utility_share: Number(result.hv_utility_share ?? 0),
+    hv_rent_share: hvRent,
+    hv_utility_share: hvUtility,
     period: String(result.period ?? period),
   }
 }
@@ -114,7 +144,7 @@ export async function generateFixedSplitInvoices(
 // ─── Create marketing project contract (Finance) ────────────────────────────
 
 export async function createContract(formData: FormData) {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'dept_manager'])
   const supabase = await createClient()
 
   const companyId = (formData.get('company_id') as string) ?? ''
@@ -122,6 +152,7 @@ export async function createContract(formData: FormData) {
   const amount = parseFloat((formData.get('amount') as string) ?? '0')
   const startDate = (formData.get('start_date') as string) || null
   const endDate = (formData.get('end_date') as string) || null
+  const returnPath = (formData.get('return_path') as string) || '/billing'
 
   if (!companyId) throw new Error('Company is required')
   if (!description.trim()) throw new Error('Description is required')
@@ -176,8 +207,9 @@ export async function createContract(formData: FormData) {
   })
 
   revalidatePath('/billing')
+  revalidatePath('/dept-pool')
   revalidatePath('/approvals')
-  redirect('/billing')
+  redirect(returnPath)
 }
 
 // ─── Update marketing project contract (Finance) ────────────────────────────

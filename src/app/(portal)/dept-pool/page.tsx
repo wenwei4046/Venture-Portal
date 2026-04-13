@@ -77,13 +77,21 @@ export default async function DeptPoolPage() {
 
   return (
     <div>
-      <div className="flex items-baseline justify-between mb-10">
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10">
         <div>
           <h1 className="font-serif text-3xl text-ink">Department Pools</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
             Per-department P&amp;L pools. <em>Marketing has real P&amp;L; HR and Finance are cost-to-cost.</em>
           </p>
         </div>
+        {user.role === 'dept_manager' ? (
+          <Link
+            href="/dept-pool/contracts/new"
+            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2.5 rounded-md transition-colors shrink-0"
+          >
+            New project contract
+          </Link>
+        ) : null}
       </div>
 
       {/* ───────── Hero totals ───────── */}

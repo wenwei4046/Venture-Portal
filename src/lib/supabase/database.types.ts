@@ -2844,7 +2844,7 @@ export type Database = {
         Returns: Json
       }
       generate_monthly_invoices: {
-        Args: { p_period_month: string }
+        Args: { p_period_month: string; p_modes?: string[] }
         Returns: Json
       }
       get_current_base_rate: {

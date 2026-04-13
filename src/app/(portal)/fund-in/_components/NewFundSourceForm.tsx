@@ -155,7 +155,7 @@ export default function NewFundSourceForm({ companies, directors, departments }:
             ))}
           </select>
           <p className="font-serif italic text-muted text-xs mt-1.5">
-            Transfer idle funds from this department pool into HV operating fund
+            Transfer idle funds from this department pool into Venture Pool
           </p>
         </div>
       ) : null}

@@ -6,9 +6,17 @@ import { generateMonthlyInvoices, type GenerateInvoicesResult } from '../actions
 
 interface Props {
   currentPeriod: string
+  modes?: string[]       // e.g. ['hr_pool_split'] — null = all
+  label?: string         // button label override
+  description?: string   // confirmation description override
 }
 
-export default function GenerateInvoicesButton({ currentPeriod }: Props) {
+export default function GenerateInvoicesButton({
+  currentPeriod,
+  modes,
+  label = 'Generate invoices',
+  description,
+}: Props) {
   const [isPending, startTransition] = useTransition()
   const [confirming, setConfirming] = useState(false)
   const [result, setResult] = useState<GenerateInvoicesResult | null>(null)
@@ -20,6 +28,7 @@ export default function GenerateInvoicesButton({ currentPeriod }: Props) {
 
     const formData = new FormData()
     formData.append('period_month', currentPeriod)
+    if (modes) formData.append('modes', modes.join(','))
 
     startTransition(async () => {
       try {
@@ -32,14 +41,15 @@ export default function GenerateInvoicesButton({ currentPeriod }: Props) {
     })
   }
 
+  const periodLabel = dayjs(currentPeriod).format('MMMM YYYY')
+  const modeLabel = modes ? modes.join(', ') : 'all modes'
+
   if (confirming) {
     return (
-      <div className="confirm-slide-in bg-surface border border-hairline rounded-md p-5 w-[26rem]">
-        <h3 className="font-serif text-lg text-ink mb-2">Generate invoices</h3>
+      <div className="confirm-slide-in bg-surface border border-hairline rounded-md p-5 max-w-md">
+        <h3 className="font-serif text-lg text-ink mb-2">{label}</h3>
         <p className="font-serif italic text-graphite text-sm mb-4">
-          Generates draft invoices for {dayjs(currentPeriod).format('MMMM YYYY')} from
-          the submitted HR cost snapshot + active marketing contracts.{' '}
-          <em>Already-issued invoices will be preserved.</em>
+          {description ?? `Generate draft invoices for ${periodLabel} (${modeLabel}). Already-issued invoices will be preserved.`}
         </p>
 
         {error ? (
@@ -59,10 +69,7 @@ export default function GenerateInvoicesButton({ currentPeriod }: Props) {
           </button>
           <button
             type="button"
-            onClick={() => {
-              setConfirming(false)
-              setError(null)
-            }}
+            onClick={() => { setConfirming(false); setError(null) }}
             className="text-sm text-graphite hover:text-ink font-sans"
           >
             Cancel
@@ -78,7 +85,7 @@ export default function GenerateInvoicesButton({ currentPeriod }: Props) {
         <div className="text-right text-xs">
           <div className="font-serif italic text-ledger">
             {result.generated} generated
-            {result.skipped > 0 ? `, ${result.skipped} skipped` : ''}
+            {result.skipped > 0 ? `, ${result.skipped} preserved` : ''}
           </div>
           {Object.entries(result.mode_counts).some(([, n]) => n > 0) ? (
             <div className="font-mono text-xs text-muted mt-1">
@@ -88,19 +95,14 @@ export default function GenerateInvoicesButton({ currentPeriod }: Props) {
                 .join(' · ')}
             </div>
           ) : null}
-          {result.errors.length > 0 ? (
-            <div className="font-serif italic text-danger mt-1">
-              {result.errors.length} error(s)
-            </div>
-          ) : null}
         </div>
       ) : null}
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+        className="text-xs text-accent hover:text-accent-hover font-serif italic"
       >
-        Generate invoices
+        {label}
       </button>
     </div>
   )

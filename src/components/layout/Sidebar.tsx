@@ -34,10 +34,9 @@ function isGroup(entry: NavEntry): entry is NavGroup {
   return 'children' in entry
 }
 
-const LOAN_PREFIXES = ['/fund-in', '/fund-out', '/overdue']
-
 const navEntries: NavEntry[] = [
   { href: '/dashboard', label: 'Overview', visible: () => true },
+  { href: '/payments', label: 'Payments', visible: canAccessTreasury },
   {
     label: 'Loan',
     visible: canAccessTreasury,
@@ -48,12 +47,17 @@ const navEntries: NavEntry[] = [
     ],
   },
   { href: '/statements', label: 'Statements', visible: canAccessTreasury },
-  { href: '/payments', label: 'Payments', visible: canAccessTreasury },
   { href: '/approvals', label: 'Approvals', visible: canApprove },
   { href: '/dept-pool', label: 'Dept Pool', visible: canAccessDeptPool },
   { href: '/billing', label: 'Billing', visible: canAccessBilling },
-  { href: '/director-salary', label: 'Director Salary', visible: canAccessDirectorSalary },
-  { href: '/director-pool', label: 'Director Pool', visible: canAccessDirectorSalary },
+  {
+    label: 'Director',
+    visible: canAccessDirectorSalary,
+    children: [
+      { href: '/director-salary', label: 'Director Salary', visible: canAccessDirectorSalary },
+      { href: '/director-pool', label: 'Director Pool', visible: canAccessDirectorSalary },
+    ],
+  },
   { href: '/hr-costing', label: 'HR Costing', visible: canAccessHRCosting },
   { href: '/claims', label: 'Claims', visible: canAccessClaims },
   { href: '/reconciliation', label: 'Reconciliation', visible: canAccessTreasury },
@@ -72,11 +76,25 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
   const pathname = usePathname()
   const router = useRouter()
 
-  // Auto-open Loan group if current path is a loan sub-page
-  const isLoanPath = LOAN_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + '/'))
-  const [loanOpen, setLoanOpen] = useState(isLoanPath)
-
   const visible = navEntries.filter((entry) => entry.visible(role))
+
+  // Track which groups are open. Auto-open if current path matches a child.
+  const getInitialOpen = () => {
+    const open: Record<string, boolean> = {}
+    for (const entry of visible) {
+      if (isGroup(entry)) {
+        open[entry.label] = entry.children.some(
+          (c) => pathname === c.href || pathname.startsWith(c.href + '/')
+        )
+      }
+    }
+    return open
+  }
+  const [groupOpen, setGroupOpen] = useState(getInitialOpen)
+
+  function toggleGroup(label: string) {
+    setGroupOpen((prev) => ({ ...prev, [label]: !prev[label] }))
+  }
 
   // Eagerly prefetch ALL visible routes on mount for instant navigation
   useEffect(() => {
@@ -91,10 +109,17 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Keep Loan group open when navigating between loan pages
+  // Auto-open group when navigating to a child page
   useEffect(() => {
-    if (isLoanPath) setLoanOpen(true)
-  }, [isLoanPath])
+    for (const entry of visible) {
+      if (isGroup(entry)) {
+        const match = entry.children.some(
+          (c) => pathname === c.href || pathname.startsWith(c.href + '/')
+        )
+        if (match) setGroupOpen((prev) => ({ ...prev, [entry.label]: true }))
+      }
+    }
+  }, [pathname]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-close the mobile drawer when the route changes (user clicked a link).
   useEffect(() => {
@@ -148,23 +173,24 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
             const groupActive = entry.children.some(
               (c) => pathname === c.href || pathname.startsWith(c.href + '/')
             )
+            const isOpen = !!groupOpen[entry.label]
             return (
               <div key={entry.label}>
                 <button
                   type="button"
-                  onClick={() => setLoanOpen(!loanOpen)}
+                  onClick={() => toggleGroup(entry.label)}
                   className={
-                    groupActive && !loanOpen
+                    groupActive && !isOpen
                       ? 'w-full flex items-center justify-between px-3 py-2 mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[15px]'
                       : 'w-full flex items-center justify-between px-3 py-2 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-sm font-sans'
                   }
                 >
                   {entry.label}
-                  <span className={`text-[10px] transition-transform ${loanOpen ? 'rotate-180' : ''}`}>
+                  <span className={`text-[10px] transition-transform ${isOpen ? 'rotate-180' : ''}`}>
                     ▼
                   </span>
                 </button>
-                {loanOpen ? (
+                {isOpen ? (
                   <div className="ml-3 border-l border-hairline pl-2">
                     {entry.children
                       .filter((c) => c.visible(role))

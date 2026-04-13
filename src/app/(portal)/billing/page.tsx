@@ -98,9 +98,6 @@ export default async function BillingPage({ searchParams }: Props) {
         </div>
         <div className="flex items-center gap-5 shrink-0">
           <PeriodSelector currentPeriod={period} />
-          {user.role === 'finance' && submitted ? (
-            <GenerateInvoicesButton currentPeriod={period} />
-          ) : null}
         </div>
       </div>
 
@@ -153,16 +150,51 @@ export default async function BillingPage({ searchParams }: Props) {
       {/* ───────── Invoices list (fills in once Step 5 ships) ───────── */}
       <InvoicesList invoices={invoiceList} companyMap={companyMap} period={period} />
 
-      {/* ───────── Billing modes ───────── */}
-      <HRPoolSplitSection deptSummaries={deptSummaries} submitted={submitted} />
-      <FinanceAttributionSection deptSummaries={deptSummaries} submitted={submitted} />
+      {/* ───────── Billing modes (per-department generation) ───────── */}
+      <div className="relative">
+        {user.role === 'finance' && submitted ? (
+          <div className="absolute right-0 top-10">
+            <GenerateInvoicesButton
+              currentPeriod={period}
+              modes={['hr_pool_split']}
+              label="Generate HR invoices"
+            />
+          </div>
+        ) : null}
+        <HRPoolSplitSection deptSummaries={deptSummaries} submitted={submitted} />
+      </div>
+
+      <div className="relative">
+        {user.role === 'finance' && submitted ? (
+          <div className="absolute right-0 top-10">
+            <GenerateInvoicesButton
+              currentPeriod={period}
+              modes={['finance_attribution', 'finance_mgmt_fee']}
+              label="Generate Finance invoices"
+            />
+          </div>
+        ) : null}
+        <FinanceAttributionSection deptSummaries={deptSummaries} submitted={submitted} />
+      </div>
+
       <FinanceMgmtFeeSection submitted={submitted} />
-      <MarketingProjectList
-        contracts={(marketingContracts ?? [])
-          .filter((c): c is typeof c & { company_id: string } => c.company_id !== null)}
-        companyMap={companyMap}
-        canCreate={user.role === 'finance'}
-      />
+      <div className="relative">
+        {user.role === 'finance' ? (
+          <div className="absolute right-0 top-10">
+            <GenerateInvoicesButton
+              currentPeriod={period}
+              modes={['marketing_project']}
+              label="Generate Marketing invoices"
+            />
+          </div>
+        ) : null}
+        <MarketingProjectList
+          contracts={(marketingContracts ?? [])
+            .filter((c): c is typeof c & { company_id: string } => c.company_id !== null)}
+          companyMap={companyMap}
+          canCreate={user.role === 'finance'}
+        />
+      </div>
       <FixedSplitPanel currentPeriod={period} canGenerate={user.role === 'finance'} />
       <NonBillableList />
     </div>

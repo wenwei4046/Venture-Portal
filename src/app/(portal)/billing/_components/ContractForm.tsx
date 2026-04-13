@@ -21,9 +21,10 @@ interface ContractData {
 interface Props {
   companies: Company[]
   contract?: ContractData
+  returnPath?: string  // override redirect after creation (default: /billing)
 }
 
-export default function ContractForm({ companies, contract }: Props) {
+export default function ContractForm({ companies, contract, returnPath }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
@@ -58,6 +59,7 @@ export default function ContractForm({ companies, contract }: Props) {
   return (
     <form ref={formRef} action={handleSubmit} className="max-w-2xl space-y-6">
       {contract && <input type="hidden" name="id" value={contract.id} />}
+      {returnPath && <input type="hidden" name="return_path" value={returnPath} />}
 
       {error && (
         <div className="bg-danger-bg border border-danger text-danger rounded-md p-3 text-sm font-sans">

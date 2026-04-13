@@ -1,0 +1,13 @@
+-- ============================================================================
+-- 20260101000068_fixed_split_auto_deduct.sql
+-- Auto-deduct HV's rent + utility share from Venture Pool
+-- when generating fixed split invoices.
+-- ============================================================================
+
+-- We update the server action rather than the RPC to keep the deduct logic
+-- in TypeScript (consistent with other pool operations). The RPC already
+-- returns hv_rent_share and hv_utility_share — the action will use those
+-- to insert into hv_operating_fund.
+--
+-- This is a no-op migration. The actual logic change is in:
+-- src/app/(portal)/billing/actions.ts → generateFixedSplitInvoices()

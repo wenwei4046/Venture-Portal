@@ -44,6 +44,12 @@ export async function createPaymentVoucher(formData: FormData) {
   const seq = (count ?? 0) + 1
   const voucherNo = `HV-PV-${period}-${String(seq).padStart(4, '0')}`
 
+  // Credit (receive) payments are auto-completed — no approval needed.
+  // Money flows in immediately on creation.
+  const isAutoComplete = direction === 'credit'
+  const nowIso = new Date().toISOString()
+  const todayStr = dayjs().format('YYYY-MM-DD')
+
   const { data, error } = await supabase
     .from('payment_vouchers')
     .insert({
@@ -53,7 +59,7 @@ export async function createPaymentVoucher(formData: FormData) {
       category_code: categoryCode,
       source_pool: sourcePool,
       target_pool: targetPool,
-      status: 'draft' as const,
+      status: isAutoComplete ? ('paid' as const) : ('draft' as const),
       amount,
       payee_name: payeeName,
       payee_company_id: payeeCompanyId,
@@ -64,11 +70,59 @@ export async function createPaymentVoucher(formData: FormData) {
       payment_method: paymentMethod,
       notes,
       created_by: user.id,
+      ...(isAutoComplete ? {
+        approved_by: user.id,
+        approved_at: nowIso,
+        executed_by: user.id,
+        executed_at: nowIso,
+        payment_date: todayStr,
+      } : {}),
     })
     .select('id')
     .single()
 
   if (error) throw new Error(`Failed to create voucher: ${error.message}`)
+
+  // Auto-complete credit payments: adjust bank + pool immediately
+  if (isAutoComplete) {
+    // Bank balance: add
+    if (bankAccountId) {
+      const { data: bank } = await supabase
+        .from('bank_accounts')
+        .select('current_balance, gl_account_code')
+        .eq('id', bankAccountId)
+        .single()
+      if (bank) {
+        await supabase
+          .from('bank_accounts')
+          .update({ current_balance: Number(bank.current_balance) + amount })
+          .eq('id', bankAccountId)
+      }
+    }
+    // Pool balance: add to target pool
+    if (targetPool) {
+      await adjustPool(supabase, targetPool, 'in', r2(amount), `PV ${voucherNo}: ${description}`, user.id, null, nowIso)
+    }
+    // GL journal entry (non-blocking)
+    try {
+      const bankGlCode = bankAccountId
+        ? ((await supabase.from('bank_accounts').select('gl_account_code').eq('id', bankAccountId).single()).data?.gl_account_code ?? '1010')
+        : '1010'
+      await postJournalEntry(supabase, {
+        transactionDate: todayStr,
+        description: `PV ${voucherNo}: ${description}`,
+        referenceType: 'payment_voucher',
+        referenceId: data.id,
+        lines: [
+          { accountCode: bankGlCode, debit: r2(amount), description: `Bank deposit — ${voucherNo}` },
+          { accountCode: '1040', credit: r2(amount), description: `Payment received — ${payeeName}` },
+        ],
+        createdBy: user.id,
+      })
+    } catch {
+      console.error('GL posting failed for auto-complete credit voucher', data.id)
+    }
+  }
 
   // ── Upload attachments to Supabase Storage ──
   const attachmentCount = parseInt((formData.get('attachment_count') as string) ?? '0', 10)
@@ -431,6 +485,17 @@ async function adjustPool(
           approval_id: direction === 'out' ? approvalId : null,
           created_by: userId,
         })
+
+        // When money flows OUT of a dept pool, it flows INTO Venture Pool
+        if (direction === 'out') {
+          await supabase.from('hv_operating_fund').insert({
+            transaction_type: 'profit_in' as const,
+            amount,
+            description: `Dept pool transfer: ${description}`,
+            reference_table: 'dept_pools',
+            created_by: userId,
+          })
+        }
       }
     }
   } catch (err) {

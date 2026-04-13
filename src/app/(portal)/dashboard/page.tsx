@@ -786,7 +786,7 @@ export default async function DashboardPage() {
                         <div className="font-mono tabular font-medium text-ink">{formatMoney(summary.pool_breakdown.dept_pool)}</div>
                       </div>
                       <div>
-                        <div className="font-mono text-xs text-muted uppercase tracking-wide mb-1">HV Operating Fund</div>
+                        <div className="font-mono text-xs text-muted uppercase tracking-wide mb-1">Venture Pool</div>
                         <div className="font-mono tabular font-medium text-ink">{formatMoney(summary.pool_breakdown.hv_operating_fund)}</div>
                       </div>
                     </div>

@@ -7,7 +7,7 @@ import { formatMoney } from '@/lib/utils'
 import PaymentTabs from './_components/PaymentTabs'
 
 const POOL_LABELS: Record<string, string> = {
-  hv_operating_fund: 'HV Operating',
+  hv_operating_fund: 'Venture Pool',
   salary_pool: 'Salary Pool',
   dept_pool_marketing: 'Marketing',
   dept_pool_finance: 'Finance',

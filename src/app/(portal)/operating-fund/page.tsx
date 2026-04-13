@@ -31,7 +31,7 @@ export default async function OperatingFundPage() {
   return (
     <div>
       <div className="mb-10">
-        <h1 className="font-serif text-3xl text-ink">HV Operating Fund</h1>
+        <h1 className="font-serif text-3xl text-ink">Venture Pool</h1>
         <p className="font-serif italic text-graphite text-base mt-2">
           Fund deposits, loan disbursements, director savings, and statutory surplus.
         </p>

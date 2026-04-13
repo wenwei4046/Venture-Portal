@@ -114,7 +114,7 @@ export default async function FundSummaryPage() {
           <h2 className="font-sans text-xs uppercase tracking-wide text-muted font-semibold mb-4">Free Capital</h2>
           <div className="space-y-2">
             <div className="flex items-baseline justify-between">
-              <span className="font-serif text-sm text-graphite">HV Operating Fund</span>
+              <span className="font-serif text-sm text-graphite">Venture Pool</span>
               <span className="font-mono tabular text-sm font-medium text-ink">{formatMoney(hvFundBalance)}</span>
             </div>
             <div className="flex items-baseline justify-between">
@@ -155,7 +155,7 @@ export default async function FundSummaryPage() {
               { name: 'Loans Outstanding', value: loansOutstanding },
               { name: 'Buffer', value: bufferAmount },
               { name: 'Invoice Pool', value: invoicePoolBalance },
-              { name: 'HV Operating Fund', value: hvFundBalance },
+              { name: 'Venture Pool', value: hvFundBalance },
               { name: 'Dept Pool', value: deptPoolBalance },
               { name: 'Free Cash', value: Math.max(0, freeCash) },
             ]}

@@ -11,7 +11,7 @@ export default function NonBillableList() {
         <span className="font-serif italic text-muted text-xs">non_billable</span>
       </div>
       <p className="font-serif italic text-graphite text-sm mb-4">
-        Group-level expenses deducted from the HV operating fund instead of
+        Group-level expenses deducted from the Venture Pool instead of
         invoiced. HV&apos;s rent share lands here automatically.
       </p>
 
@@ -19,7 +19,7 @@ export default function NonBillableList() {
         <p className="font-serif italic text-muted text-sm">
           Non-billable entry form lands in a future phase. Automatic deductions
           from invoice generation (HV rent share, etc.) already flow through
-          <em> hv_operating_fund</em>.
+          the Venture Pool.
         </p>
       </div>
     </section>

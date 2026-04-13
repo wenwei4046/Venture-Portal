@@ -19,6 +19,8 @@
   "dependencies": {
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.0",
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
     "dayjs": "^1.11.13",
     "next": "^15.0.0",
     "react": "^19.0.0",

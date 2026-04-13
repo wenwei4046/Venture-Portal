@@ -11,7 +11,7 @@ interface Props {
 }
 
 const POOL_OPTIONS = [
-  { value: 'hv_operating_fund', label: 'HV Operating Fund' },
+  { value: 'hv_operating_fund', label: 'Venture Pool' },
   { value: 'salary_pool', label: 'Director Salary Pool' },
   { value: 'dept_pool_marketing', label: 'Marketing Dept Pool' },
   { value: 'dept_pool_finance', label: 'Finance Dept Pool' },
