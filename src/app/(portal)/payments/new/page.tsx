@@ -4,6 +4,24 @@ import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import NewPaymentForm from '../_components/NewPaymentForm'
 
+// Settlement routing: when a sub pays an invoice, the money logically lands
+// in the dept pool that generated the service (HR OpEx → HR Pool, etc.).
+// fixed_split (rent/utility) stays on Venture Pool since HV is the landlord.
+function poolForBillingMode(mode: string): string {
+  switch (mode) {
+    case 'hr_pool_split':
+      return 'dept_pool_hr'
+    case 'finance_attribution':
+    case 'finance_mgmt_fee':
+      return 'dept_pool_finance'
+    case 'marketing_project':
+      return 'dept_pool_marketing'
+    case 'fixed_split':
+    default:
+      return 'hv_operating_fund'
+  }
+}
+
 interface Props {
   searchParams: Promise<{ invoice_id?: string }>
 }
@@ -32,6 +50,7 @@ export default async function NewPaymentPage({ searchParams }: Props) {
     total_amount: number
     period_month: string
     billing_mode: string
+    target_pool: string
   } | null = null
 
   if (invoiceId) {
@@ -51,6 +70,7 @@ export default async function NewPaymentPage({ searchParams }: Props) {
         total_amount: Number(inv.total_amount),
         period_month: inv.period_month,
         billing_mode: inv.billing_mode,
+        target_pool: poolForBillingMode(inv.billing_mode),
       }
     }
   }
@@ -65,14 +85,15 @@ export default async function NewPaymentPage({ searchParams }: Props) {
           ← Back to {invoicePreset ? 'Billing' : 'Payments'}
         </Link>
         <h1 className="font-serif text-3xl text-ink mt-3">
-          {invoicePreset ? 'Pay invoice' : 'Create payment'}
+          {invoicePreset ? 'Settle invoice' : 'Create payment'}
         </h1>
         <p className="font-serif italic text-graphite text-base mt-2">
           {invoicePreset ? (
             <>
-              Paying invoice <span className="font-mono text-ink">{invoicePreset.invoice_no}</span> —{' '}
+              Recording payment received for invoice{' '}
+              <span className="font-mono text-ink">{invoicePreset.invoice_no}</span> —{' '}
               {invoicePreset.company_name} · {dayjs(invoicePreset.period_month).format('MMM YYYY')}.
-              Principal must approve before execution.
+              Credit voucher, auto-approved on save.
             </>
           ) : (
             <>

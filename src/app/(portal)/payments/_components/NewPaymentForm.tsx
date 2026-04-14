@@ -12,6 +12,7 @@ interface InvoicePreset {
   total_amount: number
   period_month: string
   billing_mode: string
+  target_pool: string
 }
 
 interface Props {
@@ -41,10 +42,10 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const isInvoicePay = !!invoicePreset
-  const [direction, setDirection] = useState<'debit' | 'credit'>('debit')
+  const [direction, setDirection] = useState<'debit' | 'credit'>(isInvoicePay ? 'credit' : 'debit')
   const [categoryCode, setCategoryCode] = useState(isInvoicePay ? 'billing_payment' : '')
-  const [sourcePool, setSourcePool] = useState(isInvoicePay ? 'hv_operating_fund' : '')
-  const [targetPool, setTargetPool] = useState('')
+  const [sourcePool, setSourcePool] = useState('')
+  const [targetPool, setTargetPool] = useState(isInvoicePay ? invoicePreset!.target_pool : '')
   const [files, setFiles] = useState<File[]>([])
   const [showNewCategory, setShowNewCategory] = useState(false)
   const [newCatLabel, setNewCatLabel] = useState('')
@@ -82,47 +83,51 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
 
   return (
     <form ref={formRef} action={handleSubmit} className="bg-surface border border-hairline rounded-md p-8 max-w-3xl">
-      {/* ── Direction toggle (Debit / Credit) ── */}
-      <div className="mb-6">
-        <label className="block text-sm font-sans font-medium text-graphite mb-2">
-          Direction
-        </label>
-        <div className="flex gap-0 border border-hairline rounded-md overflow-hidden w-fit">
-          <button
-            type="button"
-            onClick={() => { setDirection('debit'); setTargetPool('') }}
-            className={direction === 'debit'
-              ? 'px-5 py-2 bg-accent-bg text-accent font-serif italic text-sm'
-              : 'px-5 py-2 text-graphite font-sans text-sm hover:bg-surface-2'}
-          >
-            Debit (pay out)
-          </button>
-          <button
-            type="button"
-            onClick={() => { setDirection('credit'); setSourcePool('') }}
-            className={direction === 'credit'
-              ? 'px-5 py-2 bg-accent-bg text-accent font-serif italic text-sm border-l border-hairline'
-              : 'px-5 py-2 text-graphite font-sans text-sm hover:bg-surface-2 border-l border-hairline'}
-          >
-            Credit (receive)
-          </button>
+      {/* Direction: toggle for standalone vouchers, locked to credit when settling an invoice */}
+      {isInvoicePay ? (
+        <input type="hidden" name="direction" value="credit" />
+      ) : (
+        <div className="mb-6">
+          <label className="block text-sm font-sans font-medium text-graphite mb-2">
+            Direction
+          </label>
+          <div className="flex gap-0 border border-hairline rounded-md overflow-hidden w-fit">
+            <button
+              type="button"
+              onClick={() => { setDirection('debit'); setTargetPool('') }}
+              className={direction === 'debit'
+                ? 'px-5 py-2 bg-accent-bg text-accent font-serif italic text-sm'
+                : 'px-5 py-2 text-graphite font-sans text-sm hover:bg-surface-2'}
+            >
+              Debit (pay out)
+            </button>
+            <button
+              type="button"
+              onClick={() => { setDirection('credit'); setSourcePool('') }}
+              className={direction === 'credit'
+                ? 'px-5 py-2 bg-accent-bg text-accent font-serif italic text-sm border-l border-hairline'
+                : 'px-5 py-2 text-graphite font-sans text-sm hover:bg-surface-2 border-l border-hairline'}
+            >
+              Credit (receive)
+            </button>
+          </div>
+          <input type="hidden" name="direction" value={direction} />
         </div>
-        <input type="hidden" name="direction" value={direction} />
-        {/* Auto-set voucher_type based on direction (or billing_payment when paying an invoice) */}
-        <input
-          type="hidden"
-          name="voucher_type"
-          value={isInvoicePay ? 'billing_payment' : direction === 'debit' ? 'expense' : 'receive_payment'}
-        />
-        {isInvoicePay ? <input type="hidden" name="invoice_id" value={invoicePreset!.id} /> : null}
-      </div>
+      )}
+      {/* voucher_type: billing_payment when settling, else derived from direction */}
+      <input
+        type="hidden"
+        name="voucher_type"
+        value={isInvoicePay ? 'billing_payment' : direction === 'debit' ? 'expense' : 'receive_payment'}
+      />
+      {isInvoicePay ? <input type="hidden" name="invoice_id" value={invoicePreset!.id} /> : null}
 
       {isInvoicePay ? (
         <div className="mb-6 border border-accent-border rounded-md bg-accent-bg p-4">
-          <div className="font-serif italic text-accent text-sm mb-1">Paying invoice</div>
+          <div className="font-serif italic text-accent text-sm mb-1">Settling invoice</div>
           <div className="font-mono text-sm text-ink mb-1">{invoicePreset!.invoice_no}</div>
           <div className="font-serif text-sm text-graphite">
-            {invoicePreset!.company_name} — RM {invoicePreset!.total_amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
+            {invoicePreset!.company_name} paid RM {invoicePreset!.total_amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
           </div>
         </div>
       ) : null}

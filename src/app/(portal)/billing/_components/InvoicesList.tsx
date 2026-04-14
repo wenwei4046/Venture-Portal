@@ -149,7 +149,7 @@ export default function InvoicesList({ invoices, companyMap, period }: Props) {
                             href={`/payments/new?invoice_id=${inv.id}`}
                             className="text-xs text-accent hover:text-accent-hover font-serif italic"
                           >
-                            Pay →
+                            Settle →
                           </Link>
                         ) : null}
                       </td>
