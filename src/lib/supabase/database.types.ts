@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       access_log: {
@@ -1969,6 +1994,7 @@ export type Database = {
           executed_at: string | null
           executed_by: string | null
           id: string
+          invoice_id: string | null
           journal_entry_id: string | null
           notes: string | null
           payee_company_id: string | null
@@ -2001,6 +2027,7 @@ export type Database = {
           executed_at?: string | null
           executed_by?: string | null
           id?: string
+          invoice_id?: string | null
           journal_entry_id?: string | null
           notes?: string | null
           payee_company_id?: string | null
@@ -2033,6 +2060,7 @@ export type Database = {
           executed_at?: string | null
           executed_by?: string | null
           id?: string
+          invoice_id?: string | null
           journal_entry_id?: string | null
           notes?: string | null
           payee_company_id?: string | null
@@ -2098,6 +2126,13 @@ export type Database = {
             columns: ["executed_by"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_vouchers_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
           {
@@ -2844,7 +2879,7 @@ export type Database = {
         Returns: Json
       }
       generate_monthly_invoices: {
-        Args: { p_period_month: string; p_modes?: string[] }
+        Args: { p_modes?: string[]; p_period_month: string }
         Returns: Json
       }
       get_current_base_rate: {
@@ -3168,6 +3203,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       account_type: ["asset", "liability", "equity", "revenue", "expense"],

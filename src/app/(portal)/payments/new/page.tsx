@@ -1,11 +1,18 @@
 import Link from 'next/link'
+import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import NewPaymentForm from '../_components/NewPaymentForm'
 
-export default async function NewPaymentPage() {
+interface Props {
+  searchParams: Promise<{ invoice_id?: string }>
+}
+
+export default async function NewPaymentPage({ searchParams }: Props) {
   await requireRole(['finance'])
   const supabase = await createClient()
+
+  const { invoice_id: invoiceId } = await searchParams
 
   const [
     { data: companies },
@@ -17,19 +24,62 @@ export default async function NewPaymentPage() {
     supabase.from('payment_categories').select('code, label').eq('is_active', true).order('sort_order'),
   ])
 
+  let invoicePreset: {
+    id: string
+    invoice_no: string | null
+    company_id: string
+    company_name: string
+    total_amount: number
+    period_month: string
+    billing_mode: string
+  } | null = null
+
+  if (invoiceId) {
+    const { data: inv } = await supabase
+      .from('invoices')
+      .select('id, invoice_no, company_id, total_amount, period_month, billing_mode, status, companies(name)')
+      .eq('id', invoiceId)
+      .single()
+
+    if (inv && inv.status !== 'paid' && inv.status !== 'paid_via_netting') {
+      const company = (inv.companies as { name: string } | null) ?? null
+      invoicePreset = {
+        id: inv.id,
+        invoice_no: inv.invoice_no,
+        company_id: inv.company_id,
+        company_name: company?.name ?? '—',
+        total_amount: Number(inv.total_amount),
+        period_month: inv.period_month,
+        billing_mode: inv.billing_mode,
+      }
+    }
+  }
+
   return (
     <div>
       <div className="mb-10">
         <Link
-          href="/payments"
+          href={invoicePreset ? '/billing' : '/payments'}
           className="text-sm text-muted hover:text-accent font-sans transition-colors"
         >
-          ← Back to Payments
+          ← Back to {invoicePreset ? 'Billing' : 'Payments'}
         </Link>
-        <h1 className="font-serif text-3xl text-ink mt-3">Create payment</h1>
+        <h1 className="font-serif text-3xl text-ink mt-3">
+          {invoicePreset ? 'Pay invoice' : 'Create payment'}
+        </h1>
         <p className="font-serif italic text-graphite text-base mt-2">
-          Every bank transfer, expense, repayment, or claim payout goes through a payment voucher.
-          Principal must approve before execution.
+          {invoicePreset ? (
+            <>
+              Paying invoice <span className="font-mono text-ink">{invoicePreset.invoice_no}</span> —{' '}
+              {invoicePreset.company_name} · {dayjs(invoicePreset.period_month).format('MMM YYYY')}.
+              Principal must approve before execution.
+            </>
+          ) : (
+            <>
+              Every bank transfer, expense, repayment, or claim payout goes through a payment voucher.
+              Principal must approve before execution.
+            </>
+          )}
         </p>
       </div>
 
@@ -37,6 +87,7 @@ export default async function NewPaymentPage() {
         companies={companies ?? []}
         bankAccounts={bankAccounts ?? []}
         categories={categories ?? []}
+        invoicePreset={invoicePreset}
       />
     </div>
   )

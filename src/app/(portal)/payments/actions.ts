@@ -21,6 +21,7 @@ export async function createPaymentVoucher(formData: FormData) {
   const bankAccountId = (formData.get('bank_account_id') as string) || null
   const referenceType = (formData.get('reference_type') as string) || null
   const referenceId = (formData.get('reference_id') as string) || null
+  const invoiceId = (formData.get('invoice_id') as string) || null
   const description = (formData.get('description') as string)?.trim() ?? ''
   const paymentMethod = (formData.get('payment_method') as string) || 'bank_transfer'
   const direction = (formData.get('direction') as string) || 'debit'
@@ -35,6 +36,29 @@ export async function createPaymentVoucher(formData: FormData) {
   if (isNaN(amount) || amount <= 0) throw new Error('Amount must be greater than 0')
   if (!payeeName) throw new Error('Payee name is required')
   if (!description) throw new Error('Description is required')
+  if (voucherType === 'billing_payment' && !invoiceId) {
+    throw new Error('Billing payment requires a linked invoice')
+  }
+  if (voucherType === 'billing_payment' && invoiceId) {
+    const { data: openInv } = await supabase
+      .from('invoices')
+      .select('id, status')
+      .eq('id', invoiceId)
+      .in('status', ['issued', 'draft'])
+      .maybeSingle()
+    if (!openInv) {
+      throw new Error('Invoice is not open for payment (already paid, via netting, or does not exist)')
+    }
+    const { data: existingVoucher } = await supabase
+      .from('payment_vouchers')
+      .select('id, voucher_no')
+      .eq('invoice_id', invoiceId)
+      .in('status', ['draft', 'pending_approval', 'approved', 'paid'])
+      .maybeSingle()
+    if (existingVoucher) {
+      throw new Error(`Voucher ${existingVoucher.voucher_no} already exists for this invoice`)
+    }
+  }
 
   // Generate voucher number: HV-PV-YYYYMM-NNNN
   const period = dayjs().format('YYYYMM')
@@ -66,6 +90,7 @@ export async function createPaymentVoucher(formData: FormData) {
       bank_account_id: bankAccountId,
       reference_type: referenceType,
       reference_id: referenceId,
+      invoice_id: invoiceId,
       description,
       payment_method: paymentMethod,
       notes,

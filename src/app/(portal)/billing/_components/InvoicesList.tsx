@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
 
@@ -99,7 +100,8 @@ export default function InvoicesList({ invoices, companyMap, period }: Props) {
                   <th className="text-left py-3 pr-4 font-medium">Company</th>
                   <th className="text-left py-3 pr-4 font-medium">Mode</th>
                   <th className="text-right py-3 pr-4 font-medium">Amount</th>
-                  <th className="text-left py-3 font-medium">Status</th>
+                  <th className="text-left py-3 pr-4 font-medium">Status</th>
+                  <th className="text-right py-3 font-medium">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -127,8 +129,18 @@ export default function InvoicesList({ invoices, companyMap, period }: Props) {
                       <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">
                         {formatMoney(Number(inv.total_amount))}
                       </td>
-                      <td className="py-3">
+                      <td className="py-3 pr-4">
                         <InvoiceStatus status={inv.status} />
+                      </td>
+                      <td className="py-3 text-right">
+                        {inv.status === 'issued' || inv.status === 'draft' ? (
+                          <Link
+                            href={`/payments/new?invoice_id=${inv.id}`}
+                            className="text-xs text-accent hover:text-accent-hover font-serif italic"
+                          >
+                            Pay →
+                          </Link>
+                        ) : null}
                       </td>
                     </tr>
                   )

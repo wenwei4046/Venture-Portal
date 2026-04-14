@@ -4,10 +4,21 @@ import { useState, useTransition, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { createPaymentVoucher, createPaymentCategory } from '../actions'
 
+interface InvoicePreset {
+  id: string
+  invoice_no: string | null
+  company_id: string
+  company_name: string
+  total_amount: number
+  period_month: string
+  billing_mode: string
+}
+
 interface Props {
   companies: { id: string; name: string; short_code: string }[]
   bankAccounts: { id: string; bank_name: string; account_number: string; current_balance: number }[]
   categories: { code: string; label: string }[]
+  invoicePreset?: InvoicePreset | null
 }
 
 const POOL_OPTIONS = [
@@ -26,12 +37,13 @@ const PAYMENT_METHODS = [
   { value: 'netting', label: 'Netting / offset' },
 ]
 
-export default function NewPaymentForm({ companies, bankAccounts, categories }: Props) {
+export default function NewPaymentForm({ companies, bankAccounts, categories, invoicePreset }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const isInvoicePay = !!invoicePreset
   const [direction, setDirection] = useState<'debit' | 'credit'>('debit')
-  const [categoryCode, setCategoryCode] = useState('')
-  const [sourcePool, setSourcePool] = useState('')
+  const [categoryCode, setCategoryCode] = useState(isInvoicePay ? 'billing_payment' : '')
+  const [sourcePool, setSourcePool] = useState(isInvoicePay ? 'hv_operating_fund' : '')
   const [targetPool, setTargetPool] = useState('')
   const [files, setFiles] = useState<File[]>([])
   const [showNewCategory, setShowNewCategory] = useState(false)
@@ -96,9 +108,24 @@ export default function NewPaymentForm({ companies, bankAccounts, categories }: 
           </button>
         </div>
         <input type="hidden" name="direction" value={direction} />
-        {/* Auto-set voucher_type based on direction */}
-        <input type="hidden" name="voucher_type" value={direction === 'debit' ? 'expense' : 'receive_payment'} />
+        {/* Auto-set voucher_type based on direction (or billing_payment when paying an invoice) */}
+        <input
+          type="hidden"
+          name="voucher_type"
+          value={isInvoicePay ? 'billing_payment' : direction === 'debit' ? 'expense' : 'receive_payment'}
+        />
+        {isInvoicePay ? <input type="hidden" name="invoice_id" value={invoicePreset!.id} /> : null}
       </div>
+
+      {isInvoicePay ? (
+        <div className="mb-6 border border-accent-border rounded-md bg-accent-bg p-4">
+          <div className="font-serif italic text-accent text-sm mb-1">Paying invoice</div>
+          <div className="font-mono text-sm text-ink mb-1">{invoicePreset!.invoice_no}</div>
+          <div className="font-serif text-sm text-graphite">
+            {invoicePreset!.company_name} — RM {invoicePreset!.total_amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
+          </div>
+        </div>
+      ) : null}
 
       {/* ── Payee ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
@@ -111,6 +138,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories }: 
             name="payee_name"
             type="text"
             required
+            defaultValue={isInvoicePay ? invoicePreset!.company_name : ''}
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
             placeholder={direction === 'debit' ? 'Recipient name' : 'Payer name'}
           />
@@ -123,6 +151,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories }: 
           <select
             id="payee_company_id"
             name="payee_company_id"
+            defaultValue={isInvoicePay ? invoicePreset!.company_id : ''}
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
           >
             <option value="">Select company…</option>
@@ -152,6 +181,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories }: 
               step="0.01"
               min="0.01"
               required
+              defaultValue={isInvoicePay ? invoicePreset!.total_amount.toFixed(2) : ''}
               className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
               placeholder="0.00"
             />
@@ -316,6 +346,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories }: 
           name="description"
           rows={3}
           required
+          defaultValue={isInvoicePay ? `Settle invoice ${invoicePreset!.invoice_no} — ${invoicePreset!.company_name}` : ''}
           className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
           placeholder="What is this payment for? Include reference numbers, invoice numbers, etc."
         />
