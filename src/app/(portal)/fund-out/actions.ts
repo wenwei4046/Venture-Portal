@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { assertPeriodOpen } from '@/lib/period-lock'
 import type { PaymentType } from '@/types'
 
 // ─── Create new loan (Finance) ────────────────────────────────────────────────
@@ -123,6 +124,8 @@ export async function recordRepayment(formData: FormData) {
   if (dayjs(paymentDate).isAfter(dayjs(), 'day')) {
     throw new Error('Payment date cannot be in the future')
   }
+
+  await assertPeriodOpen(supabase, paymentDate)
 
   // Check loan is active and amount doesn't exceed outstanding for principal payments
   const { data: loan, error: loanError } = await supabase

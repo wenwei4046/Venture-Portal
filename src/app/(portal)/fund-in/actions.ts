@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { assertPeriodOpen } from '@/lib/period-lock'
 import type { FundSourceType } from '@/types'
 
 interface CreateFundSourceInput {
@@ -64,6 +65,8 @@ export async function createFundSource(formData: FormData) {
   if (dayjs(raw.effective_date).isAfter(dayjs(), 'day')) {
     throw new Error('Effective date cannot be in the future')
   }
+
+  await assertPeriodOpen(supabase, raw.effective_date)
 
   // ── Balance validation for department_pool ──
   if (raw.source_type === 'department_pool') {

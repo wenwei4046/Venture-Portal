@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { assertPeriodOpen } from '@/lib/period-lock'
 
 // ─── Detect overdue loans (Finance) ───────────────────────────────────────────
 
@@ -161,6 +162,8 @@ export async function markOverduePaid(formData: FormData) {
 
   const id = (formData.get('id') as string) ?? ''
   if (!id) throw new Error('Overdue record id is required')
+
+  await assertPeriodOpen(supabase, new Date())
 
   const { error } = await supabase
     .from('overdue_records')

@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { assertPeriodOpen } from '@/lib/period-lock'
 import {
   billingModeToCategoryCode,
   billingModeLabel,
@@ -22,6 +23,8 @@ export async function generateStatements(formData: FormData) {
 
   // Normalize to first of month
   const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
+
+  await assertPeriodOpen(supabase, period)
 
   // 1. Get all active companies
   const { data: companies, error: companiesError } = await supabase
@@ -214,6 +217,15 @@ export async function issueStatement(formData: FormData) {
   const id = (formData.get('id') as string) ?? ''
   if (!id) throw new Error('Statement id is required')
 
+  const { data: stmt } = await supabase
+    .from('monthly_statements')
+    .select('period_month')
+    .eq('id', id)
+    .single()
+  if (stmt?.period_month) {
+    await assertPeriodOpen(supabase, stmt.period_month)
+  }
+
   const { error } = await supabase
     .from('monthly_statements')
     .update({
@@ -238,6 +250,8 @@ export async function markStatementPaid(formData: FormData) {
 
   const id = (formData.get('id') as string) ?? ''
   if (!id) throw new Error('Statement id is required')
+
+  await assertPeriodOpen(supabase, new Date())
 
   const { error } = await supabase
     .from('monthly_statements')

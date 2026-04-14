@@ -10,9 +10,10 @@ import DirectorSalarySection from './_components/DirectorSalarySection'
 import BaseRateSimulator from './_components/BaseRateSimulator'
 import BankAccountsSection from './_components/BankAccountsSection'
 import CompaniesSection from './_components/CompaniesSection'
+import PeriodsSection from './_components/PeriodsSection'
 import SettingsTabs, { type SettingsTab } from './_components/SettingsTabs'
 
-const VALID_TABS: SettingsTab[] = ['treasury', 'overdue', 'splits', 'directors', 'companies', 'banks', 'simulator']
+const VALID_TABS: SettingsTab[] = ['treasury', 'overdue', 'splits', 'directors', 'companies', 'banks', 'periods', 'simulator']
 function isValidTab(s: string | undefined): s is SettingsTab {
   return !!s && (VALID_TABS as string[]).includes(s)
 }
@@ -46,6 +47,7 @@ export default async function SettingsPage({ searchParams }: Props) {
     { data: fundSourceRows },
     { data: latestBaseRate },
     { data: bankAccountRows },
+    { data: periodLockRows },
   ] = await Promise.all([
     supabase.from('treasury_config').select('*'),
     supabase.from('overdue_config').select('*'),
@@ -56,6 +58,7 @@ export default async function SettingsPage({ searchParams }: Props) {
     supabase.from('fund_sources').select('amount, cost_rate').eq('status', 'active'),
     supabase.from('base_rate_history').select('weighted_cost, op_margin, base_rate').order('approved_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('bank_accounts').select('*').order('is_primary', { ascending: false }),
+    supabase.from('period_locks').select('period_month, is_locked, closed_at, notes').order('period_month', { ascending: false }),
   ])
 
   const treasury = (treasuryRows ?? []) as TreasuryConfig[]
@@ -165,6 +168,17 @@ export default async function SettingsPage({ searchParams }: Props) {
             gl_account_code: a.gl_account_code,
             status: a.status,
             notes: a.notes,
+          }))}
+        />
+      )}
+
+      {activeTab === 'periods' && (
+        <PeriodsSection
+          locks={(periodLockRows ?? []).map((l) => ({
+            period_month: l.period_month,
+            is_locked: l.is_locked,
+            closed_at: l.closed_at,
+            notes: l.notes,
           }))}
         />
       )}

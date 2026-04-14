@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { assertPeriodOpen } from '@/lib/period-lock'
 import { notifyApprovalDecision } from '@/lib/slack'
 
 // ─── Approve request (Principal) ──────────────────────────────────────────────
@@ -33,6 +34,9 @@ export async function approveRequest(formData: FormData) {
   if (approval.submitted_by === user.id) {
     throw new Error('Cannot approve your own submission')
   }
+
+  // Approving moves money (loan disbursement, voucher exec, pool release) — block if today's period is locked
+  await assertPeriodOpen(supabase, new Date())
 
   const now = new Date().toISOString()
 

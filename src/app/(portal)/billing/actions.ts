@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { assertPeriodOpen } from '@/lib/period-lock'
 
 export interface GenerateInvoicesResult {
   generated: number
@@ -35,6 +36,8 @@ export async function generateMonthlyInvoices(
   if (!rawPeriod) throw new Error('Period month is required')
 
   const period = dayjs(rawPeriod).startOf('month').format('YYYY-MM-DD')
+
+  await assertPeriodOpen(supabase, period)
 
   // Optional: generate only specific billing modes
   const modesRaw = formData.get('modes') as string | null
@@ -89,6 +92,8 @@ export async function generateFixedSplitInvoices(
   }
 
   const period = dayjs(rawPeriod).startOf('month').format('YYYY-MM-DD')
+
+  await assertPeriodOpen(supabase, period)
 
   const { data, error } = await supabase.rpc('generate_fixed_split_invoices', {
     p_period_month: period,
@@ -310,6 +315,8 @@ export async function approveCreditNote(formData: FormData) {
 
   const id = formData.get('id') as string
   if (!id) throw new Error('Credit note id is required')
+
+  await assertPeriodOpen(supabase, new Date())
 
   const { error } = await supabase
     .from('credit_notes')

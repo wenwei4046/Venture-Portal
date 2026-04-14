@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { assertPeriodOpen } from '@/lib/period-lock'
 
 export async function submitClaim(formData: FormData) {
   const user = await requireRole(['principal', 'finance', 'hr', 'dept_manager'])
@@ -49,6 +50,9 @@ export async function approveClaim(claimId: string) {
   if (claim.claim_type === 'benefit' && user.role !== 'hr' && user.role !== 'principal') {
     throw new Error('Only HR or Principal can approve benefit claims')
   }
+
+  // Approving a project claim moves money from the Director Saving Pool (hv_operating_fund)
+  await assertPeriodOpen(supabase, new Date())
 
   const { error } = await supabase
     .from('claims')

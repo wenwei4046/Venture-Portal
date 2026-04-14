@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { assertPeriodOpen } from '@/lib/period-lock'
 
 // ─── Submit HR cost summary for a period (HR) ────────────────────────────────
 
@@ -21,6 +22,8 @@ export async function submitHRCostSummary(formData: FormData) {
   if (dayjs(period).isAfter(dayjs().startOf('month'))) {
     throw new Error('Cannot submit for a future period')
   }
+
+  await assertPeriodOpen(supabase, period)
 
   // Build snapshot payload via SECURITY DEFINER RPC (reads all hr_staff_costs).
   const { data: payload, error: payloadErr } = await supabase

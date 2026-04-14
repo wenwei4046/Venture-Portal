@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { assertPeriodOpen } from '@/lib/period-lock'
 import {
   calculatePool,
   calculateDirectorPayout,
@@ -27,6 +28,8 @@ export async function saveCTC(formData: FormData) {
   const allowance = parseFloat(formData.get('allowance') as string) || 0
 
   const period = dayjs(periodRaw).startOf('month').format('YYYY-MM-DD')
+
+  await assertPeriodOpen(supabase, period)
 
   // Upsert CTC record (trigger auto-computes statutory + total_ctc)
   const { error } = await supabase.from('director_ctc').upsert(
@@ -65,6 +68,8 @@ export async function batchSaveCTC(period: string, records: BatchCTCInput[]) {
   const supabase = await createClient()
 
   const periodNorm = dayjs(period).startOf('month').format('YYYY-MM-DD')
+
+  await assertPeriodOpen(supabase, periodNorm)
 
   const rows = records
     .filter(r => r.basic > 0 || r.kpi > 0 || r.allowance > 0)
@@ -106,6 +111,8 @@ export async function calculateDirectorSalary(period: string): Promise<Calculate
   const supabase = await createClient()
 
   const periodNorm = dayjs(period).startOf('month').format('YYYY-MM-DD')
+
+  await assertPeriodOpen(supabase, periodNorm)
 
   // 1. Fetch CTC records for this period
   const { data: ctcRows, error: ctcErr } = await supabase
@@ -350,6 +357,8 @@ export async function confirmPayouts(period: string) {
   const supabase = await createClient()
 
   const periodNorm = dayjs(period).startOf('month').format('YYYY-MM-DD')
+
+  await assertPeriodOpen(supabase, periodNorm)
 
   const { error, count } = await supabase
     .from('director_payouts')

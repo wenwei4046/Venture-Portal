@@ -10,6 +10,7 @@ export type SettingsTab =
   | 'directors'
   | 'companies'
   | 'banks'
+  | 'periods'
   | 'simulator'
 
 const TABS: TabItem[] = [
@@ -19,6 +20,7 @@ const TABS: TabItem[] = [
   { key: 'directors', label: 'Directors' },
   { key: 'companies', label: 'Companies' },
   { key: 'banks', label: 'Bank Accounts' },
+  { key: 'periods', label: 'Periods' },
   { key: 'simulator', label: 'Simulator' },
 ]
 
