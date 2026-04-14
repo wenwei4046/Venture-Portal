@@ -39,6 +39,7 @@ export default async function BillingPage({ searchParams }: Props) {
     { data: invoices },
     { data: companies },
     { data: headcountRows },
+    { data: directorSummary },
   ] = await Promise.all([
     supabase.rpc('get_submitted_hr_summary', { p_period: period }).maybeSingle(),
     supabase
@@ -58,6 +59,8 @@ export default async function BillingPage({ searchParams }: Props) {
       .from('monthly_headcounts')
       .select('company_id, headcount')
       .eq('period_month', period),
+    // Director OpEx — use Finance-safe aggregate RPC (no per-director exposure)
+    supabase.rpc('get_director_payout_summary', { p_period: period }).maybeSingle(),
   ])
 
   // hrSummary errors (e.g. RLS / RPC failure) — log but render empty state
@@ -84,6 +87,24 @@ export default async function BillingPage({ searchParams }: Props) {
 
   const invoiceList = invoices ?? []
   const invoiceTotal = invoiceList.reduce((acc, i) => acc + Number(i.total_amount), 0)
+
+  // 4-column OpEx overview — aggregate per dept/mode for the period
+  const hrTotal = invoiceList
+    .filter((i) => i.billing_mode === 'hr_pool_split')
+    .reduce((s, i) => s + Number(i.total_amount), 0)
+  const financeTotal = invoiceList
+    .filter((i) => i.billing_mode === 'finance_attribution' || i.billing_mode === 'finance_mgmt_fee')
+    .reduce((s, i) => s + Number(i.total_amount), 0)
+  const marketingTotal = invoiceList
+    .filter((i) => i.billing_mode === 'marketing_project')
+    .reduce((s, i) => s + Number(i.total_amount), 0)
+  const directorOpexTotal = Number(directorSummary?.out_total_payroll_gross ?? 0)
+  const directorPayoutCount = Number(directorSummary?.out_payout_count ?? 0)
+  const hrInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'hr_pool_split').length
+  const financeInvoiceCount = invoiceList.filter(
+    (i) => i.billing_mode === 'finance_attribution' || i.billing_mode === 'finance_mgmt_fee'
+  ).length
+  const marketingInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'marketing_project').length
 
   const companyList = companies ?? []
   const companyMap = new Map(
@@ -152,7 +173,15 @@ export default async function BillingPage({ searchParams }: Props) {
         </div>
       </div>
 
-      {/* ───────── Invoices list (fills in once Step 5 ships) ───────── */}
+      {/* ───────── 4-column cost overview ───────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+        <CostCard label="HR OpEx" amount={hrTotal} count={hrInvoiceCount} unit="invoice" />
+        <CostCard label="Finance OpEx" amount={financeTotal} count={financeInvoiceCount} unit="invoice" />
+        <CostCard label="Marketing OpEx" amount={marketingTotal} count={marketingInvoiceCount} unit="invoice" />
+        <CostCard label="Director OpEx" amount={directorOpexTotal} count={directorPayoutCount} unit="payout" />
+      </div>
+
+      {/* ───────── Invoices list ───────── */}
       <InvoicesList invoices={invoiceList} companyMap={companyMap} period={period} />
 
       {/* ───────── Billing modes (per-department generation) ───────── */}
@@ -210,6 +239,31 @@ export default async function BillingPage({ searchParams }: Props) {
         }))}
       />
       <NonBillableList />
+    </div>
+  )
+}
+
+function CostCard({
+  label,
+  amount,
+  count,
+  unit,
+}: {
+  label: string
+  amount: number
+  count: number
+  unit: string
+}) {
+  const muted = amount === 0
+  return (
+    <div className="border border-hairline rounded-md bg-surface p-5">
+      <div className="font-serif italic text-accent text-sm mb-1">{label}</div>
+      <div className={`font-serif text-3xl leading-none ${muted ? 'text-muted' : 'text-ink'}`}>
+        {formatMoney(amount)}
+      </div>
+      <div className="font-mono text-xs text-muted mt-2">
+        {count} {unit}{count === 1 ? '' : 's'}
+      </div>
     </div>
   )
 }
