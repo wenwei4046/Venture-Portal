@@ -38,6 +38,7 @@ export default async function BillingPage({ searchParams }: Props) {
     { data: marketingContracts },
     { data: invoices },
     { data: companies },
+    { data: headcountRows },
   ] = await Promise.all([
     supabase.rpc('get_submitted_hr_summary', { p_period: period }).maybeSingle(),
     supabase
@@ -52,7 +53,11 @@ export default async function BillingPage({ searchParams }: Props) {
       .select('id, invoice_no, company_id, period_month, billing_mode, total_amount, status')
       .eq('period_month', period)
       .order('billing_mode', { ascending: true }),
-    supabase.from('companies').select('id, name, short_code').eq('is_active', true),
+    supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('short_code'),
+    supabase
+      .from('monthly_headcounts')
+      .select('company_id, headcount')
+      .eq('period_month', period),
   ])
 
   // hrSummary errors (e.g. RLS / RPC failure) — log but render empty state
@@ -195,7 +200,15 @@ export default async function BillingPage({ searchParams }: Props) {
           canCreate={user.role === 'finance'}
         />
       </div>
-      <FixedSplitPanel currentPeriod={period} canGenerate={user.role === 'finance'} />
+      <FixedSplitPanel
+        currentPeriod={period}
+        canGenerate={user.role === 'finance'}
+        companies={companyList.map((c) => ({ id: c.id, name: c.name, short_code: c.short_code }))}
+        savedHeadcounts={(headcountRows ?? []).map((h) => ({
+          company_id: h.company_id,
+          headcount: Number(h.headcount),
+        }))}
+      />
       <NonBillableList />
     </div>
   )

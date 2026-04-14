@@ -21,7 +21,14 @@ export interface FixedSplitResult {
   utility_invoices: number
   hv_rent_share: number
   hv_utility_share: number
+  total_headcount: number
+  hv_headcount: number
   period: string
+}
+
+export interface HeadcountEntry {
+  company_id: string | null
+  headcount: number
 }
 
 // ─── Generate monthly invoices for a period (Finance) ────────────────────────
@@ -85,10 +92,25 @@ export async function generateFixedSplitInvoices(
   const utilityTotal = parseFloat(
     (formData.get('utility_total') as string) ?? '0'
   )
+  const headcountsRaw = (formData.get('headcounts') as string) ?? '[]'
 
   if (!rawPeriod) throw new Error('Period month is required')
   if (rentTotal <= 0 && utilityTotal <= 0) {
     throw new Error('Enter at least one total (rent or utility)')
+  }
+
+  let headcounts: HeadcountEntry[]
+  try {
+    headcounts = JSON.parse(headcountsRaw)
+  } catch {
+    throw new Error('Invalid headcounts payload')
+  }
+  if (!Array.isArray(headcounts) || headcounts.length === 0) {
+    throw new Error('Enter headcounts for at least one company')
+  }
+  const totalHc = headcounts.reduce((s, h) => s + (Number(h.headcount) || 0), 0)
+  if (totalHc <= 0) {
+    throw new Error('Total headcount must be greater than 0')
   }
 
   const period = dayjs(rawPeriod).startOf('month').format('YYYY-MM-DD')
@@ -99,6 +121,10 @@ export async function generateFixedSplitInvoices(
     p_period_month: period,
     p_rent_total: rentTotal,
     p_utility_total: utilityTotal,
+    // Supabase generated type narrows JSONB to a recursive Json; HeadcountEntry
+    // is structurally fine but won't match the recursive shape.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    p_headcounts: headcounts as any,
   })
 
   if (error) {
@@ -142,6 +168,8 @@ export async function generateFixedSplitInvoices(
     utility_invoices: Number(result.utility_invoices ?? 0),
     hv_rent_share: hvRent,
     hv_utility_share: hvUtility,
+    total_headcount: Number(result.total_headcount ?? totalHc),
+    hv_headcount: Number(result.hv_headcount ?? 0),
     period: String(result.period ?? period),
   }
 }

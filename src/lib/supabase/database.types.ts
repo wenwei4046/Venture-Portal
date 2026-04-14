@@ -1676,6 +1676,48 @@ export type Database = {
           },
         ]
       }
+      monthly_headcounts: {
+        Row: {
+          company_id: string | null
+          headcount: number
+          id: string
+          period_month: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          company_id?: string | null
+          headcount: number
+          id?: string
+          period_month: string
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          company_id?: string | null
+          headcount?: number
+          id?: string
+          period_month?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_headcounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monthly_headcounts_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       monthly_statement_lines: {
         Row: {
           amount: number
@@ -2872,6 +2914,7 @@ export type Database = {
       format_invoice_no: { Args: { p_period: string }; Returns: string }
       generate_fixed_split_invoices: {
         Args: {
+          p_headcounts?: Json
           p_period_month: string
           p_rent_total?: number
           p_utility_total?: number
