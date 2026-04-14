@@ -56,7 +56,7 @@ export default async function PnLPage({ searchParams }: Props) {
 
   // ── SHARED SERVICES (Pass-through — billed to subs to recover cost) ──
   const hrBilling = invoiceByMode('hr_pool_split')
-  const financeBilling = invoiceByMode('finance_attribution') + invoiceByMode('finance_mgmt_fee')
+  const financeBilling = invoiceByMode('finance_attribution')
   const rentUtilityBilling = invoiceByMode('fixed_split')
   const totalBillback = hrBilling + financeBilling + rentUtilityBilling
 

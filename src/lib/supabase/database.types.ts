@@ -1275,7 +1275,6 @@ export type Database = {
           employee_name: string
           epf_er: number | null
           id: string
-          is_mgmt_fee: boolean
           non_statutory_allowance: number
           socso_er: number | null
           status: Database["public"]["Enums"]["hr_staff_status"]
@@ -1292,7 +1291,6 @@ export type Database = {
           employee_name: string
           epf_er?: number | null
           id?: string
-          is_mgmt_fee?: boolean
           non_statutory_allowance?: number
           socso_er?: number | null
           status?: Database["public"]["Enums"]["hr_staff_status"]
@@ -1309,7 +1307,6 @@ export type Database = {
           employee_name?: string
           epf_er?: number | null
           id?: string
-          is_mgmt_fee?: boolean
           non_statutory_allowance?: number
           socso_er?: number | null
           status?: Database["public"]["Enums"]["hr_staff_status"]
@@ -3066,7 +3063,6 @@ export type Database = {
       billing_mode:
         | "hr_pool_split"
         | "finance_attribution"
-        | "finance_mgmt_fee"
         | "marketing_project"
         | "fixed_split"
         | "non_billable"
@@ -3278,7 +3274,6 @@ export const Constants = {
       billing_mode: [
         "hr_pool_split",
         "finance_attribution",
-        "finance_mgmt_fee",
         "marketing_project",
         "fixed_split",
         "non_billable",

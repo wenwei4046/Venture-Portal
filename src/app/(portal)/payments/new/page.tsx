@@ -12,7 +12,6 @@ function poolForBillingMode(mode: string): string {
     case 'hr_pool_split':
       return 'dept_pool_hr'
     case 'finance_attribution':
-    case 'finance_mgmt_fee':
       return 'dept_pool_finance'
     case 'marketing_project':
       return 'dept_pool_marketing'

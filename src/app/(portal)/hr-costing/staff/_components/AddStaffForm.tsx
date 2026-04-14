@@ -66,7 +66,7 @@ export default function AddStaffForm({ departments }: Props) {
           </select>
         </div>
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
         <div>
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
             Basic Salary <span className="text-xs text-muted ml-1 font-normal">(RM)</span>
@@ -105,16 +105,6 @@ export default function AddStaffForm({ departments }: Props) {
             defaultValue="0"
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
           />
-        </div>
-        <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Type</label>
-          <select
-            name="is_mgmt_fee"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
-          >
-            <option value="false">Attribution</option>
-            <option value="true">Management Fee</option>
-          </select>
         </div>
       </div>
       <div className="flex items-center gap-3">

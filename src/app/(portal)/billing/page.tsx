@@ -6,7 +6,6 @@ import PeriodSelector from './_components/PeriodSelector'
 import GenerateInvoicesButton from './_components/GenerateInvoicesButton'
 import HRPoolSplitSection from './_components/HRPoolSplitSection'
 import FinanceAttributionSection from './_components/FinanceAttributionSection'
-import FinanceMgmtFeeSection from './_components/FinanceMgmtFeeSection'
 import MarketingProjectList from './_components/MarketingProjectList'
 import FixedSplitPanel from './_components/FixedSplitPanel'
 import NonBillableList from './_components/NonBillableList'
@@ -93,7 +92,7 @@ export default async function BillingPage({ searchParams }: Props) {
     .filter((i) => i.billing_mode === 'hr_pool_split')
     .reduce((s, i) => s + Number(i.total_amount), 0)
   const financeTotal = invoiceList
-    .filter((i) => i.billing_mode === 'finance_attribution' || i.billing_mode === 'finance_mgmt_fee')
+    .filter((i) => i.billing_mode === 'finance_attribution')
     .reduce((s, i) => s + Number(i.total_amount), 0)
   const marketingTotal = invoiceList
     .filter((i) => i.billing_mode === 'marketing_project')
@@ -102,7 +101,7 @@ export default async function BillingPage({ searchParams }: Props) {
   const directorPayoutCount = Number(directorSummary?.out_payout_count ?? 0)
   const hrInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'hr_pool_split').length
   const financeInvoiceCount = invoiceList.filter(
-    (i) => i.billing_mode === 'finance_attribution' || i.billing_mode === 'finance_mgmt_fee'
+    (i) => i.billing_mode === 'finance_attribution'
   ).length
   const marketingInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'marketing_project').length
 
@@ -203,7 +202,7 @@ export default async function BillingPage({ searchParams }: Props) {
           <div className="absolute right-0 top-10">
             <GenerateInvoicesButton
               currentPeriod={period}
-              modes={['finance_attribution', 'finance_mgmt_fee']}
+              modes={['finance_attribution']}
               label="Generate Finance invoices"
             />
           </div>
@@ -211,7 +210,6 @@ export default async function BillingPage({ searchParams }: Props) {
         <FinanceAttributionSection deptSummaries={deptSummaries} submitted={submitted} />
       </div>
 
-      <FinanceMgmtFeeSection submitted={submitted} />
       <div className="relative">
         {user.role === 'finance' ? (
           <div className="absolute right-0 top-10">

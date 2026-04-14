@@ -261,7 +261,6 @@ function formatCategory(code: string): string {
   const labels: Record<string, string> = {
     hr_pool: 'HR Pool',
     finance_staff: 'Finance Staff',
-    finance_mgmt_fee: 'Finance Mgmt Fee',
     marketing_project: 'Marketing Project',
     rent: 'Rent',
     utility: 'Utility',

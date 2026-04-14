@@ -149,7 +149,6 @@ export interface BaseRateHistory {
 export type BillingMode =
   | 'hr_pool_split'
   | 'finance_attribution'
-  | 'finance_mgmt_fee'
   | 'marketing_project'
   | 'fixed_split'
   | 'non_billable'
@@ -209,7 +208,6 @@ export type LineDirection = 'receivable' | 'payable'
 export type LineCategory =
   | 'hr_pool'
   | 'finance_staff'
-  | 'finance_mgmt_fee'
   | 'marketing_project'
   | 'rent'
   | 'utility'
@@ -337,7 +335,6 @@ export interface HRStaffCost {
   socso_er?: number
   eis_er?: number
   total_ctc?: number
-  is_mgmt_fee: boolean
   status: 'active' | 'inactive'
   created_by: string
   created_at: string

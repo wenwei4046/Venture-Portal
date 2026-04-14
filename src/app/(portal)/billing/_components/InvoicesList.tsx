@@ -21,8 +21,6 @@ function formatBillingMode(mode: string): string {
       return 'HR pool split'
     case 'finance_attribution':
       return 'Finance attribution'
-    case 'finance_mgmt_fee':
-      return 'Finance mgmt fee'
     case 'marketing_project':
       return 'Marketing project'
     case 'fixed_split':

@@ -86,22 +86,20 @@ describe('computeHRPoolInvoiceAmount — set-based SQL mirror', () => {
 })
 
 describe('BILLING_MODES enum contract', () => {
-  it('has exactly 6 modes matching the Postgres billing_mode enum', () => {
+  it('has exactly 5 modes matching the Postgres billing_mode enum', () => {
     expect(BILLING_MODES).toEqual([
       'hr_pool_split',
       'finance_attribution',
-      'finance_mgmt_fee',
       'marketing_project',
       'fixed_split',
       'non_billable',
     ])
   })
 
-  it('auto-generated subset excludes fixed_split + non_billable (Step 8 pending)', () => {
+  it('auto-generated subset excludes fixed_split + non_billable', () => {
     expect(AUTO_GENERATED_BILLING_MODES).toEqual([
       'hr_pool_split',
       'finance_attribution',
-      'finance_mgmt_fee',
       'marketing_project',
     ])
   })
@@ -114,10 +112,6 @@ describe('billingModeToCategoryCode — Step 6 mapping contract', () => {
 
   it('maps finance_attribution to finance_staff', () => {
     expect(billingModeToCategoryCode('finance_attribution')).toBe('finance_staff')
-  })
-
-  it('maps finance_mgmt_fee to finance_mgmt_fee', () => {
-    expect(billingModeToCategoryCode('finance_mgmt_fee')).toBe('finance_mgmt_fee')
   })
 
   it('maps marketing_project to marketing_project', () => {
@@ -133,7 +127,6 @@ describe('billingModeLabel — UI display', () => {
   it('produces human-readable labels for all modes', () => {
     expect(billingModeLabel('hr_pool_split')).toBe('HR Pool Split')
     expect(billingModeLabel('finance_attribution')).toBe('Finance Attribution')
-    expect(billingModeLabel('finance_mgmt_fee')).toBe('Finance Mgmt Fee')
     expect(billingModeLabel('marketing_project')).toBe('Marketing Project')
     expect(billingModeLabel('fixed_split')).toBe('Fixed Split')
     expect(billingModeLabel('non_billable')).toBe('Non-billable')

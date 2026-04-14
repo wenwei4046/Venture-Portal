@@ -58,7 +58,6 @@ export default async function StaffListPage() {
                 <th className="text-right py-3 pr-4 font-medium">Non-Stat. Allow.</th>
                 <th className="text-right py-3 pr-4 font-medium">EPF ER</th>
                 <th className="text-right py-3 pr-4 font-medium">Total CTC</th>
-                <th className="text-left py-3 pr-4 font-medium">Type</th>
                 <th className="text-right py-3 pr-4 font-medium">Actions</th>
               </tr>
             </thead>
@@ -77,11 +76,6 @@ export default async function StaffListPage() {
                     <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">{formatMoney(s.non_statutory_allowance ?? 0)}</td>
                     <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">{formatMoney(s.epf_er ?? 0)}</td>
                     <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">{formatMoney(s.total_ctc ?? 0)}</td>
-                    <td className="py-4 pr-4">
-                      <em className={`font-serif text-sm ${s.is_mgmt_fee ? 'text-accent' : 'text-graphite'}`}>
-                        {s.is_mgmt_fee ? 'Mgmt Fee' : 'Attribution'}
-                      </em>
-                    </td>
                     <td className="py-4 pr-4 text-right">
                       <StaffActions staffId={s.id} staffName={s.employee_name} />
                     </td>

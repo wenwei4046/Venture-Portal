@@ -36,19 +36,19 @@ const PERIOD = '2026-04-01'
 // the invoice generation tests in Step 5 read these exact values.
 const HR_STAFF = [
   // HR department (3 staff) — totals: basic 18,000 / allowance 2,500
-  { dept: 'HR', name: 'HR Lead',       basic: 7000, allow: 1000, epf: 910,  socso: 122, eis: 14, mgmt: false },
-  { dept: 'HR', name: 'HR Officer',    basic: 6000, allow: 800,  epf: 780,  socso: 105, eis: 12, mgmt: false },
-  { dept: 'HR', name: 'HR Assistant',  basic: 5000, allow: 700,  epf: 650,  socso: 87,  eis: 10, mgmt: false },
+  { dept: 'HR', name: 'HR Lead',       basic: 7000, allow: 1000, epf: 910,  socso: 122, eis: 14 },
+  { dept: 'HR', name: 'HR Officer',    basic: 6000, allow: 800,  epf: 780,  socso: 105, eis: 12 },
+  { dept: 'HR', name: 'HR Assistant',  basic: 5000, allow: 700,  epf: 650,  socso: 87,  eis: 10 },
 
-  // Finance department (3 staff, 1 marked is_mgmt_fee for the Finance Mgmt Fee billing mode)
-  { dept: 'Finance', name: 'Finance Manager', basic: 10000, allow: 1500, epf: 1300, socso: 175, eis: 20, mgmt: true  },
-  { dept: 'Finance', name: 'Accountant',      basic: 7500,  allow: 1000, epf: 975,  socso: 131, eis: 15, mgmt: false },
-  { dept: 'Finance', name: 'AP Clerk',        basic: 6500,  allow: 800,  epf: 845,  socso: 114, eis: 13, mgmt: false },
+  // Finance department (3 staff)
+  { dept: 'Finance', name: 'Finance Manager', basic: 10000, allow: 1500, epf: 1300, socso: 175, eis: 20 },
+  { dept: 'Finance', name: 'Accountant',      basic: 7500,  allow: 1000, epf: 975,  socso: 131, eis: 15 },
+  { dept: 'Finance', name: 'AP Clerk',        basic: 6500,  allow: 800,  epf: 845,  socso: 114, eis: 13 },
 
   // Marketing department (3 staff)
-  { dept: 'Marketing', name: 'Mkt Lead',     basic: 5000, allow: 500, epf: 650, socso: 87, eis: 10, mgmt: false },
-  { dept: 'Marketing', name: 'Mkt Designer', basic: 3000, allow: 300, epf: 390, socso: 52, eis: 6,  mgmt: false },
-  { dept: 'Marketing', name: 'Mkt Intern',   basic: 1500, allow: 200, epf: 195, socso: 26, eis: 3,  mgmt: false },
+  { dept: 'Marketing', name: 'Mkt Lead',     basic: 5000, allow: 500, epf: 650, socso: 87, eis: 10 },
+  { dept: 'Marketing', name: 'Mkt Designer', basic: 3000, allow: 300, epf: 390, socso: 52, eis: 6  },
+  { dept: 'Marketing', name: 'Mkt Intern',   basic: 1500, allow: 200, epf: 195, socso: 26, eis: 3  },
 ]
 
 // HR pool allocation: dept's total cost is split across subsidiaries.
@@ -142,7 +142,6 @@ async function main() {
         socso_er: spec.socso,
         eis_er: spec.eis,
         total_ctc: totalCtc,
-        is_mgmt_fee: spec.mgmt,
         status: 'active',
         created_by: hrUser.id,
       })

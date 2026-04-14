@@ -44,7 +44,6 @@ export function computeHRPoolInvoiceAmount(
 export const BILLING_MODES = [
   'hr_pool_split',
   'finance_attribution',
-  'finance_mgmt_fee',
   'marketing_project',
   'fixed_split',
   'non_billable',
@@ -59,7 +58,6 @@ export type BillingMode = (typeof BILLING_MODES)[number]
 export const AUTO_GENERATED_BILLING_MODES: readonly BillingMode[] = [
   'hr_pool_split',
   'finance_attribution',
-  'finance_mgmt_fee',
   'marketing_project',
 ] as const
 
@@ -79,8 +77,6 @@ export function billingModeToCategoryCode(mode: BillingMode): string | null {
       return 'hr_pool'
     case 'finance_attribution':
       return 'finance_staff'
-    case 'finance_mgmt_fee':
-      return 'finance_mgmt_fee'
     case 'marketing_project':
       return 'marketing_project'
     case 'fixed_split':
@@ -104,8 +100,6 @@ export function billingModeLabel(mode: BillingMode): string {
       return 'HR Pool Split'
     case 'finance_attribution':
       return 'Finance Attribution'
-    case 'finance_mgmt_fee':
-      return 'Finance Mgmt Fee'
     case 'marketing_project':
       return 'Marketing Project'
     case 'fixed_split':

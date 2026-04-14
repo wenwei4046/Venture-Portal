@@ -20,7 +20,6 @@ export async function addStaff(formData: FormData) {
     basic_salary: parseFloat(formData.get('basic_salary') as string) || 0,
     allowances: parseFloat(formData.get('allowances') as string) || 0,
     non_statutory_allowance: parseFloat(formData.get('non_statutory_allowance') as string) || 0,
-    is_mgmt_fee: formData.get('is_mgmt_fee') === 'true',
     created_by: user.id,
   })
 
@@ -43,7 +42,6 @@ export async function updateStaff(id: string, formData: FormData) {
       basic_salary: parseFloat(formData.get('basic_salary') as string) || 0,
       allowances: parseFloat(formData.get('allowances') as string) || 0,
       non_statutory_allowance: parseFloat(formData.get('non_statutory_allowance') as string) || 0,
-      is_mgmt_fee: formData.get('is_mgmt_fee') === 'true',
     })
     .eq('id', id)
 
