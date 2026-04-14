@@ -309,6 +309,60 @@ export async function createCreditNote(formData: FormData) {
   return data.id
 }
 
+// ─── Approve / Issue Invoice (Finance — draft → issued) ────────────────────
+
+export async function approveInvoice(formData: FormData) {
+  await requireRole(['finance'])
+  const supabase = await createClient()
+
+  const id = (formData.get('id') as string) ?? ''
+  if (!id) throw new Error('Invoice id is required')
+
+  const { data: inv } = await supabase
+    .from('invoices')
+    .select('period_month, status')
+    .eq('id', id)
+    .single()
+  if (!inv) throw new Error('Invoice not found')
+  if (inv.status !== 'draft') throw new Error(`Invoice is already ${inv.status}`)
+
+  await assertPeriodOpen(supabase, inv.period_month)
+
+  const { error } = await supabase
+    .from('invoices')
+    .update({ status: 'issued' })
+    .eq('id', id)
+    .eq('status', 'draft')
+
+  if (error) throw new Error(`Failed to issue invoice: ${error.message}`)
+
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+}
+
+export async function approveInvoicesForPeriod(formData: FormData) {
+  await requireRole(['finance'])
+  const supabase = await createClient()
+
+  const rawPeriod = (formData.get('period_month') as string) ?? ''
+  if (!rawPeriod) throw new Error('Period month is required')
+  const period = dayjs(rawPeriod).startOf('month').format('YYYY-MM-DD')
+
+  await assertPeriodOpen(supabase, period)
+
+  const { error, count } = await supabase
+    .from('invoices')
+    .update({ status: 'issued' }, { count: 'exact' })
+    .eq('period_month', period)
+    .eq('status', 'draft')
+
+  if (error) throw new Error(`Failed to bulk issue invoices: ${error.message}`)
+
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+  return { issued: count ?? 0, period }
+}
+
 export async function approveCreditNote(formData: FormData) {
   const user = await requireRole(['principal'])
   const supabase = await createClient()

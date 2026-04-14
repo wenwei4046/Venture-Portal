@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
+import { ApproveInvoiceButton, BulkIssueInvoicesButton } from './InvoiceActions'
 
 interface Invoice {
   id: string
@@ -43,20 +44,28 @@ export default function InvoicesList({ invoices, companyMap, period }: Props) {
   const totalsByMode = new Map<string, number>()
   const totalsByCompany = new Map<string, number>()
   let grandTotal = 0
+  let draftCount = 0
   for (const inv of invoices) {
     const amt = Number(inv.total_amount)
     grandTotal += amt
     totalsByMode.set(inv.billing_mode, (totalsByMode.get(inv.billing_mode) ?? 0) + amt)
     totalsByCompany.set(inv.company_id, (totalsByCompany.get(inv.company_id) ?? 0) + amt)
+    if (inv.status === 'draft') draftCount++
   }
 
   return (
     <section className="border-t border-hairline pt-8 mb-12">
-      <div className="flex items-baseline justify-between mb-4">
+      <div className="flex items-baseline justify-between mb-4 gap-4 flex-wrap">
         <h2 className="font-serif text-xl text-ink">Invoices</h2>
-        <div className="font-mono text-xs text-muted">
-          {dayjs(period).format('MMMM YYYY')} · {invoices.length}{' '}
-          {invoices.length === 1 ? 'invoice' : 'invoices'}
+        <div className="flex items-baseline gap-4">
+          <div className="font-mono text-xs text-muted">
+            {dayjs(period).format('MMMM YYYY')} · {invoices.length}{' '}
+            {invoices.length === 1 ? 'invoice' : 'invoices'}
+            {draftCount > 0 ? ` · ${draftCount} draft` : ''}
+          </div>
+          {draftCount > 0 ? (
+            <BulkIssueInvoicesButton period={period} count={draftCount} />
+          ) : null}
         </div>
       </div>
 
@@ -133,7 +142,9 @@ export default function InvoicesList({ invoices, companyMap, period }: Props) {
                         <InvoiceStatus status={inv.status} />
                       </td>
                       <td className="py-3 text-right">
-                        {inv.status === 'issued' || inv.status === 'draft' ? (
+                        {inv.status === 'draft' ? (
+                          <ApproveInvoiceButton id={inv.id} />
+                        ) : inv.status === 'issued' ? (
                           <Link
                             href={`/payments/new?invoice_id=${inv.id}`}
                             className="text-xs text-accent hover:text-accent-hover font-serif italic"
