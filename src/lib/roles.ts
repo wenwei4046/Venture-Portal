@@ -27,7 +27,8 @@ export function canAccessDirectorPool(role: UserRole): boolean {
 }
 
 export function canAccessHRCosting(role: UserRole): boolean {
-  return role === 'principal' || role === 'hr'
+  // Phase 7 Step 15: Finance executes approved snapshots, so needs access.
+  return role === 'principal' || role === 'hr' || role === 'finance'
 }
 
 export function canAccessReports(role: UserRole): boolean {

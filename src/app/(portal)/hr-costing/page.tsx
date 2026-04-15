@@ -26,7 +26,10 @@ interface LiveDeptRow {
 }
 
 export default async function HRCostingPage() {
-  const user = await requireRole(['principal', 'hr'])
+  // Phase 7 Step 15: Finance added here so they can click Execute transfers
+  // on approved_for_execution snapshots. HR submits; Principal approves;
+  // Finance executes.
+  const user = await requireRole(['principal', 'hr', 'finance'])
   const supabase = await createClient()
 
   const currentPeriod = getPeriodMonth()
