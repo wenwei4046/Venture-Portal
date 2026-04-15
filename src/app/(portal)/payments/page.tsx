@@ -5,6 +5,8 @@ import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import PaymentTabs from './_components/PaymentTabs'
+import PaymentFilters from './_components/PaymentFilters'
+import BackToTop from './_components/BackToTop'
 
 const POOL_LABELS: Record<string, string> = {
   hv_operating_fund: 'Venture Pool',
@@ -24,13 +26,30 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 interface Props {
-  searchParams: Promise<{ status?: string }>
+  searchParams: Promise<{
+    status?: string
+    q?: string
+    type?: string
+    pool?: string
+    from?: string
+    to?: string
+    min?: string
+    max?: string
+  }>
 }
 
 export default async function PaymentsPage({ searchParams }: Props) {
   await requireRole(['principal', 'finance'])
   const supabase = await createClient()
-  const { status: statusFilter } = await searchParams
+  const params = await searchParams
+  const statusFilter = params.status
+  const qFilter = params.q?.trim().toLowerCase() ?? ''
+  const typeFilter = params.type ?? ''
+  const poolFilter = params.pool ?? ''
+  const fromFilter = params.from ?? ''
+  const toFilter = params.to ?? ''
+  const minFilter = params.min ? parseFloat(params.min) : null
+  const maxFilter = params.max ? parseFloat(params.max) : null
 
   // Fetch vouchers with category label
   const { data: vouchers } = await supabase
@@ -38,9 +57,44 @@ export default async function PaymentsPage({ searchParams }: Props) {
     .select('*, payment_categories(label)')
     .order('created_at', { ascending: false })
 
+  // Build voucher_id → pool set map (multi-source subtable)
+  const sourcesByVoucher = new Map<string, Set<string>>()
+  if (poolFilter) {
+    const { data: srcs } = await supabase
+      .from('payment_voucher_sources')
+      .select('voucher_id, pool')
+    for (const s of srcs ?? []) {
+      if (!sourcesByVoucher.has(s.voucher_id)) sourcesByVoucher.set(s.voucher_id, new Set())
+      sourcesByVoucher.get(s.voucher_id)!.add(s.pool)
+    }
+  }
+
   const all = vouchers ?? []
   const tab = statusFilter ?? 'all'
-  const filtered = tab === 'all' ? all : all.filter((v) => v.status === tab)
+
+  // Apply all filters in-memory. Summary stats below use `all` (unfiltered
+  // context), only the table uses `filtered`.
+  const filtered = all.filter((v) => {
+    if (tab !== 'all' && v.status !== tab) return false
+    if (typeFilter && v.voucher_type !== typeFilter) return false
+    if (poolFilter) {
+      if (v.direction === 'credit') {
+        if (v.target_pool !== poolFilter) return false
+      } else {
+        const poolSet = sourcesByVoucher.get(v.id)
+        if (!poolSet || !poolSet.has(poolFilter)) return false
+      }
+    }
+    if (fromFilter && dayjs(v.created_at).isBefore(dayjs(fromFilter), 'day')) return false
+    if (toFilter && dayjs(v.created_at).isAfter(dayjs(toFilter), 'day')) return false
+    if (minFilter !== null && Number(v.amount) < minFilter) return false
+    if (maxFilter !== null && Number(v.amount) > maxFilter) return false
+    if (qFilter) {
+      const hay = `${v.voucher_no ?? ''} ${v.description ?? ''} ${v.payee_name ?? ''}`.toLowerCase()
+      if (!hay.includes(qFilter)) return false
+    }
+    return true
+  })
 
   const counts = {
     all: all.length,
@@ -119,8 +173,13 @@ export default async function PaymentsPage({ searchParams }: Props) {
             <PaymentTabs />
           </Suspense>
 
+          <Suspense fallback={null}>
+            <PaymentFilters />
+          </Suspense>
+
           <p className="font-serif italic text-graphite text-sm mb-4">
-            {filtered.length} {tab === 'all' ? 'total' : tab.replace('_', ' ')} voucher{filtered.length === 1 ? '' : 's'}
+            {filtered.length} of {all.length} voucher{all.length === 1 ? '' : 's'}
+            {tab !== 'all' ? ` · ${tab.replace('_', ' ')}` : ''}
           </p>
 
           {filtered.length === 0 ? (
@@ -198,6 +257,8 @@ export default async function PaymentsPage({ searchParams }: Props) {
           )}
         </section>
       )}
+
+      <BackToTop />
     </div>
   )
 }
