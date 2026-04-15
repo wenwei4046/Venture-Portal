@@ -30,6 +30,11 @@ export async function approveRequest(formData: FormData) {
     throw new Error('Approval not found or already processed')
   }
 
+  // Phase 7 Step 9: grouped approvals must go through approveRequestGroup
+  if (approval.group_id) {
+    throw new Error('This request is part of a combined approval — use the combined card to approve both together.')
+  }
+
   // Security: prevent self-approval (defense in depth — CHECK constraint enforces too)
   if (approval.submitted_by === user.id) {
     throw new Error('Cannot approve your own submission')
@@ -245,6 +250,11 @@ export async function rejectRequest(formData: FormData) {
     throw new Error('Approval not found or already processed')
   }
 
+  // Phase 7 Step 9: grouped approvals must go through rejectRequestGroup
+  if (approval.group_id) {
+    throw new Error('This request is part of a combined approval — use the combined card to reject both together.')
+  }
+
   const now = new Date().toISOString()
 
   const { error: approvalError } = await supabase
@@ -286,6 +296,235 @@ export async function rejectRequest(formData: FormData) {
       .from('payment_vouchers')
       .update({ status: 'voided' })
       .eq('id', approval.reference_id)
+      .eq('status', 'pending_approval')
+  }
+
+  revalidatePath('/approvals')
+  revalidatePath('/fund-out')
+  revalidatePath('/payments')
+  revalidatePath('/dashboard')
+  redirect('/approvals')
+}
+
+// ─── Approve combined group (Principal) — Phase 7 Step 9 ─────────────────────
+//
+// Used by Loan OUT flow: one button approves both the new_loan AND its paired
+// payment_voucher (loan disbursement). Money moves on approval — voucher is
+// flipped to 'paid' with executed metadata; hv_fund fund_out + bank debit fire
+// once.
+
+export async function approveRequestGroup(formData: FormData) {
+  const user = await requireRole(['principal'])
+  const supabase = await createClient()
+
+  const groupId = (formData.get('group_id') as string) ?? ''
+  const notes = (formData.get('notes') as string) || null
+
+  if (!groupId) throw new Error('group_id is required')
+
+  await assertPeriodOpen(supabase, new Date())
+
+  // Fetch both approval_requests in the group
+  const { data: group, error: fetchError } = await supabase
+    .from('approval_requests')
+    .select('*')
+    .eq('group_id', groupId)
+    .eq('status', 'pending')
+
+  if (fetchError || !group || group.length === 0) {
+    throw new Error('Approval group not found or already processed')
+  }
+
+  // Self-approval guard — applies if ANY request in the group is self-submitted
+  if (group.some((r) => r.submitted_by === user.id)) {
+    throw new Error('Cannot approve your own submission')
+  }
+
+  const loanApproval = group.find((r) => r.request_type === 'new_loan')
+  const voucherApproval = group.find((r) => r.request_type === 'payment_voucher')
+
+  if (!loanApproval || !voucherApproval) {
+    throw new Error('Combined approval requires one new_loan + one payment_voucher request')
+  }
+
+  const now = new Date().toISOString()
+  const todayStr = now.slice(0, 10)
+
+  // ─── Pre-flight: bank balance check ───
+  const { data: voucher } = await supabase
+    .from('payment_vouchers')
+    .select('id, amount, bank_account_id, voucher_no, description')
+    .eq('id', voucherApproval.reference_id)
+    .eq('status', 'pending_approval')
+    .single()
+
+  if (!voucher) throw new Error('Paired voucher not found or not pending approval')
+
+  const { data: primaryBank } = await supabase
+    .from('bank_accounts')
+    .select('id, current_balance, bank_name')
+    .eq('is_primary', true)
+    .eq('status', 'active')
+    .single()
+
+  if (primaryBank) {
+    const balance = Number(primaryBank.current_balance)
+    const amount = Number(voucher.amount)
+    if (balance < amount) {
+      throw new Error(
+        `Insufficient bank balance. ${primaryBank.bank_name} has RM ${balance.toFixed(2)} but loan disbursement requires RM ${amount.toFixed(2)}.`
+      )
+    }
+  }
+
+  // ─── 1) Flip both approval_requests to approved ───
+  const { error: groupUpdateError } = await supabase
+    .from('approval_requests')
+    .update({
+      status: 'approved',
+      workflow_state: 'approved',
+      approved_by: user.id,
+      approved_at: now,
+      notes,
+    })
+    .eq('group_id', groupId)
+    .eq('status', 'pending')
+
+  if (groupUpdateError) {
+    throw new Error(`Failed to approve group: ${groupUpdateError.message}`)
+  }
+
+  // ─── 2) Activate the loan ───
+  const { error: loanError } = await supabase
+    .from('loans')
+    .update({
+      status: 'active',
+      approved_by: user.id,
+      approved_at: now,
+      disbursement_date: todayStr,
+    })
+    .eq('id', loanApproval.reference_id)
+    .eq('status', 'pending_approval')
+
+  if (loanError) {
+    throw new Error(`Group approved but loan activation failed: ${loanError.message}`)
+  }
+
+  // ─── 3) Flip voucher to paid (status transition only — money moves below) ───
+  const { error: voucherError } = await supabase
+    .from('payment_vouchers')
+    .update({
+      status: 'paid',
+      approved_by: user.id,
+      approved_at: now,
+      executed_by: user.id,
+      executed_at: now,
+      payment_date: todayStr,
+    })
+    .eq('id', voucher.id)
+    .eq('status', 'pending_approval')
+
+  if (voucherError) {
+    throw new Error(`Group approved but voucher execute failed: ${voucherError.message}`)
+  }
+
+  // ─── 4) Venture Pool: fund_out ledger entry ───
+  await supabase.from('hv_operating_fund').insert({
+    transaction_type: 'fund_out' as const,
+    amount: Number(voucher.amount),
+    description: `${voucher.voucher_no}: ${voucher.description}`,
+    reference_id: loanApproval.reference_id,
+    reference_table: 'loans',
+    created_by: user.id,
+  })
+
+  // ─── 5) Debit primary bank ───
+  if (primaryBank) {
+    await supabase
+      .from('bank_accounts')
+      .update({
+        current_balance: Number(primaryBank.current_balance) - Number(voucher.amount),
+      })
+      .eq('id', primaryBank.id)
+  }
+
+  // Slack notify (best-effort)
+  notifyApprovalDecision(
+    'new_loan',
+    'approved',
+    loanApproval.description ?? '',
+    user.name
+  ).catch(() => {})
+
+  revalidatePath('/approvals')
+  revalidatePath('/fund-out')
+  revalidatePath('/payments')
+  revalidatePath('/dashboard')
+  redirect('/approvals')
+}
+
+// ─── Reject combined group (Principal) — Phase 7 Step 9 ──────────────────────
+
+export async function rejectRequestGroup(formData: FormData) {
+  const user = await requireRole(['principal'])
+  const supabase = await createClient()
+
+  const groupId = (formData.get('group_id') as string) ?? ''
+  const notes = (formData.get('notes') as string) || null
+
+  if (!groupId) throw new Error('group_id is required')
+  if (!notes) throw new Error('Rejection reason is required')
+
+  const { data: group, error: fetchError } = await supabase
+    .from('approval_requests')
+    .select('*')
+    .eq('group_id', groupId)
+    .eq('status', 'pending')
+
+  if (fetchError || !group || group.length === 0) {
+    throw new Error('Approval group not found or already processed')
+  }
+
+  const now = new Date().toISOString()
+
+  // ─── 1) Reject all approval_requests in the group ───
+  const { error: groupUpdateError } = await supabase
+    .from('approval_requests')
+    .update({
+      status: 'rejected',
+      workflow_state: 'rejected',
+      approved_by: user.id,
+      approved_at: now,
+      notes,
+    })
+    .eq('group_id', groupId)
+    .eq('status', 'pending')
+
+  if (groupUpdateError) {
+    throw new Error(`Failed to reject group: ${groupUpdateError.message}`)
+  }
+
+  // ─── 2) Cancel the loan (if present) ───
+  const loanApproval = group.find((r) => r.request_type === 'new_loan')
+  if (loanApproval?.reference_id) {
+    await supabase
+      .from('loans')
+      .update({
+        status: 'cancelled',
+        approved_by: user.id,
+        approved_at: now,
+      })
+      .eq('id', loanApproval.reference_id)
+      .eq('status', 'pending_approval')
+  }
+
+  // ─── 3) Void the voucher (if present) ───
+  const voucherApproval = group.find((r) => r.request_type === 'payment_voucher')
+  if (voucherApproval?.reference_id) {
+    await supabase
+      .from('payment_vouchers')
+      .update({ status: 'voided' })
+      .eq('id', voucherApproval.reference_id)
       .eq('status', 'pending_approval')
   }
 

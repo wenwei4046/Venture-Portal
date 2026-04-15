@@ -3,9 +3,24 @@ import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
+import CombinedApprovalCard from './_components/CombinedApprovalCard'
+
+interface ApprovalRow {
+  id: string
+  request_type: string
+  description: string | null
+  amount: number | null
+  reference_id: string | null
+  reference_table: string | null
+  submitted_by: string
+  group_id: string | null
+  created_at: string
+  approved_at: string | null
+  status: string
+}
 
 export default async function ApprovalsPage() {
-  await requireRole(['principal'])
+  const user = await requireRole(['principal'])
   const supabase = await createClient()
 
   const [
@@ -27,11 +42,41 @@ export default async function ApprovalsPage() {
     supabase.from('users').select('id, name'),
   ])
 
-  const pending = pendingRows ?? []
-  const recent = recentRows ?? []
+  const pending = (pendingRows ?? []) as ApprovalRow[]
+  const recent = (recentRows ?? []) as ApprovalRow[]
   const submitterMap = new Map(
-    (submitters ?? []).map((u) => [u.id, u.name])
+    (submitters ?? []).map((u) => [u.id, u.name as string])
   )
+
+  // ─── Group pending approvals by group_id (Phase 7 Step 9) ───
+  // Each group_id surfaces as ONE combined card; ungrouped rows render solo.
+  type PendingItem =
+    | { kind: 'single'; row: ApprovalRow }
+    | {
+        kind: 'group'
+        groupId: string
+        items: ApprovalRow[]
+        createdAt: string
+      }
+
+  const groupMap = new Map<string, ApprovalRow[]>()
+  const items: PendingItem[] = []
+  for (const row of pending) {
+    if (row.group_id) {
+      if (!groupMap.has(row.group_id)) {
+        groupMap.set(row.group_id, [])
+        items.push({
+          kind: 'group',
+          groupId: row.group_id,
+          items: groupMap.get(row.group_id)!,
+          createdAt: row.created_at,
+        })
+      }
+      groupMap.get(row.group_id)!.push(row)
+    } else {
+      items.push({ kind: 'single', row })
+    }
+  }
 
   return (
     <div>
@@ -47,11 +92,11 @@ export default async function ApprovalsPage() {
         <div className="flex items-baseline justify-between mb-4">
           <h2 className="font-serif text-2xl text-ink">Pending</h2>
           <span className="font-mono text-xs text-muted">
-            {pending.length} {pending.length === 1 ? 'item' : 'items'}
+            {items.length} {items.length === 1 ? 'item' : 'items'}
           </span>
         </div>
 
-        {pending.length === 0 ? (
+        {items.length === 0 ? (
           <div className="border border-hairline rounded-md bg-surface p-10 text-center">
             <p className="font-serif italic text-ledger text-lg">
               All caught up.
@@ -62,39 +107,64 @@ export default async function ApprovalsPage() {
           </div>
         ) : (
           <div className="space-y-3 row-stagger">
-            {pending.map((req, i) => (
-              <Link
-                key={req.id}
-                href={`/approvals/${req.id}`}
-                style={{ '--i': i } as React.CSSProperties}
-                className="block border border-hairline rounded-md bg-surface p-5 hover:bg-surface-2/40 transition-colors"
-              >
-                <div className="flex items-baseline justify-between mb-2">
-                  <div className="text-xs font-sans font-semibold uppercase tracking-wider text-graphite">
-                    {formatRequestType(req.request_type)}
-                  </div>
-                  <div className="font-mono text-xs text-muted">
-                    {dayjs(req.created_at).format('D MMM HH:mm')}
-                  </div>
+            {items.map((item, i) =>
+              item.kind === 'group' ? (
+                <div
+                  key={item.groupId}
+                  style={{ '--i': i } as React.CSSProperties}
+                >
+                  <CombinedApprovalCard
+                    groupId={item.groupId}
+                    items={item.items.map((r) => ({
+                      request_type: r.request_type,
+                      description: r.description,
+                      amount: r.amount,
+                      reference_id: r.reference_id,
+                      reference_table: r.reference_table,
+                    }))}
+                    submitterName={
+                      submitterMap.get(item.items[0].submitted_by) ?? 'Unknown'
+                    }
+                    createdAt={item.createdAt}
+                    isSelfSubmitted={item.items.some(
+                      (r) => r.submitted_by === user.id
+                    )}
+                  />
                 </div>
-                <div className="font-serif text-lg text-ink mb-1">
-                  {req.description ?? 'No description'}
-                </div>
-                <div className="flex items-baseline gap-4 mt-2">
-                  {req.amount ? (
-                    <div className="font-mono tabular text-md font-medium text-ink">
-                      {formatMoney(Number(req.amount))}
+              ) : (
+                <Link
+                  key={item.row.id}
+                  href={`/approvals/${item.row.id}`}
+                  style={{ '--i': i } as React.CSSProperties}
+                  className="block border border-hairline rounded-md bg-surface p-5 hover:bg-surface-2/40 transition-colors"
+                >
+                  <div className="flex items-baseline justify-between mb-2">
+                    <div className="text-xs font-sans font-semibold uppercase tracking-wider text-graphite">
+                      {formatRequestType(item.row.request_type)}
                     </div>
-                  ) : null}
-                  <div className="text-xs text-muted font-sans">
-                    Submitted by{' '}
-                    <span className="font-serif italic text-graphite">
-                      {submitterMap.get(req.submitted_by) ?? 'Unknown'}
-                    </span>
+                    <div className="font-mono text-xs text-muted">
+                      {dayjs(item.row.created_at).format('D MMM HH:mm')}
+                    </div>
                   </div>
-                </div>
-              </Link>
-            ))}
+                  <div className="font-serif text-lg text-ink mb-1">
+                    {item.row.description ?? 'No description'}
+                  </div>
+                  <div className="flex items-baseline gap-4 mt-2">
+                    {item.row.amount ? (
+                      <div className="font-mono tabular text-md font-medium text-ink">
+                        {formatMoney(Number(item.row.amount))}
+                      </div>
+                    ) : null}
+                    <div className="text-xs text-muted font-sans">
+                      Submitted by{' '}
+                      <span className="font-serif italic text-graphite">
+                        {submitterMap.get(item.row.submitted_by) ?? 'Unknown'}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              )
+            )}
           </div>
         )}
       </section>
@@ -155,6 +225,8 @@ function formatRequestType(type: string): string {
     advance: 'ADVANCE',
     invoice_pool_release: 'INVOICE POOL RELEASE',
     profit_withdrawal: 'PROFIT WITHDRAWAL',
+    new_fund_source: 'NEW FUND SOURCE',
+    payment_voucher: 'PAYMENT VOUCHER',
   }
   return labels[type] ?? type.toUpperCase()
 }

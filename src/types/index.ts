@@ -56,6 +56,7 @@ export interface ApprovalRequest {
   approved_by?: string
   approved_at?: string
   notes?: string
+  group_id?: string
   created_at: string
 }
 

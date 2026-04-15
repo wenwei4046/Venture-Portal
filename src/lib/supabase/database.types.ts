@@ -93,6 +93,7 @@ export type Database = {
           description: string | null
           due_at: string | null
           escalation_chain: Json | null
+          group_id: string | null
           id: string
           notes: string | null
           reference_id: string
@@ -113,6 +114,7 @@ export type Database = {
           description?: string | null
           due_at?: string | null
           escalation_chain?: Json | null
+          group_id?: string | null
           id?: string
           notes?: string | null
           reference_id: string
@@ -133,6 +135,7 @@ export type Database = {
           description?: string | null
           due_at?: string | null
           escalation_chain?: Json | null
+          group_id?: string | null
           id?: string
           notes?: string | null
           reference_id?: string
@@ -2882,22 +2885,38 @@ export type Database = {
           out_staff_cost: number
         }[]
       }
-      cancel_loan_and_approval: {
-        Args: { p_cancel_reason?: string; p_loan_id: string }
-        Returns: undefined
-      }
-      create_loan_with_approval: {
-        Args: {
-          p_base_rate: number
-          p_company_id: string
-          p_company_name?: string
-          p_effective_rate: number
-          p_principal: number
-          p_repayment_terms?: string
-          p_risk_premium: number
-        }
-        Returns: string
-      }
+      cancel_loan_and_approval:
+        | { Args: { p_loan_id: string }; Returns: undefined }
+        | {
+            Args: { p_cancel_reason?: string; p_loan_id: string }
+            Returns: undefined
+          }
+      create_loan_with_approval:
+        | {
+            Args: {
+              p_base_rate: number
+              p_company_id: string
+              p_company_name?: string
+              p_effective_rate: number
+              p_principal: number
+              p_repayment_terms?: string
+              p_risk_premium: number
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_base_rate: number
+              p_company_id: string
+              p_company_name?: string
+              p_company_tier?: string
+              p_effective_rate: number
+              p_principal: number
+              p_repayment_terms?: string
+              p_risk_premium: number
+            }
+            Returns: string
+          }
       current_user_department_id: { Args: never; Returns: string }
       current_user_role: {
         Args: never
