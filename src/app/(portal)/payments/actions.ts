@@ -108,6 +108,17 @@ export async function createPaymentVoucher(formData: FormData) {
 
   if (error) throw new Error(`Failed to create voucher: ${error.message}`)
 
+  // Phase 7: mirror source_pool into payment_voucher_sources subtable (one row
+  // per voucher today; Step 6 will replace this with a multi-row picker).
+  // Only debit vouchers have a source; credit vouchers use target_pool.
+  if (sourcePool && direction === 'debit') {
+    await supabase.from('payment_voucher_sources').insert({
+      voucher_id: data.id,
+      pool: sourcePool,
+      amount,
+    })
+  }
+
   // Auto-complete credit payments: adjust bank + pool immediately
   if (isAutoComplete) {
     // Bank balance: add
@@ -393,11 +404,12 @@ export async function executeVoucher(formData: FormData) {
     .eq('status', 'approved')
     .single()
 
-  if (!isCredit && voucher.source_pool) {
-    // DEBIT: deduct from source pool
-    await adjustPool(supabase, voucher.source_pool, 'out', amount, poolDescription, user.id, linkedApproval?.id ?? null, nowIso)
+  if (!isCredit) {
+    // DEBIT: iterate payment_voucher_sources rows, deduct each from its pool.
+    // (Phase 7 multi-source — subtable has 1 row today, up to 3 after Step 6.)
+    await debitVoucherPools(supabase, id, poolDescription, user.id, linkedApproval?.id ?? null, nowIso)
   } else if (isCredit && voucher.target_pool) {
-    // CREDIT: add to target pool
+    // CREDIT: add to target pool (single target stays as-is; subtable is sources only)
     await adjustPool(supabase, voucher.target_pool, 'in', amount, poolDescription, user.id, linkedApproval?.id ?? null, nowIso)
   }
 
@@ -454,6 +466,41 @@ export async function executeVoucher(formData: FormData) {
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>
 
+// Iterate payment_voucher_sources rows for a voucher and debit each pool.
+// Used by executeVoucher on DEBIT direction. Credit direction stays on
+// single target_pool via adjustPool directly.
+async function debitVoucherPools(
+  supabase: SupabaseClient,
+  voucherId: string,
+  description: string,
+  userId: string,
+  approvalId: string | null,
+  nowIso: string,
+) {
+  const { data: rows } = await supabase
+    .from('payment_voucher_sources')
+    .select('pool, amount')
+    .eq('voucher_id', voucherId)
+
+  if (!rows || rows.length === 0) {
+    console.warn('debitVoucherPools: no source rows for voucher', voucherId)
+    return
+  }
+
+  for (const row of rows) {
+    await adjustPool(
+      supabase,
+      row.pool,
+      'out',
+      r2(Number(row.amount)),
+      description,
+      userId,
+      approvalId,
+      nowIso,
+    )
+  }
+}
+
 async function adjustPool(
   supabase: SupabaseClient,
   pool: string,
@@ -508,8 +555,10 @@ async function adjustPool(
           created_by: userId,
         })
 
-        // When money flows OUT of a dept pool, it flows INTO Venture Pool
-        if (direction === 'out') {
+        // When money flows OUT of a dept pool, it flows INTO Venture Pool —
+        // EXCEPT for Director Pool, which pays directors directly (money
+        // leaves the system, not transfers to HV).
+        if (direction === 'out' && pool !== 'dept_pool_director') {
           await supabase.from('hv_operating_fund').insert({
             transaction_type: 'profit_in' as const,
             amount,
