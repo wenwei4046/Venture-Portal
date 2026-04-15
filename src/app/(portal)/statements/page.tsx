@@ -4,6 +4,7 @@ import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import GenerateStatementsButton from './_components/GenerateStatementsButton'
+import StatementsTabHeader from './_components/StatementsTabHeader'
 
 export default async function StatementsPage() {
   const user = await requireRole(['principal', 'finance'])
@@ -41,6 +42,7 @@ export default async function StatementsPage() {
 
   return (
     <div>
+      <StatementsTabHeader active="statements" />
       <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10">
         <div>
           <h1 className="font-serif text-3xl text-ink">Statements</h1>

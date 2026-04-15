@@ -209,6 +209,11 @@ export async function generateStatements(formData: FormData) {
 }
 
 // ─── Issue statement (Finance — transitions from draft → issued) ─────────────
+//
+// Phase 7 Step 11: this is a pure display-only transition. Statements are
+// informational — all actual money movement (loan interest → hv_fund.fund_in,
+// invoice settlement → payment_voucher) happens in dedicated flows elsewhere.
+// Issuing or marking paid MUST NOT write to any pool ledger.
 
 export async function issueStatement(formData: FormData) {
   const user = await requireRole(['finance'])
@@ -243,6 +248,10 @@ export async function issueStatement(formData: FormData) {
 }
 
 // ─── Mark statement paid (Finance — full payment only for MVP) ───────────────
+//
+// Phase 7 Step 11: display-only transition. Money already moved via the
+// payment_voucher settlement flow; this just flips the status flag.
+// DO NOT add any hv_fund / dept_pool / invoice_payout_pool writes here.
 
 export async function markStatementPaid(formData: FormData) {
   const user = await requireRole(['finance'])

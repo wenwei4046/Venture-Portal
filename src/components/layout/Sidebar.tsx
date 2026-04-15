@@ -50,7 +50,8 @@ const navEntries: NavEntry[] = [
   { href: '/statements', label: 'Statements', visible: canAccessTreasury },
   { href: '/approvals', label: 'Approvals', visible: canApprove },
   { href: '/dept-pool', label: 'Dept Pool', visible: canAccessDeptPool },
-  { href: '/billing', label: 'Billing', visible: canAccessBilling },
+  // Phase 7 Step 11: Billing merged into Statements → Invoices sub-tab.
+  // Legacy /billing URL still redirects for external bookmarks.
   {
     label: 'Director',
     visible: canAccessDirectorSalary,
