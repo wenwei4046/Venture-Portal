@@ -12,7 +12,8 @@ type OverdueRow = {
   loan_id: string
   period_month: string
   overdue_days: number
-  overdue_stage: 'grace' | 'late_1' | 'late_2' | 'escalation'
+  overdue_stage: 'grace' | 'late_1' | 'late_2' | 'escalation' | null
+  is_overdue: boolean
   penalty_rate: number | null
   penalty_amount: number | null
   status: 'pending' | 'paid' | 'escalated'
@@ -47,13 +48,14 @@ export default async function OverduePage() {
   const active = rows.filter((r) => r.status === 'pending')
   const totalPenalty = active.reduce((sum, r) => sum + Number(r.penalty_amount ?? 0), 0)
 
-  const stageCounts = active.reduce(
-    (acc, r) => {
-      acc[r.overdue_stage] = (acc[r.overdue_stage] ?? 0) + 1
-      return acc
-    },
-    {} as Record<string, number>
-  )
+  // Phase 7 Step 12: group active overdue by period_month for display
+  const activeByPeriod = new Map<string, OverdueRow[]>()
+  for (const r of active) {
+    const list = activeByPeriod.get(r.period_month) ?? []
+    list.push(r)
+    activeByPeriod.set(r.period_month, list)
+  }
+  const activePeriods = Array.from(activeByPeriod.keys()).sort().reverse()
 
   const canFinanceAct = user.role === 'finance'
 
@@ -92,109 +94,116 @@ export default async function OverduePage() {
 
         {active.length > 0 ? (
           <div className="lg:col-span-5 space-y-2">
-            {(['grace', 'late_1', 'late_2', 'escalation'] as const).map((stage) => {
-              const count = stageCounts[stage] ?? 0
-              if (count === 0) return null
-              return (
-                <div
-                  key={stage}
-                  className="flex items-baseline justify-between font-mono text-sm"
-                >
-                  <em className="font-serif text-md text-graphite">
-                    {stageLabel(stage)}
-                  </em>
-                  <span className="text-ink tabular">{count}</span>
-                </div>
-              )
-            })}
+            {activePeriods.slice(0, 3).map((period) => (
+              <div
+                key={period}
+                className="flex items-baseline justify-between font-mono text-sm"
+              >
+                <em className="font-serif text-md text-graphite">
+                  {dayjs(period).format('MMM YYYY')}
+                </em>
+                <span className="text-ink tabular">
+                  {activeByPeriod.get(period)?.length ?? 0}
+                </span>
+              </div>
+            ))}
           </div>
         ) : null}
       </div>
 
-      {/* ───────── Active overdue list ───────── */}
+      {/* ───────── Active overdue — grouped by calendar month ───────── */}
       {active.length === 0 ? (
         <AllClearState canFinanceAct={canFinanceAct} />
       ) : (
-        <section className="mb-12">
-          <h2 className="font-serif text-2xl text-ink mb-1">Active overdue</h2>
-          <p className="font-serif italic text-graphite text-sm mb-6">
-            Sorted by period, <em>longest overdue first</em>
-          </p>
+        activePeriods.map((period) => (
+          <section key={period} className="mb-12">
+            <h2 className="font-serif text-2xl text-ink mb-1">
+              {dayjs(period).format('MMMM YYYY')}
+            </h2>
+            <p className="font-serif italic text-graphite text-sm mb-6">
+              {activeByPeriod.get(period)!.length}{' '}
+              {activeByPeriod.get(period)!.length === 1 ? 'loan' : 'loans'} with unpaid
+              interest for this period
+            </p>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                  <th className="text-left py-3 pr-4 font-medium">Company</th>
-                  <th className="text-right py-3 pr-4 font-medium">Outstanding</th>
-                  <th className="text-right py-3 pr-4 font-medium">Days</th>
-                  <th className="text-left py-3 pr-4 font-medium">Stage</th>
-                  <th className="text-right py-3 pr-4 font-medium">Penalty</th>
-                  <th className="py-3 text-right"></th>
-                </tr>
-              </thead>
-              <tbody className="row-stagger">
-                {active.map((row, i) => {
-                  const loan = loanMap.get(row.loan_id)
-                  const company = loan ? companyMap.get(loan.company_id) : undefined
-                  const outstanding = outstandingMap.get(row.loan_id) ?? Number(loan?.principal ?? 0)
-                  return (
-                    <tr
-                      key={row.id}
-                      style={{ '--i': i } as React.CSSProperties}
-                      className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors"
-                    >
-                      <td className="py-4 pr-4">
-                        <div className="font-serif text-md text-ink">
-                          {company?.name ?? '—'}
-                        </div>
-                        <div className="font-mono text-xs text-muted">
-                          {company?.code ?? ''} · {dayjs(row.period_month).format('MMM YYYY')}
-                        </div>
-                      </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
-                        {formatMoney(outstanding)}
-                      </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
-                        {row.overdue_days}d
-                      </td>
-                      <td className="py-4 pr-4">
-                        <OverdueBadge
-                          id={row.id}
-                          label={stageLabel(row.overdue_stage)}
-                          className={stageLabelClass(row.overdue_stage)}
-                        />
-                      </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-danger">
-                        {formatMoney(Number(row.penalty_amount ?? 0))}
-                      </td>
-                      <td className="py-4 text-right">
-                        {canFinanceAct ? (
-                          <div className="flex items-center justify-end gap-3">
-                            {row.overdue_stage === 'escalation' ? (
-                              <EscalateButton overdueId={row.id} />
-                            ) : null}
-                            <form action={markOverduePaid}>
-                              <input type="hidden" name="id" value={row.id} />
-                              <button
-                                type="submit"
-                                className="text-sm text-graphite hover:text-accent font-serif italic transition-colors"
-                              >
-                                Mark paid
-                              </button>
-                            </form>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
+                    <th className="text-left py-3 pr-4 font-medium">Company</th>
+                    <th className="text-right py-3 pr-4 font-medium">Outstanding</th>
+                    <th className="text-right py-3 pr-4 font-medium">Days past</th>
+                    <th className="text-left py-3 pr-4 font-medium">Status</th>
+                    <th className="text-right py-3 pr-4 font-medium">Penalty</th>
+                    <th className="py-3 text-right"></th>
+                  </tr>
+                </thead>
+                <tbody className="row-stagger">
+                  {activeByPeriod.get(period)!.map((row, i) => {
+                    const loan = loanMap.get(row.loan_id)
+                    const company = loan ? companyMap.get(loan.company_id) : undefined
+                    const outstanding = outstandingMap.get(row.loan_id) ?? Number(loan?.principal ?? 0)
+                    const hasLegacyStage = !!row.overdue_stage
+                    return (
+                      <tr
+                        key={row.id}
+                        style={{ '--i': i } as React.CSSProperties}
+                        className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors"
+                      >
+                        <td className="py-4 pr-4">
+                          <div className="font-serif text-md text-ink">
+                            {company?.name ?? '—'}
                           </div>
-                        ) : (
-                          <span className="text-xs font-mono text-muted">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
+                          <div className="font-mono text-xs text-muted">
+                            {company?.code ?? ''}
+                          </div>
+                        </td>
+                        <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
+                          {formatMoney(outstanding)}
+                        </td>
+                        <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
+                          {row.overdue_days}d
+                        </td>
+                        <td className="py-4 pr-4">
+                          <OverdueBadge
+                            id={row.id}
+                            label={hasLegacyStage ? stageLabel(row.overdue_stage!) : 'overdue'}
+                            className={hasLegacyStage
+                              ? stageLabelClass(row.overdue_stage!)
+                              : 'text-danger text-sm'}
+                          />
+                        </td>
+                        <td className="py-4 pr-4 text-right font-mono tabular font-medium text-danger">
+                          {formatMoney(Number(row.penalty_amount ?? 0))}
+                        </td>
+                        <td className="py-4 text-right">
+                          {canFinanceAct ? (
+                            <div className="flex items-center justify-end gap-3">
+                              {row.overdue_stage === 'escalation' ? (
+                                <EscalateButton overdueId={row.id} />
+                              ) : null}
+                              <form action={markOverduePaid}>
+                                <input type="hidden" name="id" value={row.id} />
+                                <button
+                                  type="submit"
+                                  className="text-sm text-graphite hover:text-accent font-serif italic transition-colors"
+                                >
+                                  Mark paid
+                                </button>
+                              </form>
+                            </div>
+                          ) : (
+                            <span className="text-xs font-mono text-muted">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ))
       )}
 
       {/* ───────── Escalated + paid history ───────── */}

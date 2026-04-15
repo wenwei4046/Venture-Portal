@@ -1877,9 +1877,10 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_overdue: boolean
           loan_id: string
           overdue_days: number
-          overdue_stage: Database["public"]["Enums"]["overdue_stage"]
+          overdue_stage: Database["public"]["Enums"]["overdue_stage"] | null
           penalty_amount: number | null
           penalty_rate: number | null
           period_month: string
@@ -1888,9 +1889,10 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_overdue?: boolean
           loan_id: string
           overdue_days: number
-          overdue_stage: Database["public"]["Enums"]["overdue_stage"]
+          overdue_stage?: Database["public"]["Enums"]["overdue_stage"] | null
           penalty_amount?: number | null
           penalty_rate?: number | null
           period_month: string
@@ -1899,9 +1901,10 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_overdue?: boolean
           loan_id?: string
           overdue_days?: number
-          overdue_stage?: Database["public"]["Enums"]["overdue_stage"]
+          overdue_stage?: Database["public"]["Enums"]["overdue_stage"] | null
           penalty_amount?: number | null
           penalty_rate?: number | null
           period_month?: string
@@ -2891,32 +2894,18 @@ export type Database = {
             Args: { p_cancel_reason?: string; p_loan_id: string }
             Returns: undefined
           }
-      create_loan_with_approval:
-        | {
-            Args: {
-              p_base_rate: number
-              p_company_id: string
-              p_company_name?: string
-              p_effective_rate: number
-              p_principal: number
-              p_repayment_terms?: string
-              p_risk_premium: number
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_base_rate: number
-              p_company_id: string
-              p_company_name?: string
-              p_company_tier?: string
-              p_effective_rate: number
-              p_principal: number
-              p_repayment_terms?: string
-              p_risk_premium: number
-            }
-            Returns: string
-          }
+      create_loan_with_approval: {
+        Args: {
+          p_base_rate: number
+          p_company_id: string
+          p_company_name?: string
+          p_effective_rate: number
+          p_principal: number
+          p_repayment_terms?: string
+          p_risk_premium: number
+        }
+        Returns: string
+      }
       current_user_department_id: { Args: never; Returns: string }
       current_user_role: {
         Args: never

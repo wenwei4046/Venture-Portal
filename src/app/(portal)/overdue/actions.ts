@@ -7,73 +7,92 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 
-// ─── Detect overdue loans (Finance) ───────────────────────────────────────────
+// ─── Detect overdue loans (Finance) — Phase 7 Step 12 calendar-month rule ────
+//
+// A loan is overdue for a calendar month M if:
+//   1. Today is AFTER the last day of month M (month has ended), AND
+//   2. The interest expected for month M (principal * effective_rate) was
+//      not paid via repayments during month M, AND
+//   3. The loan still has outstanding principal.
+//
+// Current detection checks the PREVIOUS calendar month only. Historical rows
+// keep their overdue_stage value; new rows leave stage NULL and set
+// is_overdue=true.
 
 export async function detectOverdue() {
   const user = await requireRole(['finance'])
   const supabase = await createClient()
 
-  const today = dayjs().format('YYYY-MM-DD')
-  const periodMonth = dayjs().startOf('month').format('YYYY-MM-DD')
+  const now = dayjs()
+  // Check the previous calendar month (current month isn't due yet)
+  const periodStart = now.subtract(1, 'month').startOf('month')
+  const periodEnd = periodStart.endOf('month')
+  const periodMonth = periodStart.format('YYYY-MM-DD')
 
-  // 1. Get all active loans
-  const { data: activeLoans, error: loanError } = await supabase
-    .from('loans')
-    .select('id, principal, effective_rate')
-    .eq('status', 'active')
-
-  if (loanError) {
-    throw new Error(`Failed to load active loans: ${loanError.message}`)
+  // Only relevant if today is past previous month's end (almost always true).
+  if (!now.isAfter(periodEnd, 'day')) {
+    return { detected: 0, message: 'Previous month not yet closed — nothing to check.' }
   }
 
+  const { data: activeLoans, error: loanError } = await supabase
+    .from('loans')
+    .select('id, principal, effective_rate, disbursement_date')
+    .eq('status', 'active')
+
+  if (loanError) throw new Error(`Failed to load active loans: ${loanError.message}`)
   if (!activeLoans || activeLoans.length === 0) {
     return { detected: 0, message: 'No active loans to check.' }
   }
 
-  // 2. Get outstanding amounts for all active loans
   const { data: outstandingRows } = await supabase
     .from('loan_outstanding')
     .select('loan_id, outstanding')
     .eq('status', 'active')
-
   const outstandingMap = new Map(
     (outstandingRows ?? []).map((r) => [r.loan_id, Number(r.outstanding)])
   )
 
+  // Repayments in the target period, grouped by loan.
+  const { data: periodRepayments } = await supabase
+    .from('repayments')
+    .select('loan_id, amount, payment_type, payment_date')
+    .gte('payment_date', periodStart.format('YYYY-MM-DD'))
+    .lte('payment_date', periodEnd.format('YYYY-MM-DD'))
+    .in('payment_type', ['interest', 'principal', 'netting'])
+
+  const paidInPeriod = new Map<string, number>()
+  for (const r of periodRepayments ?? []) {
+    paidInPeriod.set(
+      r.loan_id,
+      (paidInPeriod.get(r.loan_id) ?? 0) + Number(r.amount)
+    )
+  }
+
+  const daysOverdue = now.diff(periodEnd, 'day')
   let detectedCount = 0
 
-  // 3. For each loan, call Postgres helpers + upsert overdue_records
   for (const loan of activeLoans) {
-    const { data: daysOverdue } = await supabase.rpc('calculate_days_overdue', {
-      p_loan_id: loan.id,
-      p_as_of_date: today,
-    })
-
-    const days = Number(daysOverdue ?? 0)
-    if (days <= 0) continue
-
-    // Look up stage + penalty rate
-    const { data: stageRow } = await supabase.rpc('lookup_overdue_stage', {
-      p_days_overdue: days,
-    })
-
-    const stage = stageRow?.[0]?.stage
-    const penaltyRate = Number(stageRow?.[0]?.penalty_rate ?? 0)
-
-    if (!stage) continue // shouldn't happen if overdue_config is seeded
+    // Skip loans disbursed AFTER the period ended — nothing accrued yet.
+    if (loan.disbursement_date && dayjs(loan.disbursement_date).isAfter(periodEnd, 'day')) {
+      continue
+    }
 
     const outstanding = outstandingMap.get(loan.id) ?? Number(loan.principal)
-    const penaltyAmount = outstanding * penaltyRate
+    if (outstanding <= 0) continue
 
-    // Upsert (ON CONFLICT via UNIQUE (loan_id, period_month))
+    const expectedInterest = Number(loan.principal) * Number(loan.effective_rate)
+    const paid = paidInPeriod.get(loan.id) ?? 0
+    if (paid >= expectedInterest) continue // interest covered
+
     const { error: upsertError } = await supabase.from('overdue_records').upsert(
       {
         loan_id: loan.id,
         period_month: periodMonth,
-        overdue_days: days,
-        overdue_stage: stage,
-        penalty_rate: penaltyRate,
-        penalty_amount: penaltyAmount,
+        overdue_days: daysOverdue,
+        overdue_stage: null, // calendar-month rule — no stage ladder
+        is_overdue: true,
+        penalty_rate: 0,
+        penalty_amount: 0,
         status: 'pending',
       },
       { onConflict: 'loan_id,period_month' }
@@ -83,14 +102,16 @@ export async function detectOverdue() {
       console.error(`Failed to upsert overdue for loan ${loan.id}:`, upsertError.message)
       continue
     }
-
     detectedCount++
   }
 
   void user
   revalidatePath('/overdue')
   revalidatePath('/dashboard')
-  return { detected: detectedCount, message: `Detected ${detectedCount} overdue loan(s).` }
+  return {
+    detected: detectedCount,
+    message: `Detected ${detectedCount} overdue loan(s) for ${periodStart.format('MMM YYYY')}.`,
+  }
 }
 
 // ─── Submit escalation (Finance → Principal approval) ────────────────────────
