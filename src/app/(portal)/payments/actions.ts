@@ -110,7 +110,11 @@ export async function createPaymentVoucher(formData: FormData) {
       voucher_type: voucherType as 'loan_repayment' | 'billing_payment' | 'claim_payout' | 'expense' | 'internal_transfer' | 'salary_payout' | 'other' | 'receive_payment',
       direction,
       category_code: categoryCode,
-      source_pool: sourcePool,
+      // Phase 7 Step 16: source_pool deprecated. Debit vouchers get their
+      // pools from the payment_voucher_sources subtable (written below);
+      // new rows leave source_pool NULL. Credit vouchers still populate
+      // target_pool (single destination) as before.
+      source_pool: null,
       target_pool: targetPool,
       status: isAutoComplete ? ('paid' as const) : ('draft' as const),
       amount,

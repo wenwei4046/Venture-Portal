@@ -82,8 +82,29 @@ export default async function PaymentDetailPage({ params }: Props) {
   // Derive display values
   const categoryLabel = (voucher.payment_categories as { label: string } | null)?.label
     ?? (voucher.category_code ? voucher.category_code.replace(/_/g, ' ') : null)
-  const poolKey = voucher.direction === 'credit' ? voucher.target_pool : voucher.source_pool
-  const poolLabel = poolKey ? (POOL_LABELS[poolKey] ?? poolKey.replace(/_/g, ' ')) : null
+
+  // Phase 7 Step 16: debit pool labels come from payment_voucher_sources
+  // (source_pool column is deprecated). Credit keeps target_pool as before.
+  let poolLabel: string | null = null
+  if (voucher.direction === 'credit') {
+    poolLabel = voucher.target_pool
+      ? (POOL_LABELS[voucher.target_pool] ?? voucher.target_pool.replace(/_/g, ' '))
+      : null
+  } else {
+    const { data: pvsRows } = await supabase
+      .from('payment_voucher_sources')
+      .select('pool, amount')
+      .eq('voucher_id', id)
+      .order('amount', { ascending: false })
+    if (pvsRows && pvsRows.length > 0) {
+      poolLabel = pvsRows
+        .map((r) => POOL_LABELS[r.pool] ?? r.pool.replace(/_/g, ' '))
+        .join(' + ')
+    } else if (voucher.source_pool) {
+      // Legacy fallback for any row that somehow missed the mig 103 backfill
+      poolLabel = POOL_LABELS[voucher.source_pool] ?? voucher.source_pool.replace(/_/g, ' ')
+    }
+  }
 
   return (
     <div>

@@ -57,15 +57,18 @@ export default async function PaymentsPage({ searchParams }: Props) {
     .select('*, payment_categories(label)')
     .order('created_at', { ascending: false })
 
-  // Build voucher_id → pool set map (multi-source subtable)
-  const sourcesByVoucher = new Map<string, Set<string>>()
-  if (poolFilter) {
+  // Phase 7 Step 16: source_pool deprecated. Load pvs rows unconditionally
+  // so the Pool column and filter both read the canonical subtable.
+  const sourcesByVoucher = new Map<string, string[]>()
+  {
     const { data: srcs } = await supabase
       .from('payment_voucher_sources')
-      .select('voucher_id, pool')
+      .select('voucher_id, pool, amount')
+      .order('amount', { ascending: false })
     for (const s of srcs ?? []) {
-      if (!sourcesByVoucher.has(s.voucher_id)) sourcesByVoucher.set(s.voucher_id, new Set())
-      sourcesByVoucher.get(s.voucher_id)!.add(s.pool)
+      const list = sourcesByVoucher.get(s.voucher_id) ?? []
+      list.push(s.pool)
+      sourcesByVoucher.set(s.voucher_id, list)
     }
   }
 
@@ -81,8 +84,8 @@ export default async function PaymentsPage({ searchParams }: Props) {
       if (v.direction === 'credit') {
         if (v.target_pool !== poolFilter) return false
       } else {
-        const poolSet = sourcesByVoucher.get(v.id)
-        if (!poolSet || !poolSet.has(poolFilter)) return false
+        const poolList = sourcesByVoucher.get(v.id)
+        if (!poolList || !poolList.includes(poolFilter)) return false
       }
     }
     if (fromFilter && dayjs(v.created_at).isBefore(dayjs(fromFilter), 'day')) return false
@@ -207,8 +210,20 @@ export default async function PaymentsPage({ searchParams }: Props) {
                   {filtered.map((v, i) => {
                     const catLabel = (v.payment_categories as { label: string } | null)?.label
                       ?? (v.category_code ? v.category_code.replace(/_/g, ' ') : '—')
-                    const poolKey = v.direction === 'credit' ? v.target_pool : v.source_pool
-                    const poolLabel = poolKey ? (POOL_LABELS[poolKey] ?? poolKey.replace(/_/g, ' ')) : '—'
+                    // Phase 7 Step 16: debit reads pvs subtable; credit keeps target_pool.
+                    let poolLabel = '—'
+                    if (v.direction === 'credit') {
+                      poolLabel = v.target_pool
+                        ? (POOL_LABELS[v.target_pool] ?? v.target_pool.replace(/_/g, ' '))
+                        : '—'
+                    } else {
+                      const pools = sourcesByVoucher.get(v.id) ?? []
+                      if (pools.length > 0) {
+                        poolLabel = pools.map(p => POOL_LABELS[p] ?? p.replace(/_/g, ' ')).join(' + ')
+                      } else if (v.source_pool) {
+                        poolLabel = POOL_LABELS[v.source_pool] ?? v.source_pool.replace(/_/g, ' ')
+                      }
+                    }
                     return (
                       <tr
                         key={v.id}
