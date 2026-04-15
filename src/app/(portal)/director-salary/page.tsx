@@ -38,7 +38,6 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
     { data: companies },
     { data: ctcRows },
     { data: payouts },
-    { data: poolData },
     { data: financeSummary },
   ] = await Promise.all([
     supabase.from('directors').select('id, name, code, weightage, min_payout').eq('status', 'active').order('code'),
@@ -49,9 +48,6 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
     isHROrPrincipal
       ? supabase.from('director_payouts').select('*').eq('period_month', period).order('gross_amount', { ascending: false })
       : Promise.resolve({ data: [] as never[] }),
-    isHROrPrincipal
-      ? supabase.from('salary_pool').select('*').eq('period_month', period).maybeSingle()
-      : Promise.resolve({ data: null }),
     supabase.rpc('get_director_payout_summary', { p_period: period }),
   ])
 
@@ -92,7 +88,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
               Salary Pool — {periodLabel}
             </div>
             <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
-              {formatMoney(Number(poolData?.total_pool ?? summary.out_pool_total ?? 0))}
+              {formatMoney(Number(summary.out_pool_total ?? 0))}
             </div>
             <div className="font-mono text-xs text-muted mt-2">
               {summary.out_payout_count} directors ·{' '}

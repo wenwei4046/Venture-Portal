@@ -489,9 +489,6 @@ async function adjustPool(
           description,
         })
       }
-    } else if (pool === 'salary_pool') {
-      // salary_pool is a monthly snapshot table — skip auto-adjustment
-      // Salary pool adjustments happen through the Director Salary Engine
     } else if (pool.startsWith('dept_pool_')) {
       // e.g. dept_pool_marketing → department name = "Marketing"
       const deptName = pool.replace('dept_pool_', '')

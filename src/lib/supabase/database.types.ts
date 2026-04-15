@@ -2377,45 +2377,6 @@ export type Database = {
           },
         ]
       }
-      salary_pool: {
-        Row: {
-          allowance_ratio: number | null
-          basic_ratio: number | null
-          created_at: string
-          id: string
-          kpi_ratio: number | null
-          period_month: string
-          total_ctc_in: number | null
-          total_pool: number | null
-          total_saving: number | null
-          total_statutory_surplus: number | null
-        }
-        Insert: {
-          allowance_ratio?: number | null
-          basic_ratio?: number | null
-          created_at?: string
-          id?: string
-          kpi_ratio?: number | null
-          period_month: string
-          total_ctc_in?: number | null
-          total_pool?: number | null
-          total_saving?: number | null
-          total_statutory_surplus?: number | null
-        }
-        Update: {
-          allowance_ratio?: number | null
-          basic_ratio?: number | null
-          created_at?: string
-          id?: string
-          kpi_ratio?: number | null
-          period_month?: string
-          total_ctc_in?: number | null
-          total_pool?: number | null
-          total_saving?: number | null
-          total_statutory_surplus?: number | null
-        }
-        Relationships: []
-      }
       service_contracts: {
         Row: {
           amount: number | null

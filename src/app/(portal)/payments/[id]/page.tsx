@@ -9,7 +9,7 @@ import VoucherActions from './_components/VoucherActions'
 
 const POOL_LABELS: Record<string, string> = {
   hv_operating_fund: 'Venture Pool',
-  salary_pool: 'Director Salary Pool',
+  dept_pool_director: 'Director Pool',
   dept_pool_marketing: 'Marketing Dept Pool',
   dept_pool_finance: 'Finance Dept Pool',
   dept_pool_hr: 'HR Dept Pool',
