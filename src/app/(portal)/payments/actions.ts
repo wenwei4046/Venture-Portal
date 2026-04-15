@@ -466,6 +466,12 @@ export async function executeVoucher(formData: FormData) {
   // If this voucher tagged a loan_id, insert matching repayments rows and
   // clear the most recent pending overdue_record for that loan (if any).
   if (voucher.loan_id && voucher.repayment_breakdown) {
+    // repayments enforces CHECK (payment_date <= CURRENT_DATE) which runs
+    // against server UTC. Our paymentDate originates from local dayjs() and
+    // during UTC+8 evenings it can be UTC-tomorrow → constraint would reject.
+    // Clamp to UTC today.
+    const utcToday = new Date().toISOString().slice(0, 10)
+    const repayDate = paymentDate > utcToday ? utcToday : paymentDate
     const breakdown = voucher.repayment_breakdown as {
       principal?: number
       interest?: number
@@ -478,15 +484,17 @@ export async function executeVoucher(formData: FormData) {
     ].filter((e) => e.amt > 0)
 
     for (const e of entries) {
-      await supabase.from('repayments').insert({
+      const { error: repErr } = await supabase.from('repayments').insert({
         loan_id: voucher.loan_id,
         amount: e.amt,
         payment_type: e.payment_type,
-        payment_date: paymentDate,
-        reference_id: voucher.id,
+        payment_date: repayDate,
         notes: `Auto-synced from voucher ${voucher.voucher_no}`,
         created_by: user.id,
       })
+      if (repErr) {
+        console.error(`Step 12b repayments insert failed (${e.payment_type}):`, repErr.message)
+      }
     }
 
     // Clear the most recent pending overdue row for this loan (if any)
