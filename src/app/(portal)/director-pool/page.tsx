@@ -6,7 +6,7 @@ import DirectorPinGate from '@/components/DirectorPinGate'
 import { isDirectorPinVerified } from '../director-salary/pin-actions'
 
 export default async function DirectorPoolPage() {
-  const user = await requireRole(['principal', 'hr', 'finance'])
+  const user = await requireRole(['principal', 'finance'])
 
   // Finance needs PIN verification
   if (user.role === 'finance') {
@@ -18,30 +18,42 @@ export default async function DirectorPoolPage() {
 
   const supabase = await createClient()
 
-  // Fetch both pools
+  // Look up Director dept id first — Director Pool = dept_pools where dept='Director'
+  const { data: directorDept } = await supabase
+    .from('departments')
+    .select('id')
+    .eq('name', 'Director')
+    .maybeSingle()
+
   const [
-    { data: savingTxns },
+    { data: directorPoolTxns },
     { data: invoiceTxns },
     { data: claims },
   ] = await Promise.all([
-    supabase.from('hv_operating_fund').select('*').order('created_at', { ascending: false }),
+    directorDept
+      ? supabase
+          .from('dept_pools')
+          .select('*')
+          .eq('department_id', directorDept.id)
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] as never[] }),
     supabase.from('invoice_payout_pool').select('*').order('created_at', { ascending: false }),
     supabase.from('claims').select('*').eq('claim_type', 'project').in('status', ['approved', 'paid']),
   ])
 
-  // Director Saving Pool balance
-  const savingBalance = (savingTxns ?? []).reduce((s, t) => {
-    if (['saving_in', 'surplus_in', 'profit_in', 'fund_in', 'loan_repayment_in'].includes(t.transaction_type)) return s + Number(t.amount)
+  // Director Pool balance — SUM(np_in) - SUM(expense_out) for Director dept
+  const directorPoolBalance = (directorPoolTxns ?? []).reduce((s, t) => {
+    if (t.transaction_type === 'np_in') return s + Number(t.amount)
     return s - Number(t.amount)
   }, 0)
 
-  // Invoice Pool balance
+  // Invoice Pool balance (unchanged — per-director accumulation ledger)
   const invoiceBalance = (invoiceTxns ?? []).reduce((s, t) => {
     if (t.transaction_type === 'accumulate') return s + Number(t.amount)
     return s - Number(t.amount)
   }, 0)
 
-  // Total claims deducted
+  // Total claims deducted (project claims against HV operating fund)
   const totalClaimed = (claims ?? []).reduce((s, c) => s + Number(c.amount ?? 0), 0)
 
   return (
@@ -49,26 +61,26 @@ export default async function DirectorPoolPage() {
       <div className="mb-10">
         <h1 className="font-serif text-3xl text-ink">Director Pool</h1>
         <p className="font-serif italic text-graphite text-base mt-2">
-          Director Saving (5% deduction + statutory surplus) and Invoice Pool (25% accumulation).
+          Revenue pooling from subsidiary CTC payments (includes 5% saving + 25% invoice accumulator + 75% unpaid payroll).
         </p>
       </div>
 
       {/* Pool Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         <div className="border border-hairline rounded-md bg-surface p-5">
-          <div className="font-serif italic text-sm text-accent mb-1">Director Saving</div>
-          <div className={`font-serif text-2xl ${savingBalance >= 0 ? 'text-ink' : 'text-danger'}`}>
-            {formatMoney(savingBalance)}
+          <div className="font-serif italic text-sm text-accent mb-1">Director Pool</div>
+          <div className={`font-serif text-2xl ${directorPoolBalance >= 0 ? 'text-ink' : 'text-danger'}`}>
+            {formatMoney(directorPoolBalance)}
           </div>
           <div className="font-mono text-xs text-muted mt-1">
-            5% saving + statutory surplus/deficit
+            Accumulated CTC − payouts
           </div>
         </div>
         <div className="border border-hairline rounded-md bg-surface p-5">
-          <div className="font-serif italic text-sm text-accent mb-1">Director Invoice</div>
+          <div className="font-serif italic text-sm text-accent mb-1">Invoice Accumulator</div>
           <div className="font-serif text-2xl text-ink">{formatMoney(invoiceBalance)}</div>
           <div className="font-mono text-xs text-muted mt-1">
-            25% invoice portion accumulation
+            25% per-director ledger (lives inside Director Pool)
           </div>
         </div>
         <div className="border border-hairline rounded-md bg-surface p-5">
@@ -77,20 +89,20 @@ export default async function DirectorPoolPage() {
             {formatMoney(-totalClaimed)}
           </div>
           <div className="font-mono text-xs text-muted mt-1">
-            Approved director claims from saving pool
+            Approved director project claims
           </div>
         </div>
       </div>
 
-      {/* Director Saving Transactions */}
+      {/* Director Pool Activity */}
       <section className="mb-12">
-        <h2 className="font-serif text-2xl text-ink mb-1">Director Saving</h2>
+        <h2 className="font-serif text-2xl text-ink mb-1">Director Pool Activity</h2>
         <p className="font-serif italic text-graphite text-sm mb-4">
-          Monthly 5% deduction from director gross + statutory surplus/deficit. Free capital for HV operations.
+          Monthly revenue pooling from subs + payouts over time. Balance = full CTC less payroll drained.
         </p>
-        {(savingTxns ?? []).length === 0 ? (
+        {(directorPoolTxns ?? []).length === 0 ? (
           <div className="py-8 text-center border border-hairline rounded-md bg-surface">
-            <p className="font-serif italic text-muted">No saving transactions yet.</p>
+            <p className="font-serif italic text-muted">No director pool activity yet.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -104,8 +116,8 @@ export default async function DirectorPoolPage() {
                 </tr>
               </thead>
               <tbody>
-                {(savingTxns ?? []).map(t => {
-                  const isInflow = ['saving_in', 'surplus_in', 'profit_in', 'fund_in', 'loan_repayment_in'].includes(t.transaction_type)
+                {(directorPoolTxns ?? []).map(t => {
+                  const isInflow = t.transaction_type === 'np_in'
                   return (
                     <tr key={t.id} className="border-b border-hairline last:border-0">
                       <td className="py-3 pr-4 font-mono text-xs text-muted">

@@ -19,6 +19,13 @@ export function canAccessDirectorSalary(role: UserRole): boolean {
   return role === 'principal' || role === 'hr' || role === 'finance'
 }
 
+export function canAccessDirectorPool(role: UserRole): boolean {
+  // Director Pool shows accumulated running balance — Principal + Finance only.
+  // HR sees current-month calculation via /director-salary but not the
+  // all-time pool balance.
+  return role === 'principal' || role === 'finance'
+}
+
 export function canAccessHRCosting(role: UserRole): boolean {
   return role === 'principal' || role === 'hr'
 }

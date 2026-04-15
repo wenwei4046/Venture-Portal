@@ -9,6 +9,7 @@ import {
   canAccessDeptPool,
   canAccessBilling,
   canAccessDirectorSalary,
+  canAccessDirectorPool,
   canAccessHRCosting,
   canAccessClaims,
   canAccessReports,
@@ -55,7 +56,7 @@ const navEntries: NavEntry[] = [
     visible: canAccessDirectorSalary,
     children: [
       { href: '/director-salary', label: 'Director Salary', visible: canAccessDirectorSalary },
-      { href: '/director-pool', label: 'Director Pool', visible: canAccessDirectorSalary },
+      { href: '/director-pool', label: 'Director Pool', visible: canAccessDirectorPool },
     ],
   },
   { href: '/hr-costing', label: 'HR Costing', visible: canAccessHRCosting },

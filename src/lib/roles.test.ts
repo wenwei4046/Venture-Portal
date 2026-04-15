@@ -5,6 +5,7 @@ import {
   canAccessDeptPool,
   canAccessHRCosting,
   canAccessDirectorSalary,
+  canAccessDirectorPool,
   canAccessReports,
   canAccessSettings,
   canApprove,
@@ -69,6 +70,18 @@ describe('canAccessDirectorSalary', () => {
     expect(canAccessDirectorSalary('hr')).toBe(true)
     expect(canAccessDirectorSalary('finance')).toBe(true)
     expect(canAccessDirectorSalary('dept_manager')).toBe(false)
+  })
+})
+
+describe('canAccessDirectorPool', () => {
+  // Director Pool shows all-time accumulated balance. HR is intentionally
+  // excluded because HR only needs to see the current-month calculation
+  // (via /director-salary), not the accumulated running total.
+  it('allows principal and finance only', () => {
+    expect(canAccessDirectorPool('principal')).toBe(true)
+    expect(canAccessDirectorPool('finance')).toBe(true)
+    expect(canAccessDirectorPool('hr')).toBe(false)
+    expect(canAccessDirectorPool('dept_manager')).toBe(false)
   })
 })
 
