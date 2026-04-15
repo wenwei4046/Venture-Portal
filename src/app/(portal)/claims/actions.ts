@@ -10,6 +10,9 @@ export async function submitClaim(formData: FormData) {
   const supabase = await createClient()
 
   const claimType = formData.get('claim_type') as 'project' | 'benefit'
+  // Phase 7 Step 13: claimant picks a source pool. Defaults to Venture Pool
+  // if omitted (keeps submit working for legacy forms).
+  const sourcePool = (formData.get('source_pool') as string) || 'hv_operating_fund'
 
   const { error } = await supabase.from('claims').insert({
     claim_type: claimType,
@@ -17,6 +20,7 @@ export async function submitClaim(formData: FormData) {
     department_id: (formData.get('department_id') as string) || null,
     amount: parseFloat(formData.get('amount') as string) || 0,
     description: formData.get('description') as string,
+    source_pool: sourcePool,
     created_by: user.id,
   })
 
@@ -31,7 +35,7 @@ export async function approveClaim(claimId: string) {
 
   const { data: claim } = await supabase
     .from('claims')
-    .select('claim_type, status, amount, claimant_name, description, created_by')
+    .select('claim_type, status, amount, claimant_name, description, created_by, source_pool')
     .eq('id', claimId)
     .single()
 
@@ -51,32 +55,80 @@ export async function approveClaim(claimId: string) {
     throw new Error('Only HR or Principal can approve benefit claims')
   }
 
-  // Approving a project claim moves money from the Director Saving Pool (hv_operating_fund)
   await assertPeriodOpen(supabase, new Date())
 
-  const { error } = await supabase
+  // Phase 7 Step 13: two-step approval.
+  // Finance/HR approves the claim → system drafts a payment_voucher in
+  // pending_approval (one pvs row using the claimant's chosen pool) +
+  // links an approval_request of type payment_voucher. Principal then
+  // approves the voucher through the normal approvals queue; that's
+  // when pool/bank debit actually fires via executeVoucher.
+  const { error: claimErr } = await supabase
     .from('claims')
     .update({ status: 'approved', approved_by: user.id, approved_at: new Date().toISOString() })
     .eq('id', claimId)
 
-  if (error) throw new Error(`Failed to approve: ${error.message}`)
+  if (claimErr) throw new Error(`Failed to approve: ${claimErr.message}`)
 
-  // Pool claims (project type) deduct from Director Saving Pool.
-  // hv_operating_fund has no period_month column — it's a running ledger,
-  // balance = SUM(in types) − SUM(out types). reference_id ties back to the
-  // approved claim for audit.
+  // Only project claims create a voucher — benefit claims remain on the
+  // HR payroll path (unchanged).
   if (claim.claim_type === 'project' && Number(claim.amount) > 0) {
-    await supabase.from('hv_operating_fund').insert({
-      transaction_type: 'claim_out',
-      amount: Number(claim.amount),
-      description: `Pool claim: ${claim.claimant_name} — ${claim.description ?? ''}`.trim(),
-      reference_id: claimId,
-      reference_table: 'claims',
+    const amount = Number(claim.amount)
+    const sourcePool = claim.source_pool ?? 'hv_operating_fund'
+    const { data: seq } = await supabase
+      .from('payment_vouchers')
+      .select('*', { count: 'exact', head: true })
+    const period = new Date().toISOString().slice(0, 7).replace('-', '')
+    const voucherNo = `HV-PV-${period}-${String(((seq as unknown as { count?: number } | null)?.count ?? 0) + 1).padStart(4, '0')}`
+
+    const { data: voucher, error: vchErr } = await supabase
+      .from('payment_vouchers')
+      .insert({
+        voucher_no: voucherNo,
+        voucher_type: 'claim_payout',
+        direction: 'debit',
+        status: 'pending_approval',
+        amount,
+        payee_name: claim.claimant_name,
+        description: `Claim payout: ${claim.claimant_name} — ${claim.description ?? ''}`.trim(),
+        payment_method: 'bank_transfer',
+        source_pool: sourcePool,
+        reference_type: 'claim',
+        reference_id: claimId,
+        created_by: user.id,
+      })
+      .select('id')
+      .single()
+
+    if (vchErr) throw new Error(`Failed to draft claim voucher: ${vchErr.message}`)
+
+    await supabase.from('payment_voucher_sources').insert({
+      voucher_id: voucher.id,
+      pool: sourcePool,
+      amount,
     })
+
+    await supabase.from('approval_requests').insert({
+      request_type: 'payment_voucher',
+      reference_id: voucher.id,
+      reference_table: 'payment_vouchers',
+      submitted_by: user.id,
+      description: `${voucherNo}: Claim payout — ${claim.claimant_name}`,
+      amount,
+      status: 'pending',
+      workflow_state: 'submitted',
+    })
+
+    await supabase
+      .from('claims')
+      .update({ voucher_id: voucher.id })
+      .eq('id', claimId)
   }
 
   revalidatePath('/claims')
-  revalidatePath('/director-pool')
+  revalidatePath('/approvals')
+  revalidatePath('/payments')
+  revalidatePath('/dashboard')
 }
 
 export async function rejectClaim(claimId: string) {

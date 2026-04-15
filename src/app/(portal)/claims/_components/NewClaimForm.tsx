@@ -91,6 +91,24 @@ export default function NewClaimForm() {
             placeholder="Car park, medical, event expense..."
           />
         </div>
+        <div>
+          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+            Source pool
+            <span className="text-xs text-muted ml-1 font-normal">(which pool to deduct from)</span>
+          </label>
+          <select
+            name="source_pool"
+            defaultValue="hv_operating_fund"
+            required
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+          >
+            <option value="hv_operating_fund">Venture Pool</option>
+            <option value="dept_pool_director">Director Pool</option>
+            <option value="dept_pool_marketing">Marketing Dept Pool</option>
+            <option value="dept_pool_finance">Finance Dept Pool</option>
+            <option value="dept_pool_hr">HR Dept Pool</option>
+          </select>
+        </div>
       </div>
       {error && (
         <div className="bg-danger-bg border border-danger text-danger rounded-md p-2 mt-3 text-xs font-sans">

@@ -352,7 +352,9 @@ export type Database = {
           id: string
           payroll_month: string | null
           receipt_url: string | null
+          source_pool: string | null
           status: Database["public"]["Enums"]["claim_status"]
+          voucher_id: string | null
         }
         Insert: {
           amount: number
@@ -368,7 +370,9 @@ export type Database = {
           id?: string
           payroll_month?: string | null
           receipt_url?: string | null
+          source_pool?: string | null
           status?: Database["public"]["Enums"]["claim_status"]
+          voucher_id?: string | null
         }
         Update: {
           amount?: number
@@ -384,7 +388,9 @@ export type Database = {
           id?: string
           payroll_month?: string | null
           receipt_url?: string | null
+          source_pool?: string | null
           status?: Database["public"]["Enums"]["claim_status"]
+          voucher_id?: string | null
         }
         Relationships: [
           {
@@ -413,6 +419,13 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "claims_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "payment_vouchers"
             referencedColumns: ["id"]
           },
         ]
