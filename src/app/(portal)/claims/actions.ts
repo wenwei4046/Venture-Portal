@@ -75,11 +75,11 @@ export async function approveClaim(claimId: string) {
   if (claim.claim_type === 'project' && Number(claim.amount) > 0) {
     const amount = Number(claim.amount)
     const sourcePool = claim.source_pool ?? 'hv_operating_fund'
-    const { data: seq } = await supabase
+    const { count } = await supabase
       .from('payment_vouchers')
       .select('*', { count: 'exact', head: true })
     const period = new Date().toISOString().slice(0, 7).replace('-', '')
-    const voucherNo = `HV-PV-${period}-${String(((seq as unknown as { count?: number } | null)?.count ?? 0) + 1).padStart(4, '0')}`
+    const voucherNo = `HV-PV-${period}-${String((count ?? 0) + 1).padStart(4, '0')}`
 
     const { data: voucher, error: vchErr } = await supabase
       .from('payment_vouchers')
