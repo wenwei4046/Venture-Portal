@@ -2017,6 +2017,38 @@ export type Database = {
           },
         ]
       }
+      payment_voucher_sources: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          pool: string
+          voucher_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          pool: string
+          voucher_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          pool?: string
+          voucher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_voucher_sources_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "payment_vouchers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_vouchers: {
         Row: {
           amount: number
