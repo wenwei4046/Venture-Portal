@@ -31,6 +31,15 @@ export async function createPaymentVoucher(formData: FormData) {
   const targetPoolRaw = (formData.get('target_pool') as string) || null
   const targetPool = targetPoolRaw ?? (direction === 'credit' ? 'hv_operating_fund' : null)
   const notes = (formData.get('notes') as string) || null
+  // Phase 7 Step 12b: optional loan repayment tagging on Debit vouchers.
+  const loanId = (formData.get('loan_id') as string) || null
+  const repayPrincipal = parseFloat((formData.get('repayment_principal') as string) ?? '0') || 0
+  const repayInterest = parseFloat((formData.get('repayment_interest') as string) ?? '0') || 0
+  const repayPenalty = parseFloat((formData.get('repayment_penalty') as string) ?? '0') || 0
+  const repaymentBreakdown =
+    loanId && (repayPrincipal + repayInterest + repayPenalty > 0)
+      ? { principal: repayPrincipal, interest: repayInterest, penalty: repayPenalty }
+      : null
 
   // Validation
   const VALID_TYPES = ['loan_repayment', 'billing_payment', 'claim_payout', 'expense', 'internal_transfer', 'salary_payout', 'other', 'receive_payment']
@@ -76,6 +85,24 @@ export async function createPaymentVoucher(formData: FormData) {
   const nowIso = new Date().toISOString()
   const todayStr = dayjs().format('YYYY-MM-DD')
 
+  // Phase 7 Step 12b: validate loan repayment breakdown if provided
+  if (loanId) {
+    if (direction !== 'debit') {
+      throw new Error('Loan repayment must be a Debit voucher')
+    }
+    if (repaymentBreakdown) {
+      const sum =
+        repaymentBreakdown.principal +
+        repaymentBreakdown.interest +
+        repaymentBreakdown.penalty
+      if (Math.abs(sum - amount) > 0.005) {
+        throw new Error(
+          `Repayment breakdown sum RM ${sum.toFixed(2)} must match voucher total RM ${amount.toFixed(2)}`
+        )
+      }
+    }
+  }
+
   const { data, error } = await supabase
     .from('payment_vouchers')
     .insert({
@@ -96,6 +123,8 @@ export async function createPaymentVoucher(formData: FormData) {
       description,
       payment_method: paymentMethod,
       notes,
+      loan_id: loanId,
+      repayment_breakdown: repaymentBreakdown,
       created_by: user.id,
       ...(isAutoComplete ? {
         approved_by: user.id,
@@ -431,6 +460,51 @@ export async function executeVoucher(formData: FormData) {
   } else if (isCredit && voucher.target_pool) {
     // CREDIT: add to target pool (single target stays as-is; subtable is sources only)
     await adjustPool(supabase, voucher.target_pool, 'in', amount, poolDescription, user.id, linkedApproval?.id ?? null, nowIso)
+  }
+
+  // ── Phase 7 Step 12b: loan repayment sync ──
+  // If this voucher tagged a loan_id, insert matching repayments rows and
+  // clear the most recent pending overdue_record for that loan (if any).
+  if (voucher.loan_id && voucher.repayment_breakdown) {
+    const breakdown = voucher.repayment_breakdown as {
+      principal?: number
+      interest?: number
+      penalty?: number
+    }
+    const entries = [
+      { payment_type: 'principal' as const, amt: Number(breakdown.principal ?? 0) },
+      { payment_type: 'interest' as const, amt: Number(breakdown.interest ?? 0) },
+      { payment_type: 'penalty' as const, amt: Number(breakdown.penalty ?? 0) },
+    ].filter((e) => e.amt > 0)
+
+    for (const e of entries) {
+      await supabase.from('repayments').insert({
+        loan_id: voucher.loan_id,
+        amount: e.amt,
+        payment_type: e.payment_type,
+        payment_date: paymentDate,
+        reference_id: voucher.id,
+        notes: `Auto-synced from voucher ${voucher.voucher_no}`,
+        created_by: user.id,
+      })
+    }
+
+    // Clear the most recent pending overdue row for this loan (if any)
+    const { data: pendingOverdue } = await supabase
+      .from('overdue_records')
+      .select('id, period_month')
+      .eq('loan_id', voucher.loan_id)
+      .eq('status', 'pending')
+      .order('period_month', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (pendingOverdue) {
+      await supabase
+        .from('overdue_records')
+        .update({ status: 'paid' })
+        .eq('id', pendingOverdue.id)
+    }
   }
 
   // ── Post GL journal entry (double-entry) ──

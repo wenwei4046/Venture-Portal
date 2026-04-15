@@ -15,12 +15,23 @@ interface InvoicePreset {
   target_pool: string
 }
 
+interface PayableLoan {
+  id: string
+  company_name: string
+  principal: number
+  effective_rate: number
+  outstanding: number
+  overdue_count: number
+  latest_overdue_period: string | null
+}
+
 interface Props {
   companies: { id: string; name: string; short_code: string }[]
   bankAccounts: { id: string; bank_name: string; account_number: string; current_balance: number }[]
   categories: { code: string; label: string }[]
   invoicePreset?: InvoicePreset | null
   nonBillablePreset?: boolean
+  payableLoans?: PayableLoan[]
 }
 
 const POOL_OPTIONS = [
@@ -44,7 +55,7 @@ interface SourceRow {
   amount: string
 }
 
-export default function NewPaymentForm({ companies, bankAccounts, categories, invoicePreset, nonBillablePreset }: Props) {
+export default function NewPaymentForm({ companies, bankAccounts, categories, invoicePreset, nonBillablePreset, payableLoans = [] }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const isInvoicePay = !!invoicePreset
@@ -55,6 +66,18 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
     isNonBillable ? [{ pool: 'hv_operating_fund', amount: '' }] : [{ pool: '', amount: '' }]
   )
   const [amount, setAmount] = useState(isInvoicePay ? invoicePreset!.total_amount.toFixed(2) : '')
+  // Phase 7 Step 12b: loan repayment mode
+  const [isLoanRepayment, setIsLoanRepayment] = useState(false)
+  const [loanId, setLoanId] = useState<string>('')
+  const [repayPrincipal, setRepayPrincipal] = useState('0.00')
+  const [repayInterest, setRepayInterest] = useState('0.00')
+  const [repayPenalty, setRepayPenalty] = useState('0.00')
+  const repaymentSum =
+    (parseFloat(repayPrincipal) || 0) +
+    (parseFloat(repayInterest) || 0) +
+    (parseFloat(repayPenalty) || 0)
+  const repaymentSumMismatch =
+    isLoanRepayment && parseFloat(amount) > 0 && Math.abs(repaymentSum - parseFloat(amount)) > 0.005
   // Phase 7 Step 10: pre-select Venture Pool when Credit (common case).
   const [targetPool, setTargetPool] = useState(
     isInvoicePay ? invoicePreset!.target_pool : direction === 'credit' ? 'hv_operating_fund' : ''
@@ -108,6 +131,24 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
         )
         return
       }
+    }
+
+    // Phase 7 Step 12b: loan repayment validation
+    if (isLoanRepayment) {
+      if (!loanId) {
+        setError('Select a loan before submitting as a loan repayment.')
+        return
+      }
+      if (repaymentSumMismatch) {
+        setError(
+          `Repayment split sums RM ${repaymentSum.toFixed(2)} — voucher total is RM ${totalAmount.toFixed(2)}. Principal + interest + penalty must match.`
+        )
+        return
+      }
+      formData.set('loan_id', loanId)
+      formData.set('repayment_principal', repayPrincipal)
+      formData.set('repayment_interest', repayInterest)
+      formData.set('repayment_penalty', repayPenalty)
     }
 
     // Serialize multi-source rows into FormData
@@ -286,6 +327,87 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
           ))}
         </select>
       </div>
+
+      {/* ── Phase 7 Step 12b: loan repayment toggle (debit only) ── */}
+      {direction === 'debit' && !isInvoicePay && payableLoans.length > 0 ? (
+        <div className="mb-6 p-4 bg-paper border border-hairline rounded-md">
+          <label className="flex items-center gap-2 text-sm font-sans font-medium text-graphite cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isLoanRepayment}
+              onChange={(e) => setIsLoanRepayment(e.target.checked)}
+              className="rounded border-hairline"
+            />
+            This voucher is a loan repayment
+          </label>
+          {isLoanRepayment ? (
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="block text-xs font-sans text-graphite mb-1">Loan to repay</label>
+                <select
+                  value={loanId}
+                  onChange={(e) => setLoanId(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 bg-surface border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+                >
+                  <option value="">Select loan…</option>
+                  {payableLoans.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.company_name} · outstanding RM {l.outstanding.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
+                      {l.overdue_count > 0 ? ` · ⚠ ${l.overdue_count} overdue` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-sans text-graphite mb-1">Principal</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={repayPrincipal}
+                    onChange={(e) => setRepayPrincipal(e.target.value)}
+                    className="w-full px-3 py-2 bg-surface border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-sans text-graphite mb-1">Interest</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={repayInterest}
+                    onChange={(e) => setRepayInterest(e.target.value)}
+                    className="w-full px-3 py-2 bg-surface border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-sans text-graphite mb-1">Penalty</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={repayPenalty}
+                    onChange={(e) => setRepayPenalty(e.target.value)}
+                    className="w-full px-3 py-2 bg-surface border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+                  />
+                </div>
+              </div>
+              {totalAmount > 0 ? (
+                <p className={`font-mono italic text-xs ${repaymentSumMismatch ? 'text-danger' : 'text-ledger'}`}>
+                  {repaymentSumMismatch
+                    ? `Split sum RM ${repaymentSum.toFixed(2)} ≠ voucher total RM ${totalAmount.toFixed(2)}`
+                    : `Split sum RM ${repaymentSum.toFixed(2)} matches voucher total ✓`}
+                </p>
+              ) : null}
+              <p className="font-serif italic text-muted text-xs">
+                On execute, the system auto-inserts repayments rows and clears the latest pending overdue for this loan.
+              </p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* ── Source pools (Debit, multi-row) / Target pool (Credit, single) ── */}
       {direction === 'debit' ? (
@@ -539,7 +661,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
       <div className="flex items-center gap-4 pt-4 border-t border-hairline">
         <button
           type="submit"
-          disabled={isPending || sourceSumMismatch}
+          disabled={isPending || sourceSumMismatch || repaymentSumMismatch}
           className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isPending ? 'Creating…' : 'Create voucher (draft)'}

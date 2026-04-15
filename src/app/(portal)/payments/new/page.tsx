@@ -3,6 +3,7 @@ import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import NewPaymentForm from '../_components/NewPaymentForm'
+import { listPayableLoans } from '../../fund-out/actions'
 
 // Settlement routing: when a sub pays an invoice, the money logically lands
 // in the dept pool that generated the service (HR OpEx → HR Pool, etc.).
@@ -36,10 +37,12 @@ export default async function NewPaymentPage({ searchParams }: Props) {
     { data: companies },
     { data: bankAccounts },
     { data: categories },
+    payableLoans,
   ] = await Promise.all([
     supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('name'),
     supabase.from('bank_accounts').select('id, bank_name, account_number, current_balance').eq('status', 'active').order('is_primary', { ascending: false }),
     supabase.from('payment_categories').select('code, label').eq('is_active', true).order('sort_order'),
+    listPayableLoans().catch(() => []),
   ])
 
   let invoicePreset: {
@@ -120,6 +123,7 @@ export default async function NewPaymentPage({ searchParams }: Props) {
         categories={categories ?? []}
         invoicePreset={invoicePreset}
         nonBillablePreset={nonBillablePreset}
+        payableLoans={payableLoans}
       />
     </div>
   )

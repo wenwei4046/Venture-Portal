@@ -2076,6 +2076,7 @@ export type Database = {
           id: string
           invoice_id: string | null
           journal_entry_id: string | null
+          loan_id: string | null
           notes: string | null
           payee_company_id: string | null
           payee_name: string
@@ -2084,6 +2085,7 @@ export type Database = {
           payment_reference: string | null
           reference_id: string | null
           reference_type: string | null
+          repayment_breakdown: Json | null
           source_pool: string | null
           status: Database["public"]["Enums"]["payment_voucher_status"]
           target_pool: string | null
@@ -2109,6 +2111,7 @@ export type Database = {
           id?: string
           invoice_id?: string | null
           journal_entry_id?: string | null
+          loan_id?: string | null
           notes?: string | null
           payee_company_id?: string | null
           payee_name: string
@@ -2117,6 +2120,7 @@ export type Database = {
           payment_reference?: string | null
           reference_id?: string | null
           reference_type?: string | null
+          repayment_breakdown?: Json | null
           source_pool?: string | null
           status?: Database["public"]["Enums"]["payment_voucher_status"]
           target_pool?: string | null
@@ -2142,6 +2146,7 @@ export type Database = {
           id?: string
           invoice_id?: string | null
           journal_entry_id?: string | null
+          loan_id?: string | null
           notes?: string | null
           payee_company_id?: string | null
           payee_name?: string
@@ -2150,6 +2155,7 @@ export type Database = {
           payment_reference?: string | null
           reference_id?: string | null
           reference_type?: string | null
+          repayment_breakdown?: Json | null
           source_pool?: string | null
           status?: Database["public"]["Enums"]["payment_voucher_status"]
           target_pool?: string | null
@@ -2220,6 +2226,20 @@ export type Database = {
             columns: ["journal_entry_id"]
             isOneToOne: false
             referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_vouchers_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "loan_outstanding"
+            referencedColumns: ["loan_id"]
+          },
+          {
+            foreignKeyName: "payment_vouchers_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "loans"
             referencedColumns: ["id"]
           },
           {

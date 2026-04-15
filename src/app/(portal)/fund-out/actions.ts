@@ -222,6 +222,58 @@ export async function cancelLoan(formData: FormData) {
   redirect('/fund-out')
 }
 
+// ─── List loans payable via debit voucher (Finance) — Phase 7 Step 12b ──────
+//
+// Active loans with outstanding > 0 + enriched with current-period overdue
+// flag. Used by the "this is a loan repayment" checkbox in the voucher form.
+
+export async function listPayableLoans() {
+  await requireRole(['finance', 'principal'])
+  const supabase = await createClient()
+
+  const [{ data: loans }, { data: outstanding }, { data: overdues }, { data: companies }] =
+    await Promise.all([
+      supabase
+        .from('loans')
+        .select('id, company_id, principal, effective_rate, status, disbursement_date')
+        .eq('status', 'active'),
+      supabase.from('loan_outstanding').select('loan_id, outstanding'),
+      supabase
+        .from('overdue_records')
+        .select('loan_id, period_month, is_overdue, status')
+        .eq('status', 'pending'),
+      supabase.from('companies').select('id, name, short_code'),
+    ])
+
+  const outstandingMap = new Map(
+    (outstanding ?? []).map((o) => [o.loan_id, Number(o.outstanding)])
+  )
+  const overdueMap = new Map<string, { period_month: string; count: number }>()
+  for (const o of overdues ?? []) {
+    const prev = overdueMap.get(o.loan_id)
+    if (!prev) {
+      overdueMap.set(o.loan_id, { period_month: o.period_month, count: 1 })
+    } else {
+      prev.count += 1
+      if (o.period_month > prev.period_month) prev.period_month = o.period_month
+    }
+  }
+  const companyMap = new Map((companies ?? []).map((c) => [c.id, c.name as string]))
+
+  return (loans ?? [])
+    .map((l) => ({
+      id: l.id,
+      company_name: companyMap.get(l.company_id) ?? '—',
+      principal: Number(l.principal),
+      effective_rate: Number(l.effective_rate),
+      outstanding: outstandingMap.get(l.id) ?? Number(l.principal),
+      overdue_count: overdueMap.get(l.id)?.count ?? 0,
+      latest_overdue_period: overdueMap.get(l.id)?.period_month ?? null,
+    }))
+    .filter((l) => l.outstanding > 0)
+    .sort((a, b) => b.overdue_count - a.overdue_count)
+}
+
 // ─── Export loan portfolio as CSV ─────────────────────────────────────────────
 
 export async function exportLoansCSV(): Promise<string> {
