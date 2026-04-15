@@ -159,7 +159,6 @@ service_contracts (
     billing_mode    enum (
                       'hr_pool_split',              -- HR 总成本 × %
                       'finance_attribution',        -- Finance 员工归属
-                      'finance_mgmt_fee',           -- Finance 管理费 × %
                       'marketing_project',          -- Marketing 按项目
                       'fixed_split',                -- Rent / Utility
                       'non_billable'                -- Group expense
@@ -184,7 +183,7 @@ invoices (
     contract_id     uuid FK → service_contracts
     company_id      uuid FK → companies NOT NULL
     period_month    date NOT NULL
-    billing_mode    enum ('hr_pool_split','finance_attribution','finance_mgmt_fee',
+    billing_mode    enum ('hr_pool_split','finance_attribution',
                          'marketing_project','fixed_split','non_billable') NOT NULL
     base_amount     decimal(15,2)
     total_amount    decimal(15,2)
@@ -216,7 +215,7 @@ monthly_statement_lines (
     line_type       enum ('invoice','contra') NOT NULL
     direction       enum ('receivable','payable') NOT NULL
     category        enum (
-                      'hr_pool','finance_staff','finance_mgmt_fee',
+                      'hr_pool','finance_staff',
                       'marketing_project','rent','utility',
                       'loan_repayment','savings_interest','savings_principal',
                       'other'
@@ -409,7 +408,6 @@ hr_staff_costs (
     socso_er        decimal(15,2)
     eis_er          decimal(15,2)
     total_ctc       decimal(15,2)                    -- 系统加总
-    is_mgmt_fee     boolean DEFAULT false            -- Finance Manager 走 % split
     status          enum ('active','inactive') DEFAULT 'active'
     created_by      uuid FK → users NOT NULL
     created_at      timestamptz DEFAULT now()
@@ -431,7 +429,6 @@ hr_staff_allocation (
 )
 -- Constraint: 同 staff + period_month 的 allocation_pct 加总 = 1.0
 -- 只有 Finance dept 员工用这张表（per person attribution）
--- is_mgmt_fee = true 的员工也用这张表（management fee split）
 ```
 5.4 claims
 ```sql

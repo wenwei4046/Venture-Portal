@@ -121,9 +121,8 @@ Dept Manager: 只读自己部门
 Mode	部门	怎么算	谁录入
 `hr_pool_split`	HR	HR 总成本 × %	HR 算，Finance 出票
 `finance_attribution`	Finance	员工 CTC × attribution %	HR 算，Finance 出票
-`finance_mgmt_fee`	Finance	Manager 成本 × %	HR 算，Finance 出票
 `marketing_project`	Marketing	按项目合同金额	Finance 直接开
-`fixed_split`	Shared	Rent/Utility × %	Finance 录入
+`fixed_split`	Shared	Rent/Utility × %（按 headcount）	Finance 录入
 `non_billable`	HV	Group expense	Finance 录入
 UI Pages
 Page 1: Billing Overview
@@ -251,20 +250,14 @@ def generate_monthly_invoices(period_month):
         create_invoice(alloc.company_id, period_month, 'hr_pool_split', amount)
     
     # 2. Finance Attribution
-    for staff in hr_staff_costs WHERE department = 'Finance' AND is_mgmt_fee = false:
+    for staff in hr_staff_costs WHERE department = 'Finance':
         for alloc in hr_staff_allocation WHERE staff_id AND period_month:
             amount = staff.total_ctc * alloc.allocation_pct
             create_invoice(alloc.company_id, period_month, 'finance_attribution', amount)
     
-    # 3. Finance Mgmt Fee
-    for staff in hr_staff_costs WHERE is_mgmt_fee = true:
-        for alloc in hr_staff_allocation WHERE staff_id AND period_month:
-            amount = staff.total_ctc * alloc.allocation_pct
-            create_invoice(alloc.company_id, period_month, 'finance_mgmt_fee', amount)
+    # 3. Marketing Project — already created manually by Finance
     
-    # 4. Marketing Project — already created manually by Finance
-    
-    # 5. Fixed Split (Rent / Utility)
+    # 4. Fixed Split (Rent / Utility)
     for split_type in ['rent', 'utility']:
         total = get_monthly_amount(split_type, period_month)
         for company_split in get_splits(split_type):

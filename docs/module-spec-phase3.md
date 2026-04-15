@@ -509,7 +509,7 @@ Data sources:
 loan_interest    = SUM(loans.outstanding * loans.effective_rate) WHERE status='active'
 penalty          = SUM(overdue_records.penalty_amount) WHERE period_month
 hr_billing       = SUM(invoices.total_amount) WHERE billing_mode='hr_pool_split'
-finance_billing  = SUM(invoices.total_amount) WHERE billing_mode IN ('finance_attribution','finance_mgmt_fee')
+finance_billing  = SUM(invoices.total_amount) WHERE billing_mode='finance_attribution'
 marketing_billing= SUM(invoices.total_amount) WHERE billing_mode='marketing_project'
 rent_billback    = SUM(invoices.total_amount) WHERE billing_mode='fixed_split' AND category='rent'
 utility_billback = SUM(invoices.total_amount) WHERE billing_mode='fixed_split' AND category='utility'

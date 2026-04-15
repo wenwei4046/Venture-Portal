@@ -22,14 +22,15 @@ function poolForBillingMode(mode: string): string {
 }
 
 interface Props {
-  searchParams: Promise<{ invoice_id?: string }>
+  searchParams: Promise<{ invoice_id?: string; preset?: string }>
 }
 
 export default async function NewPaymentPage({ searchParams }: Props) {
   await requireRole(['finance'])
   const supabase = await createClient()
 
-  const { invoice_id: invoiceId } = await searchParams
+  const { invoice_id: invoiceId, preset } = await searchParams
+  const nonBillablePreset = preset === 'non_billable'
 
   const [
     { data: companies },
@@ -84,7 +85,11 @@ export default async function NewPaymentPage({ searchParams }: Props) {
           ← Back to {invoicePreset ? 'Billing' : 'Payments'}
         </Link>
         <h1 className="font-serif text-3xl text-ink mt-3">
-          {invoicePreset ? 'Settle invoice' : 'Create payment'}
+          {invoicePreset
+            ? 'Settle invoice'
+            : nonBillablePreset
+              ? 'Non-billable expense'
+              : 'Create payment'}
         </h1>
         <p className="font-serif italic text-graphite text-base mt-2">
           {invoicePreset ? (
@@ -93,6 +98,12 @@ export default async function NewPaymentPage({ searchParams }: Props) {
               <span className="font-mono text-ink">{invoicePreset.invoice_no}</span> —{' '}
               {invoicePreset.company_name} · {dayjs(invoicePreset.period_month).format('MMM YYYY')}.
               Credit voucher, auto-approved on save.
+            </>
+          ) : nonBillablePreset ? (
+            <>
+              Group-level expense deducted from the Venture Pool. HV retreats,
+              brand upgrades, HV&apos;s own rent share, etc.{' '}
+              <em>Principal must approve before execution.</em>
             </>
           ) : (
             <>
@@ -108,6 +119,7 @@ export default async function NewPaymentPage({ searchParams }: Props) {
         bankAccounts={bankAccounts ?? []}
         categories={categories ?? []}
         invoicePreset={invoicePreset}
+        nonBillablePreset={nonBillablePreset}
       />
     </div>
   )

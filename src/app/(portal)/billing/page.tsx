@@ -31,6 +31,9 @@ export default async function BillingPage({ searchParams }: Props) {
   const { period: rawPeriod } = await searchParams
   const period = dayjs(rawPeriod ?? getPeriodMonth()).startOf('month').format('YYYY-MM-DD')
 
+  const periodStart = dayjs(period).startOf('month').toISOString()
+  const periodEnd = dayjs(period).endOf('month').toISOString()
+
   // Fetch in parallel — each query is Finance-safe via RLS or dedicated RPC
   const [
     { data: hrSummary, error: hrSummaryError },
@@ -39,6 +42,7 @@ export default async function BillingPage({ searchParams }: Props) {
     { data: companies },
     { data: headcountRows },
     { data: directorSummary },
+    { data: nonBillableTxns },
   ] = await Promise.all([
     supabase.rpc('get_submitted_hr_summary', { p_period: period }).maybeSingle(),
     supabase
@@ -60,6 +64,12 @@ export default async function BillingPage({ searchParams }: Props) {
       .eq('period_month', period),
     // Director OpEx — use Finance-safe aggregate RPC (no per-director exposure)
     supabase.rpc('get_director_payout_summary', { p_period: period }).maybeSingle(),
+    supabase
+      .from('hv_operating_fund')
+      .select('id, created_at, transaction_type, amount, description, reference_table')
+      .gte('created_at', periodStart)
+      .lte('created_at', periodEnd)
+      .order('created_at', { ascending: false }),
   ])
 
   // hrSummary errors (e.g. RLS / RPC failure) — log but render empty state
@@ -236,7 +246,18 @@ export default async function BillingPage({ searchParams }: Props) {
           headcount: Number(h.headcount),
         }))}
       />
-      <NonBillableList />
+      <NonBillableList
+        transactions={(nonBillableTxns ?? []).map((t) => ({
+          id: t.id,
+          created_at: t.created_at,
+          transaction_type: t.transaction_type,
+          amount: Number(t.amount),
+          description: t.description,
+          reference_table: t.reference_table,
+        }))}
+        period={period}
+        canAdd={user.role === 'finance'}
+      />
     </div>
   )
 }

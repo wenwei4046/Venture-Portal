@@ -20,6 +20,7 @@ interface Props {
   bankAccounts: { id: string; bank_name: string; account_number: string; current_balance: number }[]
   categories: { code: string; label: string }[]
   invoicePreset?: InvoicePreset | null
+  nonBillablePreset?: boolean
 }
 
 const POOL_OPTIONS = [
@@ -38,13 +39,14 @@ const PAYMENT_METHODS = [
   { value: 'netting', label: 'Netting / offset' },
 ]
 
-export default function NewPaymentForm({ companies, bankAccounts, categories, invoicePreset }: Props) {
+export default function NewPaymentForm({ companies, bankAccounts, categories, invoicePreset, nonBillablePreset }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const isInvoicePay = !!invoicePreset
+  const isNonBillable = !!nonBillablePreset && !isInvoicePay
   const [direction, setDirection] = useState<'debit' | 'credit'>(isInvoicePay ? 'credit' : 'debit')
   const [categoryCode, setCategoryCode] = useState(isInvoicePay ? 'billing_payment' : '')
-  const [sourcePool, setSourcePool] = useState('')
+  const [sourcePool, setSourcePool] = useState(isNonBillable ? 'hv_operating_fund' : '')
   const [targetPool, setTargetPool] = useState(isInvoicePay ? invoicePreset!.target_pool : '')
   const [files, setFiles] = useState<File[]>([])
   const [showNewCategory, setShowNewCategory] = useState(false)
@@ -187,7 +189,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
               min="0.01"
               required
               defaultValue={isInvoicePay ? invoicePreset!.total_amount.toFixed(2) : ''}
-              className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
+              className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border read-only:bg-surface-2 read-only:cursor-not-allowed"
               placeholder="0.00"
             />
           </div>
@@ -351,7 +353,11 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
           name="description"
           rows={3}
           required
-          defaultValue={isInvoicePay ? `Settle invoice ${invoicePreset!.invoice_no} — ${invoicePreset!.company_name}` : ''}
+          defaultValue={
+            isInvoicePay
+              ? `Settle invoice ${invoicePreset!.invoice_no} — ${invoicePreset!.company_name}`
+              : ''
+          }
           className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
           placeholder="What is this payment for? Include reference numbers, invoice numbers, etc."
         />
