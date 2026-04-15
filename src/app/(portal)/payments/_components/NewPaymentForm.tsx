@@ -39,6 +39,11 @@ const PAYMENT_METHODS = [
   { value: 'netting', label: 'Netting / offset' },
 ]
 
+interface SourceRow {
+  pool: string
+  amount: string
+}
+
 export default function NewPaymentForm({ companies, bankAccounts, categories, invoicePreset, nonBillablePreset }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -46,13 +51,32 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
   const isNonBillable = !!nonBillablePreset && !isInvoicePay
   const [direction, setDirection] = useState<'debit' | 'credit'>(isInvoicePay ? 'credit' : 'debit')
   const [categoryCode, setCategoryCode] = useState(isInvoicePay ? 'billing_payment' : '')
-  const [sourcePool, setSourcePool] = useState(isNonBillable ? 'hv_operating_fund' : '')
+  const [sourceRows, setSourceRows] = useState<SourceRow[]>(
+    isNonBillable ? [{ pool: 'hv_operating_fund', amount: '' }] : [{ pool: '', amount: '' }]
+  )
+  const [amount, setAmount] = useState(isInvoicePay ? invoicePreset!.total_amount.toFixed(2) : '')
   const [targetPool, setTargetPool] = useState(isInvoicePay ? invoicePreset!.target_pool : '')
   const [files, setFiles] = useState<File[]>([])
   const [showNewCategory, setShowNewCategory] = useState(false)
   const [newCatLabel, setNewCatLabel] = useState('')
   const [catList, setCatList] = useState(categories)
   const formRef = useRef<HTMLFormElement>(null)
+
+  const totalAmount = parseFloat(amount) || 0
+  const sourceSum = sourceRows.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0)
+  const sourceSumMismatch =
+    direction === 'debit' && totalAmount > 0 && Math.abs(sourceSum - totalAmount) > 0.005
+  const canAddRow = sourceRows.length < 3
+
+  // Auto-fill the first row's amount when there's exactly one row and the user
+  // hasn't touched it yet — the common single-source case.
+  useEffect(() => {
+    if (direction !== 'debit') return
+    if (sourceRows.length !== 1) return
+    if (sourceRows[0].amount !== '') return
+    if (!totalAmount) return
+    setSourceRows([{ pool: sourceRows[0].pool, amount: totalAmount.toFixed(2) }])
+  }, [totalAmount, direction, sourceRows])
 
   useEffect(() => {
     if (error && formRef.current) {
@@ -68,6 +92,32 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
 
   async function handleSubmit(formData: FormData) {
     setError(null)
+
+    // Client-side sum check before submit (debit only)
+    if (direction === 'debit') {
+      if (sourceRows.some(r => !r.pool)) {
+        setError('Every source row needs a pool selected.')
+        return
+      }
+      if (sourceSumMismatch) {
+        setError(
+          `Source rows sum RM ${sourceSum.toFixed(2)} — voucher total is RM ${totalAmount.toFixed(2)}. Adjust to match before submitting.`
+        )
+        return
+      }
+    }
+
+    // Serialize multi-source rows into FormData
+    formData.delete('source_pool') // replaced by source_rows for debit
+    if (direction === 'debit') {
+      formData.set('source_rows_count', String(sourceRows.length))
+      sourceRows.forEach((r, i) => {
+        formData.set(`source_rows[${i}][pool]`, r.pool)
+        formData.set(`source_rows[${i}][amount]`, r.amount)
+      })
+      // Back-compat: write source_pool = first row's pool (Step 16 drops this)
+      formData.set('source_pool', sourceRows[0]?.pool ?? '')
+    }
 
     // Append files to formData for server action
     files.forEach((f, i) => formData.append(`attachment_${i}`, f))
@@ -105,7 +155,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
             </button>
             <button
               type="button"
-              onClick={() => { setDirection('credit'); setSourcePool('') }}
+              onClick={() => setDirection('credit')}
               className={direction === 'credit'
                 ? 'px-5 py-2 bg-accent-bg text-accent font-serif italic text-sm border-l border-hairline'
                 : 'px-5 py-2 text-graphite font-sans text-sm hover:bg-surface-2 border-l border-hairline'}
@@ -188,7 +238,9 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
               step="0.01"
               min="0.01"
               required
-              defaultValue={isInvoicePay ? invoicePreset!.total_amount.toFixed(2) : ''}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              readOnly={isInvoicePay}
               className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border read-only:bg-surface-2 read-only:cursor-not-allowed"
               placeholder="0.00"
             />
@@ -229,27 +281,81 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
         </select>
       </div>
 
-      {/* ── Source pool (Debit) / Target pool (Credit) ── */}
+      {/* ── Source pools (Debit, multi-row) / Target pool (Credit, single) ── */}
       {direction === 'debit' ? (
         <div className="mb-6">
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Deduct from pool <span className="text-danger">*</span>
-          </label>
-          <select
-            name="source_pool"
-            value={sourcePool}
-            onChange={(e) => setSourcePool(e.target.value)}
-            required
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-          >
-            <option value="">Select pool…</option>
-            {POOL_OPTIONS.map((p) => (
-              <option key={p.value} value={p.value}>{p.label}</option>
+          <div className="flex items-baseline justify-between mb-1.5">
+            <label className="block text-sm font-sans font-medium text-graphite">
+              Deduct from pools <span className="text-danger">*</span>
+            </label>
+            <button
+              type="button"
+              disabled={!canAddRow}
+              onClick={() => setSourceRows([...sourceRows, { pool: '', amount: '' }])}
+              className="text-xs text-accent hover:text-accent-hover font-serif italic disabled:text-muted disabled:cursor-not-allowed"
+            >
+              + Add source{!canAddRow ? ' (max 3)' : ''}
+            </button>
+          </div>
+          <div className="space-y-2">
+            {sourceRows.map((row, i) => (
+              <div key={i} className="flex gap-2 items-start">
+                <select
+                  value={row.pool}
+                  onChange={(e) => {
+                    const next = [...sourceRows]
+                    next[i] = { ...next[i], pool: e.target.value }
+                    setSourceRows(next)
+                  }}
+                  required
+                  className="flex-1 px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+                >
+                  <option value="">Select pool…</option>
+                  {POOL_OPTIONS.map((p) => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+                <div className="relative w-40">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted font-mono">RM</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    value={row.amount}
+                    onChange={(e) => {
+                      const next = [...sourceRows]
+                      next[i] = { ...next[i], amount: e.target.value }
+                      setSourceRows(next)
+                    }}
+                    className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+                    placeholder="0.00"
+                  />
+                </div>
+                {sourceRows.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setSourceRows(sourceRows.filter((_, j) => j !== i))}
+                    className="px-2 py-2 text-muted hover:text-danger text-lg font-mono"
+                    title="Remove this source"
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
             ))}
-          </select>
-          <p className="font-serif italic text-muted text-xs mt-1.5">
-            Which pool should this payment be deducted from?
-          </p>
+          </div>
+          {totalAmount > 0 ? (
+            <p className={`font-mono italic text-xs mt-2 ${sourceSumMismatch ? 'text-danger' : 'text-ledger'}`}>
+              {sourceSumMismatch
+                ? `Sum RM ${sourceSum.toFixed(2)} · voucher total RM ${totalAmount.toFixed(2)} · mismatch RM ${(totalAmount - sourceSum).toFixed(2)}`
+                : `Sum RM ${sourceSum.toFixed(2)} matches voucher total ✓`}
+            </p>
+          ) : (
+            <p className="font-serif italic text-muted text-xs mt-2">
+              Split the voucher total across up to 3 pools. Row amounts must sum to the voucher total.
+            </p>
+          )}
           <input type="hidden" name="target_pool" value="" />
         </div>
       ) : (
@@ -427,7 +533,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
       <div className="flex items-center gap-4 pt-4 border-t border-hairline">
         <button
           type="submit"
-          disabled={isPending}
+          disabled={isPending || sourceSumMismatch}
           className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isPending ? 'Creating…' : 'Create voucher (draft)'}

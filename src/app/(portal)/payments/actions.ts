@@ -108,15 +108,33 @@ export async function createPaymentVoucher(formData: FormData) {
 
   if (error) throw new Error(`Failed to create voucher: ${error.message}`)
 
-  // Phase 7: mirror source_pool into payment_voucher_sources subtable (one row
-  // per voucher today; Step 6 will replace this with a multi-row picker).
-  // Only debit vouchers have a source; credit vouchers use target_pool.
-  if (sourcePool && direction === 'debit') {
-    await supabase.from('payment_voucher_sources').insert({
-      voucher_id: data.id,
-      pool: sourcePool,
-      amount,
-    })
+  // Phase 7: write N rows into payment_voucher_sources for debit vouchers.
+  // Form sends source_rows[i][pool] + source_rows[i][amount]; legacy callers
+  // that only send source_pool fall through to a single-row insert.
+  if (direction === 'debit') {
+    const rowCount = parseInt((formData.get('source_rows_count') as string) ?? '0', 10)
+    const rows: { pool: string; amount: number }[] = []
+    if (rowCount > 0) {
+      for (let i = 0; i < rowCount; i++) {
+        const pool = (formData.get(`source_rows[${i}][pool]`) as string)?.trim() ?? ''
+        const amt = parseFloat((formData.get(`source_rows[${i}][amount]`) as string) ?? '0')
+        if (pool && amt > 0) rows.push({ pool, amount: amt })
+      }
+    } else if (sourcePool) {
+      rows.push({ pool: sourcePool, amount })
+    }
+    if (rows.length > 0) {
+      const sum = rows.reduce((s, r) => s + r.amount, 0)
+      if (Math.abs(sum - amount) > 0.005) {
+        throw new Error(`source rows sum (${sum.toFixed(2)}) does not match voucher amount (${amount.toFixed(2)})`)
+      }
+      if (rows.length > 3) {
+        throw new Error('payment_voucher_sources: max 3 source rows per voucher')
+      }
+      await supabase.from('payment_voucher_sources').insert(
+        rows.map(r => ({ voucher_id: data.id, pool: r.pool, amount: r.amount }))
+      )
+    }
   }
 
   // Auto-complete credit payments: adjust bank + pool immediately
