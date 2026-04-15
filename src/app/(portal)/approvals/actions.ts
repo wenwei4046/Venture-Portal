@@ -132,6 +132,58 @@ export async function approveRequest(formData: FormData) {
         `Approval recorded but pool release failed: ${releaseError.message}`
       )
     }
+  } else if (approval.request_type === 'new_fund_source') {
+    // Phase 7: flip the fund_source from pending_approval → active, post the
+    // Venture Pool credit (hv_operating_fund.fund_in), and bump the primary
+    // bank balance. All three only fire on approval — on submit the
+    // fund_source sits quietly in pending_approval with zero ledger impact.
+    const { data: fundSource, error: fsFetchError } = await supabase
+      .from('fund_sources')
+      .select('id, amount, source_type, from_company_id, from_director_id')
+      .eq('id', approval.reference_id)
+      .eq('status', 'pending_approval')
+      .single()
+
+    if (fsFetchError || !fundSource) {
+      throw new Error('Approval recorded but fund source not found or not pending')
+    }
+
+    const { error: fsUpdateError } = await supabase
+      .from('fund_sources')
+      .update({ status: 'active', updated_at: now })
+      .eq('id', approval.reference_id)
+      .eq('status', 'pending_approval')
+
+    if (fsUpdateError) {
+      throw new Error(`Approval recorded but fund source activation failed: ${fsUpdateError.message}`)
+    }
+
+    // Post the Venture Pool credit — mirrors the old inline createFundSource write
+    const typeLabel = fundSource.source_type === 'subsidiary' ? 'subsidiary deposit'
+      : fundSource.source_type === 'director_loan' ? 'director loan'
+      : 'dept pool transfer'
+    await supabase.from('hv_operating_fund').insert({
+      transaction_type: 'fund_in' as const,
+      amount: Number(fundSource.amount),
+      description: `Fund source: ${typeLabel}`,
+      reference_id: fundSource.id,
+      reference_table: 'fund_sources',
+      created_by: user.id,
+    })
+
+    // Bump primary bank account balance
+    const { data: primaryBank } = await supabase
+      .from('bank_accounts')
+      .select('id, current_balance')
+      .eq('is_primary', true)
+      .eq('status', 'active')
+      .single()
+    if (primaryBank) {
+      await supabase
+        .from('bank_accounts')
+        .update({ current_balance: Number(primaryBank.current_balance) + Number(fundSource.amount) })
+        .eq('id', primaryBank.id)
+    }
   } else if (approval.request_type === 'payment_voucher') {
     // Phase 4: approve the linked payment voucher
     const { error: pvError } = await supabase

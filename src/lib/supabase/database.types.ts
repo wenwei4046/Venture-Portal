@@ -1036,6 +1036,7 @@ export type Database = {
           penalty_on_early: number | null
           repaid_at: string | null
           repaid_by: string | null
+          repayment_date: string | null
           source_type: Database["public"]["Enums"]["fund_source_type"]
           status: Database["public"]["Enums"]["fund_source_status"]
           updated_at: string
@@ -1058,6 +1059,7 @@ export type Database = {
           penalty_on_early?: number | null
           repaid_at?: string | null
           repaid_by?: string | null
+          repayment_date?: string | null
           source_type: Database["public"]["Enums"]["fund_source_type"]
           status?: Database["public"]["Enums"]["fund_source_status"]
           updated_at?: string
@@ -1080,6 +1082,7 @@ export type Database = {
           penalty_on_early?: number | null
           repaid_at?: string | null
           repaid_by?: string | null
+          repayment_date?: string | null
           source_type?: Database["public"]["Enums"]["fund_source_type"]
           status?: Database["public"]["Enums"]["fund_source_status"]
           updated_at?: string
@@ -3044,6 +3047,7 @@ export type Database = {
         | "invoice_pool_release"
         | "profit_withdrawal"
         | "payment_voucher"
+        | "new_fund_source"
       approval_status: "pending" | "approved" | "rejected"
       approval_workflow_state:
         | "submitted"
@@ -3065,7 +3069,12 @@ export type Database = {
       dept_pool_txn_type: "np_in" | "expense_out"
       director_status: "active" | "inactive"
       epf_part: "A" | "C" | "E" | "F"
-      fund_source_status: "active" | "matured" | "repaid" | "cancelled"
+      fund_source_status:
+        | "pending_approval"
+        | "active"
+        | "matured"
+        | "repaid"
+        | "cancelled"
       fund_source_type:
         | "subsidiary"
         | "director_loan"
@@ -3253,6 +3262,7 @@ export const Constants = {
         "invoice_pool_release",
         "profit_withdrawal",
         "payment_voucher",
+        "new_fund_source",
       ],
       approval_status: ["pending", "approved", "rejected"],
       approval_workflow_state: [
@@ -3277,7 +3287,13 @@ export const Constants = {
       dept_pool_txn_type: ["np_in", "expense_out"],
       director_status: ["active", "inactive"],
       epf_part: ["A", "C", "E", "F"],
-      fund_source_status: ["active", "matured", "repaid", "cancelled"],
+      fund_source_status: [
+        "pending_approval",
+        "active",
+        "matured",
+        "repaid",
+        "cancelled",
+      ],
       fund_source_type: [
         "subsidiary",
         "director_loan",

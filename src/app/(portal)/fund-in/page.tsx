@@ -23,7 +23,7 @@ type FundSourceRow = {
   lock_in_months: number | null
   effective_date: string
   maturity_date: string | null
-  status: 'active' | 'matured' | 'repaid' | 'cancelled'
+  status: 'pending_approval' | 'active' | 'matured' | 'repaid' | 'cancelled'
   notes: string | null
 }
 
@@ -77,6 +77,7 @@ export default async function FundInPage({ searchParams }: Props) {
 
   // Status counts for tab badges
   const counts = {
+    pending_approval: sources.filter((s) => s.status === 'pending_approval').length,
     active: sources.filter((s) => s.status === 'active').length,
     matured: sources.filter((s) => s.status === 'matured').length,
     repaid: sources.filter((s) => s.status === 'repaid').length,
@@ -254,6 +255,9 @@ function StatusLabel({
   status: FundSourceRow['status']
   maturityDate: string | null
 }) {
+  if (status === 'pending_approval') {
+    return <em className="font-serif text-alert text-sm">pending approval</em>
+  }
   if (status === 'active') {
     if (maturityDate) {
       const days = dayjs(maturityDate).diff(dayjs(), 'day')

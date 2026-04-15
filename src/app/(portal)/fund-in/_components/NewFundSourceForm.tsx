@@ -258,6 +258,24 @@ export default function NewFundSourceForm({ companies, directors, departments }:
         </div>
       </div>
 
+      {/* ───────── Repayment date (Phase 7) ───────── */}
+      <div className="mb-6">
+        <label htmlFor="repayment_date" className="block text-sm font-sans font-medium text-graphite mb-1.5">
+          Expected repayment date <span className="text-danger">*</span>
+        </label>
+        <input
+          id="repayment_date"
+          name="repayment_date"
+          type="date"
+          required
+          defaultValue={dayjs().add(12, 'month').format('YYYY-MM-DD')}
+          className="w-full max-w-sm px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+        />
+        <p className="font-serif italic text-muted text-xs mt-1.5">
+          Target date HV repays the full principal. Must be on or after the effective date.
+        </p>
+      </div>
+
       {/* ───────── Notes ───────── */}
       <div className="mb-6">
         <label htmlFor="notes" className="block text-sm font-sans font-medium text-graphite mb-1.5">
@@ -286,7 +304,7 @@ export default function NewFundSourceForm({ companies, directors, departments }:
           disabled={isPending}
           className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isPending ? 'Saving…' : 'Record fund source'}
+          {isPending ? 'Submitting…' : 'Submit for approval'}
         </button>
         <Link
           href="/fund-in"
@@ -295,7 +313,7 @@ export default function NewFundSourceForm({ companies, directors, departments }:
           Cancel
         </Link>
         <span className="text-xs text-muted italic font-serif ml-auto">
-          Rate locks at save
+          Rate locks at save · Principal must approve before money moves
         </span>
       </div>
     </form>

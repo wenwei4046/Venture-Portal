@@ -40,6 +40,7 @@ export type ApprovalRequestType =
   | 'invoice_pool_release'
   | 'profit_withdrawal'
   | 'payment_voucher'
+  | 'new_fund_source'
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 
@@ -61,7 +62,7 @@ export interface ApprovalRequest {
 // ─── Treasury ─────────────────────────────────────────────────────────────────
 
 export type FundSourceType = 'subsidiary' | 'director_loan' | 'department_pool' | 'director_saving'
-export type FundSourceStatus = 'active' | 'matured' | 'repaid' | 'cancelled'
+export type FundSourceStatus = 'pending_approval' | 'active' | 'matured' | 'repaid' | 'cancelled'
 
 export interface FundSource {
   id: string

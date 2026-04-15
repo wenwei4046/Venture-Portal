@@ -15,6 +15,7 @@ interface CreateFundSourceInput {
   cost_rate_percent: number
   lock_in_months: number
   effective_date: string
+  repayment_date: string
   notes?: string
 }
 
@@ -32,6 +33,7 @@ export async function createFundSource(formData: FormData) {
     cost_rate_percent: parseFloat((formData.get('cost_rate_percent') as string) ?? '0'),
     lock_in_months: parseInt((formData.get('lock_in_months') as string) ?? '0', 10),
     effective_date: (formData.get('effective_date') as string) ?? '',
+    repayment_date: (formData.get('repayment_date') as string) ?? '',
     notes: (formData.get('notes') as string) || undefined,
   }
 
@@ -64,6 +66,12 @@ export async function createFundSource(formData: FormData) {
   }
   if (dayjs(raw.effective_date).isAfter(dayjs(), 'day')) {
     throw new Error('Effective date cannot be in the future')
+  }
+  if (!raw.repayment_date) {
+    throw new Error('Repayment date is required')
+  }
+  if (dayjs(raw.repayment_date).isBefore(dayjs(raw.effective_date), 'day')) {
+    throw new Error('Repayment date must be on or after effective date')
   }
 
   await assertPeriodOpen(supabase, raw.effective_date)
@@ -99,8 +107,11 @@ export async function createFundSource(formData: FormData) {
     cost_rate,
     lock_in_months: raw.lock_in_months || null,
     effective_date: raw.effective_date,
+    repayment_date: raw.repayment_date,
     early_withdrawal: false,
-    status: 'active' as const,
+    // Phase 7: starts in pending_approval. Principal approval flips to 'active'
+    // and posts the Venture Pool credit + bank balance bump.
+    status: 'pending_approval' as const,
     notes: raw.notes ?? null,
     created_by: user.id,
   }
@@ -123,20 +134,34 @@ export async function createFundSource(formData: FormData) {
     throw new Error(`Failed to create fund source: ${error.message}`)
   }
 
-  // Auto-add to Operation Pool (fund_in entry)
+  // Phase 7: no longer posts hv_operating_fund.fund_in on submit. Money moves
+  // when Principal approves — see approvals/actions.ts::approveRequest's
+  // 'new_fund_source' branch. Here we only queue the approval request.
   const typeLabel = raw.source_type === 'subsidiary' ? 'subsidiary deposit'
     : raw.source_type === 'director_loan' ? 'director loan'
     : 'dept pool transfer'
-  await supabase.from('hv_operating_fund').insert({
-    transaction_type: 'fund_in' as const,
-    amount: raw.amount,
-    description: `Fund source: ${typeLabel}`,
-    reference_id: data.id,
-    reference_table: 'fund_sources',
-    created_by: user.id,
-  })
+
+  const { error: approvalError } = await supabase
+    .from('approval_requests')
+    .insert({
+      request_type: 'new_fund_source' as const,
+      reference_id: data.id,
+      reference_table: 'fund_sources',
+      submitted_by: user.id,
+      description: `New fund source: ${typeLabel} — RM ${raw.amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${raw.cost_rate_percent}%/mo`,
+      amount: raw.amount,
+      status: 'pending' as const,
+      workflow_state: 'submitted' as const,
+    })
+
+  if (approvalError) {
+    // Best-effort rollback: delete the orphan fund_source so user can retry
+    await supabase.from('fund_sources').delete().eq('id', data.id)
+    throw new Error(`Failed to queue approval: ${approvalError.message}`)
+  }
 
   revalidatePath('/fund-in')
+  revalidatePath('/approvals')
   revalidatePath('/dashboard')
   redirect(`/fund-in/${data.id}`)
 }

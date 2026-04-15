@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { SlidingTabs } from '@/components/motion/SlidingTabs'
 
 const TABS = [
+  { key: 'pending_approval', label: 'Pending' },
   { key: 'active', label: 'Active' },
   { key: 'matured', label: 'Matured' },
   { key: 'repaid', label: 'Repaid' },
