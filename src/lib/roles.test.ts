@@ -56,10 +56,10 @@ describe('canAccessDeptPool', () => {
 })
 
 describe('canAccessHRCosting', () => {
-  it('allows principal and hr only', () => {
+  it('allows principal, hr, and finance (Step 15 execute)', () => {
     expect(canAccessHRCosting('principal')).toBe(true)
     expect(canAccessHRCosting('hr')).toBe(true)
-    expect(canAccessHRCosting('finance')).toBe(false)
+    expect(canAccessHRCosting('finance')).toBe(true)
     expect(canAccessHRCosting('dept_manager')).toBe(false)
   })
 })
