@@ -207,6 +207,20 @@ export async function approveRequest(formData: FormData) {
         `Approval recorded but voucher update failed: ${pvError.message}`
       )
     }
+  } else if (approval.request_type === 'hr_costing') {
+    // Phase 7 Step 15: flip HR cost snapshot to approved_for_execution;
+    // Finance then clicks Execute on /hr-costing.
+    const { error: hrErr } = await supabase
+      .from('hr_cost_submissions')
+      .update({ execution_state: 'approved_for_execution' })
+      .eq('id', approval.reference_id)
+      .eq('execution_state', 'pending')
+
+    if (hrErr) {
+      throw new Error(
+        `Approval recorded but HR costing state update failed: ${hrErr.message}`
+      )
+    }
   }
   // Other request types (base_rate, tier_change, etc) handled in Phase 1.5+
 

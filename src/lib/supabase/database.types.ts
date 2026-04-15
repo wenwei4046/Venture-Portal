@@ -1138,6 +1138,7 @@ export type Database = {
       hr_cost_submissions: {
         Row: {
           dept_summaries: Json
+          execution_state: string | null
           id: string
           notes: string | null
           period_month: string
@@ -1149,6 +1150,7 @@ export type Database = {
         }
         Insert: {
           dept_summaries: Json
+          execution_state?: string | null
           id?: string
           notes?: string | null
           period_month: string
@@ -1160,6 +1162,7 @@ export type Database = {
         }
         Update: {
           dept_summaries?: Json
+          execution_state?: string | null
           id?: string
           notes?: string | null
           period_month?: string
@@ -3089,6 +3092,7 @@ export type Database = {
         | "profit_withdrawal"
         | "payment_voucher"
         | "new_fund_source"
+        | "hr_costing"
       approval_status: "pending" | "approved" | "rejected"
       approval_workflow_state:
         | "submitted"
@@ -3304,6 +3308,7 @@ export const Constants = {
         "profit_withdrawal",
         "payment_voucher",
         "new_fund_source",
+        "hr_costing",
       ],
       approval_status: ["pending", "approved", "rejected"],
       approval_workflow_state: [

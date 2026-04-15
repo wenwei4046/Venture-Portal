@@ -26,6 +26,7 @@ const APPROVE_LEAD: Record<ApprovalRequestType, string> = {
   profit_withdrawal: 'Approving authorises the profit withdrawal',
   payment_voucher: 'Approving authorises the payment for execution',
   new_fund_source: 'Approving activates the fund source and credits the Venture Pool',
+  hr_costing: 'Approving locks in the HR costing snapshot for Finance to execute',
 }
 
 const REJECT_LEAD: Record<ApprovalRequestType, string> = {
@@ -41,6 +42,7 @@ const REJECT_LEAD: Record<ApprovalRequestType, string> = {
   profit_withdrawal: 'Rejecting denies the withdrawal',
   payment_voucher: 'Rejecting cancels the payment — no funds will be transferred',
   new_fund_source: 'Rejecting cancels the fund source — no capital will be posted',
+  hr_costing: 'Rejecting keeps the HR snapshot as-is and blocks execution',
 }
 
 export default function ApprovalActions({ approvalId, requestType }: Props) {

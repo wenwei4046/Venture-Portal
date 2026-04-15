@@ -41,6 +41,7 @@ export type ApprovalRequestType =
   | 'profit_withdrawal'
   | 'payment_voucher'
   | 'new_fund_source'
+  | 'hr_costing'
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 

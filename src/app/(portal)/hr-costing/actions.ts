@@ -43,14 +43,21 @@ export async function submitHRCostSummary(formData: FormData) {
 
   // Insert the immutable snapshot. UNIQUE (period_month) enforces idempotency:
   // a second submission for the same period fails with a clear error.
-  const { error: insertErr } = await supabase.from('hr_cost_submissions').insert({
-    period_month: period,
-    submitted_by: user.id,
-    dept_summaries: payload.dept_summaries,
-    staff_snapshot: payload.staff_snapshot,
-    pool_allocation_snapshot: payload.pool_allocation_snapshot,
-    staff_allocation_snapshot: payload.staff_allocation_snapshot,
-  })
+  // Phase 7 Step 15: start with execution_state='pending' so Principal can
+  // approve the snapshot before Finance executes it.
+  const { data: submission, error: insertErr } = await supabase
+    .from('hr_cost_submissions')
+    .insert({
+      period_month: period,
+      submitted_by: user.id,
+      dept_summaries: payload.dept_summaries,
+      staff_snapshot: payload.staff_snapshot,
+      pool_allocation_snapshot: payload.pool_allocation_snapshot,
+      staff_allocation_snapshot: payload.staff_allocation_snapshot,
+      execution_state: 'pending',
+    })
+    .select('id')
+    .single()
 
   if (insertErr) {
     if (insertErr.code === '23505') {
@@ -61,12 +68,60 @@ export async function submitHRCostSummary(formData: FormData) {
     throw new Error(`Failed to submit HR cost summary: ${insertErr.message}`)
   }
 
+  // Phase 7 Step 15: queue Principal approval for the HR cost snapshot.
+  const totalCtc = Object.values(deptSummaries).reduce<number>(
+    (acc, d) => acc + Number((d as { total_ctc?: number }).total_ctc ?? 0),
+    0
+  )
+  const { error: approvalErr } = await supabase.from('approval_requests').insert({
+    request_type: 'hr_costing',
+    reference_id: submission.id,
+    reference_table: 'hr_cost_submissions',
+    submitted_by: user.id,
+    description: `HR Costing snapshot for ${dayjs(period).format('MMM YYYY')} — ${Object.keys(deptSummaries).length} dept(s)`,
+    amount: totalCtc,
+    status: 'pending',
+    workflow_state: 'submitted',
+  })
+  if (approvalErr) {
+    // Best-effort: don't block the submission on an approval insert hiccup.
+    console.error('HR costing approval queue failed:', approvalErr.message)
+  }
+
   revalidatePath('/hr-costing')
-  revalidatePath('/billing')
+  revalidatePath('/statements/invoices')
+  revalidatePath('/approvals')
   revalidatePath('/dashboard')
 
   return {
     period,
     departments: Object.keys(deptSummaries),
   }
+}
+
+// ─── Finance executes an approved HR Costing snapshot (Step 15) ──────────────
+//
+// After Principal approves the hr_costing approval_request, Finance clicks
+// Execute on the snapshot row. No money movement here — the snapshot is
+// already used by billing; execution_state = 'executed' signals that
+// Finance has formally picked it up.
+
+export async function executeHrCosting(formData: FormData) {
+  const user = await requireRole(['finance'])
+  const supabase = await createClient()
+
+  const id = (formData.get('id') as string) ?? ''
+  if (!id) throw new Error('Submission id is required')
+
+  const { error } = await supabase
+    .from('hr_cost_submissions')
+    .update({ execution_state: 'executed' })
+    .eq('id', id)
+    .eq('execution_state', 'approved_for_execution')
+
+  if (error) throw new Error(`Failed to execute HR costing: ${error.message}`)
+
+  void user
+  revalidatePath('/hr-costing')
+  revalidatePath('/dashboard')
 }

@@ -218,6 +218,8 @@ function formatRequestType(type: string): string {
     invoice_pool_release: 'Invoice pool release',
     profit_withdrawal: 'Profit withdrawal',
     payment_voucher: 'Payment voucher',
+    hr_costing: 'HR costing',
+    new_fund_source: 'New fund source',
   }
   return labels[type] ?? type
 }

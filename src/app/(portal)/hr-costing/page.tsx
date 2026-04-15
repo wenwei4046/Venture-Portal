@@ -4,6 +4,7 @@ import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import SubmitHRCostButton from './_components/SubmitHRCostButton'
+import { executeHrCosting } from './actions'
 
 interface DeptSummary {
   department_id: string
@@ -36,7 +37,7 @@ export default async function HRCostingPage() {
   // Submission history (last 12 periods)
   const { data: submissions } = await supabase
     .from('hr_cost_submissions')
-    .select('id, period_month, submitted_at, submitted_by, dept_summaries')
+    .select('id, period_month, submitted_at, submitted_by, dept_summaries, execution_state')
     .order('period_month', { ascending: false })
     .limit(12)
 
@@ -75,6 +76,7 @@ export default async function HRCostingPage() {
   )
 
   const canSubmit = user.role === 'hr'
+  const canExecute = user.role === 'finance' || user.role === 'principal'
 
   return (
     <div>
@@ -215,9 +217,10 @@ export default async function HRCostingPage() {
                 <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
                   <th className="text-left py-3 pr-4 font-medium">Period</th>
                   <th className="text-left py-3 pr-4 font-medium">Submitted by</th>
-                  <th className="text-left py-3 pr-4 font-medium">Submitted at</th>
+                  <th className="text-left py-3 pr-4 font-medium">State</th>
                   <th className="text-right py-3 pr-4 font-medium">Basic</th>
-                  <th className="text-right py-3 font-medium">Total CTC</th>
+                  <th className="text-right py-3 pr-4 font-medium">Total CTC</th>
+                  <th className="py-3 text-right"></th>
                 </tr>
               </thead>
               <tbody>
@@ -234,6 +237,7 @@ export default async function HRCostingPage() {
                     (acc, d) => acc + Number(d.total_ctc ?? 0),
                     0
                   )
+                  const state = s.execution_state ?? 'approved_for_execution' // legacy NULL
                   return (
                     <tr
                       key={s.id}
@@ -245,14 +249,29 @@ export default async function HRCostingPage() {
                       <td className="py-3 pr-4 font-serif italic text-graphite">
                         {submitterName.get(s.submitted_by) ?? '—'}
                       </td>
-                      <td className="py-3 pr-4 font-mono text-xs text-muted">
-                        {dayjs(s.submitted_at).format('D MMM YYYY HH:mm')}
+                      <td className="py-3 pr-4">
+                        <StateBadge state={state} />
                       </td>
                       <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
                         {formatMoney(totalBasic)}
                       </td>
-                      <td className="py-3 text-right font-mono tabular font-medium text-ink font-semibold">
+                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">
                         {formatMoney(totalCtc)}
+                      </td>
+                      <td className="py-3 text-right">
+                        {canExecute && state === 'approved_for_execution' ? (
+                          <form action={executeHrCosting}>
+                            <input type="hidden" name="id" value={s.id} />
+                            <button
+                              type="submit"
+                              className="text-sm text-accent hover:text-accent-hover font-serif italic transition-colors"
+                            >
+                              Execute transfers
+                            </button>
+                          </form>
+                        ) : (
+                          <span className="text-xs font-mono text-muted">—</span>
+                        )}
                       </td>
                     </tr>
                   )
@@ -264,4 +283,14 @@ export default async function HRCostingPage() {
       </section>
     </div>
   )
+}
+
+function StateBadge({ state }: { state: string }) {
+  if (state === 'pending')
+    return <em className="font-serif italic text-alert text-xs">awaiting Principal</em>
+  if (state === 'approved_for_execution')
+    return <em className="font-serif italic text-accent text-xs">ready to execute</em>
+  if (state === 'executed')
+    return <em className="font-serif italic text-ledger text-xs">executed</em>
+  return <em className="font-serif italic text-muted text-xs">{state}</em>
 }

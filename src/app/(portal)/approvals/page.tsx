@@ -227,6 +227,7 @@ function formatRequestType(type: string): string {
     profit_withdrawal: 'PROFIT WITHDRAWAL',
     new_fund_source: 'NEW FUND SOURCE',
     payment_voucher: 'PAYMENT VOUCHER',
+    hr_costing: 'HR COSTING',
   }
   return labels[type] ?? type.toUpperCase()
 }
