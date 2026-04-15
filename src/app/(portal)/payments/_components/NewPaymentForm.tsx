@@ -55,7 +55,10 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
     isNonBillable ? [{ pool: 'hv_operating_fund', amount: '' }] : [{ pool: '', amount: '' }]
   )
   const [amount, setAmount] = useState(isInvoicePay ? invoicePreset!.total_amount.toFixed(2) : '')
-  const [targetPool, setTargetPool] = useState(isInvoicePay ? invoicePreset!.target_pool : '')
+  // Phase 7 Step 10: pre-select Venture Pool when Credit (common case).
+  const [targetPool, setTargetPool] = useState(
+    isInvoicePay ? invoicePreset!.target_pool : direction === 'credit' ? 'hv_operating_fund' : ''
+  )
   const [files, setFiles] = useState<File[]>([])
   const [showNewCategory, setShowNewCategory] = useState(false)
   const [newCatLabel, setNewCatLabel] = useState('')
@@ -155,7 +158,10 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
             </button>
             <button
               type="button"
-              onClick={() => setDirection('credit')}
+              onClick={() => {
+                setDirection('credit')
+                if (!targetPool) setTargetPool('hv_operating_fund')
+              }}
               className={direction === 'credit'
                 ? 'px-5 py-2 bg-accent-bg text-accent font-serif italic text-sm border-l border-hairline'
                 : 'px-5 py-2 text-graphite font-sans text-sm hover:bg-surface-2 border-l border-hairline'}

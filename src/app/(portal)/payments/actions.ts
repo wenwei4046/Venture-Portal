@@ -27,7 +27,9 @@ export async function createPaymentVoucher(formData: FormData) {
   const direction = (formData.get('direction') as string) || 'debit'
   const categoryCode = (formData.get('category_code') as string) || null
   const sourcePool = (formData.get('source_pool') as string) || null
-  const targetPool = (formData.get('target_pool') as string) || null
+  // Phase 7 Step 10: Credit vouchers default to Venture Pool when unspecified.
+  const targetPoolRaw = (formData.get('target_pool') as string) || null
+  const targetPool = targetPoolRaw ?? (direction === 'credit' ? 'hv_operating_fund' : null)
   const notes = (formData.get('notes') as string) || null
 
   // Validation
