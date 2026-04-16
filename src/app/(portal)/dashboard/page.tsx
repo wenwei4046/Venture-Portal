@@ -1251,7 +1251,7 @@ export default async function DashboardPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="border border-hairline rounded-md bg-surface p-5">
-            <div className="font-serif italic text-accent text-sm mb-1">Salary Pool</div>
+            <div className="font-serif italic text-accent text-sm mb-1">Director Pool</div>
             <div className="font-serif text-2xl text-ink leading-none">
               {formatMoney(Number(summary.salary_pool_total ?? 0))}
             </div>
