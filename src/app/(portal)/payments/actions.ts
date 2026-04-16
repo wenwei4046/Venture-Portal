@@ -31,13 +31,17 @@ export async function createPaymentVoucher(formData: FormData) {
   const targetPoolRaw = (formData.get('target_pool') as string) || null
   const targetPool = targetPoolRaw ?? (direction === 'credit' ? 'hv_operating_fund' : null)
   const notes = (formData.get('notes') as string) || null
-  // Phase 7 Step 12b: optional loan repayment tagging on Debit vouchers.
+  // Optional loan repayment tagging on Debit vouchers.
+  // Business direction: HV repaying a fund_source (subsidiary savings /
+  // director loan). fund_source_id is the new canonical field; legacy loan_id
+  // is kept NULL for new vouchers but still stored if passed for back-compat.
+  const fundSourceId = (formData.get('fund_source_id') as string) || null
   const loanId = (formData.get('loan_id') as string) || null
   const repayPrincipal = parseFloat((formData.get('repayment_principal') as string) ?? '0') || 0
   const repayInterest = parseFloat((formData.get('repayment_interest') as string) ?? '0') || 0
   const repayPenalty = parseFloat((formData.get('repayment_penalty') as string) ?? '0') || 0
   const repaymentBreakdown =
-    loanId && (repayPrincipal + repayInterest + repayPenalty > 0)
+    (fundSourceId || loanId) && (repayPrincipal + repayInterest + repayPenalty > 0)
       ? { principal: repayPrincipal, interest: repayInterest, penalty: repayPenalty }
       : null
 
@@ -95,10 +99,13 @@ export async function createPaymentVoucher(formData: FormData) {
   const nowIso = new Date().toISOString()
   const todayStr = dayjs().format('YYYY-MM-DD')
 
-  // Phase 7 Step 12b: validate loan repayment breakdown if provided
-  if (loanId) {
+  // Validate loan repayment breakdown if provided (fund_source or legacy loan)
+  if (fundSourceId || loanId) {
     if (direction !== 'debit') {
       throw new Error('Loan repayment must be a Debit voucher')
+    }
+    if (fundSourceId && loanId) {
+      throw new Error('Voucher cannot reference both a fund_source and a loan')
     }
     if (repaymentBreakdown) {
       const sum =
@@ -109,6 +116,17 @@ export async function createPaymentVoucher(formData: FormData) {
         throw new Error(
           `Repayment breakdown sum RM ${sum.toFixed(2)} must match voucher total RM ${amount.toFixed(2)}`
         )
+      }
+    }
+    if (fundSourceId) {
+      const { data: fs } = await supabase
+        .from('fund_sources')
+        .select('status')
+        .eq('id', fundSourceId)
+        .maybeSingle()
+      if (!fs) throw new Error('Fund source not found')
+      if (fs.status !== 'active' && fs.status !== 'matured') {
+        throw new Error(`Cannot repay fund source with status ${fs.status}`)
       }
     }
   }
@@ -138,6 +156,7 @@ export async function createPaymentVoucher(formData: FormData) {
       payment_method: paymentMethod,
       notes,
       loan_id: loanId,
+      fund_source_id: fundSourceId,
       repayment_breakdown: repaymentBreakdown,
       created_by: user.id,
       ...(isAutoComplete ? {
@@ -476,10 +495,12 @@ export async function executeVoucher(formData: FormData) {
     await adjustPool(supabase, voucher.target_pool, 'in', amount, poolDescription, user.id, linkedApproval?.id ?? null, nowIso)
   }
 
-  // ── Phase 7 Step 12b: loan repayment sync ──
-  // If this voucher tagged a loan_id, insert matching repayments rows and
-  // clear the most recent pending overdue_record for that loan (if any).
-  if (voucher.loan_id && voucher.repayment_breakdown) {
+  // ── Loan repayment sync ──
+  // Debit vouchers tagged with fund_source_id (new canonical path): HV paying
+  // back a subsidiary/director. Writes fund_source_repayments rows.
+  // Legacy loan_id path (HV→sub loan) kept for back-compat; writes repayments
+  // + clears overdue_records.
+  if (voucher.repayment_breakdown && (voucher.fund_source_id || voucher.loan_id)) {
     // repayments enforces CHECK (payment_date <= CURRENT_DATE) which runs
     // against server UTC. Our paymentDate originates from local dayjs() and
     // during UTC+8 evenings it can be UTC-tomorrow → constraint would reject.
@@ -497,35 +518,53 @@ export async function executeVoucher(formData: FormData) {
       { payment_type: 'penalty' as const, amt: Number(breakdown.penalty ?? 0) },
     ].filter((e) => e.amt > 0)
 
-    for (const e of entries) {
-      const { error: repErr } = await supabase.from('repayments').insert({
-        loan_id: voucher.loan_id,
-        amount: e.amt,
-        payment_type: e.payment_type,
-        payment_date: repayDate,
-        notes: `Auto-synced from voucher ${voucher.voucher_no}`,
-        created_by: user.id,
-      })
-      if (repErr) {
-        console.error(`Step 12b repayments insert failed (${e.payment_type}):`, repErr.message)
+    if (voucher.fund_source_id) {
+      // New path: HV repaying fund source
+      for (const e of entries) {
+        const { error: repErr } = await supabase.from('fund_source_repayments').insert({
+          fund_source_id: voucher.fund_source_id,
+          amount: e.amt,
+          payment_type: e.payment_type,
+          payment_date: repayDate,
+          notes: `Auto-synced from voucher ${voucher.voucher_no}`,
+          payment_voucher_id: id,
+          created_by: user.id,
+        })
+        if (repErr) {
+          console.error(`fund_source_repayments insert failed (${e.payment_type}):`, repErr.message)
+        }
       }
-    }
+    } else if (voucher.loan_id) {
+      // Legacy path: loans/repayments + overdue clear
+      for (const e of entries) {
+        const { error: repErr } = await supabase.from('repayments').insert({
+          loan_id: voucher.loan_id,
+          amount: e.amt,
+          payment_type: e.payment_type,
+          payment_date: repayDate,
+          notes: `Auto-synced from voucher ${voucher.voucher_no}`,
+          created_by: user.id,
+        })
+        if (repErr) {
+          console.error(`repayments insert failed (${e.payment_type}):`, repErr.message)
+        }
+      }
 
-    // Clear the most recent pending overdue row for this loan (if any)
-    const { data: pendingOverdue } = await supabase
-      .from('overdue_records')
-      .select('id, period_month')
-      .eq('loan_id', voucher.loan_id)
-      .eq('status', 'pending')
-      .order('period_month', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (pendingOverdue) {
-      await supabase
+      const { data: pendingOverdue } = await supabase
         .from('overdue_records')
-        .update({ status: 'paid' })
-        .eq('id', pendingOverdue.id)
+        .select('id, period_month')
+        .eq('loan_id', voucher.loan_id)
+        .eq('status', 'pending')
+        .order('period_month', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (pendingOverdue) {
+        await supabase
+          .from('overdue_records')
+          .update({ status: 'paid' })
+          .eq('id', pendingOverdue.id)
+      }
     }
   }
 

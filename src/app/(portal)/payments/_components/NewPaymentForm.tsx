@@ -15,15 +15,22 @@ interface InvoicePreset {
   target_pool: string
 }
 
-interface PayableLoan {
+interface PayableFundSource {
   id: string
-  company_id: string
-  company_name: string
-  principal: number
-  effective_rate: number
+  label: string
+  source_type: string
+  from_company_id: string | null
+  from_director_id: string | null
+  original_amount: number
+  cost_rate: number
+  lock_in_months: number | null
   outstanding: number
-  overdue_count: number
-  latest_overdue_period: string | null
+  monthly_payment: number
+  monthly_principal: number
+  monthly_interest: number
+  total_periods: number
+  periods_paid: number
+  remaining_periods: number
 }
 
 interface Props {
@@ -32,7 +39,7 @@ interface Props {
   categories: { code: string; label: string }[]
   invoicePreset?: InvoicePreset | null
   nonBillablePreset?: boolean
-  payableLoans?: PayableLoan[]
+  payableFundSources?: PayableFundSource[]
 }
 
 const POOL_OPTIONS = [
@@ -56,7 +63,7 @@ interface SourceRow {
   amount: string
 }
 
-export default function NewPaymentForm({ companies, bankAccounts, categories, invoicePreset, nonBillablePreset, payableLoans = [] }: Props) {
+export default function NewPaymentForm({ companies, bankAccounts, categories, invoicePreset, nonBillablePreset, payableFundSources = [] }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const isInvoicePay = !!invoicePreset
@@ -70,9 +77,9 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
   // Controlled payee fields so loan-repayment mode can auto-fill them
   const [payeeName, setPayeeName] = useState(isInvoicePay ? invoicePreset!.company_name : '')
   const [payeeCompanyId, setPayeeCompanyId] = useState(isInvoicePay ? invoicePreset!.company_id : '')
-  // Phase 7 Step 12b: loan repayment mode
+  // Loan repayment mode — HV repaying a fund source (subsidiary savings / director loan)
   const [isLoanRepayment, setIsLoanRepayment] = useState(false)
-  const [loanId, setLoanId] = useState<string>('')
+  const [fundSourceId, setFundSourceId] = useState<string>('')
   const [repayPrincipal, setRepayPrincipal] = useState('0.00')
   const [repayInterest, setRepayInterest] = useState('0.00')
   const [repayPenalty, setRepayPenalty] = useState('0.00')
@@ -108,18 +115,22 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
     setSourceRows([{ pool: sourceRows[0].pool, amount: totalAmount.toFixed(2) }])
   }, [totalAmount, direction, sourceRows])
 
-  // Loan repayment: when loan is selected, auto-fill payee + company + suggest
-  // one month's interest (user can override to pay more principal / penalty).
+  // When a fund source is picked, auto-fill payee + monthly principal/interest
+  // split (user can override). Payee = the company/director HV owes money to.
+  const selectedFundSource = payableFundSources.find((fs) => fs.id === fundSourceId) ?? null
   useEffect(() => {
-    if (!isLoanRepayment || !loanId) return
-    const loan = payableLoans.find((l) => l.id === loanId)
-    if (!loan) return
-    setPayeeName(loan.company_name)
-    setPayeeCompanyId(loan.company_id)
-    // Monthly interest = principal * effective_rate (one month accrual)
-    const monthlyInterest = (loan.principal * loan.effective_rate).toFixed(2)
-    setRepayInterest((prev) => (prev === '0.00' || prev === '' ? monthlyInterest : prev))
-  }, [isLoanRepayment, loanId, payableLoans])
+    if (!isLoanRepayment || !selectedFundSource) return
+    const company = companies.find((c) => c.id === selectedFundSource.from_company_id)
+    if (company) {
+      setPayeeName(company.name)
+      setPayeeCompanyId(company.id)
+    } else if (selectedFundSource.from_director_id) {
+      setPayeeName('Director')
+      setPayeeCompanyId('')
+    }
+    setRepayPrincipal((prev) => (prev === '0.00' || prev === '' ? selectedFundSource.monthly_principal.toFixed(2) : prev))
+    setRepayInterest((prev) => (prev === '0.00' || prev === '' ? selectedFundSource.monthly_interest.toFixed(2) : prev))
+  }, [isLoanRepayment, selectedFundSource, companies])
 
   // Loan repayment mode: amount = sum of split; category auto-chosen by what's being paid.
   useEffect(() => {
@@ -159,10 +170,10 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
       }
     }
 
-    // Phase 7 Step 12b: loan repayment validation
+    // Loan repayment validation (HV → fund source)
     if (isLoanRepayment) {
-      if (!loanId) {
-        setError('Select a loan before submitting as a loan repayment.')
+      if (!fundSourceId) {
+        setError('Select a loan (fund source) before submitting as a loan repayment.')
         return
       }
       if (repaymentSumMismatch) {
@@ -171,7 +182,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
         )
         return
       }
-      formData.set('loan_id', loanId)
+      formData.set('fund_source_id', fundSourceId)
       formData.set('repayment_principal', repayPrincipal)
       formData.set('repayment_interest', repayInterest)
       formData.set('repayment_penalty', repayPenalty)
@@ -383,8 +394,8 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
         </select>
       </div>
 
-      {/* ── Phase 7 Step 12b: loan repayment toggle (debit only) ── */}
-      {direction === 'debit' && !isInvoicePay && payableLoans.length > 0 ? (
+      {/* ── Loan repayment toggle (debit only) — HV repaying fund source ── */}
+      {direction === 'debit' && !isInvoicePay && payableFundSources.length > 0 ? (
         <div className="mb-6 p-4 bg-paper border border-hairline rounded-md">
           <label className="flex items-center gap-2 text-sm font-sans font-medium text-graphite cursor-pointer">
             <input
@@ -400,19 +411,31 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
               <div>
                 <label className="block text-xs font-sans text-graphite mb-1">Loan to repay</label>
                 <select
-                  value={loanId}
-                  onChange={(e) => setLoanId(e.target.value)}
+                  value={fundSourceId}
+                  onChange={(e) => {
+                    setFundSourceId(e.target.value)
+                    // Reset split so useEffect repopulates from the new source
+                    setRepayPrincipal('0.00')
+                    setRepayInterest('0.00')
+                  }}
                   required
                   className="w-full px-3 py-2 bg-surface border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
                 >
                   <option value="">Select loan…</option>
-                  {payableLoans.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.company_name} · outstanding RM {l.outstanding.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
-                      {l.overdue_count > 0 ? ` · ⚠ ${l.overdue_count} overdue` : ''}
+                  {payableFundSources.map((fs) => (
+                    <option key={fs.id} value={fs.id}>
+                      {fs.label} · {fs.remaining_periods} of {fs.total_periods} periods left
                     </option>
                   ))}
                 </select>
+                {selectedFundSource ? (
+                  <p className="font-serif italic text-muted text-xs mt-1.5">
+                    Monthly payment RM {selectedFundSource.monthly_payment.toFixed(2)} ·
+                    outstanding principal RM {selectedFundSource.outstanding.toFixed(2)} ·
+                    {selectedFundSource.remaining_periods} month
+                    {selectedFundSource.remaining_periods === 1 ? '' : 's'} remaining
+                  </p>
+                ) : null}
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
@@ -457,7 +480,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
                 </p>
               ) : null}
               <p className="font-serif italic text-muted text-xs">
-                On execute, the system auto-inserts repayments rows and clears the latest pending overdue for this loan.
+                On execute, the system auto-inserts fund_source_repayments rows for this subsidiary/director.
               </p>
             </div>
           ) : null}

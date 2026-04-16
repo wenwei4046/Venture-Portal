@@ -231,3 +231,97 @@ export async function markFundSourceMatured(formData: FormData) {
   revalidatePath(`/fund-in/${id}`)
   revalidatePath('/dashboard')
 }
+
+// ─── List payable fund sources for Debit voucher ─────────────────────────────
+//
+// "HV pays out" to repay subs/directors. Pulls active fund_sources with
+// outstanding > 0 + computes monthly principal/interest split + remaining
+// periods. Consumed by Payment Voucher form's "this voucher is a loan
+// repayment" checkbox (Finance-only).
+
+export interface PayableFundSource {
+  id: string
+  label: string              // "CONTS — subsidiary · RM 300,000 @ 2.0%/mo · 6mo"
+  source_type: string
+  from_company_id: string | null
+  from_director_id: string | null
+  original_amount: number
+  cost_rate: number
+  lock_in_months: number | null
+  outstanding: number
+  monthly_payment: number
+  monthly_principal: number
+  monthly_interest: number
+  total_periods: number
+  periods_paid: number
+  remaining_periods: number
+}
+
+export async function listPayableFundSources(): Promise<PayableFundSource[]> {
+  await requireRole(['finance', 'principal'])
+  const supabase = await createClient()
+
+  const [{ data: outstanding }, { data: sources }, { data: companies }, { data: repayments }] =
+    await Promise.all([
+      supabase
+        .from('fund_source_outstanding')
+        .select('fund_source_id, source_type, from_company_id, from_director_id, original_amount, cost_rate, lock_in_months, outstanding, monthly_payment, total_principal_paid'),
+      supabase.from('fund_sources').select('id, status'),
+      supabase.from('companies').select('id, name, short_code'),
+      supabase
+        .from('fund_source_repayments')
+        .select('fund_source_id, payment_type, payment_date')
+        .eq('payment_type', 'principal'),
+    ])
+
+  const statusMap = new Map((sources ?? []).map((s) => [s.id, s.status]))
+  const companyMap = new Map((companies ?? []).map((c) => [c.id, c]))
+
+  // Count distinct principal payment months per fund source (periods paid)
+  const periodsPaidMap = new Map<string, Set<string>>()
+  for (const r of repayments ?? []) {
+    const ym = (r.payment_date as string).slice(0, 7)
+    const set = periodsPaidMap.get(r.fund_source_id) ?? new Set<string>()
+    set.add(ym)
+    periodsPaidMap.set(r.fund_source_id, set)
+  }
+
+  return (outstanding ?? [])
+    .filter((o) => {
+      const status = statusMap.get(o.fund_source_id)
+      return status === 'active' && Number(o.outstanding) > 0
+    })
+    .map((o) => {
+      const amount = Number(o.original_amount)
+      const rate = Number(o.cost_rate)
+      const months = o.lock_in_months ?? 1
+      const monthlyPayment = Number(o.monthly_payment)
+      const monthlyInterest = months > 0 ? Number((amount * rate).toFixed(2)) : 0
+      const monthlyPrincipal = Number((monthlyPayment - monthlyInterest).toFixed(2))
+      const periodsPaid = periodsPaidMap.get(o.fund_source_id)?.size ?? 0
+      const remaining = Math.max(0, months - periodsPaid)
+
+      const company = o.from_company_id ? companyMap.get(o.from_company_id) : null
+      const counterparty = company ? `${company.short_code ?? company.name}` : 'Director'
+      const label = `${counterparty} · RM ${amount.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} @ ${(rate * 100).toFixed(3)}%/mo · ${months}mo`
+
+      return {
+        id: o.fund_source_id,
+        label,
+        source_type: o.source_type,
+        from_company_id: o.from_company_id,
+        from_director_id: o.from_director_id,
+        original_amount: amount,
+        cost_rate: rate,
+        lock_in_months: o.lock_in_months,
+        outstanding: Number(o.outstanding),
+        monthly_payment: monthlyPayment,
+        monthly_principal: monthlyPrincipal,
+        monthly_interest: monthlyInterest,
+        total_periods: months,
+        periods_paid: periodsPaid,
+        remaining_periods: remaining,
+      }
+    })
+    .sort((a, b) => b.remaining_periods - a.remaining_periods)
+}
