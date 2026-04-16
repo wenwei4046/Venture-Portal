@@ -17,6 +17,7 @@ interface InvoicePreset {
 
 interface PayableLoan {
   id: string
+  company_id: string
   company_name: string
   principal: number
   effective_rate: number
@@ -66,6 +67,9 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
     isNonBillable ? [{ pool: 'hv_operating_fund', amount: '' }] : [{ pool: '', amount: '' }]
   )
   const [amount, setAmount] = useState(isInvoicePay ? invoicePreset!.total_amount.toFixed(2) : '')
+  // Controlled payee fields so loan-repayment mode can auto-fill them
+  const [payeeName, setPayeeName] = useState(isInvoicePay ? invoicePreset!.company_name : '')
+  const [payeeCompanyId, setPayeeCompanyId] = useState(isInvoicePay ? invoicePreset!.company_id : '')
   // Phase 7 Step 12b: loan repayment mode
   const [isLoanRepayment, setIsLoanRepayment] = useState(false)
   const [loanId, setLoanId] = useState<string>('')
@@ -76,8 +80,8 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
     (parseFloat(repayPrincipal) || 0) +
     (parseFloat(repayInterest) || 0) +
     (parseFloat(repayPenalty) || 0)
-  const repaymentSumMismatch =
-    isLoanRepayment && parseFloat(amount) > 0 && Math.abs(repaymentSum - parseFloat(amount)) > 0.005
+  // In loan repayment mode, the voucher amount IS the repayment split sum — no separate mismatch possible.
+  const repaymentSumMismatch = false
   // Phase 7 Step 10: pre-select Venture Pool when Credit (common case).
   const [targetPool, setTargetPool] = useState(
     isInvoicePay ? invoicePreset!.target_pool : direction === 'credit' ? 'hv_operating_fund' : ''
@@ -103,6 +107,28 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
     if (!totalAmount) return
     setSourceRows([{ pool: sourceRows[0].pool, amount: totalAmount.toFixed(2) }])
   }, [totalAmount, direction, sourceRows])
+
+  // Loan repayment: when loan is selected, auto-fill payee + company + suggest
+  // one month's interest (user can override to pay more principal / penalty).
+  useEffect(() => {
+    if (!isLoanRepayment || !loanId) return
+    const loan = payableLoans.find((l) => l.id === loanId)
+    if (!loan) return
+    setPayeeName(loan.company_name)
+    setPayeeCompanyId(loan.company_id)
+    // Monthly interest = principal * effective_rate (one month accrual)
+    const monthlyInterest = (loan.principal * loan.effective_rate).toFixed(2)
+    setRepayInterest((prev) => (prev === '0.00' || prev === '' ? monthlyInterest : prev))
+  }, [isLoanRepayment, loanId, payableLoans])
+
+  // Loan repayment mode: amount = sum of split; category auto-chosen by what's being paid.
+  useEffect(() => {
+    if (!isLoanRepayment) return
+    setAmount(repaymentSum.toFixed(2))
+    // If paying principal → classify as loan_principal, else loan_interest.
+    const wantCat = (parseFloat(repayPrincipal) || 0) > 0 ? 'loan_principal' : 'loan_interest'
+    if (catList.some((c) => c.code === wantCat)) setCategoryCode(wantCat)
+  }, [isLoanRepayment, repaymentSum, repayPrincipal, catList])
 
   useEffect(() => {
     if (error && formRef.current) {
@@ -231,80 +257,97 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
         </div>
       ) : null}
 
-      {/* ── Payee ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
-        <div>
-          <label htmlFor="payee_company_id" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Company
-          </label>
-          <select
-            id="payee_company_id"
-            name="payee_company_id"
-            defaultValue={isInvoicePay ? invoicePreset!.company_id : ''}
-            onChange={(e) => {
-              const co = companies.find((c) => c.id === e.target.value)
-              if (co) {
-                const nameInput = document.getElementById('payee_name') as HTMLInputElement | null
-                if (nameInput && !nameInput.value) {
-                  nameInput.value = co.name
-                }
-              }
-            }}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-          >
-            <option value="">Select company…</option>
-            {companies.map((c) => (
-              <option key={c.id} value={c.id}>{c.name} ({c.short_code})</option>
-            ))}
-          </select>
-          <p className="font-serif italic text-muted text-xs mt-1">
-            Name auto-fills from company if left blank
-          </p>
-        </div>
+      {/* ── Payee ── (hidden in loan-repayment mode; auto-filled from selected loan) */}
+      {isLoanRepayment ? (
+        <>
+          <input type="hidden" name="payee_company_id" value={payeeCompanyId} />
+          <input type="hidden" name="payee_name" value={payeeName} />
+        </>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
+          <div>
+            <label htmlFor="payee_company_id" className="block text-sm font-sans font-medium text-graphite mb-1.5">
+              Company
+            </label>
+            <select
+              id="payee_company_id"
+              name="payee_company_id"
+              value={payeeCompanyId}
+              onChange={(e) => {
+                setPayeeCompanyId(e.target.value)
+                const co = companies.find((c) => c.id === e.target.value)
+                if (co && !payeeName) setPayeeName(co.name)
+              }}
+              className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+            >
+              <option value="">Select company…</option>
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>{c.name} ({c.short_code})</option>
+              ))}
+            </select>
+            <p className="font-serif italic text-muted text-xs mt-1">
+              Name auto-fills from company if left blank
+            </p>
+          </div>
 
-        <div>
-          <label htmlFor="payee_name" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            {direction === 'debit' ? 'Pay to' : 'Received from'}
-            <span className="text-muted font-normal ml-1">(auto from company)</span>
-          </label>
-          <input
-            id="payee_name"
-            name="payee_name"
-            type="text"
-            defaultValue={isInvoicePay ? invoicePreset!.company_name : ''}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-            placeholder={direction === 'debit' ? 'Recipient name' : 'Payer name'}
-          />
+          <div>
+            <label htmlFor="payee_name" className="block text-sm font-sans font-medium text-graphite mb-1.5">
+              {direction === 'debit' ? 'Pay to' : 'Received from'}
+              <span className="text-muted font-normal ml-1">(auto from company)</span>
+            </label>
+            <input
+              id="payee_name"
+              name="payee_name"
+              type="text"
+              value={payeeName}
+              onChange={(e) => setPayeeName(e.target.value)}
+              className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+              placeholder={direction === 'debit' ? 'Recipient name' : 'Payer name'}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Hidden reference fields (no longer type-driven) */}
       <input type="hidden" name="reference_type" value="" />
       <input type="hidden" name="reference_id" value="" />
 
-      {/* ── Amount + Bank account ── */}
+      {/* ── Amount + Bank account ── (Amount is auto-computed in loan-repayment mode) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
-        <div>
-          <label htmlFor="amount" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Amount
-          </label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted font-mono">RM</span>
-            <input
-              id="amount"
-              name="amount"
-              type="number"
-              step="0.01"
-              min="0.01"
-              required
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              readOnly={isInvoicePay}
-              className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border read-only:bg-surface-2 read-only:cursor-not-allowed"
-              placeholder="0.00"
-            />
+        {isLoanRepayment ? (
+          <>
+            <input type="hidden" name="amount" value={amount} />
+            <div className="flex flex-col justify-center">
+              <div className="text-xs text-muted uppercase tracking-wide font-sans">Repayment total</div>
+              <div className="font-serif text-2xl text-ink tabular">
+                RM {repaymentSum.toFixed(2)}
+              </div>
+              <div className="text-xs text-muted font-mono mt-1">auto from split below</div>
+            </div>
+          </>
+        ) : (
+          <div>
+            <label htmlFor="amount" className="block text-sm font-sans font-medium text-graphite mb-1.5">
+              Amount
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted font-mono">RM</span>
+              <input
+                id="amount"
+                name="amount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                required
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                readOnly={isInvoicePay}
+                className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border read-only:bg-surface-2 read-only:cursor-not-allowed"
+                placeholder="0.00"
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         <div>
           <label htmlFor="bank_account_id" className="block text-sm font-sans font-medium text-graphite mb-1.5">
@@ -522,7 +565,10 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
         </div>
       )}
 
-      {/* ── Category ── */}
+      {/* ── Category ── (auto-selected in loan-repayment mode) */}
+      {isLoanRepayment ? (
+        <input type="hidden" name="category_code" value={categoryCode} />
+      ) : (
       <div className="mb-6">
         <div className="flex items-baseline justify-between mb-1.5">
           <label className="block text-sm font-sans font-medium text-graphite">
@@ -588,6 +634,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
           For P&L classification. Create new categories as needed.
         </p>
       </div>
+      )}
 
       {/* ── Description ── */}
       <div className="mb-6">

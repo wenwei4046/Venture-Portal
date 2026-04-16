@@ -263,6 +263,7 @@ export async function listPayableLoans() {
   return (loans ?? [])
     .map((l) => ({
       id: l.id,
+      company_id: l.company_id,
       company_name: companyMap.get(l.company_id) ?? '—',
       principal: Number(l.principal),
       effective_rate: Number(l.effective_rate),
