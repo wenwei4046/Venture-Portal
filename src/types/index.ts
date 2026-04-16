@@ -97,6 +97,7 @@ export interface Loan {
   risk_premium: number
   effective_rate: number
   disbursement_date?: string
+  tenure_months: number
   repayment_terms?: string
   status: LoanStatus
   approved_by?: string

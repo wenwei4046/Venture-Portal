@@ -130,33 +130,64 @@ export default function NewLoanForm({ companies, baseRate }: Props) {
         </div>
       ) : null}
 
-      {/* ───────── Principal ───────── */}
-      <div className="mb-6">
-        <label
-          htmlFor="principal"
-          className="block text-sm font-sans font-medium text-graphite mb-1.5"
-        >
-          Principal amount
-        </label>
-        <div className="relative max-w-sm">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted font-mono">
-            RM
-          </span>
-          <input
-            id="principal"
-            name="principal"
-            type="number"
-            step="0.01"
-            min="0.01"
-            max="100000000"
-            required
-            className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
-            placeholder="100000.00"
-          />
+      {/* ───────── Principal + Tenure ───────── */}
+      <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label
+            htmlFor="principal"
+            className="block text-sm font-sans font-medium text-graphite mb-1.5"
+          >
+            Principal amount
+          </label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted font-mono">
+              RM
+            </span>
+            <input
+              id="principal"
+              name="principal"
+              type="number"
+              step="0.01"
+              min="0.01"
+              max="100000000"
+              required
+              className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
+              placeholder="100000.00"
+            />
+          </div>
+          <p className="font-serif italic text-muted text-xs mt-1.5">
+            Loan principal in MYR (ceiling RM 100M)
+          </p>
         </div>
-        <p className="font-serif italic text-muted text-xs mt-1.5">
-          Loan principal in MYR (ceiling RM 100M)
-        </p>
+
+        <div>
+          <label
+            htmlFor="tenure_months"
+            className="block text-sm font-sans font-medium text-graphite mb-1.5"
+          >
+            Tenure
+          </label>
+          <div className="relative">
+            <input
+              id="tenure_months"
+              name="tenure_months"
+              type="number"
+              step="1"
+              min="1"
+              max="12"
+              required
+              defaultValue="12"
+              className="w-full px-3 py-2 pr-16 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
+              placeholder="12"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted font-mono">
+              months
+            </span>
+          </div>
+          <p className="font-serif italic text-muted text-xs mt-1.5">
+            1–12 months (maximum 12)
+          </p>
+        </div>
       </div>
 
       {/* ───────── Repayment terms ───────── */}

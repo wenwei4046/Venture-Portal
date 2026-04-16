@@ -57,6 +57,10 @@ export default async function LoanDetailPage({ params }: Props) {
   const totalPrincipalPaid = Number(outstanding?.total_principal_paid ?? 0)
   const totalInterestPaid = Number(outstanding?.total_interest_paid ?? 0)
   const repaymentList = repayments ?? []
+  const tenureMonths = Number(loan.tenure_months ?? 0)
+  const maturityDate = loan.disbursement_date && tenureMonths > 0
+    ? dayjs(loan.disbursement_date).add(tenureMonths, 'month')
+    : null
 
   const canRecordRepayment = user.role === 'finance' && loan.status === 'active'
   const canCancelLoan = user.role === 'finance' && loan.status === 'pending_approval'
@@ -131,6 +135,24 @@ export default async function LoanDetailPage({ params }: Props) {
               </div>
             </div>
           ) : null}
+
+          <div>
+            <div className="font-serif italic text-graphite text-sm mb-1">
+              Tenure
+            </div>
+            <div className="font-serif text-xl text-ink">
+              {tenureMonths} {tenureMonths === 1 ? 'month' : 'months'}
+            </div>
+            {maturityDate ? (
+              <div className="font-mono text-xs text-muted mt-1">
+                Matures {maturityDate.format('D MMM YYYY')}
+              </div>
+            ) : (
+              <div className="font-mono text-xs text-muted mt-1 italic font-serif">
+                Maturity set once disbursed
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

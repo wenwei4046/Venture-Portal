@@ -16,6 +16,7 @@ export async function createLoan(formData: FormData) {
 
   const companyId = (formData.get('company_id') as string) ?? ''
   const principal = parseFloat((formData.get('principal') as string) ?? '0')
+  const tenureMonths = parseInt((formData.get('tenure_months') as string) ?? '', 10)
   const repaymentTerms = (formData.get('repayment_terms') as string) ?? ''
 
   if (!companyId) throw new Error('Company is required')
@@ -24,6 +25,9 @@ export async function createLoan(formData: FormData) {
   }
   if (principal > 100_000_000) {
     throw new Error('Principal exceeds RM 100M ceiling')
+  }
+  if (isNaN(tenureMonths) || tenureMonths < 1 || tenureMonths > 12) {
+    throw new Error('Tenure must be between 1 and 12 months')
   }
 
   // ─── Look up active base rate ───
@@ -84,6 +88,7 @@ export async function createLoan(formData: FormData) {
       p_base_rate: base,
       p_risk_premium: premium,
       p_effective_rate: effective,
+      p_tenure_months: tenureMonths,
       p_repayment_terms: repaymentTerms || undefined,
       p_company_name: company.name,
     }
