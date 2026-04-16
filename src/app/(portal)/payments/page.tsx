@@ -39,7 +39,7 @@ interface Props {
 }
 
 export default async function PaymentsPage({ searchParams }: Props) {
-  await requireRole(['principal', 'finance'])
+  const user = await requireRole(['principal', 'finance'])
   const supabase = await createClient()
   const params = await searchParams
   const statusFilter = params.status
@@ -126,12 +126,14 @@ export default async function PaymentsPage({ searchParams }: Props) {
             All money in and out goes through a payment voucher. Finance creates, Principal approves, Finance executes.
           </p>
         </div>
-        <Link
-          href="/payments/new"
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-        >
-          Create payment
-        </Link>
+        {user.role === 'finance' ? (
+          <Link
+            href="/payments/new"
+            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+          >
+            Create payment
+          </Link>
+        ) : null}
       </div>
 
       {/* ───────── Summary ───────── */}
