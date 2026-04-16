@@ -16,7 +16,7 @@ export async function createPaymentVoucher(formData: FormData) {
 
   const voucherType = formData.get('voucher_type') as string
   const amount = parseFloat((formData.get('amount') as string) ?? '0')
-  const payeeName = (formData.get('payee_name') as string)?.trim() ?? ''
+  let payeeName = (formData.get('payee_name') as string)?.trim() ?? ''
   const payeeCompanyId = (formData.get('payee_company_id') as string) || null
   const bankAccountId = (formData.get('bank_account_id') as string) || null
   const referenceType = (formData.get('reference_type') as string) || null
@@ -42,10 +42,20 @@ export async function createPaymentVoucher(formData: FormData) {
       : null
 
   // Validation
+  // If company selected but payee_name blank, infer from company
+  if (!payeeName && payeeCompanyId) {
+    const { data: co } = await supabase
+      .from('companies')
+      .select('name')
+      .eq('id', payeeCompanyId)
+      .single()
+    if (co) payeeName = co.name
+  }
+
   const VALID_TYPES = ['loan_repayment', 'billing_payment', 'claim_payout', 'expense', 'internal_transfer', 'salary_payout', 'other', 'receive_payment']
   if (!VALID_TYPES.includes(voucherType)) throw new Error('Invalid voucher type')
   if (isNaN(amount) || amount <= 0) throw new Error('Amount must be greater than 0')
-  if (!payeeName) throw new Error('Payee name is required')
+  if (!payeeName) throw new Error('Payee name is required (select a company or enter manually)')
   if (!description) throw new Error('Description is required')
   if (voucherType === 'billing_payment' && !invoiceId) {
     throw new Error('Billing payment requires a linked invoice')

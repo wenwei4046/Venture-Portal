@@ -234,28 +234,22 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
       {/* ── Payee ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
         <div>
-          <label htmlFor="payee_name" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            {direction === 'debit' ? 'Pay to' : 'Received from'}
-          </label>
-          <input
-            id="payee_name"
-            name="payee_name"
-            type="text"
-            required
-            defaultValue={isInvoicePay ? invoicePreset!.company_name : ''}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-            placeholder={direction === 'debit' ? 'Recipient name' : 'Payer name'}
-          />
-        </div>
-
-        <div>
           <label htmlFor="payee_company_id" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Company <span className="text-muted font-normal">(optional)</span>
+            Company
           </label>
           <select
             id="payee_company_id"
             name="payee_company_id"
             defaultValue={isInvoicePay ? invoicePreset!.company_id : ''}
+            onChange={(e) => {
+              const co = companies.find((c) => c.id === e.target.value)
+              if (co) {
+                const nameInput = document.getElementById('payee_name') as HTMLInputElement | null
+                if (nameInput && !nameInput.value) {
+                  nameInput.value = co.name
+                }
+              }
+            }}
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
           >
             <option value="">Select company…</option>
@@ -263,6 +257,24 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
               <option key={c.id} value={c.id}>{c.name} ({c.short_code})</option>
             ))}
           </select>
+          <p className="font-serif italic text-muted text-xs mt-1">
+            Name auto-fills from company if left blank
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor="payee_name" className="block text-sm font-sans font-medium text-graphite mb-1.5">
+            {direction === 'debit' ? 'Pay to' : 'Received from'}
+            <span className="text-muted font-normal ml-1">(auto from company)</span>
+          </label>
+          <input
+            id="payee_name"
+            name="payee_name"
+            type="text"
+            defaultValue={isInvoicePay ? invoicePreset!.company_name : ''}
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+            placeholder={direction === 'debit' ? 'Recipient name' : 'Payer name'}
+          />
         </div>
       </div>
 
