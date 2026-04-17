@@ -134,7 +134,7 @@ export default async function ApprovalsPage() {
               ) : (
                 <Link
                   key={item.row.id}
-                  href={`/approvals/${item.row.id}`}
+                  href={approvalHref(item.row)}
                   style={{ '--i': i } as React.CSSProperties}
                   className="block border border-hairline rounded-md bg-surface p-5 hover:bg-surface-2/40 transition-colors"
                 >
@@ -228,6 +228,17 @@ function formatRequestType(type: string): string {
     new_fund_source: 'NEW FUND SOURCE',
     payment_voucher: 'PAYMENT VOUCHER',
     hr_costing: 'HR COSTING',
+    payroll_run: 'PAYROLL RUN',
   }
   return labels[type] ?? type.toUpperCase()
+}
+
+function approvalHref(row: ApprovalRow): string {
+  // payroll_run approvals have their own detail page with 4-OPEX drill-down +
+  // fan-out approval that runs through approve_payroll_run RPC. All other
+  // types use the generic /approvals/[id] route.
+  if (row.request_type === 'payroll_run' && row.reference_id) {
+    return `/approvals/payroll-run/${row.reference_id}`
+  }
+  return `/approvals/${row.id}`
 }
