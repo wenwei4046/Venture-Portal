@@ -151,6 +151,19 @@ export default async function DashboardPage() {
           .eq('period_month', period),
       ])
 
+      // Latest active payment request for the current run, if any.
+      // Drives steps 6 and 7 on the Monthly Cycle board.
+      const { data: paymentRequest } = payrollRun?.id
+        ? await supabase
+            .from('payroll_payment_requests')
+            .select('id, status, pv_id')
+            .eq('payroll_run_id', payrollRun.id)
+            .in('status', ['submitted', 'pv_generated', 'completed'])
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        : { data: null }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const depts = (hrSummary as any[]) ?? []
       const totalStaff = depts.reduce((s: number, d: { staff_count: number }) => s + Number(d.staff_count ?? 0), 0)
@@ -165,6 +178,13 @@ export default async function DashboardPage() {
       const runApproved = runStatus === 'approved' || runStatus === 'paid'
       const runPaid = runStatus === 'paid'
 
+      const requestStatus = paymentRequest?.status as string | undefined
+      const requestActive =
+        requestStatus === 'submitted' ||
+        requestStatus === 'pv_generated' ||
+        requestStatus === 'completed'
+      const poolFunded = requestStatus === 'completed' || runPaid
+
       const pendingBenefit = (pendingClaims ?? []).filter(c => c.claim_type === 'benefit').length
       const pendingPool = (pendingClaims ?? []).filter(c => c.claim_type === 'project').length
       const totalPending = pendingBenefit + pendingPool
@@ -175,22 +195,37 @@ export default async function DashboardPage() {
 
       // Cycle step state — 'done' / 'active' / 'waiting' / 'pending'.
       // Exactly one 'active' at a time so HR always has one obvious next click.
+      // Nine steps mirror the split flow post-refactor:
+      //   1 staff master · 2 import · 3 review drafts · 4 submit for approval
+      //   5 Principal approves costing · 6 request payment from Finance
+      //   7 Finance generates + Principal approves PV · 8 HR Pool → staff (bank CSV)
+      //   9 Statutory files
       type StepState = 'done' | 'active' | 'waiting' | 'pending'
       const s1: StepState = totalStaff > 0 ? 'done' : 'active'
       const s2: StepState = payrollImported ? 'done' : (s1 === 'done' ? 'active' : 'pending')
       const s3: StepState = (rows.length > 0 && draftCount === 0) ? 'done' : (s2 === 'done' && draftCount > 0 ? 'active' : 'pending')
       const s4: StepState = runSubmitted ? 'done' : (s3 === 'done' ? 'active' : 'pending')
       const s5: StepState = runApproved ? 'done' : (runSubmitted ? 'waiting' : 'pending')
-      const s6: StepState = runPaid ? 'active' : 'pending'
-      const s7: StepState = runPaid ? 'active' : 'pending'
-      const doneCount = [s1, s2, s3, s4, s5, s6, s7].filter(s => s === 'done').length
+      const s6: StepState = requestActive
+        ? 'done'
+        : runApproved
+          ? 'active'
+          : 'pending'
+      const s7: StepState = poolFunded
+        ? 'done'
+        : requestStatus === 'submitted' || requestStatus === 'pv_generated'
+          ? 'waiting'
+          : 'pending'
+      const s8: StepState = poolFunded ? 'active' : 'pending'
+      const s9: StepState = poolFunded ? 'active' : 'pending'
+      const doneCount = [s1, s2, s3, s4, s5, s6, s7, s8, s9].filter(s => s === 'done').length
 
       return (
         <div>
           <div className="mb-10">
             <div className="font-serif italic text-accent text-base mb-1">HR · {dayjs().format('MMMM YYYY')}</div>
             <h1 className="font-serif text-3xl text-ink mb-1">Monthly Payroll Cycle</h1>
-            <p className="font-mono text-xs text-muted">{dayjs().format('dddd, D MMMM YYYY')} · {doneCount} of 7 steps complete</p>
+            <p className="font-mono text-xs text-muted">{dayjs().format('dddd, D MMMM YYYY')} · {doneCount} of 9 steps complete</p>
           </div>
 
           {/* Monthly Cycle — the whole HR job in one linear board */}
@@ -229,12 +264,12 @@ export default async function DashboardPage() {
               <CycleStep
                 n={4}
                 state={s4}
-                title="Request Payroll Payment"
+                title="Submit for Approval"
                 detail={
                   runSubmitted
-                    ? `Submitted to Principal · RM ${formatMoneyBare(Number(payrollRun?.total_amount ?? 0))}`
+                    ? `Submitted · RM ${formatMoneyBare(Number(payrollRun?.total_amount ?? 0))}`
                     : s4 === 'active'
-                      ? 'Send to Principal for approval'
+                      ? 'Send the payroll numbers to Principal'
                       : 'Finish drafts first'
                 }
                 ctaLabel={s4 === 'active' ? 'Go to grid →' : 'View →'}
@@ -244,12 +279,12 @@ export default async function DashboardPage() {
               <CycleStep
                 n={5}
                 state={s5}
-                title="Principal approval"
+                title="Principal approves costing"
                 detail={
                   runApproved
                     ? `Approved ${payrollRun?.approved_at ? dayjs(payrollRun.approved_at).format('D MMM HH:mm') : ''}`
                     : s5 === 'waiting'
-                      ? 'Awaiting Principal sign-off'
+                      ? 'Awaiting Principal sign-off — no money moves yet'
                       : '—'
                 }
                 ctaLabel=""
@@ -259,28 +294,60 @@ export default async function DashboardPage() {
               <CycleStep
                 n={6}
                 state={s6}
-                title="Bank transfer file"
+                title="Request payment from Finance"
                 detail={
-                  runPaid
-                    ? 'Alliance Bank CSV ready to download'
-                    : 'Available after Principal approves'
+                  requestActive
+                    ? 'Request sent to Finance'
+                    : s6 === 'active'
+                      ? 'Ask Finance to generate the Payment Voucher'
+                      : 'Wait for costing approval'
                 }
-                ctaLabel="Download CSV →"
-                ctaHref={`${periodUrl}/bank-transfer`}
+                ctaLabel={s6 === 'active' ? 'Go to grid →' : 'View →'}
+                ctaHref={periodUrl}
                 hideCta={s6 === 'pending'}
               />
               <CycleStep
                 n={7}
                 state={s7}
+                title="PV approved · HR Pool funded"
+                detail={
+                  poolFunded
+                    ? 'Money landed in HR Pool'
+                    : requestStatus === 'pv_generated'
+                      ? 'PV generated by Finance — awaiting Principal approval'
+                      : requestStatus === 'submitted'
+                        ? 'Finance will generate the PV, then Principal approves'
+                        : '—'
+                }
+                ctaLabel={paymentRequest?.pv_id ? 'View voucher →' : ''}
+                ctaHref={paymentRequest?.pv_id ? `/payments/${paymentRequest.pv_id}` : ''}
+                hideCta={!paymentRequest?.pv_id}
+              />
+              <CycleStep
+                n={8}
+                state={s8}
+                title="Bank transfer file"
+                detail={
+                  poolFunded
+                    ? 'Alliance Bank CSV ready to download'
+                    : 'Available after HR Pool is funded'
+                }
+                ctaLabel="Download CSV →"
+                ctaHref={`${periodUrl}/bank-transfer`}
+                hideCta={s8 === 'pending'}
+              />
+              <CycleStep
+                n={9}
+                state={s9}
                 title="Statutory files"
                 detail={
-                  runPaid
+                  poolFunded
                     ? 'KWSP · SOCSO · EIS · LHDN CP39 ready'
-                    : 'Available after Principal approves'
+                    : 'Available after HR Pool is funded'
                 }
                 ctaLabel="Go to files →"
                 ctaHref={periodUrl}
-                hideCta={s7 === 'pending'}
+                hideCta={s9 === 'pending'}
               />
             </div>
           </section>
