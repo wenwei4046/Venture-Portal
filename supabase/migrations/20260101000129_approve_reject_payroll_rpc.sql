@@ -171,7 +171,7 @@ BEGIN
 
     UPDATE approval_requests
        SET status = 'approved',
-           workflow_state = 'completed',
+           workflow_state = 'approved',
            approved_by = p_approver,
            approved_at = NOW()
      WHERE id = v_run.approval_id;
