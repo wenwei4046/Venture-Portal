@@ -20,6 +20,8 @@ interface StaffRow {
   pcb_category: string
   children_count: number
   employment_type: string
+  bank_name: string | null
+  bank_account_no: string | null
 }
 
 interface Props {
@@ -243,6 +245,36 @@ export default function EditStaffForm({ staff }: Props) {
             step="1"
             defaultValue={staff.children_count ?? 0}
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
+          />
+        </div>
+      </div>
+
+      {/* Section 4 — Bank account (Spec 5) */}
+      <h3 className="font-serif text-lg text-ink mb-1">Bank account</h3>
+      <p className="font-serif italic text-graphite text-sm mb-4">
+        Receiving account for bulk salary transfers. Exported in the monthly bank-transfer CSV.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <div>
+          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+            Bank <span className="text-xs text-muted ml-1 font-normal">(e.g. Maybank, Hong Leong)</span>
+          </label>
+          <input
+            name="bank_name"
+            defaultValue={staff.bank_name ?? ''}
+            placeholder="Maybank"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+            Account No <span className="text-xs text-muted ml-1 font-normal">(digits only)</span>
+          </label>
+          <input
+            name="bank_account_no"
+            defaultValue={staff.bank_account_no ?? ''}
+            placeholder="1234567890"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
           />
         </div>
       </div>

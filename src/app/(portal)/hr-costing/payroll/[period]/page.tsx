@@ -59,6 +59,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
     const staff = (r as any).hr_staff_costs
     return {
       id: r.id,
+      staff_id: r.staff_id,
       staff_name: staff?.employee_name ?? '—',
       dept_name: staff?.departments?.name ?? '—',
       status: r.status,
@@ -112,18 +113,26 @@ export default async function PayrollGridPage({ params }: PageProps) {
             {totals.staff} staff · <em>Drafts editable inline</em> · Statutory recomputes on save
           </p>
         </div>
-        {allDraft && (
-          <div className="flex items-center gap-3">
-            <Link
-              href={`/hr-costing/payroll/${period}/import`}
-              className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
-            >
-              Import CSV
-            </Link>
-            <CopyFromLastMonthButton period={period} />
-            <SubmitToPrincipalButton period={period} totalAmount={totals.gross} />
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {allDraft && (
+            <>
+              <Link
+                href={`/hr-costing/payroll/${period}/import`}
+                className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
+              >
+                Import CSV
+              </Link>
+              <CopyFromLastMonthButton period={period} />
+              <SubmitToPrincipalButton period={period} totalAmount={totals.gross} />
+            </>
+          )}
+          <a
+            href={`/hr-costing/payroll/${period}/bank-transfer?format=hl_connect`}
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
+          >
+            Bank CSV (HL Connect)
+          </a>
+        </div>
       </div>
 
       {/* Summary band */}
@@ -152,7 +161,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
         </div>
       </div>
 
-      <PayrollGrid rows={gridRows} />
+      <PayrollGrid rows={gridRows} period={period} />
     </div>
   )
 }

@@ -38,6 +38,8 @@ export async function updateStaff(id: string, formData: FormData) {
   const hireDate = (formData.get('hire_date') as string) || null
   const resignDate = (formData.get('resignation_date') as string) || null
   const employeeCode = ((formData.get('employee_code') as string) || '').trim() || null
+  const bankName = ((formData.get('bank_name') as string) || '').trim() || null
+  const bankAccountNo = ((formData.get('bank_account_no') as string) || '').trim() || null
 
   const { error } = await supabase
     .from('hr_staff_costs')
@@ -55,6 +57,8 @@ export async function updateStaff(id: string, formData: FormData) {
       pcb_category: formData.get('pcb_category') as 'KA1' | 'KA2' | 'KA3',
       children_count: parseInt(formData.get('children_count') as string, 10) || 0,
       employment_type: formData.get('employment_type') as 'salaried' | 'commission_eligible',
+      bank_name: bankName,
+      bank_account_no: bankAccountNo,
     })
     .eq('id', id)
 

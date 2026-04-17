@@ -5,6 +5,7 @@ import PayrollRow from './PayrollRow'
 
 export interface PayrollRowData {
   id: string
+  staff_id: string
   staff_name: string
   dept_name: string
   status: string
@@ -31,9 +32,10 @@ export interface PayrollRowData {
 
 interface Props {
   rows: PayrollRowData[]
+  period: string
 }
 
-export default function PayrollGrid({ rows }: Props) {
+export default function PayrollGrid({ rows, period }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   return (
@@ -60,6 +62,7 @@ export default function PayrollGrid({ rows }: Props) {
               <PayrollRow
                 key={r.id}
                 row={r}
+                period={period}
                 expanded={expandedId === r.id}
                 onToggleExpand={() => setExpandedId(expandedId === r.id ? null : r.id)}
               />

@@ -8,11 +8,12 @@ import type { PayrollRowData } from './PayrollGrid'
 
 interface Props {
   row: PayrollRowData
+  period: string
   expanded: boolean
   onToggleExpand: () => void
 }
 
-export default function PayrollRow({ row, expanded, onToggleExpand }: Props) {
+export default function PayrollRow({ row, period, expanded, onToggleExpand }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [edit, setEdit] = useState({
@@ -96,6 +97,13 @@ export default function PayrollRow({ row, expanded, onToggleExpand }: Props) {
             )}
             {saved && <span className="text-xs font-serif italic text-ledger">✓</span>}
             {error && <span className="text-xs font-serif italic text-danger" title={error}>!</span>}
+            <a
+              href={`/hr-costing/payroll/${period}/${row.staff_id}/payslip`}
+              className="text-xs font-sans text-muted hover:text-accent"
+              title="Open payslip"
+            >
+              Payslip
+            </a>
             <button
               onClick={onToggleExpand}
               className="text-xs text-muted hover:text-accent"

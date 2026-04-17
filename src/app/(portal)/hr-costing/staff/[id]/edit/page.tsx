@@ -57,6 +57,8 @@ export default async function EditStaffPage({ params }: PageProps) {
           pcb_category: staff.pcb_category,
           children_count: Number(staff.children_count ?? 0),
           employment_type: staff.employment_type,
+          bank_name: staff.bank_name ?? null,
+          bank_account_no: staff.bank_account_no ?? null,
         }}
       />
     </div>
