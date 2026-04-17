@@ -5,6 +5,7 @@ import { requireRole } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import PayrollGrid, { type PayrollRowData } from '../_components/PayrollGrid'
 import CopyFromLastMonthButton from '../_components/CopyFromLastMonthButton'
+import SubmitToPrincipalButton from '../_components/SubmitToPrincipalButton'
 
 interface PageProps {
   params: Promise<{ period: string }>
@@ -120,6 +121,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
               Import CSV
             </Link>
             <CopyFromLastMonthButton period={period} />
+            <SubmitToPrincipalButton period={period} totalAmount={totals.gross} />
           </div>
         )}
       </div>

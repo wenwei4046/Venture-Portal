@@ -1,8 +1,36 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { assertPeriodOpen } from '@/lib/period-lock'
+
+/**
+ * HR submits the month's payroll to Principal for approval.
+ * Wraps submit_payroll_to_principal RPC (migration 128).
+ * Redirects to the approval detail page for the newly-created run.
+ */
+export async function submitToPrincipal(period: string): Promise<void> {
+  const user = await requireRole(['hr', 'principal'])
+  const supabase = await createClient()
+
+  // Period-lock gate — RPC assumes caller already checked.
+  await assertPeriodOpen(supabase, period)
+
+  const { data, error } = await supabase.rpc('submit_payroll_to_principal', {
+    p_period: period,
+    p_user_id: user.id,
+  })
+
+  if (error) throw new Error(`Submit failed: ${error.message}`)
+  if (!data) throw new Error('Submit failed: no run id returned')
+
+  revalidatePath('/hr-costing/payroll')
+  revalidatePath(`/hr-costing/payroll/${period}`)
+  revalidatePath('/approvals')
+  redirect(`/approvals/payroll-run/${data}`)
+}
 
 export interface PayrollRowUpdate {
   basic_salary?: number
