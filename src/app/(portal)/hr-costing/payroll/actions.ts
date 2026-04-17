@@ -4,6 +4,38 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 
+export interface PayrollRowUpdate {
+  basic_salary?: number
+  statutory_allowance?: number
+  non_statutory_allowance?: number
+  ot_hours?: number
+  ot_amount?: number
+  commission_amount?: number
+  unpaid_leave_days?: number
+}
+
+/**
+ * Update one payroll row. The DB trigger recomputes pro-rata + statutory + gross/net.
+ * Only allowed while status='draft'.
+ */
+export async function updatePayrollRow(
+  id: string,
+  fields: PayrollRowUpdate,
+): Promise<void> {
+  await requireRole(['hr', 'principal'])
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('hr_monthly_payroll')
+    .update(fields)
+    .eq('id', id)
+    .eq('status', 'draft')
+
+  if (error) throw new Error(`Failed to update payroll row: ${error.message}`)
+
+  revalidatePath('/hr-costing/payroll', 'layout')
+}
+
 /**
  * Create rows for every active staff in the given period.
  * Idempotent — relies on uq_monthly_payroll_staff_period to skip existing.
