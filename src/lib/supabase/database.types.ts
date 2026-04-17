@@ -430,6 +430,127 @@ export type Database = {
           },
         ]
       }
+      commission_inputs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          period_month: string
+          sales_amount: number
+          sales_count: number
+          staff_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          period_month: string
+          sales_amount?: number
+          sales_count?: number
+          staff_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          period_month?: string
+          sales_amount?: number
+          sales_count?: number
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_inputs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_inputs_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "hr_staff_costs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commission_rules: {
+        Row: {
+          base_dept_id: string | null
+          base_source:
+            | Database["public"]["Enums"]["commission_base_source"]
+            | null
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          effective_to: string | null
+          id: string
+          pct: number | null
+          rule_name: string
+          rule_type: Database["public"]["Enums"]["commission_rule_type"]
+          staff_id: string | null
+          tier_config: Json | null
+        }
+        Insert: {
+          base_dept_id?: string | null
+          base_source?:
+            | Database["public"]["Enums"]["commission_base_source"]
+            | null
+          created_at?: string
+          created_by?: string | null
+          effective_from: string
+          effective_to?: string | null
+          id?: string
+          pct?: number | null
+          rule_name: string
+          rule_type: Database["public"]["Enums"]["commission_rule_type"]
+          staff_id?: string | null
+          tier_config?: Json | null
+        }
+        Update: {
+          base_dept_id?: string | null
+          base_source?:
+            | Database["public"]["Enums"]["commission_base_source"]
+            | null
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          pct?: number | null
+          rule_name?: string
+          rule_type?: Database["public"]["Enums"]["commission_rule_type"]
+          staff_id?: string | null
+          tier_config?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_rules_base_dept_id_fkey"
+            columns: ["base_dept_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_rules_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_rules_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "hr_staff_costs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           created_at: string
@@ -1182,6 +1303,146 @@ export type Database = {
           },
         ]
       }
+      hr_import_templates: {
+        Row: {
+          column_map: Json
+          created_at: string
+          id: string
+          match_strategy: string
+          template_name: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          column_map: Json
+          created_at?: string
+          id?: string
+          match_strategy?: string
+          template_name: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          column_map?: Json
+          created_at?: string
+          id?: string
+          match_strategy?: string
+          template_name?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_import_templates_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_monthly_payroll: {
+        Row: {
+          basic_salary: number
+          commission_amount: number
+          created_at: string
+          created_by: string | null
+          eis_ee: number
+          eis_er: number
+          epf_ee: number
+          epf_er: number
+          gross: number
+          id: string
+          net: number
+          non_statutory_allowance: number
+          ot_amount: number
+          ot_hours: number
+          pcb: number
+          period_month: string
+          prorata_days_in_month: number
+          prorata_days_worked: number
+          socso_ee: number
+          socso_er: number
+          source: Database["public"]["Enums"]["hr_monthly_payroll_source"]
+          staff_id: string
+          status: Database["public"]["Enums"]["hr_monthly_payroll_status"]
+          statutory_allowance: number
+          unpaid_leave_days: number
+          updated_at: string
+        }
+        Insert: {
+          basic_salary?: number
+          commission_amount?: number
+          created_at?: string
+          created_by?: string | null
+          eis_ee?: number
+          eis_er?: number
+          epf_ee?: number
+          epf_er?: number
+          gross?: number
+          id?: string
+          net?: number
+          non_statutory_allowance?: number
+          ot_amount?: number
+          ot_hours?: number
+          pcb?: number
+          period_month: string
+          prorata_days_in_month?: number
+          prorata_days_worked?: number
+          socso_ee?: number
+          socso_er?: number
+          source?: Database["public"]["Enums"]["hr_monthly_payroll_source"]
+          staff_id: string
+          status?: Database["public"]["Enums"]["hr_monthly_payroll_status"]
+          statutory_allowance?: number
+          unpaid_leave_days?: number
+          updated_at?: string
+        }
+        Update: {
+          basic_salary?: number
+          commission_amount?: number
+          created_at?: string
+          created_by?: string | null
+          eis_ee?: number
+          eis_er?: number
+          epf_ee?: number
+          epf_er?: number
+          gross?: number
+          id?: string
+          net?: number
+          non_statutory_allowance?: number
+          ot_amount?: number
+          ot_hours?: number
+          pcb?: number
+          period_month?: string
+          prorata_days_in_month?: number
+          prorata_days_worked?: number
+          socso_ee?: number
+          socso_er?: number
+          source?: Database["public"]["Enums"]["hr_monthly_payroll_source"]
+          staff_id?: string
+          status?: Database["public"]["Enums"]["hr_monthly_payroll_status"]
+          statutory_allowance?: number
+          unpaid_leave_days?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_monthly_payroll_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_monthly_payroll_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "hr_staff_costs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hr_pool_allocation: {
         Row: {
           company_id: string
@@ -1290,14 +1551,23 @@ export type Database = {
         Row: {
           allowances: number
           basic_salary: number
+          children_count: number
           created_at: string
           created_by: string
           department_id: string
           eis_er: number | null
+          employee_code: string | null
           employee_name: string
+          employment_type: Database["public"]["Enums"]["hr_employment_type"]
+          epf_category: Database["public"]["Enums"]["epf_part"]
           epf_er: number | null
+          hire_date: string | null
           id: string
+          is_epf_exempt: boolean
           non_statutory_allowance: number
+          pcb_category: Database["public"]["Enums"]["pcb_category"]
+          resignation_date: string | null
+          socso_category: Database["public"]["Enums"]["socso_category"]
           socso_er: number | null
           status: Database["public"]["Enums"]["hr_staff_status"]
           total_ctc: number | null
@@ -1306,14 +1576,23 @@ export type Database = {
         Insert: {
           allowances?: number
           basic_salary: number
+          children_count?: number
           created_at?: string
           created_by: string
           department_id: string
           eis_er?: number | null
+          employee_code?: string | null
           employee_name: string
+          employment_type?: Database["public"]["Enums"]["hr_employment_type"]
+          epf_category?: Database["public"]["Enums"]["epf_part"]
           epf_er?: number | null
+          hire_date?: string | null
           id?: string
+          is_epf_exempt?: boolean
           non_statutory_allowance?: number
+          pcb_category?: Database["public"]["Enums"]["pcb_category"]
+          resignation_date?: string | null
+          socso_category?: Database["public"]["Enums"]["socso_category"]
           socso_er?: number | null
           status?: Database["public"]["Enums"]["hr_staff_status"]
           total_ctc?: number | null
@@ -1322,14 +1601,23 @@ export type Database = {
         Update: {
           allowances?: number
           basic_salary?: number
+          children_count?: number
           created_at?: string
           created_by?: string
           department_id?: string
           eis_er?: number | null
+          employee_code?: string | null
           employee_name?: string
+          employment_type?: Database["public"]["Enums"]["hr_employment_type"]
+          epf_category?: Database["public"]["Enums"]["epf_part"]
           epf_er?: number | null
+          hire_date?: string | null
           id?: string
+          is_epf_exempt?: boolean
           non_statutory_allowance?: number
+          pcb_category?: Database["public"]["Enums"]["pcb_category"]
+          resignation_date?: string | null
+          socso_category?: Database["public"]["Enums"]["socso_category"]
           socso_er?: number | null
           status?: Database["public"]["Enums"]["hr_staff_status"]
           total_ctc?: number | null
@@ -1348,6 +1636,54 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_staff_salary_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          effective_from: string
+          id: string
+          new_basic: number
+          old_basic: number
+          reason: string | null
+          staff_id: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          effective_from: string
+          id?: string
+          new_basic: number
+          old_basic: number
+          reason?: string | null
+          staff_id: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          effective_from?: string
+          id?: string
+          new_basic?: number
+          old_basic?: number
+          reason?: string | null
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_staff_salary_history_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_staff_salary_history_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "hr_staff_costs"
             referencedColumns: ["id"]
           },
         ]
@@ -1634,6 +1970,7 @@ export type Database = {
           repayment_terms: string | null
           risk_premium: number
           status: Database["public"]["Enums"]["loan_status"]
+          tenure_months: number
           updated_at: string
           version: number
         }
@@ -1651,6 +1988,7 @@ export type Database = {
           repayment_terms?: string | null
           risk_premium: number
           status?: Database["public"]["Enums"]["loan_status"]
+          tenure_months: number
           updated_at?: string
           version?: number
         }
@@ -1668,6 +2006,7 @@ export type Database = {
           repayment_terms?: string | null
           risk_premium?: number
           status?: Database["public"]["Enums"]["loan_status"]
+          tenure_months?: number
           updated_at?: string
           version?: number
         }
@@ -2089,6 +2428,7 @@ export type Database = {
           direction: string
           executed_at: string | null
           executed_by: string | null
+          fund_source_id: string | null
           id: string
           invoice_id: string | null
           journal_entry_id: string | null
@@ -2124,6 +2464,7 @@ export type Database = {
           direction?: string
           executed_at?: string | null
           executed_by?: string | null
+          fund_source_id?: string | null
           id?: string
           invoice_id?: string | null
           journal_entry_id?: string | null
@@ -2159,6 +2500,7 @@ export type Database = {
           direction?: string
           executed_at?: string | null
           executed_by?: string | null
+          fund_source_id?: string | null
           id?: string
           invoice_id?: string | null
           journal_entry_id?: string | null
@@ -2228,6 +2570,20 @@ export type Database = {
             columns: ["executed_by"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_vouchers_fund_source_id_fkey"
+            columns: ["fund_source_id"]
+            isOneToOne: false
+            referencedRelation: "fund_source_outstanding"
+            referencedColumns: ["fund_source_id"]
+          },
+          {
+            foreignKeyName: "payment_vouchers_fund_source_id_fkey"
+            columns: ["fund_source_id"]
+            isOneToOne: false
+            referencedRelation: "fund_sources"
             referencedColumns: ["id"]
           },
           {
@@ -2834,6 +3190,30 @@ export type Database = {
         }
         Relationships: []
       }
+      hr_monthly_payroll_summary: {
+        Row: {
+          department_id: string | null
+          department_name: string | null
+          dept_ee_deductions: number | null
+          dept_eis_er: number | null
+          dept_epf_er: number | null
+          dept_gross: number | null
+          dept_net: number | null
+          dept_socso_er: number | null
+          dept_stat_er: number | null
+          period_month: string | null
+          staff_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_staff_costs_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hv_operating_fund_balance: {
         Row: {
           balance: number | null
@@ -2930,6 +3310,10 @@ export type Database = {
             Args: { p_cancel_reason?: string; p_loan_id: string }
             Returns: undefined
           }
+      compute_commission: {
+        Args: { p_period: string; p_staff_id: string }
+        Returns: number
+      }
       create_loan_with_approval: {
         Args: {
           p_base_rate: number
@@ -2939,6 +3323,7 @@ export type Database = {
           p_principal: number
           p_repayment_terms?: string
           p_risk_premium: number
+          p_tenure_months: number
         }
         Returns: string
       }
@@ -3110,6 +3495,13 @@ export type Database = {
         | "non_billable"
       claim_status: "pending" | "approved" | "rejected" | "paid"
       claim_type: "project" | "benefit"
+      commission_base_source:
+        | "staff_sales_count"
+        | "staff_sales_amount"
+        | "dept_np"
+        | "company_sales"
+        | "team_commission_sum"
+      commission_rule_type: "tiered_per_unit" | "pct_of_base"
       contract_status: "active" | "completed" | "cancelled"
       dept_pool_txn_type: "np_in" | "expense_out"
       director_status: "active" | "inactive"
@@ -3125,6 +3517,9 @@ export type Database = {
         | "director_loan"
         | "department_pool"
         | "director_saving"
+      hr_employment_type: "salaried" | "commission_eligible"
+      hr_monthly_payroll_source: "imported" | "manual" | "carried_forward"
+      hr_monthly_payroll_status: "draft" | "submitted" | "paid"
       hr_staff_status: "active" | "inactive"
       hv_fund_txn_type:
         | "saving_in"
@@ -3329,6 +3724,14 @@ export const Constants = {
       ],
       claim_status: ["pending", "approved", "rejected", "paid"],
       claim_type: ["project", "benefit"],
+      commission_base_source: [
+        "staff_sales_count",
+        "staff_sales_amount",
+        "dept_np",
+        "company_sales",
+        "team_commission_sum",
+      ],
+      commission_rule_type: ["tiered_per_unit", "pct_of_base"],
       contract_status: ["active", "completed", "cancelled"],
       dept_pool_txn_type: ["np_in", "expense_out"],
       director_status: ["active", "inactive"],
@@ -3346,6 +3749,9 @@ export const Constants = {
         "department_pool",
         "director_saving",
       ],
+      hr_employment_type: ["salaried", "commission_eligible"],
+      hr_monthly_payroll_source: ["imported", "manual", "carried_forward"],
+      hr_monthly_payroll_status: ["draft", "submitted", "paid"],
       hr_staff_status: ["active", "inactive"],
       hv_fund_txn_type: [
         "saving_in",

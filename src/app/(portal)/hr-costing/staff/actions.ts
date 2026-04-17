@@ -49,12 +49,12 @@ export async function updateStaff(id: string, formData: FormData) {
       employee_code: employeeCode,
       hire_date: hireDate,
       resignation_date: resignDate,
-      epf_category: formData.get('epf_category') as string,
-      socso_category: formData.get('socso_category') as string,
+      epf_category: formData.get('epf_category') as 'A' | 'C' | 'E' | 'F',
+      socso_category: formData.get('socso_category') as 'first' | 'second',
       is_epf_exempt: formData.get('is_epf_exempt') === 'on',
-      pcb_category: formData.get('pcb_category') as string,
+      pcb_category: formData.get('pcb_category') as 'KA1' | 'KA2' | 'KA3',
       children_count: parseInt(formData.get('children_count') as string, 10) || 0,
-      employment_type: formData.get('employment_type') as string,
+      employment_type: formData.get('employment_type') as 'salaried' | 'commission_eligible',
     })
     .eq('id', id)
 

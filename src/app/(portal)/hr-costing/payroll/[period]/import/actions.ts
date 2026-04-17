@@ -157,8 +157,19 @@ export async function applyImport(
 
   let updated = 0
   for (const item of preview.toUpdate) {
-    const fields: Record<string, number> = {}
-    for (const c of item.changes) fields[c.field] = c.to
+    const fields: Partial<{
+      basic_salary: number
+      statutory_allowance: number
+      non_statutory_allowance: number
+      ot_hours: number
+      ot_amount: number
+      commission_amount: number
+      unpaid_leave_days: number
+    }> = {}
+    for (const c of item.changes) {
+      // Writable fields were already validated by previewImport
+      ;(fields as Record<string, number>)[c.field] = c.to
+    }
     const { error } = await supabase
       .from('hr_monthly_payroll')
       .update(fields)
