@@ -27,10 +27,11 @@ One row per (employee × month). Master holds "who", monthly holds "how much thi
 | Pro-rata | YES — calendar days, applies to basic + stat-allow + OT, NOT commission, NOT non-stat-allow |
 | Staff PCB | YES (add `pcb_category` + `children_count`, use `lookup_pcb`) |
 | Alliance Bank pool | Separate pool; Finance transfers pooled money there before Principal approves payroll |
-| Pool architecture | Separate `operating_pools` table for HR/Finance/Director/Digital; Marketing keeps existing `dept_pools` (P&L semantics) |
-| Voucher sources max | Drop 3-cap trigger to allow 5-source bank transfers |
-| NRIC | Add to staff + directors for Spec 6 statutory files |
+| Pool architecture | Separate `operating_pools` table for **HR / Finance / Director** (3 pools only — Digital dropped 2026-04-17); Marketing keeps existing `dept_pools` because it has revenue (commission, referral) → P&L semantics |
+| Voucher sources max | Drop 3-cap trigger entirely (no upper limit) to allow 5-source bank transfers |
+| NRIC | Add to staff + directors. **User confirmed 2026-04-17**: full NRIC list available — one-shot backfill in migration 138 |
 | File download routes | Allow GET route handlers (read-only exception to CLAUDE.md no-API-routes rule) |
+| Finance drill-down scope | **Confirmed 2026-04-17**: Finance sees individual salaries for **their own department** (Finance dept); other departments (Marketing/HR/Director) stay aggregate-only. ⚠️ **Diverges from current `docs/access-matrix.md`** which says Finance cannot see any individual salaries. Spec 1 must update access-matrix.md + RLS policy on `hr_monthly_payroll` / `hr_staff_costs` accordingly. |
 
 ## Spec boundaries
 
@@ -41,20 +42,28 @@ One row per (employee × month). Master holds "who", monthly holds "how much thi
 - **Spec 5**: payslip PDF + bank transfer files
 - **Spec 6**: statutory compliance ZIP (KWSP / SOCSO / EIS / LHDN)
 
-## Top-5 blockers for Spec 1 kickoff (needs user confirmation)
+## Blockers — ALL RESOLVED 2026-04-17 ✅
 
-1. Pro-rata basis confirmation (calendar vs working days)
-2. Finance drill-down scope (Director only, or also Mkt / HR / Fin staff?)
-3. 3-row voucher cap removal OK?
-4. NRIC values available for backfill?
-5. `dept_pools` vs `operating_pools` separation OK?
+| # | Topic | Answer |
+|---|---|---|
+| 1 | Pro-rata basis | Calendar days |
+| 2 | Finance drill-down scope | Own dept individual / other depts aggregate (see decisions table — diverges from access-matrix.md, Spec 1 must reconcile) |
+| 3 | 3-row voucher cap | Remove entirely (no limit) |
+| 4 | NRIC backfill data | Available, one-shot backfill in Spec 6 / migration 138 |
+| 5 | GET route handlers for file downloads | Allow (read-only exception to CLAUDE.md) |
+| 6 | `operating_pools` vs `dept_pools` | Separate tables; Digital dropped; 3 new pools only |
 
-## Pre-flight known issues in the worktree
+## Deferred questions (non-blocking, decide at each spec kickoff)
 
-- Uncommitted: `supabase/migrations/20260101000119_director_ctc_statutory_auto_compute.sql`
-- Modified but unstaged: `src/app/(portal)/director-salary/{_components/CTCInputGrid.tsx, page.tsx}`, `src/app/(portal)/director-salary/page.tsx`, `scripts/check-remote-migrations.mjs`
+1. Bank format for Spec 5 default — Alliance, Hong Leong, both?
+2. Initial commission rules (Telemarketer, MK, other commission-eligible staff) — create via UI post-Spec-1
+3. Payslip email delivery — v1 download-only (recommended); email = v2
+4. Unpaid leave / leave import — defer to v2
+5. Commission clawback — confirmed NO
 
-These must land before Spec 1 starts so migration 120 has a clean base.
+## Pre-flight clean ✅
+
+As of commit `d900f76` (2026-04-17), all pre-Spec-1 work is committed and pushed. Clean base for migration 120.
 
 ## References
 
