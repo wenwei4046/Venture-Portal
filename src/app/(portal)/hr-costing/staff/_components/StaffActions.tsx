@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Link from 'next/link'
 import { deleteStaff } from '../actions'
 
 interface Props {
@@ -44,11 +45,19 @@ export default function StaffActions({ staffId }: Props) {
   }
 
   return (
-    <button
-      onClick={() => setConfirming(true)}
-      className="text-xs font-sans text-muted hover:text-danger transition-colors"
-    >
-      Delete
-    </button>
+    <div className="flex items-center gap-3 justify-end">
+      <Link
+        href={`/hr-costing/staff/${staffId}/edit`}
+        className="text-xs font-sans text-muted hover:text-accent transition-colors"
+      >
+        Edit
+      </Link>
+      <button
+        onClick={() => setConfirming(true)}
+        className="text-xs font-sans text-muted hover:text-danger transition-colors"
+      >
+        Delete
+      </button>
+    </div>
   )
 }

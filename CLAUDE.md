@@ -152,6 +152,7 @@ Coding Conventions
 TypeScript strict mode — no `any`
 Server Components by default — Client Components only when needed (forms, interactive widgets)
 Writes — use Server Actions (`'use server'`), NOT API Route Handlers. Every action calls `requireRole(...)` at entry.
+Read-only file downloads (PDF, CSV, ZIP binary streams) — GET Route Handlers (`app/**/route.ts`) are OK because Server Actions can't stream binary responses cleanly. Still call `requireRole(...)` at entry. Never accept write-side params — POST/PUT/DELETE route handlers remain forbidden. Locked by user 2026-04-17 (Spec 5 blocker Q5).
 Supabase client — server-side (`lib/supabase/server.ts`) uses anon key with RLS via SSR cookies. Service role client (`admin.ts`) is dormant + `'server-only'` guarded; avoid unless you truly need to bypass RLS.
 Aggregate queries — prefer RPC functions (`dashboard_summary`, `get_hr_cost_summary`) over scattered per-field selects. Single round-trip, clearer intent, easier to unit test at SQL level.
 Error handling — Server Actions throw, pages use error boundaries, never return `{ data, error }` to the client

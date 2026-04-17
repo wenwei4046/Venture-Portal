@@ -5,7 +5,6 @@ import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import dayjs from 'dayjs'
 import Link from 'next/link'
 import CTCInputGrid from './_components/CTCInputGrid'
-import CalculateButton from './_components/CalculateButton'
 import ConfirmPayoutsButton from './_components/ConfirmPayoutsButton'
 import DirectorPinGate from '@/components/DirectorPinGate'
 import { isDirectorPinVerified } from './pin-actions'
@@ -183,7 +182,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
           <section className="mb-16">
             <h2 className="font-serif text-2xl text-ink mb-1">CTC Input</h2>
             <p className="font-serif italic text-graphite text-sm mb-6">
-              录入每间子公司的 Director Portion。<em>Statutory ER 由 trigger 自动计算，Pool 按 Weightage 分配。</em>
+              录入每间子公司的 Director Portion。<em>Save & Calculate 会同时存 CTC 并立刻重算所有 draft payout。</em>
             </p>
 
             <CTCInputGrid
@@ -210,20 +209,6 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
               }))}
               period={period}
             />
-          </section>
-
-          {/* Calculate Button */}
-          <section className="mb-16">
-            <div className="mb-6">
-              <h2 className="font-serif text-2xl text-ink mb-1">Calculate</h2>
-              <p className="font-serif italic text-graphite text-sm">
-                {hasPayouts
-                  ? 'CTC 已计算。重新计算会替换所有 draft 状态的 payout。'
-                  : 'CTC 录入完成后，点击 Calculate 触发 10 步计算。'}
-              </p>
-            </div>
-
-            <CalculateButton period={period} />
           </section>
 
           {/* Per-Director Payouts Table */}

@@ -83,6 +83,50 @@ export type Database = {
           },
         ]
       }
+      alliance_bank_pool: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          period_month: string | null
+          reference_id: string | null
+          reference_type: string | null
+          transaction_type: Database["public"]["Enums"]["alliance_pool_txn_type"]
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by: string
+          description: string
+          id?: string
+          period_month?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          transaction_type: Database["public"]["Enums"]["alliance_pool_txn_type"]
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string
+          description?: string
+          id?: string
+          period_month?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          transaction_type?: Database["public"]["Enums"]["alliance_pool_txn_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alliance_bank_pool_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       approval_requests: {
         Row: {
           amount: number | null
@@ -426,6 +470,127 @@ export type Database = {
             columns: ["voucher_id"]
             isOneToOne: false
             referencedRelation: "payment_vouchers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commission_inputs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          period_month: string
+          sales_amount: number
+          sales_count: number
+          staff_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          period_month: string
+          sales_amount?: number
+          sales_count?: number
+          staff_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          period_month?: string
+          sales_amount?: number
+          sales_count?: number
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_inputs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_inputs_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "hr_staff_costs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commission_rules: {
+        Row: {
+          base_dept_id: string | null
+          base_source:
+            | Database["public"]["Enums"]["commission_base_source"]
+            | null
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          effective_to: string | null
+          id: string
+          pct: number | null
+          rule_name: string
+          rule_type: Database["public"]["Enums"]["commission_rule_type"]
+          staff_id: string | null
+          tier_config: Json | null
+        }
+        Insert: {
+          base_dept_id?: string | null
+          base_source?:
+            | Database["public"]["Enums"]["commission_base_source"]
+            | null
+          created_at?: string
+          created_by?: string | null
+          effective_from: string
+          effective_to?: string | null
+          id?: string
+          pct?: number | null
+          rule_name: string
+          rule_type: Database["public"]["Enums"]["commission_rule_type"]
+          staff_id?: string | null
+          tier_config?: Json | null
+        }
+        Update: {
+          base_dept_id?: string | null
+          base_source?:
+            | Database["public"]["Enums"]["commission_base_source"]
+            | null
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          pct?: number | null
+          rule_name?: string
+          rule_type?: Database["public"]["Enums"]["commission_rule_type"]
+          staff_id?: string | null
+          tier_config?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_rules_base_dept_id_fkey"
+            columns: ["base_dept_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_rules_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_rules_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "hr_staff_costs"
             referencedColumns: ["id"]
           },
         ]
@@ -866,6 +1031,7 @@ export type Database = {
           id: string
           min_payout: number
           name: string
+          nric: string | null
           pcb_category: Database["public"]["Enums"]["pcb_category"]
           status: Database["public"]["Enums"]["director_status"]
           tax_ref_no: string | null
@@ -879,6 +1045,7 @@ export type Database = {
           id?: string
           min_payout: number
           name: string
+          nric?: string | null
           pcb_category?: Database["public"]["Enums"]["pcb_category"]
           status?: Database["public"]["Enums"]["director_status"]
           tax_ref_no?: string | null
@@ -892,6 +1059,7 @@ export type Database = {
           id?: string
           min_payout?: number
           name?: string
+          nric?: string | null
           pcb_category?: Database["public"]["Enums"]["pcb_category"]
           status?: Database["public"]["Enums"]["director_status"]
           tax_ref_no?: string | null
@@ -1182,6 +1350,146 @@ export type Database = {
           },
         ]
       }
+      hr_import_templates: {
+        Row: {
+          column_map: Json
+          created_at: string
+          id: string
+          match_strategy: string
+          template_name: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          column_map: Json
+          created_at?: string
+          id?: string
+          match_strategy?: string
+          template_name: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          column_map?: Json
+          created_at?: string
+          id?: string
+          match_strategy?: string
+          template_name?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_import_templates_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_monthly_payroll: {
+        Row: {
+          basic_salary: number
+          commission_amount: number
+          created_at: string
+          created_by: string | null
+          eis_ee: number
+          eis_er: number
+          epf_ee: number
+          epf_er: number
+          gross: number
+          id: string
+          net: number
+          non_statutory_allowance: number
+          ot_amount: number
+          ot_hours: number
+          pcb: number
+          period_month: string
+          prorata_days_in_month: number
+          prorata_days_worked: number
+          socso_ee: number
+          socso_er: number
+          source: Database["public"]["Enums"]["hr_monthly_payroll_source"]
+          staff_id: string
+          status: Database["public"]["Enums"]["hr_monthly_payroll_status"]
+          statutory_allowance: number
+          unpaid_leave_days: number
+          updated_at: string
+        }
+        Insert: {
+          basic_salary?: number
+          commission_amount?: number
+          created_at?: string
+          created_by?: string | null
+          eis_ee?: number
+          eis_er?: number
+          epf_ee?: number
+          epf_er?: number
+          gross?: number
+          id?: string
+          net?: number
+          non_statutory_allowance?: number
+          ot_amount?: number
+          ot_hours?: number
+          pcb?: number
+          period_month: string
+          prorata_days_in_month?: number
+          prorata_days_worked?: number
+          socso_ee?: number
+          socso_er?: number
+          source?: Database["public"]["Enums"]["hr_monthly_payroll_source"]
+          staff_id: string
+          status?: Database["public"]["Enums"]["hr_monthly_payroll_status"]
+          statutory_allowance?: number
+          unpaid_leave_days?: number
+          updated_at?: string
+        }
+        Update: {
+          basic_salary?: number
+          commission_amount?: number
+          created_at?: string
+          created_by?: string | null
+          eis_ee?: number
+          eis_er?: number
+          epf_ee?: number
+          epf_er?: number
+          gross?: number
+          id?: string
+          net?: number
+          non_statutory_allowance?: number
+          ot_amount?: number
+          ot_hours?: number
+          pcb?: number
+          period_month?: string
+          prorata_days_in_month?: number
+          prorata_days_worked?: number
+          socso_ee?: number
+          socso_er?: number
+          source?: Database["public"]["Enums"]["hr_monthly_payroll_source"]
+          staff_id?: string
+          status?: Database["public"]["Enums"]["hr_monthly_payroll_status"]
+          statutory_allowance?: number
+          unpaid_leave_days?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_monthly_payroll_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_monthly_payroll_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "hr_staff_costs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hr_pool_allocation: {
         Row: {
           company_id: string
@@ -1289,15 +1597,27 @@ export type Database = {
       hr_staff_costs: {
         Row: {
           allowances: number
+          bank_account_no: string | null
+          bank_name: string | null
           basic_salary: number
+          children_count: number
           created_at: string
           created_by: string
           department_id: string
           eis_er: number | null
+          employee_code: string | null
           employee_name: string
+          employment_type: Database["public"]["Enums"]["hr_employment_type"]
+          epf_category: Database["public"]["Enums"]["epf_part"]
           epf_er: number | null
+          hire_date: string | null
           id: string
+          is_epf_exempt: boolean
           non_statutory_allowance: number
+          nric: string | null
+          pcb_category: Database["public"]["Enums"]["pcb_category"]
+          resignation_date: string | null
+          socso_category: Database["public"]["Enums"]["socso_category"]
           socso_er: number | null
           status: Database["public"]["Enums"]["hr_staff_status"]
           total_ctc: number | null
@@ -1305,15 +1625,27 @@ export type Database = {
         }
         Insert: {
           allowances?: number
+          bank_account_no?: string | null
+          bank_name?: string | null
           basic_salary: number
+          children_count?: number
           created_at?: string
           created_by: string
           department_id: string
           eis_er?: number | null
+          employee_code?: string | null
           employee_name: string
+          employment_type?: Database["public"]["Enums"]["hr_employment_type"]
+          epf_category?: Database["public"]["Enums"]["epf_part"]
           epf_er?: number | null
+          hire_date?: string | null
           id?: string
+          is_epf_exempt?: boolean
           non_statutory_allowance?: number
+          nric?: string | null
+          pcb_category?: Database["public"]["Enums"]["pcb_category"]
+          resignation_date?: string | null
+          socso_category?: Database["public"]["Enums"]["socso_category"]
           socso_er?: number | null
           status?: Database["public"]["Enums"]["hr_staff_status"]
           total_ctc?: number | null
@@ -1321,15 +1653,27 @@ export type Database = {
         }
         Update: {
           allowances?: number
+          bank_account_no?: string | null
+          bank_name?: string | null
           basic_salary?: number
+          children_count?: number
           created_at?: string
           created_by?: string
           department_id?: string
           eis_er?: number | null
+          employee_code?: string | null
           employee_name?: string
+          employment_type?: Database["public"]["Enums"]["hr_employment_type"]
+          epf_category?: Database["public"]["Enums"]["epf_part"]
           epf_er?: number | null
+          hire_date?: string | null
           id?: string
+          is_epf_exempt?: boolean
           non_statutory_allowance?: number
+          nric?: string | null
+          pcb_category?: Database["public"]["Enums"]["pcb_category"]
+          resignation_date?: string | null
+          socso_category?: Database["public"]["Enums"]["socso_category"]
           socso_er?: number | null
           status?: Database["public"]["Enums"]["hr_staff_status"]
           total_ctc?: number | null
@@ -1348,6 +1692,54 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_staff_salary_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          effective_from: string
+          id: string
+          new_basic: number
+          old_basic: number
+          reason: string | null
+          staff_id: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          effective_from: string
+          id?: string
+          new_basic: number
+          old_basic: number
+          reason?: string | null
+          staff_id: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          effective_from?: string
+          id?: string
+          new_basic?: number
+          old_basic?: number
+          reason?: string | null
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_staff_salary_history_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_staff_salary_history_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "hr_staff_costs"
             referencedColumns: ["id"]
           },
         ]
@@ -1452,6 +1844,9 @@ export type Database = {
           id: string
           invoice_no: string | null
           period_month: string
+          routes_to_pool:
+            | Database["public"]["Enums"]["operating_pool_type"]
+            | null
           sst_amount: number | null
           sst_rate: number | null
           status: Database["public"]["Enums"]["invoice_status"]
@@ -1468,6 +1863,9 @@ export type Database = {
           id?: string
           invoice_no?: string | null
           period_month: string
+          routes_to_pool?:
+            | Database["public"]["Enums"]["operating_pool_type"]
+            | null
           sst_amount?: number | null
           sst_rate?: number | null
           status?: Database["public"]["Enums"]["invoice_status"]
@@ -1484,6 +1882,9 @@ export type Database = {
           id?: string
           invoice_no?: string | null
           period_month?: string
+          routes_to_pool?:
+            | Database["public"]["Enums"]["operating_pool_type"]
+            | null
           sst_amount?: number | null
           sst_rate?: number | null
           status?: Database["public"]["Enums"]["invoice_status"]
@@ -1634,6 +2035,7 @@ export type Database = {
           repayment_terms: string | null
           risk_premium: number
           status: Database["public"]["Enums"]["loan_status"]
+          tenure_months: number
           updated_at: string
           version: number
         }
@@ -1651,6 +2053,7 @@ export type Database = {
           repayment_terms?: string | null
           risk_premium: number
           status?: Database["public"]["Enums"]["loan_status"]
+          tenure_months: number
           updated_at?: string
           version?: number
         }
@@ -1668,6 +2071,7 @@ export type Database = {
           repayment_terms?: string | null
           risk_premium?: number
           status?: Database["public"]["Enums"]["loan_status"]
+          tenure_months?: number
           updated_at?: string
           version?: number
         }
@@ -1844,6 +2248,53 @@ export type Database = {
           },
           {
             foreignKeyName: "monthly_statements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operating_pools: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          period_month: string
+          pool_type: Database["public"]["Enums"]["operating_pool_type"]
+          reference_id: string | null
+          reference_type: string | null
+          transaction_type: Database["public"]["Enums"]["operating_pool_txn_type"]
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by: string
+          description: string
+          id?: string
+          period_month: string
+          pool_type: Database["public"]["Enums"]["operating_pool_type"]
+          reference_id?: string | null
+          reference_type?: string | null
+          transaction_type: Database["public"]["Enums"]["operating_pool_txn_type"]
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string
+          description?: string
+          id?: string
+          period_month?: string
+          pool_type?: Database["public"]["Enums"]["operating_pool_type"]
+          reference_id?: string | null
+          reference_type?: string | null
+          transaction_type?: Database["public"]["Enums"]["operating_pool_txn_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operating_pools_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "users"
@@ -2089,6 +2540,7 @@ export type Database = {
           direction: string
           executed_at: string | null
           executed_by: string | null
+          fund_source_id: string | null
           id: string
           invoice_id: string | null
           journal_entry_id: string | null
@@ -2124,6 +2576,7 @@ export type Database = {
           direction?: string
           executed_at?: string | null
           executed_by?: string | null
+          fund_source_id?: string | null
           id?: string
           invoice_id?: string | null
           journal_entry_id?: string | null
@@ -2159,6 +2612,7 @@ export type Database = {
           direction?: string
           executed_at?: string | null
           executed_by?: string | null
+          fund_source_id?: string | null
           id?: string
           invoice_id?: string | null
           journal_entry_id?: string | null
@@ -2231,6 +2685,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "payment_vouchers_fund_source_id_fkey"
+            columns: ["fund_source_id"]
+            isOneToOne: false
+            referencedRelation: "fund_source_outstanding"
+            referencedColumns: ["fund_source_id"]
+          },
+          {
+            foreignKeyName: "payment_vouchers_fund_source_id_fkey"
+            columns: ["fund_source_id"]
+            isOneToOne: false
+            referencedRelation: "fund_sources"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "payment_vouchers_invoice_id_fkey"
             columns: ["invoice_id"]
             isOneToOne: false
@@ -2263,6 +2731,98 @@ export type Database = {
             columns: ["payee_company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_runs: {
+        Row: {
+          approval_id: string | null
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          director_salary_total: number
+          finance_opex_total: number
+          hr_opex_total: number
+          id: string
+          marketing_opex_total: number
+          paid_at: string | null
+          period_month: string
+          rejected_at: string | null
+          rejection_reason: string | null
+          status: Database["public"]["Enums"]["payroll_run_status"]
+          submitted_at: string | null
+          submitted_by: string | null
+          total_amount: number | null
+          updated_at: string
+        }
+        Insert: {
+          approval_id?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          director_salary_total?: number
+          finance_opex_total?: number
+          hr_opex_total?: number
+          id?: string
+          marketing_opex_total?: number
+          paid_at?: string | null
+          period_month: string
+          rejected_at?: string | null
+          rejection_reason?: string | null
+          status?: Database["public"]["Enums"]["payroll_run_status"]
+          submitted_at?: string | null
+          submitted_by?: string | null
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Update: {
+          approval_id?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          director_salary_total?: number
+          finance_opex_total?: number
+          hr_opex_total?: number
+          id?: string
+          marketing_opex_total?: number
+          paid_at?: string | null
+          period_month?: string
+          rejected_at?: string | null
+          rejection_reason?: string | null
+          status?: Database["public"]["Enums"]["payroll_run_status"]
+          submitted_at?: string | null
+          submitted_by?: string | null
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_runs_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_runs_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_with_target"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_runs_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_runs_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -2726,6 +3286,14 @@ export type Database = {
       }
     }
     Views: {
+      alliance_bank_pool_balance: {
+        Row: {
+          balance: number | null
+          last_txn_at: string | null
+          txn_count: number | null
+        }
+        Relationships: []
+      }
       approval_requests_with_target: {
         Row: {
           amount: number | null
@@ -2834,6 +3402,30 @@ export type Database = {
         }
         Relationships: []
       }
+      hr_monthly_payroll_summary: {
+        Row: {
+          department_id: string | null
+          department_name: string | null
+          dept_ee_deductions: number | null
+          dept_eis_er: number | null
+          dept_epf_er: number | null
+          dept_gross: number | null
+          dept_net: number | null
+          dept_socso_er: number | null
+          dept_stat_er: number | null
+          period_month: string | null
+          staff_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_staff_costs_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hv_operating_fund_balance: {
         Row: {
           balance: number | null
@@ -2869,6 +3461,15 @@ export type Database = {
           },
         ]
       }
+      operating_pool_balance: {
+        Row: {
+          balance: number | null
+          last_txn_at: string | null
+          pool_type: Database["public"]["Enums"]["operating_pool_type"] | null
+          txn_count: number | null
+        }
+        Relationships: []
+      }
       trial_balance: {
         Row: {
           account_code: string | null
@@ -2891,6 +3492,10 @@ export type Database = {
       }
     }
     Functions: {
+      approve_payroll_run: {
+        Args: { p_approver: string; p_run_id: string }
+        Returns: undefined
+      }
       build_hr_cost_submission_payload: {
         Args: { p_period: string }
         Returns: {
@@ -2930,6 +3535,10 @@ export type Database = {
             Args: { p_cancel_reason?: string; p_loan_id: string }
             Returns: undefined
           }
+      compute_commission: {
+        Args: { p_period: string; p_staff_id: string }
+        Returns: number
+      }
       create_loan_with_approval: {
         Args: {
           p_base_rate: number
@@ -2939,6 +3548,7 @@ export type Database = {
           p_principal: number
           p_repayment_terms?: string
           p_risk_premium: number
+          p_tenure_months: number
         }
         Returns: string
       }
@@ -3075,10 +3685,19 @@ export type Database = {
         }[]
       }
       mark_matured_fund_sources: { Args: never; Returns: number }
+      reject_payroll_run: {
+        Args: { p_approver: string; p_reason: string; p_run_id: string }
+        Returns: undefined
+      }
       save_director_salary_results: { Args: { p_data: Json }; Returns: Json }
+      submit_payroll_to_principal: {
+        Args: { p_period: string; p_user_id: string }
+        Returns: string
+      }
     }
     Enums: {
       account_type: "asset" | "liability" | "equity" | "revenue" | "expense"
+      alliance_pool_txn_type: "transfer_in" | "salary_payout_out" | "adjustment"
       approval_request_type:
         | "new_loan"
         | "base_rate"
@@ -3093,6 +3712,7 @@ export type Database = {
         | "payment_voucher"
         | "new_fund_source"
         | "hr_costing"
+        | "payroll_run"
       approval_status: "pending" | "approved" | "rejected"
       approval_workflow_state:
         | "submitted"
@@ -3110,6 +3730,13 @@ export type Database = {
         | "non_billable"
       claim_status: "pending" | "approved" | "rejected" | "paid"
       claim_type: "project" | "benefit"
+      commission_base_source:
+        | "staff_sales_count"
+        | "staff_sales_amount"
+        | "dept_np"
+        | "company_sales"
+        | "team_commission_sum"
+      commission_rule_type: "tiered_per_unit" | "pct_of_base"
       contract_status: "active" | "completed" | "cancelled"
       dept_pool_txn_type: "np_in" | "expense_out"
       director_status: "active" | "inactive"
@@ -3125,6 +3752,9 @@ export type Database = {
         | "director_loan"
         | "department_pool"
         | "director_saving"
+      hr_employment_type: "salaried" | "commission_eligible"
+      hr_monthly_payroll_source: "imported" | "manual" | "carried_forward"
+      hr_monthly_payroll_status: "draft" | "submitted" | "paid"
       hr_staff_status: "active" | "inactive"
       hv_fund_txn_type:
         | "saving_in"
@@ -3139,6 +3769,13 @@ export type Database = {
       invoice_pool_txn_type: "accumulate" | "release"
       invoice_status: "draft" | "issued" | "paid" | "paid_via_netting"
       loan_status: "pending_approval" | "active" | "fully_repaid" | "cancelled"
+      operating_pool_txn_type:
+        | "invoice_settled_in"
+        | "payroll_out"
+        | "transfer_out"
+        | "transfer_in"
+        | "adjustment"
+      operating_pool_type: "hr_opex" | "finance_opex" | "director_opex"
       overdue_stage: "grace" | "late_1" | "late_2" | "escalation"
       overdue_status: "pending" | "paid" | "escalated"
       payment_voucher_status:
@@ -3156,7 +3793,14 @@ export type Database = {
         | "salary_payout"
         | "other"
         | "receive_payment"
+        | "payroll_bank_transfer"
       payout_status: "draft" | "confirmed" | "paid"
+      payroll_run_status:
+        | "draft"
+        | "submitted"
+        | "approved"
+        | "paid"
+        | "rejected"
       pcb_category: "KA1" | "KA2" | "KA3"
       repayment_type: "principal" | "interest" | "penalty" | "netting"
       socso_category: "first" | "second"
@@ -3295,6 +3939,11 @@ export const Constants = {
   public: {
     Enums: {
       account_type: ["asset", "liability", "equity", "revenue", "expense"],
+      alliance_pool_txn_type: [
+        "transfer_in",
+        "salary_payout_out",
+        "adjustment",
+      ],
       approval_request_type: [
         "new_loan",
         "base_rate",
@@ -3309,6 +3958,7 @@ export const Constants = {
         "payment_voucher",
         "new_fund_source",
         "hr_costing",
+        "payroll_run",
       ],
       approval_status: ["pending", "approved", "rejected"],
       approval_workflow_state: [
@@ -3329,6 +3979,14 @@ export const Constants = {
       ],
       claim_status: ["pending", "approved", "rejected", "paid"],
       claim_type: ["project", "benefit"],
+      commission_base_source: [
+        "staff_sales_count",
+        "staff_sales_amount",
+        "dept_np",
+        "company_sales",
+        "team_commission_sum",
+      ],
+      commission_rule_type: ["tiered_per_unit", "pct_of_base"],
       contract_status: ["active", "completed", "cancelled"],
       dept_pool_txn_type: ["np_in", "expense_out"],
       director_status: ["active", "inactive"],
@@ -3346,6 +4004,9 @@ export const Constants = {
         "department_pool",
         "director_saving",
       ],
+      hr_employment_type: ["salaried", "commission_eligible"],
+      hr_monthly_payroll_source: ["imported", "manual", "carried_forward"],
+      hr_monthly_payroll_status: ["draft", "submitted", "paid"],
       hr_staff_status: ["active", "inactive"],
       hv_fund_txn_type: [
         "saving_in",
@@ -3361,6 +4022,14 @@ export const Constants = {
       invoice_pool_txn_type: ["accumulate", "release"],
       invoice_status: ["draft", "issued", "paid", "paid_via_netting"],
       loan_status: ["pending_approval", "active", "fully_repaid", "cancelled"],
+      operating_pool_txn_type: [
+        "invoice_settled_in",
+        "payroll_out",
+        "transfer_out",
+        "transfer_in",
+        "adjustment",
+      ],
+      operating_pool_type: ["hr_opex", "finance_opex", "director_opex"],
       overdue_stage: ["grace", "late_1", "late_2", "escalation"],
       overdue_status: ["pending", "paid", "escalated"],
       payment_voucher_status: [
@@ -3379,8 +4048,16 @@ export const Constants = {
         "salary_payout",
         "other",
         "receive_payment",
+        "payroll_bank_transfer",
       ],
       payout_status: ["draft", "confirmed", "paid"],
+      payroll_run_status: [
+        "draft",
+        "submitted",
+        "approved",
+        "paid",
+        "rejected",
+      ],
       pcb_category: ["KA1", "KA2", "KA3"],
       repayment_type: ["principal", "interest", "penalty", "netting"],
       socso_category: ["first", "second"],
