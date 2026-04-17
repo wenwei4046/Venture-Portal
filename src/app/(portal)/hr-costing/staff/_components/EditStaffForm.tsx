@@ -22,6 +22,7 @@ interface StaffRow {
   employment_type: string
   bank_name: string | null
   bank_account_no: string | null
+  nric: string | null
 }
 
 interface Props {
@@ -93,6 +94,18 @@ export default function EditStaffForm({ staff }: Props) {
             name="employee_code"
             defaultValue={staff.employee_code ?? ''}
             placeholder="e.g. EMP-001"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+            NRIC <span className="text-xs text-muted ml-1 font-normal">(12 digits, for statutory files)</span>
+          </label>
+          <input
+            name="nric"
+            defaultValue={staff.nric ?? ''}
+            placeholder="850101141234"
+            pattern="[0-9-\s]*"
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
           />
         </div>

@@ -59,6 +59,7 @@ export default async function EditStaffPage({ params }: PageProps) {
           employment_type: staff.employment_type,
           bank_name: staff.bank_name ?? null,
           bank_account_no: staff.bank_account_no ?? null,
+          nric: staff.nric ?? null,
         }}
       />
     </div>

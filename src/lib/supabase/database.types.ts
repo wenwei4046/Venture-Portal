@@ -83,6 +83,50 @@ export type Database = {
           },
         ]
       }
+      alliance_bank_pool: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          period_month: string | null
+          reference_id: string | null
+          reference_type: string | null
+          transaction_type: Database["public"]["Enums"]["alliance_pool_txn_type"]
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by: string
+          description: string
+          id?: string
+          period_month?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          transaction_type: Database["public"]["Enums"]["alliance_pool_txn_type"]
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string
+          description?: string
+          id?: string
+          period_month?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          transaction_type?: Database["public"]["Enums"]["alliance_pool_txn_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alliance_bank_pool_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       approval_requests: {
         Row: {
           amount: number | null
@@ -987,6 +1031,7 @@ export type Database = {
           id: string
           min_payout: number
           name: string
+          nric: string | null
           pcb_category: Database["public"]["Enums"]["pcb_category"]
           status: Database["public"]["Enums"]["director_status"]
           tax_ref_no: string | null
@@ -1000,6 +1045,7 @@ export type Database = {
           id?: string
           min_payout: number
           name: string
+          nric?: string | null
           pcb_category?: Database["public"]["Enums"]["pcb_category"]
           status?: Database["public"]["Enums"]["director_status"]
           tax_ref_no?: string | null
@@ -1013,6 +1059,7 @@ export type Database = {
           id?: string
           min_payout?: number
           name?: string
+          nric?: string | null
           pcb_category?: Database["public"]["Enums"]["pcb_category"]
           status?: Database["public"]["Enums"]["director_status"]
           tax_ref_no?: string | null
@@ -1550,6 +1597,8 @@ export type Database = {
       hr_staff_costs: {
         Row: {
           allowances: number
+          bank_account_no: string | null
+          bank_name: string | null
           basic_salary: number
           children_count: number
           created_at: string
@@ -1565,6 +1614,7 @@ export type Database = {
           id: string
           is_epf_exempt: boolean
           non_statutory_allowance: number
+          nric: string | null
           pcb_category: Database["public"]["Enums"]["pcb_category"]
           resignation_date: string | null
           socso_category: Database["public"]["Enums"]["socso_category"]
@@ -1575,6 +1625,8 @@ export type Database = {
         }
         Insert: {
           allowances?: number
+          bank_account_no?: string | null
+          bank_name?: string | null
           basic_salary: number
           children_count?: number
           created_at?: string
@@ -1590,6 +1642,7 @@ export type Database = {
           id?: string
           is_epf_exempt?: boolean
           non_statutory_allowance?: number
+          nric?: string | null
           pcb_category?: Database["public"]["Enums"]["pcb_category"]
           resignation_date?: string | null
           socso_category?: Database["public"]["Enums"]["socso_category"]
@@ -1600,6 +1653,8 @@ export type Database = {
         }
         Update: {
           allowances?: number
+          bank_account_no?: string | null
+          bank_name?: string | null
           basic_salary?: number
           children_count?: number
           created_at?: string
@@ -1615,6 +1670,7 @@ export type Database = {
           id?: string
           is_epf_exempt?: boolean
           non_statutory_allowance?: number
+          nric?: string | null
           pcb_category?: Database["public"]["Enums"]["pcb_category"]
           resignation_date?: string | null
           socso_category?: Database["public"]["Enums"]["socso_category"]
@@ -3230,6 +3286,14 @@ export type Database = {
       }
     }
     Views: {
+      alliance_bank_pool_balance: {
+        Row: {
+          balance: number | null
+          last_txn_at: string | null
+          txn_count: number | null
+        }
+        Relationships: []
+      }
       approval_requests_with_target: {
         Row: {
           amount: number | null
@@ -3633,6 +3697,7 @@ export type Database = {
     }
     Enums: {
       account_type: "asset" | "liability" | "equity" | "revenue" | "expense"
+      alliance_pool_txn_type: "transfer_in" | "salary_payout_out" | "adjustment"
       approval_request_type:
         | "new_loan"
         | "base_rate"
@@ -3728,6 +3793,7 @@ export type Database = {
         | "salary_payout"
         | "other"
         | "receive_payment"
+        | "payroll_bank_transfer"
       payout_status: "draft" | "confirmed" | "paid"
       payroll_run_status:
         | "draft"
@@ -3873,6 +3939,11 @@ export const Constants = {
   public: {
     Enums: {
       account_type: ["asset", "liability", "equity", "revenue", "expense"],
+      alliance_pool_txn_type: [
+        "transfer_in",
+        "salary_payout_out",
+        "adjustment",
+      ],
       approval_request_type: [
         "new_loan",
         "base_rate",
@@ -3977,6 +4048,7 @@ export const Constants = {
         "salary_payout",
         "other",
         "receive_payment",
+        "payroll_bank_transfer",
       ],
       payout_status: ["draft", "confirmed", "paid"],
       payroll_run_status: [

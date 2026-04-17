@@ -135,6 +135,17 @@ export default async function PayrollGridPage({ params }: PageProps) {
         </div>
       </div>
 
+      {/* Statutory export band */}
+      <div className="mt-4 flex items-center justify-end gap-2 mb-8">
+        <span className="font-serif italic text-muted text-xs uppercase tracking-wide mr-1">
+          Statutory files
+        </span>
+        <StatutoryLink period={period} file="kwsp" label="KWSP" />
+        <StatutoryLink period={period} file="socso" label="SOCSO" />
+        <StatutoryLink period={period} file="eis" label="EIS" />
+        <StatutoryLink period={period} file="pcb" label="LHDN CP39" />
+      </div>
+
       {/* Summary band */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mb-10 border-y border-hairline py-6">
         <div>
@@ -163,5 +174,16 @@ export default async function PayrollGridPage({ params }: PageProps) {
 
       <PayrollGrid rows={gridRows} period={period} />
     </div>
+  )
+}
+
+function StatutoryLink({ period, file, label }: { period: string; file: string; label: string }) {
+  return (
+    <a
+      href={`/hr-costing/payroll/${period}/statutory?file=${file}`}
+      className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-xs px-2.5 py-1.5 rounded-md transition-colors"
+    >
+      {label}
+    </a>
   )
 }
