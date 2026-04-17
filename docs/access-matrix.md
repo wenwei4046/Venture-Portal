@@ -146,9 +146,11 @@ Project Claim — 提交	❌	员工提交给 Finance	❌	❌
 Project Claim — 审批	❌	✅ 批	❌	❌
 Project Claim — 出钱	❌	✅ 写	❌	❌
 RLS 规则:
-`hr_staff_costs` 表 — 只有 Principal 和 HR 可读。Finance 不能访问此表
-`hr_staff_allocation` 表 — 同上
-Finance 只能看到 HR 提交的 aggregate view:
+`hr_staff_costs` 表 — Principal 和 HR 全部可读。Finance 可读 **自己所属 department** 的 row（`department_id = current_user_department_id()`）— **更新 2026-04-17** 以支持 Spec 1 HR Payroll 的 Finance 部门经理查看本部门个人薪水，不拓宽到其他部门。其他部门仍走 aggregate view。
+`hr_staff_allocation` 表 — Principal 和 HR 可读；Finance 无权访问（保留原规则）
+`hr_monthly_payroll` 表 (Spec 1) — Principal 全部可读/可写；HR 全部可读，draft 状态可写；Finance 仅可读自己部门员工的 row；Dept Manager DENY
+`hr_monthly_payroll_summary` 视图 (Spec 1) — 继承下层 RLS（SECURITY INVOKER）；Finance 查询时只聚合本部门数据；Principal/HR 查询时覆盖全部门
+Finance 跨部门的 aggregate view:
 Finance 看到的 HR Cost Summary:
 ```
 HR Department — April 2025
