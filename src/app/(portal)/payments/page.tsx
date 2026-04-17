@@ -57,6 +57,13 @@ export default async function PaymentsPage({ searchParams }: Props) {
     .select('*, payment_categories(label)')
     .order('created_at', { ascending: false })
 
+  // Stage D/E surface: count payroll_payment_requests needing Finance action.
+  // Shown as a badge in the header so Finance doesn't miss HR's handoff.
+  const { count: payrollRequestsPending } = await supabase
+    .from('payroll_payment_requests')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'submitted')
+
   // Phase 7 Step 16: source_pool deprecated. Load pvs rows unconditionally
   // so the Pool column and filter both read the canonical subtable.
   const sourcesByVoucher = new Map<string, string[]>()
@@ -126,14 +133,31 @@ export default async function PaymentsPage({ searchParams }: Props) {
             All money in and out goes through a payment voucher. Finance creates, Principal approves, Finance executes.
           </p>
         </div>
-        {user.role === 'finance' ? (
+        <div className="flex items-center gap-3">
           <Link
-            href="/payments/new"
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            href="/payments/payroll-requests"
+            className={
+              (payrollRequestsPending ?? 0) > 0
+                ? 'bg-surface hover:bg-surface-2 border border-accent-border text-accent font-serif italic text-sm px-3 py-2 rounded-md transition-colors flex items-center gap-2'
+                : 'bg-surface hover:bg-surface-2 border border-hairline text-graphite font-serif italic text-sm px-3 py-2 rounded-md transition-colors flex items-center gap-2'
+            }
           >
-            Create payment
+            Payroll Requests
+            {(payrollRequestsPending ?? 0) > 0 ? (
+              <span className="bg-accent text-white font-mono text-[10px] px-1.5 py-0.5 rounded">
+                {payrollRequestsPending}
+              </span>
+            ) : null}
           </Link>
-        ) : null}
+          {user.role === 'finance' ? (
+            <Link
+              href="/payments/new"
+              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            >
+              Create payment
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       {/* ───────── Summary ───────── */}

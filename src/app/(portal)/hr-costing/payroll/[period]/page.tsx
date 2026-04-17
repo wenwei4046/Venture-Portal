@@ -6,6 +6,10 @@ import { formatMoney } from '@/lib/utils'
 import PayrollGrid, { type PayrollRowData } from '../_components/PayrollGrid'
 import CopyFromLastMonthButton from '../_components/CopyFromLastMonthButton'
 import SubmitToPrincipalButton from '../_components/SubmitToPrincipalButton'
+import MoreActionsDropdown from '../_components/MoreActionsDropdown'
+import RequestPayrollPaymentButton, {
+  type RequestState,
+} from '../_components/RequestPayrollPaymentButton'
 
 interface PageProps {
   params: Promise<{ period: string }>
@@ -25,25 +29,44 @@ export default async function PayrollGridPage({ params }: PageProps) {
 
   const supabase = await createClient()
 
-  const { data: rows } = await supabase
-    .from('hr_monthly_payroll')
-    .select(`
-      id, staff_id, period_month, status, source,
-      basic_salary, statutory_allowance, non_statutory_allowance,
-      ot_hours, ot_amount, commission_amount, unpaid_leave_days,
-      prorata_days_worked, prorata_days_in_month,
-      epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb,
-      gross, net,
-      hr_staff_costs (employee_name, departments (name))
-    `)
-    .eq('period_month', period)
-    .order('id')
+  const [{ data: rows }, { data: run }] = await Promise.all([
+    supabase
+      .from('hr_monthly_payroll')
+      .select(`
+        id, staff_id, period_month, status, source,
+        basic_salary, statutory_allowance, non_statutory_allowance,
+        ot_hours, ot_amount, commission_amount, unpaid_leave_days,
+        prorata_days_worked, prorata_days_in_month,
+        epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb,
+        gross, net,
+        hr_staff_costs (employee_name, departments (name))
+      `)
+      .eq('period_month', period)
+      .order('id'),
+    supabase
+      .from('payroll_runs')
+      .select('id, status, total_amount, submitted_at, approved_at, paid_at, rejection_reason')
+      .eq('period_month', period)
+      .maybeSingle(),
+  ])
+
+  // Latest payment request for this run (if run exists). Order by created_at
+  // desc so we can spot an active one first; uniqueness is enforced at DB,
+  // so at most one non-terminal row exists.
+  const { data: requestRows } = run
+    ? await supabase
+        .from('payroll_payment_requests')
+        .select('id, status, pv_id, requested_at, created_at')
+        .eq('payroll_run_id', run.id)
+        .order('created_at', { ascending: false })
+        .limit(5)
+    : { data: null }
 
   if (!rows || rows.length === 0) {
     return (
       <div>
         <Link href="/hr-costing/payroll" className="text-sm text-muted hover:text-accent font-sans transition-colors">
-          ← Back to Monthly Payroll
+          ← Back to Payroll
         </Link>
         <h1 className="font-serif text-3xl text-ink mt-6 mb-2">{formatPeriodLabel(period)}</h1>
         <p className="font-serif italic text-graphite mb-8">No rows for this period yet.</p>
@@ -95,7 +118,73 @@ export default async function PayrollGridPage({ params }: PageProps) {
     pcb: gridRows.reduce((s, r) => s + r.pcb, 0),
   }
 
+  // ─── Derive the period's phase from run + latest request ─────────────────
+  // Each phase maps to a distinct UI:
+  //   drafting              → HR editing rows; show Submit for Approval
+  //   awaiting-approval     → Run submitted; show waiting banner
+  //   approved-no-request   → Principal approved costing; show Request button
+  //   request-submitted     → HR requested payment; Finance hasn't generated PV
+  //   request-pv-generated  → Finance generated PV; awaiting Principal PV approval
+  //   completed             → PV approved + executed (HR Pool funded)
+  //   rejected              → Principal rejected; HR edits + re-submits
+  //   legacy-paid           → Run paid under the old monolithic RPC (pre-refactor)
+  type Phase =
+    | 'drafting'
+    | 'awaiting-approval'
+    | 'approved-no-request'
+    | 'request-submitted'
+    | 'request-pv-generated'
+    | 'completed'
+    | 'rejected'
+    | 'legacy-paid'
+
   const allDraft = gridRows.every(r => r.status === 'draft')
+  const requests = requestRows ?? []
+  const activeRequest = requests.find(
+    r => r.status === 'submitted' || r.status === 'pv_generated' || r.status === 'completed',
+  )
+
+  let phase: Phase = 'drafting'
+  if (!run) {
+    phase = allDraft ? 'drafting' : 'awaiting-approval'
+  } else if (run.status === 'submitted') {
+    phase = 'awaiting-approval'
+  } else if (run.status === 'rejected') {
+    phase = 'rejected'
+  } else if (run.status === 'paid') {
+    phase = 'legacy-paid'
+  } else if (run.status === 'approved') {
+    if (!activeRequest) phase = 'approved-no-request'
+    else if (activeRequest.status === 'submitted') phase = 'request-submitted'
+    else if (activeRequest.status === 'pv_generated') phase = 'request-pv-generated'
+    else if (activeRequest.status === 'completed') phase = 'completed'
+  }
+
+  // Build RequestState prop for the button component
+  let requestState: RequestState
+  if (!activeRequest) {
+    requestState = { kind: 'none' }
+  } else if (activeRequest.status === 'submitted') {
+    requestState = {
+      kind: 'submitted',
+      requestId: activeRequest.id,
+      requestedAt: activeRequest.requested_at,
+    }
+  } else if (activeRequest.status === 'pv_generated') {
+    requestState = {
+      kind: 'pv_generated',
+      pvId: activeRequest.pv_id ?? '',
+      requestId: activeRequest.id,
+    }
+  } else if (activeRequest.status === 'completed') {
+    requestState = {
+      kind: 'completed',
+      pvId: activeRequest.pv_id ?? '',
+      completedAt: null,
+    }
+  } else {
+    requestState = { kind: 'cancelled' }
+  }
 
   return (
     <div>
@@ -103,18 +192,32 @@ export default async function PayrollGridPage({ params }: PageProps) {
         href="/hr-costing/payroll"
         className="text-sm text-muted hover:text-accent font-sans transition-colors"
       >
-        ← Back to Monthly Payroll
+        ← Back to Payroll
       </Link>
 
-      <div className="flex items-baseline justify-between mt-6 mb-8">
+      {/* Row 1 — title + primary CTA varies by phase */}
+      <div className="flex items-baseline justify-between mt-6 mb-6 gap-6">
         <div>
           <h1 className="font-serif text-3xl text-ink">{formatPeriodLabel(period)}</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
-            {totals.staff} staff · <em>Drafts editable inline</em> · Statutory recomputes on save
+            {totals.staff} staff ·{' '}
+            <PhaseLabel phase={phase} rejectionReason={run?.rejection_reason} />
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {allDraft && (
+        <PhaseCta
+          phase={phase}
+          period={period}
+          runId={run?.id}
+          totalGross={totals.gross}
+          totalAmount={Number(run?.total_amount ?? totals.gross)}
+          requestState={requestState}
+        />
+      </div>
+
+      {/* Row 2 — secondary actions: data-entry only while drafting */}
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-2">
+          {phase === 'drafting' || phase === 'rejected' ? (
             <>
               <Link
                 href={`/hr-costing/payroll/${period}/import`}
@@ -123,28 +226,34 @@ export default async function PayrollGridPage({ params }: PageProps) {
                 Import InfoTech
               </Link>
               <CopyFromLastMonthButton period={period} />
-              <SubmitToPrincipalButton period={period} totalAmount={totals.gross} />
             </>
-          )}
-          <a
-            href={`/hr-costing/payroll/${period}/bank-transfer?format=alliance`}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
-            title="HR uploads this to Alliance Bank portal to disburse salaries"
-          >
-            Bank CSV (Alliance Bank)
-          </a>
+          ) : null}
         </div>
-      </div>
-
-      {/* Statutory export band */}
-      <div className="mt-4 flex items-center justify-end gap-2 mb-8">
-        <span className="font-serif italic text-muted text-xs uppercase tracking-wide mr-1">
-          Statutory files
-        </span>
-        <StatutoryLink period={period} file="kwsp" label="KWSP" />
-        <StatutoryLink period={period} file="socso" label="SOCSO" />
-        <StatutoryLink period={period} file="eis" label="EIS" />
-        <StatutoryLink period={period} file="pcb" label="LHDN CP39" />
+        <MoreActionsDropdown
+          actions={[
+            {
+              label: 'Bank CSV (Alliance Bank)',
+              href: `/hr-costing/payroll/${period}/bank-transfer?format=alliance`,
+              title: 'Bulk payment file for the Alliance Bank portal',
+            },
+            {
+              label: 'KWSP file',
+              href: `/hr-costing/payroll/${period}/statutory?file=kwsp`,
+            },
+            {
+              label: 'SOCSO file',
+              href: `/hr-costing/payroll/${period}/statutory?file=socso`,
+            },
+            {
+              label: 'EIS file',
+              href: `/hr-costing/payroll/${period}/statutory?file=eis`,
+            },
+            {
+              label: 'LHDN CP39 file',
+              href: `/hr-costing/payroll/${period}/statutory?file=pcb`,
+            },
+          ]}
+        />
       </div>
 
       {/* Summary band */}
@@ -178,13 +287,105 @@ export default async function PayrollGridPage({ params }: PageProps) {
   )
 }
 
-function StatutoryLink({ period, file, label }: { period: string; file: string; label: string }) {
-  return (
-    <a
-      href={`/hr-costing/payroll/${period}/statutory?file=${file}`}
-      className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-xs px-2.5 py-1.5 rounded-md transition-colors"
-    >
-      {label}
-    </a>
-  )
+function PhaseLabel({
+  phase,
+  rejectionReason,
+}: {
+  phase:
+    | 'drafting'
+    | 'awaiting-approval'
+    | 'approved-no-request'
+    | 'request-submitted'
+    | 'request-pv-generated'
+    | 'completed'
+    | 'rejected'
+    | 'legacy-paid'
+  rejectionReason?: string | null
+}) {
+  switch (phase) {
+    case 'drafting':
+      return <em>Drafts editable inline</em>
+    case 'awaiting-approval':
+      return <em>Submitted — awaiting Principal approval of costing</em>
+    case 'approved-no-request':
+      return <em>Costing approved — request payroll payment from Finance next</em>
+    case 'request-submitted':
+      return <em>Payment request sent to Finance</em>
+    case 'request-pv-generated':
+      return <em>PV generated by Finance — awaiting Principal approval</em>
+    case 'completed':
+      return <em>HR Pool funded · ready to pay staff</em>
+    case 'rejected':
+      return (
+        <em className="text-danger">
+          Rejected by Principal{rejectionReason ? ` · ${rejectionReason}` : ''} · edit and re-submit
+        </em>
+      )
+    case 'legacy-paid':
+      return <em>Completed under the old flow</em>
+  }
+}
+
+function PhaseCta({
+  phase,
+  period,
+  runId,
+  totalGross,
+  totalAmount,
+  requestState,
+}: {
+  phase:
+    | 'drafting'
+    | 'awaiting-approval'
+    | 'approved-no-request'
+    | 'request-submitted'
+    | 'request-pv-generated'
+    | 'completed'
+    | 'rejected'
+    | 'legacy-paid'
+  period: string
+  runId?: string
+  totalGross: number
+  totalAmount: number
+  requestState: RequestState
+}) {
+  if (phase === 'drafting' || phase === 'rejected') {
+    return <SubmitToPrincipalButton period={period} totalAmount={totalGross} />
+  }
+  if (phase === 'awaiting-approval') {
+    return (
+      <div className="bg-surface border border-hairline rounded-md px-4 py-2 text-right">
+        <em className="font-serif italic text-accent text-sm">Awaiting Principal</em>
+        <div className="font-mono text-xs text-muted mt-0.5">
+          RM {totalAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
+        </div>
+      </div>
+    )
+  }
+  if (
+    phase === 'approved-no-request' ||
+    phase === 'request-submitted' ||
+    phase === 'request-pv-generated' ||
+    phase === 'completed'
+  ) {
+    if (!runId) return null
+    return (
+      <RequestPayrollPaymentButton
+        runId={runId}
+        totalAmount={totalAmount}
+        state={requestState}
+      />
+    )
+  }
+  if (phase === 'legacy-paid') {
+    return (
+      <div className="bg-surface border border-ledger/40 rounded-md px-4 py-2 text-right">
+        <em className="font-serif italic text-ledger text-sm">Completed</em>
+        <div className="font-mono text-xs text-muted mt-0.5">
+          RM {totalAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
+        </div>
+      </div>
+    )
+  }
+  return null
 }

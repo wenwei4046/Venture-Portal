@@ -38,7 +38,7 @@ export default async function AlliancePoolPage() {
   return (
     <div>
       <div className="mb-10">
-        <h1 className="font-serif text-3xl text-ink">Alliance Bank Pool</h1>
+        <h1 className="font-serif text-3xl text-ink">HR Pool</h1>
         <p className="font-serif italic text-graphite text-base mt-2">
           Isolated account for salary disbursement. Finance tops up from OPEX pools; Principal approves payroll which debits here.
         </p>

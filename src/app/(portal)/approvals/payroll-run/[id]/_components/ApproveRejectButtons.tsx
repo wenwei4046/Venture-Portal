@@ -49,10 +49,13 @@ export default function ApproveRejectButtons({ runId, totalAmount }: Props) {
     return (
       <div className="flex flex-col items-end gap-2 bg-surface border border-accent-border rounded-md p-4 max-w-md">
         <p className="font-serif text-sm text-ink">
-          Approving will pay out <strong>RM {totalAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}</strong>.
+          Approve the April payroll costing for{' '}
+          <strong>RM {totalAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}</strong>?
         </p>
         <p className="font-serif italic text-graphite text-xs mb-1">
-          This creates one voucher per employee + director, marks them paid, and deducts from the operating fund.
+          This confirms the numbers are correct so Finance can invoice the subsidiaries.
+          <strong> No money moves yet</strong> — payment vouchers are generated in a later step when HR
+          requests payroll payment.
         </p>
         <div className="flex gap-2">
           <button
@@ -60,7 +63,7 @@ export default function ApproveRejectButtons({ runId, totalAmount }: Props) {
             disabled={isPending}
             className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md disabled:opacity-50"
           >
-            {isPending ? 'Approving...' : 'Yes, approve & pay'}
+            {isPending ? 'Approving...' : 'Approve costing'}
           </button>
           <button
             onClick={() => setMode('idle')}

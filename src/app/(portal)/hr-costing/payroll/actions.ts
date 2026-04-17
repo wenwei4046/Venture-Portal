@@ -102,6 +102,123 @@ export async function createPayrollPeriod(period: string): Promise<{ created: nu
 }
 
 /**
+ * Stage D — HR requests payroll payment.
+ * Creates a payroll_payment_requests row (status='submitted') linked to an
+ * approved payroll_run. Finance then generates a PV against this request
+ * (Stage E). The DB trigger validates that the run is in 'approved' state
+ * and that the amount matches total_amount exactly.
+ *
+ * Fails if:
+ *   - the run is not status='approved' (trigger raises)
+ *   - there's already an active request (UNIQUE partial index raises 23505)
+ */
+export async function requestPayrollPayment(runId: string): Promise<string> {
+  const user = await requireRole(['hr'])
+  const supabase = await createClient()
+
+  const { data: run, error: readErr } = await supabase
+    .from('payroll_runs')
+    .select('id, period_month, status, total_amount')
+    .eq('id', runId)
+    .maybeSingle()
+
+  if (readErr) throw new Error(`Failed to read payroll run: ${readErr.message}`)
+  if (!run) throw new Error('Payroll run not found')
+  if (run.status !== 'approved') {
+    throw new Error(
+      `Cannot request payment — run status is ${run.status}, must be approved`,
+    )
+  }
+
+  const amount = Number(run.total_amount ?? 0)
+  if (amount <= 0) {
+    throw new Error('Payroll run has no total_amount recorded; cannot request payment')
+  }
+
+  const { data: inserted, error: insertErr } = await supabase
+    .from('payroll_payment_requests')
+    .insert({
+      payroll_run_id: run.id,
+      requested_by: user.id,
+      amount,
+      target_pool: 'alliance_bank_pool',
+      status: 'submitted',
+    })
+    .select('id')
+    .single()
+
+  if (insertErr) {
+    if (insertErr.code === '23505') {
+      throw new Error(
+        'A payment request is already active for this payroll run. Cancel it first if you need to re-submit.',
+      )
+    }
+    throw new Error(`Failed to create payment request: ${insertErr.message}`)
+  }
+
+  revalidatePath(`/hr-costing/payroll/${run.period_month}`)
+  revalidatePath('/hr-costing/payroll')
+  revalidatePath('/dashboard')
+  revalidatePath('/payments')
+  return inserted.id
+}
+
+/**
+ * Stage D cancel — HR withdraws a still-submitted payment request before
+ * Finance has generated a PV. RLS enforces ownership + submitted status.
+ */
+export async function cancelPayrollPaymentRequest(
+  requestId: string,
+  reason: string,
+): Promise<void> {
+  const user = await requireRole(['hr'])
+  const supabase = await createClient()
+
+  const trimmed = reason.trim()
+  if (trimmed.length === 0) throw new Error('Cancellation reason is required')
+
+  const { data: req, error: readErr } = await supabase
+    .from('payroll_payment_requests')
+    .select('id, payroll_run_id, status, requested_by, payroll_runs(period_month)')
+    .eq('id', requestId)
+    .maybeSingle()
+
+  if (readErr) throw new Error(`Failed to read request: ${readErr.message}`)
+  if (!req) throw new Error('Payment request not found')
+  if (req.requested_by !== user.id) {
+    throw new Error('You can only cancel your own request')
+  }
+  if (req.status !== 'submitted') {
+    throw new Error(
+      `Cannot cancel — request status is ${req.status}. ` +
+        (req.status === 'pv_generated'
+          ? 'Finance has already generated a PV; ask Finance to void it.'
+          : ''),
+    )
+  }
+
+  const { error: updateErr } = await supabase
+    .from('payroll_payment_requests')
+    .update({
+      status: 'cancelled',
+      cancelled_at: new Date().toISOString(),
+      cancelled_by: user.id,
+      cancellation_reason: trimmed,
+    })
+    .eq('id', requestId)
+    .eq('status', 'submitted')
+
+  if (updateErr) throw new Error(`Failed to cancel: ${updateErr.message}`)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const period = (req.payroll_runs as any)?.period_month
+  if (period) revalidatePath(`/hr-costing/payroll/${period}`)
+  revalidatePath('/hr-costing/payroll')
+  revalidatePath('/dashboard')
+  revalidatePath('/payments')
+}
+
+/**
  * Copy values from last month's rows into this period's rows.
  * Only affects existing draft rows for p_period — does not create new rows.
  */

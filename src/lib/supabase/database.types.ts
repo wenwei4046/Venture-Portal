@@ -2735,6 +2735,96 @@ export type Database = {
           },
         ]
       }
+      payroll_payment_requests: {
+        Row: {
+          amount: number
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          payroll_run_id: string
+          pv_id: string | null
+          requested_at: string
+          requested_by: string
+          source_bank_id: string | null
+          status: Database["public"]["Enums"]["payroll_payment_request_status"]
+          target_pool: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          payroll_run_id: string
+          pv_id?: string | null
+          requested_at?: string
+          requested_by: string
+          source_bank_id?: string | null
+          status?: Database["public"]["Enums"]["payroll_payment_request_status"]
+          target_pool?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          payroll_run_id?: string
+          pv_id?: string | null
+          requested_at?: string
+          requested_by?: string
+          source_bank_id?: string | null
+          status?: Database["public"]["Enums"]["payroll_payment_request_status"]
+          target_pool?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_payment_requests_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_payment_requests_payroll_run_id_fkey"
+            columns: ["payroll_run_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_payment_requests_pv_id_fkey"
+            columns: ["pv_id"]
+            isOneToOne: false
+            referencedRelation: "payment_vouchers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_payment_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_payment_requests_source_bank_id_fkey"
+            columns: ["source_bank_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payroll_runs: {
         Row: {
           approval_id: string | null
@@ -3795,6 +3885,11 @@ export type Database = {
         | "receive_payment"
         | "payroll_bank_transfer"
       payout_status: "draft" | "confirmed" | "paid"
+      payroll_payment_request_status:
+        | "submitted"
+        | "pv_generated"
+        | "completed"
+        | "cancelled"
       payroll_run_status:
         | "draft"
         | "submitted"
@@ -4051,6 +4146,12 @@ export const Constants = {
         "payroll_bank_transfer",
       ],
       payout_status: ["draft", "confirmed", "paid"],
+      payroll_payment_request_status: [
+        "submitted",
+        "pv_generated",
+        "completed",
+        "cancelled",
+      ],
       payroll_run_status: [
         "draft",
         "submitted",

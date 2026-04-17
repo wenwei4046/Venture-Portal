@@ -10,7 +10,6 @@ import {
   canAccessBilling,
   canAccessDirectorSalary,
   canAccessDirectorPool,
-  canAccessHRCosting,
   canAccessClaims,
   canAccessReports,
   canAccessSettings,
@@ -35,8 +34,16 @@ function isGroup(entry: NavEntry): entry is NavGroup {
   return 'children' in entry
 }
 
+const isHR = (role: UserRole) => role === 'hr'
+const isPrincipalOrFinance = (role: UserRole) =>
+  role === 'principal' || role === 'finance'
+
 const navEntries: NavEntry[] = [
   { href: '/dashboard', label: 'Overview', visible: () => true },
+  // HR top-level shortcuts — every page HR touches monthly is one click away.
+  { href: '/hr-costing/payroll', label: 'Payroll', visible: isHR },
+  { href: '/hr-costing/staff', label: 'Staff', visible: isHR },
+  { href: '/director-salary', label: 'Director Salary', visible: isHR },
   { href: '/payments', label: 'Payments', visible: canAccessTreasury },
   {
     label: 'Loan',
@@ -54,13 +61,13 @@ const navEntries: NavEntry[] = [
   // Legacy /billing URL still redirects for external bookmarks.
   {
     label: 'Director',
-    visible: canAccessDirectorSalary,
+    visible: isPrincipalOrFinance,
     children: [
       { href: '/director-salary', label: 'Director Salary', visible: canAccessDirectorSalary },
       { href: '/director-pool', label: 'Director Pool', visible: canAccessDirectorPool },
     ],
   },
-  { href: '/hr-costing', label: 'HR Costing', visible: canAccessHRCosting },
+  { href: '/hr-costing', label: 'HR Costing', visible: isPrincipalOrFinance },
   { href: '/claims', label: 'Claims', visible: canAccessClaims },
   { href: '/reconciliation', label: 'Reconciliation', visible: canAccessTreasury },
   { href: '/reports', label: 'Reports', visible: canAccessReports },
