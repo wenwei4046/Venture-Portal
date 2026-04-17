@@ -93,9 +93,15 @@ export default async function HRCostingPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/hr-costing/staff"
-            className="inline-block bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            className="inline-block bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
           >
             Manage Staff
+          </Link>
+          <Link
+            href="/hr-costing/payroll"
+            className="inline-block bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+          >
+            Monthly Payroll
           </Link>
           {canSubmit && !currentSubmission ? (
             <SubmitHRCostButton defaultPeriod={currentPeriod} />
