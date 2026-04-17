@@ -35,6 +35,10 @@ export async function updateStaff(id: string, formData: FormData) {
   await requireRole(['hr', 'principal'])
   const supabase = await createClient()
 
+  const hireDate = (formData.get('hire_date') as string) || null
+  const resignDate = (formData.get('resignation_date') as string) || null
+  const employeeCode = ((formData.get('employee_code') as string) || '').trim() || null
+
   const { error } = await supabase
     .from('hr_staff_costs')
     .update({
@@ -42,12 +46,25 @@ export async function updateStaff(id: string, formData: FormData) {
       basic_salary: parseFloat(formData.get('basic_salary') as string) || 0,
       allowances: parseFloat(formData.get('allowances') as string) || 0,
       non_statutory_allowance: parseFloat(formData.get('non_statutory_allowance') as string) || 0,
+      employee_code: employeeCode,
+      hire_date: hireDate,
+      resignation_date: resignDate,
+      epf_category: formData.get('epf_category') as string,
+      socso_category: formData.get('socso_category') as string,
+      is_epf_exempt: formData.get('is_epf_exempt') === 'on',
+      pcb_category: formData.get('pcb_category') as string,
+      children_count: parseInt(formData.get('children_count') as string, 10) || 0,
+      employment_type: formData.get('employment_type') as string,
     })
     .eq('id', id)
 
-  if (error) throw new Error(`Failed to update: ${error.message}`)
+  if (error) {
+    if (error.code === '23505') throw new Error('Employee code already used by another active staff')
+    throw new Error(`Failed to update: ${error.message}`)
+  }
 
   revalidatePath('/hr-costing')
+  revalidatePath(`/hr-costing/staff/${id}/edit`)
 }
 
 export async function deleteStaff(id: string) {
