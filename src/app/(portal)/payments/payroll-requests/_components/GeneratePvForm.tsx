@@ -94,8 +94,9 @@ export default function GeneratePvForm({ requestId, amount, banks, pools }: Prop
         </label>
         <button
           onClick={handleGenerate}
-          disabled={isPending || !bankId || bankShort || poolShort}
+          disabled={isPending || !bankId || bankShort}
           className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-3 py-1.5 rounded-md disabled:opacity-50"
+          title={poolShort ? 'Pool is short — you can still generate, but add more source pools on the PV detail before Principal approval' : undefined}
         >
           {isPending ? 'Generating…' : 'Generate PV →'}
         </button>
