@@ -120,7 +120,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
                 href={`/hr-costing/payroll/${period}/import`}
                 className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
               >
-                Import CSV
+                Import InfoTech
               </Link>
               <CopyFromLastMonthButton period={period} />
               <SubmitToPrincipalButton period={period} totalAmount={totals.gross} />

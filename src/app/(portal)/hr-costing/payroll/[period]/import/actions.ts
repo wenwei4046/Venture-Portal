@@ -3,25 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-
-export type SystemField =
-  | 'skip'
-  | 'employee_code' // matching only, not written
-  | 'employee_name_match' // matching only, not written
-  | 'basic_salary'
-  | 'statutory_allowance'
-  | 'non_statutory_allowance'
-  | 'ot_hours'
-  | 'ot_amount'
-  | 'commission_amount'
-  | 'unpaid_leave_days'
-
-export type ColumnMap = Record<string, SystemField>
-
-/**
- * A row from the parsed CSV, keyed by the CSV header name.
- */
-export type ParsedRow = Record<string, string>
+import type { InfotechRow } from '@/lib/import/infotech-payroll'
 
 export interface PreviewResult {
   toUpdate: Array<{
@@ -31,71 +13,73 @@ export interface PreviewResult {
     matchedBy: 'employee_code' | 'employee_name_fuzzy'
     changes: Array<{ field: string; from: number; to: number }>
   }>
-  skipped: Array<{ rowIndex: number; reason: string; values: Record<string, string> }>
-  writableFields: SystemField[]
+  skipped: Array<{ rowIndex: number; reason: string; code: string; name: string }>
+  /** Count of InfoTech rows that had no actual data to import (all numbers zero). */
+  noChangeCount: number
 }
-
-const WRITABLE_FIELDS: SystemField[] = [
-  'basic_salary',
-  'statutory_allowance',
-  'non_statutory_allowance',
-  'ot_hours',
-  'ot_amount',
-  'commission_amount',
-  'unpaid_leave_days',
-]
 
 function normalise(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '')
 }
 
 /**
- * Dry-run the import. Matches each CSV row to a staff record, computes the
- * diff against the existing hr_monthly_payroll row for the period, and reports
- * updates vs skipped rows. Does NOT write.
+ * Dry-run the InfoTech import: match each row to a staff record, compute the
+ * diff against the period's hr_monthly_payroll row, report updates + skips.
+ *
+ * Only the three input fields InfoTech provides are touched:
+ *   basic_salary            ← Tot. Sal
+ *   ot_amount               ← OT Amt
+ *   non_statutory_allowance ← Allowance Add
+ *
+ * DB trigger then recomputes pro-rata + statutory + gross + net.
  */
-export async function previewImport(
-  mapping: ColumnMap,
-  rows: ParsedRow[],
+export async function previewInfotechImport(
+  rows: InfotechRow[],
   period: string,
 ): Promise<PreviewResult> {
   await requireRole(['hr', 'principal'])
   const supabase = await createClient()
 
   const [{ data: staffList }, { data: payroll }] = await Promise.all([
-    supabase.from('hr_staff_costs').select('id, employee_name, employee_code').eq('status', 'active'),
-    supabase.from('hr_monthly_payroll')
-      .select('id, staff_id, basic_salary, statutory_allowance, non_statutory_allowance, ot_hours, ot_amount, commission_amount, unpaid_leave_days')
+    supabase
+      .from('hr_staff_costs')
+      .select('id, employee_name, employee_code')
+      .eq('status', 'active'),
+    supabase
+      .from('hr_monthly_payroll')
+      .select('id, staff_id, basic_salary, ot_amount, non_statutory_allowance')
       .eq('period_month', period),
   ])
 
   const staff = staffList ?? []
   const payrollByStaff = new Map((payroll ?? []).map(p => [p.staff_id, p]))
   const staffByCode = new Map(
-    staff.filter(s => s.employee_code).map(s => [s.employee_code as string, s]),
+    staff
+      .filter(s => s.employee_code)
+      .map(s => [s.employee_code as string, s]),
   )
   const staffByNormName = new Map(staff.map(s => [normalise(s.employee_name), s]))
 
-  const codeCol = Object.entries(mapping).find(([, f]) => f === 'employee_code')?.[0]
-  const nameCol = Object.entries(mapping).find(([, f]) => f === 'employee_name_match')?.[0]
-
   const toUpdate: PreviewResult['toUpdate'] = []
   const skipped: PreviewResult['skipped'] = []
+  let noChangeCount = 0
 
   rows.forEach((row, idx) => {
+    const code = row.employeeCode
+    const name = row.employeeName
+
     let matched: { id: string; employee_name: string; employee_code: string | null } | undefined
     let matchedBy: 'employee_code' | 'employee_name_fuzzy' | null = null
 
-    if (codeCol && row[codeCol]) {
-      const code = row[codeCol].trim()
+    if (code) {
       const hit = staffByCode.get(code)
       if (hit) {
         matched = hit
         matchedBy = 'employee_code'
       }
     }
-    if (!matched && nameCol && row[nameCol]) {
-      const hit = staffByNormName.get(normalise(row[nameCol]))
+    if (!matched && name) {
+      const hit = staffByNormName.get(normalise(name))
       if (hit) {
         matched = hit
         matchedBy = 'employee_name_fuzzy'
@@ -103,30 +87,34 @@ export async function previewImport(
     }
 
     if (!matched || !matchedBy) {
-      skipped.push({ rowIndex: idx, reason: 'No matching staff', values: row })
+      skipped.push({ rowIndex: idx, reason: 'No matching staff', code, name })
       return
     }
 
     const existing = payrollByStaff.get(matched.id)
     if (!existing) {
-      skipped.push({ rowIndex: idx, reason: 'No payroll row for this staff in the period', values: row })
+      skipped.push({
+        rowIndex: idx,
+        reason: 'No payroll row for this staff in the period',
+        code,
+        name,
+      })
       return
     }
 
     const changes: Array<{ field: string; from: number; to: number }> = []
-    for (const [csvCol, systemField] of Object.entries(mapping)) {
-      if (!WRITABLE_FIELDS.includes(systemField)) continue
-      const raw = row[csvCol] ?? ''
-      const parsed = parseFloat(raw)
-      if (!Number.isFinite(parsed)) continue
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const current = Number((existing as any)[systemField] ?? 0)
-      if (Math.abs(parsed - current) < 0.005) continue
-      changes.push({ field: systemField, from: current, to: parsed })
+    const deltas: Array<{ field: string; incoming: number; current: number }> = [
+      { field: 'basic_salary', incoming: row.basicSalary, current: Number(existing.basic_salary) },
+      { field: 'ot_amount', incoming: row.otAmount, current: Number(existing.ot_amount) },
+      { field: 'non_statutory_allowance', incoming: row.nonStatutoryAllowance, current: Number(existing.non_statutory_allowance) },
+    ]
+    for (const d of deltas) {
+      if (Math.abs(d.incoming - d.current) < 0.005) continue
+      changes.push({ field: d.field, from: d.current, to: d.incoming })
     }
 
     if (changes.length === 0) {
-      skipped.push({ rowIndex: idx, reason: 'No changes vs current row', values: row })
+      noChangeCount++
       return
     }
 
@@ -139,35 +127,31 @@ export async function previewImport(
     })
   })
 
-  return { toUpdate, skipped, writableFields: WRITABLE_FIELDS }
+  return { toUpdate, skipped, noChangeCount }
 }
 
 /**
- * Apply the previewed updates. Calls updatePayrollRow-equivalent directly —
- * RLS + status='draft' gating still applies.
+ * Apply the previewed updates. Re-runs previewInfotechImport to recompute
+ * the diff against the live DB (guards against stale client state), then
+ * writes each change via a plain UPDATE — RLS + hr_monthly_payroll status
+ * gating still applies.
  */
-export async function applyImport(
-  mapping: ColumnMap,
-  rows: ParsedRow[],
+export async function applyInfotechImport(
+  rows: InfotechRow[],
   period: string,
-): Promise<{ updated: number; skipped: number }> {
+): Promise<{ updated: number; skipped: number; noChange: number }> {
   await requireRole(['hr', 'principal'])
   const supabase = await createClient()
-  const preview = await previewImport(mapping, rows, period)
+  const preview = await previewInfotechImport(rows, period)
 
   let updated = 0
   for (const item of preview.toUpdate) {
     const fields: Partial<{
       basic_salary: number
-      statutory_allowance: number
-      non_statutory_allowance: number
-      ot_hours: number
       ot_amount: number
-      commission_amount: number
-      unpaid_leave_days: number
+      non_statutory_allowance: number
     }> = {}
     for (const c of item.changes) {
-      // Writable fields were already validated by previewImport
       ;(fields as Record<string, number>)[c.field] = c.to
     }
     const { error } = await supabase
@@ -180,5 +164,5 @@ export async function applyImport(
   }
 
   revalidatePath(`/hr-costing/payroll/${period}`)
-  return { updated, skipped: preview.skipped.length }
+  return { updated, skipped: preview.skipped.length, noChange: preview.noChangeCount }
 }
