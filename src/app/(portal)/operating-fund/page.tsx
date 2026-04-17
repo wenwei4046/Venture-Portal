@@ -2,20 +2,35 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 
+const POOL_LABELS: Record<string, string> = {
+  hr_opex: 'HR OPEX',
+  finance_opex: 'Finance OPEX',
+  director_opex: 'Director OPEX',
+}
+
+const POOL_ORDER = ['hr_opex', 'finance_opex', 'director_opex'] as const
+
 export default async function OperatingFundPage() {
   const user = await requireRole(['principal', 'finance'])
   const supabase = await createClient()
 
-  const { data: transactions } = await supabase
-    .from('hv_operating_fund')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(100)
-
-  // Calculate running balance
-  const { data: allTxns } = await supabase
-    .from('hv_operating_fund')
-    .select('transaction_type, amount')
+  const [
+    { data: transactions },
+    { data: allTxns },
+    { data: poolBalances },
+  ] = await Promise.all([
+    supabase
+      .from('hv_operating_fund')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100),
+    supabase
+      .from('hv_operating_fund')
+      .select('transaction_type, amount'),
+    supabase
+      .from('operating_pool_balance')
+      .select('pool_type, balance, txn_count, last_txn_at'),
+  ])
 
   const IN_TYPES = ['saving_in', 'surplus_in', 'profit_in', 'fund_in', 'loan_repayment_in']
   let balance = 0
@@ -27,6 +42,10 @@ export default async function OperatingFundPage() {
       balance -= amt
     }
   }
+
+  const poolBalanceMap = new Map(
+    (poolBalances ?? []).map(p => [p.pool_type, p])
+  )
 
   return (
     <div>
@@ -49,6 +68,43 @@ export default async function OperatingFundPage() {
           </div>
         </div>
       </div>
+
+      {/* Department Pools (Spec 3) */}
+      <section className="mb-12">
+        <div className="flex items-baseline justify-between mb-4">
+          <div>
+            <h2 className="font-serif text-2xl text-ink">Department Pools</h2>
+            <p className="font-serif italic text-graphite text-sm mt-1">
+              OPEX balance per department. Invoices settled flow in; payroll (Spec 4) flows out.
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {POOL_ORDER.map(poolType => {
+            const pool = poolBalanceMap.get(poolType)
+            const bal = pool ? Number(pool.balance) : 0
+            const count = pool?.txn_count ?? 0
+            return (
+              <div key={poolType} className="border border-hairline rounded-md p-5 bg-surface">
+                <div className="font-serif italic text-graphite text-xs uppercase tracking-wide mb-2">
+                  {POOL_LABELS[poolType]}
+                </div>
+                <div className={`font-mono tabular text-2xl ${bal >= 0 ? 'text-ink' : 'text-danger'}`}>
+                  {formatMoney(bal)}
+                </div>
+                <div className="font-sans text-xs text-muted mt-2">
+                  {count} {count === 1 ? 'transaction' : 'transactions'}
+                  {pool?.last_txn_at && (
+                    <span className="ml-2">
+                      · last {new Date(pool.last_txn_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short' })}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </section>
 
       {/* Transaction table */}
       {(!transactions || transactions.length === 0) ? (

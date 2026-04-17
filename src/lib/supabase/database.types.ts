@@ -1788,6 +1788,9 @@ export type Database = {
           id: string
           invoice_no: string | null
           period_month: string
+          routes_to_pool:
+            | Database["public"]["Enums"]["operating_pool_type"]
+            | null
           sst_amount: number | null
           sst_rate: number | null
           status: Database["public"]["Enums"]["invoice_status"]
@@ -1804,6 +1807,9 @@ export type Database = {
           id?: string
           invoice_no?: string | null
           period_month: string
+          routes_to_pool?:
+            | Database["public"]["Enums"]["operating_pool_type"]
+            | null
           sst_amount?: number | null
           sst_rate?: number | null
           status?: Database["public"]["Enums"]["invoice_status"]
@@ -1820,6 +1826,9 @@ export type Database = {
           id?: string
           invoice_no?: string | null
           period_month?: string
+          routes_to_pool?:
+            | Database["public"]["Enums"]["operating_pool_type"]
+            | null
           sst_amount?: number | null
           sst_rate?: number | null
           status?: Database["public"]["Enums"]["invoice_status"]
@@ -2183,6 +2192,53 @@ export type Database = {
           },
           {
             foreignKeyName: "monthly_statements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operating_pools: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          period_month: string
+          pool_type: Database["public"]["Enums"]["operating_pool_type"]
+          reference_id: string | null
+          reference_type: string | null
+          transaction_type: Database["public"]["Enums"]["operating_pool_txn_type"]
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by: string
+          description: string
+          id?: string
+          period_month: string
+          pool_type: Database["public"]["Enums"]["operating_pool_type"]
+          reference_id?: string | null
+          reference_type?: string | null
+          transaction_type: Database["public"]["Enums"]["operating_pool_txn_type"]
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string
+          description?: string
+          id?: string
+          period_month?: string
+          pool_type?: Database["public"]["Enums"]["operating_pool_type"]
+          reference_id?: string | null
+          reference_type?: string | null
+          transaction_type?: Database["public"]["Enums"]["operating_pool_txn_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operating_pools_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "users"
@@ -2619,6 +2675,98 @@ export type Database = {
             columns: ["payee_company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_runs: {
+        Row: {
+          approval_id: string | null
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          director_salary_total: number
+          finance_opex_total: number
+          hr_opex_total: number
+          id: string
+          marketing_opex_total: number
+          paid_at: string | null
+          period_month: string
+          rejected_at: string | null
+          rejection_reason: string | null
+          status: Database["public"]["Enums"]["payroll_run_status"]
+          submitted_at: string | null
+          submitted_by: string | null
+          total_amount: number | null
+          updated_at: string
+        }
+        Insert: {
+          approval_id?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          director_salary_total?: number
+          finance_opex_total?: number
+          hr_opex_total?: number
+          id?: string
+          marketing_opex_total?: number
+          paid_at?: string | null
+          period_month: string
+          rejected_at?: string | null
+          rejection_reason?: string | null
+          status?: Database["public"]["Enums"]["payroll_run_status"]
+          submitted_at?: string | null
+          submitted_by?: string | null
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Update: {
+          approval_id?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          director_salary_total?: number
+          finance_opex_total?: number
+          hr_opex_total?: number
+          id?: string
+          marketing_opex_total?: number
+          paid_at?: string | null
+          period_month?: string
+          rejected_at?: string | null
+          rejection_reason?: string | null
+          status?: Database["public"]["Enums"]["payroll_run_status"]
+          submitted_at?: string | null
+          submitted_by?: string | null
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_runs_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_runs_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_with_target"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_runs_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_runs_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -3249,6 +3397,15 @@ export type Database = {
           },
         ]
       }
+      operating_pool_balance: {
+        Row: {
+          balance: number | null
+          last_txn_at: string | null
+          pool_type: Database["public"]["Enums"]["operating_pool_type"] | null
+          txn_count: number | null
+        }
+        Relationships: []
+      }
       trial_balance: {
         Row: {
           account_code: string | null
@@ -3271,6 +3428,10 @@ export type Database = {
       }
     }
     Functions: {
+      approve_payroll_run: {
+        Args: { p_approver: string; p_run_id: string }
+        Returns: undefined
+      }
       build_hr_cost_submission_payload: {
         Args: { p_period: string }
         Returns: {
@@ -3460,7 +3621,15 @@ export type Database = {
         }[]
       }
       mark_matured_fund_sources: { Args: never; Returns: number }
+      reject_payroll_run: {
+        Args: { p_approver: string; p_reason: string; p_run_id: string }
+        Returns: undefined
+      }
       save_director_salary_results: { Args: { p_data: Json }; Returns: Json }
+      submit_payroll_to_principal: {
+        Args: { p_period: string; p_user_id: string }
+        Returns: string
+      }
     }
     Enums: {
       account_type: "asset" | "liability" | "equity" | "revenue" | "expense"
@@ -3478,6 +3647,7 @@ export type Database = {
         | "payment_voucher"
         | "new_fund_source"
         | "hr_costing"
+        | "payroll_run"
       approval_status: "pending" | "approved" | "rejected"
       approval_workflow_state:
         | "submitted"
@@ -3534,6 +3704,13 @@ export type Database = {
       invoice_pool_txn_type: "accumulate" | "release"
       invoice_status: "draft" | "issued" | "paid" | "paid_via_netting"
       loan_status: "pending_approval" | "active" | "fully_repaid" | "cancelled"
+      operating_pool_txn_type:
+        | "invoice_settled_in"
+        | "payroll_out"
+        | "transfer_out"
+        | "transfer_in"
+        | "adjustment"
+      operating_pool_type: "hr_opex" | "finance_opex" | "director_opex"
       overdue_stage: "grace" | "late_1" | "late_2" | "escalation"
       overdue_status: "pending" | "paid" | "escalated"
       payment_voucher_status:
@@ -3552,6 +3729,12 @@ export type Database = {
         | "other"
         | "receive_payment"
       payout_status: "draft" | "confirmed" | "paid"
+      payroll_run_status:
+        | "draft"
+        | "submitted"
+        | "approved"
+        | "paid"
+        | "rejected"
       pcb_category: "KA1" | "KA2" | "KA3"
       repayment_type: "principal" | "interest" | "penalty" | "netting"
       socso_category: "first" | "second"
@@ -3704,6 +3887,7 @@ export const Constants = {
         "payment_voucher",
         "new_fund_source",
         "hr_costing",
+        "payroll_run",
       ],
       approval_status: ["pending", "approved", "rejected"],
       approval_workflow_state: [
@@ -3767,6 +3951,14 @@ export const Constants = {
       invoice_pool_txn_type: ["accumulate", "release"],
       invoice_status: ["draft", "issued", "paid", "paid_via_netting"],
       loan_status: ["pending_approval", "active", "fully_repaid", "cancelled"],
+      operating_pool_txn_type: [
+        "invoice_settled_in",
+        "payroll_out",
+        "transfer_out",
+        "transfer_in",
+        "adjustment",
+      ],
+      operating_pool_type: ["hr_opex", "finance_opex", "director_opex"],
       overdue_stage: ["grace", "late_1", "late_2", "escalation"],
       overdue_status: ["pending", "paid", "escalated"],
       payment_voucher_status: [
@@ -3787,6 +3979,13 @@ export const Constants = {
         "receive_payment",
       ],
       payout_status: ["draft", "confirmed", "paid"],
+      payroll_run_status: [
+        "draft",
+        "submitted",
+        "approved",
+        "paid",
+        "rejected",
+      ],
       pcb_category: ["KA1", "KA2", "KA3"],
       repayment_type: ["principal", "interest", "penalty", "netting"],
       socso_category: ["first", "second"],
