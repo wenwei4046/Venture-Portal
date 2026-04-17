@@ -111,7 +111,17 @@ export default async function PayrollGridPage({ params }: PageProps) {
             {totals.staff} staff · <em>Drafts editable inline</em> · Statutory recomputes on save
           </p>
         </div>
-        {allDraft && <CopyFromLastMonthButton period={period} />}
+        {allDraft && (
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/hr-costing/payroll/${period}/import`}
+              className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
+            >
+              Import CSV
+            </Link>
+            <CopyFromLastMonthButton period={period} />
+          </div>
+        )}
       </div>
 
       {/* Summary band */}
