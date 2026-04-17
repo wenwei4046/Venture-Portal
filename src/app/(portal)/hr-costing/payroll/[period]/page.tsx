@@ -6,6 +6,7 @@ import { formatMoney } from '@/lib/utils'
 import PayrollGrid, { type PayrollRowData } from '../_components/PayrollGrid'
 import CopyFromLastMonthButton from '../_components/CopyFromLastMonthButton'
 import SubmitToPrincipalButton from '../_components/SubmitToPrincipalButton'
+import MoreActionsDropdown from '../_components/MoreActionsDropdown'
 
 interface PageProps {
   params: Promise<{ period: string }>
@@ -43,7 +44,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
     return (
       <div>
         <Link href="/hr-costing/payroll" className="text-sm text-muted hover:text-accent font-sans transition-colors">
-          ← Back to Monthly Payroll
+          ← Back to Payroll
         </Link>
         <h1 className="font-serif text-3xl text-ink mt-6 mb-2">{formatPeriodLabel(period)}</h1>
         <p className="font-serif italic text-graphite mb-8">No rows for this period yet.</p>
@@ -103,18 +104,26 @@ export default async function PayrollGridPage({ params }: PageProps) {
         href="/hr-costing/payroll"
         className="text-sm text-muted hover:text-accent font-sans transition-colors"
       >
-        ← Back to Monthly Payroll
+        ← Back to Payroll
       </Link>
 
-      <div className="flex items-baseline justify-between mt-6 mb-8">
+      {/* Row 1 — title + primary CTA (only when all rows still draft) */}
+      <div className="flex items-baseline justify-between mt-6 mb-6">
         <div>
           <h1 className="font-serif text-3xl text-ink">{formatPeriodLabel(period)}</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
             {totals.staff} staff · <em>Drafts editable inline</em> · Statutory recomputes on save
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {allDraft && (
+        {allDraft ? (
+          <SubmitToPrincipalButton period={period} totalAmount={totals.gross} />
+        ) : null}
+      </div>
+
+      {/* Row 2 — secondary actions: data-entry on the left, exports on the right */}
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-2">
+          {allDraft ? (
             <>
               <Link
                 href={`/hr-costing/payroll/${period}/import`}
@@ -123,28 +132,34 @@ export default async function PayrollGridPage({ params }: PageProps) {
                 Import InfoTech
               </Link>
               <CopyFromLastMonthButton period={period} />
-              <SubmitToPrincipalButton period={period} totalAmount={totals.gross} />
             </>
-          )}
-          <a
-            href={`/hr-costing/payroll/${period}/bank-transfer?format=alliance`}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
-            title="HR uploads this to Alliance Bank portal to disburse salaries"
-          >
-            Bank CSV (Alliance Bank)
-          </a>
+          ) : null}
         </div>
-      </div>
-
-      {/* Statutory export band */}
-      <div className="mt-4 flex items-center justify-end gap-2 mb-8">
-        <span className="font-serif italic text-muted text-xs uppercase tracking-wide mr-1">
-          Statutory files
-        </span>
-        <StatutoryLink period={period} file="kwsp" label="KWSP" />
-        <StatutoryLink period={period} file="socso" label="SOCSO" />
-        <StatutoryLink period={period} file="eis" label="EIS" />
-        <StatutoryLink period={period} file="pcb" label="LHDN CP39" />
+        <MoreActionsDropdown
+          actions={[
+            {
+              label: 'Bank CSV (Alliance Bank)',
+              href: `/hr-costing/payroll/${period}/bank-transfer?format=alliance`,
+              title: 'Bulk payment file for the Alliance Bank portal',
+            },
+            {
+              label: 'KWSP file',
+              href: `/hr-costing/payroll/${period}/statutory?file=kwsp`,
+            },
+            {
+              label: 'SOCSO file',
+              href: `/hr-costing/payroll/${period}/statutory?file=socso`,
+            },
+            {
+              label: 'EIS file',
+              href: `/hr-costing/payroll/${period}/statutory?file=eis`,
+            },
+            {
+              label: 'LHDN CP39 file',
+              href: `/hr-costing/payroll/${period}/statutory?file=pcb`,
+            },
+          ]}
+        />
       </div>
 
       {/* Summary band */}
@@ -178,13 +193,3 @@ export default async function PayrollGridPage({ params }: PageProps) {
   )
 }
 
-function StatutoryLink({ period, file, label }: { period: string; file: string; label: string }) {
-  return (
-    <a
-      href={`/hr-costing/payroll/${period}/statutory?file=${file}`}
-      className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-xs px-2.5 py-1.5 rounded-md transition-colors"
-    >
-      {label}
-    </a>
-  )
-}

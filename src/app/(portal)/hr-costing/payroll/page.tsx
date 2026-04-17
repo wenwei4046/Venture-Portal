@@ -63,16 +63,9 @@ export default async function PayrollListPage() {
 
   return (
     <div>
-      <Link
-        href="/hr-costing"
-        className="text-sm text-muted hover:text-accent font-sans transition-colors"
-      >
-        ← Back to HR Costing
-      </Link>
-
-      <div className="flex items-baseline justify-between mt-6 mb-10">
+      <div className="flex items-baseline justify-between mt-2 mb-10">
         <div>
-          <h1 className="font-serif text-3xl text-ink">Monthly Payroll</h1>
+          <h1 className="font-serif text-3xl text-ink">Payroll</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
             One snapshot per employee per month. Pro-rata, statutory, PCB auto-computed.
             <em> HR edits drafts; Principal approves.</em>

@@ -34,7 +34,7 @@ export default function SubmitToPrincipalButton({ period, totalAmount }: Props) 
       <div className="flex flex-col items-end gap-2">
         <div className="flex items-center gap-3 bg-surface border border-accent-border rounded-md px-4 py-2">
           <span className="font-serif italic text-graphite text-sm">
-            Submit RM {totalAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} to Principal?
+            Request for Payroll Payment of RM {totalAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}?
           </span>
           <button
             onClick={handleConfirm}
@@ -62,7 +62,7 @@ export default function SubmitToPrincipalButton({ period, totalAmount }: Props) 
         onClick={() => setConfirming(true)}
         className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
       >
-        Submit to Principal →
+        Request for Payroll Payment
       </button>
       {error && <span className="text-sm font-serif italic text-danger">{error}</span>}
     </div>
