@@ -127,10 +127,11 @@ export default async function PayrollGridPage({ params }: PageProps) {
             </>
           )}
           <a
-            href={`/hr-costing/payroll/${period}/bank-transfer?format=hl_connect`}
+            href={`/hr-costing/payroll/${period}/bank-transfer?format=alliance`}
             className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
+            title="HR uploads this to Alliance Bank portal to disburse salaries"
           >
-            Bank CSV (HL Connect)
+            Bank CSV (Alliance Bank)
           </a>
         </div>
       </div>

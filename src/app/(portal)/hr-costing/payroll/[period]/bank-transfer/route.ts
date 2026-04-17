@@ -1,16 +1,21 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { generateHlConnectCsv, type PayslipPayee } from '@/lib/bank-transfer/hl-connect'
+import { generateAllianceBankCsv, type PayslipPayee } from '@/lib/bank-transfer/alliance-bank'
 
 /**
- * GET /hr-costing/payroll/[period]/bank-transfer?format=hl_connect
+ * GET /hr-costing/payroll/[period]/bank-transfer?format=alliance
  *
- * Streams a Hong Leong Connect CSV for every staff row in the period.
+ * Streams an Alliance Bank bulk-payment CSV for every staff row in the
+ * period. Two-step salary flow (corrected 2026-04-17):
+ *   1. Finance moves the lump sum HL Bank → Alliance Bank (Spec 4
+ *      payroll_bank_transfer voucher).
+ *   2. HR downloads THIS CSV, uploads it to the Alliance Bank portal,
+ *      and triggers the bulk payout.
  *
  * Allowed by the Read-only file downloads exception in CLAUDE.md
- * (Spec 5a). Still requires principal / finance / hr — Finance is the
- * one who actually uploads the file to the bank portal.
+ * (Spec 5a). Requires principal / finance / hr — HR is the primary
+ * operator but Finance and Principal can regenerate for oversight.
  */
 export async function GET(
   request: Request,
@@ -24,10 +29,13 @@ export async function GET(
   }
 
   const url = new URL(request.url)
-  const format = url.searchParams.get('format') ?? 'hl_connect'
-  if (format !== 'hl_connect') {
+  // Accept 'hl_connect' as a legacy alias so old bookmarks don't 404;
+  // both route to the Alliance Bank generator.
+  const rawFormat = url.searchParams.get('format') ?? 'alliance'
+  const format = rawFormat === 'hl_connect' ? 'alliance' : rawFormat
+  if (format !== 'alliance') {
     return NextResponse.json(
-      { error: `unsupported format: ${format}. Available: hl_connect` },
+      { error: `unsupported format: ${rawFormat}. Available: alliance` },
       { status: 400 },
     )
   }
@@ -62,7 +70,7 @@ export async function GET(
       bankName: staff?.bank_name ?? null,
       bankAccountNo: staff?.bank_account_no ?? null,
       amount: Number(r.net),
-      voucherNo: null, // Spec 5c MVP — voucher_no wiring comes once Spec 4 transfer lands
+      voucherNo: null, // voucher_no wiring can come once payroll_runs.id is threaded in
       periodLabel,
     }
   })
@@ -73,9 +81,9 @@ export async function GET(
     Date.UTC(periodDate.getUTCFullYear(), periodDate.getUTCMonth() + 1, 0),
   )
 
-  const result = generateHlConnectCsv(payees, paymentDate)
+  const result = generateAllianceBankCsv(payees, paymentDate)
 
-  const filename = `hl-connect-payroll-${period.slice(0, 7)}.csv`
+  const filename = `alliance-bank-payroll-${period.slice(0, 7)}.csv`
 
   const headers = new Headers({
     'Content-Type': 'text/csv; charset=utf-8',

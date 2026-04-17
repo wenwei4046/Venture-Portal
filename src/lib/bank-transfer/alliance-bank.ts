@@ -1,13 +1,19 @@
 /**
- * Hong Leong Connect bulk payment CSV generator.
+ * Alliance Bank bulk payment CSV generator.
  *
- * HV uses Hong Leong as the main bank; HR exports this file from the
- * payroll grid and uploads it to the HL Connect portal to execute
- * the month's salary transfers in one go.
+ * Two-step HV salary flow (corrected 2026-04-17 per user):
+ *   1. Finance transfers the month's payroll total from HL Bank → Alliance
+ *      Bank as one lump sum. That's the payroll_bank_transfer voucher
+ *      in Spec 4 — the cash moves via operating_pools -> alliance_bank_pool.
+ *   2. HR exports THIS CSV from the payroll grid and uploads it to the
+ *      Alliance Bank portal to disburse to each employee.
  *
- * Schema (approximation — the real HL Connect upload template varies
- * slightly over time; regenerate against the portal's latest sample
- * when a new format is published):
+ * So this file is the Step-2 CSV — Alliance Bank's bulk payment format,
+ * uploaded by HR, paying out of the Alliance account.
+ *
+ * Schema below is a pragmatic approximation. Verify against an actual
+ * Alliance Bank bulk-payment sample file before going live; column names
+ * and order typically differ slightly from this template.
  *
  *   PAYMENT_DATE,CURRENCY,AMOUNT,BENEFICIARY_BANK,BENEFICIARY_ACCOUNT,
  *   BENEFICIARY_NAME,PAYER_REFERENCE,BENEFICIARY_REFERENCE
@@ -18,7 +24,7 @@
  * - BENEFICIARY_BANK: free text
  * - BENEFICIARY_ACCOUNT: digits only
  * - BENEFICIARY_NAME: 1-40 chars, ASCII-safe
- * - PAYER_REFERENCE: our reference shown on HV's statement (voucher_no)
+ * - PAYER_REFERENCE: our reference shown on Alliance statement (voucher_no or emp code)
  * - BENEFICIARY_REFERENCE: shown on employee's statement (e.g. "Salary Apr 2026")
  *
  * Any row missing bank_account_no is skipped with a `missingBank` entry
@@ -36,7 +42,7 @@ export interface PayslipPayee {
   periodLabel: string
 }
 
-export interface HlConnectResult {
+export interface AllianceBankResult {
   csv: string
   rowCount: number
   missingBank: Array<{ employeeName: string; reason: 'missing_account' | 'missing_bank' }>
@@ -69,7 +75,7 @@ function csvEscape(value: string): string {
 }
 
 function sanitiseName(name: string): string {
-  // HL Connect rejects non-ASCII characters in the beneficiary name field.
+  // Alliance Bank's bulk upload rejects non-ASCII in the beneficiary name field.
   // Strip diacritics, drop other non-ASCII, collapse whitespace, truncate to 40.
   return name
     .normalize('NFD')
@@ -81,12 +87,12 @@ function sanitiseName(name: string): string {
     .slice(0, 40)
 }
 
-export function generateHlConnectCsv(
+export function generateAllianceBankCsv(
   payees: PayslipPayee[],
   paymentDate: Date,
-): HlConnectResult {
+): AllianceBankResult {
   const rows: string[] = [HEADERS.join(',')]
-  const missingBank: HlConnectResult['missingBank'] = []
+  const missingBank: AllianceBankResult['missingBank'] = []
   let totalAmount = 0
   let rowCount = 0
 
