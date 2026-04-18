@@ -42,6 +42,7 @@ const navEntries: NavEntry[] = [
   { href: '/dashboard', label: 'Overview', visible: () => true },
   // HR top-level shortcuts — every page HR touches monthly is one click away.
   { href: '/hr-costing/payroll', label: 'Payroll', visible: isHR },
+  { href: '/hr-costing/payment', label: 'Payment', visible: isHR },
   { href: '/hr-costing/staff', label: 'Staff', visible: isHR },
   { href: '/director-salary', label: 'Director Salary', visible: isHR },
   { href: '/payments', label: 'Payments', visible: canAccessTreasury },

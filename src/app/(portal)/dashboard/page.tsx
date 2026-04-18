@@ -128,6 +128,7 @@ export default async function DashboardPage() {
         { data: payrollRun },
         { data: pendingClaims },
         { data: dirPayouts },
+        { data: poolRows },
       ] = await Promise.all([
         supabase.rpc('get_hr_cost_summary'),
         supabase
@@ -149,7 +150,10 @@ export default async function DashboardPage() {
           .from('director_payouts')
           .select('id, status')
           .eq('period_month', period),
+        supabase.from('alliance_bank_pool_balance').select('balance'),
       ])
+
+      const poolBalance = Number(poolRows?.[0]?.balance ?? 0)
 
       // Latest active payment request for the current run, if any.
       // Drives steps 6 and 7 on the Monthly Cycle board.
@@ -222,10 +226,22 @@ export default async function DashboardPage() {
 
       return (
         <div>
-          <div className="mb-10">
-            <div className="font-serif italic text-accent text-base mb-1">HR · {dayjs().format('MMMM YYYY')}</div>
-            <h1 className="font-serif text-3xl text-ink mb-1">Monthly Payroll Cycle</h1>
-            <p className="font-mono text-xs text-muted">{dayjs().format('dddd, D MMMM YYYY')} · {doneCount} of 9 steps complete</p>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-10">
+            <div>
+              <div className="font-serif italic text-accent text-base mb-1">HR · {dayjs().format('MMMM YYYY')}</div>
+              <h1 className="font-serif text-3xl text-ink mb-1">Monthly Payroll Cycle</h1>
+              <p className="font-mono text-xs text-muted">{dayjs().format('dddd, D MMMM YYYY')} · {doneCount} of 9 steps complete</p>
+            </div>
+            <Link
+              href="/hr-costing/payment"
+              className="shrink-0 border border-hairline bg-surface hover:bg-surface-2 rounded-md px-5 py-3 transition-colors block text-right"
+            >
+              <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">HR Pool balance</div>
+              <div className={`font-mono tabular text-xl mt-0.5 ${poolBalance >= 0 ? 'text-ink' : 'text-danger'}`}>
+                {formatMoney(poolBalance)}
+              </div>
+              <div className="font-sans text-[11px] text-muted mt-0.5">Open Payment →</div>
+            </Link>
           </div>
 
           {/* Monthly Cycle — the whole HR job in one linear board */}

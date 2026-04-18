@@ -1,0 +1,267 @@
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth'
+import { formatMoney } from '@/lib/utils'
+import RequestPayrollPaymentButton, {
+  type RequestState,
+} from '../payroll/_components/RequestPayrollPaymentButton'
+
+function currentPeriod(): string {
+  const now = new Date()
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`
+}
+
+export default async function HRPaymentPage() {
+  await requireRole(['principal', 'hr'])
+  const supabase = await createClient()
+
+  const period = currentPeriod()
+
+  const [{ data: run }, { data: poolRows }, { data: payrollRows }] = await Promise.all([
+    supabase
+      .from('payroll_runs')
+      .select('id, status, total_amount, rejection_reason')
+      .eq('period_month', period)
+      .maybeSingle(),
+    supabase.from('alliance_bank_pool_balance').select('balance'),
+    supabase.from('hr_monthly_payroll').select('net, gross, status').eq('period_month', period),
+  ])
+
+  const poolBal = Number(poolRows?.[0]?.balance ?? 0)
+  const totalNet = (payrollRows ?? []).reduce((s, r) => s + Number(r.net), 0)
+  const totalGross = (payrollRows ?? []).reduce((s, r) => s + Number(r.gross), 0)
+  const totalAmount = Number(run?.total_amount ?? totalGross)
+  const staffCount = (payrollRows ?? []).length
+  const hasPayroll = staffCount > 0
+
+  const { data: requestRow } = run
+    ? await supabase
+        .from('payroll_payment_requests')
+        .select('id, status, pv_id, requested_at')
+        .eq('payroll_run_id', run.id)
+        .in('status', ['submitted', 'pv_generated', 'completed'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null }
+
+  type Phase =
+    | 'no-payroll'
+    | 'drafts-pending'
+    | 'awaiting-approval'
+    | 'rejected'
+    | 'approved-ready'
+    | 'request-submitted'
+    | 'pv-generated'
+    | 'funded'
+
+  let phase: Phase = 'no-payroll'
+  if (!hasPayroll) phase = 'no-payroll'
+  else if (!run) phase = 'drafts-pending'
+  else if (run.status === 'submitted') phase = 'awaiting-approval'
+  else if (run.status === 'rejected') phase = 'rejected'
+  else if (run.status === 'approved') {
+    if (!requestRow) phase = 'approved-ready'
+    else if (requestRow.status === 'submitted') phase = 'request-submitted'
+    else if (requestRow.status === 'pv_generated') phase = 'pv-generated'
+    else if (requestRow.status === 'completed') phase = 'funded'
+  } else if (run.status === 'paid') phase = 'funded'
+
+  let requestState: RequestState = { kind: 'none' }
+  if (requestRow) {
+    if (requestRow.status === 'submitted') {
+      requestState = {
+        kind: 'submitted',
+        requestId: requestRow.id,
+        requestedAt: requestRow.requested_at,
+      }
+    } else if (requestRow.status === 'pv_generated') {
+      requestState = {
+        kind: 'pv_generated',
+        pvId: requestRow.pv_id ?? '',
+        requestId: requestRow.id,
+      }
+    } else if (requestRow.status === 'completed') {
+      requestState = {
+        kind: 'completed',
+        pvId: requestRow.pv_id ?? '',
+        completedAt: null,
+      }
+    }
+  }
+
+  const periodLabel = new Date(period + 'T00:00:00Z').toLocaleString('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
+
+  return (
+    <div>
+      <div className="mt-2 mb-10">
+        <div className="font-serif italic text-accent text-base mb-1">HR · {periodLabel}</div>
+        <h1 className="font-serif text-3xl text-ink">Payment</h1>
+        <p className="font-serif italic text-graphite text-base mt-2">
+          Request payroll funding from Finance, then disburse to staff from the HR Pool.
+        </p>
+      </div>
+
+      {/* Hero — Total Amount + HR Pool balance */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12 pb-12 border-b border-hairline">
+        <div>
+          <div className="font-serif italic text-graphite text-xs uppercase tracking-wide mb-2">
+            Total amount this month
+          </div>
+          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
+            {formatMoney(totalAmount)}
+          </div>
+          <div className="font-mono text-xs text-muted mt-2">
+            {hasPayroll
+              ? `${staffCount} staff · ${formatMoney(totalNet)} net`
+              : 'No payroll imported yet'}
+          </div>
+        </div>
+        <div>
+          <div className="font-serif italic text-graphite text-xs uppercase tracking-wide mb-2">
+            HR Pool balance
+          </div>
+          <div
+            className={`font-serif text-[44px] md:text-hero leading-none ${
+              poolBal >= 0 ? 'text-ink' : 'text-danger'
+            }`}
+          >
+            {formatMoney(poolBal)}
+          </div>
+          <div className="font-mono text-xs text-muted mt-2">
+            Isolated salary disbursement account
+          </div>
+        </div>
+      </div>
+
+      {/* Phase-driven action */}
+      <div className="mb-12">
+        {phase === 'no-payroll' && (
+          <div className="py-12 text-center border border-hairline rounded-md bg-surface">
+            <p className="font-serif italic text-graphite text-lg mb-4">
+              No payroll imported for this month yet.
+            </p>
+            <Link
+              href="/hr-costing/payroll"
+              className="inline-block bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            >
+              Go to Payroll →
+            </Link>
+          </div>
+        )}
+
+        {phase === 'drafts-pending' && (
+          <div className="py-12 text-center border border-hairline rounded-md bg-surface">
+            <p className="font-serif italic text-graphite text-lg mb-2">
+              Payroll hasn&apos;t been submitted to Principal yet.
+            </p>
+            <p className="font-serif italic text-muted text-sm mb-6">
+              Finish editing drafts and click Submit for Approval first.
+            </p>
+            <Link
+              href="/hr-costing/payroll"
+              className="inline-block bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            >
+              Open Payroll grid →
+            </Link>
+          </div>
+        )}
+
+        {phase === 'awaiting-approval' && (
+          <div className="py-10 px-6 text-center border border-accent-border rounded-md bg-surface">
+            <em className="font-serif italic text-accent text-lg">
+              Submitted to Principal — awaiting approval of costing
+            </em>
+            <p className="font-serif italic text-muted text-sm mt-3">
+              You can request payment once Principal approves.
+            </p>
+          </div>
+        )}
+
+        {phase === 'rejected' && (
+          <div className="py-10 px-6 text-center border border-danger rounded-md bg-surface">
+            <em className="font-serif italic text-danger text-lg">
+              Costing rejected by Principal
+            </em>
+            {run?.rejection_reason && (
+              <p className="font-serif italic text-graphite text-sm mt-2">
+                Reason: {run.rejection_reason}
+              </p>
+            )}
+            <Link
+              href="/hr-costing/payroll"
+              className="inline-block mt-4 bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            >
+              Edit &amp; re-submit →
+            </Link>
+          </div>
+        )}
+
+        {(phase === 'approved-ready' ||
+          phase === 'request-submitted' ||
+          phase === 'pv-generated') &&
+          run && (
+            <div className="border border-hairline rounded-md bg-surface p-8">
+              <h2 className="font-serif text-xl text-ink mb-2">Request payment from Finance</h2>
+              <p className="font-serif italic text-graphite text-sm mb-6">
+                Finance generates a Payment Voucher. Principal approves it. The money moves
+                from the HV operating account into the HR Pool.
+              </p>
+              <RequestPayrollPaymentButton
+                runId={run.id}
+                totalAmount={totalAmount}
+                state={requestState}
+              />
+            </div>
+          )}
+
+        {phase === 'funded' && (
+          <div className="border border-ledger/40 bg-surface rounded-md p-8">
+            <div className="flex items-baseline justify-between gap-4 mb-4">
+              <div>
+                <em className="font-serif italic text-ledger text-lg">✓ HR Pool funded</em>
+                <p className="font-serif italic text-graphite text-sm mt-1">
+                  Ready to disburse to staff.
+                </p>
+              </div>
+              {requestRow?.pv_id && (
+                <Link
+                  href={`/payments/${requestRow.pv_id}`}
+                  className="text-xs font-sans text-muted hover:text-accent shrink-0"
+                >
+                  View funding voucher →
+                </Link>
+              )}
+            </div>
+
+            <div className="mt-6 pt-6 border-t border-hairline">
+              <h3 className="font-serif text-md text-ink mb-1">Pay staff</h3>
+              <p className="font-serif italic text-graphite text-sm mb-4">
+                Bulk transfer via bank file, or create a one-off voucher for
+                an off-cycle payment.
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <Link
+                  href={`/hr-costing/payroll/${period}/bank-transfer?format=alliance`}
+                  className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+                >
+                  Download Alliance Bank CSV
+                </Link>
+                <Link
+                  href="/payments/new"
+                  className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+                >
+                  Create Payment Voucher
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
