@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import { updatePayrollRow } from '../actions'
 import type { PayrollRowData } from './PayrollGrid'
 
@@ -67,27 +67,27 @@ export default function PayrollRow({ row, period, expanded, onToggleExpand }: Pr
       value={value}
       disabled={locked || isPending}
       onChange={e => setEdit({ ...edit, [name]: parseFloat(e.target.value) || 0 })}
-      className="w-20 text-right font-mono tabular text-sm bg-transparent border-b border-transparent focus:border-accent-border focus:outline-none px-1 py-1 disabled:text-muted disabled:cursor-not-allowed"
+      className="w-24 text-right font-mono tabular text-sm bg-transparent border-b border-transparent focus:border-accent-border focus:outline-none px-1 py-1 disabled:text-muted disabled:cursor-not-allowed"
     />
   )
 
   return (
     <>
       <tr className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors">
-        <td className="py-3 pr-3 font-serif text-md text-ink">{row.staff_name}</td>
-        <td className="py-3 pr-3 font-serif italic text-graphite text-sm">{row.dept_name}</td>
-        <td className="py-3 pr-3 text-right">{cell('basic_salary', edit.basic_salary)}</td>
-        <td className="py-3 pr-3 text-right">{cell('statutory_allowance', edit.statutory_allowance)}</td>
-        <td className="py-3 pr-3 text-right">{cell('non_statutory_allowance', edit.non_statutory_allowance)}</td>
-        <td className="py-3 pr-3 text-right">{cell('ot_amount', edit.ot_amount)}</td>
-        <td className="py-3 pr-3 text-right">{cell('commission_amount', edit.commission_amount)}</td>
-        <td className="py-3 pr-3 text-right">{cell('unpaid_leave_days', edit.unpaid_leave_days, '0.5')}</td>
-        <td className="py-3 pr-3 text-right font-mono tabular text-graphite">{formatMoney(row.epf_er)}</td>
-        <td className="py-3 pr-3 text-right font-mono tabular text-graphite">{formatMoney(row.socso_er)}</td>
-        <td className="py-3 pr-3 text-right font-mono tabular text-graphite">{formatMoney(row.eis_er)}</td>
-        <td className="py-3 pr-3 text-right font-mono tabular font-medium text-ink">{formatMoney(row.gross)}</td>
-        <td className="py-3 pr-3 text-right font-mono tabular font-semibold text-ink">{formatMoney(row.net)}</td>
-        <td className="py-3 pr-2 text-right">
+        <td className="py-5 pr-4 font-serif text-md text-ink">{row.staff_name}</td>
+        <td className="py-5 pr-4 font-serif italic text-graphite text-sm">{row.dept_name}</td>
+        <td className="py-5 pr-4 text-right">{cell('basic_salary', edit.basic_salary)}</td>
+        <td className="py-5 pr-4 text-right">{cell('statutory_allowance', edit.statutory_allowance)}</td>
+        <td className="py-5 pr-4 text-right">{cell('non_statutory_allowance', edit.non_statutory_allowance)}</td>
+        <td className="py-5 pr-4 text-right">{cell('ot_amount', edit.ot_amount)}</td>
+        <td className="py-5 pr-4 text-right">{cell('commission_amount', edit.commission_amount)}</td>
+        <td className="py-5 pr-4 text-right">{cell('unpaid_leave_days', edit.unpaid_leave_days, '0.5')}</td>
+        <td className="py-5 pr-4 text-right font-mono tabular text-graphite">{formatMoneyBare(row.epf_er)}</td>
+        <td className="py-5 pr-4 text-right font-mono tabular text-graphite">{formatMoneyBare(row.socso_er)}</td>
+        <td className="py-5 pr-4 text-right font-mono tabular text-graphite">{formatMoneyBare(row.eis_er)}</td>
+        <td className="py-5 pr-4 text-right font-mono tabular font-medium text-ink">{formatMoneyBare(row.gross)}</td>
+        <td className="py-5 pr-4 text-right font-mono tabular font-semibold text-ink">{formatMoneyBare(row.net)}</td>
+        <td className="py-5 pr-2 text-right">
           <div className="flex items-center gap-2 justify-end">
             {dirty && !locked && (
               <button

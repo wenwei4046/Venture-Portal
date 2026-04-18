@@ -40,24 +40,29 @@ export default function PayrollGrid({ rows, period }: Props) {
 
   return (
     <div className="mb-12">
+      <div className="flex items-baseline justify-between mb-3">
+        <p className="font-serif italic text-graphite text-xs">
+          All values in RM. Click the row arrow for pro-rata + EE breakdown.
+        </p>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-              <th className="text-left py-3 pr-3 font-medium">Name</th>
-              <th className="text-left py-3 pr-3 font-medium">Dept</th>
-              <th className="text-right py-3 pr-3 font-medium">Basic</th>
-              <th className="text-right py-3 pr-3 font-medium">Stat. Allow.</th>
-              <th className="text-right py-3 pr-3 font-medium">Non-Stat.</th>
-              <th className="text-right py-3 pr-3 font-medium">OT</th>
-              <th className="text-right py-3 pr-3 font-medium">Comm.</th>
-              <th className="text-right py-3 pr-3 font-medium">Unpaid</th>
-              <th className="text-right py-3 pr-3 font-medium">EPF ER</th>
-              <th className="text-right py-3 pr-3 font-medium">SOCSO ER</th>
-              <th className="text-right py-3 pr-3 font-medium">EIS ER</th>
-              <th className="text-right py-3 pr-3 font-medium">Gross</th>
-              <th className="text-right py-3 pr-3 font-medium">Net</th>
-              <th className="text-right py-3 pr-2 font-medium w-14"></th>
+              <th className="text-left py-4 pr-4 font-medium">Name</th>
+              <th className="text-left py-4 pr-4 font-medium">Dept</th>
+              <th className="text-right py-4 pr-4 font-medium">Basic</th>
+              <th className="text-right py-4 pr-4 font-medium">Stat.</th>
+              <th className="text-right py-4 pr-4 font-medium">Non-Stat.</th>
+              <th className="text-right py-4 pr-4 font-medium">OT</th>
+              <th className="text-right py-4 pr-4 font-medium">Comm.</th>
+              <th className="text-right py-4 pr-4 font-medium">Unpaid</th>
+              <th className="text-right py-4 pr-4 font-medium">EPF&nbsp;ER</th>
+              <th className="text-right py-4 pr-4 font-medium">SOCSO&nbsp;ER</th>
+              <th className="text-right py-4 pr-4 font-medium">EIS&nbsp;ER</th>
+              <th className="text-right py-4 pr-4 font-medium">Gross</th>
+              <th className="text-right py-4 pr-4 font-medium">Net</th>
+              <th className="text-right py-4 pr-2 font-medium w-14"></th>
             </tr>
           </thead>
           <tbody>
@@ -74,7 +79,7 @@ export default function PayrollGrid({ rows, period }: Props) {
         </table>
       </div>
       <p className="font-serif italic text-muted text-xs mt-4">
-        Click the row arrow to see the full pro-rata + statutory breakdown. Edit values inline, click Save on the row. Statutory re-computes automatically.
+        Edit values inline, click Save on the row. Statutory re-computes automatically.
       </p>
     </div>
   )
