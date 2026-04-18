@@ -65,13 +65,10 @@ export default async function PayrollGridPage({ params }: PageProps) {
   if (!rows || rows.length === 0) {
     return (
       <div>
-        <Link href="/hr-costing/payroll" className="text-sm text-muted hover:text-accent font-sans transition-colors">
-          ← Back to Payroll
-        </Link>
-        <h1 className="font-serif text-3xl text-ink mt-6 mb-2">{formatPeriodLabel(period)}</h1>
+        <h1 className="font-serif text-3xl text-ink mt-2 mb-2">{formatPeriodLabel(period)}</h1>
         <p className="font-serif italic text-graphite mb-8">No rows for this period yet.</p>
         <p className="font-sans text-sm text-muted">
-          Go back and create this period from the list page.
+          Open <Link href="/hr-costing/payroll" className="text-accent hover:underline">Payroll</Link> to create the current period.
         </p>
       </div>
     )
@@ -188,15 +185,8 @@ export default async function PayrollGridPage({ params }: PageProps) {
 
   return (
     <div>
-      <Link
-        href="/hr-costing/payroll"
-        className="text-sm text-muted hover:text-accent font-sans transition-colors"
-      >
-        ← Back to Payroll
-      </Link>
-
       {/* Row 1 — title + primary CTA varies by phase */}
-      <div className="flex items-baseline justify-between mt-6 mb-6 gap-6">
+      <div className="flex items-baseline justify-between mt-2 mb-6 gap-6">
         <div>
           <h1 className="font-serif text-3xl text-ink">{formatPeriodLabel(period)}</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
