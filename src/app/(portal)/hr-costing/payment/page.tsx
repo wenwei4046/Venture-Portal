@@ -113,7 +113,9 @@ export default async function HRPaymentPage() {
 
   // ── Disbursement voucher state — check if batch already generated ─────────
   // reference_id on a disbursement voucher is either an hr_monthly_payroll.id
-  // or a director_payouts.id depending on the row type.
+  // or a director_payouts.id depending on the row type. Rejected + voided
+  // vouchers keep their audit trail but don't block a retry, so they're
+  // filtered out here in sync with the RPC's dedupe logic.
   const payrollIds = [
     ...rows.map(r => r.id as string),
     ...dRows.map(d => d.id as string),
@@ -121,9 +123,10 @@ export default async function HRPaymentPage() {
   const { data: disbursementVouchers } = payrollIds.length
     ? await supabase
         .from('payment_vouchers')
-        .select('id, reference_id')
+        .select('id, reference_id, status')
         .eq('reference_type', 'payroll_disbursement')
         .in('reference_id', payrollIds)
+        .not('status', 'in', '(rejected,voided)')
     : { data: null }
   const disbursementCount = disbursementVouchers?.length ?? 0
   const alreadyDisbursed = disbursementCount > 0
