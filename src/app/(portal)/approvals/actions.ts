@@ -2,10 +2,12 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { notifyApprovalDecision } from '@/lib/slack'
+import { applyVoucherPaidSideEffects } from '@/lib/voucher-paid-helpers'
 
 // ─── Approve request (Principal) ──────────────────────────────────────────────
 
@@ -190,13 +192,50 @@ export async function approveRequest(formData: FormData) {
         .eq('id', primaryBank.id)
     }
   } else if (approval.request_type === 'payment_voucher') {
-    // Phase 4: approve the linked payment voucher
+    // Approve + execute in one step. Sets voucher to 'paid' directly, then
+    // applies bank debit / pool adjust / loan sync / GL journal side effects.
+    const paymentDate = dayjs().format('YYYY-MM-DD')
+
+    const { data: voucher, error: pvFetchErr } = await supabase
+      .from('payment_vouchers')
+      .select('*')
+      .eq('id', approval.reference_id)
+      .eq('status', 'pending_approval')
+      .single()
+
+    if (pvFetchErr || !voucher) {
+      throw new Error(
+        `Approval recorded but voucher fetch failed: ${pvFetchErr?.message ?? 'not found'}`
+      )
+    }
+
+    // Bank balance check on the debit side
+    if (voucher.bank_account_id && voucher.direction === 'debit') {
+      const { data: bank } = await supabase
+        .from('bank_accounts')
+        .select('current_balance, bank_name')
+        .eq('id', voucher.bank_account_id)
+        .single()
+      if (bank) {
+        const balance = Number(bank.current_balance)
+        const amt = Number(voucher.amount)
+        if (balance < amt) {
+          throw new Error(
+            `Insufficient bank balance. ${bank.bank_name} has RM ${balance.toFixed(2)} but payment requires RM ${amt.toFixed(2)}.`
+          )
+        }
+      }
+    }
+
     const { error: pvError } = await supabase
       .from('payment_vouchers')
       .update({
-        status: 'approved',
+        status: 'paid',
         approved_by: user.id,
         approved_at: now,
+        executed_by: user.id,
+        executed_at: now,
+        payment_date: paymentDate,
         notes,
       })
       .eq('id', approval.reference_id)
@@ -207,6 +246,8 @@ export async function approveRequest(formData: FormData) {
         `Approval recorded but voucher update failed: ${pvError.message}`
       )
     }
+
+    await applyVoucherPaidSideEffects(supabase, voucher, paymentDate, user.id)
   } else if (approval.request_type === 'hr_costing') {
     // Phase 7 Step 15: flip HR cost snapshot to approved_for_execution;
     // Finance then clicks Execute on /hr-costing.

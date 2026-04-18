@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import dayjs from 'dayjs'
 
 interface Props {
   voucherId: string
@@ -13,7 +12,6 @@ interface Props {
   isFinance: boolean
   submitForApproval: (formData: FormData) => Promise<void>
   approveVoucher: (formData: FormData) => Promise<void>
-  executeVoucher: (formData: FormData) => Promise<void>
   voidVoucher: (formData: FormData) => Promise<void>
 }
 
@@ -27,15 +25,12 @@ export default function VoucherActions({
   isFinance,
   submitForApproval,
   approveVoucher,
-  executeVoucher,
   voidVoucher,
 }: Props) {
   const [isPending, startTransition] = useTransition()
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [confirmAction, setConfirmAction] = useState<'approve' | 'execute' | null>(null)
+  const [confirmAction, setConfirmAction] = useState<'approve' | null>(null)
   const [notes, setNotes] = useState('')
-
-  const today = dayjs().format('YYYY-MM-DD')
 
   async function handleAction(action: (fd: FormData) => Promise<void>, extraFields?: Record<string, string>) {
     setMessage(null)
@@ -131,7 +126,8 @@ export default function VoucherActions({
             <div className="bg-surface border border-hairline rounded-md p-6">
               <h3 className="font-serif text-lg text-ink mb-2">Confirm approval</h3>
               <p className="font-serif italic text-graphite text-sm mb-4">
-                Approving authorises Finance to execute this payment. <em>This cannot be undone.</em>
+                Approving <em>pays this voucher immediately</em> — bank balance, Dept Pool,
+                and GL journal all update in the same step. <em>This cannot be undone.</em>
               </p>
               <div className="mb-4">
                 <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
@@ -152,7 +148,7 @@ export default function VoucherActions({
                   onClick={() => handleAction(approveVoucher, { notes })}
                   className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50"
                 >
-                  {isPending ? 'Approving…' : 'Yes, approve'}
+                  {isPending ? 'Approving & paying…' : 'Approve & Pay'}
                 </button>
                 <button
                   type="button"
@@ -165,15 +161,13 @@ export default function VoucherActions({
             </div>
           ) : null}
 
-          {isFinance ? (
-            <div className={isPrincipal ? 'mt-4' : ''}>
-              {!isPrincipal ? (
-                <div className="bg-surface border border-hairline rounded-md p-4 mb-3">
-                  <p className="font-serif italic text-graphite text-sm">
-                    Awaiting Principal approval. <em>You can track the status here.</em>
-                  </p>
-                </div>
-              ) : null}
+          {isFinance && !isPrincipal ? (
+            <div>
+              <div className="bg-surface border border-hairline rounded-md p-4 mb-3">
+                <p className="font-serif italic text-graphite text-sm">
+                  Awaiting Principal approval. <em>You can track the status here.</em>
+                </p>
+              </div>
               <button
                 type="button"
                 disabled={isPending}
@@ -185,86 +179,6 @@ export default function VoucherActions({
             </div>
           ) : null}
         </>
-      ) : null}
-
-      {/* Approved: Finance can execute */}
-      {status === 'approved' && isFinance ? (
-        confirmAction !== 'execute' ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setConfirmAction('execute')}
-              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors"
-            >
-              Execute payment
-            </button>
-          </div>
-        ) : (
-          <div className="bg-surface border border-hairline rounded-md p-6">
-            <h3 className="font-serif text-lg text-ink mb-2">Confirm execution</h3>
-            <p className="font-serif italic text-graphite text-sm mb-4">
-              Confirm you have transferred the funds. Bank balance will be auto-deducted.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-                  Payment date
-                </label>
-                <input
-                  id="exec_payment_date"
-                  type="date"
-                  defaultValue={today}
-                  max={today}
-                  className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-                  Bank reference <span className="text-muted font-normal">(optional)</span>
-                </label>
-                <input
-                  id="exec_payment_ref"
-                  type="text"
-                  className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-                  placeholder="Transfer ref #"
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={() => {
-                  const dateEl = document.getElementById('exec_payment_date') as HTMLInputElement
-                  const refEl = document.getElementById('exec_payment_ref') as HTMLInputElement
-                  handleAction(executeVoucher, {
-                    payment_date: dateEl?.value ?? today,
-                    payment_reference: refEl?.value ?? '',
-                  })
-                }}
-                className="bg-ledger hover:opacity-90 text-white font-serif italic text-sm px-5 py-2 rounded-md transition-opacity disabled:opacity-50"
-              >
-                {isPending ? 'Executing…' : 'Confirm paid'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmAction(null)}
-                className="text-sm text-graphite hover:text-ink font-sans transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )
-      ) : null}
-
-      {/* Approved but not Finance: read-only */}
-      {status === 'approved' && !isFinance ? (
-        <div className="bg-surface border border-hairline rounded-md p-4">
-          <p className="font-serif italic text-graphite text-sm">
-            Approved. Finance will execute the payment.
-          </p>
-        </div>
       ) : null}
 
       {/* Message */}

@@ -57,12 +57,12 @@ export async function approveClaim(claimId: string) {
 
   await assertPeriodOpen(supabase, new Date())
 
-  // Phase 7 Step 13: two-step approval.
   // Finance/HR approves the claim → system drafts a payment_voucher in
   // pending_approval (one pvs row using the claimant's chosen pool) +
   // links an approval_request of type payment_voucher. Principal then
-  // approves the voucher through the normal approvals queue; that's
-  // when pool/bank debit actually fires via executeVoucher.
+  // approves the voucher through the normal approvals queue — approve is
+  // now a single-step action that pays immediately (bank debit, pool
+  // adjust, GL journal all fire in approveVoucher itself).
   const { error: claimErr } = await supabase
     .from('claims')
     .update({ status: 'approved', approved_by: user.id, approved_at: new Date().toISOString() })

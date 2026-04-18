@@ -6,7 +6,11 @@ import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { postJournalEntry, r2 } from '@/lib/journal'
-import { assertPeriodOpen } from '@/lib/period-lock'
+import {
+  adjustPool,
+  applyVoucherPaidSideEffects,
+  type SupabaseClient,
+} from '@/lib/voucher-paid-helpers'
 
 // ─── Create payment voucher (Finance) ────────────────────────────────────────
 
@@ -323,7 +327,10 @@ export async function submitForApproval(formData: FormData) {
   revalidatePath('/dashboard')
 }
 
-// ─── Approve voucher (Principal) ─────────────────────────────────────────────
+// ─── Approve voucher (Principal — approve + execute in one step) ────────────
+// User directive 2026-04-19: approve = paid. The old 2-step flow (Principal
+// approves → Finance executes) was collapsed so Principal's one click moves
+// the money + marks the voucher paid in the same action.
 
 export async function approveVoucher(formData: FormData) {
   const user = await requireRole(['principal'])
@@ -333,12 +340,13 @@ export async function approveVoucher(formData: FormData) {
   const notes = (formData.get('notes') as string) || null
   if (!id) throw new Error('Voucher id is required')
 
+  const paymentDate = dayjs().format('YYYY-MM-DD')
   const nowIso = new Date().toISOString()
 
-  // Fetch the voucher to check bank balance
+  // Fetch full voucher for downstream side effects
   const { data: voucher, error: fetchErr } = await supabase
     .from('payment_vouchers')
-    .select('amount, bank_account_id, voucher_type')
+    .select('*')
     .eq('id', id)
     .eq('status', 'pending_approval')
     .single()
@@ -346,7 +354,7 @@ export async function approveVoucher(formData: FormData) {
   if (fetchErr || !voucher) throw new Error('Voucher not found or not pending approval')
 
   // ── Bank balance check — cannot approve if insufficient funds ──
-  if (voucher.bank_account_id) {
+  if (voucher.bank_account_id && voucher.direction === 'debit') {
     const { data: bank } = await supabase
       .from('bank_accounts')
       .select('current_balance, bank_name')
@@ -364,13 +372,17 @@ export async function approveVoucher(formData: FormData) {
     }
   }
 
-  // Update voucher
+  // Flip voucher to paid in one shot — approved_by and executed_by are both
+  // the Principal since approve and execute are now the same action.
   const { error: voucherError } = await supabase
     .from('payment_vouchers')
     .update({
-      status: 'approved',
+      status: 'paid',
       approved_by: user.id,
       approved_at: nowIso,
+      executed_by: user.id,
+      executed_at: nowIso,
+      payment_date: paymentDate,
       notes,
     })
     .eq('id', id)
@@ -378,7 +390,9 @@ export async function approveVoucher(formData: FormData) {
 
   if (voucherError) throw new Error(`Failed to approve voucher: ${voucherError.message}`)
 
-  // Also approve the linked approval_request
+  // Also approve the linked approval_request (must happen BEFORE side effects,
+  // because applyVoucherPaidSideEffects looks up the approved row for the
+  // dept_pool expense_out approval_id FK.)
   const { data: approvalReq } = await supabase
     .from('approval_requests')
     .select('id')
@@ -400,336 +414,13 @@ export async function approveVoucher(formData: FormData) {
       .eq('id', approvalReq.id)
   }
 
+  // Apply bank debit, pool adjust, loan/fund-source sync, GL journal
+  await applyVoucherPaidSideEffects(supabase, voucher, paymentDate, user.id)
+
   revalidatePath(`/payments/${id}`)
   revalidatePath('/payments')
   revalidatePath('/approvals')
   revalidatePath('/dashboard')
-}
-
-// ─── Execute payment (Finance — marks as paid, adjusts bank + pool) ─────────
-
-export async function executeVoucher(formData: FormData) {
-  const user = await requireRole(['finance'])
-  const supabase = await createClient()
-
-  const id = formData.get('id') as string
-  const paymentDate = (formData.get('payment_date') as string) || dayjs().format('YYYY-MM-DD')
-  const paymentReference = (formData.get('payment_reference') as string) || null
-  if (!id) throw new Error('Voucher id is required')
-
-  if (dayjs(paymentDate).isAfter(dayjs(), 'day')) {
-    throw new Error('Payment date cannot be in the future')
-  }
-
-  // Check period is open
-  await assertPeriodOpen(supabase, paymentDate)
-
-  // Fetch the voucher
-  const { data: voucher, error: fetchError } = await supabase
-    .from('payment_vouchers')
-    .select('*')
-    .eq('id', id)
-    .eq('status', 'approved')
-    .single()
-
-  if (fetchError || !voucher) throw new Error('Voucher not found or not approved')
-
-  const nowIso = new Date().toISOString()
-
-  // Mark voucher as paid
-  const { error: updateError } = await supabase
-    .from('payment_vouchers')
-    .update({
-      status: 'paid',
-      executed_by: user.id,
-      executed_at: nowIso,
-      payment_date: paymentDate,
-      payment_reference: paymentReference,
-    })
-    .eq('id', id)
-    .eq('status', 'approved')
-
-  if (updateError) throw new Error(`Failed to execute voucher: ${updateError.message}`)
-
-  // ── Auto-adjust bank balance (debit = subtract, credit = add) ──
-  const isCredit = voucher.direction === 'credit'
-  let bankGlCode = '1010' // default: Hong Leong
-  if (voucher.bank_account_id) {
-    const { data: bank } = await supabase
-      .from('bank_accounts')
-      .select('current_balance, gl_account_code')
-      .eq('id', voucher.bank_account_id)
-      .single()
-
-    if (bank) {
-      bankGlCode = bank.gl_account_code ?? '1010'
-      const newBalance = isCredit
-        ? Number(bank.current_balance) + Number(voucher.amount)
-        : Number(bank.current_balance) - Number(voucher.amount)
-      await supabase
-        .from('bank_accounts')
-        .update({ current_balance: newBalance })
-        .eq('id', voucher.bank_account_id)
-    }
-  }
-
-  // ── Auto-adjust pool balance ──
-  const amount = r2(Number(voucher.amount))
-  const poolDescription = `PV ${voucher.voucher_no}: ${voucher.description}`
-
-  // Find linked approval_request (needed for dept_pool expense_out)
-  const { data: linkedApproval } = await supabase
-    .from('approval_requests')
-    .select('id')
-    .eq('reference_id', id)
-    .eq('reference_table', 'payment_vouchers')
-    .eq('status', 'approved')
-    .single()
-
-  if (!isCredit) {
-    // DEBIT: iterate payment_voucher_sources rows, deduct each from its pool.
-    // (Phase 7 multi-source — subtable has 1 row today, up to 3 after Step 6.)
-    await debitVoucherPools(supabase, id, poolDescription, user.id, linkedApproval?.id ?? null, nowIso)
-  } else if (isCredit && voucher.target_pool) {
-    // CREDIT: add to target pool (single target stays as-is; subtable is sources only)
-    await adjustPool(supabase, voucher.target_pool, 'in', amount, poolDescription, user.id, linkedApproval?.id ?? null, nowIso)
-  }
-
-  // ── Loan repayment sync ──
-  // Debit vouchers tagged with fund_source_id (new canonical path): HV paying
-  // back a subsidiary/director. Writes fund_source_repayments rows.
-  // Legacy loan_id path (HV→sub loan) kept for back-compat; writes repayments
-  // + clears overdue_records.
-  if (voucher.repayment_breakdown && (voucher.fund_source_id || voucher.loan_id)) {
-    // repayments enforces CHECK (payment_date <= CURRENT_DATE) which runs
-    // against server UTC. Our paymentDate originates from local dayjs() and
-    // during UTC+8 evenings it can be UTC-tomorrow → constraint would reject.
-    // Clamp to UTC today.
-    const utcToday = new Date().toISOString().slice(0, 10)
-    const repayDate = paymentDate > utcToday ? utcToday : paymentDate
-    const breakdown = voucher.repayment_breakdown as {
-      principal?: number
-      interest?: number
-      penalty?: number
-    }
-    const entries = [
-      { payment_type: 'principal' as const, amt: Number(breakdown.principal ?? 0) },
-      { payment_type: 'interest' as const, amt: Number(breakdown.interest ?? 0) },
-      { payment_type: 'penalty' as const, amt: Number(breakdown.penalty ?? 0) },
-    ].filter((e) => e.amt > 0)
-
-    if (voucher.fund_source_id) {
-      // New path: HV repaying fund source
-      for (const e of entries) {
-        const { error: repErr } = await supabase.from('fund_source_repayments').insert({
-          fund_source_id: voucher.fund_source_id,
-          amount: e.amt,
-          payment_type: e.payment_type,
-          payment_date: repayDate,
-          notes: `Auto-synced from voucher ${voucher.voucher_no}`,
-          payment_voucher_id: id,
-          created_by: user.id,
-        })
-        if (repErr) {
-          console.error(`fund_source_repayments insert failed (${e.payment_type}):`, repErr.message)
-        }
-      }
-    } else if (voucher.loan_id) {
-      // Legacy path: loans/repayments + overdue clear
-      for (const e of entries) {
-        const { error: repErr } = await supabase.from('repayments').insert({
-          loan_id: voucher.loan_id,
-          amount: e.amt,
-          payment_type: e.payment_type,
-          payment_date: repayDate,
-          notes: `Auto-synced from voucher ${voucher.voucher_no}`,
-          created_by: user.id,
-        })
-        if (repErr) {
-          console.error(`repayments insert failed (${e.payment_type}):`, repErr.message)
-        }
-      }
-
-      const { data: pendingOverdue } = await supabase
-        .from('overdue_records')
-        .select('id, period_month')
-        .eq('loan_id', voucher.loan_id)
-        .eq('status', 'pending')
-        .order('period_month', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (pendingOverdue) {
-        await supabase
-          .from('overdue_records')
-          .update({ status: 'paid' })
-          .eq('id', pendingOverdue.id)
-      }
-    }
-  }
-
-  // ── Post GL journal entry (double-entry) ──
-  const expenseAccount: Record<string, string> = {
-    loan_repayment: '2010',      // Fund Sources Payable
-    billing_payment: '2060',     // AP General
-    claim_payout: '5060',        // Claims Expense
-    expense: '5050',             // G&A Expenses
-    internal_transfer: '1011',   // Cash — Alliance (debit the receiving bank)
-    salary_payout: '2030',       // Salary Payable
-    other: '5050',               // G&A Expenses
-  }
-
-  const debitAccount = expenseAccount[voucher.voucher_type] ?? '5050'
-
-  try {
-    // For credit (receive), reverse: debit bank, credit revenue/receivable
-    const lines = isCredit
-      ? [
-          { accountCode: bankGlCode, debit: amount, description: `Bank deposit — ${voucher.voucher_no}` },
-          { accountCode: '1040', credit: amount, description: `Payment received — ${voucher.payee_name}` },
-        ]
-      : [
-          { accountCode: debitAccount, debit: amount, description: `${voucher.voucher_type} — ${voucher.payee_name}` },
-          { accountCode: bankGlCode, credit: amount, description: `Bank payment — ${voucher.voucher_no}` },
-        ]
-
-    const journalId = await postJournalEntry(supabase, {
-      transactionDate: paymentDate,
-      description: `PV ${voucher.voucher_no}: ${voucher.description}`,
-      referenceType: 'payment_voucher',
-      referenceId: id,
-      lines,
-      createdBy: user.id,
-    })
-
-    // Link journal entry to voucher
-    await supabase
-      .from('payment_vouchers')
-      .update({ journal_entry_id: journalId })
-      .eq('id', id)
-  } catch {
-    // GL posting is non-blocking — voucher is already marked paid
-    console.error('GL journal posting failed for voucher', id)
-  }
-
-  revalidatePath(`/payments/${id}`)
-  revalidatePath('/payments')
-  revalidatePath('/dashboard')
-}
-
-// ─── Pool adjustment helper ─────────────────────────────────────────────────
-
-type SupabaseClient = Awaited<ReturnType<typeof createClient>>
-
-// Iterate payment_voucher_sources rows for a voucher and debit each pool.
-// Used by executeVoucher on DEBIT direction. Credit direction stays on
-// single target_pool via adjustPool directly.
-async function debitVoucherPools(
-  supabase: SupabaseClient,
-  voucherId: string,
-  description: string,
-  userId: string,
-  approvalId: string | null,
-  nowIso: string,
-) {
-  const { data: rows } = await supabase
-    .from('payment_voucher_sources')
-    .select('pool, amount')
-    .eq('voucher_id', voucherId)
-
-  if (!rows || rows.length === 0) {
-    console.warn('debitVoucherPools: no source rows for voucher', voucherId)
-    return
-  }
-
-  for (const row of rows) {
-    await adjustPool(
-      supabase,
-      row.pool,
-      'out',
-      r2(Number(row.amount)),
-      description,
-      userId,
-      approvalId,
-      nowIso,
-    )
-  }
-}
-
-async function adjustPool(
-  supabase: SupabaseClient,
-  pool: string,
-  direction: 'in' | 'out',
-  amount: number,
-  description: string,
-  userId: string,
-  approvalId: string | null,
-  nowIso: string,
-) {
-  try {
-    if (pool === 'venture_pool') {
-      await supabase.from('venture_pool').insert({
-        transaction_type: direction === 'out' ? 'expense_out' : 'profit_in',
-        amount,
-        description,
-        reference_table: 'payment_vouchers',
-        created_by: userId,
-      })
-    } else if (pool === 'invoice_payout_pool') {
-      if (direction === 'out') {
-        await supabase.from('invoice_payout_pool').insert({
-          transaction_type: 'release' as const,
-          amount,
-          description,
-          release_approved_by: userId,
-          release_approved_at: nowIso,
-        })
-      } else {
-        await supabase.from('invoice_payout_pool').insert({
-          transaction_type: 'accumulate' as const,
-          amount,
-          description,
-        })
-      }
-    } else if (pool.startsWith('dept_pool_')) {
-      // All 5 Dept Pools (HR, Finance, Director Office, Marketing, Director)
-      // live in dept_pools keyed by department_id. Explicit map because
-      // 'dept_pool_director_office' → 'Director Office' needs underscore→space.
-      const POOL_TO_DEPT: Record<string, string> = {
-        dept_pool_hr: 'HR',
-        dept_pool_finance: 'Finance',
-        dept_pool_director_office: 'Director Office',
-        dept_pool_marketing: 'Marketing',
-        dept_pool_director: 'Director',
-      }
-      const deptName = POOL_TO_DEPT[pool]
-      if (deptName) {
-        const { data: dept } = await supabase
-          .from('departments')
-          .select('id')
-          .eq('name', deptName)
-          .single()
-
-        if (dept) {
-          await supabase.from('dept_pools').insert({
-            department_id: dept.id,
-            transaction_type: direction === 'out' ? 'expense_out' : 'np_in',
-            amount,
-            description,
-            approval_id: direction === 'out' ? approvalId : null,
-            created_by: userId,
-          })
-          // No auto-credit to venture_pool: money debited from a Dept Pool
-          // actually leaves the system (staff bank accounts, vendors). The
-          // old Marketing-specific "flow back to venture_pool" behaviour was
-          // removed 2026-04-19 after the user flagged it as double-counting.
-        }
-      }
-    }
-  } catch (err) {
-    // Pool adjustment is non-blocking — payment already executed
-    console.error('Pool adjustment failed:', pool, err)
-  }
 }
 
 // ─── Void voucher (Finance, only draft/pending) ─────────────────────────────

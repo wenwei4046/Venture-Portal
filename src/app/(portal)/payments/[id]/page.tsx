@@ -4,7 +4,7 @@ import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
-import { submitForApproval, approveVoucher, executeVoucher, voidVoucher } from '../actions'
+import { submitForApproval, approveVoucher, voidVoucher } from '../actions'
 import VoucherActions from './_components/VoucherActions'
 
 const POOL_LABELS: Record<string, string> = {
@@ -254,7 +254,6 @@ export default async function PaymentDetailPage({ params }: Props) {
         isFinance={isFinance}
         submitForApproval={submitForApproval}
         approveVoucher={approveVoucher}
-        executeVoucher={executeVoucher}
         voidVoucher={voidVoucher}
       />
     </div>
