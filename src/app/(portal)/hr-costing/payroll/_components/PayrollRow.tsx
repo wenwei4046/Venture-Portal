@@ -82,6 +82,9 @@ export default function PayrollRow({ row, period, expanded, onToggleExpand }: Pr
         <td className="py-3 pr-3 text-right">{cell('ot_amount', edit.ot_amount)}</td>
         <td className="py-3 pr-3 text-right">{cell('commission_amount', edit.commission_amount)}</td>
         <td className="py-3 pr-3 text-right">{cell('unpaid_leave_days', edit.unpaid_leave_days, '0.5')}</td>
+        <td className="py-3 pr-3 text-right font-mono tabular text-graphite">{formatMoney(row.epf_er)}</td>
+        <td className="py-3 pr-3 text-right font-mono tabular text-graphite">{formatMoney(row.socso_er)}</td>
+        <td className="py-3 pr-3 text-right font-mono tabular text-graphite">{formatMoney(row.eis_er)}</td>
         <td className="py-3 pr-3 text-right font-mono tabular font-medium text-ink">{formatMoney(row.gross)}</td>
         <td className="py-3 pr-3 text-right font-mono tabular font-semibold text-ink">{formatMoney(row.net)}</td>
         <td className="py-3 pr-2 text-right">
@@ -116,7 +119,7 @@ export default function PayrollRow({ row, period, expanded, onToggleExpand }: Pr
       </tr>
       {expanded && (
         <tr className="border-b border-hairline bg-surface-2/30">
-          <td colSpan={11} className="py-4 px-4">
+          <td colSpan={14} className="py-4 px-4">
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-8 gap-y-3 text-sm">
               <div>
                 <div className="text-xs uppercase tracking-wide text-muted font-sans">Pro-rata</div>

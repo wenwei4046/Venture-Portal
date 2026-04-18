@@ -52,6 +52,9 @@ export default function PayrollGrid({ rows, period }: Props) {
               <th className="text-right py-3 pr-3 font-medium">OT</th>
               <th className="text-right py-3 pr-3 font-medium">Comm.</th>
               <th className="text-right py-3 pr-3 font-medium">Unpaid</th>
+              <th className="text-right py-3 pr-3 font-medium">EPF ER</th>
+              <th className="text-right py-3 pr-3 font-medium">SOCSO ER</th>
+              <th className="text-right py-3 pr-3 font-medium">EIS ER</th>
               <th className="text-right py-3 pr-3 font-medium">Gross</th>
               <th className="text-right py-3 pr-3 font-medium">Net</th>
               <th className="text-right py-3 pr-2 font-medium w-14"></th>
