@@ -36,7 +36,7 @@ export default async function DirectorReportPage({ params }: PageProps) {
       .eq('period_month', run.period_month),
     supabase
       .from('director_payouts')
-      .select('id, gross_amount, saving_amount, advance_amount, advance_repaid, advance_balance, payroll_gross, payroll_epf_ee, payroll_socso_ee, payroll_eis_ee, payroll_pcb, payroll_net, invoice_total, statutory_surplus, calculation_snapshot, directors(name, code)')
+      .select('id, gross_amount, saving_amount, advance_amount, advance_repaid, advance_balance, payroll_gross, payroll_epf_er, payroll_epf_ee, payroll_socso_er, payroll_socso_ee, payroll_eis_er, payroll_eis_ee, payroll_pcb, payroll_net, invoice_base, invoice_epf_er, invoice_socso_er, invoice_eis_er, invoice_total, statutory_surplus, calculation_snapshot, directors(name, code)')
       .eq('period_month', run.period_month)
       .order('created_at'),
   ])
@@ -235,19 +235,8 @@ export default async function DirectorReportPage({ params }: PageProps) {
                     </span>
                     <span className="font-mono text-xs text-muted">gross {formatMoney(Number(p.gross_amount ?? 0))}</span>
                   </summary>
-                  <div className="px-4 pb-4 pt-1 grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 text-xs font-sans">
-                    <CalcField label="Gross" value={p.gross_amount} />
-                    <CalcField label="5% Saving" value={p.saving_amount} />
-                    <CalcField label="Advance Issued" value={p.advance_amount} />
-                    <CalcField label="Advance Repaid" value={p.advance_repaid} />
-                    <CalcField label="Payroll Gross" value={p.payroll_gross} />
-                    <CalcField label="EPF EE" value={p.payroll_epf_ee} />
-                    <CalcField label="SOCSO EE" value={p.payroll_socso_ee} />
-                    <CalcField label="EIS EE" value={p.payroll_eis_ee} />
-                    <CalcField label="PCB" value={p.payroll_pcb} />
-                    <CalcField label="Payroll Net" value={p.payroll_net} strong />
-                    <CalcField label="Invoice Total" value={p.invoice_total} />
-                    <CalcField label="Stat Surplus" value={p.statutory_surplus} />
+                  <div className="px-4 pb-4 pt-1">
+                    <FormulaBreakdown payout={p} />
                   </div>
                   {p.calculation_snapshot != null && (
                     <div className="border-t border-hairline px-4 py-3">
@@ -267,13 +256,124 @@ export default async function DirectorReportPage({ params }: PageProps) {
   )
 }
 
-function CalcField({ label, value, strong }: { label: string; value: number | string | null; strong?: boolean }) {
-  const n = Number(value ?? 0)
+// Narrative per-director breakdown — mirrors the 7-step calculation in
+// src/lib/salary.ts so Principal/HR can eyeball the math without parsing
+// the raw JSON snapshot underneath.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function FormulaBreakdown({ payout }: { payout: any }) {
+  const gross = Number(payout.gross_amount ?? 0)
+  const saving = Number(payout.saving_amount ?? 0)
+  const afterSaving = gross - saving
+  const advance = Number(payout.advance_amount ?? 0)
+  const advanceRepaid = Number(payout.advance_repaid ?? 0)
+  const advanceBalance = Number(payout.advance_balance ?? 0)
+  const payrollGross = Number(payout.payroll_gross ?? 0)
+  const invoiceBase = Number(payout.invoice_base ?? 0)
+  const payrollCalc = afterSaving * 0.75
+  const epfEr = Number(payout.payroll_epf_er ?? 0)
+  const epfEe = Number(payout.payroll_epf_ee ?? 0)
+  const socsoEr = Number(payout.payroll_socso_er ?? 0)
+  const socsoEe = Number(payout.payroll_socso_ee ?? 0)
+  const eisEr = Number(payout.payroll_eis_er ?? 0)
+  const eisEe = Number(payout.payroll_eis_ee ?? 0)
+  const pcb = Number(payout.payroll_pcb ?? 0)
+  const payrollNet = Number(payout.payroll_net ?? 0)
+  const invoiceEpfEr = Number(payout.invoice_epf_er ?? 0)
+  const invoiceSocsoEr = Number(payout.invoice_socso_er ?? 0)
+  const invoiceEisEr = Number(payout.invoice_eis_er ?? 0)
+  const invoiceTotal = Number(payout.invoice_total ?? 0)
+  const statSurplus = Number(payout.statutory_surplus ?? 0)
+
   return (
-    <div className="flex justify-between border-b border-hairline/60 pb-1">
-      <span className="text-muted">{label}</span>
-      <span className={`font-mono tabular ${strong ? 'text-ink font-semibold' : 'text-graphite'}`}>
-        {formatMoney(n)}
+    <div className="space-y-4 text-sm">
+      <Step n="1" title="Gross from Director Pool">
+        <Row label="Pool × Weightage ÷ Total Weightage" value={gross} strong />
+      </Step>
+
+      <Step n="2" title="5% Co-saving → Venture Pool">
+        <Row label="Gross" value={gross} />
+        <Row label="− 5% Saving" value={-saving} />
+        <Row label="= After Saving" value={afterSaving} strong divider />
+      </Step>
+
+      <Step n="3" title="75 / 25 Split">
+        <Row label="Payroll Portion (75%)" value={payrollCalc} />
+        <Row label="Invoice Portion (25%)" value={invoiceBase} />
+      </Step>
+
+      {advance > 0 && (
+        <Step n="4" title="Min-Payout Top-up (Advance)">
+          <Row label="Natural payroll (75%)" value={payrollCalc} />
+          <Row label="+ Advance issued this month" value={advance} />
+          <Row label="= Payroll Gross (lifted to min payout)" value={payrollGross} strong divider />
+        </Step>
+      )}
+
+      <Step n="5" title="Payroll Deductions">
+        <Row label="Payroll Gross" value={payrollGross} />
+        <Row label={`− EPF (ER ${formatMoney(epfEr)} + EE ${formatMoney(epfEe)})`} value={-(epfEr + epfEe)} />
+        <Row label={`− SOCSO (ER ${formatMoney(socsoEr)} + EE ${formatMoney(socsoEe)})`} value={-(socsoEr + socsoEe)} />
+        <Row label={`− EIS (ER ${formatMoney(eisEr)} + EE ${formatMoney(eisEe)})`} value={-(eisEr + eisEe)} />
+        <Row label="− PCB" value={-pcb} />
+        {advanceRepaid > 0 && (
+          <Row label="− Advance repaid (carry-forward)" value={-advanceRepaid} />
+        )}
+        <Row label="= Payroll Net" value={payrollNet} strong divider />
+      </Step>
+
+      <Step n="6" title="Invoice to Outsource Entity">
+        <Row label="Invoice Base (25%)" value={invoiceBase} />
+        <Row label="+ Employer EPF" value={invoiceEpfEr} />
+        <Row label="+ Employer SOCSO" value={invoiceSocsoEr} />
+        <Row label="+ Employer EIS" value={invoiceEisEr} />
+        <Row label="= Invoice Total" value={invoiceTotal} strong divider />
+      </Step>
+
+      <Step n="7" title="Statutory Surplus → Venture Pool">
+        <Row label="ER In from CTC − ER Out (payroll + invoice)" value={statSurplus} strong />
+      </Step>
+
+      {advanceBalance !== 0 && (
+        <div className="border-t border-hairline pt-3 font-serif italic text-xs text-muted">
+          Running advance balance (carry forward next month): {formatMoney(advanceBalance)}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Step({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="font-serif italic text-xs uppercase tracking-wider text-accent mb-1.5">
+        Step {n} · {title}
+      </div>
+      <div className="pl-3 border-l border-hairline/60 space-y-0.5">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function Row({ label, value, strong, divider }: { label: string; value: number; strong?: boolean; divider?: boolean }) {
+  return (
+    <div
+      className={
+        'flex justify-between items-baseline py-0.5 ' +
+        (divider ? 'border-t border-hairline/60 mt-1 pt-1 ' : '')
+      }
+    >
+      <span className={strong ? 'font-serif text-ink' : 'font-serif italic text-graphite text-xs'}>
+        {label}
+      </span>
+      <span
+        className={
+          'font-mono tabular ' +
+          (strong ? 'text-ink font-semibold text-sm' : 'text-graphite text-xs') +
+          (value < 0 ? ' text-danger' : '')
+        }
+      >
+        {value < 0 ? `(${formatMoney(-value)})` : formatMoney(value)}
       </span>
     </div>
   )
