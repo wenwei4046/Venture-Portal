@@ -27,11 +27,11 @@ async function countAll() {
     'hr_monthly_payroll',
     'hr_staff_salary_history',
     'hr_staff_costs',
-    'alliance_bank_pool',
     'hr_cost_submissions',
     'monthly_headcounts',
     'director_payouts',
     'director_ctc',
+    'dept_pools',
   ]
   const counts = {}
   for (const t of tables) {
@@ -133,8 +133,22 @@ async function main() {
   // (6) payroll_runs
   await deleteAll('payroll_runs')
 
-  // (7) alliance_bank_pool (transfer_in / debit transactions from payroll flow)
-  await deleteAll('alliance_bank_pool')
+  // (7) dept_pools rows for HR / Finance / Director Office (post-Stage-6
+  //     unification: these 3 pools replaced operating_pools). Leaves Marketing
+  //     + Director pool rows intact.
+  const { data: wipeDepts } = await admin
+    .from('departments')
+    .select('id, name')
+    .in('name', ['HR', 'Finance', 'Director Office'])
+  const wipeDeptIds = (wipeDepts ?? []).map((d) => d.id)
+  if (wipeDeptIds.length > 0) {
+    const { error } = await admin
+      .from('dept_pools')
+      .delete()
+      .in('department_id', wipeDeptIds)
+    if (error) console.log(`  ⚠ dept_pools (HR/Fin/DirOffice): ${error.message}`)
+    else console.log(`  ✓ dept_pools rows for ${wipeDepts.map((d) => d.name).join(', ')} cleared`)
+  }
 
   // (8) hr_monthly_payroll
   await deleteAll('hr_monthly_payroll')
