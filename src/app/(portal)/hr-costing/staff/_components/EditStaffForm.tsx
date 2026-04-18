@@ -23,6 +23,12 @@ interface StaffRow {
   bank_name: string | null
   bank_account_no: string | null
   nric: string | null
+  contact_number: string | null
+  email: string | null
+  address: string | null
+  emergency_contact_name: string | null
+  emergency_contact_phone: string | null
+  emergency_contact_relationship: string | null
 }
 
 interface Props {
@@ -287,6 +293,82 @@ export default function EditStaffForm({ staff }: Props) {
             name="bank_account_no"
             defaultValue={staff.bank_account_no ?? ''}
             placeholder="1234567890"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+          />
+        </div>
+      </div>
+
+      {/* Section 5 — Contact */}
+      <h3 className="font-serif text-lg text-ink mb-1">Contact</h3>
+      <p className="font-serif italic text-graphite text-sm mb-4">
+        Personal phone, email, and address. Used for payslip delivery and HR records.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <div>
+          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+            Phone <span className="text-xs text-muted ml-1 font-normal">(Malaysian format)</span>
+          </label>
+          <input
+            name="contact_number"
+            type="tel"
+            defaultValue={staff.contact_number ?? ''}
+            placeholder="012-345 6789"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Email</label>
+          <input
+            name="email"
+            type="email"
+            defaultValue={staff.email ?? ''}
+            placeholder="name@example.com"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Address</label>
+          <textarea
+            name="address"
+            rows={2}
+            defaultValue={staff.address ?? ''}
+            placeholder="Street, city, postcode"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border resize-y"
+          />
+        </div>
+      </div>
+
+      {/* Section 6 — Emergency Contact */}
+      <h3 className="font-serif text-lg text-ink mb-1">Emergency Contact</h3>
+      <p className="font-serif italic text-graphite text-sm mb-4">
+        Person to notify in case of emergency.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div>
+          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Name</label>
+          <input
+            name="emergency_contact_name"
+            defaultValue={staff.emergency_contact_name ?? ''}
+            placeholder="Full name"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Relationship</label>
+          <input
+            name="emergency_contact_relationship"
+            defaultValue={staff.emergency_contact_relationship ?? ''}
+            placeholder="Spouse, Parent, Sibling…"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Phone</label>
+          <input
+            name="emergency_contact_phone"
+            type="tel"
+            defaultValue={staff.emergency_contact_phone ?? ''}
+            placeholder="012-345 6789"
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
           />
         </div>

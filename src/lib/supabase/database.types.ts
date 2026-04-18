@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       access_log: {
@@ -1596,15 +1571,21 @@ export type Database = {
       }
       hr_staff_costs: {
         Row: {
+          address: string | null
           allowances: number
           bank_account_no: string | null
           bank_name: string | null
           basic_salary: number
           children_count: number
+          contact_number: string | null
           created_at: string
           created_by: string
           department_id: string
           eis_er: number | null
+          email: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          emergency_contact_relationship: string | null
           employee_code: string | null
           employee_name: string
           employment_type: Database["public"]["Enums"]["hr_employment_type"]
@@ -1624,15 +1605,21 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          address?: string | null
           allowances?: number
           bank_account_no?: string | null
           bank_name?: string | null
           basic_salary: number
           children_count?: number
+          contact_number?: string | null
           created_at?: string
           created_by: string
           department_id: string
           eis_er?: number | null
+          email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
           employee_code?: string | null
           employee_name: string
           employment_type?: Database["public"]["Enums"]["hr_employment_type"]
@@ -1652,15 +1639,21 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          address?: string | null
           allowances?: number
           bank_account_no?: string | null
           bank_name?: string | null
           basic_salary?: number
           children_count?: number
+          contact_number?: string | null
           created_at?: string
           created_by?: string
           department_id?: string
           eis_er?: number | null
+          email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
           employee_code?: string | null
           employee_name?: string
           employment_type?: Database["public"]["Enums"]["hr_employment_type"]
@@ -3642,6 +3635,10 @@ export type Database = {
         }
         Returns: string
       }
+      create_payroll_disbursement_vouchers: {
+        Args: { p_period: string }
+        Returns: Json
+      }
       current_user_department_id: { Args: never; Returns: string }
       current_user_role: {
         Args: never
@@ -4028,9 +4025,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       account_type: ["asset", "liability", "equity", "revenue", "expense"],

@@ -60,6 +60,12 @@ export default async function EditStaffPage({ params }: PageProps) {
           bank_name: staff.bank_name ?? null,
           bank_account_no: staff.bank_account_no ?? null,
           nric: staff.nric ?? null,
+          contact_number: staff.contact_number ?? null,
+          email: staff.email ?? null,
+          address: staff.address ?? null,
+          emergency_contact_name: staff.emergency_contact_name ?? null,
+          emergency_contact_phone: staff.emergency_contact_phone ?? null,
+          emergency_contact_relationship: staff.emergency_contact_relationship ?? null,
         }}
       />
     </div>

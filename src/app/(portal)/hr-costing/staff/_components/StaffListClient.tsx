@@ -1,15 +1,12 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { formatMoney } from '@/lib/utils'
+import Link from 'next/link'
 import StaffActions from './StaffActions'
 
 export interface StaffRow {
   id: string
   employee_name: string
-  basic_salary: number
-  allowances: number
-  non_statutory_allowance: number | null
   dept_name: string | null
 }
 
@@ -59,9 +56,6 @@ export default function StaffListClient({ staff }: Props) {
               <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
                 <th className="text-left py-3 pr-4 font-medium">Name</th>
                 <th className="text-left py-3 pr-4 font-medium">Department</th>
-                <th className="text-right py-3 pr-4 font-medium">Basic</th>
-                <th className="text-right py-3 pr-4 font-medium">Statutory Allow.</th>
-                <th className="text-right py-3 pr-4 font-medium">Non-Stat. Allow.</th>
                 <th className="text-right py-3 pr-4 font-medium">Actions</th>
               </tr>
             </thead>
@@ -72,19 +66,15 @@ export default function StaffListClient({ staff }: Props) {
                   className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors"
                 >
                   <td className="py-4 pr-4">
-                    <div className="font-serif text-md text-ink">{s.employee_name}</div>
+                    <Link
+                      href={`/hr-costing/staff/${s.id}`}
+                      className="font-serif text-md text-ink hover:text-accent hover:underline underline-offset-4 decoration-1 transition-colors"
+                    >
+                      {s.employee_name}
+                    </Link>
                   </td>
                   <td className="py-4 pr-4 font-serif italic text-graphite">
                     {s.dept_name ?? '—'}
-                  </td>
-                  <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
-                    {formatMoney(s.basic_salary)}
-                  </td>
-                  <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
-                    {formatMoney(s.allowances)}
-                  </td>
-                  <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
-                    {formatMoney(s.non_statutory_allowance ?? 0)}
                   </td>
                   <td className="py-4 pr-4 text-right">
                     <StaffActions staffId={s.id} staffName={s.employee_name} />

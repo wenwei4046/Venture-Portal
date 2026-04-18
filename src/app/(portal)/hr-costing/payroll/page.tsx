@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import CreatePeriodButton from './_components/CreatePeriodButton'
+import ImportInfotechEntryButton from './_components/ImportInfotechEntryButton'
 
 function currentPeriod(): string {
   const now = new Date()
@@ -44,9 +45,12 @@ export default async function PayrollLandingPage() {
         <p className="font-serif italic text-accent text-sm mb-2">{formattedPeriod}</p>
         <p className="font-serif text-2xl text-ink mb-3">No payroll for this month yet.</p>
         <p className="font-serif italic text-muted text-sm mb-8 max-w-md mx-auto">
-          Create the period to start. You can then import from the InfoTech Excel or edit rows manually.
+          Create the period to start from draft rows, or import directly from your InfoTech Excel export.
         </p>
-        <CreatePeriodButton period={thisPeriod} />
+        <div className="flex items-center justify-center gap-3 flex-wrap">
+          <CreatePeriodButton period={thisPeriod} />
+          <ImportInfotechEntryButton period={thisPeriod} />
+        </div>
       </div>
     </div>
   )

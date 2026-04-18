@@ -4,6 +4,12 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 
+function trimOrNull(v: FormDataEntryValue | null): string | null {
+  if (typeof v !== 'string') return null
+  const t = v.trim()
+  return t.length > 0 ? t : null
+}
+
 export async function addStaff(formData: FormData) {
   const user = await requireRole(['hr', 'principal'])
   const supabase = await createClient()
@@ -20,6 +26,12 @@ export async function addStaff(formData: FormData) {
     basic_salary: parseFloat(formData.get('basic_salary') as string) || 0,
     allowances: parseFloat(formData.get('allowances') as string) || 0,
     non_statutory_allowance: parseFloat(formData.get('non_statutory_allowance') as string) || 0,
+    contact_number: trimOrNull(formData.get('contact_number')),
+    email: trimOrNull(formData.get('email')),
+    address: trimOrNull(formData.get('address')),
+    emergency_contact_name: trimOrNull(formData.get('emergency_contact_name')),
+    emergency_contact_phone: trimOrNull(formData.get('emergency_contact_phone')),
+    emergency_contact_relationship: trimOrNull(formData.get('emergency_contact_relationship')),
     created_by: user.id,
   })
 
@@ -61,6 +73,12 @@ export async function updateStaff(id: string, formData: FormData) {
       bank_name: bankName,
       bank_account_no: bankAccountNo,
       nric: nric,
+      contact_number: trimOrNull(formData.get('contact_number')),
+      email: trimOrNull(formData.get('email')),
+      address: trimOrNull(formData.get('address')),
+      emergency_contact_name: trimOrNull(formData.get('emergency_contact_name')),
+      emergency_contact_phone: trimOrNull(formData.get('emergency_contact_phone')),
+      emergency_contact_relationship: trimOrNull(formData.get('emergency_contact_relationship')),
     })
     .eq('id', id)
 
@@ -71,20 +89,6 @@ export async function updateStaff(id: string, formData: FormData) {
 
   revalidatePath('/hr-costing')
   revalidatePath(`/hr-costing/staff/${id}/edit`)
-}
-
-export async function deleteStaff(id: string) {
-  await requireRole(['hr', 'principal'])
-  const supabase = await createClient()
-
-  const { error } = await supabase
-    .from('hr_staff_costs')
-    .delete()
-    .eq('id', id)
-
-  if (error) throw new Error(`Failed to delete: ${error.message}`)
-
-  revalidatePath('/hr-costing')
 }
 
 export async function deactivateStaff(id: string) {
@@ -98,5 +102,5 @@ export async function deactivateStaff(id: string) {
 
   if (error) throw new Error(`Failed to deactivate: ${error.message}`)
 
-  revalidatePath('/hr-costing')
+  revalidatePath('/hr-costing', 'layout')
 }

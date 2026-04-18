@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { addStaff } from '../actions'
 
 interface Props {
@@ -8,9 +9,9 @@ interface Props {
 }
 
 export default function AddStaffForm({ departments }: Props) {
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
@@ -27,14 +28,10 @@ export default function AddStaffForm({ departments }: Props) {
 
   function handleSubmit(formData: FormData) {
     setError(null)
-    setSaved(false)
     startTransition(async () => {
       try {
         await addStaff(formData)
-        setSaved(true)
-        // Reset form
-        const form = document.getElementById('add-staff-form') as HTMLFormElement
-        form?.reset()
+        router.push('/hr-costing/staff')
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       }
@@ -130,6 +127,70 @@ export default function AddStaffForm({ departments }: Props) {
         </div>
       </div>
 
+      <div className="border-t border-hairline my-6" />
+
+      <h3 className="font-serif text-md text-ink mb-1">Contact <span className={hintBase}>optional, editable later</span></h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+        <div>
+          <label className={labelBase}>Phone</label>
+          <input
+            name="contact_number"
+            type="tel"
+            placeholder="012-345 6789"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+          />
+        </div>
+        <div>
+          <label className={labelBase}>Email</label>
+          <input
+            name="email"
+            type="email"
+            placeholder="name@example.com"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label className={labelBase}>Address</label>
+          <textarea
+            name="address"
+            rows={2}
+            placeholder="Street, city, postcode"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border resize-y"
+          />
+        </div>
+      </div>
+
+      <div className="border-t border-hairline my-6" />
+
+      <h3 className="font-serif text-md text-ink mb-1">Emergency Contact <span className={hintBase}>optional</span></h3>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-3">
+        <div>
+          <label className={labelBase}>Name</label>
+          <input
+            name="emergency_contact_name"
+            placeholder="Full name"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+          />
+        </div>
+        <div>
+          <label className={labelBase}>Relationship</label>
+          <input
+            name="emergency_contact_relationship"
+            placeholder="Spouse, Parent…"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+          />
+        </div>
+        <div>
+          <label className={labelBase}>Phone</label>
+          <input
+            name="emergency_contact_phone"
+            type="tel"
+            placeholder="012-345 6789"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+          />
+        </div>
+      </div>
+
       <div className="flex items-center gap-3 mt-6">
         <button
           type="submit"
@@ -138,7 +199,6 @@ export default function AddStaffForm({ departments }: Props) {
         >
           {isPending ? 'Adding...' : 'Add Staff'}
         </button>
-        {saved && <span className="text-sm font-serif italic text-ledger">Added.</span>}
         {error && <span className="text-sm font-serif italic text-danger">{error}</span>}
       </div>
     </form>

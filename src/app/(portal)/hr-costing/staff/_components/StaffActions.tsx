@@ -2,23 +2,28 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { deleteStaff } from '../actions'
+import { useRouter } from 'next/navigation'
+import { deactivateStaff } from '../actions'
 
 interface Props {
   staffId: string
   staffName: string
 }
 
-export default function StaffActions({ staffId }: Props) {
+export default function StaffActions({ staffId, staffName }: Props) {
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [confirming, setConfirming] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  function handleDelete() {
+  function handleDeactivate() {
+    setError(null)
     startTransition(async () => {
       try {
-        await deleteStaff(staffId)
-      } catch {
-        alert('Failed to delete staff')
+        await deactivateStaff(staffId)
+        router.refresh()
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to deactivate')
       }
       setConfirming(false)
     })
@@ -26,9 +31,10 @@ export default function StaffActions({ staffId }: Props) {
 
   if (confirming) {
     return (
-      <div className="confirm-slide-in flex items-center gap-2">
+      <div className="confirm-slide-in flex items-center gap-2 justify-end">
+        <span className="text-xs font-serif italic text-muted mr-1">Deactivate {staffName}?</span>
         <button
-          onClick={handleDelete}
+          onClick={handleDeactivate}
           disabled={isPending}
           className="text-xs font-sans text-danger hover:underline disabled:opacity-50"
         >
@@ -40,6 +46,7 @@ export default function StaffActions({ staffId }: Props) {
         >
           Cancel
         </button>
+        {error && <span className="text-xs font-serif italic text-danger">{error}</span>}
       </div>
     )
   }
@@ -55,8 +62,9 @@ export default function StaffActions({ staffId }: Props) {
       <button
         onClick={() => setConfirming(true)}
         className="text-xs font-sans text-muted hover:text-danger transition-colors"
+        title="Mark as inactive. Payroll records are preserved."
       >
-        Delete
+        Deactivate
       </button>
     </div>
   )
