@@ -204,20 +204,19 @@ export default async function PayrollGridPage({ params }: PageProps) {
         />
       </div>
 
-      {/* Row 2 — secondary actions: data-entry only while drafting */}
+      {/* Row 2 — secondary actions. Import is always available; Copy-from-last
+          is drafting/rejected only since it overwrites rows. */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-2">
-          {phase === 'drafting' || phase === 'rejected' ? (
-            <>
-              <Link
-                href={`/hr-costing/payroll/${period}/import`}
-                className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
-              >
-                Import InfoTech
-              </Link>
-              <CopyFromLastMonthButton period={period} />
-            </>
-          ) : null}
+          <Link
+            href={`/hr-costing/payroll/${period}/import`}
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
+          >
+            Import InfoTech
+          </Link>
+          {(phase === 'drafting' || phase === 'rejected') && (
+            <CopyFromLastMonthButton period={period} />
+          )}
         </div>
         <MoreActionsDropdown
           actions={[

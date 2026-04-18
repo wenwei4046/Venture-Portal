@@ -161,20 +161,12 @@ export default async function HRPaymentPage() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mt-2 mb-10">
-        <div>
-          <div className="font-serif italic text-accent text-base mb-1">HR · {periodLabel}</div>
-          <h1 className="font-serif text-3xl text-ink">Payment</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
-            Request payroll funding from Finance, then disburse to staff from the HR Pool.
-          </p>
-        </div>
-        <Link
-          href={`/hr-costing/payroll/${period}/import`}
-          className="shrink-0 bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors self-start sm:self-end"
-        >
-          Import InfoTech xlsx
-        </Link>
+      <div className="mt-2 mb-10">
+        <div className="font-serif italic text-accent text-base mb-1">HR · {periodLabel}</div>
+        <h1 className="font-serif text-3xl text-ink">Payment</h1>
+        <p className="font-serif italic text-graphite text-base mt-2">
+          Request payroll funding from Finance, then disburse to staff from the HR Pool.
+        </p>
       </div>
 
       {/* Hero — Total Amount + HR Pool balance */}
@@ -272,10 +264,10 @@ export default async function HRPaymentPage() {
               No payroll imported for this month yet.
             </p>
             <Link
-              href={`/hr-costing/payroll/${period}/import`}
+              href="/hr-costing/payroll"
               className="inline-block bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
             >
-              Import InfoTech xlsx →
+              Go to Payroll →
             </Link>
           </div>
         )}
