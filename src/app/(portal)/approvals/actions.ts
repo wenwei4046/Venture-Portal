@@ -396,14 +396,90 @@ export async function approveRequestGroup(formData: FormData) {
   }
 
   const loanApproval = group.find((r) => r.request_type === 'new_loan')
-  const voucherApproval = group.find((r) => r.request_type === 'payment_voucher')
+  const voucherApprovals = group.filter((r) => r.request_type === 'payment_voucher')
 
-  if (!loanApproval || !voucherApproval) {
-    throw new Error('Combined approval requires one new_loan + one payment_voucher request')
+  if (voucherApprovals.length === 0) {
+    throw new Error('Combined approval group must include at least one payment voucher')
   }
 
   const now = new Date().toISOString()
   const todayStr = now.slice(0, 10)
+
+  // ── Batch disbursement mode: no new_loan, N payment_vouchers ──────────────
+  // Payroll disbursement vouchers ship as one approval group (same group_id)
+  // with N = 32 typical. Flip each voucher to paid and run the normal pool /
+  // bank / GL side effects per voucher via the shared helper. No loan flow.
+  if (!loanApproval) {
+    const { error: groupUpdateError } = await supabase
+      .from('approval_requests')
+      .update({
+        status: 'approved',
+        workflow_state: 'approved',
+        approved_by: user.id,
+        approved_at: now,
+        notes,
+      })
+      .eq('group_id', groupId)
+      .eq('status', 'pending')
+
+    if (groupUpdateError) {
+      throw new Error(`Failed to approve group: ${groupUpdateError.message}`)
+    }
+
+    let processed = 0
+    for (const va of voucherApprovals) {
+      if (!va.reference_id) continue
+
+      const { data: v } = await supabase
+        .from('payment_vouchers')
+        .select('*')
+        .eq('id', va.reference_id)
+        .eq('status', 'pending_approval')
+        .single()
+
+      if (!v) continue
+
+      const { error: flipErr } = await supabase
+        .from('payment_vouchers')
+        .update({
+          status: 'paid',
+          approved_by: user.id,
+          approved_at: now,
+          executed_by: user.id,
+          executed_at: now,
+          payment_date: todayStr,
+          notes,
+        })
+        .eq('id', v.id)
+        .eq('status', 'pending_approval')
+
+      if (flipErr) {
+        throw new Error(`Group approved but voucher ${v.voucher_no} flip failed: ${flipErr.message}`)
+      }
+
+      await applyVoucherPaidSideEffects(supabase, v, todayStr, user.id)
+      processed++
+    }
+
+    notifyApprovalDecision(
+      'payment_voucher',
+      'approved',
+      `Batch of ${processed} vouchers`,
+      user.name,
+    ).catch(() => {})
+
+    revalidatePath('/approvals')
+    revalidatePath('/payments')
+    revalidatePath('/dashboard')
+    revalidatePath('/hr-costing/payment')
+    redirect('/approvals')
+  }
+
+  // ── Loan OUT mode: 1 new_loan + 1 payment_voucher ─────────────────────────
+  if (voucherApprovals.length !== 1) {
+    throw new Error('Loan OUT approval group must include exactly one payment_voucher')
+  }
+  const voucherApproval = voucherApprovals[0]
 
   // ─── Pre-flight: bank balance check ───
   const { data: voucher } = await supabase
@@ -573,13 +649,14 @@ export async function rejectRequestGroup(formData: FormData) {
       .eq('status', 'pending_approval')
   }
 
-  // ─── 3) Void the voucher (if present) ───
-  const voucherApproval = group.find((r) => r.request_type === 'payment_voucher')
-  if (voucherApproval?.reference_id) {
+  // ─── 3) Void every voucher in the group (N for batch, 1 for Loan OUT) ───
+  const voucherApprovals = group.filter((r) => r.request_type === 'payment_voucher')
+  for (const va of voucherApprovals) {
+    if (!va.reference_id) continue
     await supabase
       .from('payment_vouchers')
       .update({ status: 'voided' })
-      .eq('id', voucherApproval.reference_id)
+      .eq('id', va.reference_id)
       .eq('status', 'pending_approval')
   }
 
@@ -587,5 +664,6 @@ export async function rejectRequestGroup(formData: FormData) {
   revalidatePath('/fund-out')
   revalidatePath('/payments')
   revalidatePath('/dashboard')
+  revalidatePath('/hr-costing/payment')
   redirect('/approvals')
 }
