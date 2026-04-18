@@ -41,11 +41,18 @@ export default function AddStaffForm({ departments }: Props) {
     })
   }
 
+  const moneyInputBase =
+    'w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border'
+  const labelBase = 'block text-sm font-sans font-medium text-graphite mb-1.5'
+  const hintBase = 'text-xs text-muted ml-1 font-normal'
+  const rmPrefix =
+    'absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono text-muted pointer-events-none'
+
   return (
     <form ref={formRef} id="add-staff-form" action={handleSubmit} className="bg-surface border border-hairline rounded-md p-6 max-w-2xl">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Name</label>
+          <label className={labelBase}>Name</label>
           <input
             name="name"
             required
@@ -53,7 +60,7 @@ export default function AddStaffForm({ departments }: Props) {
           />
         </div>
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Department</label>
+          <label className={labelBase}>Department</label>
           <select
             name="department_id"
             required
@@ -66,48 +73,64 @@ export default function AddStaffForm({ departments }: Props) {
           </select>
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+
+      <div className="border-t border-hairline my-6" />
+
+      <div className="grid grid-cols-1 gap-4 mb-4">
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Basic Salary <span className="text-xs text-muted ml-1 font-normal">(RM)</span>
+          <label className={labelBase}>
+            Basic Salary <span className={hintBase}>attracts EPF / SOCSO / EIS</span>
           </label>
-          <input
-            name="basic_salary"
-            type="number"
-            step="0.01"
-            min="0"
-            required
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Statutory Allow. <span className="text-xs text-muted ml-1 font-normal">(RM, attracts EPF)</span>
-          </label>
-          <input
-            name="allowances"
-            type="number"
-            step="0.01"
-            min="0"
-            defaultValue="0"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Non-Stat. Allow. <span className="text-xs text-muted ml-1 font-normal">(RM, no EPF)</span>
-          </label>
-          <input
-            name="non_statutory_allowance"
-            type="number"
-            step="0.01"
-            min="0"
-            defaultValue="0"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
-          />
+          <div className="relative">
+            <span className={rmPrefix}>RM</span>
+            <input
+              name="basic_salary"
+              type="number"
+              step="0.01"
+              min="0"
+              required
+              placeholder="0.00"
+              className={moneyInputBase}
+            />
+          </div>
         </div>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className={labelBase}>
+            Statutory Allow. <span className={hintBase}>attracts EPF</span>
+          </label>
+          <div className="relative">
+            <span className={rmPrefix}>RM</span>
+            <input
+              name="allowances"
+              type="number"
+              step="0.01"
+              min="0"
+              defaultValue="0.00"
+              className={moneyInputBase}
+            />
+          </div>
+        </div>
+        <div>
+          <label className={labelBase}>
+            Non-Stat. Allow. <span className={hintBase}>no EPF</span>
+          </label>
+          <div className="relative">
+            <span className={rmPrefix}>RM</span>
+            <input
+              name="non_statutory_allowance"
+              type="number"
+              step="0.01"
+              min="0"
+              defaultValue="0.00"
+              className={moneyInputBase}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 mt-6">
         <button
           type="submit"
           disabled={isPending}
