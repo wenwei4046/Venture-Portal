@@ -26,10 +26,9 @@ interface LiveDeptRow {
 }
 
 export default async function HRCostingPage() {
-  // Phase 7 Step 15: Finance added here so they can click Execute transfers
-  // on approved_for_execution snapshots. HR submits; Principal approves;
-  // Finance executes.
-  const user = await requireRole(['principal', 'hr', 'finance'])
+  // Finance no longer accesses this page — they see aggregates on Dept Pool
+  // and execute approved snapshots from /dept-pool/submissions.
+  const user = await requireRole(['principal', 'hr'])
   const supabase = await createClient()
 
   const currentPeriod = getPeriodMonth()

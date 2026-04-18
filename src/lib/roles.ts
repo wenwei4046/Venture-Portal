@@ -27,8 +27,10 @@ export function canAccessDirectorPool(role: UserRole): boolean {
 }
 
 export function canAccessHRCosting(role: UserRole): boolean {
-  // Phase 7 Step 15: Finance executes approved snapshots, so needs access.
-  return role === 'principal' || role === 'hr' || role === 'finance'
+  // HR submits monthly snapshots; Principal approves via the Approvals queue.
+  // Finance no longer sees the tab — they consume the aggregate from Dept Pool
+  // and mark approved snapshots as executed from /dept-pool/submissions.
+  return role === 'principal' || role === 'hr'
 }
 
 export function canAccessReports(role: UserRole): boolean {
