@@ -126,7 +126,7 @@ export default async function HRPaymentPage() {
         .select('id, reference_id, status')
         .eq('reference_type', 'payroll_disbursement')
         .in('reference_id', payrollIds)
-        .not('status', 'in', '(rejected,voided)')
+        .in('status', ['draft', 'pending_approval', 'approved', 'paid'])
     : { data: null }
   const disbursementCount = disbursementVouchers?.length ?? 0
   const alreadyDisbursed = disbursementCount > 0
