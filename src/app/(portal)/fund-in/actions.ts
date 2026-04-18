@@ -287,7 +287,8 @@ export async function listPayableFundSources(): Promise<PayableFundSource[]> {
   }
 
   return (outstanding ?? [])
-    .filter((o) => {
+    .filter((o): o is typeof o & { fund_source_id: string; source_type: string } => {
+      if (o.fund_source_id == null || o.source_type == null) return false
       const status = statusMap.get(o.fund_source_id)
       return status === 'active' && Number(o.outstanding) > 0
     })

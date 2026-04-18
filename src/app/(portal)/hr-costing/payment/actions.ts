@@ -16,7 +16,11 @@ export async function createPayrollDisbursement(
   await requireRole(['hr', 'principal'])
   const supabase = await createClient()
 
-  const { data, error } = await supabase.rpc(
+  // RPC was added in migration 148 but database.types.ts was last regenerated
+  // before then. Running `supabase gen types typescript` removes the need for
+  // this escape hatch.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.rpc as any)(
     'create_payroll_disbursement_vouchers',
     { p_period: period },
   )

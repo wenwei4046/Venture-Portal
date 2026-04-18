@@ -3693,6 +3693,17 @@ export type Database = {
           out_total_statutory_surplus: number
         }[]
       }
+      get_hr_cost_submissions_list: {
+        Args: never
+        Returns: {
+          dept_summaries: Json
+          execution_state: string
+          id: string
+          period_month: string
+          submitted_at: string
+          submitted_by_name: string
+        }[]
+      }
       get_hr_cost_summary: {
         Args: never
         Returns: {

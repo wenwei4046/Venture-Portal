@@ -22,6 +22,15 @@ interface DeptNPRpcRow {
   out_net_profit: number | string
 }
 
+interface HRCostSubmissionRow {
+  id: string
+  period_month: string
+  submitted_at: string
+  submitted_by_name: string | null
+  execution_state: string
+  dept_summaries: Record<string, { total_ctc?: number; department_id?: string }> | null
+}
+
 export default async function DeptPoolPage() {
   const user = await requireRole(['principal', 'finance', 'dept_manager'])
   const supabase = await createClient()
@@ -70,6 +79,23 @@ export default async function DeptPoolPage() {
     }
   }
 
+  // Lifetime sum of approved HR cost submissions per dept. Only count
+  // submissions Principal has approved — pending snapshots shouldn't flow
+  // into the Dept Pool total yet.
+  const { data: submissionsRaw } = await supabase.rpc('get_hr_cost_submissions_list')
+  const submissions = (submissionsRaw ?? []) as unknown as HRCostSubmissionRow[]
+  const costingByDept = new Map<string, number>()
+  for (const sub of submissions) {
+    if (sub.execution_state === 'pending') continue
+    const entries = Object.entries(sub.dept_summaries ?? {})
+    for (const [, info] of entries) {
+      const deptId = info?.department_id
+      const ctc = Number(info?.total_ctc ?? 0)
+      if (!deptId || !Number.isFinite(ctc)) continue
+      costingByDept.set(deptId, (costingByDept.get(deptId) ?? 0) + ctc)
+    }
+  }
+
   const totalDeployed = Array.from(balanceMap.values()).reduce(
     (acc, b) => acc + (b > 0 ? b : 0),
     0
@@ -84,14 +110,22 @@ export default async function DeptPoolPage() {
             Per-department P&amp;L pools. <em>Marketing has real P&amp;L; HR and Finance are cost-to-cost.</em>
           </p>
         </div>
-        {user.role === 'dept_manager' ? (
+        <div className="flex items-center gap-3 shrink-0">
           <Link
-            href="/dept-pool/contracts/new"
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2.5 rounded-md transition-colors shrink-0"
+            href="/dept-pool/submissions"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
           >
-            New project contract
+            Past Month Submission
           </Link>
-        ) : null}
+          {user.role === 'dept_manager' ? (
+            <Link
+              href="/dept-pool/contracts/new"
+              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2.5 rounded-md transition-colors"
+            >
+              New project contract
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       {/* ───────── Hero totals ───────── */}
@@ -134,6 +168,7 @@ export default async function DeptPoolPage() {
                   <th className="text-right py-3 pr-4 font-medium">Staff cost</th>
                   <th className="text-right py-3 pr-4 font-medium">Expenses</th>
                   <th className="text-right py-3 pr-4 font-medium">This month NP</th>
+                  <th className="text-right py-3 pr-4 font-medium">Costing Submission</th>
                   <th className="py-3 text-right font-medium"></th>
                 </tr>
               </thead>
@@ -171,6 +206,9 @@ export default async function DeptPoolPage() {
                         ) : (
                           <span className="text-muted">—</span>
                         )}
+                      </td>
+                      <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                        {formatMoney(costingByDept.get(dept.id) ?? 0)}
                       </td>
                       <td className="py-3 text-right">
                         {href ? (
