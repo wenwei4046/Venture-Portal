@@ -25,23 +25,31 @@ export default async function HRPaymentPage() {
 
   const period = currentPeriod()
 
-  const [{ data: run }, { data: poolRows }, { data: payrollRows }] = await Promise.all([
+  const [{ data: run }, { data: hrDept }, { data: payrollRows }] = await Promise.all([
     supabase
       .from('payroll_runs')
       .select('id, status, total_amount, rejection_reason')
       .eq('period_month', period)
       .maybeSingle(),
     supabase
-      .from('operating_pool_balance')
-      .select('balance')
-      .eq('pool_type', 'hr_opex'),
+      .from('departments')
+      .select('id')
+      .eq('name', 'HR')
+      .single(),
     supabase
       .from('hr_monthly_payroll')
       .select('id, net, gross, status, hr_staff_costs(employee_name, departments(name))')
       .eq('period_month', period),
   ])
 
-  const poolBal = Number(poolRows?.[0]?.balance ?? 0)
+  const { data: poolRow } = hrDept
+    ? await supabase
+        .from('dept_pool_balances')
+        .select('balance')
+        .eq('department_id', hrDept.id)
+        .maybeSingle()
+    : { data: null }
+  const poolBal = Number(poolRow?.balance ?? 0)
   const rows = payrollRows ?? []
   const totalNet = rows.reduce((s, r) => s + Number(r.net), 0)
   const totalGross = rows.reduce((s, r) => s + Number(r.gross), 0)

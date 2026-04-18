@@ -177,7 +177,7 @@ export async function requestPayrollPayment(runId: string): Promise<string> {
       payroll_run_id: run.id,
       requested_by: user.id,
       amount,
-      target_pool: 'hr_opex',
+      target_pool: 'dept_pool_hr',
       status: 'submitted',
     })
     .select('id')

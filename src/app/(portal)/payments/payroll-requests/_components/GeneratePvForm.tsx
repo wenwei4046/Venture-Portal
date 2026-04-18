@@ -29,11 +29,11 @@ function fmt(n: number): string {
 
 function poolLabel(key: string): string {
   switch (key) {
-    case 'hr_opex':
+    case 'dept_pool_hr':
       return 'HR Department Pool'
-    case 'finance_opex':
+    case 'dept_pool_finance':
       return 'Finance Department Pool'
-    case 'director_opex':
+    case 'dept_pool_director_office':
       return 'Director Office Department Pool'
     case 'dept_pool_marketing':
       return 'Marketing Department Pool'

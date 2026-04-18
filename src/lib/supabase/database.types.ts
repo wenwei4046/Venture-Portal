@@ -1693,47 +1693,6 @@ export type Database = {
           },
         ]
       }
-      venture_pool: {
-        Row: {
-          amount: number
-          created_at: string
-          created_by: string | null
-          description: string | null
-          id: string
-          reference_id: string | null
-          reference_table: string | null
-          transaction_type: Database["public"]["Enums"]["hv_fund_txn_type"]
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          reference_id?: string | null
-          reference_table?: string | null
-          transaction_type: Database["public"]["Enums"]["hv_fund_txn_type"]
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          reference_id?: string | null
-          reference_table?: string | null
-          transaction_type?: Database["public"]["Enums"]["hv_fund_txn_type"]
-        }
-        Relationships: [
-          {
-            foreignKeyName: "venture_pool_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       invoice_payout_pool: {
         Row: {
           amount: number
@@ -1797,9 +1756,6 @@ export type Database = {
           invoice_no: string | null
           period_month: string
           reference_no: string | null
-          routes_to_pool:
-            | Database["public"]["Enums"]["operating_pool_type"]
-            | null
           sst_amount: number | null
           sst_rate: number | null
           status: Database["public"]["Enums"]["invoice_status"]
@@ -1820,9 +1776,6 @@ export type Database = {
           invoice_no?: string | null
           period_month: string
           reference_no?: string | null
-          routes_to_pool?:
-            | Database["public"]["Enums"]["operating_pool_type"]
-            | null
           sst_amount?: number | null
           sst_rate?: number | null
           status?: Database["public"]["Enums"]["invoice_status"]
@@ -1843,9 +1796,6 @@ export type Database = {
           invoice_no?: string | null
           period_month?: string
           reference_no?: string | null
-          routes_to_pool?:
-            | Database["public"]["Enums"]["operating_pool_type"]
-            | null
           sst_amount?: number | null
           sst_rate?: number | null
           status?: Database["public"]["Enums"]["invoice_status"]
@@ -2209,53 +2159,6 @@ export type Database = {
           },
           {
             foreignKeyName: "monthly_statements_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      operating_pools: {
-        Row: {
-          amount: number
-          created_at: string
-          created_by: string
-          description: string
-          id: string
-          period_month: string
-          pool_type: Database["public"]["Enums"]["operating_pool_type"]
-          reference_id: string | null
-          reference_type: string | null
-          transaction_type: Database["public"]["Enums"]["operating_pool_txn_type"]
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          created_by: string
-          description: string
-          id?: string
-          period_month: string
-          pool_type: Database["public"]["Enums"]["operating_pool_type"]
-          reference_id?: string | null
-          reference_type?: string | null
-          transaction_type: Database["public"]["Enums"]["operating_pool_txn_type"]
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          created_by?: string
-          description?: string
-          id?: string
-          period_month?: string
-          pool_type?: Database["public"]["Enums"]["operating_pool_type"]
-          reference_id?: string | null
-          reference_type?: string | null
-          transaction_type?: Database["public"]["Enums"]["operating_pool_txn_type"]
-        }
-        Relationships: [
-          {
-            foreignKeyName: "operating_pools_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "users"
@@ -3338,6 +3241,47 @@ export type Database = {
           },
         ]
       }
+      venture_pool: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          reference_id: string | null
+          reference_table: string | null
+          transaction_type: Database["public"]["Enums"]["hv_fund_txn_type"]
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          reference_id?: string | null
+          reference_table?: string | null
+          transaction_type: Database["public"]["Enums"]["hv_fund_txn_type"]
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          reference_id?: string | null
+          reference_table?: string | null
+          transaction_type?: Database["public"]["Enums"]["hv_fund_txn_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hv_operating_fund_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       approval_requests_with_target: {
@@ -3472,12 +3416,6 @@ export type Database = {
           },
         ]
       }
-      venture_pool_balance: {
-        Row: {
-          balance: number | null
-        }
-        Relationships: []
-      }
       invoice_payout_pool_balance: {
         Row: {
           balance: number | null
@@ -3507,15 +3445,6 @@ export type Database = {
           },
         ]
       }
-      operating_pool_balance: {
-        Row: {
-          balance: number | null
-          last_txn_at: string | null
-          pool_type: Database["public"]["Enums"]["operating_pool_type"] | null
-          txn_count: number | null
-        }
-        Relationships: []
-      }
       trial_balance: {
         Row: {
           account_code: string | null
@@ -3535,6 +3464,12 @@ export type Database = {
             referencedColumns: ["code"]
           },
         ]
+      }
+      venture_pool_balance: {
+        Row: {
+          balance: number | null
+        }
+        Relationships: []
       }
     }
     Functions: {
@@ -3830,13 +3765,6 @@ export type Database = {
       invoice_pool_txn_type: "accumulate" | "release"
       invoice_status: "draft" | "issued" | "paid" | "paid_via_netting"
       loan_status: "pending_approval" | "active" | "fully_repaid" | "cancelled"
-      operating_pool_txn_type:
-        | "invoice_settled_in"
-        | "payroll_out"
-        | "transfer_out"
-        | "transfer_in"
-        | "adjustment"
-      operating_pool_type: "hr_opex" | "finance_opex" | "director_opex"
       overdue_stage: "grace" | "late_1" | "late_2" | "escalation"
       overdue_status: "pending" | "paid" | "escalated"
       payment_voucher_status:
@@ -4081,14 +4009,6 @@ export const Constants = {
       invoice_pool_txn_type: ["accumulate", "release"],
       invoice_status: ["draft", "issued", "paid", "paid_via_netting"],
       loan_status: ["pending_approval", "active", "fully_repaid", "cancelled"],
-      operating_pool_txn_type: [
-        "invoice_settled_in",
-        "payroll_out",
-        "transfer_out",
-        "transfer_in",
-        "adjustment",
-      ],
-      operating_pool_type: ["hr_opex", "finance_opex", "director_opex"],
       overdue_stage: ["grace", "late_1", "late_2", "escalation"],
       overdue_status: ["pending", "paid", "escalated"],
       payment_voucher_status: [

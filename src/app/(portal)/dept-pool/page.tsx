@@ -49,7 +49,9 @@ export default async function DeptPoolPage() {
     visible = visible.filter((d) => d.id === user.department_id)
   }
 
-  // Load balances (view already computes NP in - expense out)
+  // Load balances — all 5 Dept Pools live in dept_pool_balances after the
+  // Stage-6 unification (HR / Finance / Director Office migrated from
+  // operating_pools into dept_pools).
   const { data: balances } = await supabase
     .from('dept_pool_balances')
     .select('department_id, balance')
@@ -107,7 +109,7 @@ export default async function DeptPoolPage() {
         <div>
           <h1 className="font-serif text-3xl text-ink">Department Pools</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
-            Per-department P&amp;L pools. <em>Marketing has real P&amp;L; HR and Finance are cost-to-cost.</em>
+            Running balance per department — credits from invoice settlement + P&amp;L, debits from payroll + expenses.
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
@@ -234,9 +236,7 @@ export default async function DeptPoolPage() {
       </section>
 
       <p className="font-serif italic text-muted text-xs">
-        Note: Finance and HR departments are cost-to-cost — their pool balance is
-        always RM 0 because their total cost is billed back to subsidiaries via
-        the HR Pool Split + Finance Attribution + Finance Mgmt Fee billing modes.
+        All 5 Dept Pools share the same model: invoices settled + P&amp;L in, payroll consolidation + expenses out.
       </p>
     </div>
   )

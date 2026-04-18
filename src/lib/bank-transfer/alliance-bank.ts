@@ -5,7 +5,7 @@
  *   1. Finance transfers the month's payroll total from HL Bank → Alliance
  *      Bank as one lump sum. That's the payroll_bank_transfer voucher;
  *      accounting-wise, the cash consolidates into HR Department Pool
- *      (operating_pools.hr_opex) post-Stage-5.
+ *      (dept_pools, department = HR) post-Stage-6.
  *   2. HR exports THIS CSV from the payroll grid and uploads it to the
  *      Alliance Bank portal to disburse to each employee.
  *

@@ -675,21 +675,6 @@ async function adjustPool(
         reference_table: 'payment_vouchers',
         created_by: userId,
       })
-    } else if (pool === 'hr_opex' || pool === 'finance_opex' || pool === 'director_opex') {
-      // Post-Stage-5: HR / Finance / Director Office Dept Pools live in
-      // operating_pools. Payroll disbursement vouchers debit hr_opex here
-      // (adjustPool used to silently skip because only the venture_pool /
-      // dept_pool_* branches existed, which left alliance_bank_pool balance
-      // perpetually growing — fixed alongside the alliance_bank_pool drop).
-      await supabase.from('operating_pools').insert({
-        pool_type: pool,
-        transaction_type: direction === 'out' ? 'payroll_out' : 'transfer_in',
-        amount,
-        description,
-        reference_type: 'payment_voucher',
-        period_month: nowIso.slice(0, 7) + '-01',
-        created_by: userId,
-      })
     } else if (pool === 'invoice_payout_pool') {
       if (direction === 'out') {
         await supabase.from('invoice_payout_pool').insert({
@@ -707,35 +692,37 @@ async function adjustPool(
         })
       }
     } else if (pool.startsWith('dept_pool_')) {
-      // e.g. dept_pool_marketing → department name = "Marketing"
-      const deptName = pool.replace('dept_pool_', '')
-      const { data: dept } = await supabase
-        .from('departments')
-        .select('id')
-        .ilike('name', deptName)
-        .single()
+      // All 5 Dept Pools (HR, Finance, Director Office, Marketing, Director)
+      // live in dept_pools keyed by department_id. Explicit map because
+      // 'dept_pool_director_office' → 'Director Office' needs underscore→space.
+      const POOL_TO_DEPT: Record<string, string> = {
+        dept_pool_hr: 'HR',
+        dept_pool_finance: 'Finance',
+        dept_pool_director_office: 'Director Office',
+        dept_pool_marketing: 'Marketing',
+        dept_pool_director: 'Director',
+      }
+      const deptName = POOL_TO_DEPT[pool]
+      if (deptName) {
+        const { data: dept } = await supabase
+          .from('departments')
+          .select('id')
+          .eq('name', deptName)
+          .single()
 
-      if (dept) {
-        await supabase.from('dept_pools').insert({
-          department_id: dept.id,
-          transaction_type: direction === 'out' ? 'expense_out' : 'np_in',
-          amount,
-          description,
-          approval_id: direction === 'out' ? approvalId : null,
-          created_by: userId,
-        })
-
-        // When money flows OUT of a dept pool, it flows INTO Venture Pool —
-        // EXCEPT for Director Pool, which pays directors directly (money
-        // leaves the system, not transfers to HV).
-        if (direction === 'out' && pool !== 'dept_pool_director') {
-          await supabase.from('venture_pool').insert({
-            transaction_type: 'profit_in' as const,
+        if (dept) {
+          await supabase.from('dept_pools').insert({
+            department_id: dept.id,
+            transaction_type: direction === 'out' ? 'expense_out' : 'np_in',
             amount,
-            description: `Dept pool transfer: ${description}`,
-            reference_table: 'dept_pools',
+            description,
+            approval_id: direction === 'out' ? approvalId : null,
             created_by: userId,
           })
+          // No auto-credit to venture_pool: money debited from a Dept Pool
+          // actually leaves the system (staff bank accounts, vendors). The
+          // old Marketing-specific "flow back to venture_pool" behaviour was
+          // removed 2026-04-19 after the user flagged it as double-counting.
         }
       }
     }

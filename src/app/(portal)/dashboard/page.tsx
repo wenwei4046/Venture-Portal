@@ -143,7 +143,7 @@ export default async function DashboardPage() {
         { data: payrollRun },
         { data: pendingClaims },
         { data: dirPayouts },
-        { data: poolRows },
+        { data: hrDept },
       ] = await Promise.all([
         supabase.rpc('get_hr_cost_summary'),
         supabase
@@ -166,12 +166,20 @@ export default async function DashboardPage() {
           .select('id, status')
           .eq('period_month', period),
         supabase
-          .from('operating_pool_balance')
-          .select('balance')
-          .eq('pool_type', 'hr_opex'),
+          .from('departments')
+          .select('id')
+          .eq('name', 'HR')
+          .single(),
       ])
 
-      const poolBalance = Number(poolRows?.[0]?.balance ?? 0)
+      const { data: hrPoolRow } = hrDept?.id
+        ? await supabase
+            .from('dept_pool_balances')
+            .select('balance')
+            .eq('department_id', hrDept.id)
+            .maybeSingle()
+        : { data: null }
+      const poolBalance = Number(hrPoolRow?.balance ?? 0)
 
       // Latest active payment request for the current run, if any.
       // Drives steps 6 and 7 on the Monthly Cycle board.

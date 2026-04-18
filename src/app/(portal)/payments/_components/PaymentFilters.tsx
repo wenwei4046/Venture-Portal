@@ -18,10 +18,11 @@ const VOUCHER_TYPES = [
 const POOLS = [
   { value: '', label: 'Any pool' },
   { value: 'venture_pool', label: 'Venture Pool' },
-  { value: 'dept_pool_director', label: 'Director Pool' },
-  { value: 'dept_pool_marketing', label: 'Marketing' },
-  { value: 'dept_pool_finance', label: 'Finance' },
   { value: 'dept_pool_hr', label: 'HR' },
+  { value: 'dept_pool_finance', label: 'Finance' },
+  { value: 'dept_pool_director_office', label: 'Director Office' },
+  { value: 'dept_pool_director', label: 'Director' },
+  { value: 'dept_pool_marketing', label: 'Marketing' },
   { value: 'invoice_payout_pool', label: 'Invoice Payout' },
 ]
 

@@ -44,10 +44,11 @@ interface Props {
 
 const POOL_OPTIONS = [
   { value: 'venture_pool', label: 'Venture Pool' },
+  { value: 'dept_pool_hr', label: 'HR Dept Pool' },
+  { value: 'dept_pool_finance', label: 'Finance Dept Pool' },
+  { value: 'dept_pool_director_office', label: 'Director Office Dept Pool' },
   { value: 'dept_pool_director', label: 'Director Pool' },
   { value: 'dept_pool_marketing', label: 'Marketing Dept Pool' },
-  { value: 'dept_pool_finance', label: 'Finance Dept Pool' },
-  { value: 'dept_pool_hr', label: 'HR Dept Pool' },
   { value: 'invoice_payout_pool', label: 'Invoice Payout Pool' },
 ]
 
