@@ -341,21 +341,11 @@ export default async function HRPaymentPage() {
 
         {phase === 'funded' && (
           <div className="border border-ledger/40 bg-surface rounded-md p-8">
-            <div className="flex items-baseline justify-between gap-4 mb-4">
-              <div>
-                <em className="font-serif italic text-ledger text-lg">✓ HR Pool funded</em>
-                <p className="font-serif italic text-graphite text-sm mt-1">
-                  Ready to disburse to staff.
-                </p>
-              </div>
-              {requestRow?.pv_id && (
-                <Link
-                  href={`/payments/${requestRow.pv_id}`}
-                  className="text-xs font-sans text-muted hover:text-accent shrink-0"
-                >
-                  View funding voucher →
-                </Link>
-              )}
+            <div className="mb-4">
+              <em className="font-serif italic text-ledger text-lg">✓ HR Pool funded</em>
+              <p className="font-serif italic text-graphite text-sm mt-1">
+                Ready to disburse to staff.
+              </p>
             </div>
 
             <div className="mt-6 pt-6 border-t border-hairline">

@@ -174,12 +174,6 @@ export default function RequestPayrollPaymentButton({
             RM {fmt(totalAmount)}
           </span>
         </div>
-        <a
-          href={`/payments/${state.pvId}`}
-          className="text-xs font-sans text-muted hover:text-accent transition-colors"
-        >
-          View voucher →
-        </a>
       </div>
     )
   }
@@ -195,14 +189,6 @@ export default function RequestPayrollPaymentButton({
           RM {fmt(totalAmount)}
         </span>
       </div>
-      {state.pvId ? (
-        <a
-          href={`/payments/${state.pvId}`}
-          className="text-xs font-sans text-muted hover:text-accent transition-colors"
-        >
-          View voucher →
-        </a>
-      ) : null}
     </div>
   )
 }
