@@ -4,24 +4,6 @@ import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 
-interface DeptNPRow {
-  department_id: string
-  period_month: string
-  revenue: number
-  staff_cost: number
-  expenses: number
-  net_profit: number
-}
-
-interface DeptNPRpcRow {
-  out_department_id: string
-  out_period_month: string
-  out_revenue: number | string
-  out_staff_cost: number | string
-  out_expenses: number | string
-  out_net_profit: number | string
-}
-
 interface HRCostSubmissionRow {
   id: string
   period_month: string
@@ -60,25 +42,28 @@ export default async function DeptPoolPage() {
     (balances ?? []).map((b) => [b.department_id as string, Number(b.balance)])
   )
 
-  // Compute NP for each visible dept for the current period.
-  // calculate_dept_np returns a single-row set; Supabase wraps it in an array.
-  const npByDept = new Map<string, DeptNPRow>()
-  for (const dept of visible) {
-    const { data } = await supabase.rpc('calculate_dept_np', {
-      p_dept_id: dept.id,
-      p_period: period,
-    })
-    const row = ((data ?? []) as unknown as DeptNPRpcRow[])[0]
-    if (row) {
-      npByDept.set(dept.id, {
-        department_id: row.out_department_id,
-        period_month: row.out_period_month,
-        revenue: Number(row.out_revenue ?? 0),
-        staff_cost: Number(row.out_staff_cost ?? 0),
-        expenses: Number(row.out_expenses ?? 0),
-        net_profit: Number(row.out_net_profit ?? 0),
-      })
+  // This-month In / Out per dept. Only Marketing runs on P&L semantics
+  // (revenue - staff cost - expenses); the other 4 pools are pure ledger
+  // movement so we show credits in / debits out directly from dept_pools.
+  // Marketing's P&L breakdown still lives on /dept-pool/marketing.
+  const periodStart = dayjs(period).startOf('month').format('YYYY-MM-DD')
+  const nextMonthStart = dayjs(period).add(1, 'month').startOf('month').format('YYYY-MM-DD')
+  const { data: poolTxns } = await supabase
+    .from('dept_pools')
+    .select('department_id, transaction_type, amount')
+    .gte('created_at', periodStart)
+    .lt('created_at', nextMonthStart)
+
+  const inOutByDept = new Map<string, { in_amt: number; out_amt: number }>()
+  for (const t of poolTxns ?? []) {
+    const key = t.department_id as string
+    const cur = inOutByDept.get(key) ?? { in_amt: 0, out_amt: 0 }
+    if (t.transaction_type === 'np_in') {
+      cur.in_amt += Number(t.amount)
+    } else if (t.transaction_type === 'expense_out') {
+      cur.out_amt += Number(t.amount)
     }
+    inOutByDept.set(key, cur)
   }
 
   // Lifetime sum of approved HR cost submissions per dept. Only count
@@ -150,7 +135,7 @@ export default async function DeptPoolPage() {
       <section className="mb-12">
         <h2 className="font-serif text-xl text-ink mb-1">By department</h2>
         <p className="font-serif italic text-graphite text-sm mb-4">
-          Balance = running NP - expenses. <em>NP trend</em> updates once revenue and approved expenses flow in.
+          Balance = running credits − debits. HR / Finance / Director Office / Director are pure in-and-out pools; <em>Marketing</em> also tracks P&amp;L — open its detail view.
         </p>
 
         {visible.length === 0 ? (
@@ -166,10 +151,9 @@ export default async function DeptPoolPage() {
                 <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
                   <th className="text-left py-3 pr-4 font-medium">Department</th>
                   <th className="text-right py-3 pr-4 font-medium">Balance</th>
-                  <th className="text-right py-3 pr-4 font-medium">Revenue</th>
-                  <th className="text-right py-3 pr-4 font-medium">Staff cost</th>
-                  <th className="text-right py-3 pr-4 font-medium">Expenses</th>
-                  <th className="text-right py-3 pr-4 font-medium">This month NP</th>
+                  <th className="text-right py-3 pr-4 font-medium">In (this month)</th>
+                  <th className="text-right py-3 pr-4 font-medium">Out (this month)</th>
+                  <th className="text-right py-3 pr-4 font-medium">Net (this month)</th>
                   <th className="text-right py-3 pr-4 font-medium">Costing Submission</th>
                   <th className="py-3 text-right font-medium"></th>
                 </tr>
@@ -177,7 +161,8 @@ export default async function DeptPoolPage() {
               <tbody>
                 {visible.map((dept) => {
                   const balance = balanceMap.get(dept.id) ?? 0
-                  const np = npByDept.get(dept.id)
+                  const inOut = inOutByDept.get(dept.id) ?? { in_amt: 0, out_amt: 0 }
+                  const net = inOut.in_amt - inOut.out_amt
                   const isMarketing = dept.name === 'Marketing'
                   const href = isMarketing ? '/dept-pool/marketing' : null
                   return (
@@ -191,23 +176,16 @@ export default async function DeptPoolPage() {
                       <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">
                         {formatMoney(balance)}
                       </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
-                        {formatMoney(np?.revenue ?? 0)}
+                      <td className="py-3 pr-4 text-right font-mono tabular text-ledger">
+                        {formatMoney(inOut.in_amt)}
                       </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
-                        {formatMoney(np?.staff_cost ?? 0)}
-                      </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
-                        {formatMoney(np?.expenses ?? 0)}
+                      <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                        {formatMoney(inOut.out_amt)}
                       </td>
                       <td className="py-3 pr-4 text-right font-mono tabular font-semibold">
-                        {np ? (
-                          <span className={np.net_profit >= 0 ? 'text-ink' : 'text-danger'}>
-                            {formatMoney(np.net_profit)}
-                          </span>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
+                        <span className={net >= 0 ? 'text-ink' : 'text-danger'}>
+                          {formatMoney(net)}
+                        </span>
                       </td>
                       <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
                         {formatMoney(costingByDept.get(dept.id) ?? 0)}
