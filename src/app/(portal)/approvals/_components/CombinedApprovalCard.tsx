@@ -33,9 +33,15 @@ export default function CombinedApprovalCard({
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const loan = items.find((i) => i.request_type === 'new_loan')
-  const voucher = items.find((i) => i.request_type === 'payment_voucher')
-  const total = Number(loan?.amount ?? voucher?.amount ?? 0)
+  // Sum every item's amount — handles both the 2-item Loan OUT combo and
+  // N-voucher payroll disbursement batches. Previously we did
+  // items.find(payment_voucher) which only surfaced the first voucher's
+  // amount, so 32-voucher batches displayed RM <one-voucher> as the total.
+  const total = items.reduce((s, i) => s + Number(i.amount ?? 0), 0)
+  const approveLabel =
+    items.length === 2 ? 'Approve both' : `Approve all ${items.length}`
+  const approvingLabel =
+    items.length === 2 ? 'Approving…' : `Approving all ${items.length}…`
 
   const handleApprove = () => {
     setError(null)
@@ -170,7 +176,7 @@ export default function CombinedApprovalCard({
             disabled={isPending}
             className="px-4 py-2 bg-accent text-white text-sm font-serif italic rounded-md hover:bg-accent-hover disabled:opacity-50"
           >
-            {isPending ? 'Approving…' : 'Approve both'}
+            {isPending ? approvingLabel : approveLabel}
           </button>
           <button
             type="button"
