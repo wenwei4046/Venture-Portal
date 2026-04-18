@@ -14,6 +14,7 @@ import MarketingProjectList from './MarketingProjectList'
 import FixedSplitPanel from './FixedSplitPanel'
 import NonBillableList from './NonBillableList'
 import InvoicesList from './InvoicesList'
+import ManualOpexSection, { type ExistingInvoice } from './ManualOpexSection'
 
 interface Props {
   searchParams: Promise<{ period?: string }>
@@ -106,6 +107,12 @@ export default async function BillingView({ searchParams }: Props) {
   const marketingTotal = invoiceList
     .filter((i) => i.billing_mode === 'marketing_project')
     .reduce((s, i) => s + Number(i.total_amount), 0)
+  const directorOfficeTotal = invoiceList
+    .filter((i) => i.billing_mode === 'director_office_attribution')
+    .reduce((s, i) => s + Number(i.total_amount), 0)
+  const directorAttributionTotal = invoiceList
+    .filter((i) => i.billing_mode === 'director_attribution')
+    .reduce((s, i) => s + Number(i.total_amount), 0)
   const directorOpexTotal = Number(directorSummary?.out_total_payroll_gross ?? 0)
   const directorPayoutCount = Number(directorSummary?.out_payout_count ?? 0)
   const hrInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'hr_pool_split').length
@@ -113,6 +120,37 @@ export default async function BillingView({ searchParams }: Props) {
     (i) => i.billing_mode === 'finance_attribution'
   ).length
   const marketingInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'marketing_project').length
+
+  // Task 4: Marketing OPEX visibility sourced from the submitted payroll_run,
+  // not from invoices (Marketing pays its own staff from contract revenue,
+  // doesn't bill subsidiaries). Shown so Finance can still see the number.
+  const { data: payrollRun } = await supabase
+    .from('payroll_runs')
+    .select('marketing_opex_total')
+    .eq('period_month', period)
+    .maybeSingle()
+  const marketingOpexFromPayroll = Number(payrollRun?.marketing_opex_total ?? 0)
+
+  // Director Office + Director OPEX sections need existing invoices keyed per
+  // company so the manual form can block double-billing.
+  const directorOfficeExisting: ExistingInvoice[] = invoiceList
+    .filter((i) => i.billing_mode === 'director_office_attribution')
+    .map((i) => ({
+      id: i.id,
+      invoice_no: i.invoice_no ?? '',
+      company_id: i.company_id,
+      total_amount: Number(i.total_amount),
+      status: i.status,
+    }))
+  const directorAttributionExisting: ExistingInvoice[] = invoiceList
+    .filter((i) => i.billing_mode === 'director_attribution')
+    .map((i) => ({
+      id: i.id,
+      invoice_no: i.invoice_no ?? '',
+      company_id: i.company_id,
+      total_amount: Number(i.total_amount),
+      status: i.status,
+    }))
 
   const companyList = companies ?? []
   const companyMap = new Map(
@@ -179,11 +217,18 @@ export default async function BillingView({ searchParams }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-        <CostCard label="HR OpEx" amount={hrTotal} count={hrInvoiceCount} unit="invoice" />
-        <CostCard label="Finance OpEx" amount={financeTotal} count={financeInvoiceCount} unit="invoice" />
-        <CostCard label="Marketing OpEx" amount={marketingTotal} count={marketingInvoiceCount} unit="invoice" />
-        <CostCard label="Director OpEx" amount={directorOpexTotal} count={directorPayoutCount} unit="payout" />
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
+        <CostCard label="HR OPEX" amount={hrTotal} count={hrInvoiceCount} unit="invoice" />
+        <CostCard label="Finance OPEX" amount={financeTotal} count={financeInvoiceCount} unit="invoice" />
+        <CostCard
+          label="Marketing OPEX"
+          amount={marketingOpexFromPayroll > 0 ? marketingOpexFromPayroll : marketingTotal}
+          count={marketingInvoiceCount}
+          unit="invoice"
+          note={marketingOpexFromPayroll > 0 ? 'from payroll — no invoice' : undefined}
+        />
+        <CostCard label="Director Office OPEX" amount={directorOfficeTotal} count={directorOfficeExisting.length} unit="invoice" />
+        <CostCard label="Director OPEX" amount={directorAttributionTotal} count={directorAttributionExisting.length} unit="invoice" />
       </div>
 
       <InvoicesList invoices={invoiceList} companyMap={companyMap} period={period} />
@@ -231,6 +276,28 @@ export default async function BillingView({ searchParams }: Props) {
           canCreate={user.role === 'finance'}
         />
       </div>
+      <ManualOpexSection
+        title="Director Office OPEX"
+        poolLabel="Director Office Department Pool"
+        description="Bill subsidiaries for Director Office staff costs."
+        billingMode="director_office_attribution"
+        period={period}
+        companies={companyList}
+        existing={directorOfficeExisting}
+        canCreate={user.role === 'finance'}
+      />
+
+      <ManualOpexSection
+        title="Director OPEX"
+        poolLabel="Director Department Pool"
+        description="Bill subsidiaries for Director OPEX. Invoice payments credit the Director Dept Pool where directors get paid from."
+        billingMode="director_attribution"
+        period={period}
+        companies={companyList}
+        existing={directorAttributionExisting}
+        canCreate={user.role === 'finance'}
+      />
+
       <FixedSplitPanel
         currentPeriod={period}
         canGenerate={user.role === 'finance'}
@@ -261,11 +328,13 @@ function CostCard({
   amount,
   count,
   unit,
+  note,
 }: {
   label: string
   amount: number
   count: number
   unit: string
+  note?: string
 }) {
   const muted = amount === 0
   return (
@@ -275,7 +344,7 @@ function CostCard({
         {formatMoney(amount)}
       </div>
       <div className="font-mono text-xs text-muted mt-2">
-        {count} {unit}{count === 1 ? '' : 's'}
+        {note ?? `${count} ${unit}${count === 1 ? '' : 's'}`}
       </div>
     </div>
   )

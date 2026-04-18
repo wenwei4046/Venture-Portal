@@ -31,6 +31,95 @@ export interface HeadcountEntry {
   headcount: number
 }
 
+// ─── Manual OPEX invoice creation (Finance, Task 4) ─────────────────────────
+//
+// Unlike generate_monthly_invoices (which auto-splits via billing rules),
+// this action lets Finance type a specific amount for a specific subsidiary
+// under one of the OPEX billing modes. Created invoice starts in 'draft';
+// Finance issues it separately via the existing billing flow, then the
+// knock-off trigger (migration 133 + 155) credits the correct pool.
+//
+// Used by the Director Office OPEX + Director OPEX sections on
+// Statement > Invoice. Could be extended to HR/Finance OPEX rows later
+// if Finance wants fully-manual control over those too (user's Task 4
+// eventual goal; still manual-only for the director modes for now).
+
+const MANUAL_OPEX_BILLING_MODES = [
+  'hr_pool_split',
+  'finance_attribution',
+  'director_office_attribution',
+  'director_attribution',
+] as const
+
+export type ManualOpexBillingMode = (typeof MANUAL_OPEX_BILLING_MODES)[number]
+
+export async function createOpexInvoice(formData: FormData): Promise<void> {
+  const user = await requireRole(['finance'])
+  const supabase = await createClient()
+
+  const companyId = (formData.get('company_id') as string | null) ?? ''
+  const rawPeriod = (formData.get('period_month') as string | null) ?? ''
+  const rawBillingMode = (formData.get('billing_mode') as string | null) ?? ''
+  const rawAmount = (formData.get('amount') as string | null) ?? ''
+
+  if (!companyId) throw new Error('Subsidiary is required')
+  if (!rawPeriod) throw new Error('Period is required')
+  if (!MANUAL_OPEX_BILLING_MODES.includes(rawBillingMode as ManualOpexBillingMode)) {
+    throw new Error(`Unsupported billing mode for manual OPEX invoice: ${rawBillingMode}`)
+  }
+  const billingMode = rawBillingMode as ManualOpexBillingMode
+
+  const amount = Number(rawAmount)
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error('Amount must be a positive number')
+  }
+
+  const period = dayjs(rawPeriod).startOf('month').format('YYYY-MM-DD')
+  await assertPeriodOpen(supabase, period)
+
+  // Refuse if an invoice already exists for this (company, period, billing_mode)
+  const { data: existing } = await supabase
+    .from('invoices')
+    .select('id, invoice_no')
+    .eq('company_id', companyId)
+    .eq('period_month', period)
+    .eq('billing_mode', billingMode)
+    .limit(1)
+
+  if (existing && existing.length > 0) {
+    throw new Error(
+      `Invoice already exists for this subsidiary + period + billing mode (${existing[0].invoice_no}). Edit that one instead.`,
+    )
+  }
+
+  // Sequence: count existing invoices for this period + 1
+  const { count } = await supabase
+    .from('invoices')
+    .select('*', { count: 'exact', head: true })
+    .eq('period_month', period)
+
+  const yyyymm = dayjs(period).format('YYYYMM')
+  const seq = (count ?? 0) + 1
+  const invoiceNo = `HV-INV-${yyyymm}-${String(seq).padStart(4, '0')}`
+
+  const { error } = await supabase.from('invoices').insert({
+    invoice_no: invoiceNo,
+    company_id: companyId,
+    period_month: period,
+    billing_mode: billingMode,
+    base_amount: amount,
+    total_amount: amount,
+    status: 'draft',
+    version: 1,
+    created_by: user.id,
+  })
+
+  if (error) throw new Error(`Failed to create invoice: ${error.message}`)
+
+  revalidatePath('/statements/invoices')
+  revalidatePath('/billing')
+}
+
 // ─── Generate monthly invoices for a period (Finance) ────────────────────────
 
 export async function generateMonthlyInvoices(

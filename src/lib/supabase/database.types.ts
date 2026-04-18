@@ -3835,6 +3835,8 @@ export type Database = {
         | "marketing_project"
         | "fixed_split"
         | "non_billable"
+        | "director_office_attribution"
+        | "director_attribution"
       claim_status: "pending" | "approved" | "rejected" | "paid"
       claim_type: "project" | "benefit"
       commission_base_source:
@@ -4085,6 +4087,8 @@ export const Constants = {
         "marketing_project",
         "fixed_split",
         "non_billable",
+        "director_office_attribution",
+        "director_attribution",
       ],
       claim_status: ["pending", "approved", "rejected", "paid"],
       claim_type: ["project", "benefit"],
