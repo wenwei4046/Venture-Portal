@@ -20,26 +20,30 @@ export default function PortalFrame({
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   return (
-    <div className="flex h-screen overflow-hidden bg-paper">
-      <Sidebar
-        role={user.role}
-        mobileOpen={mobileNavOpen}
-        onClose={() => setMobileNavOpen(false)}
-      />
+    <div className="flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible">
+      <div className="print:hidden contents">
+        <Sidebar
+          role={user.role}
+          mobileOpen={mobileNavOpen}
+          onClose={() => setMobileNavOpen(false)}
+        />
+      </div>
 
       {/* Backdrop — mobile only, click-to-dismiss */}
       {mobileNavOpen ? (
         <div
           onClick={() => setMobileNavOpen(false)}
-          className="fixed inset-0 bg-ink/40 z-40 md:hidden"
+          className="fixed inset-0 bg-ink/40 z-40 md:hidden print:hidden"
           aria-label="Close navigation"
         />
       ) : null}
 
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <TopBar user={user} onMenuClick={() => setMobileNavOpen(true)} />
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-6 md:py-10 page-enter">
+      <div className="flex flex-col flex-1 overflow-hidden print:overflow-visible">
+        <div className="print:hidden contents">
+          <TopBar user={user} onMenuClick={() => setMobileNavOpen(true)} />
+        </div>
+        <main className="flex-1 overflow-y-auto print:overflow-visible">
+          <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-6 md:py-10 page-enter print:max-w-none print:p-0">
             {children}
           </div>
         </main>
