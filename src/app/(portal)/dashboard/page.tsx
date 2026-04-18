@@ -480,11 +480,8 @@ export default async function DashboardPage() {
     }
 
     if (userRole === 'dept_manager') {
-      // Dept Manager Dashboard — role-specific overview. Currently only
-      // Marketing has a real P&L; HR/Finance dept pools are cost-to-cost
-      // and balance at zero by design. Either way, the dept_manager sees
-      // their own department's pool state + their own submitted expense
-      // requests awaiting Principal sign-off.
+      // Dept Manager Dashboard — shows the manager's own department pool
+      // state + their submitted expense requests awaiting Principal sign-off.
       if (!user.department_id) {
         return (
           <div className="py-16 text-center">

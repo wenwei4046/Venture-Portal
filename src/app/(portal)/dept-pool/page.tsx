@@ -220,11 +220,7 @@ export default async function DeptPoolPage() {
                           >
                             View
                           </Link>
-                        ) : (
-                          <span className="font-serif italic text-muted text-xs">
-                            cost-to-cost
-                          </span>
-                        )}
+                        ) : null}
                       </td>
                     </tr>
                   )
