@@ -3716,6 +3716,15 @@ export type Database = {
           total_statutory: number
         }[]
       }
+      get_payroll_breakdown_by_pool: {
+        Args: { p_request_id: string }
+        Returns: {
+          dept_name: string
+          pool_balance: number
+          pool_key: string
+          required_amount: number
+        }[]
+      }
       get_submitted_hr_summary: {
         Args: { p_period: string }
         Returns: {

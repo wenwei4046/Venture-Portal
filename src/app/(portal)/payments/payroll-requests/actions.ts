@@ -10,38 +10,51 @@ import { requireRole } from '@/lib/auth'
  * Stage E — Finance generates a Payment Voucher against a submitted
  * payroll_payment_request.
  *
- * The PV is created in 'pending_approval' status (goes straight to Principal,
- * no draft step) with:
+ * Task 3: Finance now allocates the payroll total across up to 5 Department
+ * Pools (HR / Finance / Director Office / Marketing + a spare slot) in the
+ * Generate PV form. Each pool contribution writes one payment_voucher_sources
+ * row; the sum is validated to equal request.amount here and again by the
+ * pvs_sum_matches_voucher trigger on approval.
+ *
+ * The PV is created in 'pending_approval' status with:
  *   - voucher_type = 'payroll_bank_transfer'
  *   - direction = 'debit'
  *   - amount = request.amount (locked)
  *   - bank_account_id = source bank picked by Finance
- *   - payment_voucher_sources = one row with the source pool picked by Finance
+ *   - payment_voucher_sources = up to 5 rows (one per Dept Pool allocation)
  *
- * Sufficient-balance check is enforced here (user constraint 2026-04-17):
- *   - source bank balance ≥ request amount — otherwise the server action
- *     aborts before inserting the PV. The same bank-balance check runs again
- *     in approveVoucher when Principal approves, so this is a pre-check to
- *     give Finance an early error instead of a failed approval later.
+ * Pre-checks before insert:
+ *   - Source bank balance ≥ request.amount (same check runs again on approval)
+ *   - Sum of source allocations == request.amount
+ *   - Each source pool has enough balance (operating_pools trigger would also
+ *     reject at approval; the UI check gives Finance an early error)
  *
- * On success:
- *   - PV row inserted with reference_type='payroll_payment_request', reference_id=requestId
- *   - payroll_payment_requests.pv_id + status='pv_generated' + source_bank_id set
- *   - Finance is redirected to /payments/[voucherId] so they can review and
- *     edit source pools before Principal sees it.
- *
- * Multi-pool sourcing: this action sets ONE source pool. If the payroll needs
- * to draw from multiple operating pools (HR OPEX + Finance OPEX + etc.),
- * Finance opens the PV detail page and adds more rows to payment_voucher_sources
- * before submitting to Principal. This keeps the queue UI minimal.
+ * On success: redirect to /payments/[voucherId] so Finance can review before
+ * submitting to Principal.
  */
+export interface PayrollPoolSource {
+  pool: string
+  amount: number
+}
+
 export async function generatePvFromRequest(
   requestId: string,
   sourceBankId: string,
-  sourcePool: string,
+  sources: PayrollPoolSource[],
 ): Promise<string> {
   const user = await requireRole(['finance'])
   const supabase = await createClient()
+
+  if (!Array.isArray(sources) || sources.length === 0) {
+    throw new Error('At least one source pool allocation is required')
+  }
+  if (sources.length > 5) {
+    throw new Error('Too many source pools — the voucher supports at most 5')
+  }
+  for (const s of sources) {
+    if (!s.pool || typeof s.pool !== 'string') throw new Error('Invalid source pool')
+    if (!(s.amount > 0)) throw new Error(`Allocation for ${s.pool} must be positive`)
+  }
 
   // ── Read the request + its linked payroll_run for period context ──────────
   const { data: req, error: reqErr } = await supabase
@@ -63,6 +76,16 @@ export async function generatePvFromRequest(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const periodMonth = (req.payroll_runs as any).period_month as string
   const amount = Number(req.amount)
+
+  // ── Validate source allocation sum matches request total ──────────────────
+  const allocatedSum = sources.reduce((acc, s) => acc + s.amount, 0)
+  const allocatedCents = Math.round(allocatedSum * 100)
+  const amountCents = Math.round(amount * 100)
+  if (allocatedCents !== amountCents) {
+    throw new Error(
+      `Source allocation RM ${allocatedSum.toFixed(2)} does not match payroll total RM ${amount.toFixed(2)}`,
+    )
+  }
 
   // ── Validate + sufficient-balance check on the source bank ────────────────
   const { data: bank, error: bankErr } = await supabase
@@ -121,19 +144,24 @@ export async function generatePvFromRequest(
     throw new Error(`Failed to create PV: ${vErr?.message ?? 'unknown'}`)
   }
 
-  // ── Add the source pool row. Finance can add more pools on the PV detail ──
+  // ── Insert source pool allocations (up to 5 rows) ─────────────────────────
   const { error: srcErr } = await supabase
     .from('payment_voucher_sources')
-    .insert({
-      voucher_id: voucher.id,
-      pool: sourcePool,
-      amount,
-    })
+    .insert(
+      sources.map(s => ({
+        voucher_id: voucher.id,
+        pool: s.pool,
+        amount: s.amount,
+      })),
+    )
 
   if (srcErr) {
-    // Best effort: PV exists but source row failed. Warn Finance to fix on
-    // the detail page before submitting for approval.
-    console.error('Failed to insert voucher source:', srcErr.message)
+    // Best effort: PV exists but source rows failed. Surface the error so
+    // Finance can fix on the detail page before submitting for approval.
+    console.error('Failed to insert voucher sources:', srcErr.message)
+    throw new Error(
+      `PV ${voucher.voucher_no} created but source allocations failed: ${srcErr.message}`,
+    )
   }
 
   // ── Open an approval_requests row so Principal's /approvals queue shows

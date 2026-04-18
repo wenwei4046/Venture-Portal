@@ -3,7 +3,7 @@ import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
-import GeneratePvForm from './_components/GeneratePvForm'
+import GeneratePvForm, { type PoolBreakdownRow } from './_components/GeneratePvForm'
 
 interface RequestRow {
   id: string
@@ -18,6 +18,13 @@ interface RequestRow {
   pv_status: string | null
 }
 
+interface BreakdownRpcRow {
+  pool_key: string
+  dept_name: string
+  required_amount: number | string
+  pool_balance: number | string
+}
+
 export default async function PayrollRequestsPage() {
   await requireRole(['finance', 'principal'])
   const supabase = await createClient()
@@ -25,7 +32,6 @@ export default async function PayrollRequestsPage() {
   const [
     { data: requests },
     { data: banks },
-    { data: poolBalances },
   ] = await Promise.all([
     supabase
       .from('payroll_payment_requests')
@@ -42,9 +48,6 @@ export default async function PayrollRequestsPage() {
       .select('id, bank_name, current_balance')
       .eq('status', 'active')
       .order('is_primary', { ascending: false }),
-    supabase
-      .from('operating_pool_balance')
-      .select('pool_type, balance'),
   ])
 
   const rows: RequestRow[] = (requests ?? []).map(r => {
@@ -77,19 +80,27 @@ export default async function PayrollRequestsPage() {
     current_balance: Number(b.current_balance ?? 0),
   }))
 
-  const POOL_LABELS: Record<string, string> = {
-    hr_opex: 'HR OPEX',
-    finance_opex: 'Finance OPEX',
-    director_opex: 'Director OPEX',
-  }
-  const poolBalanceMap = new Map(
-    (poolBalances ?? []).map(p => [p.pool_type, Number(p.balance ?? 0)]),
+  // Task 3: fetch per-request dept breakdown (HR / Finance / Director Office /
+  // Marketing) so the Generate PV form can show who owes what and how much
+  // each Department Pool has available. Parallelised across submitted rows.
+  const breakdownResults = await Promise.all(
+    submittedRows.map(r =>
+      supabase
+        .rpc('get_payroll_breakdown_by_pool', { p_request_id: r.id })
+        .then(res => ({
+          id: r.id,
+          rows: ((res.data ?? []) as unknown as BreakdownRpcRow[]).map(
+            (b): PoolBreakdownRow => ({
+              pool_key: b.pool_key,
+              dept_name: b.dept_name,
+              required_amount: Number(b.required_amount ?? 0),
+              pool_balance: Number(b.pool_balance ?? 0),
+            }),
+          ),
+        })),
+    ),
   )
-  const poolOptions = (['hr_opex', 'finance_opex', 'director_opex'] as const).map(k => ({
-    key: k,
-    label: POOL_LABELS[k]!,
-    balance: poolBalanceMap.get(k) ?? 0,
-  }))
+  const breakdownByRequest = new Map(breakdownResults.map(r => [r.id, r.rows]))
 
   return (
     <div>
@@ -102,9 +113,9 @@ export default async function PayrollRequestsPage() {
         </Link>
         <h1 className="font-serif text-3xl text-ink mt-3">Payroll Requests</h1>
         <p className="font-serif italic text-graphite text-base mt-2">
-          HR has requested payroll payment. Generate a Payment Voucher for each
-          submitted request, pick the source bank and pool, and submit to Principal.
-          <em> Bank balance is checked before the PV is created.</em>
+          HR has requested payroll payment. Allocate the total across each
+          Department Pool, pick the source bank, then submit to Principal.
+          <em> Bank and pool balances are checked before the PV is created.</em>
         </p>
       </div>
 
@@ -155,7 +166,7 @@ export default async function PayrollRequestsPage() {
                   requestId={r.id}
                   amount={r.amount}
                   banks={bankOptions}
-                  pools={poolOptions}
+                  breakdown={breakdownByRequest.get(r.id) ?? []}
                 />
               </div>
             ))}
