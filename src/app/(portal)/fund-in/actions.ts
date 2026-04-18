@@ -134,7 +134,7 @@ export async function createFundSource(formData: FormData) {
     throw new Error(`Failed to create fund source: ${error.message}`)
   }
 
-  // Phase 7: no longer posts hv_operating_fund.fund_in on submit. Money moves
+  // Phase 7: no longer posts venture_pool.fund_in on submit. Money moves
   // when Principal approves — see approvals/actions.ts::approveRequest's
   // 'new_fund_source' branch. Here we only queue the approval request.
   const typeLabel = raw.source_type === 'subsidiary' ? 'subsidiary deposit'

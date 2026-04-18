@@ -12,7 +12,7 @@ export async function submitClaim(formData: FormData) {
   const claimType = formData.get('claim_type') as 'project' | 'benefit'
   // Phase 7 Step 13: claimant picks a source pool. Defaults to Venture Pool
   // if omitted (keeps submit working for legacy forms).
-  const sourcePool = (formData.get('source_pool') as string) || 'hv_operating_fund'
+  const sourcePool = (formData.get('source_pool') as string) || 'venture_pool'
 
   const { error } = await supabase.from('claims').insert({
     claim_type: claimType,
@@ -74,7 +74,7 @@ export async function approveClaim(claimId: string) {
   // HR payroll path (unchanged).
   if (claim.claim_type === 'project' && Number(claim.amount) > 0) {
     const amount = Number(claim.amount)
-    const sourcePool = claim.source_pool ?? 'hv_operating_fund'
+    const sourcePool = claim.source_pool ?? 'venture_pool'
     const { count } = await supabase
       .from('payment_vouchers')
       .select('*', { count: 'exact', head: true })

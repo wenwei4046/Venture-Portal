@@ -1,10 +1,11 @@
 /**
  * Alliance Bank bulk payment CSV generator.
  *
- * Two-step HV salary flow (corrected 2026-04-17 per user):
+ * Two-step HV salary flow:
  *   1. Finance transfers the month's payroll total from HL Bank → Alliance
- *      Bank as one lump sum. That's the payroll_bank_transfer voucher
- *      in Spec 4 — the cash moves via operating_pools -> alliance_bank_pool.
+ *      Bank as one lump sum. That's the payroll_bank_transfer voucher;
+ *      accounting-wise, the cash consolidates into HR Department Pool
+ *      (operating_pools.hr_opex) post-Stage-5.
  *   2. HR exports THIS CSV from the payroll grid and uploads it to the
  *      Alliance Bank portal to disburse to each employee.
  *

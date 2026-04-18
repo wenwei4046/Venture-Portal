@@ -29,7 +29,7 @@ export async function createPaymentVoucher(formData: FormData) {
   const sourcePool = (formData.get('source_pool') as string) || null
   // Phase 7 Step 10: Credit vouchers default to Venture Pool when unspecified.
   const targetPoolRaw = (formData.get('target_pool') as string) || null
-  const targetPool = targetPoolRaw ?? (direction === 'credit' ? 'hv_operating_fund' : null)
+  const targetPool = targetPoolRaw ?? (direction === 'credit' ? 'venture_pool' : null)
   const notes = (formData.get('notes') as string) || null
   // Optional loan repayment tagging on Debit vouchers.
   // Business direction: HV repaying a fund_source (subsidiary savings /
@@ -667,12 +667,27 @@ async function adjustPool(
   nowIso: string,
 ) {
   try {
-    if (pool === 'hv_operating_fund') {
-      await supabase.from('hv_operating_fund').insert({
+    if (pool === 'venture_pool') {
+      await supabase.from('venture_pool').insert({
         transaction_type: direction === 'out' ? 'expense_out' : 'profit_in',
         amount,
         description,
         reference_table: 'payment_vouchers',
+        created_by: userId,
+      })
+    } else if (pool === 'hr_opex' || pool === 'finance_opex' || pool === 'director_opex') {
+      // Post-Stage-5: HR / Finance / Director Office Dept Pools live in
+      // operating_pools. Payroll disbursement vouchers debit hr_opex here
+      // (adjustPool used to silently skip because only the venture_pool /
+      // dept_pool_* branches existed, which left alliance_bank_pool balance
+      // perpetually growing — fixed alongside the alliance_bank_pool drop).
+      await supabase.from('operating_pools').insert({
+        pool_type: pool,
+        transaction_type: direction === 'out' ? 'payroll_out' : 'transfer_in',
+        amount,
+        description,
+        reference_type: 'payment_voucher',
+        period_month: nowIso.slice(0, 7) + '-01',
         created_by: userId,
       })
     } else if (pool === 'invoice_payout_pool') {
@@ -714,7 +729,7 @@ async function adjustPool(
         // EXCEPT for Director Pool, which pays directors directly (money
         // leaves the system, not transfers to HV).
         if (direction === 'out' && pool !== 'dept_pool_director') {
-          await supabase.from('hv_operating_fund').insert({
+          await supabase.from('venture_pool').insert({
             transaction_type: 'profit_in' as const,
             amount,
             description: `Dept pool transfer: ${description}`,

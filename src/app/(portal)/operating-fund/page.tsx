@@ -20,12 +20,12 @@ export default async function OperatingFundPage() {
     { data: poolBalances },
   ] = await Promise.all([
     supabase
-      .from('hv_operating_fund')
+      .from('venture_pool')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(100),
     supabase
-      .from('hv_operating_fund')
+      .from('venture_pool')
       .select('transaction_type, amount'),
     supabase
       .from('operating_pool_balance')
@@ -75,15 +75,9 @@ export default async function OperatingFundPage() {
           <div>
             <h2 className="font-serif text-2xl text-ink">Department Pools</h2>
             <p className="font-serif italic text-graphite text-sm mt-1">
-              OPEX balance per department. Invoices settled flow in; transfers to <a href="/alliance-pool" className="underline hover:text-accent">HR Pool</a> flow out.
+              OPEX balance per department. Invoices settled flow in; payroll consolidation flows through HR Pool.
             </p>
           </div>
-          <a
-            href="/alliance-pool"
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
-          >
-            HR Pool →
-          </a>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {POOL_ORDER.map(poolType => {

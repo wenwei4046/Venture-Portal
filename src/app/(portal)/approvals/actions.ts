@@ -91,7 +91,7 @@ export async function approveRequest(formData: FormData) {
 
     if (loanForPool) {
       const companyName = (loanForPool.companies as { name: string } | null)?.name ?? 'Unknown'
-      await supabase.from('hv_operating_fund').insert({
+      await supabase.from('venture_pool').insert({
         transaction_type: 'fund_out' as const,
         amount: Number(loanForPool.principal),
         description: `Loan disbursement: ${companyName}`,
@@ -139,7 +139,7 @@ export async function approveRequest(formData: FormData) {
     }
   } else if (approval.request_type === 'new_fund_source') {
     // Phase 7: flip the fund_source from pending_approval → active, post the
-    // Venture Pool credit (hv_operating_fund.fund_in), and bump the primary
+    // Venture Pool credit (venture_pool.fund_in), and bump the primary
     // bank balance. All three only fire on approval — on submit the
     // fund_source sits quietly in pending_approval with zero ledger impact.
     const { data: fundSource, error: fsFetchError } = await supabase
@@ -167,7 +167,7 @@ export async function approveRequest(formData: FormData) {
     const typeLabel = fundSource.source_type === 'subsidiary' ? 'subsidiary deposit'
       : fundSource.source_type === 'director_loan' ? 'director loan'
       : 'dept pool transfer'
-    await supabase.from('hv_operating_fund').insert({
+    await supabase.from('venture_pool').insert({
       transaction_type: 'fund_in' as const,
       amount: Number(fundSource.amount),
       description: `Fund source: ${typeLabel}`,
@@ -443,7 +443,7 @@ export async function approveRequestGroup(formData: FormData) {
   }
 
   // ─── 4) Venture Pool: fund_out ledger entry ───
-  await supabase.from('hv_operating_fund').insert({
+  await supabase.from('venture_pool').insert({
     transaction_type: 'fund_out' as const,
     amount: Number(voucher.amount),
     description: `${voucher.voucher_no}: ${voucher.description}`,

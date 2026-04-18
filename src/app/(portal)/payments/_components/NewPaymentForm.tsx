@@ -43,7 +43,7 @@ interface Props {
 }
 
 const POOL_OPTIONS = [
-  { value: 'hv_operating_fund', label: 'Venture Pool' },
+  { value: 'venture_pool', label: 'Venture Pool' },
   { value: 'dept_pool_director', label: 'Director Pool' },
   { value: 'dept_pool_marketing', label: 'Marketing Dept Pool' },
   { value: 'dept_pool_finance', label: 'Finance Dept Pool' },
@@ -71,7 +71,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
   const [direction, setDirection] = useState<'debit' | 'credit'>(isInvoicePay ? 'credit' : 'debit')
   const [categoryCode, setCategoryCode] = useState(isInvoicePay ? 'billing_payment' : '')
   const [sourceRows, setSourceRows] = useState<SourceRow[]>(
-    isNonBillable ? [{ pool: 'hv_operating_fund', amount: '' }] : [{ pool: '', amount: '' }]
+    isNonBillable ? [{ pool: 'venture_pool', amount: '' }] : [{ pool: '', amount: '' }]
   )
   const [amount, setAmount] = useState(isInvoicePay ? invoicePreset!.total_amount.toFixed(2) : '')
   // Controlled payee fields so loan-repayment mode can auto-fill them
@@ -91,7 +91,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
   const repaymentSumMismatch = false
   // Phase 7 Step 10: pre-select Venture Pool when Credit (common case).
   const [targetPool, setTargetPool] = useState(
-    isInvoicePay ? invoicePreset!.target_pool : direction === 'credit' ? 'hv_operating_fund' : ''
+    isInvoicePay ? invoicePreset!.target_pool : direction === 'credit' ? 'venture_pool' : ''
   )
   const [files, setFiles] = useState<File[]>([])
   const [showNewCategory, setShowNewCategory] = useState(false)
@@ -238,7 +238,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
               type="button"
               onClick={() => {
                 setDirection('credit')
-                if (!targetPool) setTargetPool('hv_operating_fund')
+                if (!targetPool) setTargetPool('venture_pool')
               }}
               className={direction === 'credit'
                 ? 'px-5 py-2 bg-accent-bg text-accent font-serif italic text-sm border-l border-hairline'

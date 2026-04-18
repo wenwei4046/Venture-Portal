@@ -55,11 +55,11 @@ export default async function PnLPage({ searchParams }: Props) {
   const marketingNP = marketingRevenue - marketingStaffCost - marketingExpenses
 
   // ── SHARED SERVICES (Pass-through — billed to subs to recover cost) ──
-  const hrBilling = invoiceByMode('hr_pool_split')
-  const financeBilling = invoiceByMode('finance_attribution')
-  const rentUtilityBilling = invoiceByMode('fixed_split')
-  const totalBillback = hrBilling + financeBilling + rentUtilityBilling
-
+  // Post-Stage-3b: HR / Finance / Fixed Split modes removed. Shared-services
+  // bill-back will come back in via the manual Create Invoice flow; until
+  // that's wired, this section is stubbed at zero so the rest of the P&L
+  // still renders.
+  const totalBillback = 0
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const hrRow = (hrSummary as any[])?.find((r: { department_name: string }) => r.department_name === 'HR')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -155,16 +155,8 @@ export default async function PnLPage({ searchParams }: Props) {
           </h2>
           <div className="space-y-2">
             <div className="flex items-baseline justify-between">
-              <span className="font-serif text-base text-ink">HR pool split billing</span>
-              <span className="font-mono tabular text-base font-medium text-ink">{formatMoney(hrBilling)}</span>
-            </div>
-            <div className="flex items-baseline justify-between">
-              <span className="font-serif text-base text-ink">Finance billing</span>
-              <span className="font-mono tabular text-base font-medium text-ink">{formatMoney(financeBilling)}</span>
-            </div>
-            <div className="flex items-baseline justify-between">
-              <span className="font-serif text-base text-ink">Rent & utility bill-back</span>
-              <span className="font-mono tabular text-base font-medium text-ink">{formatMoney(rentUtilityBilling)}</span>
+              <span className="font-serif text-base text-ink">Bill-back revenue</span>
+              <span className="font-mono tabular text-base font-medium text-muted italic">pending new flow</span>
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif text-base text-ink">Shared services staff cost</span>

@@ -11,9 +11,20 @@ interface Props {
   period: string
   expanded: boolean
   onToggleExpand: () => void
+  selected: boolean
+  onToggleSelect: () => void
+  selectDisabled: boolean
 }
 
-export default function PayrollRow({ row, period, expanded, onToggleExpand }: Props) {
+export default function PayrollRow({
+  row,
+  period,
+  expanded,
+  onToggleExpand,
+  selected,
+  onToggleSelect,
+  selectDisabled,
+}: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [edit, setEdit] = useState({
@@ -74,6 +85,17 @@ export default function PayrollRow({ row, period, expanded, onToggleExpand }: Pr
   return (
     <>
       <tr className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors">
+        <td className="py-5 pl-2 pr-2 w-8">
+          <input
+            type="checkbox"
+            aria-label={`Select ${row.staff_name}`}
+            checked={selected}
+            disabled={locked || selectDisabled}
+            onChange={onToggleSelect}
+            className="w-4 h-4 accent-accent cursor-pointer disabled:cursor-not-allowed disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:outline-none"
+            title={locked ? `Cannot delete — status is ${row.status}` : undefined}
+          />
+        </td>
         <td className="py-5 pr-4 font-serif text-md text-ink">{row.staff_name}</td>
         <td className="py-5 pr-4 font-serif italic text-graphite text-sm">{row.dept_name}</td>
         <td className="py-5 pr-4 text-right">{cell('basic_salary', edit.basic_salary)}</td>
@@ -119,7 +141,7 @@ export default function PayrollRow({ row, period, expanded, onToggleExpand }: Pr
       </tr>
       {expanded && (
         <tr className="border-b border-hairline bg-surface-2/30">
-          <td colSpan={14} className="py-4 px-4">
+          <td colSpan={15} className="py-4 px-4">
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-8 gap-y-3 text-sm">
               <div>
                 <div className="text-xs uppercase tracking-wide text-muted font-sans">Pro-rata</div>

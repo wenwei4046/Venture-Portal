@@ -6,7 +6,7 @@ import { generateMonthlyInvoices, type GenerateInvoicesResult } from '../actions
 
 interface Props {
   currentPeriod: string
-  modes?: string[]       // e.g. ['hr_pool_split'] — null = all
+  modes?: string[]       // e.g. ['marketing_project'] — null = all
   label?: string         // button label override
   description?: string   // confirmation description override
 }

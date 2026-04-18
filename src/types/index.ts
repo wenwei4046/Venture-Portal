@@ -152,11 +152,12 @@ export interface BaseRateHistory {
 // ─── Service Billing ──────────────────────────────────────────────────────────
 
 export type BillingMode =
-  | 'hr_pool_split'
-  | 'finance_attribution'
   | 'marketing_project'
-  | 'fixed_split'
   | 'non_billable'
+  | 'director_office_attribution'
+  | 'director_attribution'
+  | 'hr_attribution'
+  | 'finance_attribution'
 
 export type ContractStatus = 'active' | 'completed' | 'cancelled'
 

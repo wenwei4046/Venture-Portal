@@ -25,39 +25,26 @@ export function isValidInvoiceNoFormat(invoiceNo: string | null | undefined): bo
 }
 
 /**
- * Formats an HR pool split invoice amount: department total CTC × allocation %.
- * Purely illustrative — the same formula runs inside generate_monthly_invoices
- * via set-based SQL (ROUND(x * y, 2)). Kept here so the UI and tests share one
- * source of truth for the rounding behaviour.
- */
-export function computeHRPoolInvoiceAmount(
-  deptTotalCtc: number,
-  splitPct: number
-): number {
-  return Math.round(deptTotalCtc * splitPct * 100) / 100
-}
-
-/**
  * Valid billing modes. Must match the `billing_mode` Postgres enum.
  * Used by UI labels + invoice generation tests.
  */
 export const BILLING_MODES = [
-  'hr_pool_split',
-  'finance_attribution',
   'marketing_project',
-  'fixed_split',
   'non_billable',
+  'director_office_attribution',
+  'director_attribution',
+  'hr_attribution',
+  'finance_attribution',
 ] as const
 
 export type BillingMode = (typeof BILLING_MODES)[number]
 
 /**
- * Modes currently handled by generate_monthly_invoices (Phase 2 Step 5).
- * fixed_split and non_billable land in Step 8 with the Rent/Utility settings.
+ * Modes currently handled by generate_monthly_invoices.
+ * Post-Stage-3b: only marketing_project auto-generates.
+ * Director modes come from the manual ManualOpexSection / Create Invoice form.
  */
 export const AUTO_GENERATED_BILLING_MODES: readonly BillingMode[] = [
-  'hr_pool_split',
-  'finance_attribution',
   'marketing_project',
 ] as const
 
@@ -67,24 +54,22 @@ export const AUTO_GENERATED_BILLING_MODES: readonly BillingMode[] = [
  * statement generation flow in Phase 2 Step 6.
  *
  * Returns `null` for modes that do not produce a billable statement line
- * (currently `non_billable` — those flow through hv_operating_fund instead).
+ * (currently `non_billable` — those flow through venture_pool instead).
  *
  * Categories are seeded in `20260101000003_statements.sql`.
  */
 export function billingModeToCategoryCode(mode: BillingMode): string | null {
   switch (mode) {
-    case 'hr_pool_split':
+    case 'marketing_project':
+      return 'marketing_project'
+    case 'director_office_attribution':
+      return 'director_office'
+    case 'director_attribution':
+      return 'director'
+    case 'hr_attribution':
       return 'hr_pool'
     case 'finance_attribution':
       return 'finance_staff'
-    case 'marketing_project':
-      return 'marketing_project'
-    case 'fixed_split':
-      // Fixed split lines are keyed by sub-type at insert time — the invoice
-      // generator knows whether the row is rent or utility. For now, Step 5
-      // does not generate fixed_split invoices (Step 8 adds them with the
-      // sub-type stored on the invoice), so this branch is unreachable.
-      return 'rent'
     case 'non_billable':
       return null
   }
@@ -96,14 +81,16 @@ export function billingModeToCategoryCode(mode: BillingMode): string | null {
  */
 export function billingModeLabel(mode: BillingMode): string {
   switch (mode) {
-    case 'hr_pool_split':
-      return 'HR Pool Split'
-    case 'finance_attribution':
-      return 'Finance Attribution'
     case 'marketing_project':
       return 'Marketing Project'
-    case 'fixed_split':
-      return 'Fixed Split'
+    case 'director_office_attribution':
+      return 'Director Office OPEX'
+    case 'director_attribution':
+      return 'Director OPEX'
+    case 'hr_attribution':
+      return 'HR OPEX'
+    case 'finance_attribution':
+      return 'Finance OPEX'
     case 'non_billable':
       return 'Non-billable'
   }

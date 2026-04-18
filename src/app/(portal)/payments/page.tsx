@@ -9,7 +9,7 @@ import PaymentFilters from './_components/PaymentFilters'
 import BackToTop from './_components/BackToTop'
 
 const POOL_LABELS: Record<string, string> = {
-  hv_operating_fund: 'Venture Pool',
+  venture_pool: 'Venture Pool',
   dept_pool_director: 'Director Pool',
   dept_pool_marketing: 'Marketing',
   dept_pool_finance: 'Finance',

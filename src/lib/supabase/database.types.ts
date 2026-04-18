@@ -58,50 +58,6 @@ export type Database = {
           },
         ]
       }
-      alliance_bank_pool: {
-        Row: {
-          amount: number
-          created_at: string
-          created_by: string
-          description: string
-          id: string
-          period_month: string | null
-          reference_id: string | null
-          reference_type: string | null
-          transaction_type: Database["public"]["Enums"]["alliance_pool_txn_type"]
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          created_by: string
-          description: string
-          id?: string
-          period_month?: string | null
-          reference_id?: string | null
-          reference_type?: string | null
-          transaction_type: Database["public"]["Enums"]["alliance_pool_txn_type"]
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          created_by?: string
-          description?: string
-          id?: string
-          period_month?: string | null
-          reference_id?: string | null
-          reference_type?: string | null
-          transaction_type?: Database["public"]["Enums"]["alliance_pool_txn_type"]
-        }
-        Relationships: [
-          {
-            foreignKeyName: "alliance_bank_pool_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       approval_requests: {
         Row: {
           amount: number | null
@@ -1737,7 +1693,7 @@ export type Database = {
           },
         ]
       }
-      hv_operating_fund: {
+      venture_pool: {
         Row: {
           amount: number
           created_at: string
@@ -1770,7 +1726,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "hv_operating_fund_created_by_fkey"
+            foreignKeyName: "venture_pool_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "users"
@@ -1834,9 +1790,13 @@ export type Database = {
           contract_id: string | null
           created_at: string
           created_by: string
+          description: string | null
+          due_date: string | null
           id: string
+          invoice_date: string | null
           invoice_no: string | null
           period_month: string
+          reference_no: string | null
           routes_to_pool:
             | Database["public"]["Enums"]["operating_pool_type"]
             | null
@@ -1853,9 +1813,13 @@ export type Database = {
           contract_id?: string | null
           created_at?: string
           created_by: string
+          description?: string | null
+          due_date?: string | null
           id?: string
+          invoice_date?: string | null
           invoice_no?: string | null
           period_month: string
+          reference_no?: string | null
           routes_to_pool?:
             | Database["public"]["Enums"]["operating_pool_type"]
             | null
@@ -1872,9 +1836,13 @@ export type Database = {
           contract_id?: string | null
           created_at?: string
           created_by?: string
+          description?: string | null
+          due_date?: string | null
           id?: string
+          invoice_date?: string | null
           invoice_no?: string | null
           period_month?: string
+          reference_no?: string | null
           routes_to_pool?:
             | Database["public"]["Enums"]["operating_pool_type"]
             | null
@@ -2824,6 +2792,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           created_at: string
+          director_office_total: number
           director_salary_total: number
           finance_opex_total: number
           hr_opex_total: number
@@ -2844,6 +2813,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           created_at?: string
+          director_office_total?: number
           director_salary_total?: number
           finance_opex_total?: number
           hr_opex_total?: number
@@ -2864,6 +2834,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           created_at?: string
+          director_office_total?: number
           director_salary_total?: number
           finance_opex_total?: number
           hr_opex_total?: number
@@ -3369,14 +3340,6 @@ export type Database = {
       }
     }
     Views: {
-      alliance_bank_pool_balance: {
-        Row: {
-          balance: number | null
-          last_txn_at: string | null
-          txn_count: number | null
-        }
-        Relationships: []
-      }
       approval_requests_with_target: {
         Row: {
           amount: number | null
@@ -3509,7 +3472,7 @@ export type Database = {
           },
         ]
       }
-      hv_operating_fund_balance: {
+      venture_pool_balance: {
         Row: {
           balance: number | null
         }
@@ -3646,15 +3609,6 @@ export type Database = {
       }
       dashboard_summary: { Args: never; Returns: Json }
       format_invoice_no: { Args: { p_period: string }; Returns: string }
-      generate_fixed_split_invoices: {
-        Args: {
-          p_headcounts?: Json
-          p_period_month: string
-          p_rent_total?: number
-          p_utility_total?: number
-        }
-        Returns: Json
-      }
       generate_monthly_invoices: {
         Args: { p_modes?: string[]; p_period_month: string }
         Returns: Json
@@ -3804,7 +3758,6 @@ export type Database = {
     }
     Enums: {
       account_type: "asset" | "liability" | "equity" | "revenue" | "expense"
-      alliance_pool_txn_type: "transfer_in" | "salary_payout_out" | "adjustment"
       approval_request_type:
         | "new_loan"
         | "base_rate"
@@ -3830,13 +3783,12 @@ export type Database = {
         | "rejected"
         | "expired"
       billing_mode:
-        | "hr_pool_split"
-        | "finance_attribution"
         | "marketing_project"
-        | "fixed_split"
         | "non_billable"
         | "director_office_attribution"
         | "director_attribution"
+        | "hr_attribution"
+        | "finance_attribution"
       claim_status: "pending" | "approved" | "rejected" | "paid"
       claim_type: "project" | "benefit"
       commission_base_source:
@@ -4050,11 +4002,6 @@ export const Constants = {
   public: {
     Enums: {
       account_type: ["asset", "liability", "equity", "revenue", "expense"],
-      alliance_pool_txn_type: [
-        "transfer_in",
-        "salary_payout_out",
-        "adjustment",
-      ],
       approval_request_type: [
         "new_loan",
         "base_rate",
@@ -4082,13 +4029,12 @@ export const Constants = {
         "expired",
       ],
       billing_mode: [
-        "hr_pool_split",
-        "finance_attribution",
         "marketing_project",
-        "fixed_split",
         "non_billable",
         "director_office_attribution",
         "director_attribution",
+        "hr_attribution",
+        "finance_attribution",
       ],
       claim_status: ["pending", "approved", "rejected", "paid"],
       claim_type: ["project", "benefit"],

@@ -31,7 +31,10 @@ export default async function HRPaymentPage() {
       .select('id, status, total_amount, rejection_reason')
       .eq('period_month', period)
       .maybeSingle(),
-    supabase.from('alliance_bank_pool_balance').select('balance'),
+    supabase
+      .from('operating_pool_balance')
+      .select('balance')
+      .eq('pool_type', 'hr_opex'),
     supabase
       .from('hr_monthly_payroll')
       .select('id, net, gross, status, hr_staff_costs(employee_name, departments(name))')

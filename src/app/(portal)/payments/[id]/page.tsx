@@ -8,7 +8,7 @@ import { submitForApproval, approveVoucher, executeVoucher, voidVoucher } from '
 import VoucherActions from './_components/VoucherActions'
 
 const POOL_LABELS: Record<string, string> = {
-  hv_operating_fund: 'Venture Pool',
+  venture_pool: 'Venture Pool',
   dept_pool_director: 'Director Pool',
   dept_pool_marketing: 'Marketing Dept Pool',
   dept_pool_finance: 'Finance Dept Pool',

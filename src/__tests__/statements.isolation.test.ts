@@ -33,7 +33,7 @@ describe('Phase 7 Step 11 — statements actions stay display-only', () => {
   }
 
   const forbidden = [
-    'hv_operating_fund',
+    'venture_pool',
     'dept_pools',
     'invoice_payout_pool',
     'payment_vouchers',

@@ -15,59 +15,42 @@ export interface GenerateInvoicesResult {
   mode_counts: Record<string, number>
 }
 
-export interface FixedSplitResult {
-  generated: number
-  rent_invoices: number
-  utility_invoices: number
-  hv_rent_share: number
-  hv_utility_share: number
-  total_headcount: number
-  hv_headcount: number
-  period: string
-}
-
-export interface HeadcountEntry {
-  company_id: string | null
-  headcount: number
-}
-
-// ─── Manual OPEX invoice creation (Finance, Task 4) ─────────────────────────
+// ─── Create one-off invoice (Finance, Stage 4) ─────────────────────────────
 //
-// Unlike generate_monthly_invoices (which auto-splits via billing rules),
-// this action lets Finance type a specific amount for a specific subsidiary
-// under one of the OPEX billing modes. Created invoice starts in 'draft';
-// Finance issues it separately via the existing billing flow, then the
-// knock-off trigger (migration 133 + 155) credits the correct pool.
-//
-// Used by the Director Office OPEX + Director OPEX sections on
-// Statement > Invoice. Could be extended to HR/Finance OPEX rows later
-// if Finance wants fully-manual control over those too (user's Task 4
-// eventual goal; still manual-only for the director modes for now).
+// Full-featured sibling of createOpexInvoice, used by the Create Invoice
+// button on the billing page. Accepts the richer metadata Finance needs on
+// an actual invoice (invoice_date, due_date, description, reference_no) on
+// top of the existing company/period/amount/billing_mode fields.
 
-const MANUAL_OPEX_BILLING_MODES = [
-  'hr_pool_split',
+const CREATE_INVOICE_MODES = [
+  'hr_attribution',
   'finance_attribution',
   'director_office_attribution',
   'director_attribution',
+  'marketing_project',
 ] as const
 
-export type ManualOpexBillingMode = (typeof MANUAL_OPEX_BILLING_MODES)[number]
+export type CreateInvoiceMode = (typeof CREATE_INVOICE_MODES)[number]
 
-export async function createOpexInvoice(formData: FormData): Promise<void> {
+export async function createManualInvoice(formData: FormData): Promise<void> {
   const user = await requireRole(['finance'])
   const supabase = await createClient()
 
-  const companyId = (formData.get('company_id') as string | null) ?? ''
-  const rawPeriod = (formData.get('period_month') as string | null) ?? ''
-  const rawBillingMode = (formData.get('billing_mode') as string | null) ?? ''
-  const rawAmount = (formData.get('amount') as string | null) ?? ''
+  const companyId = String(formData.get('company_id') ?? '')
+  const rawPeriod = String(formData.get('period_month') ?? '')
+  const rawMode = String(formData.get('billing_mode') ?? '')
+  const rawAmount = String(formData.get('amount') ?? '')
+  const invoiceDate = String(formData.get('invoice_date') ?? '').trim() || null
+  const dueDate = String(formData.get('due_date') ?? '').trim() || null
+  const description = String(formData.get('description') ?? '').trim() || null
+  const referenceNo = String(formData.get('reference_no') ?? '').trim() || null
 
   if (!companyId) throw new Error('Subsidiary is required')
   if (!rawPeriod) throw new Error('Period is required')
-  if (!MANUAL_OPEX_BILLING_MODES.includes(rawBillingMode as ManualOpexBillingMode)) {
-    throw new Error(`Unsupported billing mode for manual OPEX invoice: ${rawBillingMode}`)
+  if (!CREATE_INVOICE_MODES.includes(rawMode as CreateInvoiceMode)) {
+    throw new Error(`Unsupported billing mode: ${rawMode}`)
   }
-  const billingMode = rawBillingMode as ManualOpexBillingMode
+  const billingMode = rawMode as CreateInvoiceMode
 
   const amount = Number(rawAmount)
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -77,22 +60,6 @@ export async function createOpexInvoice(formData: FormData): Promise<void> {
   const period = dayjs(rawPeriod).startOf('month').format('YYYY-MM-DD')
   await assertPeriodOpen(supabase, period)
 
-  // Refuse if an invoice already exists for this (company, period, billing_mode)
-  const { data: existing } = await supabase
-    .from('invoices')
-    .select('id, invoice_no')
-    .eq('company_id', companyId)
-    .eq('period_month', period)
-    .eq('billing_mode', billingMode)
-    .limit(1)
-
-  if (existing && existing.length > 0) {
-    throw new Error(
-      `Invoice already exists for this subsidiary + period + billing mode (${existing[0].invoice_no}). Edit that one instead.`,
-    )
-  }
-
-  // Sequence: count existing invoices for this period + 1
   const { count } = await supabase
     .from('invoices')
     .select('*', { count: 'exact', head: true })
@@ -110,14 +77,17 @@ export async function createOpexInvoice(formData: FormData): Promise<void> {
     base_amount: amount,
     total_amount: amount,
     status: 'draft',
-    version: 1,
+    invoice_date: invoiceDate,
+    due_date: dueDate,
+    description,
+    reference_no: referenceNo,
     created_by: user.id,
   })
 
   if (error) throw new Error(`Failed to create invoice: ${error.message}`)
 
-  revalidatePath('/statements/invoices')
   revalidatePath('/billing')
+  revalidatePath('/statements/invoices')
 }
 
 // ─── Generate monthly invoices for a period (Finance) ────────────────────────
@@ -165,101 +135,6 @@ export async function generateMonthlyInvoices(
     errors: Array.isArray(result.errors) ? result.errors.map(String) : [],
     period: String(result.period ?? period),
     mode_counts: (result.mode_counts ?? {}) as Record<string, number>,
-  }
-}
-
-// ─── Generate fixed split invoices (Rent + Utility) ─────────────────────────
-
-export async function generateFixedSplitInvoices(
-  formData: FormData
-): Promise<FixedSplitResult> {
-  await requireRole(['finance'])
-  const supabase = await createClient()
-
-  const rawPeriod = (formData.get('period_month') as string) ?? ''
-  const rentTotal = parseFloat((formData.get('rent_total') as string) ?? '0')
-  const utilityTotal = parseFloat(
-    (formData.get('utility_total') as string) ?? '0'
-  )
-  const headcountsRaw = (formData.get('headcounts') as string) ?? '[]'
-
-  if (!rawPeriod) throw new Error('Period month is required')
-  if (rentTotal <= 0 && utilityTotal <= 0) {
-    throw new Error('Enter at least one total (rent or utility)')
-  }
-
-  let headcounts: HeadcountEntry[]
-  try {
-    headcounts = JSON.parse(headcountsRaw)
-  } catch {
-    throw new Error('Invalid headcounts payload')
-  }
-  if (!Array.isArray(headcounts) || headcounts.length === 0) {
-    throw new Error('Enter headcounts for at least one company')
-  }
-  const totalHc = headcounts.reduce((s, h) => s + (Number(h.headcount) || 0), 0)
-  if (totalHc <= 0) {
-    throw new Error('Total headcount must be greater than 0')
-  }
-
-  const period = dayjs(rawPeriod).startOf('month').format('YYYY-MM-DD')
-
-  await assertPeriodOpen(supabase, period)
-
-  const { data, error } = await supabase.rpc('generate_fixed_split_invoices', {
-    p_period_month: period,
-    p_rent_total: rentTotal,
-    p_utility_total: utilityTotal,
-    // Supabase generated type narrows JSONB to a recursive Json; HeadcountEntry
-    // is structurally fine but won't match the recursive shape.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    p_headcounts: headcounts as any,
-  })
-
-  if (error) {
-    throw new Error(`Failed to generate fixed split invoices: ${error.message}`)
-  }
-
-  const result = data as unknown as FixedSplitResult
-
-  // Auto-deduct HV's non-billable share from Venture Pool
-  const hvRent = Number(result.hv_rent_share ?? 0)
-  const hvUtility = Number(result.hv_utility_share ?? 0)
-  const user = await requireRole(['finance', 'principal'])
-
-  if (hvRent > 0) {
-    await supabase.from('hv_operating_fund').insert({
-      transaction_type: 'expense_out' as const,
-      amount: hvRent,
-      description: `HV rent share — ${dayjs(period).format('MMM YYYY')}`,
-      reference_table: 'invoices',
-      created_by: user.id,
-    })
-  }
-  if (hvUtility > 0) {
-    await supabase.from('hv_operating_fund').insert({
-      transaction_type: 'expense_out' as const,
-      amount: hvUtility,
-      description: `HV utility share — ${dayjs(period).format('MMM YYYY')}`,
-      reference_table: 'invoices',
-      created_by: user.id,
-    })
-  }
-
-  revalidatePath('/billing')
-  revalidatePath('/statements')
-  revalidatePath('/dashboard')
-  revalidatePath('/operating-fund')
-
-  return {
-    generated: Number(result.generated ?? 0),
-    rent_invoices: Number(result.rent_invoices ?? 0),
-    utility_invoices: Number(result.utility_invoices ?? 0),
-    hv_rent_share: hvRent,
-    hv_utility_share: hvUtility,
-    total_headcount: Number(result.total_headcount ?? totalHc),
-    hv_headcount: Number(result.hv_headcount ?? 0),
-    period: String(result.period ?? period),
   }
 }
 

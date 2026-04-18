@@ -6,19 +6,19 @@ import NewPaymentForm from '../_components/NewPaymentForm'
 import { listPayableFundSources } from '../../fund-in/actions'
 
 // Settlement routing: when a sub pays an invoice, the money logically lands
-// in the dept pool that generated the service (HR OpEx → HR Pool, etc.).
-// fixed_split (rent/utility) stays on Venture Pool since HV is the landlord.
+// in the dept pool that generated the service (marketing contracts → Marketing
+// Pool, director OPEX → Director / Director Office Pool). Unknown modes fall
+// back to Venture Pool.
 function poolForBillingMode(mode: string): string {
   switch (mode) {
-    case 'hr_pool_split':
-      return 'dept_pool_hr'
-    case 'finance_attribution':
-      return 'dept_pool_finance'
     case 'marketing_project':
       return 'dept_pool_marketing'
-    case 'fixed_split':
+    case 'director_attribution':
+      return 'dept_pool_director'
+    case 'director_office_attribution':
+      return 'dept_pool_director_office'
     default:
-      return 'hv_operating_fund'
+      return 'venture_pool'
   }
 }
 

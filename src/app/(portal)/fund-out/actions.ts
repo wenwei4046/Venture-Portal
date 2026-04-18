@@ -182,7 +182,7 @@ export async function recordRepayment(formData: FormData) {
       .single()
 
     const companyName = (loanForPool?.companies as { name: string } | null)?.name ?? 'Unknown'
-    await supabase.from('hv_operating_fund').insert({
+    await supabase.from('venture_pool').insert({
       transaction_type: 'loan_repayment_in' as const,
       amount,
       description: `Loan repayment (principal): ${companyName}`,

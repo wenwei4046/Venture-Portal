@@ -6,15 +6,13 @@ import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
+import type { CreateInvoiceMode } from '../actions'
 import PeriodSelector from './PeriodSelector'
 import GenerateInvoicesButton from './GenerateInvoicesButton'
-import HRPoolSplitSection from './HRPoolSplitSection'
-import FinanceAttributionSection from './FinanceAttributionSection'
 import MarketingProjectList from './MarketingProjectList'
-import FixedSplitPanel from './FixedSplitPanel'
 import NonBillableList from './NonBillableList'
 import InvoicesList from './InvoicesList'
-import ManualOpexSection, { type ExistingInvoice } from './ManualOpexSection'
+import CreateInvoiceButton from './CreateInvoiceButton'
 
 interface Props {
   searchParams: Promise<{ period?: string }>
@@ -44,8 +42,6 @@ export default async function BillingView({ searchParams }: Props) {
     { data: marketingContracts },
     { data: invoices },
     { data: companies },
-    { data: headcountRows },
-    { data: directorSummary },
     { data: nonBillableTxns },
   ] = await Promise.all([
     supabase.rpc('get_submitted_hr_summary', { p_period: period }).maybeSingle(),
@@ -63,12 +59,7 @@ export default async function BillingView({ searchParams }: Props) {
       .order('billing_mode', { ascending: true }),
     supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('short_code'),
     supabase
-      .from('monthly_headcounts')
-      .select('company_id, headcount')
-      .eq('period_month', period),
-    supabase.rpc('get_director_payout_summary', { p_period: period }).maybeSingle(),
-    supabase
-      .from('hv_operating_fund')
+      .from('venture_pool')
       .select('id, created_at, transaction_type, amount, description, reference_table')
       .gte('created_at', periodStart)
       .lte('created_at', periodEnd)
@@ -98,12 +89,7 @@ export default async function BillingView({ searchParams }: Props) {
   const invoiceList = invoices ?? []
   const invoiceTotal = invoiceList.reduce((acc, i) => acc + Number(i.total_amount), 0)
 
-  const hrTotal = invoiceList
-    .filter((i) => i.billing_mode === 'hr_pool_split')
-    .reduce((s, i) => s + Number(i.total_amount), 0)
-  const financeTotal = invoiceList
-    .filter((i) => i.billing_mode === 'finance_attribution')
-    .reduce((s, i) => s + Number(i.total_amount), 0)
+  // Per-mode invoice sums (shown in the cost cards).
   const marketingTotal = invoiceList
     .filter((i) => i.billing_mode === 'marketing_project')
     .reduce((s, i) => s + Number(i.total_amount), 0)
@@ -113,44 +99,36 @@ export default async function BillingView({ searchParams }: Props) {
   const directorAttributionTotal = invoiceList
     .filter((i) => i.billing_mode === 'director_attribution')
     .reduce((s, i) => s + Number(i.total_amount), 0)
-  const directorOpexTotal = Number(directorSummary?.out_total_payroll_gross ?? 0)
-  const directorPayoutCount = Number(directorSummary?.out_payout_count ?? 0)
-  const hrInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'hr_pool_split').length
-  const financeInvoiceCount = invoiceList.filter(
-    (i) => i.billing_mode === 'finance_attribution'
-  ).length
+  const hrAttributionTotal = invoiceList
+    .filter((i) => i.billing_mode === 'hr_attribution')
+    .reduce((s, i) => s + Number(i.total_amount), 0)
+  const financeAttributionTotal = invoiceList
+    .filter((i) => i.billing_mode === 'finance_attribution')
+    .reduce((s, i) => s + Number(i.total_amount), 0)
+
+  const hrInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'hr_attribution').length
+  const financeInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'finance_attribution').length
+  const directorOfficeInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'director_office_attribution').length
+  const directorAttributionInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'director_attribution').length
   const marketingInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'marketing_project').length
 
-  // Task 4: Marketing OPEX visibility sourced from the submitted payroll_run,
-  // not from invoices (Marketing pays its own staff from contract revenue,
-  // doesn't bill subsidiaries). Shown so Finance can still see the number.
+  // Pull the 5 per-dept OPEX totals the approved payroll_run captured at
+  // Stage A (Principal approved HR costing). Finance uses these as the
+  // REQUIRED amount per dept — once they've created + issued invoices for
+  // the dept, the card flips to showing the invoice total instead.
   const { data: payrollRun } = await supabase
     .from('payroll_runs')
-    .select('marketing_opex_total')
+    .select(
+      'marketing_opex_total, hr_opex_total, finance_opex_total, director_office_total, director_salary_total'
+    )
     .eq('period_month', period)
     .maybeSingle()
-  const marketingOpexFromPayroll = Number(payrollRun?.marketing_opex_total ?? 0)
-
-  // Director Office + Director OPEX sections need existing invoices keyed per
-  // company so the manual form can block double-billing.
-  const directorOfficeExisting: ExistingInvoice[] = invoiceList
-    .filter((i) => i.billing_mode === 'director_office_attribution')
-    .map((i) => ({
-      id: i.id,
-      invoice_no: i.invoice_no ?? '',
-      company_id: i.company_id,
-      total_amount: Number(i.total_amount),
-      status: i.status,
-    }))
-  const directorAttributionExisting: ExistingInvoice[] = invoiceList
-    .filter((i) => i.billing_mode === 'director_attribution')
-    .map((i) => ({
-      id: i.id,
-      invoice_no: i.invoice_no ?? '',
-      company_id: i.company_id,
-      total_amount: Number(i.total_amount),
-      status: i.status,
-    }))
+  const payrollApproved = !!payrollRun
+  const marketingFromPayroll = Number(payrollRun?.marketing_opex_total ?? 0)
+  const hrFromPayroll = Number(payrollRun?.hr_opex_total ?? 0)
+  const financeFromPayroll = Number(payrollRun?.finance_opex_total ?? 0)
+  const directorOfficeFromPayroll = Number(payrollRun?.director_office_total ?? 0)
+  const directorFromPayroll = Number(payrollRun?.director_salary_total ?? 0)
 
   const companyList = companies ?? []
   const companyMap = new Map(
@@ -163,12 +141,15 @@ export default async function BillingView({ searchParams }: Props) {
         <div>
           <h1 className="font-serif text-3xl text-ink">Service Billing</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
-            Five billing modes feed the monthly consolidated statement.{' '}
-            <em>Finance reviews + issues invoices, Principal approves new contracts.</em>
+            Department OPEX billing and marketing contracts feed the monthly consolidated statement.{' '}
+            <em>Finance creates + issues invoices, Principal approves new contracts.</em>
           </p>
         </div>
-        <div className="flex items-center gap-5 shrink-0">
+        <div className="flex items-center gap-3 shrink-0">
           <PeriodSelector currentPeriod={period} />
+          {user.role === 'finance' && (
+            <CreateInvoiceButton companies={companyList} currentPeriod={period} />
+          )}
         </div>
       </div>
 
@@ -218,46 +199,65 @@ export default async function BillingView({ searchParams }: Props) {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
-        <CostCard label="HR OPEX" amount={hrTotal} count={hrInvoiceCount} unit="invoice" />
-        <CostCard label="Finance OPEX" amount={financeTotal} count={financeInvoiceCount} unit="invoice" />
-        <CostCard
-          label="Marketing OPEX"
-          amount={marketingOpexFromPayroll > 0 ? marketingOpexFromPayroll : marketingTotal}
-          count={marketingInvoiceCount}
-          unit="invoice"
-          note={marketingOpexFromPayroll > 0 ? 'from payroll — no invoice' : undefined}
+        <DeptCostCard
+          label="HR OPEX"
+          required={hrFromPayroll}
+          invoiced={hrAttributionTotal}
+          invoiceCount={hrInvoiceCount}
+          invoiceMode="hr_attribution"
+          payrollApproved={payrollApproved}
+          canCreate={user.role === 'finance'}
+          companies={companyList}
+          currentPeriod={period}
         />
-        <CostCard label="Director Office OPEX" amount={directorOfficeTotal} count={directorOfficeExisting.length} unit="invoice" />
-        <CostCard label="Director OPEX" amount={directorAttributionTotal} count={directorAttributionExisting.length} unit="invoice" />
+        <DeptCostCard
+          label="Finance OPEX"
+          required={financeFromPayroll}
+          invoiced={financeAttributionTotal}
+          invoiceCount={financeInvoiceCount}
+          invoiceMode="finance_attribution"
+          payrollApproved={payrollApproved}
+          canCreate={user.role === 'finance'}
+          companies={companyList}
+          currentPeriod={period}
+        />
+        <DeptCostCard
+          label="Director Office OPEX"
+          required={directorOfficeFromPayroll}
+          invoiced={directorOfficeTotal}
+          invoiceCount={directorOfficeInvoiceCount}
+          invoiceMode="director_office_attribution"
+          payrollApproved={payrollApproved}
+          canCreate={user.role === 'finance'}
+          companies={companyList}
+          currentPeriod={period}
+        />
+        <DeptCostCard
+          label="Director OPEX"
+          required={directorFromPayroll}
+          invoiced={directorAttributionTotal}
+          invoiceCount={directorAttributionInvoiceCount}
+          invoiceMode="director_attribution"
+          payrollApproved={payrollApproved}
+          canCreate={user.role === 'finance'}
+          companies={companyList}
+          currentPeriod={period}
+        />
+        <DeptCostCard
+          label="Marketing OPEX"
+          required={marketingFromPayroll}
+          invoiced={marketingTotal}
+          invoiceCount={marketingInvoiceCount}
+          invoiceMode="marketing_project"
+          payrollApproved={payrollApproved}
+          canCreate={user.role === 'finance'}
+          companies={companyList}
+          currentPeriod={period}
+          marketingNote
+        />
       </div>
 
       <InvoicesList invoices={invoiceList} companyMap={companyMap} period={period} />
-
-      <div className="relative">
-        {user.role === 'finance' && submitted ? (
-          <div className="absolute right-0 top-10">
-            <GenerateInvoicesButton
-              currentPeriod={period}
-              modes={['hr_pool_split']}
-              label="Generate HR invoices"
-            />
-          </div>
-        ) : null}
-        <HRPoolSplitSection deptSummaries={deptSummaries} submitted={submitted} />
-      </div>
-
-      <div className="relative">
-        {user.role === 'finance' && submitted ? (
-          <div className="absolute right-0 top-10">
-            <GenerateInvoicesButton
-              currentPeriod={period}
-              modes={['finance_attribution']}
-              label="Generate Finance invoices"
-            />
-          </div>
-        ) : null}
-        <FinanceAttributionSection deptSummaries={deptSummaries} submitted={submitted} />
-      </div>
 
       <div className="relative">
         {user.role === 'finance' ? (
@@ -276,37 +276,6 @@ export default async function BillingView({ searchParams }: Props) {
           canCreate={user.role === 'finance'}
         />
       </div>
-      <ManualOpexSection
-        title="Director Office OPEX"
-        poolLabel="Director Office Department Pool"
-        description="Bill subsidiaries for Director Office staff costs."
-        billingMode="director_office_attribution"
-        period={period}
-        companies={companyList}
-        existing={directorOfficeExisting}
-        canCreate={user.role === 'finance'}
-      />
-
-      <ManualOpexSection
-        title="Director OPEX"
-        poolLabel="Director Department Pool"
-        description="Bill subsidiaries for Director OPEX. Invoice payments credit the Director Dept Pool where directors get paid from."
-        billingMode="director_attribution"
-        period={period}
-        companies={companyList}
-        existing={directorAttributionExisting}
-        canCreate={user.role === 'finance'}
-      />
-
-      <FixedSplitPanel
-        currentPeriod={period}
-        canGenerate={user.role === 'finance'}
-        companies={companyList.map((c) => ({ id: c.id, name: c.name, short_code: c.short_code }))}
-        savedHeadcounts={(headcountRows ?? []).map((h) => ({
-          company_id: h.company_id,
-          headcount: Number(h.headcount),
-        }))}
-      />
       <NonBillableList
         transactions={(nonBillableTxns ?? []).map((t) => ({
           id: t.id,
@@ -323,29 +292,81 @@ export default async function BillingView({ searchParams }: Props) {
   )
 }
 
-function CostCard({
+// Per-dept OPEX card. Shows three stacked states based on payroll approval +
+// invoice state:
+//   1. Payroll not approved yet → muted zero + "awaiting HR costing"
+//   2. Payroll approved, no invoice → required amount + "from payroll — no invoice"
+//      (Finance uses this number when creating invoices)
+//   3. Payroll approved, invoices exist → invoice total + invoice count, plus a
+//      tiny gap indicator if invoiced ≠ required
+// Each card hosts its own "+ Create Invoice" button (compact link style) for
+// Finance, pre-filled with this dept's billing_mode.
+function DeptCostCard({
   label,
-  amount,
-  count,
-  unit,
-  note,
+  required,
+  invoiced,
+  invoiceCount,
+  invoiceMode,
+  payrollApproved,
+  canCreate,
+  companies,
+  currentPeriod,
+  marketingNote,
 }: {
   label: string
-  amount: number
-  count: number
-  unit: string
-  note?: string
+  required: number
+  invoiced: number
+  invoiceCount: number
+  invoiceMode: CreateInvoiceMode
+  payrollApproved: boolean
+  canCreate: boolean
+  companies: Array<{ id: string; name: string; short_code: string }>
+  currentPeriod: string
+  marketingNote?: boolean
 }) {
-  const muted = amount === 0
+  const hasInvoices = invoiceCount > 0
+  const hasRequired = required > 0.005
+  const amount = hasInvoices ? invoiced : required
+  const muted = !hasInvoices && !hasRequired
+
+  let note: string
+  if (!payrollApproved) {
+    note = 'awaiting HR costing'
+  } else if (hasInvoices) {
+    const gap = Math.round((required - invoiced) * 100) / 100
+    if (Math.abs(gap) < 0.01) {
+      note = `${invoiceCount} invoice${invoiceCount === 1 ? '' : 's'}`
+    } else if (gap > 0) {
+      note = `${invoiceCount} invoice${invoiceCount === 1 ? '' : 's'} · short RM ${gap.toLocaleString('en-MY', { minimumFractionDigits: 2 })}`
+    } else {
+      note = `${invoiceCount} invoice${invoiceCount === 1 ? '' : 's'} · over RM ${(-gap).toLocaleString('en-MY', { minimumFractionDigits: 2 })}`
+    }
+  } else if (marketingNote) {
+    note = 'from payroll — no invoice'
+  } else {
+    note = 'from payroll — no invoice yet'
+  }
+
   return (
-    <div className="border border-hairline rounded-md bg-surface p-5">
+    <div className="border border-hairline rounded-md bg-surface p-5 flex flex-col">
       <div className="font-serif italic text-accent text-sm mb-1">{label}</div>
       <div className={`font-serif text-3xl leading-none ${muted ? 'text-muted' : 'text-ink'}`}>
         {formatMoney(amount)}
       </div>
-      <div className="font-mono text-xs text-muted mt-2">
-        {note ?? `${count} ${unit}${count === 1 ? '' : 's'}`}
-      </div>
+      <div className="font-mono text-xs text-muted mt-2">{note}</div>
+      {canCreate && payrollApproved && (
+        <div className="mt-3 pt-3 border-t border-hairline">
+          <CreateInvoiceButton
+            companies={companies}
+            currentPeriod={currentPeriod}
+            prefillMode={invoiceMode}
+            targetAmount={required}
+            alreadyInvoiced={invoiced}
+            compact
+            label="+ Create Invoice"
+          />
+        </div>
+      )}
     </div>
   )
 }

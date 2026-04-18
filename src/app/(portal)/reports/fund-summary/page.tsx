@@ -19,7 +19,7 @@ export default async function FundSummaryPage() {
   ] = await Promise.all([
     supabase.from('fund_sources').select('*').eq('status', 'active').order('effective_date'),
     supabase.from('loans').select('principal, status').eq('status', 'active'),
-    supabase.from('hv_operating_fund').select('transaction_type, amount'),
+    supabase.from('venture_pool').select('transaction_type, amount'),
     supabase.from('invoice_payout_pool').select('transaction_type, amount'),
     supabase.from('dept_pools').select('transaction_type, amount'),
     supabase.from('treasury_config').select('config_key, config_value').eq('config_key', 'buffer_amount').maybeSingle(),

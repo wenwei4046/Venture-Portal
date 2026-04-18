@@ -37,6 +37,8 @@ function poolLabel(key: string): string {
       return 'Director Office Department Pool'
     case 'dept_pool_marketing':
       return 'Marketing Department Pool'
+    case 'dept_pool_director':
+      return 'Director Department Pool'
     default:
       return key
   }

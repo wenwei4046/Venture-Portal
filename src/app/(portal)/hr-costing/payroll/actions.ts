@@ -65,6 +65,42 @@ export async function updatePayrollRow(
 }
 
 /**
+ * Delete one or more draft payroll rows for a given period. Used to drop
+ * staff who shouldn't be on this month's payroll (no pay leave, late joiners,
+ * early resignations) after an InfoTech import seeds rows for everyone.
+ *
+ * Only draft rows are deletable — once submitted/approved/paid, the row is
+ * part of the payroll_run total and must stay. The .eq('status','draft')
+ * guard silently drops non-draft ids from the delete set rather than throwing,
+ * so mixed-selection UI still succeeds partially; the returned count reflects
+ * what actually got removed.
+ */
+export async function deletePayrollRows(
+  ids: string[],
+  period: string,
+): Promise<{ deleted: number }> {
+  await requireRole(['hr', 'principal'])
+  if (ids.length === 0) return { deleted: 0 }
+
+  const supabase = await createClient()
+  await assertPeriodOpen(supabase, period)
+
+  const { error, count } = await supabase
+    .from('hr_monthly_payroll')
+    .delete({ count: 'exact' })
+    .in('id', ids)
+    .eq('status', 'draft')
+    .eq('period_month', period)
+
+  if (error) throw new Error(`Failed to delete payroll rows: ${error.message}`)
+
+  revalidatePath(`/hr-costing/payroll/${period}`)
+  revalidatePath('/hr-costing/payroll')
+
+  return { deleted: count ?? 0 }
+}
+
+/**
  * Create rows for every active staff in the given period.
  * Idempotent — relies on uq_monthly_payroll_staff_period to skip existing.
  * Same behavior as migration 126 backfill, now callable from the UI.
@@ -141,7 +177,7 @@ export async function requestPayrollPayment(runId: string): Promise<string> {
       payroll_run_id: run.id,
       requested_by: user.id,
       amount,
-      target_pool: 'alliance_bank_pool',
+      target_pool: 'hr_opex',
       status: 'submitted',
     })
     .select('id')

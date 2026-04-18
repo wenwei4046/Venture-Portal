@@ -13,18 +13,18 @@ interface Invoice {
   status: string
 }
 
-// Humanize the 5 billing mode enum values. Shown in the invoice table and
-// the per-mode totals breakdown — raw snake_case reads like a dev dump.
+// Humanize the billing mode enum values for UI display — raw snake_case
+// reads like a dev dump.
 function formatBillingMode(mode: string): string {
   switch (mode) {
-    case 'hr_pool_split':
-      return 'HR pool split'
-    case 'finance_attribution':
-      return 'Finance attribution'
     case 'marketing_project':
       return 'Marketing project'
-    case 'fixed_split':
-      return 'Rent & utility split'
+    case 'director_office_attribution':
+      return 'Director Office OPEX'
+    case 'director_attribution':
+      return 'Director OPEX'
+    case 'non_billable':
+      return 'Non-billable'
     default:
       return mode
   }

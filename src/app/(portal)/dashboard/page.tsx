@@ -57,7 +57,7 @@ type MarketingNp = {
 type PoolBreakdown = {
   fund_sources: number
   dept_pool: number
-  hv_operating_fund: number
+  venture_pool: number
   total: number
 }
 
@@ -165,7 +165,10 @@ export default async function DashboardPage() {
           .from('director_payouts')
           .select('id, status')
           .eq('period_month', period),
-        supabase.from('alliance_bank_pool_balance').select('balance'),
+        supabase
+          .from('operating_pool_balance')
+          .select('balance')
+          .eq('pool_type', 'hr_opex'),
       ])
 
       const poolBalance = Number(poolRows?.[0]?.balance ?? 0)
@@ -906,7 +909,7 @@ export default async function DashboardPage() {
                       </div>
                       <div>
                         <div className="font-mono text-xs text-muted uppercase tracking-wide mb-1">Venture Pool</div>
-                        <div className="font-mono tabular font-medium text-ink">{formatMoney(summary.pool_breakdown.hv_operating_fund)}</div>
+                        <div className="font-mono tabular font-medium text-ink">{formatMoney(summary.pool_breakdown.venture_pool)}</div>
                       </div>
                     </div>
 

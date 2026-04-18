@@ -98,11 +98,11 @@ export default function NewClaimForm() {
           </label>
           <select
             name="source_pool"
-            defaultValue="hv_operating_fund"
+            defaultValue="venture_pool"
             required
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
           >
-            <option value="hv_operating_fund">Venture Pool</option>
+            <option value="venture_pool">Venture Pool</option>
             <option value="dept_pool_director">Director Pool</option>
             <option value="dept_pool_marketing">Marketing Dept Pool</option>
             <option value="dept_pool_finance">Finance Dept Pool</option>
