@@ -5,10 +5,18 @@ import { formatMoney } from '@/lib/utils'
 import RequestPayrollPaymentButton, {
   type RequestState,
 } from '../payroll/_components/RequestPayrollPaymentButton'
+import CreateDisbursementButton from './_components/CreateDisbursementButton'
 
 function currentPeriod(): string {
   const now = new Date()
   return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`
+}
+
+interface DeptBreakdown {
+  dept_name: string
+  staff_count: number
+  total_net: number
+  total_gross: number
 }
 
 export default async function HRPaymentPage() {
@@ -24,16 +32,44 @@ export default async function HRPaymentPage() {
       .eq('period_month', period)
       .maybeSingle(),
     supabase.from('alliance_bank_pool_balance').select('balance'),
-    supabase.from('hr_monthly_payroll').select('net, gross, status').eq('period_month', period),
+    supabase
+      .from('hr_monthly_payroll')
+      .select('id, net, gross, status, hr_staff_costs(employee_name, departments(name))')
+      .eq('period_month', period),
   ])
 
   const poolBal = Number(poolRows?.[0]?.balance ?? 0)
-  const totalNet = (payrollRows ?? []).reduce((s, r) => s + Number(r.net), 0)
-  const totalGross = (payrollRows ?? []).reduce((s, r) => s + Number(r.gross), 0)
+  const rows = payrollRows ?? []
+  const totalNet = rows.reduce((s, r) => s + Number(r.net), 0)
+  const totalGross = rows.reduce((s, r) => s + Number(r.gross), 0)
   const totalAmount = Number(run?.total_amount ?? totalGross)
-  const staffCount = (payrollRows ?? []).length
+  const staffCount = rows.length
   const hasPayroll = staffCount > 0
 
+  // ── Per-department breakdown ──────────────────────────────────────────────
+  const byDept = new Map<string, DeptBreakdown>()
+  for (const r of rows) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const staff = (r as any).hr_staff_costs
+    const deptName = staff?.departments?.name ?? '—'
+    if (!byDept.has(deptName)) {
+      byDept.set(deptName, {
+        dept_name: deptName,
+        staff_count: 0,
+        total_net: 0,
+        total_gross: 0,
+      })
+    }
+    const b = byDept.get(deptName)!
+    b.staff_count++
+    b.total_net += Number(r.net)
+    b.total_gross += Number(r.gross)
+  }
+  const deptBreakdown = Array.from(byDept.values()).sort(
+    (a, b) => b.total_gross - a.total_gross,
+  )
+
+  // ── Funding-request state ─────────────────────────────────────────────────
   const { data: requestRow } = run
     ? await supabase
         .from('payroll_payment_requests')
@@ -44,6 +80,33 @@ export default async function HRPaymentPage() {
         .limit(1)
         .maybeSingle()
     : { data: null }
+
+  // ── Disbursement voucher state — check if batch already generated ─────────
+  const payrollIds = rows.map(r => r.id as string)
+  const { data: disbursementVouchers } = payrollIds.length
+    ? await supabase
+        .from('payment_vouchers')
+        .select('id, reference_id')
+        .eq('reference_type', 'payroll_disbursement')
+        .in('reference_id', payrollIds)
+    : { data: null }
+  const disbursementCount = disbursementVouchers?.length ?? 0
+  const alreadyDisbursed = disbursementCount > 0
+
+  // Find the approval group_id for the batch
+  let disbursementGroupId: string | null = null
+  if (alreadyDisbursed && disbursementVouchers && disbursementVouchers.length > 0) {
+    const voucherIds = disbursementVouchers.map(v => v.id as string)
+    const { data: approvalRow } = await supabase
+      .from('approval_requests')
+      .select('group_id')
+      .in('reference_id', voucherIds)
+      .eq('reference_table', 'payment_vouchers')
+      .not('group_id', 'is', null)
+      .limit(1)
+      .maybeSingle()
+    disbursementGroupId = approvalRow?.group_id ?? null
+  }
 
   type Phase =
     | 'no-payroll'
@@ -98,16 +161,24 @@ export default async function HRPaymentPage() {
 
   return (
     <div>
-      <div className="mt-2 mb-10">
-        <div className="font-serif italic text-accent text-base mb-1">HR · {periodLabel}</div>
-        <h1 className="font-serif text-3xl text-ink">Payment</h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          Request payroll funding from Finance, then disburse to staff from the HR Pool.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mt-2 mb-10">
+        <div>
+          <div className="font-serif italic text-accent text-base mb-1">HR · {periodLabel}</div>
+          <h1 className="font-serif text-3xl text-ink">Payment</h1>
+          <p className="font-serif italic text-graphite text-base mt-2">
+            Request payroll funding from Finance, then disburse to staff from the HR Pool.
+          </p>
+        </div>
+        <Link
+          href={`/hr-costing/payroll/${period}/import`}
+          className="shrink-0 bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors self-start sm:self-end"
+        >
+          Import InfoTech xlsx
+        </Link>
       </div>
 
       {/* Hero — Total Amount + HR Pool balance */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12 pb-12 border-b border-hairline">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10 pb-10 border-b border-hairline">
         <div>
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide mb-2">
             Total amount this month
@@ -138,6 +209,61 @@ export default async function HRPaymentPage() {
         </div>
       </div>
 
+      {/* Per-department breakdown */}
+      {hasPayroll && (
+        <section className="mb-10">
+          <h2 className="font-serif text-xl text-ink mb-1">By department</h2>
+          <p className="font-serif italic text-graphite text-sm mb-4">
+            Gross is what Finance funds; net is what lands in staff accounts.
+          </p>
+          <div className="overflow-x-auto border border-hairline rounded-md bg-surface">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
+                  <th className="text-left py-3 px-5 font-medium">Department</th>
+                  <th className="text-right py-3 px-5 font-medium">Staff</th>
+                  <th className="text-right py-3 px-5 font-medium">Net</th>
+                  <th className="text-right py-3 px-5 font-medium">Gross</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deptBreakdown.map(d => (
+                  <tr
+                    key={d.dept_name}
+                    className="border-b border-hairline last:border-0"
+                  >
+                    <td className="py-3 px-5 font-serif text-md text-ink">
+                      {d.dept_name}
+                    </td>
+                    <td className="py-3 px-5 text-right font-mono tabular text-graphite">
+                      {d.staff_count}
+                    </td>
+                    <td className="py-3 px-5 text-right font-mono tabular text-graphite">
+                      {formatMoney(d.total_net)}
+                    </td>
+                    <td className="py-3 px-5 text-right font-mono tabular font-medium text-ink">
+                      {formatMoney(d.total_gross)}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="bg-surface-2/40 border-t-2 border-hairline">
+                  <td className="py-3 px-5 font-serif italic text-ink">Total</td>
+                  <td className="py-3 px-5 text-right font-mono tabular font-semibold text-ink">
+                    {staffCount}
+                  </td>
+                  <td className="py-3 px-5 text-right font-mono tabular font-semibold text-ink">
+                    {formatMoney(totalNet)}
+                  </td>
+                  <td className="py-3 px-5 text-right font-mono tabular font-semibold text-ink">
+                    {formatMoney(totalGross)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       {/* Phase-driven action */}
       <div className="mb-12">
         {phase === 'no-payroll' && (
@@ -146,10 +272,10 @@ export default async function HRPaymentPage() {
               No payroll imported for this month yet.
             </p>
             <Link
-              href="/hr-costing/payroll"
+              href={`/hr-costing/payroll/${period}/import`}
               className="inline-block bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
             >
-              Go to Payroll →
+              Import InfoTech xlsx →
             </Link>
           </div>
         )}
@@ -206,10 +332,12 @@ export default async function HRPaymentPage() {
           phase === 'pv-generated') &&
           run && (
             <div className="border border-hairline rounded-md bg-surface p-8">
-              <h2 className="font-serif text-xl text-ink mb-2">Request payment from Finance</h2>
+              <h2 className="font-serif text-xl text-ink mb-2">
+                Request Fund out from Finance
+              </h2>
               <p className="font-serif italic text-graphite text-sm mb-6">
-                Finance generates a Payment Voucher. Principal approves it. The money moves
-                from the HV operating account into the HR Pool.
+                Finance generates a Payment Voucher for <strong>RM {formatMoney(totalAmount).replace('RM ', '')}</strong>.
+                Principal approves the PV and money moves from the HV operating account into the HR Pool.
               </p>
               <RequestPayrollPaymentButton
                 runId={run.id}
@@ -240,23 +368,32 @@ export default async function HRPaymentPage() {
 
             <div className="mt-6 pt-6 border-t border-hairline">
               <h3 className="font-serif text-md text-ink mb-1">Pay staff</h3>
-              <p className="font-serif italic text-graphite text-sm mb-4">
-                Bulk transfer via bank file, or create a one-off voucher for
-                an off-cycle payment.
+              <p className="font-serif italic text-graphite text-sm mb-5">
+                Generate individual payment vouchers (one per staff, sent to
+                Principal for approval as a batch), then download the Alliance
+                Bank file for the actual bank transfer.
               </p>
-              <div className="flex flex-wrap items-center gap-3">
+
+              <div className="mb-5">
+                <CreateDisbursementButton
+                  period={period}
+                  totalNet={totalNet}
+                  staffCount={staffCount}
+                  alreadyGenerated={alreadyDisbursed}
+                  groupId={disbursementGroupId}
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-hairline">
                 <Link
                   href={`/hr-costing/payroll/${period}/bank-transfer?format=alliance`}
                   className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
                 >
                   Download Alliance Bank CSV
                 </Link>
-                <Link
-                  href="/payments/new"
-                  className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-                >
-                  Create Payment Voucher
-                </Link>
+                <span className="font-serif italic text-muted text-xs">
+                  The bank file that actually moves money to staff accounts.
+                </span>
               </div>
             </div>
           </div>
