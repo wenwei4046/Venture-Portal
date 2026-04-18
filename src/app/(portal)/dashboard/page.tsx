@@ -4,6 +4,10 @@ import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 
+// Always re-fetch on request — dept pool balances change after every approve
+// & pay, so cached renders go stale within seconds.
+export const dynamic = 'force-dynamic'
+
 type Subsidiary = {
   id: string
   name: string
