@@ -193,7 +193,15 @@ export default async function PayrollRunApprovalPage({ params }: PageProps) {
 
           {directorRows.length > 0 && (
             <div className="mb-10">
-              <h2 className="font-serif text-lg text-ink mb-4">Directors</h2>
+              <div className="flex items-baseline justify-between mb-4">
+                <h2 className="font-serif text-lg text-ink">Directors</h2>
+                <Link
+                  href={`/approvals/payroll-run/${run.id}/director-report`}
+                  className="text-sm text-accent hover:underline font-serif italic"
+                >
+                  View full breakdown →
+                </Link>
+              </div>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
