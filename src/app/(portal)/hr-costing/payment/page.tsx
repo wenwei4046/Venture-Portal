@@ -25,7 +25,7 @@ export default async function HRPaymentPage() {
 
   const period = currentPeriod()
 
-  const [{ data: run }, { data: hrDept }, { data: payrollRows }] = await Promise.all([
+  const [{ data: run }, { data: hrDept }, { data: payrollRows }, { data: directorRows }] = await Promise.all([
     supabase
       .from('payroll_runs')
       .select('id, status, total_amount, rejection_reason')
@@ -40,6 +40,10 @@ export default async function HRPaymentPage() {
       .from('hr_monthly_payroll')
       .select('id, net, gross, status, hr_staff_costs(employee_name, departments(name))')
       .eq('period_month', period),
+    supabase
+      .from('director_payouts')
+      .select('id, payroll_net, payroll_gross, directors(name)')
+      .eq('period_month', period),
   ])
 
   const { data: poolRow } = hrDept
@@ -51,10 +55,15 @@ export default async function HRPaymentPage() {
     : { data: null }
   const poolBal = Number(poolRow?.balance ?? 0)
   const rows = payrollRows ?? []
-  const totalNet = rows.reduce((s, r) => s + Number(r.net), 0)
-  const totalGross = rows.reduce((s, r) => s + Number(r.gross), 0)
+  const dRows = (directorRows ?? []).filter(d => Number(d.payroll_net ?? 0) > 0)
+  const staffNet = rows.reduce((s, r) => s + Number(r.net), 0)
+  const staffGross = rows.reduce((s, r) => s + Number(r.gross), 0)
+  const directorNet = dRows.reduce((s, d) => s + Number(d.payroll_net ?? 0), 0)
+  const directorGross = dRows.reduce((s, d) => s + Number(d.payroll_gross ?? 0), 0)
+  const totalNet = staffNet + directorNet
+  const totalGross = staffGross + directorGross
   const totalAmount = Number(run?.total_amount ?? totalGross)
-  const staffCount = rows.length
+  const staffCount = rows.length + dRows.length
   const hasPayroll = staffCount > 0
 
   // ── Per-department breakdown ──────────────────────────────────────────────
@@ -76,6 +85,16 @@ export default async function HRPaymentPage() {
     b.total_net += Number(r.net)
     b.total_gross += Number(r.gross)
   }
+  // Directors count as their own dept row in the disbursement batch so the
+  // "Create N vouchers" total matches what the RPC generates.
+  if (dRows.length > 0) {
+    byDept.set('Director', {
+      dept_name: 'Director',
+      staff_count: dRows.length,
+      total_net: directorNet,
+      total_gross: directorGross,
+    })
+  }
   const deptBreakdown = Array.from(byDept.values()).sort(
     (a, b) => b.total_gross - a.total_gross,
   )
@@ -93,7 +112,12 @@ export default async function HRPaymentPage() {
     : { data: null }
 
   // ── Disbursement voucher state — check if batch already generated ─────────
-  const payrollIds = rows.map(r => r.id as string)
+  // reference_id on a disbursement voucher is either an hr_monthly_payroll.id
+  // or a director_payouts.id depending on the row type.
+  const payrollIds = [
+    ...rows.map(r => r.id as string),
+    ...dRows.map(d => d.id as string),
+  ]
   const { data: disbursementVouchers } = payrollIds.length
     ? await supabase
         .from('payment_vouchers')
