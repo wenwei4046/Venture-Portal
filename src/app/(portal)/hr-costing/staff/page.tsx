@@ -34,6 +34,8 @@ export default async function StaffListPage() {
       allowances: Number(s.allowances ?? 0),
       non_statutory_allowance: s.non_statutory_allowance != null ? Number(s.non_statutory_allowance) : null,
       epf_er: s.epf_er != null ? Number(s.epf_er) : null,
+      socso_er: s.socso_er != null ? Number(s.socso_er) : null,
+      eis_er: s.eis_er != null ? Number(s.eis_er) : null,
       total_ctc: s.total_ctc != null ? Number(s.total_ctc) : null,
       dept_name: dept?.name ?? null,
     }

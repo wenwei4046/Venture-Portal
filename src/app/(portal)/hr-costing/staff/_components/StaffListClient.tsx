@@ -11,6 +11,8 @@ export interface StaffRow {
   allowances: number
   non_statutory_allowance: number | null
   epf_er: number | null
+  socso_er: number | null
+  eis_er: number | null
   total_ctc: number | null
   dept_name: string | null
 }
@@ -65,6 +67,8 @@ export default function StaffListClient({ staff }: Props) {
                 <th className="text-right py-3 pr-4 font-medium">Statutory Allow.</th>
                 <th className="text-right py-3 pr-4 font-medium">Non-Stat. Allow.</th>
                 <th className="text-right py-3 pr-4 font-medium">EPF ER</th>
+                <th className="text-right py-3 pr-4 font-medium">SOCSO ER</th>
+                <th className="text-right py-3 pr-4 font-medium">EIS ER</th>
                 <th className="text-right py-3 pr-4 font-medium">Total CTC</th>
                 <th className="text-right py-3 pr-4 font-medium">Actions</th>
               </tr>
@@ -92,6 +96,12 @@ export default function StaffListClient({ staff }: Props) {
                   </td>
                   <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
                     {formatMoney(s.epf_er ?? 0)}
+                  </td>
+                  <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
+                    {formatMoney(s.socso_er ?? 0)}
+                  </td>
+                  <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
+                    {formatMoney(s.eis_er ?? 0)}
                   </td>
                   <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">
                     {formatMoney(s.total_ctc ?? 0)}
