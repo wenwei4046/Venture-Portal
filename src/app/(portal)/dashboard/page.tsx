@@ -25,6 +25,21 @@ type PendingApproval = {
   created_at: string
 }
 
+// payroll_run approvals have their own detail page with 4-OPEX drill-down +
+// fan-out approval. Everything else uses the generic /approvals/[id] route.
+// Mirrors the same helper in /approvals/page.tsx — both the Approvals tab and
+// the Overview's Pending Action should deep-link to the same detail page.
+function approvalHref(req: {
+  id: string
+  request_type: string
+  reference_id?: string | null
+}): string {
+  if (req.request_type === 'payroll_run' && req.reference_id) {
+    return `/approvals/payroll-run/${req.reference_id}`
+  }
+  return `/approvals/${req.id}`
+}
+
 type Alert = {
   type: 'overdue' | 'buffer' | 'maturity'
   severity: 'danger' | 'warning' | 'info'
@@ -739,6 +754,23 @@ export default async function DashboardPage() {
   const subsidiaries = summary.subsidiaries ?? []
   const alerts = summary.alerts ?? []
 
+  // dashboard_summary RPC doesn't return reference_id for pending approvals.
+  // Supplementary query so Overview links can deep-link to /approvals/payroll-run/[ref]
+  // the same way the Approvals tab does.
+  const pendingApprovalRefs = new Map<string, string | null>()
+  if (isPrincipal && pendingApprovals.length > 0) {
+    const { data: refData } = await supabase
+      .from('approval_requests')
+      .select('id, reference_id')
+      .in(
+        'id',
+        pendingApprovals.map((p: PendingApproval) => p.id),
+      )
+    for (const row of refData ?? []) {
+      pendingApprovalRefs.set(row.id, row.reference_id as string | null)
+    }
+  }
+
   // Finance sees "Awaiting Principal sign-off" — their own submitted approval_requests
   // (new_loan, new_contract, advance, etc) still pending Principal decision. This is
   // the mirror image of Principal's "Pending your hand" — Finance submits, Principal
@@ -746,7 +778,7 @@ export default async function DashboardPage() {
   const { data: financePending } = isFinance
     ? await supabase
         .from('approval_requests')
-        .select('id, request_type, description, amount, created_at')
+        .select('id, request_type, description, amount, reference_id, created_at')
         .eq('submitted_by', user.id)
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
@@ -758,7 +790,7 @@ export default async function DashboardPage() {
   const { data: financeRecent } = isFinance
     ? await supabase
         .from('approval_requests')
-        .select('id, request_type, description, amount, status, approved_at, created_at')
+        .select('id, request_type, description, amount, reference_id, status, approved_at, created_at')
         .eq('submitted_by', user.id)
         .in('status', ['approved', 'rejected'])
         .order('approved_at', { ascending: false })
@@ -955,7 +987,11 @@ export default async function DashboardPage() {
                   {pendingApprovals.slice(0, 5).map((req) => (
                     <Link
                       key={req.id}
-                      href={`/approvals/${req.id}`}
+                      href={approvalHref({
+                        id: req.id,
+                        request_type: req.request_type,
+                        reference_id: pendingApprovalRefs.get(req.id) ?? null,
+                      })}
                       className="block border-b border-hairline pb-3 hover:bg-surface-2/40 -mx-2 px-2 rounded transition-colors"
                     >
                       <div className="flex items-baseline justify-between mb-1">
@@ -1041,7 +1077,7 @@ export default async function DashboardPage() {
                   {financePendingList.slice(0, 5).map((req) => (
                     <Link
                       key={req.id}
-                      href={`/approvals/${req.id}`}
+                      href={approvalHref(req)}
                       className="flex items-baseline justify-between px-5 py-4 hover:bg-surface-2/40 transition-colors"
                     >
                       <div className="flex-1 min-w-0 pr-4">
@@ -1095,7 +1131,7 @@ export default async function DashboardPage() {
                   {financeRecentList.map((req) => (
                     <Link
                       key={req.id}
-                      href={`/approvals/${req.id}`}
+                      href={approvalHref(req)}
                       className="flex items-baseline justify-between px-5 py-4 hover:bg-surface-2/40 transition-colors"
                     >
                       <div className="flex-1 min-w-0 pr-4">
