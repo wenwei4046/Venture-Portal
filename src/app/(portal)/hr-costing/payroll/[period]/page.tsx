@@ -45,7 +45,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
       .order('id'),
     supabase
       .from('payroll_runs')
-      .select('id, status, total_amount, submitted_at, approved_at, paid_at, rejection_reason')
+      .select('id, status, total_amount, submitted_at, approved_at, paid_at, rejection_reason, rejected_at')
       .eq('period_month', period)
       .maybeSingle(),
   ])
@@ -185,6 +185,42 @@ export default async function PayrollGridPage({ params }: PageProps) {
 
   return (
     <div>
+      {/* P1-2: prominent rejection banner so HR sees reason + date at a glance,
+          not a tiny em inside the phase line. Appears only when run is rejected. */}
+      {phase === 'rejected' && run ? (
+        <div className="bg-danger-bg border border-danger rounded-md p-4 mb-6 flex items-start gap-3">
+          <span className="font-serif italic text-danger text-xl leading-none">✕</span>
+          <div className="flex-1 min-w-0">
+            <p className="font-serif text-danger text-base">
+              Rejected by Principal
+              {run.rejected_at ? (
+                <span className="font-mono text-xs text-muted ml-2">
+                  · {new Date(run.rejected_at).toLocaleString('en-MY', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+              ) : null}
+            </p>
+            {run.rejection_reason ? (
+              <p className="font-serif text-sm text-graphite mt-1 whitespace-pre-wrap">
+                {run.rejection_reason}
+              </p>
+            ) : (
+              <p className="font-serif italic text-muted text-sm mt-1">
+                No reason provided.
+              </p>
+            )}
+            <p className="font-sans text-xs text-muted mt-2">
+              Fix the rows below, then click <em className="font-serif">Submit for Principal approval</em> again.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       {/* Row 1 — title + primary CTA varies by phase */}
       <div className="flex items-baseline justify-between mt-2 mb-6 gap-6">
         <div>
