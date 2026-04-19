@@ -6,10 +6,7 @@ import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { postJournalEntry, r2 } from '@/lib/journal'
-import {
-  adjustPool,
-  type SupabaseClient,
-} from '@/lib/voucher-paid-helpers'
+import { adjustPool } from '@/lib/voucher-paid-helpers'
 
 // ─── Create payment voucher (Finance) ────────────────────────────────────────
 
