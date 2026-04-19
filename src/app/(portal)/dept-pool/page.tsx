@@ -1,8 +1,18 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import { redirect } from 'next/navigation'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
+
+// dept_manager only owns their own dept pool. Skip the multi-dept list and
+// land them straight on their own detail page — same content as clicking View.
+const DEPT_NAME_TO_SLUG: Record<string, string> = {
+  Marketing: 'marketing',
+  HR: 'hr',
+  Finance: 'finance',
+  'Director Office': 'director-office',
+}
 
 interface HRCostSubmissionRow {
   id: string
@@ -16,6 +26,18 @@ interface HRCostSubmissionRow {
 export default async function DeptPoolPage() {
   const user = await requireRole(['principal', 'finance', 'dept_manager'])
   const supabase = await createClient()
+
+  // Fast-path: dept_manager → their own dept detail page. No reason to show
+  // a 1-row list and make them click View.
+  if (user.role === 'dept_manager' && user.department_id) {
+    const { data: ownDept } = await supabase
+      .from('departments')
+      .select('name')
+      .eq('id', user.department_id)
+      .single()
+    const slug = ownDept?.name ? DEPT_NAME_TO_SLUG[ownDept.name] : null
+    if (slug) redirect(`/dept-pool/${slug === 'marketing' ? 'marketing' : slug}`)
+  }
 
   const period = getPeriodMonth()
 
