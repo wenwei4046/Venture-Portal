@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       access_log: {
@@ -3604,6 +3579,24 @@ export type Database = {
           weighted_cost: number
         }[]
       }
+      get_dept_opex_rows: {
+        Args: {
+          p_dept_id: string
+          p_period_end: string
+          p_period_start: string
+        }
+        Returns: {
+          basic_salary: number
+          commission_amount: number
+          eis_er: number
+          employee_name: string
+          epf_er: number
+          non_statutory_allowance: number
+          period_month: string
+          socso_er: number
+          statutory_allowance: number
+        }[]
+      }
       get_director_payout_summary: {
         Args: { p_period: string }
         Returns: {
@@ -3971,9 +3964,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       account_type: ["asset", "liability", "equity", "revenue", "expense"],

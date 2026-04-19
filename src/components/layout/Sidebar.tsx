@@ -79,6 +79,9 @@ const navEntries: NavEntry[] = [
 
   // ── Departments ──
   { href: '/dept-pool', label: 'Dept Pool', section: 'Departments', visible: canAccessDeptPool },
+  // OPEX is a dept_manager-only view of their own department's payroll
+  // breakdown (per-employee Basic / KPI / Allowance / ER statutory).
+  { href: '/opex', label: 'OPEX', section: 'Departments', visible: (r) => r === 'dept_manager' },
   { href: '/hr-costing', label: 'HR Costing', section: 'Departments', visible: (r) => r === 'principal' },
   // Phase 7 Step 11: Billing merged into Statements → Invoices sub-tab.
   // Legacy /billing URL still redirects for external bookmarks.
