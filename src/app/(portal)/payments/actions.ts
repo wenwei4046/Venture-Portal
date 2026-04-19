@@ -8,7 +8,6 @@ import { requireRole } from '@/lib/auth'
 import { postJournalEntry, r2 } from '@/lib/journal'
 import {
   adjustPool,
-  applyVoucherPaidSideEffects,
   type SupabaseClient,
 } from '@/lib/voucher-paid-helpers'
 
@@ -340,82 +339,29 @@ export async function approveVoucher(formData: FormData) {
   const notes = (formData.get('notes') as string) || null
   if (!id) throw new Error('Voucher id is required')
 
-  const paymentDate = dayjs().format('YYYY-MM-DD')
-  const nowIso = new Date().toISOString()
-
-  // Fetch full voucher for downstream side effects
-  const { data: voucher, error: fetchErr } = await supabase
-    .from('payment_vouchers')
-    .select('*')
-    .eq('id', id)
-    .eq('status', 'pending_approval')
-    .single()
-
-  if (fetchErr || !voucher) throw new Error('Voucher not found or not pending approval')
-
-  // ── Bank balance check — cannot approve if insufficient funds ──
-  if (voucher.bank_account_id && voucher.direction === 'debit') {
-    const { data: bank } = await supabase
-      .from('bank_accounts')
-      .select('current_balance, bank_name')
-      .eq('id', voucher.bank_account_id)
-      .single()
-
-    if (bank) {
-      const balance = Number(bank.current_balance)
-      const amount = Number(voucher.amount)
-      if (balance < amount) {
-        throw new Error(
-          `Insufficient bank balance. ${bank.bank_name} has RM ${balance.toFixed(2)} but payment requires RM ${amount.toFixed(2)}.`
-        )
-      }
-    }
-  }
-
-  // Flip voucher to paid in one shot — approved_by and executed_by are both
-  // the Principal since approve and execute are now the same action.
-  const { error: voucherError } = await supabase
-    .from('payment_vouchers')
-    .update({
-      status: 'paid',
-      approved_by: user.id,
-      approved_at: nowIso,
-      executed_by: user.id,
-      executed_at: nowIso,
-      payment_date: paymentDate,
-      notes,
-    })
-    .eq('id', id)
-    .eq('status', 'pending_approval')
-
-  if (voucherError) throw new Error(`Failed to approve voucher: ${voucherError.message}`)
-
-  // Also approve the linked approval_request (must happen BEFORE side effects,
-  // because applyVoucherPaidSideEffects looks up the approved row for the
-  // dept_pool expense_out approval_id FK.)
-  const { data: approvalReq } = await supabase
+  // P0-1: route voucher-page approvals through the same atomic RPC as the
+  // approvals-queue path. RPC takes approval_id, so look it up first.
+  const { data: approvalReq, error: arErr } = await supabase
     .from('approval_requests')
-    .select('id')
+    .select('id, group_id')
     .eq('reference_id', id)
     .eq('reference_table', 'payment_vouchers')
     .eq('status', 'pending')
     .single()
 
-  if (approvalReq) {
-    await supabase
-      .from('approval_requests')
-      .update({
-        status: 'approved',
-        workflow_state: 'approved',
-        approved_by: user.id,
-        approved_at: nowIso,
-        notes,
-      })
-      .eq('id', approvalReq.id)
+  if (arErr || !approvalReq) {
+    throw new Error('Voucher has no pending approval request')
+  }
+  if (approvalReq.group_id) {
+    throw new Error('Voucher is part of a combined approval — approve it from the Approvals queue.')
   }
 
-  // Apply bank debit, pool adjust, loan/fund-source sync, GL journal
-  await applyVoucherPaidSideEffects(supabase, voucher, paymentDate, user.id)
+  const { error: rpcErr } = await supabase.rpc('approve_single_voucher', {
+    p_approval_id: approvalReq.id,
+    p_user_id: user.id,
+    p_notes: notes ?? '',
+  })
+  if (rpcErr) throw new Error(`Approval failed: ${rpcErr.message}`)
 
   revalidatePath(`/payments/${id}`)
   revalidatePath('/payments')

@@ -3721,6 +3721,13 @@ export type Database = {
         Args: { p_approver: string; p_run_id: string }
         Returns: undefined
       }
+      approve_single_voucher: {
+        Args: { p_approval_id: string; p_notes: string; p_user_id: string }
+        Returns: {
+          voucher_id: string
+          voucher_no: string
+        }[]
+      }
       approve_voucher_batch: {
         Args: { p_group_id: string; p_notes: string; p_user_id: string }
         Returns: {

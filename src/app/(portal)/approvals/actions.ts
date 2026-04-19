@@ -2,12 +2,10 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { notifyApprovalDecision } from '@/lib/slack'
-import { applyVoucherPaidSideEffects } from '@/lib/voucher-paid-helpers'
 
 // ─── Approve request (Principal) ──────────────────────────────────────────────
 
@@ -44,6 +42,33 @@ export async function approveRequest(formData: FormData) {
 
   // Approving moves money (loan disbursement, voucher exec, pool release) — block if today's period is locked
   await assertPeriodOpen(supabase, new Date())
+
+  // P0-1: payment_voucher goes through approve_single_voucher RPC — atomic
+  // flip + bank debit + pool adjust + repayment sync + GL journal in one
+  // Postgres transaction. Early-return because the RPC does the approval flip
+  // itself; skip the generic flip below.
+  if (approval.request_type === 'payment_voucher') {
+    const { error: rpcErr } = await supabase.rpc('approve_single_voucher', {
+      p_approval_id: id,
+      p_user_id: user.id,
+      p_notes: notes ?? '',
+    })
+    if (rpcErr) {
+      throw new Error(`Approval failed: ${rpcErr.message}`)
+    }
+
+    notifyApprovalDecision(
+      approval.request_type,
+      'approved',
+      approval.description ?? '',
+      user.name
+    ).catch(() => {})
+
+    revalidatePath('/approvals')
+    revalidatePath('/payments')
+    revalidatePath('/dashboard')
+    redirect('/approvals')
+  }
 
   const now = new Date().toISOString()
 
@@ -191,63 +216,6 @@ export async function approveRequest(formData: FormData) {
         .update({ current_balance: Number(primaryBank.current_balance) + Number(fundSource.amount) })
         .eq('id', primaryBank.id)
     }
-  } else if (approval.request_type === 'payment_voucher') {
-    // Approve + execute in one step. Sets voucher to 'paid' directly, then
-    // applies bank debit / pool adjust / loan sync / GL journal side effects.
-    const paymentDate = dayjs().format('YYYY-MM-DD')
-
-    const { data: voucher, error: pvFetchErr } = await supabase
-      .from('payment_vouchers')
-      .select('*')
-      .eq('id', approval.reference_id)
-      .eq('status', 'pending_approval')
-      .single()
-
-    if (pvFetchErr || !voucher) {
-      throw new Error(
-        `Approval recorded but voucher fetch failed: ${pvFetchErr?.message ?? 'not found'}`
-      )
-    }
-
-    // Bank balance check on the debit side
-    if (voucher.bank_account_id && voucher.direction === 'debit') {
-      const { data: bank } = await supabase
-        .from('bank_accounts')
-        .select('current_balance, bank_name')
-        .eq('id', voucher.bank_account_id)
-        .single()
-      if (bank) {
-        const balance = Number(bank.current_balance)
-        const amt = Number(voucher.amount)
-        if (balance < amt) {
-          throw new Error(
-            `Insufficient bank balance. ${bank.bank_name} has RM ${balance.toFixed(2)} but payment requires RM ${amt.toFixed(2)}.`
-          )
-        }
-      }
-    }
-
-    const { error: pvError } = await supabase
-      .from('payment_vouchers')
-      .update({
-        status: 'paid',
-        approved_by: user.id,
-        approved_at: now,
-        executed_by: user.id,
-        executed_at: now,
-        payment_date: paymentDate,
-        notes,
-      })
-      .eq('id', approval.reference_id)
-      .eq('status', 'pending_approval')
-
-    if (pvError) {
-      throw new Error(
-        `Approval recorded but voucher update failed: ${pvError.message}`
-      )
-    }
-
-    await applyVoucherPaidSideEffects(supabase, voucher, paymentDate, user.id)
   } else if (approval.request_type === 'hr_costing') {
     // Phase 7 Step 15: flip HR cost snapshot to approved_for_execution;
     // Finance then clicks Execute on /hr-costing.
