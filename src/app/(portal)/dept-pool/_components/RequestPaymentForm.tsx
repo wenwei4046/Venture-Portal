@@ -141,9 +141,9 @@ export default function RequestPaymentForm({ companies, categories }: Props) {
         />
       </div>
 
-      <div className="bg-surface border border-hairline rounded-md p-3 text-xs font-serif italic text-graphite">
-        Pool: <strong>Marketing Dept Pool</strong> — debited on Principal approval. Finance will
-        pick the source bank when generating the PV.
+      <div className="bg-accent-bg border border-accent-border rounded-md p-3 text-xs font-serif italic text-ink">
+        Pool: <strong className="text-accent">Marketing Dept Pool</strong> — debited on Principal approval.
+        Finance will pick the source bank when generating the PV.
       </div>
 
       <button

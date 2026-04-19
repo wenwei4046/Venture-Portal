@@ -73,7 +73,7 @@ export default function RequestActionButtons({ requestId }: Props) {
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-3">
       <button
         onClick={handleGenerate}
         disabled={isPending}
@@ -84,7 +84,7 @@ export default function RequestActionButtons({ requestId }: Props) {
       <button
         onClick={() => setMode('rejecting')}
         disabled={isPending}
-        className="text-sm font-sans text-muted hover:text-danger"
+        className="border border-danger text-danger hover:bg-danger-bg font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50"
       >
         Reject
       </button>

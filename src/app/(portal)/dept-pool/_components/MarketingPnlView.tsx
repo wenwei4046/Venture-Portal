@@ -131,7 +131,7 @@ export default async function MarketingPnlView({ deptId, period }: Props) {
         <Kpi
           label="OPEX (staff)"
           amount={-opex}
-          subtitle={`${headcount} staff · subset of Total out (payroll consolidation)`}
+          subtitle={`${headcount} staff · subset of Total out`}
         />
         <Kpi label="Net profit" amount={netProfit} accent />
       </div>

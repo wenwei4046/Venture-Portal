@@ -120,7 +120,9 @@ export default function RequestCreditForm({ subsidiaries }: Props) {
             Subsidiaries <span className="text-danger">*</span>
           </label>
           <span className="text-xs font-mono text-muted">
-            {validItems.length} row{validItems.length === 1 ? '' : 's'}
+            {validItems.length > 0
+              ? `${validItems.length} ready`
+              : 'fill in subsidiary + amount'}
           </span>
         </div>
         <div className="border border-hairline rounded-md bg-surface overflow-hidden">
@@ -130,7 +132,7 @@ export default function RequestCreditForm({ subsidiaries }: Props) {
             <div className="col-span-1"></div>
           </div>
           {items.map((row, idx) => (
-            <div key={idx} className="grid grid-cols-12 gap-2 items-center px-3 py-2 border-b border-hairline last:border-0">
+            <div key={idx} className="grid grid-cols-12 gap-2 items-center px-3 py-2 border-b border-hairline">
               <select
                 value={row.subsidiary_id}
                 onChange={(e) => updateItem(idx, { subsidiary_id: e.target.value })}
@@ -163,14 +165,16 @@ export default function RequestCreditForm({ subsidiaries }: Props) {
               </button>
             </div>
           ))}
+          <div className="px-3 py-2">
+            <button
+              type="button"
+              onClick={addItem}
+              className="text-sm text-accent hover:text-accent-hover font-serif italic"
+            >
+              + Add subsidiary
+            </button>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={addItem}
-          className="mt-2 text-sm text-accent hover:text-accent-hover font-serif italic"
-        >
-          + Add subsidiary
-        </button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

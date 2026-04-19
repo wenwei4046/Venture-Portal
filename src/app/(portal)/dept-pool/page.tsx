@@ -198,7 +198,7 @@ export default async function DeptPoolPage() {
                       <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
                         {formatMoney(costingByDept.get(dept.id) ?? 0)}
                       </td>
-                      <td className="py-3 text-right space-x-3">
+                      <td className="py-3 text-right space-x-4">
                         {href ? (
                           <Link
                             href={href}

@@ -219,7 +219,7 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
         {sections.map((section) => (
           <div key={section.label ?? '__top'}>
             {section.label ? (
-              <div className="px-3 pt-5 pb-1.5 text-[10px] uppercase tracking-widest text-muted font-sans">
+              <div className="px-3 pt-5 pb-1.5 text-[10px] uppercase tracking-widest text-graphite font-sans font-medium">
                 {section.label}
               </div>
             ) : null}

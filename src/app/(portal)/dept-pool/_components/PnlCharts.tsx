@@ -38,6 +38,7 @@ function fmtRm(value: number): string {
 
 export default function PnlCharts({ composition, trend }: Props) {
   const totalComp = composition.reduce((s, d) => s + d.value, 0)
+  const nonZeroMonths = trend.filter((t) => t.revenue > 0 || t.cost > 0).length
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       <div className="border border-hairline rounded-md bg-surface p-6">
@@ -53,17 +54,19 @@ export default function PnlCharts({ composition, trend }: Props) {
                 dataKey="value"
                 nameKey="name"
                 cx="50%"
-                cy="50%"
-                outerRadius={90}
-                label={(props: { name?: string; percent?: number }) =>
-                  `${props.name ?? ''} ${((props.percent ?? 0) * 100).toFixed(0)}%`
+                cy="45%"
+                outerRadius={80}
+                label={(props: { percent?: number }) =>
+                  `${((props.percent ?? 0) * 100).toFixed(0)}%`
                 }
+                labelLine={false}
               >
                 {composition.map((_, i) => (
                   <Cell key={i} fill={COLORS[i % COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip formatter={(v: number) => fmtRm(v)} />
+              <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
             </PieChart>
           </ResponsiveContainer>
         )}
@@ -71,7 +74,12 @@ export default function PnlCharts({ composition, trend }: Props) {
 
       <div className="border border-hairline rounded-md bg-surface p-6">
         <h3 className="font-serif text-lg text-ink mb-1">12-month trend</h3>
-        <p className="font-serif italic text-graphite text-xs mb-4">Revenue vs total cost (expenses + OPEX)</p>
+        <p className="font-serif italic text-graphite text-xs mb-4">
+          Revenue vs total cost (expenses + OPEX)
+          {nonZeroMonths > 0 && nonZeroMonths < 12 ? (
+            <span className="text-muted"> · {nonZeroMonths} of 12 months have data</span>
+          ) : null}
+        </p>
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={trend}>
             <XAxis dataKey="month" stroke="#8c7e62" fontSize={11} />
