@@ -96,9 +96,12 @@ export default async function HRCostingPage() {
           >
             Manage Staff
           </Link>
+          {/* Monthly Payroll is navigation, not a decision. Keep it as an
+              outline button so the single rust accent stays reserved for the
+              Submit button below (the terminal decision in this flow). */}
           <Link
             href="/hr-costing/payroll"
-            className="inline-block bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            className="inline-block bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
           >
             Monthly Payroll
           </Link>

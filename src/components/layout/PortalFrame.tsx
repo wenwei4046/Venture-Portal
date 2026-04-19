@@ -29,11 +29,13 @@ export default function PortalFrame({
         />
       </div>
 
-      {/* Backdrop — mobile only, click-to-dismiss */}
+      {/* Backdrop — mobile only, click-to-dismiss. backdrop-blur-sm focuses
+          attention on the drawer and softens the cream content behind so the
+          drawer edge reads clearly against the blurred paper. */}
       {mobileNavOpen ? (
         <div
           onClick={() => setMobileNavOpen(false)}
-          className="fixed inset-0 bg-ink/40 z-40 md:hidden print:hidden"
+          className="fixed inset-0 bg-ink/40 backdrop-blur-sm z-40 md:hidden print:hidden"
           aria-label="Close navigation"
         />
       ) : null}

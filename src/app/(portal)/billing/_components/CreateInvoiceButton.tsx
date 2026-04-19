@@ -196,7 +196,7 @@ export default function CreateInvoiceButton({
 
       {open && (
         <div
-          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => !isPending && setOpen(false)}
         >
           <div
