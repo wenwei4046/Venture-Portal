@@ -163,8 +163,16 @@ export default async function DeptPoolPage() {
                   const balance = balanceMap.get(dept.id) ?? 0
                   const inOut = inOutByDept.get(dept.id) ?? { in_amt: 0, out_amt: 0 }
                   const net = inOut.in_amt - inOut.out_amt
-                  const isMarketing = dept.name === 'Marketing'
-                  const href = isMarketing ? '/dept-pool/marketing' : null
+                  // Director (the special director payout pool) has its own
+                  // /director-pool view and does not get a generic detail page.
+                  const slugByName: Record<string, string> = {
+                    Marketing: 'marketing',
+                    HR: 'hr',
+                    Finance: 'finance',
+                    'Director Office': 'director-office',
+                  }
+                  const slug = slugByName[dept.name]
+                  const href = slug ? `/dept-pool/${slug}` : null
                   return (
                     <tr
                       key={dept.id}
