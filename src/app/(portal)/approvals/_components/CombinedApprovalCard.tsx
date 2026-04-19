@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
 import { approveRequestGroup, rejectRequestGroup } from '../actions'
+import BatchDetailsModal from './BatchDetailsModal'
 
 interface GroupItem {
   request_type: string
@@ -32,6 +33,9 @@ export default function CombinedApprovalCard({
   const [rejectNotes, setRejectNotes] = useState('')
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [showDetails, setShowDetails] = useState(false)
+
+  const hasVouchers = items.some((i) => i.request_type === 'payment_voucher')
 
   // Sum every item's amount — handles both the 2-item Loan OUT combo and
   // N-voucher payroll disbursement batches. Previously we did
@@ -109,7 +113,7 @@ export default function CombinedApprovalCard({
         ))}
       </ul>
 
-      {/* Total */}
+      {/* Total + details trigger */}
       <div className="flex items-baseline justify-between border-t border-hairline pt-3 mb-5">
         <div>
           <div className="text-xs font-sans text-muted">Total disbursement</div>
@@ -124,8 +128,25 @@ export default function CombinedApprovalCard({
               {submitterName}
             </span>
           </div>
+          {hasVouchers ? (
+            <button
+              type="button"
+              onClick={() => setShowDetails(true)}
+              className="mt-1 text-xs font-serif italic text-accent hover:text-accent-hover"
+            >
+              View details →
+            </button>
+          ) : null}
         </div>
       </div>
+
+      {hasVouchers ? (
+        <BatchDetailsModal
+          groupId={groupId}
+          open={showDetails}
+          onClose={() => setShowDetails(false)}
+        />
+      ) : null}
 
       {/* Actions */}
       {isSelfSubmitted ? (

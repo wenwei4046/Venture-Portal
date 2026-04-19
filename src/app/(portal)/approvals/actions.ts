@@ -406,60 +406,25 @@ export async function approveRequestGroup(formData: FormData) {
   const todayStr = now.slice(0, 10)
 
   // ── Batch disbursement mode: no new_loan, N payment_vouchers ──────────────
-  // Payroll disbursement vouchers ship as one approval group (same group_id)
-  // with N = 32 typical. Flip each voucher to paid and run the normal pool /
-  // bank / GL side effects per voucher via the shared helper. No loan flow.
+  // Payroll disbursement vouchers ship as one approval group (same group_id),
+  // N = 32 typical. TODO-2 β (migration 171) moves the full side-effect chain
+  // (status flip, bank debit, pool adjust, repayment sync, GL journal) into
+  // approve_voucher_batch — one Postgres transaction, no partial-commit risk.
   if (!loanApproval) {
-    const { error: groupUpdateError } = await supabase
-      .from('approval_requests')
-      .update({
-        status: 'approved',
-        workflow_state: 'approved',
-        approved_by: user.id,
-        approved_at: now,
-        notes,
-      })
-      .eq('group_id', groupId)
-      .eq('status', 'pending')
+    const { data: processedRows, error: rpcError } = await supabase.rpc(
+      'approve_voucher_batch',
+      {
+        p_group_id: groupId,
+        p_user_id: user.id,
+        p_notes: notes ?? '',
+      },
+    )
 
-    if (groupUpdateError) {
-      throw new Error(`Failed to approve group: ${groupUpdateError.message}`)
+    if (rpcError) {
+      throw new Error(`Batch approval failed: ${rpcError.message}`)
     }
 
-    let processed = 0
-    for (const va of voucherApprovals) {
-      if (!va.reference_id) continue
-
-      const { data: v } = await supabase
-        .from('payment_vouchers')
-        .select('*')
-        .eq('id', va.reference_id)
-        .eq('status', 'pending_approval')
-        .single()
-
-      if (!v) continue
-
-      const { error: flipErr } = await supabase
-        .from('payment_vouchers')
-        .update({
-          status: 'paid',
-          approved_by: user.id,
-          approved_at: now,
-          executed_by: user.id,
-          executed_at: now,
-          payment_date: todayStr,
-          notes,
-        })
-        .eq('id', v.id)
-        .eq('status', 'pending_approval')
-
-      if (flipErr) {
-        throw new Error(`Group approved but voucher ${v.voucher_no} flip failed: ${flipErr.message}`)
-      }
-
-      await applyVoucherPaidSideEffects(supabase, v, todayStr, user.id)
-      processed++
-    }
+    const processed = Array.isArray(processedRows) ? processedRows.length : 0
 
     notifyApprovalDecision(
       'payment_voucher',
@@ -666,4 +631,118 @@ export async function rejectRequestGroup(formData: FormData) {
   revalidatePath('/dashboard')
   revalidatePath('/hr-costing/payment')
   redirect('/approvals')
+}
+
+// ─── Batch voucher details for CombinedApprovalCard modal (Principal) ────────
+// Called when Principal clicks "View details" on a combined approval card.
+// Batches the voucher + sources + attachments lookups so an N-voucher modal
+// opens in 3 round-trips, not 3N.
+
+export interface BatchVoucherRow {
+  approvalId: string
+  voucherId: string
+  voucherNo: string | null
+  voucherType: string
+  amount: number
+  direction: string | null
+  payeeName: string
+  description: string
+  sources: Array<{ pool: string; amount: number }>
+  attachments: Array<{
+    id: string
+    fileName: string
+    fileType: string
+    uploadedAt: string
+  }>
+}
+
+export async function getBatchVoucherDetails(groupId: string): Promise<BatchVoucherRow[]> {
+  await requireRole(['principal'])
+  const supabase = await createClient()
+
+  const { data: approvalRows } = await supabase
+    .from('approval_requests')
+    .select('id, reference_id')
+    .eq('group_id', groupId)
+    .eq('request_type', 'payment_voucher')
+
+  const pairs = (approvalRows ?? [])
+    .filter((r): r is { id: string; reference_id: string } => !!r.reference_id)
+
+  if (pairs.length === 0) return []
+
+  const voucherIds = pairs.map((r) => r.reference_id)
+
+  const [vouchersRes, sourcesRes, attachmentsRes] = await Promise.all([
+    supabase
+      .from('payment_vouchers')
+      .select('id, voucher_no, voucher_type, amount, direction, payee_name, description')
+      .in('id', voucherIds),
+    supabase
+      .from('payment_voucher_sources')
+      .select('voucher_id, pool, amount')
+      .in('voucher_id', voucherIds),
+    supabase
+      .from('payment_attachments')
+      .select('id, voucher_id, file_name, file_type, uploaded_at')
+      .in('voucher_id', voucherIds)
+      .order('uploaded_at', { ascending: false }),
+  ])
+
+  const vouchers = (vouchersRes.data ?? []) as Array<{
+    id: string
+    voucher_no: string | null
+    voucher_type: string
+    amount: string | number
+    direction: string | null
+    payee_name: string
+    description: string
+  }>
+  const sourcesByVoucher = new Map<string, Array<{ pool: string; amount: number }>>()
+  for (const s of (sourcesRes.data ?? []) as Array<{ voucher_id: string; pool: string; amount: string | number }>) {
+    const arr = sourcesByVoucher.get(s.voucher_id) ?? []
+    arr.push({ pool: s.pool, amount: Number(s.amount) })
+    sourcesByVoucher.set(s.voucher_id, arr)
+  }
+  const attachmentsByVoucher = new Map<
+    string,
+    Array<{ id: string; fileName: string; fileType: string; uploadedAt: string }>
+  >()
+  for (const a of (attachmentsRes.data ?? []) as Array<{
+    id: string
+    voucher_id: string
+    file_name: string
+    file_type: string
+    uploaded_at: string
+  }>) {
+    const arr = attachmentsByVoucher.get(a.voucher_id) ?? []
+    arr.push({
+      id: a.id,
+      fileName: a.file_name,
+      fileType: a.file_type,
+      uploadedAt: a.uploaded_at,
+    })
+    attachmentsByVoucher.set(a.voucher_id, arr)
+  }
+
+  const voucherById = new Map(vouchers.map((v) => [v.id, v]))
+
+  return pairs
+    .map((p) => {
+      const v = voucherById.get(p.reference_id)
+      if (!v) return null
+      return {
+        approvalId: p.id,
+        voucherId: v.id,
+        voucherNo: v.voucher_no,
+        voucherType: v.voucher_type,
+        amount: Number(v.amount),
+        direction: v.direction,
+        payeeName: v.payee_name,
+        description: v.description,
+        sources: sourcesByVoucher.get(v.id) ?? [],
+        attachments: attachmentsByVoucher.get(v.id) ?? [],
+      } satisfies BatchVoucherRow
+    })
+    .filter((r): r is BatchVoucherRow => r !== null)
 }

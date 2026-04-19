@@ -4,7 +4,34 @@ import dayjs from 'dayjs'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
+import {
+  getVoucherDetailContext,
+  formatSourcesLabel,
+  formatPoolLabel,
+  type VoucherDetailContext,
+} from '@/lib/voucher-detail'
+import {
+  voucherUpstreamHref,
+  voucherUpstreamLabel,
+} from '@/lib/voucher-upstream-href'
+import AttachmentList from '@/components/voucher/AttachmentList'
 import ApprovalActions from './_components/ApprovalActions'
+
+type ApprovalRequestTypeLocal =
+  | 'new_loan'
+  | 'base_rate'
+  | 'tier_change'
+  | 'escalation'
+  | 'new_contract'
+  | 'contract_change'
+  | 'dept_expense'
+  | 'advance'
+  | 'invoice_pool_release'
+  | 'profit_withdrawal'
+  | 'payment_voucher'
+  | 'hr_costing'
+  | 'new_fund_source'
+  | 'payroll_run'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -57,6 +84,21 @@ export default async function ApprovalDetailPage({ params }: Props) {
       }
     }
   }
+
+  // Load voucher detail if payment_voucher
+  let voucherContext: VoucherDetailContext | null = null
+  if (approval.request_type === 'payment_voucher' && approval.reference_id) {
+    voucherContext = await getVoucherDetailContext(supabase, approval.reference_id)
+  }
+
+  // Issue #4 pre-check: Debit voucher with insufficient bank balance should not
+  // be approvable — otherwise the approval action will throw mid-flight, and
+  // for N-voucher batches the earlier vouchers already committed.
+  const insufficientBalance =
+    voucherContext !== null &&
+    voucherContext.voucher.direction === 'debit' &&
+    voucherContext.bank !== null &&
+    voucherContext.bank.current_balance < Number(voucherContext.voucher.amount)
 
   const isPending = approval.status === 'pending'
   const isSelfSubmitted = approval.submitted_by === user.id
@@ -150,6 +192,149 @@ export default async function ApprovalDetailPage({ params }: Props) {
         </div>
       ) : null}
 
+      {/* ───────── Voucher context (if payment_voucher) ───────── */}
+      {voucherContext ? (
+        <div className="mb-10 max-w-3xl">
+          <div className="bg-surface border border-hairline rounded-md p-6">
+            <div className="flex items-baseline justify-between mb-4">
+              <h2 className="font-serif text-xl text-ink">Voucher details</h2>
+              <span className="font-mono text-xs text-muted">
+                {voucherContext.voucher.voucher_no ?? 'Draft'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5 text-sm mb-5">
+              <div>
+                <div className="text-xs text-muted uppercase tracking-wide font-sans mb-1">
+                  Amount
+                </div>
+                <div className="font-serif text-2xl text-ink">
+                  {voucherContext.voucher.direction === 'credit' ? '+' : ''}
+                  {formatMoney(Number(voucherContext.voucher.amount))}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-xs text-muted uppercase tracking-wide font-sans mb-1">
+                  {voucherContext.voucher.direction === 'debit' ? 'Pay to' : 'Received from'}
+                </div>
+                <div className="font-serif text-md text-ink">
+                  {voucherContext.voucher.payee_name}
+                </div>
+                {voucherContext.payeeCompany ? (
+                  <div className="font-mono text-xs text-muted mt-1">
+                    {voucherContext.payeeCompany.name} (
+                    {voucherContext.payeeCompany.short_code})
+                  </div>
+                ) : null}
+              </div>
+
+              {voucherContext.bank ? (
+                <div>
+                  <div className="text-xs text-muted uppercase tracking-wide font-sans mb-1">
+                    {voucherContext.voucher.direction === 'debit'
+                      ? 'Pay from bank'
+                      : 'Receive into bank'}
+                  </div>
+                  <div className="font-serif text-md text-ink">
+                    {voucherContext.bank.bank_name}
+                  </div>
+                  <div className="font-mono text-xs text-muted">
+                    Acct {voucherContext.bank.account_number} · Balance{' '}
+                    <span
+                      className={
+                        insufficientBalance ? 'text-danger font-medium' : 'text-ink'
+                      }
+                    >
+                      {formatMoney(voucherContext.bank.current_balance)}
+                    </span>
+                  </div>
+                </div>
+              ) : null}
+
+              {(() => {
+                const poolLabel =
+                  voucherContext.voucher.direction === 'credit'
+                    ? formatPoolLabel(voucherContext.voucher.target_pool)
+                    : formatSourcesLabel(
+                        voucherContext.sources,
+                        voucherContext.voucher.source_pool,
+                      )
+                return poolLabel ? (
+                  <div>
+                    <div className="text-xs text-muted uppercase tracking-wide font-sans mb-1">
+                      {voucherContext.voucher.direction === 'credit'
+                        ? 'Credit to pool'
+                        : 'Deduct from pool'}
+                    </div>
+                    <div className="font-serif text-md text-ink">{poolLabel}</div>
+                  </div>
+                ) : null
+              })()}
+            </div>
+
+            <div className="mb-5">
+              <div className="text-xs text-muted uppercase tracking-wide font-sans mb-1">
+                Description
+              </div>
+              <p className="font-serif text-md text-ink whitespace-pre-wrap">
+                {voucherContext.voucher.description}
+              </p>
+            </div>
+
+            {(() => {
+              const href = voucherUpstreamHref(
+                voucherContext.voucher.reference_type,
+                voucherContext.voucher.reference_id,
+              )
+              const label = voucherUpstreamLabel(voucherContext.voucher.reference_type)
+              return href ? (
+                <div className="mb-5">
+                  <Link
+                    href={href}
+                    className="text-sm text-accent hover:text-accent-hover font-serif italic"
+                  >
+                    View {label?.toLowerCase() ?? 'upstream record'} →
+                  </Link>
+                </div>
+              ) : null
+            })()}
+
+            {insufficientBalance ? (
+              <div className="border-t border-hairline pt-4 mt-4">
+                <div className="bg-danger-bg border border-danger rounded-md p-4 text-sm">
+                  <div className="font-serif text-danger mb-1">
+                    ⚠ Insufficient bank balance
+                  </div>
+                  <div className="font-serif italic text-danger text-sm">
+                    This voucher requires{' '}
+                    {formatMoney(Number(voucherContext.voucher.amount))} but{' '}
+                    {voucherContext.bank?.bank_name ?? 'the account'} holds only{' '}
+                    {formatMoney(voucherContext.bank?.current_balance ?? 0)}. Top up
+                    or void this voucher before approving.
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mt-4">
+            <h3 className="font-serif text-lg text-ink mb-2">Attachments</h3>
+            <AttachmentList
+              attachments={voucherContext.attachments.map((a) => ({
+                id: a.id,
+                file_name: a.file_name,
+                file_type: a.file_type,
+                file_size: a.file_size,
+                description: a.description,
+                uploaded_at: a.uploaded_at,
+              }))}
+              emptyMessage="No attachments uploaded yet. Ask Finance to attach supporting docs before approving."
+            />
+          </div>
+        </div>
+      ) : null}
+
       {/* ───────── Approval notes (if resolved) ───────── */}
       {!isPending && approval.notes ? (
         <div className="mb-10 max-w-3xl">
@@ -177,7 +362,13 @@ export default async function ApprovalDetailPage({ params }: Props) {
         ) : (
           <ApprovalActions
             approvalId={approval.id}
-            requestType={approval.request_type}
+            requestType={approval.request_type as ApprovalRequestTypeLocal}
+            disableApprove={insufficientBalance}
+            disableReason={
+              insufficientBalance
+                ? 'bank balance is below the voucher amount'
+                : null
+            }
           />
         )
       ) : (

@@ -7,6 +7,8 @@ import { approveRequest, rejectRequest } from '../../actions'
 interface Props {
   approvalId: string
   requestType: ApprovalRequestType
+  disableApprove?: boolean
+  disableReason?: string | null
 }
 
 // Per-request-type dialog copy. Each entry is the lead clause — the common
@@ -47,7 +49,12 @@ const REJECT_LEAD: Record<ApprovalRequestType, string> = {
   payroll_run: 'Rejecting sends the payroll back to HR as draft — no one gets paid',
 }
 
-export default function ApprovalActions({ approvalId, requestType }: Props) {
+export default function ApprovalActions({
+  approvalId,
+  requestType,
+  disableApprove,
+  disableReason,
+}: Props) {
   const [isPending, startTransition] = useTransition()
   const [mode, setMode] = useState<'idle' | 'approving' | 'rejecting'>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -79,21 +86,29 @@ export default function ApprovalActions({ approvalId, requestType }: Props) {
 
   if (mode === 'idle') {
     return (
-      <div className="flex items-center gap-3 max-w-3xl">
-        <button
-          type="button"
-          onClick={() => setMode('approving')}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-base px-5 py-2.5 rounded-md transition-colors"
-        >
-          Approve
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('rejecting')}
-          className="border border-hairline text-graphite hover:text-danger hover:border-danger font-sans text-sm px-4 py-2.5 rounded-md transition-colors"
-        >
-          Reject
-        </button>
+      <div className="max-w-3xl">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setMode('approving')}
+            disabled={disableApprove}
+            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-base px-5 py-2.5 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-accent"
+          >
+            Approve
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('rejecting')}
+            className="border border-hairline text-graphite hover:text-danger hover:border-danger font-sans text-sm px-4 py-2.5 rounded-md transition-colors"
+          >
+            Reject
+          </button>
+        </div>
+        {disableApprove && disableReason ? (
+          <p className="mt-2 text-xs text-danger font-serif italic">
+            Approve disabled: {disableReason}
+          </p>
+        ) : null}
       </div>
     )
   }
