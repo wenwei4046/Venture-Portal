@@ -20,11 +20,16 @@ import {
 interface NavItem {
   href: string
   label: string
+  section?: string
+  // Match the path exactly. Use for parent-overview links whose href is a
+  // strict prefix of sibling child hrefs (e.g. HR Costing > Overview).
+  exact?: boolean
   visible: (role: UserRole) => boolean
 }
 
 interface NavGroup {
   label: string
+  section?: string
   visible: (role: UserRole) => boolean
   children: NavItem[]
 }
@@ -41,14 +46,13 @@ const isPrincipalOrFinance = (role: UserRole) =>
 
 const navEntries: NavEntry[] = [
   { href: '/dashboard', label: 'Overview', visible: () => true },
-  // HR top-level shortcuts — every page HR touches monthly is one click away.
-  { href: '/hr-costing/payroll', label: 'Payroll', visible: isHR },
-  { href: '/hr-costing/payment', label: 'Payment', visible: isHR },
-  { href: '/hr-costing/staff', label: 'Staff', visible: isHR },
-  { href: '/director-salary', label: 'Director Salary', visible: isHR },
-  { href: '/payments', label: 'Payments', visible: canAccessTreasury },
+
+  // ── Daily Operations ──
+  { href: '/approvals', label: 'Approvals', section: 'Daily Operations', visible: canApprove },
+  { href: '/payments', label: 'Payments', section: 'Daily Operations', visible: canAccessTreasury },
   {
     label: 'Loan',
+    section: 'Daily Operations',
     visible: canAccessTreasury,
     children: [
       { href: '/fund-in', label: 'Fund IN', visible: canAccessTreasury },
@@ -56,25 +60,43 @@ const navEntries: NavEntry[] = [
       { href: '/overdue', label: 'Overdue', visible: canAccessTreasury },
     ],
   },
-  { href: '/statements', label: 'Statements', visible: canAccessTreasury },
-  { href: '/approvals', label: 'Approvals', visible: canApprove },
-  { href: '/dept-pool', label: 'Dept Pool', visible: canAccessDeptPool },
+  { href: '/statements', label: 'Statements', section: 'Daily Operations', visible: canAccessTreasury },
+  { href: '/reconciliation', label: 'Reconciliation', section: 'Daily Operations', visible: canAccessTreasury },
+  // HR sees HR Costing as an expandable group covering all monthly sub-pages.
+  // Principal sees a flat /hr-costing link in the Departments section below.
+  {
+    label: 'HR Costing',
+    section: 'Daily Operations',
+    visible: isHR,
+    children: [
+      { href: '/hr-costing', label: 'Overview', exact: true, visible: isHR },
+      { href: '/hr-costing/payroll', label: 'Payroll', visible: isHR },
+      { href: '/hr-costing/payment', label: 'Payment', visible: isHR },
+      { href: '/hr-costing/staff', label: 'Staff', visible: isHR },
+    ],
+  },
+  { href: '/director-salary', label: 'Director Salary', section: 'Daily Operations', visible: isHR },
+
+  // ── Departments ──
+  { href: '/dept-pool', label: 'Dept Pool', section: 'Departments', visible: canAccessDeptPool },
+  { href: '/hr-costing', label: 'HR Costing', section: 'Departments', visible: (r) => r === 'principal' },
   // Phase 7 Step 11: Billing merged into Statements → Invoices sub-tab.
   // Legacy /billing URL still redirects for external bookmarks.
   {
     label: 'Director',
+    section: 'Departments',
     visible: isPrincipalOrFinance,
     children: [
       { href: '/director-salary', label: 'Director Salary', visible: canAccessDirectorSalary },
       { href: '/director-pool', label: 'Director Pool', visible: canAccessDirectorPool },
     ],
   },
-  { href: '/hr-costing', label: 'HR Costing', visible: canAccessHRCosting },
-  { href: '/claims', label: 'Claims', visible: canAccessClaims },
-  { href: '/reconciliation', label: 'Reconciliation', visible: canAccessTreasury },
-  { href: '/reports', label: 'Reports', visible: canAccessReports },
-  { href: '/audit-log', label: 'Audit Log', visible: canAccessSettings },
-  { href: '/settings', label: 'Settings', visible: canAccessSettings },
+  { href: '/claims', label: 'Claims', section: 'Departments', visible: canAccessClaims },
+
+  // ── Reports & Admin ──
+  { href: '/reports', label: 'Reports', section: 'Reports & Admin', visible: canAccessReports },
+  { href: '/audit-log', label: 'Audit Log', section: 'Reports & Admin', visible: canAccessSettings },
+  { href: '/settings', label: 'Settings', section: 'Reports & Admin', visible: canAccessSettings },
 ]
 
 interface SidebarProps {
@@ -88,6 +110,18 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
   const router = useRouter()
 
   const visible = navEntries.filter((entry) => entry.visible(role))
+
+  // Group consecutive entries by section label so we can render dividers.
+  const sections: { label: string | null; entries: NavEntry[] }[] = []
+  for (const entry of visible) {
+    const sec = entry.section ?? null
+    const last = sections[sections.length - 1]
+    if (last && last.label === sec) {
+      last.entries.push(entry)
+    } else {
+      sections.push({ label: sec, entries: [entry] })
+    }
+  }
 
   // Track which groups are open. Auto-open if current path matches a child.
   const getInitialOpen = () => {
@@ -179,72 +213,82 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto">
-        {visible.map((entry) => {
-          if (isGroup(entry)) {
-            const groupActive = entry.children.some(
-              (c) => pathname === c.href || pathname.startsWith(c.href + '/')
-            )
-            const isOpen = !!groupOpen[entry.label]
-            return (
-              <div key={entry.label}>
-                <button
-                  type="button"
-                  onClick={() => toggleGroup(entry.label)}
+        {sections.map((section) => (
+          <div key={section.label ?? '__top'}>
+            {section.label ? (
+              <div className="px-3 pt-5 pb-1.5 text-[10px] uppercase tracking-widest text-muted font-sans">
+                {section.label}
+              </div>
+            ) : null}
+            {section.entries.map((entry) => {
+              if (isGroup(entry)) {
+                const groupActive = entry.children.some(
+                  (c) => pathname === c.href || pathname.startsWith(c.href + '/')
+                )
+                const isOpen = !!groupOpen[entry.label]
+                return (
+                  <div key={entry.label}>
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(entry.label)}
+                      className={
+                        groupActive && !isOpen
+                          ? 'w-full flex items-center justify-between px-3 py-2 mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[15px]'
+                          : 'w-full flex items-center justify-between px-3 py-2 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-sm font-sans'
+                      }
+                    >
+                      {entry.label}
+                      <span className={`text-[10px] transition-transform ${isOpen ? 'rotate-180' : ''}`}>
+                        ▼
+                      </span>
+                    </button>
+                    {isOpen ? (
+                      <div className="ml-3 border-l border-hairline pl-2">
+                        {entry.children
+                          .filter((c) => c.visible(role))
+                          .map((child) => {
+                            const active = child.exact
+                              ? pathname === child.href
+                              : pathname === child.href || pathname.startsWith(child.href + '/')
+                            return (
+                              <Link
+                                key={child.href}
+                                href={child.href}
+                                className={
+                                  active
+                                    ? 'nav-link block px-3 py-1.5 mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[14px]'
+                                    : 'nav-link block px-3 py-1.5 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-[13px] font-sans'
+                                }
+                              >
+                                {child.label}
+                              </Link>
+                            )
+                          })}
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              }
+
+              const item = entry as NavItem
+              const active =
+                pathname === item.href || pathname.startsWith(item.href + '/')
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
                   className={
-                    groupActive && !isOpen
-                      ? 'w-full flex items-center justify-between px-3 py-2 mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[15px]'
-                      : 'w-full flex items-center justify-between px-3 py-2 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-sm font-sans'
+                    active
+                      ? 'nav-link block px-3 py-2 mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[15px]'
+                      : 'nav-link block px-3 py-2 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-sm font-sans'
                   }
                 >
-                  {entry.label}
-                  <span className={`text-[10px] transition-transform ${isOpen ? 'rotate-180' : ''}`}>
-                    ▼
-                  </span>
-                </button>
-                {isOpen ? (
-                  <div className="ml-3 border-l border-hairline pl-2">
-                    {entry.children
-                      .filter((c) => c.visible(role))
-                      .map((child) => {
-                        const active =
-                          pathname === child.href || pathname.startsWith(child.href + '/')
-                        return (
-                          <Link
-                            key={child.href}
-                            href={child.href}
-                            className={
-                              active
-                                ? 'nav-link block px-3 py-1.5 mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[14px]'
-                                : 'nav-link block px-3 py-1.5 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-[13px] font-sans'
-                            }
-                          >
-                            {child.label}
-                          </Link>
-                        )
-                      })}
-                  </div>
-                ) : null}
-              </div>
-            )
-          }
-
-          const item = entry as NavItem
-          const active =
-            pathname === item.href || pathname.startsWith(item.href + '/')
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={
-                active
-                  ? 'nav-link block px-3 py-2 mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[15px]'
-                  : 'nav-link block px-3 py-2 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-sm font-sans'
-              }
-            >
-              {item.label}
-            </Link>
-          )
-        })}
+                  {item.label}
+                </Link>
+              )
+            })}
+          </div>
+        ))}
       </nav>
 
       {/* Footer */}
