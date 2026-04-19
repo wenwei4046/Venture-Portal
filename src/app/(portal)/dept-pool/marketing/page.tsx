@@ -9,6 +9,7 @@ import HistoryTable from '../_components/HistoryTable'
 import MarketingPnlView from '../_components/MarketingPnlView'
 import RequestPaymentForm from '../_components/RequestPaymentForm'
 import RequestCreditForm from '../_components/RequestCreditForm'
+import StageBadge from '../_components/StageBadge'
 
 interface Props {
   searchParams: Promise<{ tab?: string; filter?: string }>
@@ -172,7 +173,7 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
       ) : null}
 
       {activeTab === 'request-payment' && canSubmitExpense ? (
-        <RequestPaymentTabContent deptId={marketing.id} />
+        <RequestPaymentTabContent deptId={marketing.id} balance={balance} />
       ) : null}
 
       {activeTab === 'request-credit' && canSubmitExpense ? (
@@ -266,9 +267,15 @@ async function RequestCreditTabContent({ deptId }: { deptId: string }) {
   )
 }
 
-async function RequestPaymentTabContent({ deptId }: { deptId: string }) {
+async function RequestPaymentTabContent({
+  deptId,
+  balance,
+}: {
+  deptId: string
+  balance: number
+}) {
   const supabase = await createClient()
-  const [{ data: companies }, { data: categories }, { data: requests }] = await Promise.all([
+  const [{ data: companies }, { data: categories }, { data: requests }, { data: inflightRows }] = await Promise.all([
     supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('name'),
     supabase.from('payment_categories').select('code, label').eq('is_active', true).order('sort_order'),
     supabase
@@ -281,13 +288,19 @@ async function RequestPaymentTabContent({ deptId }: { deptId: string }) {
         'pending_principal_pv',
       ])
       .order('requested_at', { ascending: false }),
+    // P0-3: compute in-flight total to mirror what the RPC uses for available balance.
+    supabase
+      .from('dept_payment_requests')
+      .select('amount')
+      .eq('department_id', deptId)
+      .eq('status', 'pending_principal_expense'),
   ])
 
-  const STATUS_LABEL: Record<string, string> = {
-    pending_principal_expense: 'Awaiting Principal',
-    pending_finance_pv: 'Awaiting Finance PV',
-    pending_principal_pv: 'Awaiting Principal PV',
-  }
+  const inflight = (inflightRows ?? []).reduce(
+    (sum, r) => sum + Number(r.amount ?? 0),
+    0,
+  )
+  const available = balance - inflight
 
   return (
     <div className="space-y-10">
@@ -298,7 +311,11 @@ async function RequestPaymentTabContent({ deptId }: { deptId: string }) {
           to Principal to approve the PV. Pool is debited at Principal sign-off; cash leaves the
           bank when the PV is approved + executed.
         </p>
-        <RequestPaymentForm companies={companies ?? []} categories={categories ?? []} />
+        <RequestPaymentForm
+          companies={companies ?? []}
+          categories={categories ?? []}
+          availableBalance={available}
+        />
       </section>
 
       <section>
@@ -318,7 +335,7 @@ async function RequestPaymentTabContent({ deptId }: { deptId: string }) {
                   <th className="text-left py-3 pr-4 font-medium">Submitted</th>
                   <th className="text-left py-3 pr-4 font-medium">Payee</th>
                   <th className="text-left py-3 pr-4 font-medium">Description</th>
-                  <th className="text-left py-3 pr-4 font-medium">Status</th>
+                  <th className="text-left py-3 pr-4 font-medium">Stage</th>
                   <th className="text-right py-3 font-medium">Amount</th>
                 </tr>
               </thead>
@@ -331,9 +348,7 @@ async function RequestPaymentTabContent({ deptId }: { deptId: string }) {
                     <td className="py-3 pr-4 font-serif italic text-graphite">{r.payee_name}</td>
                     <td className="py-3 pr-4 font-serif italic text-graphite">{r.description}</td>
                     <td className="py-3 pr-4">
-                      <span className="text-xs font-serif italic text-accent">
-                        {STATUS_LABEL[r.status] ?? r.status}
-                      </span>
+                      <StageBadge status={r.status} />
                     </td>
                     <td className="py-3 text-right font-mono tabular font-medium text-ink">
                       {formatMoney(Number(r.amount))}

@@ -7,9 +7,23 @@ import { submitRequestPayment } from '../actions'
 interface Props {
   companies: { id: string; name: string; short_code: string }[]
   categories: { code: string; label: string }[]
+  // P0-3: available balance (pool balance minus in-flight Stage 1 requests).
+  availableBalance: number
 }
 
-export default function RequestPaymentForm({ companies, categories }: Props) {
+function formatRM(n: number) {
+  const abs = Math.abs(n).toLocaleString('en-MY', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+  return n < 0 ? `RM (${abs})` : `RM ${abs}`
+}
+
+export default function RequestPaymentForm({
+  companies,
+  categories,
+  availableBalance,
+}: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -18,6 +32,11 @@ export default function RequestPaymentForm({ companies, categories }: Props) {
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
+
+  const amountNum = parseFloat(amount)
+  const hasAmount = Number.isFinite(amountNum) && amountNum > 0
+  const wouldOvercommit = hasAmount && amountNum > availableBalance
+  const poolEmpty = availableBalance <= 0
 
   function handleCompanyChange(id: string) {
     setPayeeCompanyId(id)
@@ -53,6 +72,37 @@ export default function RequestPaymentForm({ companies, categories }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5 max-w-2xl">
+      {/* P0-3: available balance banner so Dept Manager sees what they can spend BEFORE filling the form. */}
+      <div
+        className={
+          poolEmpty
+            ? 'bg-danger-bg border border-danger rounded-md p-3 text-sm'
+            : 'bg-surface border border-hairline rounded-md p-3 text-sm'
+        }
+      >
+        <div className="flex items-baseline justify-between">
+          <span className="font-serif italic text-graphite">Available to request</span>
+          <span
+            className={
+              poolEmpty
+                ? 'font-mono tabular font-medium text-danger'
+                : 'font-mono tabular font-medium text-ink'
+            }
+          >
+            {formatRM(availableBalance)}
+          </span>
+        </div>
+        {poolEmpty ? (
+          <p className="font-serif italic text-danger text-xs mt-1">
+            Pool is empty or negative — you cannot submit a payment request until the pool is topped up (Marketing NP or refund credit).
+          </p>
+        ) : (
+          <p className="font-serif italic text-muted text-xs mt-1">
+            Pool balance minus requests already awaiting Principal. Submitting more than this will be rejected.
+          </p>
+        )}
+      </div>
+
       {error ? (
         <div className="bg-danger-bg border border-danger text-danger rounded-md p-3 text-sm font-sans">
           {error}
@@ -104,9 +154,18 @@ export default function RequestPaymentForm({ companies, categories }: Props) {
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             required
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+            className={
+              wouldOvercommit
+                ? 'w-full px-3 py-2 bg-paper border border-danger rounded-md text-sm font-mono text-danger focus:outline-none'
+                : 'w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border'
+            }
             placeholder="0.00"
           />
+          {wouldOvercommit ? (
+            <p className="font-serif italic text-danger text-xs mt-1">
+              Exceeds available balance ({formatRM(availableBalance)}). Reduce the amount or wait for pool top-up.
+            </p>
+          ) : null}
         </div>
         <div>
           <label className="block text-sm font-sans font-medium text-graphite mb-1">
@@ -148,10 +207,16 @@ export default function RequestPaymentForm({ companies, categories }: Props) {
 
       <button
         type="submit"
-        disabled={isPending}
-        className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2.5 rounded-md transition-colors disabled:opacity-50"
+        disabled={isPending || poolEmpty || wouldOvercommit}
+        className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2.5 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {isPending ? 'Submitting…' : 'Submit for Principal approval'}
+        {isPending
+          ? 'Submitting…'
+          : poolEmpty
+            ? 'Pool empty — cannot submit'
+            : wouldOvercommit
+              ? 'Amount exceeds available balance'
+              : 'Submit for Principal approval'}
       </button>
     </form>
   )
