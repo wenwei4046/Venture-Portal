@@ -1874,6 +1874,101 @@ export type Database = {
           },
         ]
       }
+      invoice_submission_requests: {
+        Row: {
+          created_at: string
+          department_id: string
+          description: string
+          due_date: string
+          generated_at: string | null
+          generated_by: string | null
+          generated_invoice_ids: string[] | null
+          id: string
+          invoice_date: string
+          line_items: Json
+          period_month: string
+          reference_no: string | null
+          rejected_at: string | null
+          rejected_by: string | null
+          rejection_reason: string | null
+          requested_at: string
+          requested_by: string
+          status: Database["public"]["Enums"]["invoice_submission_request_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          department_id: string
+          description: string
+          due_date: string
+          generated_at?: string | null
+          generated_by?: string | null
+          generated_invoice_ids?: string[] | null
+          id?: string
+          invoice_date: string
+          line_items: Json
+          period_month: string
+          reference_no?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
+          requested_at?: string
+          requested_by: string
+          status?: Database["public"]["Enums"]["invoice_submission_request_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          department_id?: string
+          description?: string
+          due_date?: string
+          generated_at?: string | null
+          generated_by?: string | null
+          generated_invoice_ids?: string[] | null
+          id?: string
+          invoice_date?: string
+          line_items?: Json
+          period_month?: string
+          reference_no?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
+          requested_at?: string
+          requested_by?: string
+          status?: Database["public"]["Enums"]["invoice_submission_request_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_submission_requests_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_submission_requests_generated_by_fkey"
+            columns: ["generated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_submission_requests_rejected_by_fkey"
+            columns: ["rejected_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_submission_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           base_amount: number | null
@@ -3700,6 +3795,10 @@ export type Database = {
       }
       dashboard_summary: { Args: never; Returns: Json }
       format_invoice_no: { Args: { p_period: string }; Returns: string }
+      generate_invoices_from_request: {
+        Args: { p_request_id: string }
+        Returns: string[]
+      }
       generate_monthly_invoices: {
         Args: { p_modes?: string[]; p_period_month: string }
         Returns: Json
@@ -3867,6 +3966,10 @@ export type Database = {
         Args: { p_approval_id: string }
         Returns: undefined
       }
+      reject_invoice_request: {
+        Args: { p_reason: string; p_request_id: string }
+        Returns: undefined
+      }
       reject_payroll_run: {
         Args: { p_approver: string; p_reason: string; p_run_id: string }
         Returns: undefined
@@ -3879,6 +3982,17 @@ export type Database = {
           p_description: string
           p_payee_company_id: string
           p_payee_name: string
+        }
+        Returns: string
+      }
+      submit_invoice_request: {
+        Args: {
+          p_description: string
+          p_due_date: string
+          p_invoice_date: string
+          p_line_items: Json
+          p_period_month: string
+          p_reference_no: string
         }
         Returns: string
       }
@@ -3968,6 +4082,11 @@ export type Database = {
         | "loan_repayment_in"
       invoice_pool_txn_type: "accumulate" | "release"
       invoice_status: "draft" | "issued" | "paid" | "paid_via_netting"
+      invoice_submission_request_status:
+        | "pending"
+        | "generated"
+        | "rejected"
+        | "cancelled"
       loan_status: "pending_approval" | "active" | "fully_repaid" | "cancelled"
       overdue_stage: "grace" | "late_1" | "late_2" | "escalation"
       overdue_status: "pending" | "paid" | "escalated"
@@ -4221,6 +4340,12 @@ export const Constants = {
       ],
       invoice_pool_txn_type: ["accumulate", "release"],
       invoice_status: ["draft", "issued", "paid", "paid_via_netting"],
+      invoice_submission_request_status: [
+        "pending",
+        "generated",
+        "rejected",
+        "cancelled",
+      ],
       loan_status: ["pending_approval", "active", "fully_repaid", "cancelled"],
       overdue_stage: ["grace", "late_1", "late_2", "escalation"],
       overdue_status: ["pending", "paid", "escalated"],

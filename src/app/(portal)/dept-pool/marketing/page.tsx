@@ -9,6 +9,7 @@ import DeptPoolTabs from '../_components/DeptPoolTabs'
 import HistoryTable from '../_components/HistoryTable'
 import MarketingPnlView from '../_components/MarketingPnlView'
 import RequestPaymentForm from '../_components/RequestPaymentForm'
+import RequestCreditForm from '../_components/RequestCreditForm'
 
 interface Props {
   searchParams: Promise<{ tab?: string; filter?: string }>
@@ -26,7 +27,9 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
         ? 'pnl'
         : rawTab === 'request-payment'
           ? 'request-payment'
-          : 'overview'
+          : rawTab === 'request-credit'
+            ? 'request-credit'
+            : 'overview'
   const historyFilter =
     rawFilter === 'in' ? 'in' : rawFilter === 'out' ? 'out' : 'all'
 
@@ -224,6 +227,94 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
       {activeTab === 'request-payment' && canSubmitExpense ? (
         <RequestPaymentTabContent deptId={marketing.id} />
       ) : null}
+
+      {activeTab === 'request-credit' && canSubmitExpense ? (
+        <RequestCreditTabContent deptId={marketing.id} />
+      ) : null}
+    </div>
+  )
+}
+
+async function RequestCreditTabContent({ deptId }: { deptId: string }) {
+  const supabase = await createClient()
+  const [{ data: subsidiaries }, { data: requests }] = await Promise.all([
+    supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('name'),
+    supabase
+      .from('invoice_submission_requests')
+      .select('id, requested_at, period_month, description, line_items, status, generated_invoice_ids')
+      .eq('department_id', deptId)
+      .in('status', ['pending', 'rejected'])
+      .order('requested_at', { ascending: false })
+      .limit(20),
+  ])
+
+  const STATUS_LABEL: Record<string, string> = {
+    pending: 'Awaiting Finance',
+    rejected: 'Rejected — re-submit',
+    generated: 'Generated',
+  }
+
+  return (
+    <div className="space-y-10">
+      <section>
+        <h2 className="font-serif text-xl text-ink mb-1">New invoice request</h2>
+        <p className="font-serif italic text-graphite text-sm mb-4">
+          Submits a draft invoice to Finance for generation. One row per subsidiary becomes one
+          invoice. Marketing pool credits when the subsidiary settles the invoice.
+        </p>
+        <RequestCreditForm subsidiaries={subsidiaries ?? []} />
+      </section>
+
+      <section>
+        <h2 className="font-serif text-xl text-ink mb-1">Recent requests</h2>
+        {(requests ?? []).length === 0 ? (
+          <div className="border border-hairline rounded-md bg-surface p-6 text-center">
+            <p className="font-serif italic text-muted text-sm">No invoice requests yet.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
+                  <th className="text-left py-3 pr-4 font-medium">Submitted</th>
+                  <th className="text-left py-3 pr-4 font-medium">Period</th>
+                  <th className="text-left py-3 pr-4 font-medium">Description</th>
+                  <th className="text-left py-3 pr-4 font-medium">Lines</th>
+                  <th className="text-left py-3 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(requests ?? []).map((r) => {
+                  const lineCount = Array.isArray(r.line_items) ? r.line_items.length : 0
+                  return (
+                    <tr key={r.id} className="border-b border-hairline last:border-0">
+                      <td className="py-3 pr-4 font-mono text-xs text-muted">
+                        {dayjs(r.requested_at).format('D MMM HH:mm')}
+                      </td>
+                      <td className="py-3 pr-4 font-mono text-xs text-graphite">
+                        {dayjs(r.period_month).format('MMM YYYY')}
+                      </td>
+                      <td className="py-3 pr-4 font-serif italic text-graphite">{r.description}</td>
+                      <td className="py-3 pr-4 font-mono text-xs text-graphite">{lineCount}</td>
+                      <td className="py-3">
+                        <span
+                          className={
+                            r.status === 'rejected'
+                              ? 'text-xs font-serif italic text-danger'
+                              : 'text-xs font-serif italic text-accent'
+                          }
+                        >
+                          {STATUS_LABEL[r.status] ?? r.status}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   )
 }

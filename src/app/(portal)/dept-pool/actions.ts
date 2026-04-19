@@ -41,6 +41,41 @@ export async function submitRequestPayment(args: {
   revalidatePath('/approvals')
 }
 
+// ─── Submit Request Credit (Invoice Submission) ─────────────────────────────
+
+export async function submitRequestCredit(args: {
+  period: string
+  invoiceDate: string
+  dueDate: string
+  description: string
+  referenceNo: string | null
+  lineItems: { subsidiary_id: string; amount: number }[]
+}) {
+  await requireRole(['dept_manager'])
+  const supabase = await createClient()
+
+  if (args.lineItems.length === 0) throw new Error('At least one line item is required')
+  for (const item of args.lineItems) {
+    if (!item.subsidiary_id) throw new Error('Subsidiary is required for every line')
+    if (!Number.isFinite(item.amount) || item.amount <= 0) {
+      throw new Error('Amount must be greater than 0 for every line')
+    }
+  }
+
+  const { error } = await supabase.rpc('submit_invoice_request', {
+    p_period_month: args.period,
+    p_invoice_date: args.invoiceDate,
+    p_due_date: args.dueDate,
+    p_description: args.description.trim(),
+    p_reference_no: (args.referenceNo ?? '') as string,
+    p_line_items: args.lineItems,
+  })
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/dept-pool/marketing')
+  revalidatePath('/billing/requests')
+}
+
 // ─── Submit department expense (Dept Manager) ────────────────────────────────
 
 export async function submitDeptExpense(formData: FormData) {
