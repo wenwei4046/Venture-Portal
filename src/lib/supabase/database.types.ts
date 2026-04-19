@@ -3969,6 +3969,7 @@ export type Database = {
         }[]
       }
       mark_matured_fund_sources: { Args: never; Returns: number }
+      mint_invoice_no: { Args: { p_period: string }; Returns: string }
       reject_dept_payment_request: {
         Args: { p_approval_id: string }
         Returns: undefined

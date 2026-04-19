@@ -60,14 +60,14 @@ export async function createManualInvoice(formData: FormData): Promise<void> {
   const period = dayjs(rawPeriod).startOf('month').format('YYYY-MM-DD')
   await assertPeriodOpen(supabase, period)
 
-  const { count } = await supabase
-    .from('invoices')
-    .select('*', { count: 'exact', head: true })
-    .eq('period_month', period)
-
-  const yyyymm = dayjs(period).format('YYYYMM')
-  const seq = (count ?? 0) + 1
-  const invoiceNo = `HV-INV-${yyyymm}-${String(seq).padStart(4, '0')}`
+  // P0-2: mint invoice_no via RPC so it holds the hv_invoice_no advisory lock.
+  // Prevents collisions with concurrent generate_invoices_from_request calls.
+  const { data: invoiceNo, error: mintErr } = await supabase.rpc('mint_invoice_no', {
+    p_period: period,
+  })
+  if (mintErr || !invoiceNo) {
+    throw new Error(`Failed to mint invoice number: ${mintErr?.message ?? 'unknown'}`)
+  }
 
   const { error } = await supabase.from('invoices').insert({
     invoice_no: invoiceNo,
