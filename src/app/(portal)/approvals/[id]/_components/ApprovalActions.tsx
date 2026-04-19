@@ -30,6 +30,7 @@ const APPROVE_LEAD: Record<ApprovalRequestType, string> = {
   new_fund_source: 'Approving activates the fund source and credits the Venture Pool',
   hr_costing: 'Approving locks in the HR costing snapshot for Finance to execute',
   payroll_run: 'Approving pays out the monthly payroll to every employee and director',
+  dept_payment_request: 'Approving debits the dept pool and routes the request to Finance to generate the PV',
 }
 
 const REJECT_LEAD: Record<ApprovalRequestType, string> = {
@@ -47,6 +48,7 @@ const REJECT_LEAD: Record<ApprovalRequestType, string> = {
   new_fund_source: 'Rejecting cancels the fund source — no capital will be posted',
   hr_costing: 'Rejecting keeps the HR snapshot as-is and blocks execution',
   payroll_run: 'Rejecting sends the payroll back to HR as draft — no one gets paid',
+  dept_payment_request: 'Rejecting cancels the request — pool is unchanged, Finance is not notified',
 }
 
 export default function ApprovalActions({

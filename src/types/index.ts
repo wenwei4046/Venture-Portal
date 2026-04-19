@@ -43,6 +43,7 @@ export type ApprovalRequestType =
   | 'new_fund_source'
   | 'hr_costing'
   | 'payroll_run'
+  | 'dept_payment_request'
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 

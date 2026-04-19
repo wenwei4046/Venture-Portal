@@ -693,6 +693,139 @@ export type Database = {
         }
         Relationships: []
       }
+      dept_payment_requests: {
+        Row: {
+          amount: number
+          cancelled_at: string | null
+          cancelled_by: string | null
+          category_code: string | null
+          created_at: string
+          department_id: string
+          dept_pool_id: string | null
+          description: string
+          expense_approval_id: string | null
+          id: string
+          notes: string | null
+          pay_from_account_id: string | null
+          payee_company_id: string | null
+          payee_name: string
+          payment_method: string | null
+          pv_id: string | null
+          requested_at: string
+          requested_by: string
+          status: Database["public"]["Enums"]["dept_payment_request_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          category_code?: string | null
+          created_at?: string
+          department_id: string
+          dept_pool_id?: string | null
+          description: string
+          expense_approval_id?: string | null
+          id?: string
+          notes?: string | null
+          pay_from_account_id?: string | null
+          payee_company_id?: string | null
+          payee_name: string
+          payment_method?: string | null
+          pv_id?: string | null
+          requested_at?: string
+          requested_by: string
+          status?: Database["public"]["Enums"]["dept_payment_request_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          category_code?: string | null
+          created_at?: string
+          department_id?: string
+          dept_pool_id?: string | null
+          description?: string
+          expense_approval_id?: string | null
+          id?: string
+          notes?: string | null
+          pay_from_account_id?: string | null
+          payee_company_id?: string | null
+          payee_name?: string
+          payment_method?: string | null
+          pv_id?: string | null
+          requested_at?: string
+          requested_by?: string
+          status?: Database["public"]["Enums"]["dept_payment_request_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dept_payment_requests_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dept_payment_requests_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dept_payment_requests_dept_pool_id_fkey"
+            columns: ["dept_pool_id"]
+            isOneToOne: false
+            referencedRelation: "dept_pools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dept_payment_requests_expense_approval_id_fkey"
+            columns: ["expense_approval_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dept_payment_requests_expense_approval_id_fkey"
+            columns: ["expense_approval_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_with_target"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dept_payment_requests_pay_from_account_id_fkey"
+            columns: ["pay_from_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dept_payment_requests_payee_company_id_fkey"
+            columns: ["payee_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dept_payment_requests_pv_id_fkey"
+            columns: ["pv_id"]
+            isOneToOne: false
+            referencedRelation: "payment_vouchers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dept_payment_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dept_pools: {
         Row: {
           amount: number
@@ -3485,6 +3618,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      approve_dept_payment_expense: {
+        Args: { p_approval_id: string }
+        Returns: undefined
+      }
       approve_payroll_run: {
         Args: { p_approver: string; p_run_id: string }
         Returns: undefined
@@ -3566,6 +3703,14 @@ export type Database = {
       generate_monthly_invoices: {
         Args: { p_modes?: string[]; p_period_month: string }
         Returns: Json
+      }
+      generate_pv_for_dept_request: {
+        Args: {
+          p_pay_from_account_id: string
+          p_payment_method: string
+          p_request_id: string
+        }
+        Returns: string
       }
       get_current_base_rate: {
         Args: { p_as_of_date?: string }
@@ -3718,11 +3863,25 @@ export type Database = {
         }[]
       }
       mark_matured_fund_sources: { Args: never; Returns: number }
+      reject_dept_payment_request: {
+        Args: { p_approval_id: string }
+        Returns: undefined
+      }
       reject_payroll_run: {
         Args: { p_approver: string; p_reason: string; p_run_id: string }
         Returns: undefined
       }
       save_director_salary_results: { Args: { p_data: Json }; Returns: Json }
+      submit_dept_payment_request: {
+        Args: {
+          p_amount: number
+          p_category_code?: string
+          p_description: string
+          p_payee_company_id: string
+          p_payee_name: string
+        }
+        Returns: string
+      }
       submit_payroll_to_principal: {
         Args: { p_period: string; p_user_id: string }
         Returns: string
@@ -3745,6 +3904,7 @@ export type Database = {
         | "new_fund_source"
         | "hr_costing"
         | "payroll_run"
+        | "dept_payment_request"
       approval_status: "pending" | "approved" | "rejected"
       approval_workflow_state:
         | "submitted"
@@ -3771,6 +3931,13 @@ export type Database = {
         | "team_commission_sum"
       commission_rule_type: "tiered_per_unit" | "pct_of_base"
       contract_status: "active" | "completed" | "cancelled"
+      dept_payment_request_status:
+        | "pending_principal_expense"
+        | "rejected_expense"
+        | "pending_finance_pv"
+        | "pending_principal_pv"
+        | "completed"
+        | "cancelled"
       dept_pool_txn_type: "np_in" | "expense_out"
       director_status: "active" | "inactive"
       epf_part: "A" | "C" | "E" | "F"
@@ -3982,6 +4149,7 @@ export const Constants = {
         "new_fund_source",
         "hr_costing",
         "payroll_run",
+        "dept_payment_request",
       ],
       approval_status: ["pending", "approved", "rejected"],
       approval_workflow_state: [
@@ -4012,6 +4180,14 @@ export const Constants = {
       ],
       commission_rule_type: ["tiered_per_unit", "pct_of_base"],
       contract_status: ["active", "completed", "cancelled"],
+      dept_payment_request_status: [
+        "pending_principal_expense",
+        "rejected_expense",
+        "pending_finance_pv",
+        "pending_principal_pv",
+        "completed",
+        "cancelled",
+      ],
       dept_pool_txn_type: ["np_in", "expense_out"],
       director_status: ["active", "inactive"],
       epf_part: ["A", "C", "E", "F"],

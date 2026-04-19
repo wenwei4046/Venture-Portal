@@ -222,6 +222,7 @@ function formatRequestType(type: string): string {
   const labels: Record<string, string> = {
     new_loan: 'New loan',
     payment_voucher: 'Payment voucher',
+    dept_payment_request: 'Dept Request Payment',
   }
   return labels[type] ?? type.toUpperCase()
 }

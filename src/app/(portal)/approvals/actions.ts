@@ -262,6 +262,17 @@ export async function approveRequest(formData: FormData) {
         `Approval recorded but HR costing state update failed: ${hrErr.message}`
       )
     }
+  } else if (approval.request_type === 'dept_payment_request') {
+    // PR #4: Principal #1 (expense). RPC debits the dept pool and flips the
+    // dept_payment_request to pending_finance_pv so Finance can generate the PV.
+    const { error: dprErr } = await supabase.rpc('approve_dept_payment_expense', {
+      p_approval_id: id,
+    })
+    if (dprErr) {
+      throw new Error(
+        `Approval recorded but dept payment expense step failed: ${dprErr.message}`
+      )
+    }
   }
   // Other request types (base_rate, tier_change, etc) handled in Phase 1.5+
 
@@ -352,6 +363,9 @@ export async function rejectRequest(formData: FormData) {
       .update({ status: 'voided' })
       .eq('id', approval.reference_id)
       .eq('status', 'pending_approval')
+  } else if (approval.request_type === 'dept_payment_request') {
+    // PR #4: flip dept_payment_request to rejected_expense (no pool debit).
+    await supabase.rpc('reject_dept_payment_request', { p_approval_id: id })
   }
 
   revalidatePath('/approvals')

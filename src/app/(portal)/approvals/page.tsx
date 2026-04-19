@@ -229,6 +229,7 @@ function formatRequestType(type: string): string {
     payment_voucher: 'PAYMENT VOUCHER',
     hr_costing: 'HR COSTING',
     payroll_run: 'PAYROLL RUN',
+    dept_payment_request: 'DEPT REQUEST PAYMENT',
   }
   return labels[type] ?? type.toUpperCase()
 }

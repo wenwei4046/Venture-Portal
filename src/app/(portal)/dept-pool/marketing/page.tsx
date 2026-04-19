@@ -8,6 +8,7 @@ import ExpenseForm from '../_components/ExpenseForm'
 import DeptPoolTabs from '../_components/DeptPoolTabs'
 import HistoryTable from '../_components/HistoryTable'
 import MarketingPnlView from '../_components/MarketingPnlView'
+import RequestPaymentForm from '../_components/RequestPaymentForm'
 
 interface Props {
   searchParams: Promise<{ tab?: string; filter?: string }>
@@ -19,7 +20,13 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
 
   const { tab: rawTab, filter: rawFilter } = await searchParams
   const activeTab =
-    rawTab === 'history' ? 'history' : rawTab === 'pnl' ? 'pnl' : 'overview'
+    rawTab === 'history'
+      ? 'history'
+      : rawTab === 'pnl'
+        ? 'pnl'
+        : rawTab === 'request-payment'
+          ? 'request-payment'
+          : 'overview'
   const historyFilter =
     rawFilter === 'in' ? 'in' : rawFilter === 'out' ? 'out' : 'all'
 
@@ -213,6 +220,93 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
       {activeTab === 'pnl' ? (
         <MarketingPnlView deptId={marketing.id} period={period} />
       ) : null}
+
+      {activeTab === 'request-payment' && canSubmitExpense ? (
+        <RequestPaymentTabContent deptId={marketing.id} />
+      ) : null}
+    </div>
+  )
+}
+
+async function RequestPaymentTabContent({ deptId }: { deptId: string }) {
+  const supabase = await createClient()
+  const [{ data: companies }, { data: categories }, { data: requests }] = await Promise.all([
+    supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('name'),
+    supabase.from('payment_categories').select('code, label').eq('is_active', true).order('sort_order'),
+    supabase
+      .from('dept_payment_requests')
+      .select('id, amount, payee_name, description, status, requested_at, pv_id')
+      .eq('department_id', deptId)
+      .in('status', [
+        'pending_principal_expense',
+        'pending_finance_pv',
+        'pending_principal_pv',
+      ])
+      .order('requested_at', { ascending: false }),
+  ])
+
+  const STATUS_LABEL: Record<string, string> = {
+    pending_principal_expense: 'Awaiting Principal',
+    pending_finance_pv: 'Awaiting Finance PV',
+    pending_principal_pv: 'Awaiting Principal PV',
+  }
+
+  return (
+    <div className="space-y-10">
+      <section>
+        <h2 className="font-serif text-xl text-ink mb-1">New request</h2>
+        <p className="font-serif italic text-graphite text-sm mb-4">
+          Submits to Principal for expense approval, then to Finance to generate the PV, then back
+          to Principal to approve the PV. Pool is debited at Principal sign-off; cash leaves the
+          bank when the PV is approved + executed.
+        </p>
+        <RequestPaymentForm companies={companies ?? []} categories={categories ?? []} />
+      </section>
+
+      <section>
+        <h2 className="font-serif text-xl text-ink mb-1">In flight</h2>
+        <p className="font-serif italic text-graphite text-sm mb-4">
+          Submitted requests that haven&rsquo;t completed yet.
+        </p>
+        {(requests ?? []).length === 0 ? (
+          <div className="border border-hairline rounded-md bg-surface p-6 text-center">
+            <p className="font-serif italic text-muted text-sm">No requests in flight.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
+                  <th className="text-left py-3 pr-4 font-medium">Submitted</th>
+                  <th className="text-left py-3 pr-4 font-medium">Payee</th>
+                  <th className="text-left py-3 pr-4 font-medium">Description</th>
+                  <th className="text-left py-3 pr-4 font-medium">Status</th>
+                  <th className="text-right py-3 font-medium">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(requests ?? []).map((r) => (
+                  <tr key={r.id} className="border-b border-hairline last:border-0">
+                    <td className="py-3 pr-4 font-mono text-xs text-muted">
+                      {dayjs(r.requested_at).format('D MMM HH:mm')}
+                    </td>
+                    <td className="py-3 pr-4 font-serif italic text-graphite">{r.payee_name}</td>
+                    <td className="py-3 pr-4 font-serif italic text-graphite">{r.description}</td>
+                    <td className="py-3 pr-4">
+                      <span className="text-xs font-serif italic text-accent">
+                        {STATUS_LABEL[r.status] ?? r.status}
+                      </span>
+                    </td>
+                    <td className="py-3 text-right font-mono tabular font-medium text-ink">
+                      {formatMoney(Number(r.amount))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   )
 }
