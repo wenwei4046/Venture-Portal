@@ -7,6 +7,7 @@ import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import ExpenseForm from '../_components/ExpenseForm'
 import DeptPoolTabs from '../_components/DeptPoolTabs'
 import HistoryTable from '../_components/HistoryTable'
+import MarketingPnlView from '../_components/MarketingPnlView'
 
 interface Props {
   searchParams: Promise<{ tab?: string; filter?: string }>
@@ -17,7 +18,8 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
   const supabase = await createClient()
 
   const { tab: rawTab, filter: rawFilter } = await searchParams
-  const activeTab = rawTab === 'history' ? 'history' : 'overview'
+  const activeTab =
+    rawTab === 'history' ? 'history' : rawTab === 'pnl' ? 'pnl' : 'overview'
   const historyFilter =
     rawFilter === 'in' ? 'in' : rawFilter === 'out' ? 'out' : 'all'
 
@@ -103,7 +105,12 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
         </div>
       </div>
 
-      <DeptPoolTabs basePath="/dept-pool/marketing" role={user.role} isOwnDept={isOwnDept} />
+      <DeptPoolTabs
+        basePath="/dept-pool/marketing"
+        role={user.role}
+        isOwnDept={isOwnDept}
+        extraTabs={[{ key: 'pnl', label: 'P&L' }]}
+      />
 
       {activeTab === 'overview' ? (
         <>
@@ -201,6 +208,10 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
 
       {activeTab === 'history' ? (
         <HistoryTable deptId={marketing.id} filter={historyFilter} />
+      ) : null}
+
+      {activeTab === 'pnl' ? (
+        <MarketingPnlView deptId={marketing.id} period={period} />
       ) : null}
     </div>
   )

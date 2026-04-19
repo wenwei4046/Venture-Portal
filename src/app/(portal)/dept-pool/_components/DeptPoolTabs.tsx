@@ -4,15 +4,18 @@ import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import type { UserRole } from '@/types'
 
-type Tab = 'overview' | 'history' | 'request-payment' | 'request-credit'
+type Tab = 'overview' | 'history' | 'pnl' | 'request-payment' | 'request-credit'
 
 interface Props {
   basePath: string
   role: UserRole
   isOwnDept: boolean
+  // Extra tabs inserted between History and the Request tabs. Used by Marketing
+  // for the P&L view; other dept pools don't pass this.
+  extraTabs?: { key: Tab; label: string }[]
 }
 
-export default function DeptPoolTabs({ basePath, role, isOwnDept }: Props) {
+export default function DeptPoolTabs({ basePath, role, isOwnDept, extraTabs }: Props) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const activeTab = (searchParams.get('tab') as Tab | null) ?? 'overview'
@@ -23,6 +26,9 @@ export default function DeptPoolTabs({ basePath, role, isOwnDept }: Props) {
     { key: 'overview', label: 'Overview', href: basePath },
     { key: 'history', label: 'History', href: `${basePath}?tab=history` },
   ]
+  for (const t of extraTabs ?? []) {
+    tabs.push({ key: t.key, label: t.label, href: `${basePath}?tab=${t.key}` })
+  }
   if (showRequestTabs) {
     tabs.push(
       { key: 'request-payment', label: 'Request Payment', href: `${basePath}?tab=request-payment` },
