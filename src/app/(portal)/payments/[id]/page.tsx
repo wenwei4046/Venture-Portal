@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { submitForApproval, approveVoucher, voidVoucher } from '../actions'
 import VoucherActions from './_components/VoucherActions'
+import AttachmentUploader from './_components/AttachmentUploader'
+import AttachmentList from '@/components/voucher/AttachmentList'
 
 const POOL_LABELS: Record<string, string> = {
   venture_pool: 'Venture Pool',
@@ -220,27 +222,12 @@ export default async function PaymentDetailPage({ params }: Props) {
         <p className="font-serif italic text-graphite text-sm mb-4">
           Contracts, invoices, receipts, photos — evidence for the Principal to review.
         </p>
-        {(attachments ?? []).length === 0 ? (
-          <div className="border border-hairline rounded-md bg-surface p-6 text-center">
-            <p className="font-serif italic text-muted text-sm">
-              No attachments yet. Upload via Supabase Storage (coming soon).
-            </p>
-          </div>
-        ) : (
-          <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
-            {(attachments ?? []).map((a) => (
-              <div key={a.id} className="flex items-center justify-between px-5 py-3">
-                <div>
-                  <div className="font-serif text-sm text-ink">{a.file_name}</div>
-                  <div className="font-mono text-xs text-muted">{a.file_type} · {a.description ?? ''}</div>
-                </div>
-                <div className="font-mono text-xs text-muted">
-                  {dayjs(a.uploaded_at).format('D MMM HH:mm')}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <AttachmentUploader
+          voucherId={voucher.id}
+          voucherStatus={voucher.status}
+          canUpload={voucher.status === 'draft' || voucher.status === 'pending_approval'}
+        />
+        <AttachmentList attachments={(attachments ?? []) as Parameters<typeof AttachmentList>[0]['attachments']} />
       </section>
 
       {/* ── Actions ── */}

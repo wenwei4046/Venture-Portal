@@ -488,3 +488,119 @@ export async function createPaymentCategory(formData: FormData) {
 
   revalidatePath('/payments/new')
 }
+
+// ─── Attachment signed URL (Principal + Finance) ────────────────────────────
+// Defense-in-depth: the storage bucket policy allows any authenticated user to
+// read, but `payment_attachments` table RLS limits SELECT to Principal/Finance.
+// By fetching the row first we re-assert authz before signing a URL.
+
+export async function getAttachmentSignedUrl(
+  attachmentId: string,
+): Promise<{ url: string; fileName: string }> {
+  await requireRole(['principal', 'finance'])
+  const supabase = await createClient()
+
+  const { data: attachment, error } = await supabase
+    .from('payment_attachments')
+    .select('storage_path, file_name')
+    .eq('id', attachmentId)
+    .single()
+
+  if (error || !attachment) {
+    throw new Error('Attachment not found or access denied')
+  }
+
+  const { data: signed, error: signErr } = await supabase.storage
+    .from('payment-attachments')
+    .createSignedUrl(attachment.storage_path, 60)
+
+  if (signErr || !signed) {
+    throw new Error(`Failed to sign attachment URL: ${signErr?.message ?? 'unknown'}`)
+  }
+
+  return { url: signed.signedUrl, fileName: attachment.file_name }
+}
+
+// ─── Upload voucher attachment (Principal + Finance) ────────────────────────
+
+const ALLOWED_MIME = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // xlsx
+  'application/vnd.ms-excel', // xls (legacy, accepted because some bank receipts use it)
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // docx
+  'application/msword', // doc
+  'text/csv',
+]
+const ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png', '.xlsx', '.xls', '.docx', '.doc', '.csv']
+const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
+
+export async function uploadVoucherAttachment(formData: FormData): Promise<{ count: number }> {
+  const user = await requireRole(['principal', 'finance'])
+  const supabase = await createClient()
+
+  const voucherId = (formData.get('voucher_id') as string) ?? ''
+  const description = ((formData.get('description') as string) ?? '').trim() || null
+  if (!voucherId) throw new Error('voucher_id is required')
+
+  const { data: voucher } = await supabase
+    .from('payment_vouchers')
+    .select('id, status')
+    .eq('id', voucherId)
+    .single()
+
+  if (!voucher) throw new Error('Voucher not found')
+  if (!['draft', 'pending_approval'].includes(voucher.status)) {
+    throw new Error(`Cannot upload attachments when voucher status is "${voucher.status}"`)
+  }
+
+  const files = formData.getAll('files').filter((f): f is File => f instanceof File && f.size > 0)
+  if (files.length === 0) throw new Error('No files provided')
+
+  let uploaded = 0
+  for (const file of files) {
+    if (file.size > MAX_BYTES) {
+      throw new Error(`File "${file.name}" is larger than 10 MB`)
+    }
+    if (!ALLOWED_MIME.includes(file.type)) {
+      throw new Error(`File "${file.name}" has disallowed MIME type: ${file.type}`)
+    }
+    const lowerName = file.name.toLowerCase()
+    const dotIdx = lowerName.lastIndexOf('.')
+    const ext = dotIdx >= 0 ? lowerName.slice(dotIdx) : ''
+    if (!ALLOWED_EXT.includes(ext)) {
+      throw new Error(`File "${file.name}" has disallowed extension: ${ext || '(none)'}`)
+    }
+
+    const key = `${voucherId}/${crypto.randomUUID()}-${file.name.replace(/[^\w.\-]/g, '_')}`
+    const buf = Buffer.from(await file.arrayBuffer())
+    const { error: upErr } = await supabase.storage
+      .from('payment-attachments')
+      .upload(key, buf, { contentType: file.type, upsert: false })
+
+    if (upErr) throw new Error(`Upload failed for "${file.name}": ${upErr.message}`)
+
+    const { error: insErr } = await supabase.from('payment_attachments').insert({
+      voucher_id: voucherId,
+      file_name: file.name,
+      file_type: file.type,
+      file_size: file.size,
+      storage_path: key,
+      description,
+      uploaded_by: user.id,
+    })
+
+    if (insErr) {
+      // Best effort: rollback the storage object so we don't leak orphans
+      await supabase.storage.from('payment-attachments').remove([key]).catch(() => {})
+      throw new Error(`Attachment record insert failed: ${insErr.message}`)
+    }
+
+    uploaded++
+  }
+
+  revalidatePath(`/payments/${voucherId}`)
+  revalidatePath('/approvals')
+  return { count: uploaded }
+}
