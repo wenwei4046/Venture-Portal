@@ -4,7 +4,6 @@ import { notFound } from 'next/navigation'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
-import ExpenseForm from '../_components/ExpenseForm'
 import DeptPoolTabs from '../_components/DeptPoolTabs'
 import HistoryTable from '../_components/HistoryTable'
 import MarketingPnlView from '../_components/MarketingPnlView'
@@ -71,17 +70,6 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
     expenses: Number(npRow?.out_expenses ?? 0),
     net_profit: Number(npRow?.out_net_profit ?? 0),
   }
-
-  // Pending dept expenses: approval_requests with request_type='dept_expense'
-  const { data: pendingExpenses } = activeTab === 'overview'
-    ? await supabase
-        .from('approval_requests')
-        .select('id, description, amount, submitted_by, created_at')
-        .eq('request_type', 'dept_expense')
-        .eq('reference_id', marketing.id)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-    : { data: null }
 
   // Running balance from the view
   const { data: balanceRow } = await supabase
@@ -164,53 +152,12 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
             </div>
           </div>
 
-          {/* ───────── Pending expenses ───────── */}
-          {(pendingExpenses ?? []).length > 0 ? (
-            <section className="mb-10">
-              <h2 className="font-serif text-xl text-ink mb-1">Pending approval</h2>
-              <p className="font-serif italic text-graphite text-sm mb-4">
-                Awaiting Principal sign-off. Approved items appear in the History tab.
-              </p>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                      <th className="text-left py-3 pr-4 font-medium">Submitted</th>
-                      <th className="text-left py-3 pr-4 font-medium">Description</th>
-                      <th className="text-right py-3 font-medium">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(pendingExpenses ?? []).map((p) => (
-                      <tr
-                        key={p.id}
-                        className="border-b border-hairline last:border-0"
-                      >
-                        <td className="py-3 pr-4 font-mono text-xs text-muted">
-                          {dayjs(p.created_at).format('D MMM YYYY HH:mm')}
-                        </td>
-                        <td className="py-3 pr-4 font-serif italic text-graphite">
-                          {p.description ?? '—'}
-                        </td>
-                        <td className="py-3 text-right font-mono tabular font-medium text-alert">
-                          {p.amount != null ? formatMoney(Number(p.amount)) : '—'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          ) : null}
-
-          {/* ───────── New expense form (Dept Manager only) ───────── */}
           {canSubmitExpense ? (
             <section className="border-t border-hairline pt-8">
-              <h2 className="font-serif text-xl text-ink mb-1">New expense</h2>
-              <p className="font-serif italic text-graphite text-sm mb-4">
-                Submit a new department expense for Principal approval.
+              <p className="font-serif italic text-graphite text-sm">
+                To request a vendor payment, use the <em>Request Payment</em> tab. To bill a
+                subsidiary, use <em>Request Credit</em>.
               </p>
-              <ExpenseForm />
             </section>
           ) : null}
         </>
