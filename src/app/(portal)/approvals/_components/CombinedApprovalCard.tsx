@@ -134,7 +134,7 @@ export default function CombinedApprovalCard({
               onClick={() => setShowDetails(true)}
               className="mt-1 text-xs font-serif italic text-accent hover:text-accent-hover"
             >
-              View details →
+              {isSelfSubmitted ? 'View details →' : 'Review per row →'}
             </button>
           ) : null}
         </div>
@@ -145,6 +145,7 @@ export default function CombinedApprovalCard({
           groupId={groupId}
           open={showDetails}
           onClose={() => setShowDetails(false)}
+          actionable={!isSelfSubmitted}
         />
       ) : null}
 

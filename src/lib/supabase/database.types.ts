@@ -3735,6 +3735,21 @@ export type Database = {
           voucher_no: string
         }[]
       }
+      approve_voucher_batch_partial: {
+        Args: {
+          p_approve_ids: string[]
+          p_approve_notes: string
+          p_group_id: string
+          p_reject_ids: string[]
+          p_reject_reason: string
+          p_user_id: string
+        }
+        Returns: {
+          outcome: string
+          voucher_id: string
+          voucher_no: string
+        }[]
+      }
       build_hr_cost_submission_payload: {
         Args: { p_period: string }
         Returns: {

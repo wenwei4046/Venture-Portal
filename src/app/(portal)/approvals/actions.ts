@@ -615,6 +615,45 @@ export async function rejectRequestGroup(formData: FormData) {
   redirect('/approvals')
 }
 
+// ─── Partial batch approval (Principal) — P1-1 ────────────────────────────
+// Approve some rows and reject others within the same combined batch, in one
+// atomic transaction. Both lists together must cover every pending approval
+// in the group. Rejection reason is required when any rows are rejected.
+
+export async function approveRequestGroupPartial(args: {
+  groupId: string
+  approveApprovalIds: string[]
+  rejectApprovalIds: string[]
+  approveNotes: string
+  rejectReason: string
+}) {
+  const user = await requireRole(['principal'])
+  const supabase = await createClient()
+
+  const { error } = await supabase.rpc('approve_voucher_batch_partial', {
+    p_group_id: args.groupId,
+    p_approve_ids: args.approveApprovalIds,
+    p_reject_ids: args.rejectApprovalIds,
+    p_user_id: user.id,
+    p_approve_notes: args.approveNotes ?? '',
+    p_reject_reason: args.rejectReason ?? '',
+  })
+
+  if (error) throw new Error(`Partial batch approval failed: ${error.message}`)
+
+  notifyApprovalDecision(
+    'payment_voucher',
+    'approved',
+    `Split batch: ${args.approveApprovalIds.length} approved, ${args.rejectApprovalIds.length} rejected`,
+    user.name,
+  ).catch(() => {})
+
+  revalidatePath('/approvals')
+  revalidatePath('/payments')
+  revalidatePath('/dashboard')
+  revalidatePath('/hr-costing/payment')
+}
+
 // ─── Batch voucher details for CombinedApprovalCard modal (Principal) ────────
 // Called when Principal clicks "View details" on a combined approval card.
 // Batches the voucher + sources + attachments lookups so an N-voucher modal
