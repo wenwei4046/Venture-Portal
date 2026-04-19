@@ -73,6 +73,59 @@ complete. QA audit on 2026-04-11. See `.gstack/qa-reports/qa-report-phase3-2026-
 
 ---
 
+## Phase 4 (Treasury Refactor) follow-ups
+
+Added 2026-04-19 during the Voucher Attachments (Phase A) eng review. These
+surfaced as scope-creep during the plan review and were explicitly deferred.
+
+### Medium severity
+- [ ] **Dedup `formatRequestType` across 3 files.**
+  - **What:** Three separate maps of `request_type → label` exist in
+    `src/app/(portal)/approvals/page.tsx` (13 types, ALL-CAPS),
+    `src/app/(portal)/approvals/[id]/page.tsx` (12 types, Title Case, missing
+    `payroll_run`), and
+    `src/app/(portal)/approvals/_components/CombinedApprovalCard.tsx`
+    (only 2 types).
+  - **Why:** Broken Window. Adding a new request_type requires editing 3
+    files; easy to miss one and end up with raw `hr_opex` rendered in some
+    view but `HR OPEX` in another.
+  - **Pros:** One source of truth; future additions safer.
+  - **Cons:** Pure refactor; UX debate on whether the canonical label should
+    be ALL CAPS (list) or Title Case (detail) — may need two exports.
+  - **Context:** Phase 4 Voucher Attachments eng review Issue #5.
+  - **Depends on:** nothing.
+
+### High severity
+- [x] ~~**Batch approval atomicity (`approve_voucher_batch` RPC).**~~ → Done
+  on 2026-04-19 in migration 171 (full β scope). `approve_voucher_batch`
+  SECURITY DEFINER PL/pgSQL function ports the entire side-effect chain —
+  status flip, bank debit, pool adjust, repayment sync, GL journal — into
+  one Postgres transaction. Pre-validates role, period, voucher state, and
+  bank balance before any mutation. Replaces the TS for-loop in the batch
+  branch of `approveRequestGroup`; any RAISE EXCEPTION rolls back the whole
+  batch, so partial-paid state is no longer possible. Loan OUT branch (1
+  loan + 1 voucher) still uses the TS helper (scope intentionally kept
+  narrow — only 1 voucher so partial-fail exposure is negligible).
+
+### Medium severity
+- [ ] **Phase B voucher PDF generation planning doc.**
+  - **What:** Design document for auto-generating canonical supporting PDFs
+    per voucher_type — payroll summary, payslip, invoice copy, loan memo,
+    claim form.
+  - **Why:** Principal's "every voucher must carry supporting docs" rule is
+    currently enforced by Finance uploading manually. Auto-generation closes
+    the gap and makes Phase C (DB trigger enforcing ≥1 attachment) realistic.
+  - **Pros:** Clarifies Phase B scope before implementation; surfaces design
+    questions (which PDF lib, which trigger point, what goes on the PDF).
+  - **Cons:** Document-only; no code value until Phase B starts.
+  - **Context:** Memory `project_voucher_attachments_pending.md` has the
+    voucher_type → PDF mapping table. This TODO is to expand it into a real
+    design doc with lib choice + trigger semantics + template guidelines.
+  - **Depends on:** Phase A ship + real-world feedback from Finance/Principal
+    on what's missing.
+
+---
+
 ## Compliance / Legal (NOT engineering tasks — route to Principal)
 
 - [ ] **Malaysian tax agent + company secretary sign-off before go-live.** Check:
