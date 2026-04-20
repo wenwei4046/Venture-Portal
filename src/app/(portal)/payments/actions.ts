@@ -203,18 +203,16 @@ export async function createPaymentVoucher(formData: FormData) {
 
   // Auto-complete credit payments: adjust bank + pool immediately
   if (isAutoComplete) {
-    // Bank balance: add
+    // Bank balance: add via SECURITY DEFINER RPC (bank_accounts RLS only
+    // permits Principal to UPDATE directly; Finance-initiated auto-complete
+    // credit flows through bump_bank_for_paid_credit which verifies the
+    // voucher is already paid + credit before bumping).
     if (bankAccountId) {
-      const { data: bank } = await supabase
-        .from('bank_accounts')
-        .select('current_balance, gl_account_code')
-        .eq('id', bankAccountId)
-        .single()
-      if (bank) {
-        await supabase
-          .from('bank_accounts')
-          .update({ current_balance: Number(bank.current_balance) + amount })
-          .eq('id', bankAccountId)
+      const { error: bumpErr } = await supabase.rpc('bump_bank_for_paid_credit', {
+        p_voucher_id: data.id,
+      })
+      if (bumpErr) {
+        console.error('bump_bank_for_paid_credit failed:', bumpErr.message)
       }
     }
     // Pool balance: add to target pool

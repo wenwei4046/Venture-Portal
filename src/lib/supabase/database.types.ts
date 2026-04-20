@@ -3502,7 +3502,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "hv_operating_fund_created_by_fkey"
+            foreignKeyName: "venture_pool_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "users"
@@ -3758,6 +3758,10 @@ export type Database = {
           staff_allocation_snapshot: Json
           staff_snapshot: Json
         }[]
+      }
+      bump_bank_for_paid_credit: {
+        Args: { p_voucher_id: string }
+        Returns: undefined
       }
       calculate_base_rate: {
         Args: never
