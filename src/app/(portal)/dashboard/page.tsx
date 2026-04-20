@@ -1398,7 +1398,7 @@ export default async function DashboardPage() {
           </div>
 
           <div className="border border-hairline rounded-md bg-surface p-5">
-            <div className="font-serif italic text-accent text-sm mb-1">Director Saving</div>
+            <div className="font-serif italic text-accent text-sm mb-1">Venture Pool</div>
             <div
               className={
                 Number(summary.hv_fund_balance ?? 0) < 0
@@ -1409,7 +1409,7 @@ export default async function DashboardPage() {
               {formatMoney(Number(summary.hv_fund_balance ?? 0))}
             </div>
             <p className="font-mono text-xs text-muted mt-2">
-              5% saving + statutory surplus
+              HV group-level running balance
             </p>
           </div>
 
