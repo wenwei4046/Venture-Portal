@@ -22,7 +22,7 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
 
 // Principal account details — change these as needed
 const PRINCIPAL_EMAIL = 'principal@venture.my'
-const PRINCIPAL_PASSWORD = 'changeme123'
+const PRINCIPAL_PASSWORD = '123456'
 const PRINCIPAL_NAME = 'Principal'
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
