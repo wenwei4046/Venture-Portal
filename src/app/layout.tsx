@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Instrument_Serif, Inter, JetBrains_Mono, Noto_Serif_TC } from 'next/font/google'
+import NextTopLoader from 'nextjs-toploader'
 import './globals.css'
 
 // DESIGN.md v2.0 typography — loaded via next/font for zero-CLS self-hosting
@@ -57,7 +58,15 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        <NextTopLoader
+          color="rgb(204, 90, 46)"
+          height={2}
+          showSpinner={false}
+          shadow="0 0 8px rgb(204 90 46 / 0.35)"
+        />
+        {children}
+      </body>
     </html>
   )
 }

@@ -161,16 +161,23 @@ h1, h2, h3, h4 {
   animation: page-enter 200ms ease-out both;
 }
 
-/* Loading skeleton pulse — warm cream, not gray */
-@keyframes skeleton-pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.7; }
+/* Loading skeleton shimmer — warm paper sweeps across the hairline tone */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -100% 0; }
+  100% { background-position:  100% 0; }
 }
 
 .skeleton {
-  background: rgb(var(--hairline));
+  background-color: rgb(var(--hairline));
+  background-image: linear-gradient(
+    90deg,
+    rgb(var(--hairline)) 0%,
+    rgb(var(--paper)) 50%,
+    rgb(var(--hairline)) 100%
+  );
+  background-size: 200% 100%;
   border-radius: 4px;
-  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
 }
 
 /* Sidebar link hover lift */
