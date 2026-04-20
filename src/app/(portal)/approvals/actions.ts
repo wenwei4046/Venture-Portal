@@ -109,25 +109,6 @@ export async function approveRequest(formData: FormData) {
       )
     }
 
-    // Auto-deduct from Operation Pool (fund_out entry)
-    const { data: loanForPool } = await supabase
-      .from('loans')
-      .select('company_id, principal, companies(name)')
-      .eq('id', approval.reference_id)
-      .single()
-
-    if (loanForPool) {
-      const companyName = (loanForPool.companies as { name: string } | null)?.name ?? 'Unknown'
-      await supabase.from('venture_pool').insert({
-        transaction_type: 'fund_out' as const,
-        amount: Number(loanForPool.principal),
-        description: `Loan disbursement: ${companyName}`,
-        reference_id: approval.reference_id,
-        reference_table: 'loans',
-        created_by: user.id,
-      })
-    }
-
     // Auto-deduct primary bank account for loan disbursement
     const { data: primaryBank } = await supabase
       .from('bank_accounts')
@@ -189,19 +170,6 @@ export async function approveRequest(formData: FormData) {
     if (fsUpdateError) {
       throw new Error(`Approval recorded but fund source activation failed: ${fsUpdateError.message}`)
     }
-
-    // Post the Venture Pool credit — mirrors the old inline createFundSource write
-    const typeLabel = fundSource.source_type === 'subsidiary' ? 'subsidiary deposit'
-      : fundSource.source_type === 'director_loan' ? 'director loan'
-      : 'dept pool transfer'
-    await supabase.from('venture_pool').insert({
-      transaction_type: 'fund_in' as const,
-      amount: Number(fundSource.amount),
-      description: `Fund source: ${typeLabel}`,
-      reference_id: fundSource.id,
-      reference_table: 'fund_sources',
-      created_by: user.id,
-    })
 
     // Bump primary bank account balance
     const { data: primaryBank } = await supabase
@@ -506,17 +474,7 @@ export async function approveRequestGroup(formData: FormData) {
     throw new Error(`Group approved but voucher execute failed: ${voucherError.message}`)
   }
 
-  // ─── 4) Venture Pool: fund_out ledger entry ───
-  await supabase.from('venture_pool').insert({
-    transaction_type: 'fund_out' as const,
-    amount: Number(voucher.amount),
-    description: `${voucher.voucher_no}: ${voucher.description}`,
-    reference_id: loanApproval.reference_id,
-    reference_table: 'loans',
-    created_by: user.id,
-  })
-
-  // ─── 5) Debit primary bank ───
+  // ─── 4) Debit primary bank ───
   if (primaryBank) {
     await supabase
       .from('bank_accounts')

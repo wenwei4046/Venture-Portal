@@ -160,36 +160,17 @@ export async function recordRepayment(formData: FormData) {
     }
   }
 
-  const { error: insertError, data: repaymentRow } = await supabase.from('repayments').insert({
+  const { error: insertError } = await supabase.from('repayments').insert({
     loan_id: loanId,
     amount,
     payment_type: paymentType,
     payment_date: paymentDate,
     notes,
     created_by: user.id,
-  }).select('id').single()
+  })
 
   if (insertError) {
     throw new Error(`Failed to record repayment: ${insertError.message}`)
-  }
-
-  // Auto-add principal repayments back to Operation Pool
-  if (paymentType === 'principal' && repaymentRow) {
-    const { data: loanForPool } = await supabase
-      .from('loans')
-      .select('company_id, companies(name)')
-      .eq('id', loanId)
-      .single()
-
-    const companyName = (loanForPool?.companies as { name: string } | null)?.name ?? 'Unknown'
-    await supabase.from('venture_pool').insert({
-      transaction_type: 'loan_repayment_in' as const,
-      amount,
-      description: `Loan repayment (principal): ${companyName}`,
-      reference_id: repaymentRow.id,
-      reference_table: 'repayments',
-      created_by: user.id,
-    })
   }
 
   revalidatePath(`/fund-out/${loanId}`)
