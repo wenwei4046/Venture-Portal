@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { formatMoney } from '@/lib/utils'
 import {
@@ -302,12 +303,12 @@ export default function ImportStaffWizard() {
         </details>
       )}
       <div className="flex gap-3 mt-6">
-        <a
+        <Link
           href="/hr-costing/staff"
           className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md"
         >
           Back to Staff →
-        </a>
+        </Link>
         <button
           onClick={reset}
           className="text-sm font-sans text-muted hover:text-ink"
