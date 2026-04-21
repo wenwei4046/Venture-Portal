@@ -3592,6 +3592,7 @@ export type Database = {
           cost_rate: number | null
           effective_date: string | null
           from_company_id: string | null
+          from_department_id: string | null
           from_director_id: string | null
           fund_source_id: string | null
           lock_in_months: number | null
@@ -3619,6 +3620,13 @@ export type Database = {
             columns: ["from_company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fund_sources_from_department_id_fkey"
+            columns: ["from_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
             referencedColumns: ["id"]
           },
         ]
@@ -3717,6 +3725,7 @@ export type Database = {
           p_approval_id: string
           p_description: string
           p_direction: string
+          p_loan_id?: string
           p_now: string
           p_pool: string
           p_user_id: string

@@ -263,21 +263,28 @@ export async function listPayableFundSources(): Promise<PayableFundSource[]> {
   await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
-  const [{ data: outstanding }, { data: sources }, { data: companies }, { data: repayments }] =
-    await Promise.all([
-      supabase
-        .from('fund_source_outstanding')
-        .select('fund_source_id, source_type, from_company_id, from_director_id, original_amount, cost_rate, lock_in_months, outstanding, monthly_payment, total_principal_paid'),
-      supabase.from('fund_sources').select('id, status'),
-      supabase.from('companies').select('id, name, short_code'),
-      supabase
-        .from('fund_source_repayments')
-        .select('fund_source_id, payment_type, payment_date')
-        .eq('payment_type', 'principal'),
-    ])
+  const [
+    { data: outstanding },
+    { data: sources },
+    { data: companies },
+    { data: departments },
+    { data: repayments },
+  ] = await Promise.all([
+    supabase
+      .from('fund_source_outstanding')
+      .select('fund_source_id, source_type, from_company_id, from_director_id, from_department_id, original_amount, cost_rate, lock_in_months, outstanding, monthly_payment, total_principal_paid'),
+    supabase.from('fund_sources').select('id, status'),
+    supabase.from('companies').select('id, name, short_code'),
+    supabase.from('departments').select('id, name'),
+    supabase
+      .from('fund_source_repayments')
+      .select('fund_source_id, payment_type, payment_date')
+      .eq('payment_type', 'principal'),
+  ])
 
   const statusMap = new Map((sources ?? []).map((s) => [s.id, s.status]))
   const companyMap = new Map((companies ?? []).map((c) => [c.id, c]))
+  const departmentMap = new Map((departments ?? []).map((d) => [d.id, d.name]))
 
   // Count distinct principal payment months per fund source (periods paid)
   const periodsPaidMap = new Map<string, Set<string>>()
@@ -304,8 +311,18 @@ export async function listPayableFundSources(): Promise<PayableFundSource[]> {
       const periodsPaid = periodsPaidMap.get(o.fund_source_id)?.size ?? 0
       const remaining = Math.max(0, months - periodsPaid)
 
-      const company = o.from_company_id ? companyMap.get(o.from_company_id) : null
-      const counterparty = company ? `${company.short_code ?? company.name}` : 'Director'
+      // Mig 194: dept-pool fund sources label by department name (not the
+      // "Director" fallback that earlier versions showed for any row without
+      // a from_company_id).
+      let counterparty: string
+      if (o.source_type === 'department_pool' && o.from_department_id) {
+        counterparty = departmentMap.get(o.from_department_id) ?? 'Department'
+      } else if (o.from_company_id) {
+        const company = companyMap.get(o.from_company_id)
+        counterparty = company ? `${company.short_code ?? company.name}` : 'Company'
+      } else {
+        counterparty = 'Director'
+      }
       const label = `${counterparty} · RM ${amount.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} @ ${(rate * 100).toFixed(3)}%/mo · ${months}mo`
 
       return {
