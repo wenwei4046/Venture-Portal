@@ -259,23 +259,21 @@ export default async function BillingView({ searchParams }: Props) {
 
       <InvoicesList invoices={invoiceList} companyMap={companyMap} period={period} />
 
-      <div className="relative">
-        {user.role === 'finance' ? (
-          <div className="absolute right-0 top-10">
+      <MarketingProjectList
+        contracts={(marketingContracts ?? [])
+          .filter((c): c is typeof c & { company_id: string } => c.company_id !== null)}
+        companyMap={companyMap}
+        canCreate={user.role === 'finance'}
+        headerAction={
+          user.role === 'finance' ? (
             <GenerateInvoicesButton
               currentPeriod={period}
               modes={['marketing_project']}
               label="Generate Marketing invoices"
             />
-          </div>
-        ) : null}
-        <MarketingProjectList
-          contracts={(marketingContracts ?? [])
-            .filter((c): c is typeof c & { company_id: string } => c.company_id !== null)}
-          companyMap={companyMap}
-          canCreate={user.role === 'finance'}
-        />
-      </div>
+          ) : null
+        }
+      />
       <NonBillableList
         transactions={(nonBillableTxns ?? []).map((t) => ({
           id: t.id,

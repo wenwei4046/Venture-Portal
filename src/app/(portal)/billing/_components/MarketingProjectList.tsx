@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import type { ReactNode } from 'react'
 import { formatMoney } from '@/lib/utils'
 
 interface Contract {
@@ -17,6 +18,7 @@ interface Props {
   contracts: Contract[]
   companyMap: Map<string, { name: string; code: string }>
   canCreate?: boolean
+  headerAction?: ReactNode
 }
 
 // Marketing project billing: Finance creates a service_contract per project
@@ -24,19 +26,22 @@ interface Props {
 // flows through Principal approval (new_contract approval type → Step 2
 // approval_cascade trigger activates it). Per spec, Marketing is the only
 // dept with real P&L — these contracts feed the Marketing dept pool.
-export default function MarketingProjectList({ contracts, companyMap, canCreate }: Props) {
+export default function MarketingProjectList({ contracts, companyMap, canCreate, headerAction }: Props) {
   return (
     <section className="border-t border-hairline pt-8">
-      <div className="flex items-baseline justify-between mb-4">
+      <div className="flex items-baseline justify-between mb-4 gap-4">
         <h2 className="font-serif text-xl text-ink">Marketing Projects</h2>
-        {canCreate && (
-          <Link
-            href="/billing/contracts/new"
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-          >
-            + New contract
-          </Link>
-        )}
+        <div className="flex items-baseline gap-4">
+          {headerAction}
+          {canCreate && (
+            <Link
+              href="/billing/contracts/new"
+              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            >
+              + New contract
+            </Link>
+          )}
+        </div>
       </div>
       <p className="font-serif italic text-graphite text-sm mb-4">
         Project-based service contracts between Marketing and subsidiaries. Fixed
