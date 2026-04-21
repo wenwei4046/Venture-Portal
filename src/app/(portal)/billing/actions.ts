@@ -206,6 +206,12 @@ export async function createContract(formData: FormData) {
 
   if (!mktDept) throw new Error('Marketing department not found')
 
+  // Dept Manager: must be Marketing's manager. Mig 207 RLS also enforces this,
+  // but fail fast here with a clean error instead of a generic RLS failure.
+  if (user.role === 'dept_manager' && user.department_id !== mktDept.id) {
+    throw new Error('Only Marketing department manager can create Marketing contracts')
+  }
+
   // Insert contract (active but not yet approved)
   const { data: contract, error } = await supabase
     .from('service_contracts')

@@ -82,6 +82,10 @@ const navEntries: NavEntry[] = [
   // OPEX is a dept_manager-only view of their own department's payroll
   // breakdown (per-employee Basic / KPI / Allowance / ER statutory).
   { href: '/opex', label: 'OPEX', section: 'Departments', visible: (r) => r === 'dept_manager' },
+  // Marketing dept_manager can create service contracts for their dept
+  // (mig 207 RLS). The page self-gates on Marketing dept — other dept_managers
+  // clicking this would hit notFound().
+  { href: '/billing/contracts/new', label: 'New Contract', section: 'Departments', visible: (r) => r === 'dept_manager' },
   { href: '/hr-costing', label: 'HR Costing', section: 'Departments', visible: (r) => r === 'principal' },
   // Phase 7 Step 11: Billing merged into Statements → Invoices sub-tab.
   // Legacy /billing URL still redirects for external bookmarks.
