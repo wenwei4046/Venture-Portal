@@ -423,7 +423,7 @@ export async function createPaymentCategory(formData: FormData) {
 
   const { error } = await supabase
     .from('payment_categories')
-    .upsert({ code, label }, { onConflict: 'code' })
+    .upsert({ code, label, is_active: true }, { onConflict: 'code' })
 
   if (error) throw new Error(`Failed to create category: ${error.message}`)
 

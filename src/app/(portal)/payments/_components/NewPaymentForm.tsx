@@ -95,7 +95,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
     isInvoicePay ? invoicePreset!.target_pool : direction === 'credit' ? 'venture_pool' : ''
   )
   const [files, setFiles] = useState<File[]>([])
-  const [showNewCategory, setShowNewCategory] = useState(false)
+  const [showNewCategory, setShowNewCategory] = useState(categories.length === 0)
   const [newCatLabel, setNewCatLabel] = useState('')
   const [catList, setCatList] = useState(categories)
   const formRef = useRef<HTMLFormElement>(null)
@@ -643,17 +643,23 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
           </div>
         ) : null}
 
-        <select
-          name="category_code"
-          value={categoryCode}
-          onChange={(e) => setCategoryCode(e.target.value)}
-          className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-        >
-          <option value="">Select category…</option>
-          {catList.map((c) => (
-            <option key={c.code} value={c.code}>{c.label}</option>
-          ))}
-        </select>
+        {catList.length === 0 ? (
+          <p className="font-serif italic text-muted text-sm py-2 px-3 bg-surface border border-hairline rounded-md">
+            No categories yet — create one above to start.
+          </p>
+        ) : (
+          <select
+            name="category_code"
+            value={categoryCode}
+            onChange={(e) => setCategoryCode(e.target.value)}
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+          >
+            <option value="">Select category…</option>
+            {catList.map((c) => (
+              <option key={c.code} value={c.code}>{c.label}</option>
+            ))}
+          </select>
+        )}
         <p className="font-serif italic text-muted text-xs mt-1.5">
           For P&L classification. Create new categories as needed.
         </p>
