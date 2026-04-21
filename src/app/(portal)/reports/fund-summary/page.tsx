@@ -15,14 +15,12 @@ export default async function FundSummaryPage() {
     { data: hvFundTxns },
     { data: invoicePoolTxns },
     { data: deptPoolTxns },
-    { data: config },
   ] = await Promise.all([
     supabase.from('fund_sources').select('*').eq('status', 'active').order('effective_date'),
     supabase.from('loans').select('principal, status').eq('status', 'active'),
     supabase.from('venture_pool').select('transaction_type, amount'),
     supabase.from('invoice_payout_pool').select('transaction_type, amount'),
     supabase.from('dept_pools').select('transaction_type, amount'),
-    supabase.from('treasury_config').select('config_key, config_value').eq('config_key', 'buffer_amount').maybeSingle(),
   ])
 
   // Paid Capital
@@ -31,10 +29,10 @@ export default async function FundSummaryPage() {
     ? (fundSources ?? []).reduce((s, f) => s + Number(f.amount) * Number(f.cost_rate), 0) / totalPaid
     : 0
 
-  // Free Capital
+  // Venture Pool balance (Phase 10 / mig 192 formula)
   let hvFundBalance = 0
   for (const t of hvFundTxns ?? []) {
-    const isIn = ['saving_in', 'surplus_in', 'profit_in'].includes(t.transaction_type)
+    const isIn = ['fund_in', 'loan_repayment_in', 'profit_in'].includes(t.transaction_type)
     hvFundBalance += isIn ? Number(t.amount) : -Number(t.amount)
   }
 
@@ -48,13 +46,7 @@ export default async function FundSummaryPage() {
     invoicePoolBalance += t.transaction_type === 'accumulate' ? Number(t.amount) : -Number(t.amount)
   }
 
-  // Allocated
   const loansOutstanding = (loans ?? []).reduce((s, l) => s + Number(l.principal), 0)
-  const bufferAmount = config?.config_value ? Number(config.config_value) : 50000
-
-  const totalFree = hvFundBalance + deptPoolBalance
-  const totalAllocated = loansOutstanding + bufferAmount + invoicePoolBalance
-  const freeCash = totalPaid + totalFree - totalAllocated
 
   return (
     <div>
@@ -124,7 +116,7 @@ export default async function FundSummaryPage() {
           </div>
           <div className="flex items-baseline justify-between pt-3 mt-3 border-t border-hairline">
             <span className="font-serif italic text-sm text-ink">Total Free</span>
-            <span className="font-mono tabular text-md font-medium text-ink font-semibold">{formatMoney(totalFree)}</span>
+            <span className="font-mono tabular text-md font-medium text-ink font-semibold">{formatMoney(hvFundBalance + deptPoolBalance)}</span>
           </div>
         </section>
 
@@ -135,10 +127,6 @@ export default async function FundSummaryPage() {
             <div className="flex items-baseline justify-between">
               <span className="font-serif text-sm text-graphite">Loans Outstanding</span>
               <span className="font-mono tabular text-sm font-medium text-ink">{formatMoney(loansOutstanding)}</span>
-            </div>
-            <div className="flex items-baseline justify-between">
-              <span className="font-serif text-sm text-graphite">Buffer</span>
-              <span className="font-mono tabular text-sm font-medium text-ink">{formatMoney(bufferAmount)}</span>
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif text-sm text-graphite">Invoice Payout Pool</span>
@@ -153,24 +141,12 @@ export default async function FundSummaryPage() {
           <FundPieChart
             slices={[
               { name: 'Loans Outstanding', value: loansOutstanding },
-              { name: 'Buffer', value: bufferAmount },
               { name: 'Invoice Pool', value: invoicePoolBalance },
               { name: 'Venture Pool', value: hvFundBalance },
               { name: 'Dept Pool', value: deptPoolBalance },
-              { name: 'Free Cash', value: Math.max(0, freeCash) },
             ]}
           />
         </section>
-
-        {/* Free Cash */}
-        <div className="border-t-2 border-hairline pt-6">
-          <div className="flex items-baseline justify-between">
-            <span className="font-serif text-2xl text-ink">Free Cash</span>
-            <span className={`font-serif text-2xl font-semibold ${freeCash >= 0 ? 'text-ledger' : 'text-danger'}`}>
-              {formatMoney(freeCash)}
-            </span>
-          </div>
-        </div>
       </div>
     </div>
   )

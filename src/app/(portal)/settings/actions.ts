@@ -5,22 +5,18 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import type { OverdueConfigStage } from '@/types'
 
-// ─── Treasury Config (op_margin, buffer_amount, saving_rate) ──────────────────
+// ─── Treasury Config (op_margin, saving_rate) ────────────────────────────────
 
 export async function updateTreasuryConfig(formData: FormData) {
   const user = await requireRole(['principal'])
   const supabase = await createClient()
 
   const opMarginPercent = parseFloat((formData.get('op_margin') as string) ?? '0')
-  const bufferAmount = parseFloat((formData.get('buffer_amount') as string) ?? '0')
   const savingRatePercent = parseFloat((formData.get('saving_rate') as string) ?? '0')
 
   // Input validation
   if (isNaN(opMarginPercent) || opMarginPercent < 0 || opMarginPercent >= 100) {
     throw new Error('Op Margin must be between 0 and 100%')
-  }
-  if (isNaN(bufferAmount) || bufferAmount < 0) {
-    throw new Error('Buffer Amount must be non-negative')
   }
   if (isNaN(savingRatePercent) || savingRatePercent < 0 || savingRatePercent >= 100) {
     throw new Error('Saving Rate must be between 0 and 100%')
@@ -29,7 +25,6 @@ export async function updateTreasuryConfig(formData: FormData) {
   // Convert percent values (0-100) to decimal (0-1) for storage
   const updates: Array<{ key: string; value: number }> = [
     { key: 'op_margin', value: opMarginPercent / 100 },
-    { key: 'buffer_amount', value: bufferAmount },
     { key: 'saving_rate', value: savingRatePercent / 100 },
   ]
 

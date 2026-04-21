@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
@@ -109,6 +110,23 @@ export async function approveRequest(formData: FormData) {
       )
     }
 
+    const loanAmount = Number(approval.amount ?? 0)
+
+    // Venture Pool cash ledger: loan disbursement = fund_out (Phase 10 / mig 192).
+    const { error: vpError } = await supabase
+      .from('venture_pool')
+      .insert({
+        transaction_type: 'fund_out',
+        amount: loanAmount,
+        description: approval.description ?? `Loan disbursement — ${approval.reference_id}`,
+        reference_id: approval.reference_id,
+        reference_table: 'loans',
+        created_by: user.id,
+      })
+    if (vpError) {
+      throw new Error(`Approval recorded but venture_pool fund_out failed: ${vpError.message}`)
+    }
+
     // Auto-deduct primary bank account for loan disbursement
     const { data: primaryBank } = await supabase
       .from('bank_accounts')
@@ -118,7 +136,6 @@ export async function approveRequest(formData: FormData) {
       .single()
 
     if (primaryBank) {
-      const loanAmount = Number(approval.amount ?? 0)
       if (Number(primaryBank.current_balance) < loanAmount) {
         // Don't block loan approval, but log the warning
         console.warn(`Loan approved but bank balance insufficient: balance=${primaryBank.current_balance}, loan=${loanAmount}`)
@@ -146,13 +163,12 @@ export async function approveRequest(formData: FormData) {
       )
     }
   } else if (approval.request_type === 'new_fund_source') {
-    // Phase 7: flip the fund_source from pending_approval → active, post the
-    // Venture Pool credit (venture_pool.fund_in), and bump the primary
-    // bank balance. All three only fire on approval — on submit the
-    // fund_source sits quietly in pending_approval with zero ledger impact.
+    // Flip fund_source pending_approval → active + bump primary bank balance.
+    // For source_type='department_pool', also debit the source dept pool
+    // (expense_out) so the dept pool balance reflects the transfer to HV.
     const { data: fundSource, error: fsFetchError } = await supabase
       .from('fund_sources')
-      .select('id, amount, source_type, from_company_id, from_director_id')
+      .select('id, amount, source_type, from_company_id, from_director_id, effective_date')
       .eq('id', approval.reference_id)
       .eq('status', 'pending_approval')
       .single()
@@ -169,6 +185,45 @@ export async function approveRequest(formData: FormData) {
 
     if (fsUpdateError) {
       throw new Error(`Approval recorded but fund source activation failed: ${fsUpdateError.message}`)
+    }
+
+    // from_company_id stores the department_id when source_type='department_pool'
+    // (see fund-in/actions.ts payload branch). Debit that pool so the source
+    // dept's balance drops — pre-submit balance check has already guarded
+    // against insufficient funds.
+    if (fundSource.source_type === 'department_pool' && fundSource.from_company_id) {
+      const periodMonth = dayjs(fundSource.effective_date).startOf('month').format('YYYY-MM-DD')
+      const amountLabel = Number(fundSource.amount).toLocaleString('en-MY', { minimumFractionDigits: 2 })
+      const { error: deptDebitError } = await supabase
+        .from('dept_pools')
+        .insert({
+          department_id: fundSource.from_company_id,
+          transaction_type: 'expense_out',
+          amount: Number(fundSource.amount),
+          period_month: periodMonth,
+          description: `Dept Pool → Venture transfer: RM ${amountLabel}`,
+          approval_id: id,
+          created_by: user.id,
+        })
+
+      if (deptDebitError) {
+        throw new Error(`Approval recorded but dept pool debit failed: ${deptDebitError.message}`)
+      }
+    }
+
+    // Venture Pool cash ledger: fund source activation = fund_in (Phase 10 / mig 192).
+    const { error: vpError } = await supabase
+      .from('venture_pool')
+      .insert({
+        transaction_type: 'fund_in',
+        amount: Number(fundSource.amount),
+        description: approval.description ?? `Fund source: ${fundSource.source_type}`,
+        reference_id: fundSource.id,
+        reference_table: 'fund_sources',
+        created_by: user.id,
+      })
+    if (vpError) {
+      throw new Error(`Approval recorded but venture_pool fund_in failed: ${vpError.message}`)
     }
 
     // Bump primary bank account balance

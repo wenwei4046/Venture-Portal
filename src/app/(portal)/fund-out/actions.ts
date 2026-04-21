@@ -68,13 +68,18 @@ export async function createLoan(formData: FormData) {
   const premium = customRate
   const effective = base + premium
 
-  // ─── Check HV has sufficient pool to lend ───
-  const { data: poolData } = await supabase.rpc('dashboard_summary')
-  if (poolData && typeof poolData === 'object' && 'free_cash' in poolData) {
-    const freeCash = Number((poolData as Record<string, unknown>).free_cash ?? 0)
-    if (freeCash < principal) {
+  // ─── Check primary bank has sufficient cash to lend ───
+  const { data: primaryBank } = await supabase
+    .from('bank_accounts')
+    .select('current_balance')
+    .eq('is_primary', true)
+    .eq('status', 'active')
+    .maybeSingle()
+  if (primaryBank) {
+    const bankBalance = Number(primaryBank.current_balance ?? 0)
+    if (bankBalance < principal) {
       throw new Error(
-        `Insufficient free pool. Available: RM ${freeCash.toLocaleString('en-MY', { minimumFractionDigits: 2 })}, requested: RM ${principal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}.`
+        `Insufficient bank balance. Available: RM ${bankBalance.toLocaleString('en-MY', { minimumFractionDigits: 2 })}, requested: RM ${principal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}.`
       )
     }
   }
@@ -171,6 +176,23 @@ export async function recordRepayment(formData: FormData) {
 
   if (insertError) {
     throw new Error(`Failed to record repayment: ${insertError.message}`)
+  }
+
+  // Venture Pool cash ledger: only principal repayments return capital to HV
+  // (Phase 10 / mig 192, Q3=A). Interest/penalty/netting are revenue streams,
+  // not cash-back, and don't hit venture_pool.
+  if (paymentType === 'principal') {
+    const { error: vpError } = await supabase.from('venture_pool').insert({
+      transaction_type: 'loan_repayment_in',
+      amount,
+      description: `Loan principal repayment — ${loanId}`,
+      reference_id: loanId,
+      reference_table: 'loans',
+      created_by: user.id,
+    })
+    if (vpError) {
+      throw new Error(`Repayment recorded but venture_pool loan_repayment_in failed: ${vpError.message}`)
+    }
   }
 
   revalidatePath(`/fund-out/${loanId}`)

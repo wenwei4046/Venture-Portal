@@ -20,7 +20,7 @@ export default async function OperatingFundPage() {
       .select('transaction_type, amount'),
   ])
 
-  const IN_TYPES = ['saving_in', 'surplus_in', 'profit_in']
+  const IN_TYPES = ['fund_in', 'loan_repayment_in', 'profit_in']
   let balance = 0
   for (const t of allTxns ?? []) {
     const amt = Number(t.amount)

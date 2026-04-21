@@ -78,9 +78,6 @@ export default async function SettingsPage({ searchParams }: Props) {
   }))
 
   const opMargin = Number(treasury.find((r) => r.config_key === 'op_margin')?.config_value ?? 0)
-  const bufferAmount = Number(
-    treasury.find((r) => r.config_key === 'buffer_amount')?.config_value ?? 0
-  )
   const savingRate = Number(
     treasury.find((r) => r.config_key === 'saving_rate')?.config_value ?? 0
   )
@@ -101,7 +98,6 @@ export default async function SettingsPage({ searchParams }: Props) {
       {activeTab === 'treasury' && (
         <TreasuryConfigSection
           opMargin={opMargin}
-          bufferAmount={bufferAmount}
           savingRate={savingRate}
         />
       )}

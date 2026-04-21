@@ -82,9 +82,6 @@ type DashboardSummary = {
   total_pool: number
   fund_sources_total: number
   loans_outstanding: number
-  free_cash: number
-  buffer_amount: number | null
-  buffer_breach: boolean
   weighted_cost_rate: number | null
   current_base_rate: number | null
   net_spread: number | null
@@ -814,15 +811,15 @@ export default async function DashboardPage() {
     <div>
       {/* ───────── Hero grid: 7+5 broadsheet ───────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-14 mb-16">
-        {/* LEFT 7 columns — Free pool hero */}
+        {/* LEFT 7 columns — Venture Pool hero */}
         <div className="lg:col-span-7">
           <div className="font-serif italic text-accent text-base mb-1">
-            Free pool
+            Venture Pool
           </div>
           <div className="font-serif text-[44px] md:text-hero text-ink leading-none mb-3">
             {hasAnyData ? (
-              <span className={summary.free_cash < 0 ? 'text-danger' : ''}>
-                {formatMoney(summary.free_cash)}
+              <span className={(summary.hv_fund_balance ?? 0) < 0 ? 'text-danger' : ''}>
+                {formatMoney(summary.hv_fund_balance ?? 0)}
               </span>
             ) : (
               <>
@@ -888,13 +885,6 @@ export default async function DashboardPage() {
                   lent{' '}
                   <span className="font-mono tabular not-italic">
                     {formatMoney(summary.loans_outstanding)}
-                  </span>
-                </em>
-                {' · '}
-                <em className="font-serif text-graphite">
-                  free{' '}
-                  <span className={`font-mono tabular not-italic font-medium ${summary.free_cash >= 0 ? 'text-ledger' : 'text-danger'}`}>
-                    {formatMoney(summary.free_cash)}
                   </span>
                 </em>
               </div>

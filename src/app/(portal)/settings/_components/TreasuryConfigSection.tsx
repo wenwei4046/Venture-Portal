@@ -5,13 +5,11 @@ import { updateTreasuryConfig } from '../actions'
 
 interface Props {
   opMargin: number
-  bufferAmount: number
   savingRate: number
 }
 
 export default function TreasuryConfigSection({
   opMargin,
-  bufferAmount,
   savingRate,
 }: Props) {
   const [isPending, startTransition] = useTransition()
@@ -37,12 +35,12 @@ export default function TreasuryConfigSection({
       <header className="mb-5">
         <h2 className="font-serif text-xl text-ink">Treasury</h2>
         <p className="font-serif italic text-graphite text-sm mt-0.5">
-          Base rate inputs + solvency buffer threshold.
+          Base rate inputs.
         </p>
       </header>
 
       <form action={handleSubmit} className="space-y-5">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <div>
             <label htmlFor="op_margin" className="block text-sm font-sans font-medium text-graphite mb-1.5">
               Op Margin
@@ -64,29 +62,6 @@ export default function TreasuryConfigSection({
             </div>
             <p className="text-xs text-muted mt-1.5 font-sans">
               Added to weighted cost of capital to compute Base Rate
-            </p>
-          </div>
-
-          <div>
-            <label htmlFor="buffer_amount" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-              Buffer Amount
-              <span className="text-xs text-muted ml-1 font-normal">(RM)</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted font-mono">RM</span>
-              <input
-                id="buffer_amount"
-                name="buffer_amount"
-                type="number"
-                step="100"
-                min="0"
-                defaultValue={bufferAmount.toFixed(2)}
-                required
-                className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
-              />
-            </div>
-            <p className="text-xs text-muted mt-1.5 font-sans">
-              Alert fires when Free Cash falls below this
             </p>
           </div>
 

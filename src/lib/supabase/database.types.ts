@@ -4098,11 +4098,11 @@ export type Database = {
       hr_monthly_payroll_status: "draft" | "submitted" | "paid"
       hr_staff_status: "active" | "inactive"
       hv_fund_txn_type:
-        | "saving_in"
-        | "surplus_in"
         | "profit_in"
-        | "deficit_out"
         | "expense_out"
+        | "fund_in"
+        | "fund_out"
+        | "loan_repayment_in"
       invoice_pool_txn_type: "accumulate" | "release"
       invoice_status: "draft" | "issued" | "paid" | "paid_via_netting"
       invoice_submission_request_status:
@@ -4351,11 +4351,11 @@ export const Constants = {
       hr_monthly_payroll_status: ["draft", "submitted", "paid"],
       hr_staff_status: ["active", "inactive"],
       hv_fund_txn_type: [
-        "saving_in",
-        "surplus_in",
         "profit_in",
-        "deficit_out",
         "expense_out",
+        "fund_in",
+        "fund_out",
+        "loan_repayment_in",
       ],
       invoice_pool_txn_type: ["accumulate", "release"],
       invoice_status: ["draft", "issued", "paid", "paid_via_netting"],
