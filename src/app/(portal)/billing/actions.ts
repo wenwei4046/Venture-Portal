@@ -6,6 +6,12 @@ import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
+import { postJournalEntry } from '@/lib/journal'
+
+// Mig 200/P1-6a: invoice billing_mode → revenue GL code mapping.
+function revenueGlCode(billingMode: string | null): string {
+  return billingMode === 'marketing_project' ? '4040' : '4030'
+}
 
 export interface GenerateInvoicesResult {
   generated: number
@@ -304,7 +310,7 @@ export async function createCreditNote(formData: FormData) {
 // ─── Approve / Issue Invoice (Finance — draft → issued) ────────────────────
 
 export async function approveInvoice(formData: FormData) {
-  await requireRole(['finance'])
+  const user = await requireRole(['finance'])
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -312,7 +318,7 @@ export async function approveInvoice(formData: FormData) {
 
   const { data: inv } = await supabase
     .from('invoices')
-    .select('period_month, status')
+    .select('id, invoice_no, period_month, status, total_amount, billing_mode, company_id')
     .eq('id', id)
     .single()
   if (!inv) throw new Error('Invoice not found')
@@ -328,12 +334,36 @@ export async function approveInvoice(formData: FormData) {
 
   if (error) throw new Error(`Failed to issue invoice: ${error.message}`)
 
+  // Mig 200/P1-6a: AR accrual at invoice issue.
+  //   dr 1040 AR — Subs   / cr 4030 (or 4040) Revenue
+  // Paired with the invoice-paid flow which settles AR via
+  //   dr Bank / cr 1040 AR (approve_single_voucher billing_payment branch)
+  const amount = Number(inv.total_amount ?? 0)
+  if (amount > 0) {
+    try {
+      await postJournalEntry(supabase, {
+        transactionDate: dayjs(inv.period_month).endOf('month').format('YYYY-MM-DD'),
+        description: `Invoice ${inv.invoice_no ?? inv.id} issued`,
+        referenceType: 'invoice',
+        referenceId: inv.id,
+        createdBy: user.id,
+        lines: [
+          { accountCode: '1040', debit: amount, description: `AR — invoice ${inv.invoice_no ?? ''}`.trim() },
+          { accountCode: revenueGlCode(inv.billing_mode), credit: amount, description: 'Service billing revenue recognised' },
+        ],
+      })
+    } catch (jeErr) {
+      const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
+      throw new Error(`Invoice issued but AR accrual JE failed: ${msg}`)
+    }
+  }
+
   revalidatePath('/billing')
   revalidatePath('/statements')
 }
 
 export async function approveInvoicesForPeriod(formData: FormData) {
-  await requireRole(['finance'])
+  const user = await requireRole(['finance'])
   const supabase = await createClient()
 
   const rawPeriod = (formData.get('period_month') as string) ?? ''
@@ -342,6 +372,13 @@ export async function approveInvoicesForPeriod(formData: FormData) {
 
   await assertPeriodOpen(supabase, period)
 
+  // Pull draft rows up-front so we can post AR accrual JEs after the bulk update.
+  const { data: draftInvoices } = await supabase
+    .from('invoices')
+    .select('id, invoice_no, total_amount, billing_mode')
+    .eq('period_month', period)
+    .eq('status', 'draft')
+
   const { error, count } = await supabase
     .from('invoices')
     .update({ status: 'issued' }, { count: 'exact' })
@@ -349,6 +386,29 @@ export async function approveInvoicesForPeriod(formData: FormData) {
     .eq('status', 'draft')
 
   if (error) throw new Error(`Failed to bulk issue invoices: ${error.message}`)
+
+  // Mig 200/P1-6a: post AR accrual per newly-issued invoice.
+  const txnDate = dayjs(period).endOf('month').format('YYYY-MM-DD')
+  for (const row of draftInvoices ?? []) {
+    const amount = Number(row.total_amount ?? 0)
+    if (amount <= 0) continue
+    try {
+      await postJournalEntry(supabase, {
+        transactionDate: txnDate,
+        description: `Invoice ${row.invoice_no ?? row.id} issued (bulk)`,
+        referenceType: 'invoice',
+        referenceId: row.id,
+        createdBy: user.id,
+        lines: [
+          { accountCode: '1040', debit: amount, description: `AR — invoice ${row.invoice_no ?? ''}`.trim() },
+          { accountCode: revenueGlCode(row.billing_mode), credit: amount, description: 'Service billing revenue recognised' },
+        ],
+      })
+    } catch (jeErr) {
+      const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
+      throw new Error(`Bulk issue: JE post failed for invoice ${row.invoice_no ?? row.id}: ${msg}`)
+    }
+  }
 
   revalidatePath('/billing')
   revalidatePath('/statements')

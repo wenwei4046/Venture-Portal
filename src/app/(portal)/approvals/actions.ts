@@ -7,6 +7,16 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { notifyApprovalDecision } from '@/lib/slack'
+import { postJournalEntry } from '@/lib/journal'
+
+// Mig 197: dept name → equity GL code mirror (must match dept_pool_gl_code SQL helper).
+const DEPT_POOL_GL: Record<string, string> = {
+  Marketing: '3030',
+  Finance: '3040',
+  HR: '3050',
+  'Director Office': '3070',
+  Director: '3080',
+}
 
 // ─── Approve request (Principal) ──────────────────────────────────────────────
 
@@ -209,6 +219,27 @@ export async function approveRequest(formData: FormData) {
       if (deptDebitError) {
         throw new Error(`Approval recorded but dept pool debit failed: ${deptDebitError.message}`)
       }
+
+      // Mig 197/P0-3: post dept pool → HV Operating Fund equity reclassification.
+      const { data: srcDept } = await supabase
+        .from('departments')
+        .select('name')
+        .eq('id', fundSource.from_department_id)
+        .single()
+      const srcGl = srcDept?.name ? DEPT_POOL_GL[srcDept.name] : undefined
+      if (srcGl) {
+        await postJournalEntry(supabase, {
+          transactionDate: fundSource.effective_date ?? new Date().toISOString().slice(0, 10),
+          description: `Dept Pool → Venture transfer (${srcDept?.name}) — fund source ${fundSource.id}`,
+          referenceType: 'fund_source',
+          referenceId: fundSource.id,
+          createdBy: user.id,
+          lines: [
+            { accountCode: srcGl, debit: Number(fundSource.amount), description: `${srcDept?.name} Pool transferred to HV` },
+            { accountCode: '3010', credit: Number(fundSource.amount), description: 'HV Operating Fund from dept transfer' },
+          ],
+        })
+      }
     }
 
     // Venture Pool cash ledger: fund source activation = fund_in (Phase 10 / mig 192).
@@ -229,7 +260,7 @@ export async function approveRequest(formData: FormData) {
     // Bump primary bank account balance
     const { data: primaryBank } = await supabase
       .from('bank_accounts')
-      .select('id, current_balance')
+      .select('id, current_balance, gl_account_code')
       .eq('is_primary', true)
       .eq('status', 'active')
       .single()
@@ -238,6 +269,23 @@ export async function approveRequest(formData: FormData) {
         .from('bank_accounts')
         .update({ current_balance: Number(primaryBank.current_balance) + Number(fundSource.amount) })
         .eq('id', primaryBank.id)
+    }
+
+    // Mig 197/P0-3: post fund source activation JE (dr Bank / cr 2010 Fund Sources Payable).
+    // Skip for department_pool source_type because the dept transfer JE above already
+    // covers that flow (dept→HV is an equity reclass, not a new liability).
+    if (fundSource.source_type !== 'department_pool') {
+      await postJournalEntry(supabase, {
+        transactionDate: fundSource.effective_date ?? new Date().toISOString().slice(0, 10),
+        description: approval.description ?? `Fund source activated — ${fundSource.source_type}`,
+        referenceType: 'fund_source',
+        referenceId: fundSource.id,
+        createdBy: user.id,
+        lines: [
+          { accountCode: primaryBank?.gl_account_code ?? '1010', debit: Number(fundSource.amount), description: 'Bank — fund source received' },
+          { accountCode: '2010', credit: Number(fundSource.amount), description: `Fund source payable — ${fundSource.source_type}` },
+        ],
+      })
     }
   } else if (approval.request_type === 'hr_costing') {
     // Phase 7 Step 15: flip HR cost snapshot to approved_for_execution;
@@ -463,7 +511,7 @@ export async function approveRequestGroup(formData: FormData) {
 
   const { data: primaryBank } = await supabase
     .from('bank_accounts')
-    .select('id, current_balance, bank_name')
+    .select('id, current_balance, bank_name, gl_account_code')
     .eq('is_primary', true)
     .eq('status', 'active')
     .single()
@@ -556,6 +604,30 @@ export async function approveRequestGroup(formData: FormData) {
     })
   if (vpError) {
     throw new Error(`Group approved but venture_pool fund_out failed: ${vpError.message}`)
+  }
+
+  // ─── 6) GL journal: loan disbursement (P0-2 drift fix, mig 199) ─────────
+  // approveRequestGroup bypasses approve_single_voucher because the paired
+  // approvals live under group_id (approve_single_voucher rejects grouped
+  // rows). Post the loan-side JE directly: dr 1020 Loans Receivable /
+  // cr 1010 Bank. The voucher-side JE (which approve_single_voucher would
+  // have written) is skipped here to avoid double-counting — same net
+  // balance effect, one JE labelled as the loan event.
+  try {
+    await postJournalEntry(supabase, {
+      transactionDate: todayStr,
+      description: `Loan disbursement approved — ${loanApproval.description ?? loanApproval.reference_id}`,
+      referenceType: 'loan',
+      referenceId: loanApproval.reference_id,
+      createdBy: user.id,
+      lines: [
+        { accountCode: '1020', debit: Number(voucher.amount), description: 'Loans Receivable — disbursement' },
+        { accountCode: primaryBank?.gl_account_code ?? '1010', credit: Number(voucher.amount), description: `Bank — loan disbursement ${voucher.voucher_no ?? ''}`.trim() },
+      ],
+    })
+  } catch (jeErr) {
+    const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
+    throw new Error(`Group approved but loan disbursement JE failed: ${msg}`)
   }
 
   // Slack notify (best-effort)

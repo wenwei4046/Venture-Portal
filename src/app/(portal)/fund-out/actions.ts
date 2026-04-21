@@ -6,6 +6,7 @@ import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
+import { postJournalEntry } from '@/lib/journal'
 import type { PaymentType } from '@/types'
 
 // ─── Create new loan (Finance) ────────────────────────────────────────────────
@@ -193,6 +194,45 @@ export async function recordRepayment(formData: FormData) {
     if (vpError) {
       throw new Error(`Repayment recorded but venture_pool loan_repayment_in failed: ${vpError.message}`)
     }
+  }
+
+  // Mig 197/P1-7: post matching GL journal for the direct recordRepayment
+  // path. PV-driven repayments already write JE via approve_single_voucher;
+  // this path only fires when Finance records a repayment outside the PV
+  // flow (rare), so we add the JE here for symmetry.
+  //
+  //   principal → dr Bank / cr 1020 Loans Receivable
+  //   interest  → dr Bank / cr 4010 Interest Income — Loans
+  //   penalty   → dr Bank / cr 4020 Penalty Income
+  //   netting   → dr Bank / cr 4010 (treated as interest-style gain)
+  const { data: primaryBank } = await supabase
+    .from('bank_accounts')
+    .select('gl_account_code')
+    .eq('is_primary', true)
+    .eq('status', 'active')
+    .maybeSingle()
+
+  const bankGl = primaryBank?.gl_account_code ?? '1010'
+  const creditAccount =
+    paymentType === 'principal' ? '1020' :
+    paymentType === 'penalty'   ? '4020' :
+                                  '4010'   // interest + netting
+
+  try {
+    await postJournalEntry(supabase, {
+      transactionDate: paymentDate,
+      description: `Loan ${paymentType} repayment — ${loanId}`,
+      referenceType: 'repayment',
+      referenceId: loanId,
+      createdBy: user.id,
+      lines: [
+        { accountCode: bankGl, debit: amount, description: `Bank — ${paymentType} received` },
+        { accountCode: creditAccount, credit: amount, description: `${paymentType} repayment offset` },
+      ],
+    })
+  } catch (jeErr) {
+    const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
+    throw new Error(`Repayment recorded but JE post failed: ${msg}`)
   }
 
   revalidatePath(`/fund-out/${loanId}`)
