@@ -29,6 +29,7 @@ export default async function DirectorPoolPage() {
     { data: directorPoolTxns },
     { data: invoiceTxns },
     { data: claims },
+    { data: payouts },
   ] = await Promise.all([
     directorDept
       ? supabase
@@ -39,6 +40,7 @@ export default async function DirectorPoolPage() {
       : Promise.resolve({ data: [] as never[] }),
     supabase.from('invoice_payout_pool').select('*').order('created_at', { ascending: false }),
     supabase.from('claims').select('*').eq('claim_type', 'project').in('status', ['approved', 'paid']),
+    supabase.from('director_payouts').select('saving_amount, statutory_surplus'),
   ])
 
   // Director Pool balance — SUM(np_in) - SUM(expense_out) for Director dept
@@ -47,51 +49,72 @@ export default async function DirectorPoolPage() {
     return s - Number(t.amount)
   }, 0)
 
-  // Invoice Pool balance (unchanged — per-director accumulation ledger)
+  // Invoice Pool balance (per-director accumulation ledger)
   const invoiceBalance = (invoiceTxns ?? []).reduce((s, t) => {
     if (t.transaction_type === 'accumulate') return s + Number(t.amount)
     return s - Number(t.amount)
   }, 0)
 
-  // Total claims deducted (project claims against HV operating fund)
+  // Project claims — now deducted from Director Pool (Saving bucket)
   const totalClaimed = (claims ?? []).reduce((s, c) => s + Number(c.amount ?? 0), 0)
+
+  // Saving bucket = 5% saving + statutory surplus − project claims
+  const totalSaving = (payouts ?? []).reduce((s, p) => s + Number(p.saving_amount ?? 0), 0)
+  const totalSurplus = (payouts ?? []).reduce((s, p) => s + Number(p.statutory_surplus ?? 0), 0)
+  const savingBucket = totalSaving + totalSurplus - totalClaimed
+
+  // Invoice bucket = invoice_payout_pool balance
+  const invoiceBucket = invoiceBalance
+
+  // Reconciliation: Saving + Invoice should equal Director Pool once all period payroll is PV'd out
+  const bucketsTotal = savingBucket + invoiceBucket
+  const pendingPayroll = directorPoolBalance - bucketsTotal
 
   return (
     <div>
       <div className="mb-10">
         <h1 className="font-serif text-3xl text-ink">Director Pool</h1>
         <p className="font-serif italic text-graphite text-base mt-2">
-          Revenue pooling from subsidiary CTC payments (includes 5% saving + 25% invoice accumulator + 75% unpaid payroll).
+          Two earmarked buckets: <span className="text-ink">Saving</span> (5% + statutory surplus, net of project claims) and <span className="text-ink">Invoice</span> (25% per-director accumulator). Together they equal the pool once all period payroll has been PV&apos;d out.
         </p>
       </div>
 
-      {/* Pool Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+      {/* Pool Summary Cards — 2 buckets */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
         <div className="border border-hairline rounded-md bg-surface p-5">
-          <div className="font-serif italic text-sm text-accent mb-1">Director Pool</div>
-          <div className={`font-serif text-2xl ${directorPoolBalance >= 0 ? 'text-ink' : 'text-danger'}`}>
-            {formatMoney(directorPoolBalance)}
+          <div className="font-serif italic text-sm text-accent mb-1">Saving</div>
+          <div className={`font-serif text-2xl ${savingBucket >= 0 ? 'text-ink' : 'text-danger'}`}>
+            {formatMoney(savingBucket)}
           </div>
           <div className="font-mono text-xs text-muted mt-1">
-            Accumulated CTC − payouts
+            {formatMoneyBare(totalSaving)} saving + {formatMoneyBare(totalSurplus)} surplus
+            {totalClaimed > 0 ? ` − ${formatMoneyBare(totalClaimed)} claims` : ''}
           </div>
         </div>
         <div className="border border-hairline rounded-md bg-surface p-5">
-          <div className="font-serif italic text-sm text-accent mb-1">Invoice Accumulator</div>
-          <div className="font-serif text-2xl text-ink">{formatMoney(invoiceBalance)}</div>
+          <div className="font-serif italic text-sm text-accent mb-1">Invoice</div>
+          <div className="font-serif text-2xl text-ink">{formatMoney(invoiceBucket)}</div>
           <div className="font-mono text-xs text-muted mt-1">
-            25% per-director ledger (lives inside Director Pool)
+            25% per-director accumulator (`invoice_payout_pool`)
           </div>
         </div>
-        <div className="border border-hairline rounded-md bg-surface p-5">
-          <div className="font-serif italic text-sm text-accent mb-1">Claims Deducted</div>
-          <div className="font-serif text-2xl text-danger">
-            {formatMoney(-totalClaimed)}
-          </div>
-          <div className="font-mono text-xs text-muted mt-1">
-            Approved director project claims
-          </div>
-        </div>
+      </div>
+
+      {/* Reconciliation line */}
+      <div className="mb-12 font-mono text-xs text-muted flex flex-wrap gap-x-6 gap-y-1">
+        <span>
+          Saving + Invoice: <span className="text-ink">{formatMoney(bucketsTotal)}</span>
+        </span>
+        <span>
+          Director Pool balance: <span className="text-ink">{formatMoney(directorPoolBalance)}</span>
+        </span>
+        {Math.abs(pendingPayroll) > 0.01 ? (
+          <span className="italic font-serif text-graphite">
+            Pending payroll to PV: {formatMoney(pendingPayroll)}
+          </span>
+        ) : (
+          <span className="italic font-serif text-ledger">Buckets balance ✓</span>
+        )}
       </div>
 
       {/* Director Pool Activity */}
