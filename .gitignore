@@ -48,8 +48,13 @@ scripts/pcb-data.json
 # gstack retro snapshots (local history, not source)
 .context/retros/
 
-# Claude Code local settings (per-user, not shared)
-.claude/
+# Claude Code local settings (per-user). Ignore everything by default ...
+.claude/*
+# ... but keep these project-level shared folders under version control:
+!.claude/agents/
+!.claude/personas/
+!.claude/flows/
+!.claude/agent-shared/
 
 # E2E test screenshot artifacts (local only)
 /e2e-screenshots/
