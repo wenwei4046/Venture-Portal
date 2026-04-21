@@ -29,7 +29,7 @@ export default async function PaymentDetailPage({ params }: Props) {
 
   const { data: voucher, error } = await supabase
     .from('payment_vouchers')
-    .select('*, payment_categories(label)')
+    .select('*')
     .eq('id', id)
     .single()
 
@@ -81,31 +81,45 @@ export default async function PaymentDetailPage({ params }: Props) {
   const isPrincipal = user.role === 'principal'
   const isFinance = user.role === 'finance'
 
-  // Derive display values
-  const categoryLabel = (voucher.payment_categories as { label: string } | null)?.label
-    ?? (voucher.category_code ? voucher.category_code.replace(/_/g, ' ') : null)
+  // Mig 205: category_code now lives on payment_voucher_sources (per row).
+  // Pool + category both come from the sources subtable for debit AND credit
+  // (mig 205 backfilled one synthetic row for every credit voucher).
+  const { data: pvsRows } = await supabase
+    .from('payment_voucher_sources')
+    .select('pool, amount, category_code, payment_categories(label)')
+    .eq('voucher_id', id)
+    .order('amount', { ascending: false })
 
-  // Phase 7 Step 16: debit pool labels come from payment_voucher_sources
-  // (source_pool column is deprecated). Credit keeps target_pool as before.
+  const sourceRows = (pvsRows ?? []) as Array<{
+    pool: string
+    amount: string | number
+    category_code: string | null
+    payment_categories: { label: string } | null
+  }>
+
+  const categoryLabels = Array.from(
+    new Set(
+      sourceRows
+        .map((r) => r.payment_categories?.label ?? (r.category_code ? r.category_code.replace(/_/g, ' ') : null))
+        .filter((l): l is string => !!l)
+    )
+  )
+  const categoryLabel = categoryLabels.length > 0 ? categoryLabels.join(' + ') : null
+
   let poolLabel: string | null = null
   if (voucher.direction === 'credit') {
+    // Credit: target_pool is still authoritative on payment_vouchers; the
+    // synthetic source row mirrors it but source_pool on the voucher stays NULL.
     poolLabel = voucher.target_pool
       ? (POOL_LABELS[voucher.target_pool] ?? voucher.target_pool.replace(/_/g, ' '))
       : null
-  } else {
-    const { data: pvsRows } = await supabase
-      .from('payment_voucher_sources')
-      .select('pool, amount')
-      .eq('voucher_id', id)
-      .order('amount', { ascending: false })
-    if (pvsRows && pvsRows.length > 0) {
-      poolLabel = pvsRows
-        .map((r) => POOL_LABELS[r.pool] ?? r.pool.replace(/_/g, ' '))
-        .join(' + ')
-    } else if (voucher.source_pool) {
-      // Legacy fallback for any row that somehow missed the mig 103 backfill
-      poolLabel = POOL_LABELS[voucher.source_pool] ?? voucher.source_pool.replace(/_/g, ' ')
-    }
+  } else if (sourceRows.length > 0) {
+    poolLabel = sourceRows
+      .map((r) => POOL_LABELS[r.pool] ?? r.pool.replace(/_/g, ' '))
+      .join(' + ')
+  } else if (voucher.source_pool) {
+    // Legacy fallback for any row that somehow missed mig 103/205 backfill
+    poolLabel = POOL_LABELS[voucher.source_pool] ?? voucher.source_pool.replace(/_/g, ' ')
   }
 
   return (

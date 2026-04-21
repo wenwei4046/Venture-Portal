@@ -23,7 +23,6 @@ export interface VoucherDetailContext {
     payment_date: string | null
     source_pool: string | null
     target_pool: string | null
-    category_code: string | null
     approved_at: string | null
     executed_at: string | null
     created_at: string
@@ -32,7 +31,12 @@ export interface VoucherDetailContext {
     approved_by: string | null
     payment_reference: string | null
   }
-  sources: Array<{ pool: string; amount: string | number }>
+  sources: Array<{
+    pool: string
+    amount: string | number
+    category_code: string | null
+    category_label: string | null
+  }>
   attachments: Array<{
     id: string
     file_name: string
@@ -56,21 +60,17 @@ export async function getVoucherDetailContext(
 ): Promise<VoucherDetailContext | null> {
   const { data: voucher, error } = await supabase
     .from('payment_vouchers')
-    .select('*, payment_categories(label)')
+    .select('*')
     .eq('id', voucherId)
     .single()
 
   if (error || !voucher) return null
 
-  const categoryLabel =
-    (voucher.payment_categories as { label: string } | null)?.label ??
-    (voucher.category_code ? voucher.category_code.replace(/_/g, ' ') : null)
-
   const [sourcesRes, attachmentsRes, bankRes, payeeRes, createdByRes, approvedByRes] =
     await Promise.all([
       supabase
         .from('payment_voucher_sources')
-        .select('pool, amount')
+        .select('pool, amount, category_code, payment_categories(label)')
         .eq('voucher_id', voucherId)
         .order('amount', { ascending: false }),
       supabase
@@ -105,9 +105,32 @@ export async function getVoucherDetailContext(
     ? { ...bankRaw, current_balance: Number(bankRaw.current_balance) }
     : null
 
+  // Shape sources + fold in category label from the join
+  const sources: VoucherDetailContext['sources'] = (sourcesRes.data ?? []).map((s) => {
+    const raw = s as {
+      pool: string
+      amount: string | number
+      category_code: string | null
+      payment_categories: { label: string } | null
+    }
+    return {
+      pool: raw.pool,
+      amount: raw.amount,
+      category_code: raw.category_code,
+      category_label:
+        raw.payment_categories?.label ??
+        (raw.category_code ? raw.category_code.replace(/_/g, ' ') : null),
+    }
+  })
+
+  // Voucher-level categoryLabel: distinct categories across all source rows
+  const categoryLabel = sources.length > 0
+    ? Array.from(new Set(sources.map((s) => s.category_label).filter((l): l is string => !!l))).join(' + ') || null
+    : null
+
   return {
     voucher: voucher as VoucherDetailContext['voucher'],
-    sources: (sourcesRes.data ?? []) as VoucherDetailContext['sources'],
+    sources,
     attachments: (attachmentsRes.data ?? []) as VoucherDetailContext['attachments'],
     bank,
     payeeCompany: (payeeRes.data as VoucherDetailContext['payeeCompany']) ?? null,

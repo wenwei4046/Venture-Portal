@@ -137,7 +137,7 @@ export async function createPaymentVoucher(formData: FormData) {
       voucher_no: voucherNo,
       voucher_type: voucherType as 'loan_repayment' | 'billing_payment' | 'claim_payout' | 'expense' | 'internal_transfer' | 'salary_payout' | 'other' | 'receive_payment',
       direction,
-      category_code: categoryCode,
+      // Mig 205: category_code moved to payment_voucher_sources (per-row).
       // Phase 7 Step 16: source_pool deprecated. Debit vouchers get their
       // pools from the payment_voucher_sources subtable (written below);
       // new rows leave source_pool NULL. Credit vouchers still populate
@@ -172,33 +172,45 @@ export async function createPaymentVoucher(formData: FormData) {
 
   if (error) throw new Error(`Failed to create voucher: ${error.message}`)
 
-  // Phase 7: write N rows into payment_voucher_sources for debit vouchers.
-  // Form sends source_rows[i][pool] + source_rows[i][amount]; legacy callers
-  // that only send source_pool fall through to a single-row insert.
+  // Mig 205: every voucher writes ≥1 payment_voucher_sources row.
+  // DEBIT: user-entered rows (pool + category + amount), sum must match voucher total.
+  // CREDIT: synthetic single row (pool = target_pool, amount = voucher amount).
   if (direction === 'debit') {
     const rowCount = parseInt((formData.get('source_rows_count') as string) ?? '0', 10)
-    const rows: { pool: string; amount: number }[] = []
+    const rows: { pool: string; amount: number; category_code: string | null }[] = []
     if (rowCount > 0) {
       for (let i = 0; i < rowCount; i++) {
         const pool = (formData.get(`source_rows[${i}][pool]`) as string)?.trim() ?? ''
         const amt = parseFloat((formData.get(`source_rows[${i}][amount]`) as string) ?? '0')
-        if (pool && amt > 0) rows.push({ pool, amount: amt })
+        const cat = (formData.get(`source_rows[${i}][category_code]`) as string)?.trim() || null
+        if (pool && amt > 0) rows.push({ pool, amount: amt, category_code: cat })
       }
     } else if (sourcePool) {
-      rows.push({ pool: sourcePool, amount })
+      // Legacy single-source form path — category falls back to the voucher-level
+      // field name still sent by older UIs.
+      rows.push({ pool: sourcePool, amount, category_code: categoryCode })
     }
     if (rows.length > 0) {
       const sum = rows.reduce((s, r) => s + r.amount, 0)
       if (Math.abs(sum - amount) > 0.005) {
         throw new Error(`source rows sum (${sum.toFixed(2)}) does not match voucher amount (${amount.toFixed(2)})`)
       }
-      if (rows.length > 3) {
-        throw new Error('payment_voucher_sources: max 3 source rows per voucher')
-      }
       await supabase.from('payment_voucher_sources').insert(
-        rows.map(r => ({ voucher_id: data.id, pool: r.pool, amount: r.amount }))
+        rows.map(r => ({
+          voucher_id: data.id,
+          pool: r.pool,
+          amount: r.amount,
+          category_code: r.category_code,
+        }))
       )
     }
+  } else if (direction === 'credit' && targetPool) {
+    await supabase.from('payment_voucher_sources').insert({
+      voucher_id: data.id,
+      pool: targetPool,
+      amount,
+      category_code: categoryCode,
+    })
   }
 
   // Auto-complete credit payments: adjust bank + pool immediately

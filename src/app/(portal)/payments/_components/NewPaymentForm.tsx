@@ -62,6 +62,7 @@ const PAYMENT_METHODS = [
 interface SourceRow {
   pool: string
   amount: string
+  category_code: string
 }
 
 export default function NewPaymentForm({ companies, bankAccounts, categories, invoicePreset, nonBillablePreset, payableFundSources = [] }: Props) {
@@ -72,7 +73,9 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
   const [direction, setDirection] = useState<'debit' | 'credit'>(isInvoicePay ? 'credit' : 'debit')
   const [categoryCode, setCategoryCode] = useState(isInvoicePay ? 'billing_payment' : '')
   const [sourceRows, setSourceRows] = useState<SourceRow[]>(
-    isNonBillable ? [{ pool: 'venture_pool', amount: '' }] : [{ pool: '', amount: '' }]
+    isNonBillable
+      ? [{ pool: 'venture_pool', amount: '', category_code: '' }]
+      : [{ pool: '', amount: '', category_code: isInvoicePay ? 'billing_payment' : '' }]
   )
   const [amount, setAmount] = useState(isInvoicePay ? invoicePreset!.total_amount.toFixed(2) : '')
   // Controlled payee fields so loan-repayment mode can auto-fill them
@@ -104,7 +107,6 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
   const sourceSum = sourceRows.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0)
   const sourceSumMismatch =
     direction === 'debit' && totalAmount > 0 && Math.abs(sourceSum - totalAmount) > 0.005
-  const canAddRow = sourceRows.length < 3
 
   // Auto-fill the first row's amount when there's exactly one row and the user
   // hasn't touched it yet — the common single-source case.
@@ -113,7 +115,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
     if (sourceRows.length !== 1) return
     if (sourceRows[0].amount !== '') return
     if (!totalAmount) return
-    setSourceRows([{ pool: sourceRows[0].pool, amount: totalAmount.toFixed(2) }])
+    setSourceRows([{ pool: sourceRows[0].pool, amount: totalAmount.toFixed(2), category_code: sourceRows[0].category_code }])
   }, [totalAmount, direction, sourceRows])
 
   // When a fund source is picked, auto-fill payee + monthly principal/interest
@@ -139,7 +141,11 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
     setAmount(repaymentSum.toFixed(2))
     // If paying principal → classify as loan_principal, else loan_interest.
     const wantCat = (parseFloat(repayPrincipal) || 0) > 0 ? 'loan_principal' : 'loan_interest'
-    if (catList.some((c) => c.code === wantCat)) setCategoryCode(wantCat)
+    if (catList.some((c) => c.code === wantCat)) {
+      setCategoryCode(wantCat)
+      // Mig 205: each source row owns its category. Apply auto-category to every row.
+      setSourceRows(prev => prev.map(r => ({ ...r, category_code: wantCat })))
+    }
   }, [isLoanRepayment, repaymentSum, repayPrincipal, catList])
 
   useEffect(() => {
@@ -196,6 +202,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
       sourceRows.forEach((r, i) => {
         formData.set(`source_rows[${i}][pool]`, r.pool)
         formData.set(`source_rows[${i}][amount]`, r.amount)
+        formData.set(`source_rows[${i}][category_code]`, r.category_code)
       })
       // Back-compat: write source_pool = first row's pool (Step 16 drops this)
       formData.set('source_pool', sourceRows[0]?.pool ?? '')
@@ -497,13 +504,21 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
             </label>
             <button
               type="button"
-              disabled={!canAddRow}
-              onClick={() => setSourceRows([...sourceRows, { pool: '', amount: '' }])}
-              className="text-xs text-accent hover:text-accent-hover font-serif italic disabled:text-muted disabled:cursor-not-allowed"
+              onClick={() => setSourceRows([...sourceRows, { pool: '', amount: '', category_code: '' }])}
+              className="text-xs text-accent hover:text-accent-hover font-serif italic"
             >
-              + Add source{!canAddRow ? ' (max 3)' : ''}
+              + Add source
             </button>
           </div>
+          {/* Column headers for ≥2 rows */}
+          {sourceRows.length > 1 ? (
+            <div className="flex gap-2 items-center text-xs uppercase tracking-wide text-muted font-sans mb-1.5 px-0.5">
+              <div className="flex-1">Pool</div>
+              <div className="flex-1">Category</div>
+              <div className="w-40">Amount</div>
+              <div className="w-6"></div>
+            </div>
+          ) : null}
           <div className="space-y-2">
             {sourceRows.map((row, i) => (
               <div key={i} className="flex gap-2 items-start">
@@ -520,6 +535,23 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
                   <option value="">Select pool…</option>
                   {POOL_OPTIONS.map((p) => (
                     <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+                <select
+                  value={row.category_code}
+                  onChange={(e) => {
+                    const next = [...sourceRows]
+                    next[i] = { ...next[i], category_code: e.target.value }
+                    setSourceRows(next)
+                  }}
+                  disabled={isLoanRepayment}
+                  className="flex-1 px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border disabled:opacity-60"
+                >
+                  <option value="">
+                    {catList.length === 0 ? 'No categories — create one' : 'Select category…'}
+                  </option>
+                  {catList.map((c) => (
+                    <option key={c.code} value={c.code}>{c.label}</option>
                   ))}
                 </select>
                 <div className="relative w-40">
@@ -548,7 +580,9 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
                   >
                     ×
                   </button>
-                ) : null}
+                ) : (
+                  <div className="w-6" />
+                )}
               </div>
             ))}
           </div>
@@ -560,7 +594,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
             </p>
           ) : (
             <p className="font-serif italic text-muted text-xs mt-2">
-              Split the voucher total across up to 3 pools. Row amounts must sum to the voucher total.
+              Each row: which pool pays, what category, and how much. Row amounts must sum to the voucher total.
             </p>
           )}
           <input type="hidden" name="target_pool" value="" />
@@ -589,14 +623,16 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
         </div>
       )}
 
-      {/* ── Category ── (auto-selected in loan-repayment mode) */}
+      {/* ── Category ── (debit: per-source rows own it; credit: single voucher-level) */}
       {isLoanRepayment ? (
-        <input type="hidden" name="category_code" value={categoryCode} />
+        // Loan repayment: auto-category (loan_principal/loan_interest) is applied
+        // to each source row by the useEffect above. No explicit UI needed here.
+        null
       ) : (
       <div className="mb-6">
         <div className="flex items-baseline justify-between mb-1.5">
           <label className="block text-sm font-sans font-medium text-graphite">
-            Category
+            {direction === 'credit' ? 'Category' : 'Manage categories'}
           </label>
           <button
             type="button"
@@ -643,26 +679,34 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
           </div>
         ) : null}
 
-        {catList.length === 0 ? (
-          <p className="font-serif italic text-muted text-sm py-2 px-3 bg-surface border border-hairline rounded-md">
-            No categories yet — create one above to start.
-          </p>
+        {direction === 'credit' ? (
+          catList.length === 0 ? (
+            <p className="font-serif italic text-muted text-sm py-2 px-3 bg-surface border border-hairline rounded-md">
+              No categories yet — create one above to start.
+            </p>
+          ) : (
+            <select
+              name="category_code"
+              value={categoryCode}
+              onChange={(e) => setCategoryCode(e.target.value)}
+              className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+            >
+              <option value="">Select category…</option>
+              {catList.map((c) => (
+                <option key={c.code} value={c.code}>{c.label}</option>
+              ))}
+            </select>
+          )
         ) : (
-          <select
-            name="category_code"
-            value={categoryCode}
-            onChange={(e) => setCategoryCode(e.target.value)}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-          >
-            <option value="">Select category…</option>
-            {catList.map((c) => (
-              <option key={c.code} value={c.code}>{c.label}</option>
-            ))}
-          </select>
+          <p className="font-serif italic text-muted text-xs">
+            Pick category per-row in the pool split above. New categories added here appear in every row&apos;s dropdown.
+          </p>
         )}
-        <p className="font-serif italic text-muted text-xs mt-1.5">
-          For P&L classification. Create new categories as needed.
-        </p>
+        {direction === 'credit' ? (
+          <p className="font-serif italic text-muted text-xs mt-1.5">
+            For P&L classification. Create new categories as needed.
+          </p>
+        ) : null}
       </div>
       )}
 

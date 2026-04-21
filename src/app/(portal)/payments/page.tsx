@@ -51,10 +51,10 @@ export default async function PaymentsPage({ searchParams }: Props) {
   const minFilter = params.min ? parseFloat(params.min) : null
   const maxFilter = params.max ? parseFloat(params.max) : null
 
-  // Fetch vouchers with category label
+  // Fetch vouchers (category labels now live on sources — loaded below)
   const { data: vouchers } = await supabase
     .from('payment_vouchers')
-    .select('*, payment_categories(label)')
+    .select('*')
     .order('created_at', { ascending: false })
 
   // Stage D/E surface: count payroll_payment_requests needing Finance action.
@@ -64,18 +64,33 @@ export default async function PaymentsPage({ searchParams }: Props) {
     .select('*', { count: 'exact', head: true })
     .eq('status', 'submitted')
 
-  // Phase 7 Step 16: source_pool deprecated. Load pvs rows unconditionally
-  // so the Pool column and filter both read the canonical subtable.
+  // Mig 205: sources also carry category_code. Load once, index by voucher_id,
+  // then derive pool list + category list for the table cells.
   const sourcesByVoucher = new Map<string, string[]>()
+  const categoriesByVoucher = new Map<string, string[]>()
   {
     const { data: srcs } = await supabase
       .from('payment_voucher_sources')
-      .select('voucher_id, pool, amount')
+      .select('voucher_id, pool, amount, category_code, payment_categories(label)')
       .order('amount', { ascending: false })
-    for (const s of srcs ?? []) {
-      const list = sourcesByVoucher.get(s.voucher_id) ?? []
-      list.push(s.pool)
-      sourcesByVoucher.set(s.voucher_id, list)
+    for (const s of (srcs ?? []) as Array<{
+      voucher_id: string
+      pool: string
+      category_code: string | null
+      payment_categories: { label: string } | null
+    }>) {
+      const pools = sourcesByVoucher.get(s.voucher_id) ?? []
+      pools.push(s.pool)
+      sourcesByVoucher.set(s.voucher_id, pools)
+
+      const label =
+        s.payment_categories?.label ??
+        (s.category_code ? s.category_code.replace(/_/g, ' ') : null)
+      if (label) {
+        const cats = categoriesByVoucher.get(s.voucher_id) ?? []
+        if (!cats.includes(label)) cats.push(label)
+        categoriesByVoucher.set(s.voucher_id, cats)
+      }
     }
   }
 
@@ -234,8 +249,8 @@ export default async function PaymentsPage({ searchParams }: Props) {
                 </thead>
                 <tbody className="row-stagger">
                   {filtered.map((v, i) => {
-                    const catLabel = (v.payment_categories as { label: string } | null)?.label
-                      ?? (v.category_code ? v.category_code.replace(/_/g, ' ') : '—')
+                    const cats = categoriesByVoucher.get(v.id) ?? []
+                    const catLabel = cats.length > 0 ? cats.join(' + ') : '—'
                     // Phase 7 Step 16: debit reads pvs subtable; credit keeps target_pool.
                     let poolLabel = '—'
                     if (v.direction === 'credit') {

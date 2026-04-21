@@ -2598,6 +2598,7 @@ export type Database = {
       payment_voucher_sources: {
         Row: {
           amount: number
+          category_code: string | null
           created_at: string
           id: string
           pool: string
@@ -2605,6 +2606,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          category_code?: string | null
           created_at?: string
           id?: string
           pool: string
@@ -2612,12 +2614,20 @@ export type Database = {
         }
         Update: {
           amount?: number
+          category_code?: string | null
           created_at?: string
           id?: string
           pool?: string
           voucher_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "payment_voucher_sources_category_code_fkey"
+            columns: ["category_code"]
+            isOneToOne: false
+            referencedRelation: "payment_categories"
+            referencedColumns: ["code"]
+          },
           {
             foreignKeyName: "payment_voucher_sources_voucher_id_fkey"
             columns: ["voucher_id"]
@@ -2634,7 +2644,6 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           bank_account_id: string | null
-          category_code: string | null
           created_at: string
           created_by: string
           currency: string
@@ -2670,7 +2679,6 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           bank_account_id?: string | null
-          category_code?: string | null
           created_at?: string
           created_by: string
           currency?: string
@@ -2706,7 +2714,6 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           bank_account_id?: string | null
-          category_code?: string | null
           created_at?: string
           created_by?: string
           currency?: string
@@ -2764,13 +2771,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "bank_accounts"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payment_vouchers_category_code_fkey"
-            columns: ["category_code"]
-            isOneToOne: false
-            referencedRelation: "payment_categories"
-            referencedColumns: ["code"]
           },
           {
             foreignKeyName: "payment_vouchers_created_by_fkey"
