@@ -165,10 +165,13 @@ Must be empty. Also verify expected JE count per the flow template.
 ## When to fail fast
 
 Stop the audit and report immediately if:
-- HMR drift (Phase 0 404s)
+- **Phase 0 triage fails** — any of the 3 checks (preview 200, Playwright fresh, Supabase ping) returns non-green. Report the exact failure + remediation; do NOT proceed to reading or Phase 1.
+- HMR drift mid-run (404 on a Server Action POST during Phase 2)
 - Login fails for any role (stale credentials or auth broken)
-- DB is unreachable (Supabase MCP returns connection errors)
+- DB unreachable mid-run (Supabase MCP returns connection errors after Phase 0 passed)
 - An RPC raises an exception the flow template didn't anticipate — this is the discovery, report it
+
+**Budget discipline:** if Phase 0 fails, your ENTIRE report should be ≤ 300 words and you should NOT spend tokens on Phase 0.5 reading, DB snapshots, or speculative analysis. Fail fast literally means fast.
 
 ## Output size
 
