@@ -116,12 +116,14 @@ export async function createFundSource(formData: FormData) {
     created_by: user.id,
   }
 
-  // Polymorphic FK based on type
+  // Polymorphic FK based on type — each type uses exactly one "from_*" slot.
   let payload
-  if (raw.source_type === 'subsidiary' || raw.source_type === 'department_pool') {
-    payload = { ...basePayload, from_company_id: raw.from_id || null, from_director_id: null }
+  if (raw.source_type === 'subsidiary') {
+    payload = { ...basePayload, from_company_id: raw.from_id || null, from_director_id: null, from_department_id: null }
+  } else if (raw.source_type === 'department_pool') {
+    payload = { ...basePayload, from_company_id: null, from_director_id: null, from_department_id: raw.from_id || null }
   } else {
-    payload = { ...basePayload, from_company_id: null, from_director_id: raw.from_id || null }
+    payload = { ...basePayload, from_company_id: null, from_director_id: raw.from_id || null, from_department_id: null }
   }
 
   const { data, error } = await supabase

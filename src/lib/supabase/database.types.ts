@@ -1276,6 +1276,7 @@ export type Database = {
           early_withdrawal: boolean
           effective_date: string
           from_company_id: string | null
+          from_department_id: string | null
           from_director_id: string | null
           id: string
           lock_in_months: number | null
@@ -1299,6 +1300,7 @@ export type Database = {
           early_withdrawal?: boolean
           effective_date: string
           from_company_id?: string | null
+          from_department_id?: string | null
           from_director_id?: string | null
           id?: string
           lock_in_months?: number | null
@@ -1322,6 +1324,7 @@ export type Database = {
           early_withdrawal?: boolean
           effective_date?: string
           from_company_id?: string | null
+          from_department_id?: string | null
           from_director_id?: string | null
           id?: string
           lock_in_months?: number | null
@@ -1356,6 +1359,13 @@ export type Database = {
             columns: ["from_company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fund_sources_from_department_id_fkey"
+            columns: ["from_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
             referencedColumns: ["id"]
           },
           {

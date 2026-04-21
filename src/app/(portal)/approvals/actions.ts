@@ -168,7 +168,7 @@ export async function approveRequest(formData: FormData) {
     // (expense_out) so the dept pool balance reflects the transfer to HV.
     const { data: fundSource, error: fsFetchError } = await supabase
       .from('fund_sources')
-      .select('id, amount, source_type, from_company_id, from_director_id, effective_date')
+      .select('id, amount, source_type, from_company_id, from_director_id, from_department_id, effective_date')
       .eq('id', approval.reference_id)
       .eq('status', 'pending_approval')
       .single()
@@ -187,17 +187,17 @@ export async function approveRequest(formData: FormData) {
       throw new Error(`Approval recorded but fund source activation failed: ${fsUpdateError.message}`)
     }
 
-    // from_company_id stores the department_id when source_type='department_pool'
-    // (see fund-in/actions.ts payload branch). Debit that pool so the source
-    // dept's balance drops — pre-submit balance check has already guarded
-    // against insufficient funds.
-    if (fundSource.source_type === 'department_pool' && fundSource.from_company_id) {
+    // Mig 193: department_pool transfers carry the source dept in
+    // from_department_id (not from_company_id). Debit that pool so the source
+    // dept's balance drops — pre-submit balance check in fund-in/actions.ts
+    // has already guarded against insufficient funds.
+    if (fundSource.source_type === 'department_pool' && fundSource.from_department_id) {
       const periodMonth = dayjs(fundSource.effective_date).startOf('month').format('YYYY-MM-DD')
       const amountLabel = Number(fundSource.amount).toLocaleString('en-MY', { minimumFractionDigits: 2 })
       const { error: deptDebitError } = await supabase
         .from('dept_pools')
         .insert({
-          department_id: fundSource.from_company_id,
+          department_id: fundSource.from_department_id,
           transaction_type: 'expense_out',
           amount: Number(fundSource.amount),
           period_month: periodMonth,
@@ -537,6 +537,25 @@ export async function approveRequestGroup(formData: FormData) {
         current_balance: Number(primaryBank.current_balance) - Number(voucher.amount),
       })
       .eq('id', primaryBank.id)
+  }
+
+  // ─── 5) Venture Pool cash ledger: loan disbursement = fund_out ──────────
+  // Phase 10 / mig 192. The non-grouped new_loan branch in approveRequest
+  // already does this; the combined-group path was missing it, so loan
+  // approvals left venture_pool untouched even though bank was debited.
+  // Surfaced by E2E Path 4 (2026-04-21).
+  const { error: vpError } = await supabase
+    .from('venture_pool')
+    .insert({
+      transaction_type: 'fund_out',
+      amount: Number(voucher.amount),
+      description: loanApproval.description ?? `Loan disbursement — ${loanApproval.reference_id}`,
+      reference_id: loanApproval.reference_id,
+      reference_table: 'loans',
+      created_by: user.id,
+    })
+  if (vpError) {
+    throw new Error(`Group approved but venture_pool fund_out failed: ${vpError.message}`)
   }
 
   // Slack notify (best-effort)
