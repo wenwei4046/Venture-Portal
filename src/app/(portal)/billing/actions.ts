@@ -96,6 +96,42 @@ export async function createManualInvoice(formData: FormData): Promise<void> {
   revalidatePath('/statements/invoices')
 }
 
+// ─── Director CTC per subsidiary (Finance auto-fill helper) ──────────────────
+//
+// Mig 206: when Finance opens Create Invoice with mode=director_attribution,
+// pre-populate the per-sub amount rows from director_ctc (HR already entered).
+// Aggregate-only — does NOT leak per-director breakdown. Returns [] when HR
+// hasn't entered CTC yet for the period.
+
+export interface DirectorCtcRow {
+  companyId: string
+  shortCode: string
+  name: string
+  totalCtc: number
+}
+
+export async function fetchDirectorCtcByCompany(
+  periodMonth: string,
+): Promise<DirectorCtcRow[]> {
+  await requireRole(['principal', 'finance', 'hr'])
+  const supabase = await createClient()
+
+  const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
+
+  const { data, error } = await supabase.rpc('get_director_ctc_by_company', {
+    p_period_month: period,
+  })
+
+  if (error) throw new Error(`Failed to fetch director CTC: ${error.message}`)
+
+  return (data ?? []).map((r) => ({
+    companyId: r.company_id,
+    shortCode: r.company_short_code,
+    name: r.company_name,
+    totalCtc: Number(r.total_ctc),
+  }))
+}
+
 // ─── Generate monthly invoices for a period (Finance) ────────────────────────
 
 export async function generateMonthlyInvoices(

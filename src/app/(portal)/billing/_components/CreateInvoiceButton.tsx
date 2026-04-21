@@ -1,9 +1,13 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
-import { createManualInvoice, type CreateInvoiceMode } from '../actions'
+import {
+  createManualInvoice,
+  fetchDirectorCtcByCompany,
+  type CreateInvoiceMode,
+} from '../actions'
 
 interface Company {
   id: string
@@ -73,6 +77,9 @@ export default function CreateInvoiceButton({
   const [description, setDescription] = useState('')
   const [referenceNo, setReferenceNo] = useState('')
   const [rows, setRows] = useState<Row[]>([newRow()])
+  const [autoFillNote, setAutoFillNote] = useState<string | null>(null)
+  // Track the mode+period combo we last auto-filled so we don't clobber user edits on every re-render.
+  const autoFilledKey = useRef<string | null>(null)
 
   const remaining = Math.round((targetAmount - alreadyInvoiced) * 100) / 100
   const hasTarget = targetAmount > 0.005
@@ -94,7 +101,51 @@ export default function CreateInvoiceButton({
     setReferenceNo('')
     setRows([newRow()])
     setError(null)
+    setAutoFillNote(null)
+    autoFilledKey.current = null
   }
+
+  // Mig 206: auto-fill subsidiary rows from HR's director_ctc when the user
+  // picks director_attribution. Runs on mode OR period change to that combo,
+  // but only once per combo so manual edits afterwards stick.
+  useEffect(() => {
+    if (!open) return
+    if (mode !== 'director_attribution') {
+      setAutoFillNote(null)
+      return
+    }
+    const key = `${mode}|${period}`
+    if (autoFilledKey.current === key) return
+    autoFilledKey.current = key
+
+    const periodIso = dayjs(period + '-01').format('YYYY-MM-DD')
+    setAutoFillNote('Loading director CTC from HR…')
+    fetchDirectorCtcByCompany(periodIso)
+      .then((ctcRows) => {
+        if (ctcRows.length === 0) {
+          setAutoFillNote(
+            `No director CTC entered by HR for ${dayjs(period + '-01').format('MMM YYYY')}. Enter amounts manually.`,
+          )
+          return
+        }
+        setRows(
+          ctcRows.map((r) => ({
+            uid: crypto.randomUUID(),
+            companyId: r.companyId,
+            amount: r.totalCtc.toFixed(2),
+          })),
+        )
+        setAutoFillNote(
+          `Auto-filled ${ctcRows.length} subsidiary ${ctcRows.length === 1 ? 'row' : 'rows'} from HR's director CTC for ${dayjs(period + '-01').format('MMM YYYY')}. Edit amounts as needed.`,
+        )
+        if (!description.trim()) {
+          setDescription(`Director salary CTC — ${dayjs(period + '-01').format('MMMM YYYY')}`)
+        }
+      })
+      .catch((err: unknown) => {
+        setAutoFillNote(`Auto-fill failed: ${err instanceof Error ? err.message : String(err)}`)
+      })
+  }, [open, mode, period, description])
 
   function updateRow(uid: string, patch: Partial<Row>) {
     setRows((prev) => prev.map((r) => (r.uid === uid ? { ...r, ...patch } : r)))
@@ -310,6 +361,11 @@ export default function CreateInvoiceButton({
                     {rows.length} {rows.length === 1 ? 'row' : 'rows'}
                   </span>
                 </div>
+                {autoFillNote ? (
+                  <div className="font-serif italic text-graphite text-xs mb-2 px-3 py-2 bg-accent/5 border border-accent/20 rounded-md">
+                    {autoFillNote}
+                  </div>
+                ) : null}
                 <div className="border border-hairline rounded-md overflow-hidden bg-surface">
                   <table className="w-full text-sm">
                     <thead>

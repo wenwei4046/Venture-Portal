@@ -3886,6 +3886,15 @@ export type Database = {
           statutory_allowance: number
         }[]
       }
+      get_director_ctc_by_company: {
+        Args: { p_period_month: string }
+        Returns: {
+          company_id: string
+          company_name: string
+          company_short_code: string
+          total_ctc: number
+        }[]
+      }
       get_director_payout_summary: {
         Args: { p_period: string }
         Returns: {
