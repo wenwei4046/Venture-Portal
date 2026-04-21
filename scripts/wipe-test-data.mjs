@@ -1,6 +1,9 @@
 // Wipe all transactional / test data while preserving structural rows
 // (companies, users, departments, directors, bank accounts, base rate,
-//  treasury config, categories, chart of accounts, hr_staff_costs).
+//  treasury config, payment categories, chart of accounts).
+//
+// Also wipes staff costs, monthly payroll, service contracts, and
+// config_audit_log — these hold demo data, not structural config.
 //
 // Order matters due to FK constraints. Children first, then parents.
 
@@ -34,6 +37,12 @@ async function countAll() {
     'hv_operating_fund',
     'journal_lines',
     'journal_entries',
+    'hr_staff_allocation',
+    'hr_staff_salary_history',
+    'hr_monthly_payroll',
+    'hr_staff_costs',
+    'service_contracts',
+    'config_audit_log',
   ]
   const counts = {}
   for (const t of tables) {
@@ -100,6 +109,16 @@ async function main() {
   await deleteAll('hr_cost_submissions')
   await deleteAll('monthly_headcounts')
   await deleteAll('hv_operating_fund')
+
+  // Step 7: HR staff + contracts + config audit log (deep wipe)
+  // FK order: allocation + salary_history first, then monthly_payroll,
+  // then hr_staff_costs (parent of all three), then unrelated tables.
+  await deleteAll('hr_staff_allocation')
+  await deleteAll('hr_staff_salary_history')
+  await deleteAll('hr_monthly_payroll')
+  await deleteAll('hr_staff_costs')
+  await deleteAll('service_contracts')
+  await deleteAll('config_audit_log')
 
   console.log('\n=== RESETTING BANK BALANCES TO 0 ===')
   const { data: banks } = await admin.from('bank_accounts').select('id, bank_name, current_balance')
