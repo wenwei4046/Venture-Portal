@@ -32,8 +32,10 @@ async function countAll() {
     'invoices',
     'claims',
     'director_payouts',
+    'director_ctc',
     'invoice_payout_pool',
     'dept_pools',
+    'venture_pool',
     'hv_operating_fund',
     'journal_lines',
     'journal_entries',
@@ -108,6 +110,8 @@ async function main() {
   // Step 6: standalone
   await deleteAll('hr_cost_submissions')
   await deleteAll('monthly_headcounts')
+  await deleteAll('director_ctc')
+  await deleteAll('venture_pool')
   await deleteAll('hv_operating_fund')
 
   // Step 7: HR staff + contracts + config audit log (deep wipe)
