@@ -59,9 +59,14 @@ export interface DirectorPayout {
   savingAmount: number
   afterSaving: number
 
+  // Advance offset (post-saving allowance → opening balance)
+  advanceOpeningBalance: number
+  advanceRepaid: number
+  advanceBalance: number          // closing = opening - repaid + advanceAmount
+
   // 75% Payroll
   payrollCalc: number
-  advanceAmount: number
+  advanceAmount: number           // NEW top-up this month (after offset)
   payrollGross: number
   payrollBk: number
   payrollAllow: number
@@ -124,31 +129,41 @@ export function calculateDirectorPayout(
   payrollStatutory: StatutoryLookup,
   invoiceStatutory: StatutoryLookup,
   pcbAmount: number,
+  openingAdvanceBalance: number = 0,
 ): DirectorPayout {
   // Step 4: Gross
   const grossAmount = r2(pool.totalPool * director.weightage / totalWeightage)
 
-  // Step 5: Auto-split by ratio (not used for deductions, but tracked)
-  // const dBasic = r2(grossAmount * (pool.totalBasic / pool.totalPool))
-  // const dKpi = r2(grossAmount * pool.kpiRatio)
-  // const dAllow = r2(grossAmount * pool.allowanceRatio)
-
-  // Step 6: 5% Saving
+  // Step 5: 5% Saving (applied on whole gross)
   const savingAmount = r2(grossAmount * savingRate)
   const afterSaving = r2(grossAmount - savingAmount)
 
-  // Step 7: 75/25
-  const payrollCalc = r2(afterSaving * 0.75)
-  const invoiceBase = r2(afterSaving * 0.25)
+  // Step 6: Decompose after-saving into BK (basic+kpi) and Allowance portions
+  //         using pool-level ratios. Allowance post-saving absorbs advance.
+  const allowanceShare = r2(afterSaving * pool.allowanceRatio)
+  const bkShare = r2(afterSaving - allowanceShare)
 
-  // Step 8: 75% Payroll
+  // Step 7: Allowance → Advance offset (Phase 3 spec)
+  //         Repay from allowance only; never touches basic+kpi.
+  //         Residual opening carries to next month via advanceBalance closing.
+  const advanceRepaid = r2(Math.min(openingAdvanceBalance, allowanceShare))
+  const allowanceLeftover = r2(allowanceShare - advanceRepaid)
+  const afterOffset = r2(bkShare + allowanceLeftover)
+
+  // Step 8: 75/25 split on afterOffset
+  const payrollCalc = r2(afterOffset * 0.75)
+  const invoiceBase = r2(afterOffset * 0.25)
+
+  // Step 9: 75% Payroll — top-up if below min
   const advanceAmount = r2(Math.max(0, director.minPayout - payrollCalc))
   const payrollGross = r2(Math.max(payrollCalc, director.minPayout))
+  const advanceBalance = r2(openingAdvanceBalance - advanceRepaid + advanceAmount)
 
-  const bkRatio = pool.basicRatio // (basic + kpi) / pool
-  const allowRatio = pool.allowanceRatio
-  const payrollBk = r2(payrollGross * bkRatio)
-  const payrollAllow = r2(payrollGross * allowRatio)
+  // BK / allow split of payroll_gross uses post-offset ratios so statutory
+  // lookup keys align with wage composition after offset.
+  const offsetBkRatio = afterOffset > 0 ? bkShare / afterOffset : 1
+  const payrollBk = r2(payrollGross * offsetBkRatio)
+  const payrollAllow = r2(payrollGross - payrollBk)
 
   // Statutory on 75% payroll (lookup based on payroll B+K wages)
   const payrollEpfEr = r2(payrollStatutory.epfEr)
@@ -167,14 +182,14 @@ export function calculateDirectorPayout(
     - payrollPcb
   )
 
-  // Step 9: 25% Invoice
-  const invoiceBk = r2(invoiceBase * bkRatio)
+  // Step 10: 25% Invoice
+  const invoiceBk = r2(invoiceBase * offsetBkRatio)
   const invoiceEpfEr = r2(invoiceStatutory.epfEr)
   const invoiceSocsoEr = r2(invoiceStatutory.socsoEr)
   const invoiceEisEr = r2(invoiceStatutory.eisEr)
   const invoiceTotal = r2(invoiceBase + invoiceEpfEr + invoiceSocsoEr + invoiceEisEr)
 
-  // Step 10: Statutory surplus
+  // Step 11: Statutory surplus
   const dirShare = director.weightage / totalWeightage
   const statutoryErIn = r2(pool.totalStatutoryErIn * dirShare)
   const statutoryErOut = r2(
@@ -188,6 +203,9 @@ export function calculateDirectorPayout(
     grossAmount,
     savingAmount,
     afterSaving,
+    advanceOpeningBalance: r2(openingAdvanceBalance),
+    advanceRepaid,
+    advanceBalance,
     payrollCalc,
     advanceAmount,
     payrollGross,

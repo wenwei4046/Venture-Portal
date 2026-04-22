@@ -173,13 +173,25 @@ export async function calculateDirectorSalary(period: string): Promise<Calculate
       childrenCount: dir.children_count,
     }
 
-    // Calculate payroll gross for statutory lookups
+    // Opening advance balance (from prior confirmed/paid month, 0 if none).
+    // Engine offsets this against director's post-saving allowance share
+    // before the 75/25 split.
+    const { data: openingBalRaw } = await supabase.rpc('get_director_advance_opening_balance', {
+      p_director_id: dir.id,
+      p_period: periodNorm,
+    })
+    const openingAdvanceBalance = Number(openingBalRaw ?? 0)
+
+    // Provisional post-offset afterSaving for statutory lookup keys.
     const grossAmount = pool.totalPool * dirConfig.weightage / totalWeightage
     const savingAmount = grossAmount * savingRate
     const afterSaving = grossAmount - savingAmount
-    const payrollCalc = afterSaving * 0.75
+    const allowanceShare = afterSaving * pool.allowanceRatio
+    const advanceRepaidProvisional = Math.min(openingAdvanceBalance, allowanceShare)
+    const afterOffset = afterSaving - advanceRepaidProvisional
+    const payrollCalc = afterOffset * 0.75
     const payrollGross = Math.max(payrollCalc, dirConfig.minPayout)
-    const invoiceBase = afterSaving * 0.25
+    const invoiceBase = afterOffset * 0.25
 
     // Statutory lookups for 75% payroll (based on B+K wages)
     const payrollBkWages = payrollGross * pool.basicRatio
@@ -221,7 +233,8 @@ export async function calculateDirectorSalary(period: string): Promise<Calculate
 
     const payout = calculateDirectorPayout(
       dirConfig, pool, totalWeightage, savingRate,
-      payrollStat, invoiceStat, pcbAmount ?? 0
+      payrollStat, invoiceStat, pcbAmount ?? 0,
+      openingAdvanceBalance
     )
 
     totalSaving += payout.savingAmount
@@ -263,6 +276,9 @@ export async function calculateDirectorSalary(period: string): Promise<Calculate
       gross_amount: p.grossAmount,
       saving_amount: p.savingAmount,
       after_saving: p.afterSaving,
+      advance_opening_balance: p.advanceOpeningBalance,
+      advance_repaid: p.advanceRepaid,
+      advance_balance: p.advanceBalance,
       payroll_calc: p.payrollCalc,
       advance_amount: p.advanceAmount,
       payroll_gross: p.payrollGross,

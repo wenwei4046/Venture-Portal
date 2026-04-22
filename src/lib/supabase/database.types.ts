@@ -5,7 +5,6 @@ export type Json =
   | null
   | { [key: string]: Json | undefined }
   | Json[]
-
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
@@ -965,6 +964,7 @@ export type Database = {
         Row: {
           advance_amount: number
           advance_balance: number
+          advance_opening_balance: number
           advance_repaid: number
           after_saving: number | null
           calculation_snapshot: Json | null
@@ -1001,6 +1001,7 @@ export type Database = {
         Insert: {
           advance_amount?: number
           advance_balance?: number
+          advance_opening_balance?: number
           advance_repaid?: number
           after_saving?: number | null
           calculation_snapshot?: Json | null
@@ -1037,6 +1038,7 @@ export type Database = {
         Update: {
           advance_amount?: number
           advance_balance?: number
+          advance_opening_balance?: number
           advance_repaid?: number
           after_saving?: number | null
           calculation_snapshot?: Json | null
@@ -3839,6 +3841,7 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       dashboard_summary: { Args: never; Returns: Json }
+      dept_pool_gl_code: { Args: { p_dept_name: string }; Returns: string }
       format_invoice_no: { Args: { p_period: string }; Returns: string }
       generate_invoices_from_request: {
         Args: { p_request_id: string }
@@ -3885,6 +3888,10 @@ export type Database = {
           socso_er: number
           statutory_allowance: number
         }[]
+      }
+      get_director_advance_opening_balance: {
+        Args: { p_director_id: string; p_period: string }
+        Returns: number
       }
       get_director_ctc_by_company: {
         Args: { p_period_month: string }
@@ -4017,6 +4024,17 @@ export type Database = {
       }
       mark_matured_fund_sources: { Args: never; Returns: number }
       mint_invoice_no: { Args: { p_period: string }; Returns: string }
+      post_journal_entry: {
+        Args: {
+          p_created_by: string
+          p_description: string
+          p_lines: Json
+          p_reference_id: string
+          p_reference_type: string
+          p_transaction_date: string
+        }
+        Returns: string
+      }
       reject_dept_payment_request: {
         Args: { p_approval_id: string }
         Returns: undefined
@@ -4157,6 +4175,7 @@ export type Database = {
         | "other"
         | "receive_payment"
         | "payroll_bank_transfer"
+        | "loan_disbursement"
       payout_status: "draft" | "confirmed" | "paid"
       payroll_payment_request_status:
         | "submitted"
@@ -4182,11 +4201,8 @@ export type Database = {
     }
   }
 }
-
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-
 type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
-
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
@@ -4215,7 +4231,6 @@ export type Tables<
       ? R
       : never
     : never
-
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
@@ -4240,7 +4255,6 @@ export type TablesInsert<
       ? I
       : never
     : never
-
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
@@ -4265,7 +4279,6 @@ export type TablesUpdate<
       ? U
       : never
     : never
-
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
@@ -4282,7 +4295,6 @@ export type Enums<
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
-
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
@@ -4299,7 +4311,6 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-
 export const Constants = {
   public: {
     Enums: {
@@ -4413,6 +4424,7 @@ export const Constants = {
         "other",
         "receive_payment",
         "payroll_bank_transfer",
+        "loan_disbursement",
       ],
       payout_status: ["draft", "confirmed", "paid"],
       payroll_payment_request_status: [

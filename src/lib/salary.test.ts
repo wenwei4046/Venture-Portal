@@ -170,6 +170,77 @@ describe('salary.ts — calculateDirectorPayout', () => {
   })
 })
 
+describe('salary.ts — advance offset from allowance (Phase 3 spec)', () => {
+  const pool = calculatePool(testCTCRecords)
+  const totalWeightage = testDirectors.reduce((s, d) => s + d.weightage, 0)
+  const savingRate = 0.05
+  const stat: StatutoryLookup = {
+    epfEr: 1248, epfEe: 1144,
+    socsoEr: 104.15, socsoEe: 29.75,
+    eisEr: 9.90, eisEe: 9.90,
+  }
+  const invStat: StatutoryLookup = {
+    epfEr: 396, socsoEr: 53.35, eisEr: 6.10,
+    epfEe: 0, socsoEe: 0, eisEe: 0,
+  }
+
+  it('with 0 opening balance matches legacy behaviour', () => {
+    const payout = calculateDirectorPayout(
+      testDirectors[0], pool, totalWeightage, savingRate, stat, invStat, 0, 0
+    )
+    expect(payout.advanceRepaid).toBe(0)
+    expect(payout.advanceOpeningBalance).toBe(0)
+    expect(payout.advanceBalance).toBe(payout.advanceAmount)
+  })
+
+  it('repays fully from allowance when allowance >= balance', () => {
+    // Spec example: advance 6,000, allowance (post-saving) >= 6,000 → full repay
+    const openingBalance = 500  // small balance, well within WS allowance
+    const payout = calculateDirectorPayout(
+      testDirectors[2], pool, totalWeightage, savingRate, stat, invStat, 0, openingBalance
+    )
+    expect(payout.advanceRepaid).toBe(500)
+    expect(payout.advanceBalance).toBe(payout.advanceAmount) // opening - repaid = 0, plus any new top-up
+  })
+
+  it('caps repay at allowance share when balance > allowance', () => {
+    // Huge opening balance — only allowance share gets repaid this month
+    const pool2 = calculatePool(testCTCRecords)
+    const allowanceShare = Math.round(
+      Math.round(pool2.totalPool * 1.05 / 4.0 * 0.95 * 100) / 100 * pool2.allowanceRatio * 100
+    ) / 100
+    const payout = calculateDirectorPayout(
+      testDirectors[2], pool2, totalWeightage, savingRate, stat, invStat, 0, 999999
+    )
+    expect(payout.advanceRepaid).toBeCloseTo(allowanceShare, 0)
+    expect(payout.advanceBalance).toBeGreaterThan(0) // still owing next month
+  })
+
+  it('never touches basic+KPI when allowance < balance', () => {
+    const payout = calculateDirectorPayout(
+      testDirectors[0], pool, totalWeightage, savingRate, stat, invStat, 0, 999999
+    )
+    // Leftover after offset = basic+kpi share only (allowance fully consumed)
+    const allowanceShare = Math.round(payout.afterSaving * pool.allowanceRatio * 100) / 100
+    const bkShare = Math.round((payout.afterSaving - allowanceShare) * 100) / 100
+    // payroll_calc = bkShare × 75% (or bumped to min if below)
+    expect(payout.payrollCalc).toBeCloseTo(Math.round(bkShare * 0.75 * 100) / 100, 0)
+  })
+
+  it('offset can trigger new top-up when leftover falls below min (Q4 option i)', () => {
+    // WL gross is small enough that full offset pushes payroll_calc below min
+    const openingBalance = 10000
+    const payout = calculateDirectorPayout(
+      testDirectors[0], pool, totalWeightage, savingRate, stat, invStat, 0, openingBalance
+    )
+    // After offset + 75/25: payroll_calc may be < min → advance_amount > 0
+    // Closing balance = opening - repaid + new_top_up
+    const expectedBalance =
+      Math.round((openingBalance - payout.advanceRepaid + payout.advanceAmount) * 100) / 100
+    expect(payout.advanceBalance).toBe(expectedBalance)
+  })
+})
+
 describe('salary.ts — edge cases', () => {
   it('handles zero pool gracefully', () => {
     const pool = calculatePool([])
