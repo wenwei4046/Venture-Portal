@@ -30,22 +30,27 @@ export default async function InvoicePoolPage() {
 
   return (
     <div>
-      <div className="mb-10">
-        <h1 className="font-serif text-3xl text-ink">Invoice Payout Pool</h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          25% director invoice portion. <em>Isolated pool. Release requires Principal approval.</em>
-        </p>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> DIRECTOR · INVOICE POOL
+          </div>
+          <h1 className="page-title">Invoice Payout Pool</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            25% director invoice portion. <em>Isolated pool. Release requires Principal approval.</em>
+          </p>
+        </div>
       </div>
 
       {/* Hero balance */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
         <div className="lg:col-span-7">
           <div className="font-serif italic text-accent text-base mb-1">Pool Balance</div>
-          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
+          <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
             {formatMoney(balance)}
           </div>
-          <div className="font-mono text-xs text-muted mt-2">
-            {(transactions?.length ?? 0)} transactions · not used for lending
+          <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
+            {(transactions?.length ?? 0)} TRANSACTIONS · NOT USED FOR LENDING
           </div>
         </div>
         <div className="lg:col-span-5 flex items-start justify-end">

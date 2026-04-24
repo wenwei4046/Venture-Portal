@@ -38,12 +38,17 @@ export default async function AuditLogPage({ searchParams }: Props) {
 
   return (
     <div>
-      <div className="mb-10">
-        <h1 className="font-serif text-3xl text-ink">Access Audit Log</h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          Tracks who viewed sensitive salary and director data.{' '}
-          <em>LHDN + internal governance compliance.</em>
-        </p>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> ADMIN · ACCESS AUDIT
+          </div>
+          <h1 className="page-title">Access Audit Log</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            Tracks who viewed sensitive salary and director data.{' '}
+            <em>LHDN + internal governance compliance.</em>
+          </p>
+        </div>
       </div>
 
       {/* Filter */}
@@ -81,41 +86,41 @@ export default async function AuditLogPage({ searchParams }: Props) {
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="ledger-table">
             <thead>
-              <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                <th className="text-left py-3 pr-4 font-medium">When</th>
-                <th className="text-left py-3 pr-4 font-medium">User</th>
-                <th className="text-left py-3 pr-4 font-medium">Role</th>
-                <th className="text-left py-3 pr-4 font-medium">Resource</th>
-                <th className="text-left py-3 pr-4 font-medium">Action</th>
-                <th className="text-left py-3 font-medium">Details</th>
+              <tr>
+                <th>When</th>
+                <th>User</th>
+                <th>Role</th>
+                <th>Resource</th>
+                <th>Action</th>
+                <th>Details</th>
               </tr>
             </thead>
             <tbody>
               {logs.map((log) => (
-                <tr key={log.id} className="border-b border-hairline last:border-0">
-                  <td className="py-3 pr-4 font-mono text-xs text-muted whitespace-nowrap">
+                <tr key={log.id}>
+                  <td className="font-mono text-[11px] text-graphite whitespace-nowrap">
                     {dayjs(log.created_at).format('D MMM YY HH:mm')}
                   </td>
-                  <td className="py-3 pr-4 font-serif text-md text-ink">
+                  <td className="font-serif text-[15px] text-ink">
                     {log.user_email ?? '—'}
                   </td>
-                  <td className="py-3 pr-4">
+                  <td>
                     <span className="font-serif italic text-graphite text-sm">
                       {log.user_role ?? '—'}
                     </span>
                   </td>
-                  <td className="py-3 pr-4 font-mono text-xs text-ink">
+                  <td className="font-mono text-[12px] text-ink">
                     {formatResource(log.resource_type)}
                     {log.resource_id ? (
-                      <span className="text-muted ml-1">#{log.resource_id.slice(0, 8)}</span>
+                      <span className="text-graphite ml-1">#{log.resource_id.slice(0, 8)}</span>
                     ) : null}
                   </td>
-                  <td className="py-3 pr-4 font-serif italic text-sm text-graphite">
+                  <td className="font-serif italic text-sm text-graphite">
                     {log.action}
                   </td>
-                  <td className="py-3 font-mono text-xs text-muted max-w-[200px] truncate">
+                  <td className="font-mono text-[11px] text-graphite max-w-[200px] truncate">
                     {log.metadata && Object.keys(log.metadata as object).length > 0
                       ? JSON.stringify(log.metadata)
                       : '—'}

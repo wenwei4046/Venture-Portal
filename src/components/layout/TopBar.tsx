@@ -36,14 +36,14 @@ export default function TopBar({ user, onMenuClick }: TopBarProps) {
   const displayName = user.name || getRoleLabel(user.role)
 
   return (
-    <div className="h-[60px] bg-paper border-b border-hairline px-4 md:px-8 flex items-center md:items-baseline justify-between shrink-0 gap-3">
-      <div className="flex items-center md:items-baseline gap-3 min-w-0">
+    <div className="h-[60px] bg-paper border-b border-hairline px-4 md:px-8 flex items-baseline justify-between shrink-0 gap-3">
+      <div className="flex items-baseline gap-3 min-w-0">
         {/* Hamburger — mobile only */}
         {onMenuClick ? (
           <button
             type="button"
             onClick={onMenuClick}
-            className="md:hidden text-graphite hover:text-ink p-1 -ml-1"
+            className="md:hidden text-graphite hover:text-ink p-1 -ml-1 self-center"
             aria-label="Open navigation"
           >
             <svg
@@ -62,19 +62,25 @@ export default function TopBar({ user, onMenuClick }: TopBarProps) {
             </svg>
           </button>
         ) : null}
-        <div className="font-serif text-[15px] text-graphite truncate">
+        <div className="font-serif text-[18px] md:text-[20px] text-ink truncate leading-none">
           {greeting}, <span className="italic text-accent">{displayName}</span>.
         </div>
       </div>
 
-      <div className="flex items-center gap-4 md:gap-6 shrink-0">
-        <div className="hidden sm:block font-mono text-xs text-muted">
-          {dateLabel} · {quarter}
+      <div className="flex items-baseline gap-4 md:gap-5 shrink-0">
+        <div className="hidden sm:flex items-baseline gap-3 font-mono text-[11px] text-muted tracking-[0.02em]">
+          <span className="inline-flex items-baseline gap-1.5 font-serif italic text-[13.5px] text-graphite">
+            <span aria-hidden className="w-[5px] h-[5px] rounded-full bg-ledger inline-block translate-y-[-2px]" />
+            {getRoleLabel(user.role)}
+          </span>
+          <span>{dateLabel}</span>
+          <span className="text-muted/70">·</span>
+          <span>{quarter}</span>
         </div>
         <ThemeToggle />
         <button
           onClick={handleSignOut}
-          className="text-xs text-muted hover:text-accent font-sans transition-colors"
+          className="font-sans text-[11px] text-muted hover:text-accent transition-colors uppercase tracking-[0.1em]"
           aria-label="Sign out"
         >
           Sign out

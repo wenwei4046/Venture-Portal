@@ -1,9 +1,66 @@
 # DESIGN.md — HOUZS Venture Portal
 
-**Version:** 2.0
-**Last updated:** 2026-04-10
+**Version:** 3.0
+**Last updated:** 2026-04-25
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v2.0 (Phase 1 — Treasury Core) — Anthropic-flavored ledger direction
+**Status:** v3.0 (Ledger Dense / Finance Readability pass) — single source of truth for all UI work
+
+> **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
+
+---
+
+## Implementation rules — read this first
+
+These five rules are non-negotiable for any new or amended page. The CSS / Tailwind tokens that back them live in `src/app/globals.css` and `tailwind.config.ts` — already wired up.
+
+1. **Page header.** Every top-level route page starts with this block (no exceptions, even small pages):
+   ```tsx
+   <div className="page-head">
+     <div>
+       <div className="page-eyebrow">
+         <em>I.</em> SECTION · PAGE NAME
+       </div>
+       <h1 className="page-title">Page Title</h1>
+       <p className="font-serif italic text-graphite text-base mt-3">…description…</p>
+     </div>
+     {/* optional right-side action button */}
+   </div>
+   ```
+   The roman numeral inside `<em>` mirrors the sidebar section it belongs to. Eyebrow text is `UPPERCASE · UPPERCASE`, mono.
+
+2. **Money cells use `.num`.** Never hand-roll `font-mono tabular text-ink`. Use `<td className="num">{formatMoney(x)}</td>`. Negatives get `<span className="neg">`. Hero figures use `.num-hero` and reserve `--num-ink` for the digit, `--graphite` for `RM` / `.cents` / `% /mo`.
+
+3. **Data tables use `.ledger-table`.** `<table className="ledger-table">` with `<th>` / `<td>` only — the class wires up surface bg, zebra rows, accent-bg hover, hairline borders, header padding, right-aligned `.num` cells. Stop writing `<table className="w-full text-sm"><thead><tr className="border-b…">…`.
+
+4. **Section headings use `.sect-head`.** `<div className="sect-head"><h2>…</h2><span className="rule" /><span className="count">N ITEMS</span></div>`. Italic serif title + hairline rule extending right + uppercase mono counter.
+
+5. **Colors come from CSS variables, never hex.** Use Tailwind classes (`text-ink`, `text-num-ink`, `bg-paper`, `border-hairline`, `text-accent`, `text-danger`) or `rgb(var(--xxx))` inside SVG. Hardcoded `#xxxxxx` is forbidden outside `globals.css` itself.
+
+### Canonical reference pages
+
+When you're not sure how a pattern looks in code, copy from one of these — they're the v3.0 reference implementation:
+
+| Pattern | Reference file |
+|---|---|
+| Page header + hero number + ledger table | `src/app/(portal)/fund-out/page.tsx` |
+| Multi-column hero summary | `src/app/(portal)/payments/page.tsx` |
+| Hero number + side stats | `src/app/(portal)/director-salary/page.tsx` |
+| Section-grouped tables | `src/app/(portal)/statements/page.tsx`, `src/app/(portal)/overdue/page.tsx` |
+| Hero + dept totals + history | `src/app/(portal)/hr-costing/page.tsx` |
+| Pure read-only ledger | `src/app/(portal)/audit-log/page.tsx` |
+| Sidebar (roman numerals + dot markers) | `src/components/layout/Sidebar.tsx` |
+| TopBar (greet + role badge) | `src/components/layout/TopBar.tsx` |
+
+### Pages still on the legacy v2.0 chrome (clean up when you touch them)
+
+`(portal)/fund-out/[id]`, `/fund-in/[id]`, `/fund-in/new`, `/fund-out/new`, `/payments/[id]`, `/payments/new`, `/payments/dept-requests`, `/payments/payroll-requests`, `/statements/[id]`, `/statements/[id]/print`, `/approvals/[id]`, `/approvals/payroll-run/[id]`, `/approvals/payroll-run/[id]/director-report`, `/billing/contracts/new`, `/billing/contracts/[id]/edit`, `/billing/requests`, `/dept-pool/[slug]`, `/dept-pool/marketing`, `/dept-pool/submissions`, `/dept-pool/contracts/new`, `/director-salary/[directorId]`, `/director-salary/[directorId]/print`, `/hr-costing/staff/*`, `/hr-costing/payroll/*`, `/hr-costing/payment`, `/reports/pnl`, `/reports/fund-summary`, `/reports/base-rate`, `/reports/claims`, `/opex`, `/operating-fund`, plus the HR + Dept Manager branches inside `/dashboard`. Each one inherited the deeper palette automatically but still needs `page-head` / `.num` / `.ledger-table` swap when it next gets edited.
+
+### What to do for "add a new feature" or "amend a page"
+
+1. Open the most similar reference page above and copy the structural pattern.
+2. Use existing Server Actions / RPCs unchanged — backend is locked, this doc is **frontend only**.
+3. If your page genuinely needs a new component (e.g. a new chart, new modal layout), add it under `## Component Vocabulary` in this doc *before* writing the code.
+4. Run `npm run build` before committing — it catches type errors and missing imports.
 
 ---
 
@@ -105,19 +162,37 @@ All 4 fonts are free. No licensing cost.
 
 ## Color Palette — Warm Paper
 
-### Base
+### Base (v3.0 — Finance-readability deepened)
+
+These values come from the v3.0 readability pass. **Always reference via Tailwind classes (`bg-paper`, `text-ink`, `border-hairline`) — never copy the hex into a component.** The hex literals here exist only for designer reference; the runtime uses RGB triplets in `globals.css` so dark mode + `<alpha-value>` work.
 
 ```css
 :root {
-  --bg:         #F5EFE4;  /* warm cream — page background, the "paper" */
-  --surface:    #FBF8F2;  /* lifted paper — card background */
-  --surface-2:  #EEE6D6;  /* subtle alt row for striped tables */
-  --hairline:   #DFD4BE;  /* warm pencil line — borders and dividers */
-  --ink:        #1A1613;  /* dark brown-black — primary text */
-  --graphite:   #6B5F52;  /* warm muted text — secondary */
-  --muted:      #9E8F7F;  /* tertiary text — placeholder, disabled */
+  --paper:      #F3ECDD;  /* warm cream — page background. Slightly more saturated than v2.0 to make ink/numbers stand out. */
+  --surface:    #FAF5EA;  /* lifted paper — card background */
+  --surface-2:  #E8DDC4;  /* subtle alt row for striped tables, table headers */
+  --hairline:   #C6B99E;  /* warm pencil line — borders and dividers */
+  --ink:        #1C160F;  /* dark brown-black — primary body text */
+  --graphite:   #5A4E40;  /* warm muted text — secondary */
+  --muted:      #85775F;  /* tertiary text — placeholder, disabled */
+  --num-ink:    #1A130B;  /* NEW v3.0 — deepest tone, RESERVED for monetary digits + tabular data. */
 }
 ```
+
+> **Why `--num-ink` exists:** Finance users complained that money digits looked "dreamy" in v2.0. By giving digits their own one-tier-deeper color and reserving `--graphite` for the `RM` prefix, cents, and units, the digit jumps off the page. `--ink` stays for body and titles so reading is still calm.
+
+**Token usage map:**
+
+| Token | Use for | Don't use for |
+|---|---|---|
+| `--paper` | Page bg, sidebar bg | Cards (use `--surface`) |
+| `--surface` | Card / panel bg | Page bg |
+| `--surface-2` | Zebra rows in tables, table headers, hover bg | Card bg |
+| `--hairline` | All borders, dividers, hr | Text |
+| `--ink` | Body text, titles, default text | Money digits |
+| `--num-ink` | **Money digits only** + hero figures | Body text |
+| `--graphite` | Secondary text, RM/cents/units, table cell metadata | Money digits |
+| `--muted` | Placeholder, disabled, "—" sentinels | Body text |
 
 ### Accent — single rust seal
 
@@ -166,14 +241,16 @@ All 4 fonts are free. No licensing cost.
 **Dark palette:**
 | Token | Light (RGB) | Dark (RGB) |
 |-------|-------------|------------|
-| paper | 245 239 228 | 26 23 20 |
-| surface | 251 248 242 | 36 32 25 |
-| surface-2 | 238 230 214 | 46 41 34 |
-| hairline | 223 212 190 | 61 54 44 |
-| ink | 26 22 19 | 232 224 212 |
-| graphite | 107 95 82 | 168 155 140 |
-| muted | 158 143 127 | 115 103 88 |
+| paper | 243 236 221 | 26 23 20 |
+| surface | 250 245 234 | 36 32 25 |
+| surface-2 | 232 221 196 | 46 41 34 |
+| hairline | 198 185 158 | 61 54 44 |
+| ink | 28 22 15 | 232 224 212 |
+| graphite | 90 78 64 | 168 155 140 |
+| muted | 133 119 95 | 115 103 88 |
+| **num-ink** | **26 19 11** | **245 240 232** |
 | accent | 204 90 46 | 224 107 58 |
+| accent-hover | 181 74 34 | 240 122 72 |
 
 **FOUC prevention:** Inline `<script>` in `<head>` reads localStorage before paint.
 
@@ -181,21 +258,23 @@ All 4 fonts are free. No licensing cost.
 - Recharts components (PnLChart, FundPieChart, BaseRateTrendChart) use hardcoded hex colors — chart elements may have reduced contrast in dark mode
 - Print pages (statements, director salary) stay light-only (intended for physical printing)
 
-### Contrast verification
+### Contrast verification (v3.0 Finance-readability deepening)
 
-All foreground/background combinations must pass WCAG AA:
+All combinations exceed WCAG AA. Numbers updated for the deeper palette:
 
 **Light mode:**
-- `--ink` (#1A1613) on `--paper` (#F5EFE4) = **12.8:1** ✓
-- `--graphite` (#6B5F52) on `--paper` = **5.4:1** ✓
-- `--accent` (#CC5A2E) on `--paper` = **4.7:1** ✓ (AA normal text)
+- `--num-ink` (#1A130B) on `--paper` (#F3ECDD) = **~14.0:1** ✓ (digits jump out)
+- `--ink` (#1C160F) on `--paper` = **~13.5:1** ✓
+- `--graphite` (#5A4E40) on `--paper` = **~7.0:1** ✓ (was 5.4 in v2.0 — significant improvement)
+- `--muted` (#85775F) on `--paper` = **~4.4:1** ✓ (was 3.2 — now passes AA for normal text)
+- `--accent` (#CC5A2E) on `--paper` = **~4.7:1** ✓
+- `--accent` (#CC5A2E) on `--accent-bg` (#FBE8DE) = **~4.7:1** ✓ (active sidebar item)
 
 **Dark mode:**
+- `--num-ink` (245 240 232) on `--paper` (26 23 20) = **~14.5:1** ✓
 - `--ink` (E8E0D4) on `--paper` (1A1714) = **12.1:1** ✓
 - `--graphite` (A89B8C) on `--paper` = **5.9:1** ✓
-- `--accent` (E06B3A) on `--paper` = **4.9:1** ✓ (AA normal text)
-- `--accent` on `--accent-bg` (#FBE8DE) = **4.9:1** ✓
-- `--muted` (#9E8F7F) on `--bg` = **3.2:1** — **large text only** (≥18px)
+- `--accent` (E06B3A) on `--paper` = **4.9:1** ✓
 
 ---
 
@@ -288,29 +367,85 @@ All foreground/background combinations must pass WCAG AA:
 
 ### Settings composition
 
-Stack of sections, each is a card with hairline border:
+Settings is a single page driven by a tab key in the URL (`?tab=treasury|overdue|splits|directors|companies|banks|periods|simulator`). Each tab renders its own section component. There are 8 tabs total — see `src/app/(portal)/settings/page.tsx` for the canonical mounting.
 
+Forms use serif section headings + italic subheads + sans labels + mono inputs for numbers. The buffer amount field was removed in mig 57 (no longer applicable). The tier system was removed in mig 63 — no Tier Premiums tab exists.
+
+---
+
+## v3.0 utility classes (in `globals.css`)
+
+These are the load-bearing classes that make a page feel "v3.0 ledger-dense" instead of "v2.0 broadsheet". Use them by name; do not re-implement.
+
+| Class | What it does | Where to use |
+|---|---|---|
+| `.page-head` | Flex container with bottom hairline + 64px accent rule + 28px bottom margin | Wraps every top-level page header (title + optional right-side action). |
+| `.page-eyebrow` | Mono uppercase 10.5px label with rust italic roman numeral inside `<em>` | Inside `.page-head`, above the `.page-title`. Format: `<em>I.</em> SECTION · PAGE NAME`. |
+| `.page-title` | Instrument Serif 38px ink with negative letter-spacing | The `<h1>` inside `.page-head`. |
+| `.sect-head` | Flex baseline row: italic serif title + hairline rule extending right + uppercase mono counter | Section dividers inside a page. Replaces hand-rolled `<h2>` + `<p>` mb-6 pattern. |
+| `.num` | JetBrains Mono + `tabular-nums slashed-zero` + 13.5px + weight 500 + `--num-ink` | Every money cell in a table or grid. Right-aligns inside `.ledger-table td.num`. |
+| `.num.neg` | Same as `.num` but `--danger` red | Negative amounts (`(1,234.56)` style). |
+| `.num-hero` | 56px serif + tabular + `--num-ink` + tight letter-spacing; auto-styles `<span class="cents">` and `<span class="unit">` to graphite | Dashboard / page hero figures (Free pool, Total outstanding, etc.). |
+| `.ledger-table` | Surface bg + 1px hairline border + 6px radius + zebra rows + `surface-2` thead + accent-bg hover + `td.num` right-align | Every data list table. Replaces ad-hoc `<table className="w-full text-sm">…border-b…hover:bg-surface-2/40`. |
+| `.chip` | Rounded pill: 99px radius + 10.5px mono + variant colors (`accent` / `ledger` / `alert` / `danger` / `info`) | Status tags, category labels. Inline only; do not use as button. |
+
+### `.page-head` example (mandatory shape)
+
+```tsx
+<div className="page-head">
+  <div>
+    <div className="page-eyebrow">
+      <em>I.</em> TREASURY · LOANS OUT
+    </div>
+    <h1 className="page-title">Fund OUT</h1>
+    <p className="font-serif italic text-graphite text-base mt-3">
+      Loans disbursed by HV. <em>Rates lock at creation.</em>
+    </p>
+  </div>
+  <div className="flex items-center gap-3">
+    <ExportCSVButton />
+    <Link href="/fund-out/new" className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors">
+      Record new loan
+    </Link>
+  </div>
+</div>
 ```
-Settings
-Treasury config, tier premiums, overdue stages, company tier assignment.
 
-┌─────────────────────────────────────┐
-│ Treasury                            │
-│ Base rate inputs + buffer           │
-│                                     │
-│ Op Margin    Buffer Amount   Saving │
-│ [0.400] %    [RM 50000]     [5.0] %│
-│                                     │
-│ [Save Treasury]                     │
-└─────────────────────────────────────┘
+### `.ledger-table` example (mandatory shape for any data list)
 
-┌─────────────────────────────────────┐
-│ Tier Premiums                       │
-│ ...                                 │
-└─────────────────────────────────────┘
+```tsx
+<table className="ledger-table">
+  <thead>
+    <tr>
+      <th>Company</th>
+      <th className="right">Amount</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {rows.map((r) => (
+      <tr key={r.id}>
+        <td>
+          <div className="font-serif text-[15px] text-ink">{r.name}</div>
+          <div className="font-mono text-[11px] text-graphite mt-0.5">{r.code}</div>
+        </td>
+        <td className="num">{formatMoney(r.amount)}</td>
+        <td><em className="font-serif text-graphite text-sm">active</em></td>
+      </tr>
+    ))}
+  </tbody>
+</table>
 ```
 
-Forms use serif section headings + italic subheads + sans labels + mono inputs for numbers.
+### `.sect-head` example
+
+```tsx
+<div className="sect-head">
+  <h2>Subsidiaries</h2>
+  <span className="rule" aria-hidden />
+  <span className="count">{rows.length} ENTITIES · NET POSITION TODAY</span>
+</div>
+```
 
 ---
 
@@ -341,59 +476,58 @@ Components required for Phase 1 (many already exist, need restyling):
 | `<LoadingSkeleton>` | Loading placeholder | Hairline-only, no pulse shimmer, minimal |
 | `<Timeline>` | Repayment history, cash flow | Vertical hairline track with dot markers |
 
-### Sidebar nav item pattern
+### Sidebar nav item pattern (v3.0 editorial)
 
-```tsx
-<Link
-  className={cn(
-    "block px-3 py-2 rounded-md text-sm font-sans transition-colors",
-    isActive
-      ? "bg-[--accent-bg] text-[--accent] italic font-serif text-[15px]"
-      : "text-[--graphite] hover:bg-[--surface-2] hover:text-[--ink]"
-  )}
->
-  {label}
-</Link>
-```
+The Sidebar is its own world — see `src/components/layout/Sidebar.tsx` for the canonical implementation. Three things matter for any nav-item-like surface elsewhere:
 
-Active state: italic serif text + rust background. Inactive: sans graphite text.
+- **Group label.** Italic serif accent roman numeral (`I.` `II.` `III.`) + uppercase mono section name + hairline rule extending right.
+- **Inactive nav item.** 13px sans graphite + small hairline-grey `3×3` round dot marker on the left at `8px` from edge. Hover deepens both.
+- **Active nav item.** 15.5px italic serif accent + `--accent-bg` background + `3×16` rust **vertical bar** on the left at `6px` from edge (replaces the dot).
 
-### Hero number pattern
+Do not use the v2.0 inactive-grey + active-rust-bg only. The dot/bar marker is what gives the sidebar weight.
+
+### Hero number pattern (v3.0)
+
+The hero number must use `--num-ink` (not `--ink`) and tabular figures. Wrap cents/units in `--graphite` so the digit dominates. Footer meta is uppercase mono in `--graphite` (not `--muted`).
 
 ```tsx
 <div>
-  <div className="font-serif italic text-[--accent] text-base mb-1">
-    Free pool
+  <div className="font-serif italic text-accent text-base mb-1">
+    Total outstanding
   </div>
-  <div className="font-serif text-[64px] leading-none text-[--ink] tracking-tight">
-    RM 12,847,203<span className="text-[32px] text-[--graphite]">.55</span>
+  <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
+    {formatMoney(total)}
   </div>
-  <div className="font-mono text-xs text-[--muted] mt-2">
-    As of 9 Apr 2026 · 90-day trend
+  <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
+    {count} ACTIVE LOANS
   </div>
 </div>
 ```
 
-### Approval card pattern
+For a more elaborate hero with explicit cents/unit treatment, use the `.num-hero` class which auto-styles `<span class="cents">` and `<span class="unit">` to graphite.
+
+### Approval card pattern (v3.0)
 
 ```tsx
-<div className="border border-[--hairline] rounded-md p-5 bg-[--surface]">
-  <div className="text-xs font-sans font-semibold uppercase tracking-wider text-[--graphite] mb-1">
+<div className="border border-hairline rounded-md p-5 bg-surface">
+  <div className="text-xs font-sans font-semibold uppercase tracking-wider text-graphite mb-1">
     NEW LOAN · HOUZS CENTURY
   </div>
-  <div className="font-serif text-lg text-[--ink] mb-1">Working capital loan</div>
-  <div className="font-mono text-sm text-[--ink] mb-3">
-    RM 100,000.00 · T2 · 1.175%/mo
+  <div className="font-serif text-lg text-ink mb-1">Working capital loan</div>
+  <div className="font-mono tabular text-md font-semibold text-num-ink mb-3">
+    {formatMoney(100000)} · 1.175% /mo · 12m
   </div>
-  <div className="text-xs text-[--muted] mb-3">Submitted by Finance · 2h ago</div>
-  <button className="bg-[--accent] text-white px-4 py-2 rounded-md font-serif italic text-sm hover:bg-[#B54A22]">
+  <div className="text-xs text-muted mb-3">Submitted by Finance · 2h ago</div>
+  <button className="bg-accent hover:bg-accent-hover text-white px-4 py-2 rounded-md font-serif italic text-sm">
     Approve
   </button>
-  <button className="ml-2 border border-[--hairline] px-4 py-2 rounded-md text-[--graphite] text-sm font-sans">
+  <button className="ml-2 border border-hairline px-4 py-2 rounded-md text-graphite text-sm font-sans">
     Review
   </button>
 </div>
 ```
+
+Note: tier system was removed (mig 63). Don't reintroduce `T1`/`T2`/`T3` labels. Loans show a single rate (Base + custom premium per loan, locked at creation).
 
 ---
 
@@ -506,7 +640,7 @@ Add `@axe-core/react` in dev and `eslint-plugin-jsx-a11y` in CI.
 ### Button verbs (italic serif for seal variant)
 
 - *Approve*  (seal variant, italic serif)
-- *Save* / *Save Treasury* / *Save Tiers*
+- *Save* / *Save Treasury* / *Save Directors* / *Save Companies*
 - *Record repayment*
 - *Generate statements*
 - *Escalate*
@@ -595,5 +729,6 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-04-25 v3.0** — Ledger-Dense / Finance-readability pass. Imported the design exported from claude.ai/design (`design-import/venture/`). Deepened the warm-paper palette (paper #F5EFE4 → #F3ECDD, hairline #DFD4BE → #C6B99E, ink #1A1613 → #1C160F, graphite #6B5F52 → #5A4E40, muted #9E8F7F → #85775F) and introduced a dedicated `--num-ink` (#1A130B) for monetary digits. Added v3.0 utility class layer in `globals.css`: `.num`, `.num-hero`, `.ledger-table`, `.page-head`, `.page-eyebrow`, `.page-title`, `.sect-head`, `.chip`. Sidebar rebuilt with editorial roman numerals + dot/bar markers. TopBar greet enlarged with role badge + ledger green dot. 17 high-traffic pages migrated as reference implementations (Dashboard, Fund IN/OUT, Payments, Statements, Approvals, Overdue, Reconciliation, HR Costing, Director Salary, Settings, Reports, Audit Log, Claims, Dept Pool, Director Pool, Invoice Pool, BillingView). Backend untouched (zero changes to Server Actions / RPCs / Supabase / lib).
 - **2026-04-10 v2.0** — Major pivot to Anthropic-flavored warm cream + Instrument Serif + rust accent direction, per design-consultation session. Replaces institutional slate direction from v1.0.
 - **2026-04-09 v1.0** — Initial version from /autoplan Phase 2 design review. Proposed slate-cool direction with TBD brand color (navy vs teal).

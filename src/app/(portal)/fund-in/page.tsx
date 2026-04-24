@@ -100,10 +100,13 @@ export default async function FundInPage({ searchParams }: Props) {
   return (
     <div>
       {/* ───────── Header ───────── */}
-      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10">
+      <div className="page-head">
         <div>
-          <h1 className="font-serif text-3xl text-ink">Fund IN</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
+          <div className="page-eyebrow">
+            <em>I.</em> TREASURY · CAPITAL IN
+          </div>
+          <h1 className="page-title">Fund IN</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
             Capital borrowed from subsidiaries, directors, department pools, and director savings.
           </p>
         </div>
@@ -121,7 +124,7 @@ export default async function FundInPage({ searchParams }: Props) {
           <div className="font-serif italic text-accent text-base mb-1">
             Total paid capital
           </div>
-          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
+          <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
             {totalPaid > 0 ? (
               <>
                 RM {formatMoney(totalPaid).replace('RM ', '').replace(/\.\d{2}$/, '')}
@@ -135,8 +138,8 @@ export default async function FundInPage({ searchParams }: Props) {
               </>
             )}
           </div>
-          <div className="font-mono text-xs text-muted mt-2">
-            {counts.active} active · {counts.matured} matured · {counts.repaid} repaid · {counts.cancelled} cancelled
+          <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
+            {counts.active} ACTIVE · {counts.matured} MATURED · {counts.repaid} REPAID · {counts.cancelled} CANCELLED
           </div>
         </div>
 
@@ -144,7 +147,7 @@ export default async function FundInPage({ searchParams }: Props) {
           <div className="font-serif italic text-accent text-base mb-1">
             Weighted average cost
           </div>
-          <div className="font-serif text-3xl text-ink">
+          <div className="font-serif text-3xl text-num-ink tabular">
             {totalPaid > 0 ? (
               <>
                 {(weightedCost * 100).toFixed(3)}
@@ -168,10 +171,11 @@ export default async function FundInPage({ searchParams }: Props) {
         <EmptyState />
       ) : (
         <section>
-          <h2 className="font-serif text-2xl text-ink mb-1">Fund sources</h2>
-          <p className="font-serif italic text-graphite text-sm mb-6">
-            {filtered.length} {tab === 'all' ? 'total' : tab} source{filtered.length === 1 ? '' : 's'}
-          </p>
+          <div className="sect-head">
+            <h2>Fund sources</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">{filtered.length} {tab === 'all' ? 'TOTAL' : tab.toUpperCase()}</span>
+          </div>
 
           <Suspense fallback={null}>
             <FundSourceTabs />
@@ -185,17 +189,17 @@ export default async function FundInPage({ searchParams }: Props) {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="ledger-table">
                 <thead>
-                  <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                    <th className="text-left py-3 pr-4 font-medium">Type</th>
-                    <th className="text-left py-3 pr-4 font-medium">From</th>
-                    <th className="text-right py-3 pr-4 font-medium">Amount</th>
-                    <th className="text-right py-3 pr-4 font-medium">Rate</th>
-                    <th className="text-right py-3 pr-4 font-medium">Lock-in</th>
-                    <th className="text-right py-3 pr-4 font-medium">Maturity</th>
-                    <th className="text-left py-3 pr-4 font-medium">Status</th>
-                    <th className="py-3 text-right"></th>
+                  <tr>
+                    <th>Type</th>
+                    <th>From</th>
+                    <th className="right">Amount</th>
+                    <th className="right">Rate</th>
+                    <th className="right">Lock-in</th>
+                    <th className="right">Maturity</th>
+                    <th>Status</th>
+                    <th className="right"></th>
                   </tr>
                 </thead>
                 <tbody className="row-stagger">
@@ -203,32 +207,31 @@ export default async function FundInPage({ searchParams }: Props) {
                     <tr
                       key={source.id}
                       style={{ '--i': i } as React.CSSProperties}
-                      className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors"
                     >
-                      <td className="py-4 pr-4 font-serif italic text-graphite">
+                      <td className="font-serif italic text-graphite">
                         {SOURCE_TYPE_LABELS[source.source_type] ?? source.source_type}
                       </td>
-                      <td className="py-4 pr-4 font-serif text-md text-ink">
+                      <td className="font-serif text-[15px] text-ink">
                         {getFromLabel(source)}
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
+                      <td className="num">
                         {formatMoney(Number(source.amount))}
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
+                      <td className="num">
                         {(Number(source.cost_rate) * 100).toFixed(3)}%
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
-                        {source.lock_in_months ? `${source.lock_in_months} mo` : '—'}
+                      <td className="num">
+                        {source.lock_in_months ? `${source.lock_in_months} mo` : <span className="text-muted">—</span>}
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
+                      <td className="num">
                         {source.maturity_date
                           ? dayjs(source.maturity_date).format('D MMM YYYY')
-                          : '—'}
+                          : <span className="text-muted">—</span>}
                       </td>
-                      <td className="py-4 pr-4">
+                      <td>
                         <StatusLabel status={source.status} maturityDate={source.maturity_date} />
                       </td>
-                      <td className="py-4 text-right">
+                      <td className="right">
                         <Link
                           href={`/fund-in/${source.id}`}
                           className="text-sm text-accent hover:text-accent-hover font-serif italic"

@@ -8,14 +8,17 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* Color — warm paper (RGB triplets for Tailwind opacity support) */
-  --paper: 245 239 228;
-  --surface: 251 248 242;
-  --surface-2: 238 230 214;
-  --hairline: 223 212 190;
-  --ink: 26 22 19;
-  --graphite: 107 95 82;
-  --muted: 158 143 127;
+  /* Color — warm paper, deepened per Finance-readability pass (RGB triplets for Tailwind opacity support) */
+  --paper: 243 236 221;
+  --surface: 250 245 234;
+  --surface-2: 232 221 196;
+  --hairline: 198 185 158;
+  --ink: 28 22 15;
+  --graphite: 90 78 64;
+  --muted: 133 119 95;
+
+  /* Numbers — deepest tone, reserved for monetary values + tabular data */
+  --num-ink: 26 19 11;
 
   /* Accent — single rust seal */
   --accent: 204 90 46;
@@ -44,6 +47,9 @@
   --graphite: 168 155 140;
   --muted: 115 103 88;
 
+  /* Numbers — brightest paper tone for max contrast on dark bg */
+  --num-ink: 245 240 232;
+
   --accent: 224 107 58;
   --accent-bg: 61 37 23;
   --accent-border: 139 90 58;
@@ -69,6 +75,8 @@
     --ink: 232 224 212;
     --graphite: 168 155 140;
     --muted: 115 103 88;
+
+    --num-ink: 245 240 232;
 
     --accent: 224 107 58;
     --accent-bg: 61 37 23;
@@ -329,3 +337,156 @@ select:focus {
   outline: none;
   transition: border-color 200ms ease-out, box-shadow 200ms ease-out;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Readability layer — Finance-pass tokens
+   Pull money + tabular figures forward; push decoration back.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Money / tabular numbers — the highest-priority pixels on every screen */
+.num,
+.num-hero {
+  font-family: var(--font-mono), 'JetBrains Mono', Menlo, monospace;
+  font-variant-numeric: tabular-nums slashed-zero;
+  color: rgb(var(--num-ink));
+  letter-spacing: 0;
+}
+.num { font-weight: 500; font-size: 13.5px; }
+.num-hero { font-weight: 400; font-size: 56px; line-height: 0.95; letter-spacing: -0.01em; }
+.num.neg, .num-hero.neg { color: rgb(var(--danger)); }
+/* Decoration (RM, %, /mo, cents) sits one tier back so the digit jumps */
+.num .unit, .num .cents, .num-hero .unit, .num-hero .cents { color: rgb(var(--graphite)); font-weight: 400; }
+.num-hero .cents { font-size: 28px; }
+.num-hero .unit  { font-size: 22px; }
+
+/* Ledger table — surface panel + zebra + accent hover. Opt-in via class. */
+table.ledger-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgb(var(--surface));
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 13.5px;
+}
+table.ledger-table thead th {
+  text-align: left;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgb(var(--graphite));
+  font-weight: 600;
+  padding: 13px 16px;
+  background: rgb(var(--surface-2));
+  border-bottom: 1px solid rgb(var(--hairline));
+}
+table.ledger-table thead th.right { text-align: right; }
+table.ledger-table tbody tr { border-bottom: 1px solid rgb(var(--hairline)); }
+table.ledger-table tbody tr:last-child { border-bottom: 0; }
+table.ledger-table tbody tr:nth-child(even) { background: rgb(var(--surface-2) / 0.35); }
+table.ledger-table tbody tr:hover { background: rgb(var(--accent-bg)); }
+table.ledger-table td {
+  padding: 14px 16px;
+  vertical-align: baseline;
+  color: rgb(var(--ink));
+}
+table.ledger-table td.num,
+table.ledger-table td.right { text-align: right; }
+
+/* Page header — eyebrow + accent rule under the title (newspaper editorial) */
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgb(var(--hairline));
+  position: relative;
+}
+.page-head::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 64px;
+  height: 2px;
+  background: rgb(var(--accent));
+}
+.page-eyebrow {
+  font-family: var(--font-mono), 'JetBrains Mono', Menlo, monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: rgb(var(--graphite));
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.page-eyebrow em {
+  color: rgb(var(--accent));
+  font-family: var(--font-serif), 'Instrument Serif', Georgia, serif;
+  font-style: italic;
+  font-size: 14px;
+  text-transform: none;
+  letter-spacing: 0.01em;
+}
+.page-title {
+  font-family: var(--font-serif), 'Instrument Serif', Georgia, serif;
+  font-size: 38px;
+  line-height: 1;
+  margin: 0;
+  color: rgb(var(--ink));
+  letter-spacing: -0.012em;
+}
+
+/* Section head — italic serif title + hairline rule extending right */
+.sect-head {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.sect-head h2 {
+  font-family: var(--font-serif), 'Instrument Serif', Georgia, serif;
+  font-weight: 400;
+  font-size: 22px;
+  color: rgb(var(--ink));
+  margin: 0;
+  flex-shrink: 0;
+}
+.sect-head .rule {
+  flex: 1;
+  height: 1px;
+  background: rgb(var(--hairline));
+  transform: translateY(-5px);
+}
+.sect-head .count {
+  flex-shrink: 0;
+  font-family: var(--font-mono), 'JetBrains Mono', Menlo, monospace;
+  font-size: 11px;
+  color: rgb(var(--muted));
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Chip — small tag for status / category */
+.chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-family: var(--font-mono), 'JetBrains Mono', Menlo, monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  background: rgb(var(--surface-2));
+  color: rgb(var(--graphite));
+  border: 1px solid rgb(var(--hairline));
+}
+.chip.accent { background: rgb(var(--accent-bg)); color: rgb(var(--accent)); border-color: rgb(var(--accent-border)); }
+.chip.ledger { background: rgb(var(--ledger-bg)); color: rgb(var(--ledger)); border-color: rgb(var(--ledger) / 0.4); }
+.chip.alert  { background: rgb(var(--alert-bg));  color: rgb(var(--alert));  border-color: rgb(var(--alert) / 0.4); }
+.chip.danger { background: rgb(var(--danger-bg)); color: rgb(var(--danger)); border-color: rgb(var(--danger) / 0.4); }
+.chip.info   { background: rgb(var(--info-bg));   color: rgb(var(--info));   border-color: rgb(var(--info) / 0.4); }

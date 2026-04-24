@@ -65,10 +65,13 @@ export default async function FundOutPage() {
   return (
     <div>
       {/* ───────── Header ───────── */}
-      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10">
+      <div className="page-head">
         <div>
-          <h1 className="font-serif text-3xl text-ink">Fund OUT</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
+          <div className="page-eyebrow">
+            <em>I.</em> TREASURY · LOANS OUT
+          </div>
+          <h1 className="page-title">Fund OUT</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
             Loans disbursed by HV to subsidiaries.{' '}
             <em>Rates lock at creation, never change.</em>
           </p>
@@ -90,7 +93,7 @@ export default async function FundOutPage() {
           <div className="font-serif italic text-accent text-base mb-1">
             Total outstanding
           </div>
-          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
+          <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
             {totalOutstanding > 0 ? (
               formatMoney(totalOutstanding)
             ) : (
@@ -99,9 +102,9 @@ export default async function FundOutPage() {
               </>
             )}
           </div>
-          <div className="font-mono text-xs text-muted mt-2">
-            {active.length} active {active.length === 1 ? 'loan' : 'loans'}
-            {pending.length > 0 ? ` · ${pending.length} pending approval` : ''}
+          <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
+            {active.length} ACTIVE {active.length === 1 ? 'LOAN' : 'LOANS'}
+            {pending.length > 0 ? ` · ${pending.length} PENDING APPROVAL` : ''}
           </div>
         </div>
 
@@ -109,7 +112,7 @@ export default async function FundOutPage() {
           <div className="font-serif italic text-accent text-base mb-1">
             Weighted effective rate
           </div>
-          <div className="font-serif text-3xl text-ink">
+          <div className="font-serif text-3xl text-num-ink tabular">
             {weightedRate > 0 ? (
               <>
                 {(weightedRate * 100).toFixed(3)}
@@ -120,8 +123,8 @@ export default async function FundOutPage() {
             )}
           </div>
           {monthlyInterest > 0 ? (
-            <p className="font-mono text-xs text-muted mt-2">
-              Monthly interest income{' '}
+            <p className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
+              MONTHLY INTEREST INCOME{' '}
               <span className="text-ledger">{formatMoney(monthlyInterest)}</span>
             </p>
           ) : null}
@@ -133,21 +136,22 @@ export default async function FundOutPage() {
         <EmptyState />
       ) : (
         <section>
-          <h2 className="font-serif text-2xl text-ink mb-1">Loans</h2>
-          <p className="font-serif italic text-graphite text-sm mb-6">
-            Sorted by creation date, <em>most recent first</em>
-          </p>
+          <div className="sect-head">
+            <h2>Loans</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">{loanList.length} TOTAL · MOST RECENT FIRST</span>
+          </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="ledger-table">
               <thead>
-                <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                  <th className="text-left py-3 pr-4 font-medium">Company</th>
-                  <th className="text-right py-3 pr-4 font-medium">Principal</th>
-                  <th className="text-right py-3 pr-4 font-medium">Outstanding</th>
-                  <th className="text-right py-3 pr-4 font-medium">Rate</th>
-                  <th className="text-left py-3 pr-4 font-medium">Status</th>
-                  <th className="py-3 text-right"></th>
+                <tr>
+                  <th>Company</th>
+                  <th className="right">Principal</th>
+                  <th className="right">Outstanding</th>
+                  <th className="right">Rate</th>
+                  <th>Status</th>
+                  <th className="right"></th>
                 </tr>
               </thead>
               <tbody className="row-stagger">
@@ -159,29 +163,28 @@ export default async function FundOutPage() {
                     <tr
                       key={loan.id}
                       style={{ '--i': i } as React.CSSProperties}
-                      className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors"
                     >
-                      <td className="py-4 pr-4">
-                        <div className="font-serif text-md text-ink">
+                      <td>
+                        <div className="font-serif text-[15px] text-ink">
                           {company?.name ?? '—'}
                         </div>
-                        <div className="font-mono text-xs text-muted">
+                        <div className="font-mono text-[11px] text-graphite mt-0.5">
                           {company?.code ?? ''} · {dayjs(loan.created_at).format('D MMM YYYY')}
                         </div>
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
+                      <td className="num">
                         {formatMoney(Number(loan.principal))}
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
-                        {loan.status === 'active' ? formatMoney(outstanding) : '—'}
+                      <td className="num">
+                        {loan.status === 'active' ? formatMoney(outstanding) : <span className="text-muted">—</span>}
                       </td>
-                      <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
+                      <td className="num">
                         {(Number(loan.effective_rate) * 100).toFixed(3)}%
                       </td>
-                      <td className="py-4 pr-4">
+                      <td>
                         <LoanStatusLabel status={loan.status} />
                       </td>
-                      <td className="py-4 text-right">
+                      <td className="right">
                         <Link
                           href={`/fund-out/${loan.id}`}
                           className="text-sm text-accent hover:text-accent-hover font-serif italic"

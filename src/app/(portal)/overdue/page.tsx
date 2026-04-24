@@ -62,10 +62,13 @@ export default async function OverduePage() {
   return (
     <div>
       {/* ───────── Header ───────── */}
-      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10">
+      <div className="page-head">
         <div>
-          <h1 className="font-serif text-3xl text-ink">Overdue &amp; Netting</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
+          <div className="page-eyebrow">
+            <em>I.</em> TREASURY · OVERDUE &amp; NETTING
+          </div>
+          <h1 className="page-title">Overdue &amp; Netting</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
             Loans past grace period. <em>Penalty accrues per stage until escalated.</em>
           </p>
         </div>
@@ -78,7 +81,7 @@ export default async function OverduePage() {
           <div className="font-serif italic text-accent text-base mb-1">
             Penalty outstanding
           </div>
-          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
+          <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
             {totalPenalty > 0 ? (
               formatMoney(totalPenalty)
             ) : (
@@ -87,8 +90,8 @@ export default async function OverduePage() {
               </>
             )}
           </div>
-          <div className="font-mono text-xs text-muted mt-2">
-            {active.length} pending {active.length === 1 ? 'record' : 'records'}
+          <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
+            {active.length} PENDING {active.length === 1 ? 'RECORD' : 'RECORDS'}
           </div>
         </div>
 
@@ -117,25 +120,22 @@ export default async function OverduePage() {
       ) : (
         activePeriods.map((period) => (
           <section key={period} className="mb-12">
-            <h2 className="font-serif text-2xl text-ink mb-1">
-              {dayjs(period).format('MMMM YYYY')}
-            </h2>
-            <p className="font-serif italic text-graphite text-sm mb-6">
-              {activeByPeriod.get(period)!.length}{' '}
-              {activeByPeriod.get(period)!.length === 1 ? 'loan' : 'loans'} with unpaid
-              interest for this period
-            </p>
+            <div className="sect-head">
+              <h2>{dayjs(period).format('MMMM YYYY')}</h2>
+              <span className="rule" aria-hidden />
+              <span className="count">{activeByPeriod.get(period)!.length} {activeByPeriod.get(period)!.length === 1 ? 'LOAN' : 'LOANS'} · UNPAID INTEREST</span>
+            </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="ledger-table">
                 <thead>
-                  <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                    <th className="text-left py-3 pr-4 font-medium">Company</th>
-                    <th className="text-right py-3 pr-4 font-medium">Outstanding</th>
-                    <th className="text-right py-3 pr-4 font-medium">Days past</th>
-                    <th className="text-left py-3 pr-4 font-medium">Status</th>
-                    <th className="text-right py-3 pr-4 font-medium">Penalty</th>
-                    <th className="py-3 text-right"></th>
+                  <tr>
+                    <th>Company</th>
+                    <th className="right">Outstanding</th>
+                    <th className="right">Days past</th>
+                    <th>Status</th>
+                    <th className="right">Penalty</th>
+                    <th className="right"></th>
                   </tr>
                 </thead>
                 <tbody className="row-stagger">
@@ -148,23 +148,22 @@ export default async function OverduePage() {
                       <tr
                         key={row.id}
                         style={{ '--i': i } as React.CSSProperties}
-                        className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors"
                       >
-                        <td className="py-4 pr-4">
-                          <div className="font-serif text-md text-ink">
+                        <td>
+                          <div className="font-serif text-[15px] text-ink">
                             {company?.name ?? '—'}
                           </div>
-                          <div className="font-mono text-xs text-muted">
+                          <div className="font-mono text-[11px] text-graphite mt-0.5">
                             {company?.code ?? ''}
                           </div>
                         </td>
-                        <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
+                        <td className="num">
                           {formatMoney(outstanding)}
                         </td>
-                        <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">
+                        <td className="num">
                           {row.overdue_days}d
                         </td>
-                        <td className="py-4 pr-4">
+                        <td>
                           <OverdueBadge
                             id={row.id}
                             label={hasLegacyStage ? stageLabel(row.overdue_stage!) : 'overdue'}
@@ -173,10 +172,10 @@ export default async function OverduePage() {
                               : 'text-danger text-sm'}
                           />
                         </td>
-                        <td className="py-4 pr-4 text-right font-mono tabular font-medium text-danger">
+                        <td className="num neg">
                           {formatMoney(Number(row.penalty_amount ?? 0))}
                         </td>
-                        <td className="py-4 text-right">
+                        <td className="right">
                           {canFinanceAct ? (
                             <div className="flex items-center justify-end gap-3">
                               {row.overdue_stage === 'escalation' ? (

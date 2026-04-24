@@ -816,7 +816,7 @@ export default async function DashboardPage() {
           <div className="font-serif italic text-accent text-base mb-1">
             Venture Pool
           </div>
-          <div className="font-serif text-[44px] md:text-hero text-ink leading-none mb-3">
+          <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none mb-3 tabular tracking-[-0.01em]">
             {hasAnyData ? (
               <span className={(summary.hv_fund_balance ?? 0) < 0 ? 'text-danger' : ''}>
                 {formatMoney(summary.hv_fund_balance ?? 0)}
@@ -844,7 +844,7 @@ export default async function DashboardPage() {
                 <path
                   d="M 0 30 L 40 28 L 80 32 L 120 25 L 160 22 L 200 20 L 240 24 L 280 18 L 320 15 L 360 17 L 400 12 L 440 14 L 480 10 L 520 13 L 560 8 L 600 6"
                   fill="none"
-                  stroke="#1A1613"
+                  stroke="rgb(var(--ink))"
                   strokeWidth="1.25"
                   vectorEffect="non-scaling-stroke"
                 />
@@ -853,7 +853,7 @@ export default async function DashboardPage() {
                   y1="40"
                   x2="600"
                   y2="40"
-                  stroke="#DFD4BE"
+                  stroke="rgb(var(--hairline))"
                   strokeWidth="0.5"
                   strokeDasharray="3,3"
                 />
@@ -864,7 +864,7 @@ export default async function DashboardPage() {
                 y1="40"
                 x2="600"
                 y2="40"
-                stroke="#DFD4BE"
+                stroke="rgb(var(--hairline))"
                 strokeWidth="1"
                 strokeDasharray="3,3"
               />
@@ -1174,55 +1174,53 @@ export default async function DashboardPage() {
 
       {/* ───────── Subsidiaries ───────── */}
       <section className="mb-16">
-        <h2 className="font-serif text-2xl text-ink mb-1">Subsidiaries</h2>
-        <p className="font-serif italic text-graphite text-sm mb-6">
-          {subsidiaries.length} entities, <em>net position as of this morning</em>
-        </p>
+        <div className="sect-head">
+          <h2>Subsidiaries</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">{subsidiaries.length} ENTITIES · NET POSITION TODAY</span>
+        </div>
 
         {subsidiaries.length === 0 ? (
-          <div className="py-10 text-center border-t border-hairline">
+          <div className="py-10 text-center border border-hairline rounded-md bg-surface">
             <p className="font-serif italic text-muted text-base">
               No companies configured. Visit Settings to add subsidiaries.
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="ledger-table">
               <thead>
-                <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                  <th className="text-left py-3 pr-4 font-medium">Company</th>
-                  <th className="text-right py-3 pr-4 font-medium">Savings</th>
-                  <th className="text-right py-3 pr-4 font-medium">Loans</th>
-                  <th className="text-right py-3 pr-4 font-medium">Net</th>
-                  <th className="text-left py-3 pr-4 font-medium">Position</th>
+                <tr>
+                  <th>Company</th>
+                  <th className="right">Savings</th>
+                  <th className="right">Loans</th>
+                  <th className="right">Net</th>
+                  <th>Position</th>
                 </tr>
               </thead>
               <tbody>
                 {subsidiaries.map((sub) => (
-                  <tr
-                    key={sub.id}
-                    className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors"
-                  >
-                    <td className="py-4 pr-4">
-                      <div className="font-serif text-md text-ink">{sub.name}</div>
-                      <div className="font-mono text-xs text-muted">
+                  <tr key={sub.id}>
+                    <td>
+                      <div className="font-serif text-[15px] text-ink">{sub.name}</div>
+                      <div className="font-mono text-[11px] text-graphite mt-0.5">
                         {sub.short_code}
                         {sub.has_overdue ? (
                           <span className="text-danger"> · overdue</span>
                         ) : null}
                       </div>
                     </td>
-                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
+                    <td className="num">
                       {sub.savings_deposited > 0
                         ? formatMoney(sub.savings_deposited)
-                        : '—'}
+                        : <span className="text-muted">—</span>}
                     </td>
-                    <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
+                    <td className="num">
                       {sub.loans_outstanding > 0
                         ? formatMoney(sub.loans_outstanding)
-                        : '—'}
+                        : <span className="text-muted">—</span>}
                     </td>
-                    <td className="py-4 pr-4 text-right font-mono tabular">
+                    <td className="num">
                       {sub.net_position === 0 ? (
                         <span className="text-muted">—</span>
                       ) : sub.net_position > 0 ? (
@@ -1230,12 +1228,12 @@ export default async function DashboardPage() {
                           +{formatMoneyBare(sub.net_position)}
                         </span>
                       ) : (
-                        <span className="text-danger font-semibold">
+                        <span className="text-danger font-semibold neg">
                           {formatMoneyBare(sub.net_position)}
                         </span>
                       )}
                     </td>
-                    <td className="py-4 pr-4">
+                    <td>
                       <PositionLabel position={sub.position} />
                     </td>
                   </tr>

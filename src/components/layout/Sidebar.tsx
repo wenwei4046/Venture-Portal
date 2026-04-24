@@ -181,28 +181,35 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname])
 
+  // Roman numeral counter for labeled sections only (skip the unlabeled overview).
+  const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII']
+  let romanIdx = 0
+
   return (
     <aside
       className={
-        // Desktop (md+): static 220px column, always visible.
-        // Mobile: fixed-position drawer, slides in from the left when mobileOpen.
-        `w-[240px] shrink-0 bg-paper border-r border-hairline flex flex-col h-full ` +
+        `w-[240px] shrink-0 border-r border-hairline flex flex-col h-full ` +
         `fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-out ` +
         (mobileOpen ? 'translate-x-0' : '-translate-x-full') +
         ` md:relative md:translate-x-0 md:transition-none md:w-[220px] md:z-auto`
       }
+      style={{
+        background:
+          'linear-gradient(180deg, rgb(var(--surface-2) / 0.55) 0%, rgb(var(--paper)) 180px)',
+      }}
       aria-label="Main navigation"
     >
       {/* Brand mark */}
-      <div className="px-6 pt-7 pb-5 border-b border-hairline flex items-start justify-between">
+      <div className="px-6 pt-7 pb-5 flex items-start justify-between relative">
         <div>
-          <div className="font-serif text-[24px] leading-[1.1] text-ink">
+          <div className="font-serif text-[30px] leading-none tracking-[-0.015em] text-ink">
             HOUZS
             <br />
-            <span className="italic text-accent">Venture</span>
+            <span className="italic text-ink">Venture</span>
+            <span className="text-accent ml-1">·</span>
           </div>
-          <p className="text-[11px] text-muted mt-1.5 tracking-wider">
-            INTERNAL LEDGER · 内部账册
+          <p className="font-serif italic text-[12.5px] text-graphite mt-1 tracking-[0.01em]">
+            INTERNAL LEDGER · <span className="text-accent not-italic font-sans tracking-wider text-[10.5px]">内部账册</span>
           </p>
         </div>
         {/* Close button — mobile only */}
@@ -216,91 +223,144 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
             ×
           </button>
         ) : null}
+        {/* Gradient underline — ink fading to transparent */}
+        <span
+          aria-hidden
+          className="absolute left-6 right-6 bottom-0 h-px"
+          style={{
+            background:
+              'linear-gradient(90deg, rgb(var(--ink)) 0%, rgb(var(--hairline)) 40%, transparent 100%)',
+          }}
+        />
       </div>
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto">
-        {sections.map((section) => (
-          <div key={section.label ?? '__top'}>
-            {section.label ? (
-              <div className="px-3 pt-5 pb-1.5 text-[10px] uppercase tracking-widest text-graphite font-sans font-medium">
-                {section.label}
-              </div>
-            ) : null}
-            {section.entries.map((entry) => {
-              if (isGroup(entry)) {
-                const groupActive = entry.children.some(
-                  (c) => pathname === c.href || pathname.startsWith(c.href + '/')
-                )
-                const isOpen = !!groupOpen[entry.label]
-                return (
-                  <div key={entry.label}>
-                    <button
-                      type="button"
-                      onClick={() => toggleGroup(entry.label)}
-                      className={
-                        groupActive && !isOpen
-                          ? 'w-full flex items-center justify-between px-3 py-2 mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[15px]'
-                          : 'w-full flex items-center justify-between px-3 py-2 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-sm font-sans'
-                      }
-                    >
-                      {entry.label}
-                      <span className={`text-[10px] transition-transform ${isOpen ? 'rotate-180' : ''}`}>
-                        ▼
-                      </span>
-                    </button>
-                    {isOpen ? (
-                      <div className="ml-3 border-l border-hairline pl-2">
-                        {entry.children
-                          .filter((c) => c.visible(role))
-                          .map((child) => {
-                            const active = child.exact
-                              ? pathname === child.href
-                              : pathname === child.href || pathname.startsWith(child.href + '/')
-                            return (
-                              <Link
-                                key={child.href}
-                                href={child.href}
-                                className={
-                                  active
-                                    ? 'nav-link block px-3 py-1.5 mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[14px]'
-                                    : 'nav-link block px-3 py-1.5 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-[13px] font-sans'
-                                }
-                              >
-                                {child.label}
-                              </Link>
-                            )
-                          })}
-                      </div>
-                    ) : null}
-                  </div>
-                )
-              }
+        {sections.map((section, sectionIndex) => {
+          const roman = section.label ? ROMAN[romanIdx++] : null
+          return (
+            <div
+              key={section.label ?? '__top'}
+              className={sectionIndex === 0 ? 'mt-1' : 'mt-5'}
+            >
+              {section.label ? (
+                <div className="flex items-baseline gap-2 px-3 pt-1 pb-2">
+                  <span className="font-serif italic text-[11px] text-accent tracking-[0.02em]">
+                    {roman}.
+                  </span>
+                  <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted">
+                    {section.label}
+                  </span>
+                  <span
+                    aria-hidden
+                    className="flex-1 h-px bg-hairline -translate-y-[3px]"
+                  />
+                </div>
+              ) : null}
+              {section.entries.map((entry) => {
+                if (isGroup(entry)) {
+                  const groupActive = entry.children.some(
+                    (c) =>
+                      pathname === c.href || pathname.startsWith(c.href + '/')
+                  )
+                  const isOpen = !!groupOpen[entry.label]
+                  return (
+                    <div key={entry.label}>
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(entry.label)}
+                        className={
+                          groupActive && !isOpen
+                            ? 'nav-link relative w-full flex items-center justify-between pl-[18px] pr-3 py-[7px] mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[15.5px]'
+                            : 'nav-link relative w-full flex items-center justify-between pl-[18px] pr-3 py-1.5 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-[13px] font-sans tracking-[0.005em]'
+                        }
+                      >
+                        <span
+                          aria-hidden
+                          className={
+                            groupActive && !isOpen
+                              ? 'absolute left-[6px] top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-sm bg-accent'
+                              : 'absolute left-[8px] top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full bg-muted opacity-40'
+                          }
+                        />
+                        {entry.label}
+                        <span
+                          className={`text-[10px] transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                        >
+                          ▼
+                        </span>
+                      </button>
+                      {isOpen ? (
+                        <div className="ml-3 border-l border-hairline pl-2">
+                          {entry.children
+                            .filter((c) => c.visible(role))
+                            .map((child) => {
+                              const active = child.exact
+                                ? pathname === child.href
+                                : pathname === child.href ||
+                                  pathname.startsWith(child.href + '/')
+                              return (
+                                <Link
+                                  key={child.href}
+                                  href={child.href}
+                                  className={
+                                    active
+                                      ? 'nav-link relative block pl-[18px] pr-3 py-[5px] mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[14px]'
+                                      : 'nav-link relative block pl-[18px] pr-3 py-1 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-[12.5px] font-sans tracking-[0.005em]'
+                                  }
+                                >
+                                  <span
+                                    aria-hidden
+                                    className={
+                                      active
+                                        ? 'absolute left-[6px] top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-sm bg-accent'
+                                        : 'absolute left-[8px] top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full bg-muted opacity-40'
+                                    }
+                                  />
+                                  {child.label}
+                                </Link>
+                              )
+                            })}
+                        </div>
+                      ) : null}
+                    </div>
+                  )
+                }
 
-              const item = entry as NavItem
-              const active =
-                pathname === item.href || pathname.startsWith(item.href + '/')
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={
-                    active
-                      ? 'nav-link block px-3 py-2 mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[15px]'
-                      : 'nav-link block px-3 py-2 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-sm font-sans'
-                  }
-                >
-                  {item.label}
-                </Link>
-              )
-            })}
-          </div>
-        ))}
+                const item = entry as NavItem
+                const active =
+                  pathname === item.href ||
+                  pathname.startsWith(item.href + '/')
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={
+                      active
+                        ? 'nav-link relative block pl-[18px] pr-3 py-[7px] mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[15.5px]'
+                        : 'nav-link relative block pl-[18px] pr-3 py-1.5 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-[13px] font-sans tracking-[0.005em]'
+                    }
+                  >
+                    <span
+                      aria-hidden
+                      className={
+                        active
+                          ? 'absolute left-[6px] top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-sm bg-accent'
+                          : 'absolute left-[8px] top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full bg-muted opacity-40'
+                      }
+                    />
+                    {item.label}
+                  </Link>
+                )
+              })}
+            </div>
+          )
+        })}
       </nav>
 
       {/* Footer */}
       <div className="px-6 py-4 border-t border-hairline">
-        <p className="text-[11px] text-muted font-mono">
+        <p className="text-[11px] text-muted font-mono leading-relaxed">
           HV Portal v0.3
           <br />
           Phase 3 Shipped

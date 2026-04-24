@@ -38,7 +38,7 @@ src/
 │   │   ├── director-salary/         (Phase 3)
 │   │   ├── hr-costing/              (Phase 3)
 │   │   ├── reports/                 (Phase 3)
-│   │   └── settings/                ← 4 tabs: treasury / tier / overdue / company
+│   │   └── settings/                ← 8 tabs: treasury / overdue / splits / directors / companies / banks / periods / simulator
 │   └── (no api/ folder — uses Server Actions, not Route Handlers)
 ├── components/
 │   └── layout/                     ← Sidebar, TopBar
@@ -50,8 +50,7 @@ src/
 │   │   └── database.types.ts       ← Generated from Supabase
 │   ├── auth.ts                     ← requireAuth / requireRole helpers
 │   ├── roles.ts                    ← canAccess* helpers for sidebar visibility
-│   ├── tier.ts                     ← TIER_ORDER + computeDowngradedTier (M3 regression)
-│   └── utils.ts                    ← formatMoney / formatDate
+│   └── utils.ts                    ← formatMoney / formatDate / cn / dayjs helpers
 ├── test/
 │   └── setup.ts                    ← Vitest + jest-dom matcher setup
 ├── types/
@@ -69,7 +68,7 @@ scripts/
 ├── check-dashboard.mjs             ← dashboard_summary() RPC smoke test
 └── migrate-emails.mjs              ← @houzs.my → @venture.my domain migration
 docs/
-├── DESIGN.md                       ← Design system v2.0 (Anthropic-flavored direction)
+├── DESIGN.md                       ← Design system v3.0 (Ledger-Dense / single source of truth for ALL UI)
 ├── db-schema.md                    ← Database schema reference (32 tables)
 ├── access-matrix.md                ← Role permissions reference
 ├── module-spec-phase1.md           ← ✅ Shipped: Dashboard, Fund IN/OUT, Overdue, Statements
@@ -85,7 +84,7 @@ access-matrix.md — 4 roles × 9 modules, RLS patterns, data visibility
 module-spec-phase1.md — Dashboard, Fund IN, Fund OUT, Overdue & Netting
 module-spec-phase2.md — Dept Pool, Service Billing (5 modes)
 module-spec-phase3.md — Director Salary Engine, HR Costing, Reports
-DESIGN.md — v2.0 Anthropic-flavored design system (colors, typography, components)
+DESIGN.md — v3.0 Ledger-Dense design system. **Single source of truth for all UI.** Colors, typography, components, page anatomy, the v3.0 utility classes (`.num`, `.ledger-table`, `.page-head`, etc), and canonical reference pages.
 ALWAYS reference these docs before implementing any feature.
 
 Other project docs (at repo root):
@@ -100,7 +99,7 @@ Dept Manager	`dept_manager`	Own department only
 Key Business Rules
 Treasury
 Subsidiaries deposit savings in HV at negotiated rates (per-deal, not fixed)
-HV lends to subsidiaries at Base Rate + Tier Risk Premium
+HV lends to subsidiaries at Base Rate + per-loan custom premium (set at creation, locked for the loan's life). Tier system was removed mig 63 — no T1/T2/T3 labels anywhere.
 Base Rate = Weighted Avg Cost of Paid Capital + Op Margin (quarterly, Principal approves)
 Loan rate locked at creation, never changes
 Free pool priority when lending (tracked via Dashboard, not separate allocation)
@@ -171,8 +170,26 @@ Director salary: test with the two datasets provided in specs (verify against ca
 RLS: test each role can only access what Access Matrix allows — see `docs/access-matrix.md`
 See `TESTING.md` at repo root for full layer descriptions + how to add new tests.
 Do NOT
-Do not hardcode any rates (interest, tier premium, penalty, saving %) — all from Settings/DB
+Do not hardcode any rates (interest, custom premium, penalty, saving %) — all from Settings/DB
 Do not skip RLS — every table must have policies matching Access Matrix
 Do not let Finance access hr_staff_costs or director_payouts detail — use aggregate views
 Do not use localStorage for auth — use Supabase Auth sessions
 Do not create separate apps — single Next.js app, role-based routing
+Do not invent parallel design docs (no `DESIGN-v2.md`, `STYLE.md`, `UI-NOTES.md`, etc) — DESIGN.md is the single source of truth, extend it in place
+Do not hardcode hex colors in components — use Tailwind tokens (`text-ink`, `bg-paper`, `text-num-ink`, `border-hairline`, `text-accent`, `text-danger`) backed by CSS vars in `globals.css`
+
+UI Conventions (v3.0 — enforced)
+**Read `docs/DESIGN.md` first before adding or amending any UI.** It contains the v3.0 implementation rules + utility class catalog + canonical reference pages.
+
+Five non-negotiable rules every new/amended page must follow:
+1. **Page header** — wrap top of page in `<div className="page-head">` containing `<div className="page-eyebrow"><em>I.</em> SECTION · NAME</div>` + `<h1 className="page-title">…</h1>`. Right side may hold an action button.
+2. **Money cells use `.num`** — `<td className="num">{formatMoney(x)}</td>`. Negatives get `<span className="neg">`. Hero figures use `text-num-ink` + `tabular` + `tracking-[-0.01em]`.
+3. **Data tables use `.ledger-table`** — `<table className="ledger-table">` with bare `<th>` / `<td>`. Class wires up surface bg, zebra rows, hover, hairline borders, padding, and right-aligned `.num`. Stop hand-rolling `<table className="w-full text-sm">…border-b…hover:bg-…`.
+4. **Section headings use `.sect-head`** — italic serif title + hairline rule extending right + uppercase mono counter. See `src/app/(portal)/statements/page.tsx` for the canonical pattern.
+5. **Colors via CSS variables only** — no hex outside `globals.css`. Use `text-ink` / `text-num-ink` / `text-graphite` / `bg-paper` / `bg-surface` / `border-hairline` / `text-accent` / `text-danger` / `text-ledger` / `text-alert` / `text-info`.
+
+Canonical reference pages (copy these patterns when in doubt):
+- Page header + hero number + ledger table → `src/app/(portal)/fund-out/page.tsx`
+- Multi-column hero summary → `src/app/(portal)/payments/page.tsx`
+- Section-grouped tables → `src/app/(portal)/statements/page.tsx`, `src/app/(portal)/overdue/page.tsx`
+- Sidebar (roman numerals + dot/bar markers) → `src/components/layout/Sidebar.tsx`

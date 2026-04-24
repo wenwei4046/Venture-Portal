@@ -1,0 +1,908 @@
+<!doctype html>
+<html lang="en-MY">
+<head>
+<meta charset="utf-8" />
+<title>Venture · Finance · All Tabs</title>
+<meta name="viewport" content="width=1440" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+TC:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="portals/tabs-shared.css">
+<script src="portals/data.js"></script>
+</head>
+<body>
+
+<nav class="pagebar" id="pagebar">
+  <span class="label">Finance tabs</span>
+</nav>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="wordmark">HOUZS</div>
+      <div class="tag">Venture <em>— Finance</em></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label"><span class="rom">I.</span><span>Daily</span><span class="rule"></span></div>
+      <div class="nav" id="nav-daily"></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label"><span class="rom">II.</span><span>Loans</span><span class="rule"></span></div>
+      <div class="nav" id="nav-loans"></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label"><span class="rom">III.</span><span>Billing</span><span class="rule"></span></div>
+      <div class="nav" id="nav-billing"></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label"><span class="rom">IV.</span><span>Directors</span><span class="rule"></span></div>
+      <div class="nav" id="nav-directors"></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label"><span class="rom">V.</span><span>Reconcile</span><span class="rule"></span></div>
+      <div class="nav" id="nav-reconcile"></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label"><span class="rom">VI.</span><span>Admin</span><span class="rule"></span></div>
+      <div class="nav" id="nav-admin"></div>
+    </div>
+  </aside>
+
+  <section class="main">
+    <div class="topbar">
+      <div class="greet">Good morning, <em>Finance</em>.</div>
+      <div class="topmeta">
+        <span>Wed 22 Apr 2026</span>
+        <span>· period <em style="font-family:'Instrument Serif',serif">Apr 2026</em></span>
+        <span class="user"><span class="dot"></span>Tan Y.L. · Finance Lead</span>
+      </div>
+    </div>
+    <div class="content" id="content"></div>
+  </section>
+</div>
+
+<script>
+const NAV = [
+  {group:'daily',     id:'dashboard',    label:'Dashboard'},
+  {group:'daily',     id:'inbox',        label:'Inbox', count:4},
+  {group:'daily',     id:'vouchers',     label:'Vouchers'},
+  {group:'loans',     id:'fundin',       label:'Fund IN'},
+  {group:'loans',     id:'fundout',      label:'Fund OUT'},
+  {group:'loans',     id:'overdue',      label:'Overdue', count:2},
+  {group:'billing',   id:'statements',   label:'Statements'},
+  {group:'billing',   id:'invoices',     label:'Invoices'},
+  {group:'billing',   id:'payroll',      label:'Payroll'},
+  {group:'directors', id:'dsalaryBatch', label:'Director Salary', count:1},
+  {group:'directors', id:'dpool',        label:'Director Pool'},
+  {group:'reconcile', id:'recon',        label:'Reconciliation'},
+  {group:'reconcile', id:'gl',           label:'General Ledger'},
+  {group:'admin',     id:'claims',       label:'Claims'},
+  {group:'admin',     id:'reports',      label:'Reports'},
+];
+const GROUP_EL = {daily:'nav-daily',loans:'nav-loans',billing:'nav-billing',directors:'nav-directors',reconcile:'nav-reconcile',admin:'nav-admin'};
+
+function renderNav(active){
+  NAV.forEach(n=>{
+    const host = document.getElementById(GROUP_EL[n.group]);
+    if(!host) return;
+    const a = document.createElement('a');
+    a.href='#'+n.id;
+    a.dataset.id=n.id;
+    a.className = (n.id===active)?'active':'';
+    a.innerHTML = `<span>${n.label}</span>${n.count?`<span class="count">${n.count}</span>`:''}`;
+    a.onclick=(e)=>{e.preventDefault();goto(n.id)};
+    host.appendChild(a);
+  });
+}
+function updateActiveNav(id){
+  document.querySelectorAll('.sidebar .nav a').forEach(a=>a.classList.toggle('active', a.dataset.id===id));
+  document.querySelectorAll('#pagebar button').forEach(b=>b.classList.toggle('on', b.dataset.id===id));
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on', s.id==='scr-'+id));
+  try{localStorage.setItem('vp.finance.page', id)}catch(e){}
+  window.scrollTo({top:0,behavior:'instant'});
+}
+function goto(id){updateActiveNav(id)}
+
+function renderPageBar(){
+  const bar = document.getElementById('pagebar');
+  NAV.forEach(n=>{
+    const b=document.createElement('button');
+    b.textContent=n.label;
+    b.dataset.id=n.id;
+    b.onclick=()=>goto(n.id);
+    bar.appendChild(b);
+  });
+}
+
+/* Shared data layer — see portals/data.js. All shape docs live there. */
+/* RM, bigRM, SUBS, DIRECTORS, DIRECTOR_SALARY_INPUTS, DSAL_POOL, DSAL_SPLIT, DSAL_ROWS, POOL_LEDGER, CLAIMS globals. */
+
+/* ───────────── SCREENS ───────────── */
+
+function screen_dashboard(){
+  const total = SUBS.reduce((s,x)=>s+x.outstanding,0);
+  return `
+<div class="page-head">
+  <div><h1 class="page">Finance Dashboard</h1><p class="page-sub">The bookkeeper's morning view. <em>As of Wed 22 Apr 2026.</em></p></div>
+  <div class="row"><button class="btn-ghost">Export snapshot</button><button class="btn-seal">New voucher</button></div>
+</div>
+
+<div class="hero-trio">
+  <div>
+    <div class="hero-label">Today's cash movement</div>
+    <div class="hero-num">${bigRM(184820.50)}</div>
+    <svg class="spark" viewBox="0 0 320 40" preserveAspectRatio="none"><polyline fill="none" stroke="var(--ink)" stroke-width="1.25" points="0,26 24,22 48,28 72,18 96,24 120,14 144,20 168,12 192,16 216,10 240,14 264,8 288,12 312,6"/></svg>
+    <div class="hero-meta">14 vouchers posted · net <span class="ledger">+ RM 32,100</span></div>
+  </div>
+  <div class="hero-med">
+    <div class="hero-label">Inbox awaiting</div>
+    <div class="hero-num">4 <span class="unit">items</span></div>
+    <div class="hero-meta">2 director approvals · 2 vouchers to post</div>
+  </div>
+  <div class="hero-med">
+    <div class="hero-label">Month close readiness</div>
+    <div class="hero-num">87<span class="unit">%</span></div>
+    <div class="hero-meta">3 recon breaks · 2 payroll items missing</div>
+  </div>
+</div>
+
+<div class="grid-2" style="grid-template-columns:2fr 1fr;gap:40px">
+  <div>
+    <div class="sect-head"><h2>Loan book — live</h2><span class="mono-xs">${SUBS.length} active · weighted rate 1.140%/mo</span></div>
+    <table class="ledger">
+      <thead><tr><th>Subsidiary</th><th class="th-right">Outstanding</th><th style="width:140px">Utilisation</th><th class="th-right">Interest this mo.</th></tr></thead>
+      <tbody>
+        ${SUBS.map(s=>`
+          <tr>
+            <td><span class="serif">${s.name}</span> <span class="mono-xs">· ${s.code}</span></td>
+            <td class="num">${RM(s.outstanding)}</td>
+            <td><div class="meter"><span style="width:${(s.used*100).toFixed(0)}%"></span></div><div class="mono-xs" style="margin-top:3px">${(s.used*100).toFixed(0)}%</div></td>
+            <td class="num ledger">${RM(s.outstanding*s.rate)}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  <aside>
+    <div class="sect-head"><h2 style="font-size:20px">My queue</h2><span class="mono-xs">next 24h</span></div>
+    <div class="stack-3">
+      <div class="card">
+        <div class="card-tag">DUE TODAY</div>
+        <div class="card-title">Post HOUZS Century Mar interest</div>
+        <div class="card-amount">RM 25,275.00 · credit voucher</div>
+        <div class="card-meta">Deadline 17:00 · period close</div>
+      </div>
+      <div class="card">
+        <div class="card-tag">THIS WEEK</div>
+        <div class="card-title">Issue Apr statements × 7</div>
+        <div class="card-amount">After 25 Apr cutoff</div>
+        <div class="card-meta">Auto-draft available</div>
+      </div>
+      <div class="card">
+        <div class="card-tag">BLOCKED · AWAITING PRINCIPAL</div>
+        <div class="card-title">Working capital loan — HC</div>
+        <div class="card-amount">RM 100,000.00 · submitted 2h ago</div>
+        <div class="card-meta">LCY has not actioned</div>
+      </div>
+    </div>
+  </aside>
+</div>`;
+}
+
+function screen_inbox(){
+  const items = [
+    {tag:'VOUCHER TO POST', title:'Office rent Apr 2026', amt:'RM 18,500.00 · approved by LCY', meta:'Queued 22 Apr 10:04', action:'Post to GL'},
+    {tag:'PRINCIPAL RESPONSE · APPROVED', title:'Marketing Apr batch — 3 vouchers', amt:'RM 42,380.00 · dept_pool_marketing', meta:'Approved 21 Apr 18:20 · LCY', action:'Release payment'},
+    {tag:'HR SUBMISSION', title:'Mar 2026 HR costing snapshot', amt:'RM 223,820.00 · 34 staff · 5 depts', meta:'Submitted 20 Apr · Lim P.T.', action:'Ingest to billing'},
+    {tag:'RECON BREAK', title:'CIMB 8001-3344-1290 · Mar close', amt:'Variance RM 600.00', meta:'Flagged 18 Apr · unresolved', action:'Investigate'},
+  ];
+  return `
+<div class="page-head">
+  <div><h1 class="page">Inbox</h1><p class="page-sub">All things waiting on <em>Finance</em>. Principal approvals returned, HR submissions, recon breaks.</p></div>
+  <div class="row"><button class="btn-ghost">Archive read</button></div>
+</div>
+
+<div class="tabs">
+  <a class="on">All <span class="ct">4</span></a>
+  <a>From Principal <span class="ct">1</span></a>
+  <a>From HR <span class="ct">1</span></a>
+  <a>From Dept <span class="ct">0</span></a>
+  <a>System flags <span class="ct">2</span></a>
+</div>
+
+<div class="stack-3">
+  ${items.map(c=>`
+    <div class="card" style="padding:22px 24px">
+      <div class="between"><div class="card-tag">${c.tag}</div><span class="mono-xs">${c.meta}</span></div>
+      <div class="card-title" style="margin-top:6px">${c.title}</div>
+      <div class="card-amount" style="margin-top:6px">${c.amt}</div>
+      <div class="row" style="margin-top:16px"><button class="btn-seal">${c.action}</button><button class="btn-ghost">Open</button><button class="btn-ghost">Defer</button></div>
+    </div>`).join('')}
+</div>`;
+}
+
+function screen_vouchers(){
+  const rows = [
+    ['PV-0429','2026-04-22','Office rent Apr 2026','debit','venture_pool',18500,'pending_approval','Chew S.H.'],
+    ['PV-0428','2026-04-21','Marketing — Lazada Brand Day','debit','dept_pool_marketing',12480,'approved','Chew S.H.'],
+    ['PV-0427','2026-04-21','HOUZS Century interest collection Mar','credit','venture_pool',25275,'paid','Tan Y.L.'],
+    ['PV-0426','2026-04-20','Telco & internet Apr','debit','venture_pool',2840,'paid','Tan Y.L.'],
+    ['PV-0425','2026-04-19','Invoice payout — HOUZS Living Q1','credit','invoice_payout_pool',32800,'paid','Tan Y.L.'],
+    ['PV-0424','2026-04-18','Staff claim · benefit · Tan Y.L.','debit','dept_pool_hr',340,'draft','Lim P.T.'],
+    ['PV-0423','2026-04-18','Utility bill Mar','debit','venture_pool',6240,'voided','Tan Y.L.'],
+  ];
+  return `
+<div class="page-head">
+  <div><h1 class="page">Vouchers</h1><p class="page-sub">Compose, amend, and post payment vouchers. <em>Finance is the only role that can post.</em></p></div>
+  <div class="row"><button class="btn-ghost">Import CSV</button><button class="btn-seal">New voucher</button></div>
+</div>
+
+<div class="hero">
+  <div>
+    <div class="hero-label">Posted this period</div>
+    <div class="hero-num">${bigRM(184820.50)}</div>
+    <div class="hero-meta">42 vouchers · 6 pending principal · 1 voided</div>
+  </div>
+  <div class="hero-sm">
+    <div class="hero-label">My drafts</div>
+    <div class="stack-2" style="margin-top:8px">
+      <div class="between"><em class="stat stat-muted">Draft</em><span class="mono">3</span></div>
+      <div class="between"><em class="stat stat-alert">Sent to Principal</em><span class="mono">6</span></div>
+      <div class="between"><em class="stat stat-active" style="color:var(--accent)">Approved — to post</em><span class="mono">2</span></div>
+      <div class="between"><em class="stat stat-ledger">Paid</em><span class="mono">42</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="tabs">
+  <a class="on">All <span class="ct">54</span></a>
+  <a>Draft <span class="ct">3</span></a>
+  <a>Pending <span class="ct">6</span></a>
+  <a>Approved <span class="ct">2</span></a>
+  <a>Paid <span class="ct">42</span></a>
+  <a>Voided <span class="ct">1</span></a>
+</div>
+
+<div class="row" style="gap:12px;margin-bottom:16px;flex-wrap:wrap">
+  <input placeholder="Search voucher # / payee / description" style="flex:1;min-width:280px">
+  <select><option>All pools</option><option>Venture Pool</option><option>Director Pool</option><option>Marketing</option><option>HR</option></select>
+  <input type="date" aria-label="From"><input type="date" aria-label="To">
+</div>
+
+<table class="ledger">
+  <thead><tr><th>Voucher #</th><th>Date</th><th>Description</th><th>Dir.</th><th>Pool</th><th class="th-right">Amount</th><th>Raised by</th><th>Status</th></tr></thead>
+  <tbody>
+    ${rows.map(r=>`
+      <tr>
+        <td class="mono" style="color:var(--ink);font-weight:600">${r[0]}</td>
+        <td class="mono-xs" style="color:var(--ink)">${r[1]}</td>
+        <td class="serif">${r[2]}</td>
+        <td class="mono-xs" style="color:${r[3]==='credit'?'var(--ledger)':'var(--ink)'};font-weight:600">${r[3]}</td>
+        <td class="mono-xs" style="color:var(--ink)">${r[4]}</td>
+        <td class="num">${RM(r[5])}</td>
+        <td class="mono-xs">${r[7]}</td>
+        <td><em class="stat ${r[6]==='paid'?'stat-ledger':r[6]==='pending_approval'?'stat-alert':r[6]==='approved'?'':'stat-muted'}" ${r[6]==='approved'?'style="color:var(--accent)"':''}>${r[6].replace('_',' ')}</em></td>
+      </tr>`).join('')}
+  </tbody>
+</table>`;
+}
+
+function screen_fundin(){
+  const rows = [
+    ['Subsidiary','HOUZS Century (HC)',800000,0.0080,12,'2025-11-01','2026-11-01','active'],
+    ['Subsidiary','HOUZS Living (HLIV)',500000,0.0080,12,'2026-01-10','2027-01-10','active'],
+    ['Director loan','Ng Boon Beng (D01)',1200000,0.0080,24,'2025-03-01','2027-03-01','active'],
+    ['Director loan','Tan Wei Ming (D02)',600000,0.0085,24,'2025-09-01','2027-09-01','active'],
+    ['Dept pool','Marketing pool',150000,0.0000,null,'2026-02-01',null,'active'],
+    ['Director saving','Saving 5% cohort',240000,0.0050,12,'2025-06-01','2026-06-01','active'],
+    ['Subsidiary','HOUZS Contracts (CONTS)',300000,0.0080,12,'2026-03-01','2027-03-01','pending_approval'],
+  ];
+  const total = rows.filter(r=>r[7]==='active').reduce((s,r)=>s+r[2],0);
+  return `
+<div class="page-head">
+  <div><h1 class="page">Fund IN · Finance view</h1><p class="page-sub">Record fund sources. <em>Finance drafts, Principal approves.</em></p></div>
+  <button class="btn-seal">Draft new fund source</button>
+</div>
+
+<div class="hero">
+  <div>
+    <div class="hero-label">Total paid capital</div>
+    <div class="hero-num">${bigRM(total)}</div>
+    <div class="hero-meta">6 active · 1 pending Principal approval</div>
+  </div>
+  <div class="hero-sm">
+    <div class="hero-label">Next action</div>
+    <div class="stack-2" style="margin-top:8px">
+      <div class="between"><em class="stat stat-alert">Maturing 30d</em><span class="mono">0</span></div>
+      <div class="between"><em class="stat stat-alert">Interest due this wk</em><span class="mono">3</span></div>
+      <div class="between"><em class="stat stat-muted">In principal queue</em><span class="mono">1</span></div>
+    </div>
+  </div>
+</div>
+
+<table class="ledger">
+  <thead><tr><th>Type</th><th>From</th><th class="th-right">Amount</th><th class="th-right">Cost</th><th class="th-right">Lock-in</th><th>Effective</th><th>Maturity</th><th>Status</th></tr></thead>
+  <tbody>
+    ${rows.map(r=>`
+      <tr>
+        <td class="mono-xs" style="color:var(--graphite)">${r[0]}</td>
+        <td class="serif">${r[1]}</td>
+        <td class="num">${RM(r[2])}</td>
+        <td class="num">${(r[3]*100).toFixed(3)}%/mo</td>
+        <td class="num">${r[4]?r[4]+'m':'—'}</td>
+        <td class="mono-xs">${r[5]}</td>
+        <td class="mono-xs">${r[6]??'—'}</td>
+        <td><em class="stat ${r[7]==='active'?'stat-active':'stat-alert'}">${r[7].replace('_',' ')}</em></td>
+      </tr>`).join('')}
+  </tbody>
+</table>`;
+}
+
+function screen_fundout(){
+  const rows = [
+    ['HOUZS Century (HC)',2500000,2151300,0.01140,'2025-11-01','active'],
+    ['HOUZS Contracts (CONTS)',1500000,1432700,0.01140,'2026-01-10','active'],
+    ['HOUZS Living (HLIV)',1200000, 984200,0.01140,'2025-09-01','active'],
+    ['HOUZS Furniture (FURN)',900000,712400,0.01140,'2025-12-05','active'],
+    ['HOUZS Decor (DECO)',500000, 380050,0.01140,'2026-02-20','active'],
+    ['HOUZS Sofa Co. (SOFA)',300000,245800,0.01140,'2026-03-04','active'],
+    ['HOUZS Lighting (LIGHT)',120000, 94500,0.01140,'2026-01-18','active'],
+    ['HOUZS Century (HC)',180000, 0,0.01140,null,'pending_approval'],
+  ];
+  const active = rows.filter(r=>r[5]==='active');
+  const out = active.reduce((s,r)=>s+r[2],0);
+  const monthly = active.reduce((s,r)=>s+r[2]*r[3],0);
+  return `
+<div class="page-head">
+  <div><h1 class="page">Fund OUT</h1><p class="page-sub">Loans disbursed to subsidiaries. <em>Finance disburses on Principal approval.</em></p></div>
+  <div class="row"><button class="btn-ghost">Export CSV</button><button class="btn-seal">Draft new loan</button></div>
+</div>
+
+<div class="hero">
+  <div>
+    <div class="hero-label">Total outstanding</div>
+    <div class="hero-num">${bigRM(out)}</div>
+    <div class="hero-meta">Monthly interest income <span class="ledger">${RM(monthly)}</span></div>
+  </div>
+  <div class="hero-sm">
+    <div class="hero-label">Action required</div>
+    <div class="stack-2" style="margin-top:8px">
+      <div class="between"><em class="stat stat-alert">Pending approval</em><span class="mono">1</span></div>
+      <div class="between"><em class="stat stat-alert">Interest to bill</em><span class="mono">7</span></div>
+      <div class="between"><em class="stat stat-danger">Overdue</em><span class="mono">2</span></div>
+    </div>
+  </div>
+</div>
+
+<table class="ledger">
+  <thead><tr><th>Company</th><th class="th-right">Principal</th><th class="th-right">Outstanding</th><th class="th-right">Rate</th><th>Disbursed</th><th>Status</th></tr></thead>
+  <tbody>
+    ${rows.map(r=>`
+      <tr>
+        <td class="serif">${r[0]}</td>
+        <td class="num">${RM(r[1])}</td>
+        <td class="num">${r[5]==='active'?RM(r[2]):'<span class="muted">—</span>'}</td>
+        <td class="num">${(r[3]*100).toFixed(3)}%/mo</td>
+        <td class="mono-xs">${r[4]??'—'}</td>
+        <td><em class="stat ${r[5]==='active'?'stat-active':'stat-alert'}">${r[5].replace('_',' ')}</em></td>
+      </tr>`).join('')}
+  </tbody>
+</table>`;
+}
+
+function screen_overdue(){
+  return `
+<div class="page-head">
+  <div><h1 class="page">Overdue</h1><p class="page-sub">Loans past grace. <em>Finance computes penalty · Principal escalates.</em></p></div>
+  <div class="row"><button class="btn-ghost">Run overdue sweep</button></div>
+</div>
+
+<div class="hero">
+  <div>
+    <div class="hero-label">Penalty outstanding</div>
+    <div class="hero-num">${bigRM(4823.40)}</div>
+    <div class="hero-meta">2 pending · auto-computed from day counts</div>
+  </div>
+  <div class="hero-sm stack-2">
+    <div class="between"><em class="serif grap" style="font-size:15px">Mar 2026</em><span class="mono tabular">2</span></div>
+    <div class="between"><em class="serif grap" style="font-size:15px">Feb 2026</em><span class="mono tabular">0</span></div>
+    <div class="between"><em class="serif grap" style="font-size:15px">Jan 2026</em><span class="mono tabular">0</span></div>
+  </div>
+</div>
+
+<div class="sect">
+  <h2>March 2026 · pending</h2>
+  <table class="ledger">
+    <thead><tr><th>Loan</th><th>Company</th><th class="th-right">Outstanding</th><th class="th-right">Overdue</th><th>Stage</th><th class="th-right">Penalty</th><th></th></tr></thead>
+    <tbody>
+      <tr><td class="mono" style="color:var(--graphite)">L-00121</td><td class="serif">HOUZS Decor (DECO)</td><td class="num">${RM(380050)}</td><td class="num"><em class="stat stat-alert">22d</em></td><td><em class="stat stat-alert">late_2</em></td><td class="num">${RM(3990.50)}</td><td class="th-right"><button class="btn-link">Mark paid →</button></td></tr>
+      <tr><td class="mono" style="color:var(--graphite)">L-00117</td><td class="serif">HOUZS Lighting (LIGHT)</td><td class="num">${RM(94500)}</td><td class="num"><em class="stat stat-alert">9d</em></td><td><em class="stat stat-alert">late_1</em></td><td class="num">${RM(832.90)}</td><td class="th-right"><button class="btn-link">Mark paid →</button></td></tr>
+    </tbody>
+  </table>
+</div>`;
+}
+
+function screen_statements(){
+  const rows = [
+    ['HOUZS Century (HC)',   25275.00, 3200.00, 22075.00, 'issued'],
+    ['HOUZS Contracts (CONTS)',16845.00,1100.00, 15745.00, 'issued'],
+    ['HOUZS Living (HLIV)',   11570.00, 800.00,  10770.00, 'paid'],
+    ['HOUZS Furniture (FURN)', 8370.00, 420.00,   7950.00, 'paid'],
+    ['HOUZS Decor (DECO)',     4465.00, 0.00,    4465.00, 'issued'],
+    ['HOUZS Sofa Co. (SOFA)',  2885.00, 0.00,    2885.00, 'issued'],
+    ['HOUZS Lighting (LIGHT)', 1110.00, 0.00,    1110.00, 'draft'],
+  ];
+  return `
+<div class="page-head">
+  <div><h1 class="page">Statements</h1><p class="page-sub">Monthly consolidated statements per subsidiary. <em>Finance issues · subs pay.</em></p></div>
+  <button class="btn-seal">Generate Apr 2026 statements</button>
+</div>
+
+<div class="hero">
+  <div>
+    <div class="hero-label">Latest period</div>
+    <div class="hero-num" style="font-size:48px">March <span class="cents">2026</span></div>
+    <div class="hero-meta">7 statements · 3 periods · 1 draft</div>
+  </div>
+  <div class="hero-sm stack-2">
+    <div class="between"><em class="stat stat-muted">Draft</em><span class="mono">1</span></div>
+    <div class="between"><em class="stat stat-alert">Issued</em><span class="mono">4</span></div>
+    <div class="between"><em class="stat stat-ledger">Paid</em><span class="mono">2</span></div>
+  </div>
+</div>
+
+<div class="sect">
+  <h2>March 2026</h2>
+  <table class="ledger">
+    <thead><tr><th>Company</th><th class="th-right">Invoice</th><th class="th-right">Contra</th><th class="th-right">Net</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      ${rows.map(r=>`
+        <tr>
+          <td class="serif">${r[0]}</td>
+          <td class="num">${RM(r[1])}</td>
+          <td class="num grap">${r[2]?'− '+RM(r[2]).replace('RM ',''):'—'}</td>
+          <td class="num" style="font-weight:600">${RM(r[3])}</td>
+          <td><em class="stat ${r[4]==='paid'?'stat-ledger':r[4]==='issued'?'stat-alert':'stat-muted'}">${r[4]}</em></td>
+          <td class="th-right"><button class="btn-link">Open →</button></td>
+        </tr>`).join('')}
+    </tbody>
+  </table>
+</div>`;
+}
+
+function screen_invoices(){
+  const rows = [
+    ['INV-2026-0412','2026-04-22','HOUZS Century · interest Mar',25275.00,'unpaid','HC'],
+    ['INV-2026-0411','2026-04-22','HOUZS Contracts · interest Mar',16845.00,'unpaid','CONTS'],
+    ['INV-2026-0410','2026-04-15','HOUZS Living · shared services Q1',11200.00,'paid','HLIV'],
+    ['INV-2026-0409','2026-04-10','HOUZS Furniture · D01 CTC Mar',17000.00,'paid','FURN'],
+    ['INV-2026-0408','2026-04-03','HOUZS Decor · shared services Q1',5600.00,'draft','DECO'],
+    ['CON-2026-0041','2026-04-21','HOUZS Century · credit note — billing fix',3200.00,'applied','HC'],
+  ];
+  return `
+<div class="page-head">
+  <div><h1 class="page">Invoices</h1><p class="page-sub">Individual invoice items and contra notes. <em>Roll up to monthly statements.</em></p></div>
+  <div class="row"><button class="btn-ghost">Credit note</button><button class="btn-seal">New invoice</button></div>
+</div>
+
+<div class="tabs">
+  <a class="on">All <span class="ct">48</span></a>
+  <a>Draft <span class="ct">3</span></a>
+  <a>Unpaid <span class="ct">12</span></a>
+  <a>Paid <span class="ct">28</span></a>
+  <a>Credit notes <span class="ct">5</span></a>
+</div>
+
+<table class="ledger">
+  <thead><tr><th>Doc #</th><th>Date</th><th>Description</th><th>Sub</th><th class="th-right">Amount</th><th>Status</th></tr></thead>
+  <tbody>
+    ${rows.map(r=>`
+      <tr>
+        <td class="mono" style="color:var(--ink);font-weight:600">${r[0]}</td>
+        <td class="mono-xs" style="color:var(--ink)">${r[1]}</td>
+        <td class="serif">${r[2]}</td>
+        <td><span class="chip">${r[5]}</span></td>
+        <td class="num">${RM(r[3])}</td>
+        <td><em class="stat ${r[4]==='paid'?'stat-ledger':r[4]==='unpaid'?'stat-alert':r[4]==='applied'?'stat-ledger':'stat-muted'}">${r[4]}</em></td>
+      </tr>`).join('')}
+  </tbody>
+</table>`;
+}
+
+function screen_payroll(){
+  const depts = [
+    ['Marketing',12,48000,9200,5400,62600,'executed'],
+    ['HR',4,18200,3400,1800,23400,'executed'],
+    ['Finance',6,29400,5500,2600,37500,'executed'],
+    ['Director Office',3,42000,7900,4200,54100,'executed'],
+    ['Operations',9,36400,6820,3100,46320,'pending'],
+  ];
+  const sum = depts.reduce((a,r)=>({c:a.c+r[1],b:a.b+r[2],s:a.s+r[3],al:a.al+r[4],t:a.t+r[5]}),{c:0,b:0,s:0,al:0,t:0});
+  return `
+<div class="page-head">
+  <div><h1 class="page">Monthly Payroll</h1><p class="page-sub">Execute payroll from HR's submitted snapshot. <em>Each dept pays from its own pool.</em></p></div>
+  <div class="row"><button class="btn-ghost">Print payslips</button><button class="btn-seal">Execute Apr 2026</button></div>
+</div>
+
+<div class="hero">
+  <div>
+    <div class="hero-label">March 2026 — executed</div>
+    <div class="hero-num">${bigRM(sum.t-46320)}</div>
+    <div class="hero-meta">${sum.c-9} staff · 4 depts posted · 1 dept pending</div>
+  </div>
+  <div class="hero-sm">
+    <div class="hero-label">April 2026 — queued</div>
+    <div class="stack-2" style="margin-top:8px">
+      <div class="between"><em class="serif grap" style="font-size:14px">HR snapshot received</em><span class="mono ledger">yes</span></div>
+      <div class="between"><em class="serif grap" style="font-size:14px">Pool balance sufficient</em><span class="mono ledger">5/5</span></div>
+      <div class="between"><em class="serif grap" style="font-size:14px">Director payouts linked</em><span class="mono alert">pending</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="sect">
+  <h2>Apr 2026 · by department</h2>
+  <p class="sub">Sourced from HR snapshot id <em>HRCS-2026-04</em> · dept pools debit on execute.</p>
+  <table class="ledger">
+    <thead><tr><th>Department</th><th class="th-right">Staff</th><th class="th-right">Basic</th><th class="th-right">Statutory</th><th class="th-right">Allowance</th><th class="th-right">Total CTC</th><th>State</th></tr></thead>
+    <tbody>
+      ${depts.map(r=>`
+        <tr>
+          <td class="serif">${r[0]}</td>
+          <td class="num">${r[1]}</td>
+          <td class="num">${RM(r[2])}</td>
+          <td class="num grap">${RM(r[3])}</td>
+          <td class="num grap">${RM(r[4])}</td>
+          <td class="num" style="font-weight:600">${RM(r[5])}</td>
+          <td><em class="stat ${r[6]==='executed'?'stat-ledger':'stat-alert'}">${r[6]}</em></td>
+        </tr>`).join('')}
+      <tr style="background:var(--surface-2)">
+        <td class="serif" style="font-weight:600">Totals</td>
+        <td class="num" style="font-weight:600">${sum.c}</td>
+        <td class="num" style="font-weight:600">${RM(sum.b)}</td>
+        <td class="num" style="font-weight:600">${RM(sum.s)}</td>
+        <td class="num" style="font-weight:600">${RM(sum.al)}</td>
+        <td class="num" style="font-weight:700;color:var(--accent)">${RM(sum.t)}</td><td></td>
+      </tr>
+    </tbody>
+  </table>
+</div>`;
+}
+
+function screen_recon(){
+  return `
+<div class="page-head">
+  <div><h1 class="page">Bank Reconciliation</h1><p class="page-sub">Match portal bank balance against GL · import CSV statements.</p></div>
+  <button class="btn-link">General Ledger →</button>
+</div>
+
+<div class="sect">
+  <h2>Bank vs GL</h2>
+  <p class="sub">Portal bank balance (from payment vouchers) vs GL balance (from journal entries).</p>
+  <table class="ledger">
+    <thead><tr><th>Bank</th><th>Account</th><th>GL</th><th class="th-right">Portal</th><th class="th-right">GL</th><th class="th-right">Variance</th><th></th></tr></thead>
+    <tbody>
+      <tr><td class="serif">Maybank <span class="chip accent" style="margin-left:6px">PRIMARY</span></td><td class="mono-xs">5142-2001-8834</td><td class="mono-xs">1010-001</td><td class="num">${RM(8422150.20)}</td><td class="num">${RM(8422150.20)}</td><td class="num ledger">Matched</td><td class="th-right"><button class="btn-link">Import CSV →</button></td></tr>
+      <tr><td class="serif">CIMB</td><td class="mono-xs">8001-3344-1290</td><td class="mono-xs">1010-002</td><td class="num">${RM(3211000.00)}</td><td class="num">${RM(3210400.00)}</td><td class="num danger">${RM(600)}</td><td class="th-right"><button class="btn-link">Investigate →</button></td></tr>
+      <tr><td class="serif">Public Bank</td><td class="mono-xs">3221-7780-0012</td><td class="mono-xs">1010-003</td><td class="num">${RM(1214053.35)}</td><td class="num">${RM(1214053.35)}</td><td class="num ledger">Matched</td><td class="th-right"><button class="btn-link">Import CSV →</button></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="sect">
+  <h2>CSV import</h2>
+  <div style="border:1.5px dashed var(--hairline);border-radius:6px;padding:42px 20px;text-align:center;background:var(--surface)">
+    <div class="serif" style="font-size:20px;font-style:italic;color:var(--graphite)">Drop .csv here, or <a class="btn-link" href="#">choose file</a></div>
+    <div class="mono-xs" style="margin-top:8px">Maybank, CIMB, and Public Bank exports supported</div>
+  </div>
+</div>`;
+}
+
+function screen_gl(){
+  const rows = [
+    ['JV-2026-0412','2026-04-22','Post HC Mar interest','1010-001 Maybank',25275,0],
+    ['JV-2026-0412','2026-04-22','','4010 Interest Income',0,25275],
+    ['JV-2026-0411','2026-04-22','Disburse rent Apr','6210 Rent Expense',18500,0],
+    ['JV-2026-0411','2026-04-22','','1010-001 Maybank',0,18500],
+    ['JV-2026-0410','2026-04-21','Accrue penalty DECO','1210 Penalty AR',3990.50,0],
+    ['JV-2026-0410','2026-04-21','','4020 Penalty Income',0,3990.50],
+  ];
+  return `
+<div class="page-head">
+  <div><h1 class="page">General Ledger</h1><p class="page-sub">Journal entries across the chart of accounts. <em>Finance posts · Principal views.</em></p></div>
+  <div class="row"><button class="btn-ghost">Chart of accounts</button><button class="btn-seal">Manual JV</button></div>
+</div>
+
+<div class="row" style="gap:12px;margin-bottom:16px;flex-wrap:wrap">
+  <input placeholder="Search account / narration" style="flex:1;min-width:280px">
+  <select><option>All accounts</option><option>1010 Cash</option><option>1100 AR</option><option>2010 AP</option><option>4010 Interest Income</option><option>6210 Rent</option></select>
+  <input type="date"><input type="date">
+</div>
+
+<table class="ledger">
+  <thead><tr><th>JV #</th><th>Date</th><th>Narration</th><th>Account</th><th class="th-right">Debit</th><th class="th-right">Credit</th></tr></thead>
+  <tbody>
+    ${rows.map(r=>`
+      <tr>
+        <td class="mono" style="color:var(--ink);font-weight:600">${r[0]}</td>
+        <td class="mono-xs" style="color:var(--ink)">${r[1]}</td>
+        <td class="serif">${r[2]||'<span class="muted">—</span>'}</td>
+        <td class="mono-xs">${r[3]}</td>
+        <td class="num">${r[4]?RM(r[4]):'—'}</td>
+        <td class="num">${r[5]?RM(r[5]):'—'}</td>
+      </tr>`).join('')}
+  </tbody>
+</table>`;
+}
+
+function screen_claims(){
+  const rows = [
+    ['Tan Y.L.','Optical · Mar 2026',420,'approved','19 Apr 2026','HR'],
+    ['Ng Boon Beng','Project travel · CONTS kickoff',3840,'pending','20 Apr 2026','Finance'],
+    ['Chua Mei Ling','Medical · dental',280,'paid','15 Apr 2026','HR'],
+    ['Lim Chee Yong','Client entertainment · HLIV',1250,'rejected','14 Apr 2026','Finance'],
+    ['Ong Siew Hoon','Mobile reimbursement Mar',120,'approved','12 Apr 2026','HR'],
+  ];
+  return `
+<div class="page-head">
+  <div><h1 class="page">Claims</h1><p class="page-sub">Finance-side view. <em>Benefit claims settle from pool after HR approval.</em></p></div>
+</div>
+
+<div class="tabs">
+  <a class="on">All <span class="ct">25</span></a>
+  <a>To settle <span class="ct">7</span></a>
+  <a>Paid <span class="ct">15</span></a>
+  <a>Rejected <span class="ct">3</span></a>
+</div>
+
+<table class="ledger">
+  <thead><tr><th>Claimant</th><th>Description</th><th class="th-right">Amount</th><th>Status</th><th>Channel</th><th>Date</th></tr></thead>
+  <tbody>
+    ${rows.map(r=>`
+      <tr>
+        <td class="serif">${r[0]}</td>
+        <td class="grap">${r[1]}</td>
+        <td class="num">${RM(r[2])}</td>
+        <td><em class="stat ${r[3]==='approved'?'stat-ledger':r[3]==='paid'?'stat-muted':r[3]==='rejected'?'stat-danger':'stat-alert'}">${r[3]}</em></td>
+        <td class="mono-xs">${r[5]}</td>
+        <td class="mono-xs">${r[4]}</td>
+      </tr>`).join('')}
+  </tbody>
+</table>`;
+}
+
+/* DIRECTOR SALARY BATCH — Finance executes HR's submission */
+function screen_dsalaryBatch(){
+  const d = DIRECTOR_SALARY_INPUTS;
+  const subByCode = Object.fromEntries(SUBS.map(s=>[s.code,s.name]));
+  const totalNet = DSAL_ROWS.reduce((s,r)=>s+r.net, 0);
+  const totalAdvance = DSAL_ROWS.reduce((s,r)=>s+r.advance, 0);
+  const totalSaving = DSAL_ROWS.reduce((s,r)=>s+r.saving, 0);
+  const ingestStatus = d.status;
+  return `
+<div class="page-head">
+  <div><h1 class="page">Director Salary</h1><p class="page-sub">Execute payout batch from HR's submission. <em>Read-only inputs — amendments go back to HR.</em></p></div>
+  <div class="row">
+    <button class="btn-ghost">Export CSV</button>
+    <button class="btn-seal" ${ingestStatus!=='submitted'?'disabled style="opacity:.5;cursor:not-allowed"':''}>Execute payout</button>
+  </div>
+</div>
+
+<div class="hero">
+  <div>
+    <div class="hero-label">Batch — ${PERIOD.label}</div>
+    <div class="hero-num">${bigRM(DSAL_POOL)}</div>
+    <div class="hero-meta">Ref <em class="serif">DSAL-${PERIOD.current}</em> · <em class="serif ${ingestStatus==='submitted'?'ledger':'alert'}">${ingestStatus}</em> from HR</div>
+  </div>
+  <div class="hero-sm stack-2">
+    <div class="between"><em class="serif grap" style="font-size:13px">Payroll (75%)</em><span class="mono tabular">${RM(DSAL_SPLIT.payroll)}</span></div>
+    <div class="between"><em class="serif grap" style="font-size:13px">Invoice (25%)</em><span class="mono tabular">${RM(DSAL_SPLIT.invoice)}</span></div>
+    <div class="between"><em class="serif grap" style="font-size:13px">5% Saving held</em><span class="mono tabular ledger">− ${RM(totalSaving)}</span></div>
+    <div class="between"><em class="serif grap" style="font-size:13px">Advance deducted</em><span class="mono tabular alert">− ${RM(totalAdvance)}</span></div>
+    <div class="between hairline-t"><em class="serif" style="font-size:14px">Net payable</em><span class="mono tabular" style="font-weight:700">${RM(totalNet)}</span></div>
+  </div>
+</div>
+
+${ingestStatus!=='submitted' ? `
+<div class="card" style="padding:20px 24px;margin-bottom:28px;border-color:var(--danger-soft,var(--hairline));background:var(--surface-2)">
+  <div class="card-tag">AWAITING HR SUBMISSION</div>
+  <div class="card-title">HR has not submitted this period's director salary yet.</div>
+  <div class="card-meta">Inputs visible below are draft values from HR. Execution disabled until <em>Submit to Finance</em> is triggered on the HR side.</div>
+</div>` : ''}
+
+<div class="sect">
+  <h2>CTC claims — from HR</h2>
+  <p class="sub">Source subsidiaries for this period. <em>Totals roll into the Director Pool on execution.</em></p>
+  <table class="ledger">
+    <thead><tr><th>Subsidiary</th><th class="th-right">CTC claim</th><th class="th-right">Invoice 25%</th><th class="th-right">Payroll 75%</th><th>Status</th></tr></thead>
+    <tbody>
+      ${d.ctcClaims.map(c=>`
+        <tr>
+          <td class="serif">${subByCode[c.sub]||c.sub} <span class="mono-xs">· ${c.sub}</span></td>
+          <td class="num">${RM(c.amount)}</td>
+          <td class="num grap">${RM(c.amount*0.25)}</td>
+          <td class="num grap">${RM(c.amount*0.75)}</td>
+          <td><em class="stat stat-muted">pending execution</em></td>
+        </tr>`).join('')}
+      <tr style="background:var(--surface-2)">
+        <td class="serif" style="font-weight:600">Pool total</td>
+        <td class="num" style="font-weight:700">${RM(DSAL_POOL)}</td>
+        <td class="num" style="font-weight:600">${RM(DSAL_SPLIT.invoice)}</td>
+        <td class="num" style="font-weight:600">${RM(DSAL_SPLIT.payroll)}</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="sect">
+  <div class="sect-head"><h2>Payouts to execute</h2><span class="mono-xs">${DSAL_ROWS.length} directors · single bank batch</span></div>
+  <table class="ledger">
+    <thead><tr><th>Director</th><th class="th-right">Weight</th><th class="th-right">Gross</th><th class="th-right">Payroll</th><th class="th-right">Invoice</th><th class="th-right">5% Saving</th><th class="th-right">Advance</th><th class="th-right">Net</th></tr></thead>
+    <tbody>
+      ${DSAL_ROWS.map(r=>`
+        <tr>
+          <td class="serif">${r.name} <span class="mono-xs">· ${r.dir}</span></td>
+          <td class="num">${(r.weight*100).toFixed(0)}%</td>
+          <td class="num">${RM(r.gross)}</td>
+          <td class="num">${RM(r.payroll)}</td>
+          <td class="num">${RM(r.invoice)}</td>
+          <td class="num ledger">${RM(r.saving)}</td>
+          <td class="num alert">− ${RM(r.advance)}</td>
+          <td class="num" style="font-weight:600">${RM(r.net)}</td>
+        </tr>`).join('')}
+      <tr style="background:var(--surface-2)">
+        <td class="serif" style="font-weight:600">Batch total</td><td></td>
+        <td class="num" style="font-weight:600">${RM(DSAL_POOL)}</td>
+        <td class="num" style="font-weight:600">${RM(DSAL_SPLIT.payroll)}</td>
+        <td class="num" style="font-weight:600">${RM(DSAL_SPLIT.invoice)}</td>
+        <td class="num ledger" style="font-weight:600">${RM(totalSaving)}</td>
+        <td class="num alert" style="font-weight:600">− ${RM(totalAdvance)}</td>
+        <td class="num" style="font-weight:700;color:var(--accent)">${RM(totalNet)}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="sect">
+  <h2>Execution checklist</h2>
+  <div class="stack-2">
+    <div class="between"><em class="serif grap" style="font-size:14px">HR submission received</em><span class="mono ${ingestStatus==='submitted'?'ledger':'alert'}">${ingestStatus==='submitted'?'yes':'no'}</span></div>
+    <div class="between"><em class="serif grap" style="font-size:14px">Director Pool balance sufficient</em><span class="mono ledger">${RM(DEPTS.find(d=>d.code==='director').balance)} available</span></div>
+    <div class="between"><em class="serif grap" style="font-size:14px">Weight sum</em><span class="mono ${Math.abs(DSAL_ROWS.reduce((s,r)=>s+r.weight,0)-1)<.001?'ledger':'alert'}">${(DSAL_ROWS.reduce((s,r)=>s+r.weight,0)*100).toFixed(0)}%</span></div>
+    <div class="between"><em class="serif grap" style="font-size:14px">Principal approved</em><span class="mono alert">pending</span></div>
+    <div class="between hairline-t"><em class="serif" style="font-size:14px">Ready to execute</em><span class="mono alert">3 / 4</span></div>
+  </div>
+</div>`;
+}
+
+/* DIRECTOR POOL — Finance view of the director revenue pool */
+function screen_dpool(){
+  const ledger = POOL_LEDGER.filter(r=>r.pool==='director');
+  const poolBal = DEPTS.find(d=>d.code==='director').balance;
+  const totalSaving = DIRECTORS.reduce((s,d)=>s+d.savingBalance, 0);
+  const invoiceAccum = 312800;
+  const claimsDeducted = -18400;
+  return `
+<div class="page-head">
+  <div><h1 class="page">Director Pool</h1><p class="page-sub">Revenue pool sourced from subsidiary CTC payments. <em>Finance executes in; Principal approves out.</em></p></div>
+  <div class="row"><button class="btn-ghost">Export</button><button class="btn-link">Director Salary →</button></div>
+</div>
+
+<div class="grid-3" style="margin-bottom:36px">
+  <div class="card">
+    <div class="hero-label" style="font-size:13px">Director Pool balance</div>
+    <div class="serif" style="font-size:28px;margin-top:2px">${RM(poolBal)}</div>
+    <div class="mono-xs">Accumulated CTC − payouts</div>
+  </div>
+  <div class="card">
+    <div class="hero-label" style="font-size:13px">Invoice accumulator</div>
+    <div class="serif" style="font-size:28px;margin-top:2px">${RM(invoiceAccum)}</div>
+    <div class="mono-xs">25% per-director ledger (inside pool)</div>
+  </div>
+  <div class="card">
+    <div class="hero-label" style="font-size:13px">5% Saving held</div>
+    <div class="serif ledger" style="font-size:28px;margin-top:2px">${RM(totalSaving)}</div>
+    <div class="mono-xs">Per-director saving ledger</div>
+  </div>
+</div>
+
+<div class="sect">
+  <div class="sect-head"><h2>Pool activity</h2><span class="mono-xs">${ledger.length} entries this period</span></div>
+  <p class="sub">All Director Pool transactions. <em>np_in = subsidiary CTC received; expense_out = director payout executed.</em></p>
+  <table class="ledger">
+    <thead><tr><th>Date</th><th>Kind</th><th>Description</th><th class="th-right">Amount</th></tr></thead>
+    <tbody>
+      ${ledger.map(r=>`
+        <tr>
+          <td class="mono-xs">${r.date}</td>
+          <td><em class="stat ${r.kind==='np_in'?'stat-ledger':'stat-alert'}">${r.kind}</em></td>
+          <td class="grap">${r.note}</td>
+          <td class="num ${r.amount<0?'neg':'ledger'}">${r.amount<0?'− ':'+ '}${RM(Math.abs(r.amount))}</td>
+        </tr>`).join('')}
+      <tr style="background:var(--surface-2)">
+        <td></td><td></td>
+        <td class="serif" style="font-weight:600">Net movement this period</td>
+        <td class="num" style="font-weight:700">${(() => { const net = ledger.reduce((s,r)=>s+r.amount,0); return (net>=0?'+ ':'− ')+RM(Math.abs(net)); })()}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="sect">
+  <h2>Accumulator breakdown</h2>
+  <p class="sub">Invoice accumulator held per-director; settles out as Finance-issued invoices to each subsidiary.</p>
+  <table class="ledger">
+    <thead><tr><th>Director</th><th class="th-right">5% Saving balance</th><th class="th-right">Invoice share</th><th class="th-right">Payout YTD</th></tr></thead>
+    <tbody>
+      ${DIRECTORS.map((dir,i)=>`
+        <tr>
+          <td class="serif">${dir.name} <span class="mono-xs">· ${dir.code}</span></td>
+          <td class="num ledger">${RM(dir.savingBalance)}</td>
+          <td class="num">${RM(invoiceAccum*dir.weight)}</td>
+          <td class="num grap">${RM(DSAL_POOL*dir.weight*3)}</td>
+        </tr>`).join('')}
+    </tbody>
+  </table>
+</div>`;
+}
+
+function screen_reports(){
+  const reports = [
+    ['P&L by period','Interest income, rent, salaries, shared services bill-back.'],
+    ['Cash movement','Daily, weekly, monthly by bank account.'],
+    ['AR aging','Subsidiaries, directors, staff by bucket.'],
+    ['Voucher audit','All vouchers posted with GL posting hash.'],
+    ['Payroll register','Per-staff, per-dept monthly.'],
+    ['Penalty register','Overdue stages and collections.'],
+  ];
+  return `
+<div class="page-head">
+  <div><h1 class="page">Reports</h1><p class="page-sub">Bookkeeper-facing reports. <em>Exportable to CSV and PDF.</em></p></div>
+</div>
+<div class="grid-2">
+  ${reports.map(r=>`
+    <div class="card" style="padding:28px">
+      <h2 class="serif" style="font-size:22px;margin:0">${r[0]}</h2>
+      <p class="serif" style="font-style:italic;color:var(--graphite);margin:6px 0 14px">${r[1]}</p>
+      <button class="btn-link">Open report →</button>
+    </div>`).join('')}
+</div>`;
+}
+
+/* MOUNT */
+const SCREENS = {
+  dashboard:screen_dashboard, inbox:screen_inbox, vouchers:screen_vouchers,
+  fundin:screen_fundin, fundout:screen_fundout, overdue:screen_overdue,
+  statements:screen_statements, invoices:screen_invoices, payroll:screen_payroll,
+  dsalaryBatch:screen_dsalaryBatch, dpool:screen_dpool,
+  recon:screen_recon, gl:screen_gl,
+  claims:screen_claims, reports:screen_reports,
+};
+
+const content = document.getElementById('content');
+Object.entries(SCREENS).forEach(([id,fn])=>{
+  const sec = document.createElement('div');
+  sec.className='screen'; sec.id='scr-'+id;
+  sec.innerHTML = fn();
+  content.appendChild(sec);
+  sec.querySelectorAll('table.ledger td.num').forEach(td=>{
+    if(td.textContent.trim().startsWith('−')||td.textContent.trim().startsWith('-')) td.classList.add('neg');
+  });
+});
+
+let initial='dashboard';
+try{
+  const saved=localStorage.getItem('vp.finance.page');
+  if(saved && SCREENS[saved]) initial=saved;
+  const hash=location.hash.replace('#','');
+  if(hash && SCREENS[hash]) initial=hash;
+}catch(e){}
+
+renderNav(initial);
+renderPageBar();
+updateActiveNav(initial);
+window.addEventListener('hashchange',()=>{const h=location.hash.replace('#','');if(SCREENS[h]) goto(h)});
+</script>
+</body>
+</html>

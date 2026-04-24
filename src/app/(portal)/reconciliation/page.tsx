@@ -32,10 +32,13 @@ export default async function ReconciliationPage() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10">
+      <div className="page-head">
         <div>
-          <h1 className="font-serif text-3xl text-ink">Bank Reconciliation</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
+          <div className="page-eyebrow">
+            <em>I.</em> TREASURY · BANK RECONCILIATION
+          </div>
+          <h1 className="page-title">Bank Reconciliation</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
             Compare bank balances against GL, import CSV statements for matching.
           </p>
         </div>

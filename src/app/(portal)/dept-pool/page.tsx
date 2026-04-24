@@ -114,7 +114,10 @@ export default async function DeptPoolPage() {
     <div>
       <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10">
         <div>
-          <h1 className="font-serif text-3xl text-ink">Department Pools</h1>
+          <div className="page-eyebrow">
+            <em>I.</em> DEPARTMENTS · POOL OVERVIEW
+          </div>
+          <h1 className="page-title">Department Pools</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
             Running balance per department — credits from invoice settlement + P&amp;L, debits from payroll + expenses.
           </p>

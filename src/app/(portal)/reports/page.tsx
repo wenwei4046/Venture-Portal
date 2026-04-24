@@ -29,11 +29,16 @@ export default async function ReportsPage() {
 
   return (
     <div>
-      <div className="mb-10">
-        <h1 className="font-serif text-3xl text-ink">Reports</h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          财务报表。<em>All modules consolidated.</em>
-        </p>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> REPORTS · CONSOLIDATED
+          </div>
+          <h1 className="page-title">Reports</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            财务报表。<em>All modules consolidated.</em>
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -43,10 +43,13 @@ export default async function StatementsPage() {
   return (
     <div>
       <StatementsTabHeader active="statements" />
-      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10">
+      <div className="page-head">
         <div>
-          <h1 className="font-serif text-3xl text-ink">Statements</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
+          <div className="page-eyebrow">
+            <em>I.</em> TREASURY · MONTHLY STATEMENTS
+          </div>
+          <h1 className="page-title">Statements</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
             Monthly consolidated statements. <em>Invoice items minus contra items</em>{' '}
             per subsidiary per month.
           </p>
@@ -60,16 +63,16 @@ export default async function StatementsPage() {
           <div className="font-serif italic text-accent text-base mb-1">
             {latestPeriod ? `Latest period` : 'No statements yet'}
           </div>
-          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
+          <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tracking-[-0.01em]">
             {latestPeriod ? (
               dayjs(latestPeriod).format('MMMM YYYY')
             ) : (
               <span className="text-muted">—</span>
             )}
           </div>
-          <div className="font-mono text-xs text-muted mt-2">
-            {statementList.length} total{' '}
-            {statementList.length === 1 ? 'statement' : 'statements'}
+          <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
+            {statementList.length} TOTAL{' '}
+            {statementList.length === 1 ? 'STATEMENT' : 'STATEMENTS'}
           </div>
         </div>
 
@@ -103,24 +106,22 @@ export default async function StatementsPage() {
       ) : (
         Array.from(byPeriod.entries()).map(([period, periodStatements]) => (
           <section key={period} className="mb-12">
-            <h2 className="font-serif text-2xl text-ink mb-1">
-              {dayjs(period).format('MMMM YYYY')}
-            </h2>
-            <p className="font-serif italic text-graphite text-sm mb-4">
-              {periodStatements.length}{' '}
-              {periodStatements.length === 1 ? 'statement' : 'statements'}
-            </p>
+            <div className="sect-head">
+              <h2>{dayjs(period).format('MMMM YYYY')}</h2>
+              <span className="rule" aria-hidden />
+              <span className="count">{periodStatements.length} {periodStatements.length === 1 ? 'STATEMENT' : 'STATEMENTS'}</span>
+            </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="ledger-table">
                 <thead>
-                  <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                    <th className="text-left py-3 pr-4 font-medium">Company</th>
-                    <th className="text-right py-3 pr-4 font-medium">Invoice</th>
-                    <th className="text-right py-3 pr-4 font-medium">Contra</th>
-                    <th className="text-right py-3 pr-4 font-medium">Net</th>
-                    <th className="text-left py-3 pr-4 font-medium">Status</th>
-                    <th className="py-3 text-right"></th>
+                  <tr>
+                    <th>Company</th>
+                    <th className="right">Invoice</th>
+                    <th className="right">Contra</th>
+                    <th className="right">Net</th>
+                    <th>Status</th>
+                    <th className="right"></th>
                   </tr>
                 </thead>
                 <tbody className="row-stagger">
@@ -130,33 +131,32 @@ export default async function StatementsPage() {
                       <tr
                         key={s.id}
                         style={{ '--i': i } as React.CSSProperties}
-                        className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors"
                       >
-                        <td className="py-4 pr-4">
-                          <div className="font-serif text-md text-ink">
+                        <td>
+                          <div className="font-serif text-[15px] text-ink">
                             {company?.name ?? '—'}
                           </div>
-                          <div className="font-mono text-xs text-muted">
+                          <div className="font-mono text-[11px] text-graphite mt-0.5">
                             {company?.code}
                           </div>
                         </td>
-                        <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
+                        <td className="num">
                           {Number(s.total_invoice) > 0
                             ? formatMoney(Number(s.total_invoice))
-                            : '—'}
+                            : <span className="text-muted">—</span>}
                         </td>
-                        <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">
+                        <td className="num neg">
                           {Number(s.total_contra) > 0
                             ? formatMoney(-Number(s.total_contra))
-                            : '—'}
+                            : <span className="text-muted">—</span>}
                         </td>
-                        <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">
+                        <td className="num font-semibold">
                           {formatMoney(Number(s.net_amount))}
                         </td>
-                        <td className="py-4 pr-4">
+                        <td>
                           <StatementStatus status={s.status} />
                         </td>
-                        <td className="py-4 text-right">
+                        <td className="right">
                           <Link
                             href={`/statements/${s.id}`}
                             className="text-sm text-accent hover:text-accent-hover font-serif italic"

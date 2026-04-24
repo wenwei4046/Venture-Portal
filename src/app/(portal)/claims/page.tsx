@@ -28,10 +28,13 @@ export default async function ClaimsPage({ searchParams }: Props) {
 
   return (
     <div>
-      <div className="flex items-baseline justify-between mb-10">
+      <div className="page-head">
         <div>
-          <h1 className="font-serif text-3xl text-ink">Claims</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
+          <div className="page-eyebrow">
+            <em>I.</em> CLAIMS · BENEFIT &amp; POOL
+          </div>
+          <h1 className="page-title">Claims</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
             Benefit claims (HR approves) and pool claims (Finance approves).
           </p>
         </div>

@@ -15,6 +15,7 @@ const config: Config = {
         'surface-2': 'rgb(var(--surface-2) / <alpha-value>)',
         hairline: 'rgb(var(--hairline) / <alpha-value>)',
         ink: 'rgb(var(--ink) / <alpha-value>)',
+        'num-ink': 'rgb(var(--num-ink) / <alpha-value>)',
         graphite: 'rgb(var(--graphite) / <alpha-value>)',
         muted: 'rgb(var(--muted) / <alpha-value>)',
 

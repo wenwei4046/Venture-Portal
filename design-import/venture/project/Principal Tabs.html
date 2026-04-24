@@ -1,0 +1,1208 @@
+<!doctype html>
+<html lang="en-MY">
+<head>
+<meta charset="utf-8" />
+<title>Venture · Principal · All Tabs</title>
+<meta name="viewport" content="width=1440" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+TC:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="portals/data.js"></script>
+<style>
+  :root{
+    --paper:#F3ECDD; --surface:#FAF5EA; --surface-2:#E8DDC4; --hairline:#C6B99E;
+    --ink:#1C160F; --graphite:#5A4E40; --muted:#85775F;
+    --num-ink:#1A130B;
+    --accent:#CC5A2E; --accent-bg:#FBE8DE; --accent-border:#E8B098; --accent-hover:#B54A22;
+    --ledger:#3D6B45; --ledger-bg:#E7EFE6;
+    --alert:#A07020; --alert-bg:#F5EBD3;
+    --danger:#A3371A; --danger-bg:#F8E1D8;
+    --info:#5A6B8A; --info-bg:#EBEEF3;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased}
+  .serif{font-family:'Instrument Serif','Noto Serif TC',serif;font-weight:400}
+  .mono{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums slashed-zero}
+  em,i{font-style:italic}
+  .tabular{font-variant-numeric:tabular-nums slashed-zero}
+  button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+  a{color:inherit;text-decoration:none}
+
+  /* Shell */
+  .shell{display:grid;grid-template-columns:236px 1fr;min-height:100vh}
+  .sidebar{border-right:1px solid var(--hairline);background:linear-gradient(180deg, #F2ECDF 0%, var(--paper) 180px);padding:26px 18px 32px;position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto}
+  .brand{padding:0 10px 22px;margin-bottom:10px;position:relative}
+  .brand::after{content:'';position:absolute;left:10px;right:10px;bottom:0;height:1px;background:linear-gradient(90deg, var(--ink) 0%, var(--hairline) 40%, transparent 100%)}
+  .brand .wordmark{font-family:'Instrument Serif',serif;font-size:30px;line-height:1;letter-spacing:-.015em}
+  .brand .wordmark::after{content:'·';color:var(--accent);margin-left:4px;font-weight:400}
+  .brand .tag{font-family:'Instrument Serif',serif;font-style:italic;font-size:12.5px;color:var(--graphite);margin-top:3px;letter-spacing:.01em}
+  .brand .tag em{color:var(--accent);font-style:italic}
+
+  .nav-group{margin-top:22px;position:relative}
+  .nav-group:first-of-type{margin-top:18px}
+  .nav-label{display:flex;align-items:baseline;gap:8px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.18em;color:var(--muted);padding:0 10px 8px}
+  .nav-label .rom{font-family:'Instrument Serif',serif;font-style:italic;font-weight:400;font-size:11px;letter-spacing:.02em;color:var(--accent);text-transform:none}
+  .nav-label .rule{flex:1;height:1px;background:var(--hairline);transform:translateY(-3px)}
+
+  .nav a{display:flex;align-items:baseline;justify-content:space-between;gap:6px;padding:6px 10px 6px 18px;border-radius:4px;font-size:13px;color:var(--graphite);transition:.15s;position:relative;letter-spacing:.005em}
+  .nav a::before{content:'';position:absolute;left:8px;top:50%;transform:translateY(-50%);width:3px;height:3px;border-radius:99px;background:var(--muted);opacity:.35;transition:.15s}
+  .nav a:hover{background:var(--surface-2);color:var(--ink)}
+  .nav a:hover::before{background:var(--graphite);opacity:.8}
+  .nav a.active{background:var(--accent-bg);color:var(--accent);font-family:'Instrument Serif',serif;font-style:italic;font-size:15.5px;padding-top:7px;padding-bottom:7px}
+  .nav a.active::before{width:3px;height:16px;border-radius:2px;background:var(--accent);opacity:1;left:6px}
+  .nav a .count{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--muted);letter-spacing:.02em}
+  .nav a.active .count{color:var(--accent);font-family:'JetBrains Mono',monospace;font-style:normal}
+
+  /* Topbar */
+  .main{min-width:0;display:flex;flex-direction:column}
+  .topbar{display:flex;align-items:baseline;justify-content:space-between;padding:22px 40px 10px;border-bottom:1px solid var(--hairline);gap:24px}
+  .greet{font-family:'Instrument Serif',serif;font-size:20px;color:var(--ink)}
+  .greet em{color:var(--accent)}
+  .topmeta{display:flex;gap:20px;align-items:baseline;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)}
+  .topmeta .user{font-family:'Instrument Serif',serif;font-style:italic;font-size:14px;color:var(--graphite)}
+  .topmeta .dot{width:5px;height:5px;border-radius:99px;background:var(--ledger);display:inline-block;margin-right:6px;transform:translateY(-2px)}
+
+  /* Content */
+  .content{padding:36px 40px 72px;max-width:1200px;width:100%}
+  h1.page{font-family:'Instrument Serif',serif;font-size:38px;line-height:1;margin:0;color:var(--ink);letter-spacing:-.012em;position:relative;padding-left:0;display:flex;flex-direction:column;gap:10px}
+  h1.page .eyebrow{font-family:'JetBrains Mono',monospace;font-style:normal;font-size:10.5px;font-weight:500;text-transform:uppercase;letter-spacing:.22em;color:var(--graphite);display:flex;align-items:center;gap:8px}
+  h1.page .eyebrow em{color:var(--accent);font-family:'Instrument Serif',serif;font-style:italic;font-size:14px;text-transform:none;letter-spacing:.01em}
+  p.page-sub{font-family:'Instrument Serif',serif;font-style:italic;font-size:16px;color:var(--graphite);margin:10px 0 0}
+  p.page-sub em{color:var(--ink)}
+  .page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:32px;padding-bottom:20px;border-bottom:1px solid var(--hairline);position:relative}
+  .page-head::after{content:'';position:absolute;left:0;bottom:-1px;width:64px;height:2px;background:var(--accent)}
+
+  /* Buttons */
+  .btn-seal{background:var(--accent);color:#fff;font-family:'Instrument Serif',serif;font-style:italic;font-size:14px;padding:9px 16px;border-radius:6px;transition:.15s}
+  .btn-seal:hover{background:var(--accent-hover)}
+  .btn-ghost{border:1px solid var(--hairline);color:var(--graphite);font-size:13px;padding:8px 14px;border-radius:6px;background:var(--surface)}
+  .btn-ghost:hover{background:var(--surface-2);color:var(--ink)}
+  .btn-link{font-family:'Instrument Serif',serif;font-style:italic;color:var(--accent);font-size:14px}
+  .btn-link:hover{color:var(--accent-hover)}
+
+  /* Hero strip (Option B) */
+  .hero{display:grid;grid-template-columns:7fr 5fr;gap:48px;padding-bottom:40px;border-bottom:1px solid var(--hairline);margin-bottom:40px}
+  .hero-trio{display:grid;grid-template-columns:1fr 1fr 1fr;gap:32px;padding-bottom:40px;border-bottom:1px solid var(--hairline);margin-bottom:40px}
+  .hero-label{font-family:'Instrument Serif',serif;font-style:italic;font-size:15px;color:var(--accent);margin-bottom:6px}
+  .hero-num{font-family:'Instrument Serif',serif;font-size:56px;line-height:.95;letter-spacing:-.01em;color:var(--num-ink);font-variant-numeric:tabular-nums slashed-zero}
+  .hero-num .cents,.hero-num .unit{color:var(--graphite);font-weight:400}
+  .hero-num .cents{font-size:28px}
+  .hero-num .unit{font-size:22px}
+  .hero-meta{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--graphite);margin-top:10px;letter-spacing:.02em;font-weight:500}
+  .hero-med .hero-num{font-size:40px}
+  .hero-sm .hero-num{font-size:28px}
+
+  /* Sparkline */
+  .spark{display:block;width:100%;height:40px;margin-top:10px}
+
+  /* Tables — Finance optimized */
+  table.ledger{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--surface);border:1px solid var(--hairline);border-radius:6px;overflow:hidden}
+  table.ledger thead th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--graphite);font-weight:600;padding:13px 16px;border-bottom:1px solid var(--hairline);background:var(--surface-2)}
+  table.ledger tbody tr{border-bottom:1px solid var(--hairline)}
+  table.ledger tbody tr:nth-child(even){background:color-mix(in oklab, var(--surface-2) 35%, var(--surface))}
+  table.ledger tbody tr:last-child{border-bottom:0}
+  table.ledger tbody tr:hover{background:var(--accent-bg)}
+  table.ledger td{padding:14px 16px;vertical-align:baseline;color:var(--ink)}
+  table.ledger .num{text-align:right;font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums slashed-zero;font-weight:500;color:var(--num-ink);font-size:13.5px;letter-spacing:0}
+  table.ledger .num.neg{color:var(--danger)}
+  table.ledger .serif{font-family:'Instrument Serif',serif;font-size:16px;color:var(--ink)}
+  table.ledger .mono,table.ledger .mono-xs{color:var(--graphite)}
+  .th-right{text-align:right !important}
+
+  /* Section head — editorial */
+  .sect{margin-bottom:44px}
+  .sect h2{font-family:'Instrument Serif',serif;font-weight:400;font-size:24px;color:var(--ink);margin:0 0 4px}
+  .sect .sub{font-family:'Instrument Serif',serif;font-style:italic;font-size:13.5px;color:var(--graphite);margin:0 0 18px}
+  .sect-head{display:flex;align-items:baseline;gap:16px;margin-bottom:18px}
+  .sect-head h2{margin-bottom:0;font-size:22px;flex-shrink:0}
+  .sect-head .rule{flex:1;height:1px;background:var(--hairline);transform:translateY(-5px)}
+  .sect-head .mono-xs{flex-shrink:0;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+
+  /* Status label */
+  .stat{font-family:'Instrument Serif',serif;font-style:italic;font-size:14px}
+  .stat-active{color:var(--ink)}
+  .stat-pending{color:var(--info)}
+  .stat-alert{color:var(--alert)}
+  .stat-overdue{color:var(--alert)}
+  .stat-danger{color:var(--danger)}
+  .stat-ledger{color:var(--ledger)}
+  .stat-muted{color:var(--muted)}
+
+  /* Cards */
+  .card{border:1px solid var(--hairline);border-radius:6px;background:var(--surface);padding:20px}
+  .card-tag{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--graphite)}
+  .card-title{font-family:'Instrument Serif',serif;font-size:18px;color:var(--ink);margin-top:4px}
+  .card-amount{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ink);margin-top:4px;font-weight:500}
+  .card-meta{font-size:11.5px;color:var(--graphite);font-family:'JetBrains Mono',monospace;margin-top:6px;font-weight:500}
+
+  /* Tabs (in-page) */
+  .tabs{display:flex;gap:22px;border-bottom:1px solid var(--hairline);margin-bottom:24px;overflow-x:auto}
+  .tabs a{padding:10px 2px;font-size:14px;color:var(--graphite);border-bottom:2px solid transparent;margin-bottom:-1px;transition:.15s;white-space:nowrap}
+  .tabs a:hover{color:var(--ink)}
+  .tabs a.on{color:var(--accent);font-family:'Instrument Serif',serif;font-style:italic;font-size:15.5px;border-bottom-color:var(--accent)}
+  .tabs a .ct{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--muted);margin-left:4px}
+
+  /* Meter bar */
+  .meter{display:flex;height:4px;background:var(--surface-2);border-radius:99px;overflow:hidden}
+  .meter span{background:var(--ink);display:block}
+
+  /* Empty / loading / error */
+  .empty{border:1px solid var(--hairline);border-radius:6px;background:var(--surface);padding:48px 20px;text-align:center}
+  .empty .big{font-family:'Instrument Serif',serif;font-style:italic;font-size:22px;color:var(--ledger);margin:0}
+  .empty .sml{font-family:'Instrument Serif',serif;font-style:italic;font-size:14px;color:var(--muted);margin:4px 0 0}
+  .skel{background:repeating-linear-gradient(90deg,var(--surface-2),var(--surface-2) 6px,var(--surface) 6px,var(--surface) 12px);border-radius:4px}
+  .err{border:1px solid var(--danger);border-radius:6px;background:var(--danger-bg);padding:16px 18px;color:var(--danger);font-family:'Instrument Serif',serif;font-style:italic;font-size:14px}
+
+  /* Tiny helpers */
+  .row{display:flex;gap:10px;align-items:center}
+  .between{display:flex;justify-content:space-between;align-items:baseline}
+  .stack-2>*+*{margin-top:8px}
+  .stack-3>*+*{margin-top:14px}
+  .hairline-t{border-top:1px solid var(--hairline);padding-top:14px}
+  .muted{color:var(--muted)}
+  .grap{color:var(--graphite)}
+  .ledger{color:var(--ledger)}
+  .alert{color:var(--alert)}
+  .danger{color:var(--danger)}
+  .mono-xs{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--graphite);font-weight:500}
+
+  /* Page-picker bar at top */
+  .pagebar{position:sticky;top:0;z-index:20;background:color-mix(in oklab, var(--paper) 94%, transparent);backdrop-filter:blur(6px);border-bottom:1px solid var(--hairline);padding:8px 16px;display:flex;gap:6px;flex-wrap:wrap}
+  .pagebar button{font-family:'Instrument Serif',serif;font-style:italic;font-size:13px;padding:5px 10px;border-radius:4px;color:var(--graphite)}
+  .pagebar button.on{background:var(--ink);color:var(--surface)}
+  .pagebar .label{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;padding:6px 8px}
+
+  /* Utility */
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+
+  /* Hidden by default, shown when selected */
+  .screen{display:none}
+  .screen.on{display:block}
+
+  /* 准 seal */
+  .seal{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border:1.5px solid var(--accent);color:var(--accent);font-family:'Noto Serif TC',serif;font-size:22px;border-radius:4px;transform:rotate(-4deg)}
+
+  /* segment filter pills */
+  .seg{display:inline-flex;border:1px solid var(--hairline);border-radius:6px;overflow:hidden;background:var(--surface)}
+  .seg button{padding:6px 12px;font-size:12.5px;color:var(--graphite);border-right:1px solid var(--hairline)}
+  .seg button:last-child{border-right:0}
+  .seg button.on{background:var(--ink);color:var(--surface)}
+
+  input,select{font-family:'JetBrains Mono',monospace;font-size:13px;padding:8px 10px;background:var(--surface);border:1px solid var(--hairline);border-radius:6px;color:var(--ink)}
+  input:focus,select:focus{outline:none;border-color:var(--accent-border);box-shadow:0 0 0 3px var(--accent-bg)}
+  label.field{display:block;font-family:'Inter',sans-serif;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--graphite);margin-bottom:6px}
+
+  /* Breadcrumb */
+  .bread{font-family:'Instrument Serif',serif;font-style:italic;font-size:13px;color:var(--muted);margin-bottom:10px}
+  .bread em{color:var(--graphite)}
+
+  /* Approve focal card */
+  .focal{border:1px solid var(--hairline);border-radius:6px;background:var(--surface);padding:28px 28px 24px;display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end}
+
+  /* Timeline */
+  .timeline{border-left:1px solid var(--hairline);margin-left:6px;padding-left:18px}
+  .timeline li{list-style:none;position:relative;padding:4px 0 14px}
+  .timeline li::before{content:"";position:absolute;left:-23px;top:9px;width:7px;height:7px;border-radius:99px;background:var(--graphite)}
+  .timeline li.pos::before{background:var(--ledger)}
+  .timeline li.neg::before{background:var(--alert)}
+</style>
+</head>
+<body>
+
+<!-- Page picker -->
+<nav class="pagebar" id="pagebar">
+  <span class="label">Principal tabs</span>
+</nav>
+
+<div class="shell">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="wordmark">HOUZS</div>
+      <div class="tag">Venture <em>— Principal</em></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label"><span class="rom">I.</span><span>Treasury</span><span class="rule"></span></div>
+      <div class="nav" id="nav-treasury"></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label"><span class="rom">II.</span><span>Loans</span><span class="rule"></span></div>
+      <div class="nav" id="nav-loans"></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label"><span class="rom">III.</span><span>Settlements</span><span class="rule"></span></div>
+      <div class="nav" id="nav-settle"></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label"><span class="rom">IV.</span><span>Departments</span><span class="rule"></span></div>
+      <div class="nav" id="nav-dept"></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label"><span class="rom">V.</span><span>Directors</span><span class="rule"></span></div>
+      <div class="nav" id="nav-dir"></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label"><span class="rom">VI.</span><span>Governance</span><span class="rule"></span></div>
+      <div class="nav" id="nav-gov"></div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <section class="main">
+    <div class="topbar">
+      <div class="greet">Good morning, <em>Principal</em>.</div>
+      <div class="topmeta">
+        <span>Wed 22 Apr 2026</span>
+        <span>· period <em style="font-family:'Instrument Serif',serif">Apr 2026</em></span>
+        <span class="user"><span class="dot"></span>LCY · Principal</span>
+      </div>
+    </div>
+
+    <div class="content" id="content">
+      <!-- Screens injected here -->
+    </div>
+  </section>
+</div>
+
+<script>
+/* ──────────────── NAV + SEED DATA ──────────────── */
+
+const NAV = [
+  {group:'treasury',id:'overview',  label:'Overview'},
+  {group:'treasury',id:'approvals', label:'Approvals', count:3},
+  {group:'treasury',id:'payments',  label:'Payments'},
+  {group:'loans',   id:'fundin',    label:'Fund IN'},
+  {group:'loans',   id:'fundout',   label:'Fund OUT'},
+  {group:'loans',   id:'overdue',   label:'Overdue', count:2},
+  {group:'settle',  id:'statements',label:'Statements'},
+  {group:'settle',  id:'recon',     label:'Reconciliation'},
+  {group:'dept',    id:'deptpool',  label:'Dept Pool'},
+  {group:'dept',    id:'hrcost',    label:'HR Costing'},
+  {group:'dir',     id:'dsalary',   label:'Director Salary'},
+  {group:'dir',     id:'dpool',     label:'Director Pool'},
+  {group:'gov',     id:'claims',    label:'Claims'},
+  {group:'gov',     id:'reports',   label:'Reports'},
+  {group:'gov',     id:'audit',     label:'Audit Log'},
+  {group:'gov',     id:'settings',  label:'Settings'},
+];
+
+const GROUP_EL = {treasury:'nav-treasury',loans:'nav-loans',settle:'nav-settle',dept:'nav-dept',dir:'nav-dir',gov:'nav-gov'};
+
+function renderNav(active){
+  NAV.forEach(n=>{
+    const host = document.getElementById(GROUP_EL[n.group]);
+    if(!host) return;
+    const a = document.createElement('a');
+    a.href='#'+n.id;
+    a.dataset.id=n.id;
+    a.className = (n.id===active)?'active':'';
+    a.innerHTML = `<span>${n.label}</span>${n.count?`<span class="count">${n.count}</span>`:''}`;
+    a.onclick=(e)=>{e.preventDefault();goto(n.id)};
+    host.appendChild(a);
+  });
+}
+function updateActiveNav(id){
+  document.querySelectorAll('.sidebar .nav a').forEach(a=>{
+    a.classList.toggle('active', a.dataset.id===id);
+  });
+  document.querySelectorAll('#pagebar button').forEach(b=>{
+    b.classList.toggle('on', b.dataset.id===id);
+  });
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on', s.id==='scr-'+id));
+  try{localStorage.setItem('vp.page', id)}catch(e){}
+  window.scrollTo({top:0,behavior:'instant'});
+}
+function goto(id){updateActiveNav(id)}
+
+/* Page picker at top */
+function renderPageBar(){
+  const bar = document.getElementById('pagebar');
+  NAV.forEach(n=>{
+    const b=document.createElement('button');
+    b.textContent=n.label;
+    b.dataset.id=n.id;
+    b.onclick=()=>goto(n.id);
+    bar.appendChild(b);
+  });
+}
+
+/* ──────────────── DATA ──────────────── */
+/* SUBS, DIRECTORS, DEPTS, DEPT_COST, DIRECTOR_SALARY_INPUTS,
+   DSAL_POOL, DSAL_SPLIT, DSAL_ROWS, POOL_LEDGER, CLAIMS,
+   PAYROLL_RUNS, VOUCHERS, RM, bigRM — all from portals/data.js */
+
+/* ──────────────── PAGE TEMPLATES ──────────────── */
+
+/* OVERVIEW (B) */
+function screen_overview(){
+  const total = SUBS.reduce((s,x)=>s+x.outstanding,0);
+  const weighted = SUBS.reduce((s,x)=>s+x.outstanding*x.rate,0)/total;
+  return `
+<div class="page-head">
+  <div><h1 class="page">Overview</h1><p class="page-sub">HV treasury at a glance. <em>As of Wed 22 Apr 2026.</em></p></div>
+  <div class="row"><button class="btn-ghost">Export snapshot</button></div>
+</div>
+<div class="hero-trio">
+  <div>
+    <div class="hero-label">Free pool</div>
+    <div class="hero-num">${bigRM(12847203.55)}</div>
+    <svg class="spark" viewBox="0 0 320 40" preserveAspectRatio="none"><polyline fill="none" stroke="var(--ink)" stroke-width="1.25" points="0,28 20,26 40,30 60,24 80,22 100,25 120,20 140,18 160,16 180,19 200,14 220,12 240,15 260,10 280,8 300,6 320,4"/></svg>
+    <div class="hero-meta">Above buffer RM 2.8M · 90-day trend</div>
+  </div>
+  <div class="hero-med">
+    <div class="hero-label">Total outstanding</div>
+    <div class="hero-num">${bigRM(total)}</div>
+    <div class="hero-meta">${SUBS.length} active loans · net spread <span class="ledger">+0.375%/mo</span></div>
+  </div>
+  <div class="hero-med">
+    <div class="hero-label">Monthly net spread</div>
+    <div class="hero-num">${bigRM(total*0.00375)}</div>
+    <div class="hero-meta">Weighted cost ${(0.008).toFixed(3).replace('0.','.')}% · weighted rate ${(weighted*100).toFixed(3)}%</div>
+  </div>
+</div>
+
+<div class="grid-2" style="grid-template-columns: 2fr 1fr;gap:40px">
+  <div>
+    <div class="sect-head"><h2>Subsidiaries</h2><span class="mono-xs">${SUBS.length} active · ${SUBS.filter(s=>s.used>.7).length} hot</span></div>
+    <table class="ledger">
+      <thead><tr><th>Subsidiary</th><th class="th-right">Outstanding</th><th style="width:140px">Utilisation</th><th class="th-right">Rate</th><th>Status</th></tr></thead>
+      <tbody>
+        ${SUBS.map(s=>`
+          <tr>
+            <td><span class="serif">${s.name}</span> <span class="mono-xs">· ${s.code}</span></td>
+            <td class="num">${RM(s.outstanding)}</td>
+            <td><div class="meter"><span style="width:${(s.used*100).toFixed(0)}%"></span></div><div class="mono-xs" style="margin-top:3px">${(s.used*100).toFixed(0)}%</div></td>
+            <td class="num">${(s.rate*100).toFixed(3)}%/mo</td>
+            <td><em class="stat stat-active">active</em></td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  <aside>
+    <div class="sect-head"><h2 style="font-size:20px">Pending your hand</h2><span class="mono-xs">3 items</span></div>
+    <div class="stack-3">
+      ${[
+        {tag:'NEW LOAN · HOUZS CENTURY', title:'Working capital loan', amt:'RM 100,000.00 · 1.140%/mo · 12m', meta:'Finance · 2h ago'},
+        {tag:'FUND SOURCE · DIRECTOR LOAN', title:'Ng Boon Beng — 24m lock-in', amt:'RM 250,000.00 · 0.80%/mo', meta:'Finance · 5h ago'},
+        {tag:'PAYMENT VOUCHER', title:'Office rent Apr 2026', amt:'RM 18,500.00 · Venture Pool', meta:'Finance · yesterday'},
+      ].map(c=>`
+        <div class="card">
+          <div class="card-tag">${c.tag}</div>
+          <div class="card-title">${c.title}</div>
+          <div class="card-amount">${c.amt}</div>
+          <div class="card-meta">${c.meta}</div>
+          <div class="row" style="margin-top:12px"><button class="btn-seal">Approve</button><button class="btn-ghost">Review</button></div>
+        </div>`).join('')}
+    </div>
+  </aside>
+</div>`;
+}
+
+/* APPROVALS */
+function screen_approvals(){
+  return `
+<div class="page-head">
+  <div><h1 class="page">Approvals</h1><p class="page-sub">Pending decisions that require <em>your hand</em>. Principal only.</p></div>
+</div>
+
+<div class="sect-head"><h2>Pending</h2><span class="mono-xs">3 items</span></div>
+<div class="stack-3" style="margin-bottom:48px">
+  ${[
+    {tag:'NEW LOAN · HOUZS CENTURY', title:'Working capital loan — Q2 deposit cycle', amt:'RM 100,000.00 · base rate 1.140%/mo · 12m', meta:'Finance · 2h ago', when:'22 Apr 10:18'},
+    {tag:'GROUP · 3 VOUCHERS · MARKETING', title:'Marketing campaigns Apr batch', amt:'RM 42,380.00 across 3 vouchers · dept_pool_marketing', meta:'Finance · 5h ago', when:'22 Apr 07:42'},
+    {tag:'FUND SOURCE · DIRECTOR LOAN', title:'Ng Boon Beng — 24-month lock-in', amt:'RM 250,000.00 · 0.80%/mo · maturing 22 Apr 2028', meta:'Finance · yesterday', when:'21 Apr 16:04'},
+  ].map(c=>`
+    <div class="card" style="padding:22px 24px">
+      <div class="between"><div class="card-tag">${c.tag}</div><span class="mono-xs">${c.when}</span></div>
+      <div class="card-title" style="margin-top:6px">${c.title}</div>
+      <div class="card-amount" style="margin-top:6px">${c.amt}</div>
+      <div class="card-meta">Submitted by ${c.meta}</div>
+      <div class="row" style="margin-top:16px"><button class="btn-seal">Approve</button><button class="btn-ghost">Review</button><button class="btn-ghost" style="color:var(--danger);border-color:var(--accent-border)">Reject</button></div>
+    </div>`).join('')}
+</div>
+
+<div class="sect-head"><h2>Recently decided</h2><span class="mono-xs">last 10</span></div>
+<table class="ledger">
+  <thead><tr><th>Type</th><th>Description</th><th class="th-right">Amount</th><th>Status</th><th>Decided</th></tr></thead>
+  <tbody>
+    ${[
+      ['LOAN','HOUZS Living — Q1 working capital',180000,'approved','21 Apr 14:02'],
+      ['VOUCHER','Utilities Mar 2026',6240,'approved','21 Apr 10:18'],
+      ['FUND SOURCE','HOUZS Century deposit — 12m',300000,'approved','20 Apr 17:44'],
+      ['VOUCHER','Travel reimbursement — LCY',2840,'rejected','20 Apr 11:20'],
+      ['HR COSTING','Mar 2026 snapshot',null,'approved','19 Apr 09:01'],
+    ].map(r=>`
+      <tr>
+        <td class="mono-xs" style="color:var(--graphite);text-transform:uppercase">${r[0]}</td>
+        <td class="serif">${r[1]}</td>
+        <td class="num">${r[2]?RM(r[2]):'—'}</td>
+        <td><em class="stat ${r[3]==='approved'?'stat-ledger':'stat-danger'}">${r[3]}</em></td>
+        <td class="mono-xs">${r[4]}</td>
+      </tr>`).join('')}
+  </tbody>
+</table>`;
+}
+
+/* PAYMENTS */
+function screen_payments(){
+  const rows = [
+    ['PV-0429','2026-04-22','Office rent Apr 2026','debit','venture_pool',18500,'pending_approval'],
+    ['PV-0428','2026-04-21','Marketing — Lazada Brand Day','debit','dept_pool_marketing',12480,'approved'],
+    ['PV-0427','2026-04-21','HOUZS Century interest collection Mar','credit','venture_pool',25275,'paid'],
+    ['PV-0426','2026-04-20','Telco & internet Apr','debit','venture_pool',2840,'paid'],
+    ['PV-0425','2026-04-19','Invoice payout — HOUZS Living Q1','credit','invoice_payout_pool',32800,'paid'],
+    ['PV-0424','2026-04-18','Staff claim · benefit · Tan Y.L.','debit','dept_pool_hr',340,'draft'],
+    ['PV-0423','2026-04-18','Utility bill Mar','debit','venture_pool',6240,'voided'],
+  ];
+  return `
+<div class="page-head">
+  <div><h1 class="page">Payments</h1><p class="page-sub">Payment vouchers across all pools. <em>Approved + paid reduce ledger balances.</em></p></div>
+  <div class="row"><button class="btn-ghost">Dept requests <span class="mono" style="color:var(--ink);margin-left:4px;font-weight:600">4</span></button><button class="btn-ghost">Payroll requests <span class="mono" style="color:var(--alert);margin-left:4px;font-weight:600">2</span></button><button class="btn-seal">New voucher</button></div>
+</div>
+
+<div class="hero">
+  <div>
+    <div class="hero-label">Paid this period</div>
+    <div class="hero-num">${bigRM(184820.50)}</div>
+    <div class="hero-meta">42 vouchers paid · Apr 2026 to date</div>
+  </div>
+  <div class="hero-sm">
+    <div class="hero-label">Queue</div>
+    <div class="stack-2" style="margin-top:8px">
+      <div class="between"><em class="stat stat-muted">draft</em><span class="mono">3</span></div>
+      <div class="between"><em class="stat stat-alert">pending approval</em><span class="mono">6</span></div>
+      <div class="between"><em class="stat stat-active" style="color:var(--accent)">approved</em><span class="mono">2</span></div>
+      <div class="between"><em class="stat stat-ledger">paid</em><span class="mono">42</span></div>
+      <div class="between"><em class="stat stat-danger">voided</em><span class="mono">1</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="tabs">
+  <a class="on">All <span class="ct">54</span></a>
+  <a>Draft <span class="ct">3</span></a>
+  <a>Pending <span class="ct">6</span></a>
+  <a>Approved <span class="ct">2</span></a>
+  <a>Paid <span class="ct">42</span></a>
+  <a>Voided <span class="ct">1</span></a>
+</div>
+
+<div class="row" style="gap:12px;margin-bottom:16px;flex-wrap:wrap">
+  <input placeholder="Search voucher # / payee / description" style="flex:1;min-width:280px">
+  <select><option>All types</option><option>Expense</option><option>Receipt</option><option>Salary</option></select>
+  <select><option>All pools</option><option>Venture Pool</option><option>Director Pool</option><option>Marketing</option><option>Finance</option><option>HR</option><option>Invoice Payout</option></select>
+  <input type="date" aria-label="From">
+  <input type="date" aria-label="To">
+</div>
+
+<table class="ledger">
+  <thead><tr><th>Voucher #</th><th>Date</th><th>Description</th><th>Dir.</th><th>Pool</th><th class="th-right">Amount</th><th>Status</th></tr></thead>
+  <tbody>
+    ${rows.map(r=>`
+      <tr>
+        <td class="mono" style="color:var(--ink);font-weight:600">${r[0]}</td>
+        <td class="mono-xs" style="color:var(--ink)">${r[1]}</td>
+        <td class="serif">${r[2]}</td>
+        <td class="mono-xs" style="color:${r[3]==='credit'?'var(--ledger)':'var(--ink)'};font-weight:600">${r[3]}</td>
+        <td class="mono-xs" style="color:var(--ink)">${r[4]}</td>
+        <td class="num">${RM(r[5])}</td>
+        <td><em class="stat ${
+          r[6]==='paid'?'stat-ledger':r[6]==='pending_approval'?'stat-alert':r[6]==='approved'?'':'stat-muted'
+        }" ${r[6]==='approved'?'style="color:var(--accent)"':''}>${r[6].replace('_',' ')}</em></td>
+      </tr>`).join('')}
+  </tbody>
+</table>`;
+}
+
+/* FUND IN */
+function screen_fundin(){
+  const rows = [
+    ['Subsidiary','HOUZS Century (HC)',800000,0.0080,12,'2025-11-01','2026-11-01','active'],
+    ['Subsidiary','HOUZS Living (HLIV)',500000,0.0080,12,'2026-01-10','2027-01-10','active'],
+    ['Director loan','Ng Boon Beng (D01)',1200000,0.0080,24,'2025-03-01','2027-03-01','active'],
+    ['Director loan','Tan Wei Ming (D02)',600000,0.0085,24,'2025-09-01','2027-09-01','active'],
+    ['Dept pool','Marketing pool',150000,0.0000,null,'2026-02-01',null,'active'],
+    ['Director saving','Saving 5% cohort',240000,0.0050,12,'2025-06-01','2026-06-01','active'],
+    ['Subsidiary','HOUZS Contracts (CONTS)',300000,0.0080,12,'2026-03-01','2027-03-01','pending_approval'],
+  ];
+  const active = rows.filter(r=>r[7]==='active');
+  const total = active.reduce((s,r)=>s+r[2],0);
+  const w = active.reduce((s,r)=>s+r[2]*r[3],0)/total;
+  return `
+<div class="page-head">
+  <div><h1 class="page">Fund IN</h1><p class="page-sub">Capital borrowed from subsidiaries, directors, department pools, and director savings.</p></div>
+  <button class="btn-seal">Record new fund source</button>
+</div>
+
+<div class="hero">
+  <div>
+    <div class="hero-label">Total paid capital</div>
+    <div class="hero-num">${bigRM(total)}</div>
+    <div class="hero-meta">${active.length} active · 0 matured · 0 repaid · 0 cancelled</div>
+  </div>
+  <div class="hero-sm">
+    <div class="hero-label">Weighted average cost</div>
+    <div class="hero-num" style="font-size:32px">${(w*100).toFixed(3)}<span class="unit">% /mo</span></div>
+    <div class="hero-meta">Maturing in 30d · 0 · next on 01 Jun 2026</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <a>Pending <span class="ct">1</span></a>
+  <a class="on">Active <span class="ct">6</span></a>
+  <a>Matured <span class="ct">0</span></a>
+  <a>Repaid <span class="ct">0</span></a>
+  <a>Cancelled <span class="ct">0</span></a>
+  <a>All <span class="ct">7</span></a>
+</div>
+
+<table class="ledger">
+  <thead><tr><th>Type</th><th>From</th><th class="th-right">Amount</th><th class="th-right">Cost rate</th><th class="th-right">Lock-in</th><th>Effective</th><th>Maturity</th><th>Status</th></tr></thead>
+  <tbody>
+    ${rows.filter(r=>r[7]==='active').map(r=>`
+      <tr>
+        <td class="mono-xs" style="color:var(--graphite)">${r[0]}</td>
+        <td class="serif">${r[1]}</td>
+        <td class="num">${RM(r[2])}</td>
+        <td class="num">${(r[3]*100).toFixed(3)}%/mo</td>
+        <td class="num">${r[4]?r[4]+'m':'—'}</td>
+        <td class="mono-xs">${r[5]}</td>
+        <td class="mono-xs">${r[6]??'—'}</td>
+        <td><em class="stat stat-active">active</em></td>
+      </tr>`).join('')}
+  </tbody>
+</table>`;
+}
+
+/* FUND OUT */
+function screen_fundout(){
+  const rows = [
+    ['HOUZS Century (HC)',2500000,2151300,0.01140,'2025-11-01','active'],
+    ['HOUZS Contracts (CONTS)',1500000,1432700,0.01140,'2026-01-10','active'],
+    ['HOUZS Living (HLIV)',1200000, 984200,0.01140,'2025-09-01','active'],
+    ['HOUZS Furniture (FURN)',900000,712400,0.01140,'2025-12-05','active'],
+    ['HOUZS Decor (DECO)',500000, 380050,0.01140,'2026-02-20','active'],
+    ['HOUZS Sofa Co. (SOFA)',300000,245800,0.01140,'2026-03-04','active'],
+    ['HOUZS Lighting (LIGHT)',120000, 94500,0.01140,'2026-01-18','active'],
+    ['HOUZS Century (HC)',180000, 0,0.01140,null,'pending_approval'],
+  ];
+  const active = rows.filter(r=>r[5]==='active');
+  const out = active.reduce((s,r)=>s+r[2],0);
+  const monthly = active.reduce((s,r)=>s+r[2]*r[3],0);
+  const wr = out>0 ? monthly/out : 0;
+  return `
+<div class="page-head">
+  <div><h1 class="page">Fund OUT</h1><p class="page-sub">Loans disbursed by HV to subsidiaries. <em>Rates lock at creation, never change.</em></p></div>
+  <div class="row"><button class="btn-ghost">Export CSV</button><button class="btn-seal">Record new loan</button></div>
+</div>
+
+<div class="hero">
+  <div>
+    <div class="hero-label">Total outstanding</div>
+    <div class="hero-num">${bigRM(out)}</div>
+    <div class="hero-meta">${active.length} active loans · 1 pending approval</div>
+  </div>
+  <div class="hero-sm">
+    <div class="hero-label">Weighted effective rate</div>
+    <div class="hero-num" style="font-size:32px">${(wr*100).toFixed(3)}<span class="unit">% /mo</span></div>
+    <div class="hero-meta">Monthly interest income <span class="ledger">${RM(monthly)}</span></div>
+  </div>
+</div>
+
+<table class="ledger">
+  <thead><tr><th>Company</th><th class="th-right">Principal</th><th class="th-right">Outstanding</th><th class="th-right">Rate</th><th>Disbursed</th><th>Status</th></tr></thead>
+  <tbody>
+    ${rows.map(r=>`
+      <tr>
+        <td class="serif">${r[0]}</td>
+        <td class="num">${RM(r[1])}</td>
+        <td class="num">${r[5]==='active'?RM(r[2]):'<span class="muted">—</span>'}</td>
+        <td class="num">${(r[3]*100).toFixed(3)}%/mo</td>
+        <td class="mono-xs">${r[4]??'—'}</td>
+        <td><em class="stat ${r[5]==='active'?'stat-active':'stat-alert'}">${r[5].replace('_',' ')}</em></td>
+      </tr>`).join('')}
+  </tbody>
+</table>`;
+}
+
+/* OVERDUE */
+function screen_overdue(){
+  return `
+<div class="page-head">
+  <div><h1 class="page">Overdue &amp; Netting</h1><p class="page-sub">Loans past grace period. <em>Penalty accrues per stage until escalated.</em></p></div>
+</div>
+
+<div class="hero">
+  <div>
+    <div class="hero-label">Penalty outstanding</div>
+    <div class="hero-num">${bigRM(4823.40)}</div>
+    <div class="hero-meta">2 pending records</div>
+  </div>
+  <div class="hero-sm">
+    <div class="stack-2" style="margin-top:12px">
+      <div class="between"><em class="serif" style="color:var(--graphite);font-size:15px">Mar 2026</em><span class="mono tabular">2</span></div>
+      <div class="between"><em class="serif" style="color:var(--graphite);font-size:15px">Feb 2026</em><span class="mono tabular">0</span></div>
+      <div class="between"><em class="serif" style="color:var(--graphite);font-size:15px">Jan 2026</em><span class="mono tabular">0</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="sect">
+  <h2>March 2026</h2>
+  <p class="sub">2 loans past grace — <em>penalties in accrual</em></p>
+  <table class="ledger">
+    <thead><tr><th>Loan</th><th>Company</th><th class="th-right">Outstanding</th><th class="th-right">Overdue</th><th>Stage</th><th class="th-right">Penalty rate</th><th class="th-right">Penalty</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="mono" style="color:var(--graphite)">L-00121</td>
+        <td class="serif">HOUZS Decor (DECO)</td>
+        <td class="num">${RM(380050)}</td>
+        <td class="num"><em class="stat stat-alert">overdue 22d</em></td>
+        <td><em class="stat stat-alert">late_2</em></td>
+        <td class="num">0.500%</td>
+        <td class="num">${RM(3990.50)}</td>
+        <td><em class="stat stat-alert">pending</em></td>
+      </tr>
+      <tr>
+        <td class="mono" style="color:var(--graphite)">L-00117</td>
+        <td class="serif">HOUZS Lighting (LIGHT)</td>
+        <td class="num">${RM(94500)}</td>
+        <td class="num"><em class="stat stat-alert">overdue 9d</em></td>
+        <td><em class="stat stat-alert">late_1</em></td>
+        <td class="num">0.250%</td>
+        <td class="num">${RM(832.90)}</td>
+        <td><em class="stat stat-alert">pending</em></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="row" style="margin-top:14px;gap:8px"><button class="btn-ghost">Mark paid</button><button class="btn-ghost" style="color:var(--danger);border-color:var(--accent-border)">Escalate</button></div>
+</div>
+
+<div class="sect">
+  <h2>Historical</h2>
+  <p class="sub">Resolved overdue records — <em>paid or escalated</em></p>
+  <table class="ledger">
+    <thead><tr><th>Period</th><th>Loan</th><th class="th-right">Penalty</th><th>Status</th><th>Resolved</th></tr></thead>
+    <tbody>
+      <tr><td class="mono-xs">Feb 2026</td><td class="serif">HOUZS Furniture · L-00104</td><td class="num">${RM(1420)}</td><td><em class="stat stat-ledger">paid</em></td><td class="mono-xs">12 Mar 2026</td></tr>
+      <tr><td class="mono-xs">Jan 2026</td><td class="serif">HOUZS Sofa Co. · L-00098</td><td class="num">${RM(780)}</td><td><em class="stat stat-danger">escalated</em></td><td class="mono-xs">08 Feb 2026</td></tr>
+    </tbody>
+  </table>
+</div>`;
+}
+
+/* STATEMENTS */
+function screen_statements(){
+  const rows = [
+    ['HOUZS Century (HC)',   25275.00, 3200.00, 22075.00, 'issued'],
+    ['HOUZS Contracts (CONTS)',16845.00,1100.00, 15745.00, 'issued'],
+    ['HOUZS Living (HLIV)',   11570.00, 800.00,  10770.00, 'paid'],
+    ['HOUZS Furniture (FURN)', 8370.00, 420.00,   7950.00, 'paid'],
+    ['HOUZS Decor (DECO)',     4465.00, 0.00,    4465.00, 'issued'],
+    ['HOUZS Sofa Co. (SOFA)',  2885.00, 0.00,    2885.00, 'issued'],
+    ['HOUZS Lighting (LIGHT)', 1110.00, 0.00,    1110.00, 'draft'],
+  ];
+  return `
+<div class="tabs" style="margin-top:-4px;margin-bottom:22px">
+  <a class="on">Statements</a><a>Invoices</a>
+</div>
+
+<div class="page-head">
+  <div><h1 class="page">Statements</h1><p class="page-sub">Monthly consolidated statements. <em>Invoice items minus contra items</em> per subsidiary per month.</p></div>
+  <button class="btn-seal">Generate statements</button>
+</div>
+
+<div class="hero">
+  <div>
+    <div class="hero-label">Latest period</div>
+    <div class="hero-num" style="font-size:48px">March <span class="cents">2026</span></div>
+    <div class="hero-meta">21 total statements · 3 periods</div>
+  </div>
+  <div class="hero-sm">
+    <div class="stack-2" style="margin-top:8px">
+      <div class="between"><em class="stat stat-muted">draft</em><span class="mono">1</span></div>
+      <div class="between"><em class="stat stat-alert">issued</em><span class="mono">4</span></div>
+      <div class="between"><em class="stat stat-ledger">paid</em><span class="mono">2</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="sect">
+  <h2>March 2026</h2>
+  <p class="sub">7 statements</p>
+  <table class="ledger">
+    <thead><tr><th>Company</th><th class="th-right">Invoice</th><th class="th-right">Contra</th><th class="th-right">Net</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      ${rows.map(r=>`
+        <tr>
+          <td class="serif">${r[0]}</td>
+          <td class="num">${RM(r[1])}</td>
+          <td class="num grap">${r[2]?'− '+RM(r[2]).replace('RM ',''):'—'}</td>
+          <td class="num" style="font-weight:600">${RM(r[3])}</td>
+          <td><em class="stat ${r[4]==='paid'?'stat-ledger':r[4]==='issued'?'stat-alert':'stat-muted'}">${r[4]}</em></td>
+          <td class="th-right"><button class="btn-link">Open →</button></td>
+        </tr>`).join('')}
+    </tbody>
+  </table>
+</div>`;
+}
+
+/* RECONCILIATION */
+function screen_recon(){
+  return `
+<div class="page-head">
+  <div><h1 class="page">Bank Reconciliation</h1><p class="page-sub">Compare bank balances against GL, import CSV statements for matching.</p></div>
+  <button class="btn-link">General Ledger →</button>
+</div>
+
+<div class="sect">
+  <h2>Bank vs GL Balance</h2>
+  <p class="sub">Portal bank balance (from payment vouchers) vs GL balance (from journal entries). <em>Manual reconciliation.</em></p>
+  <table class="ledger">
+    <thead><tr><th>Bank</th><th>Account</th><th>GL Code</th><th class="th-right">Portal Balance</th><th class="th-right">GL Balance</th><th class="th-right">Variance</th></tr></thead>
+    <tbody>
+      <tr><td class="serif">Maybank <span class="mono-xs" style="color:var(--accent);background:var(--accent-bg);padding:1px 5px;border-radius:3px;margin-left:6px">PRIMARY</span></td><td class="mono-xs">5142-2001-8834</td><td class="mono-xs">1010-001</td><td class="num">${RM(8422150.20)}</td><td class="num">${RM(8422150.20)}</td><td class="num ledger">Matched</td></tr>
+      <tr><td class="serif">CIMB</td><td class="mono-xs">8001-3344-1290</td><td class="mono-xs">1010-002</td><td class="num">${RM(3211000.00)}</td><td class="num">${RM(3210400.00)}</td><td class="num danger">${RM(600)}</td></tr>
+      <tr><td class="serif">Public Bank</td><td class="mono-xs">3221-7780-0012</td><td class="mono-xs">1010-003</td><td class="num">${RM(1214053.35)}</td><td class="num">${RM(1214053.35)}</td><td class="num ledger">Matched</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="sect">
+  <h2>CSV Import</h2>
+  <p class="sub">Upload a bank statement CSV to compare individual transactions.</p>
+  <div style="border:1.5px dashed var(--hairline);border-radius:6px;padding:42px 20px;text-align:center;background:var(--surface)">
+    <div class="serif" style="font-size:20px;font-style:italic;color:var(--graphite)">Drop .csv here, or <a class="btn-link" href="#">choose file</a></div>
+    <div class="mono-xs" style="margin-top:8px">Maybank, CIMB, and Public Bank exports supported</div>
+  </div>
+</div>`;
+}
+
+/* DEPT POOL */
+function screen_deptpool(){
+  const rows = [
+    ['Marketing',      824300, 165000, 142000],
+    ['HR',             312500,  42000,  38500],
+    ['Finance',        188200,  12000,  10400],
+    ['Director Office',945300, 420000, 380000],
+    ['Operations',     421000,  68000,  52800],
+  ];
+  const total = rows.reduce((s,r)=>s+r[1],0);
+  return `
+<div class="page-head">
+  <div><h1 class="page">Department Pools</h1><p class="page-sub">Running balance per department — credits from invoice settlement + P&amp;L, debits from payroll + expenses.</p></div>
+  <div class="row"><button class="btn-ghost">Submissions</button><button class="btn-ghost">Contracts</button></div>
+</div>
+
+<div class="hero">
+  <div>
+    <div class="hero-label">Total deployed</div>
+    <div class="hero-num">${bigRM(total)}</div>
+    <div class="hero-meta">Apr 2026 period · 5 departments</div>
+  </div>
+  <div class="hero-sm">
+    <div class="hero-label">This period</div>
+    <div class="stack-2" style="margin-top:8px">
+      <div class="between"><em class="serif grap" style="font-size:15px">Net in</em><span class="mono tabular ledger">${RM(rows.reduce((s,r)=>s+r[2],0))}</span></div>
+      <div class="between"><em class="serif grap" style="font-size:15px">Expense out</em><span class="mono tabular grap">− ${RM(rows.reduce((s,r)=>s+r[3],0)).replace('RM ','')}</span></div>
+    </div>
+  </div>
+</div>
+
+<table class="ledger">
+  <thead><tr><th>Department</th><th class="th-right">Balance</th><th class="th-right">Net in (Apr)</th><th class="th-right">Expense out (Apr)</th><th class="th-right">HR costing LTD</th><th></th></tr></thead>
+  <tbody>
+    ${rows.map(r=>`
+      <tr>
+        <td class="serif">${r[0]}</td>
+        <td class="num">${RM(r[1])}</td>
+        <td class="num ledger">+ ${RM(r[2]).replace('RM ','')}</td>
+        <td class="num grap">− ${RM(r[3]).replace('RM ','')}</td>
+        <td class="num">${RM(r[3]*12)}</td>
+        <td class="th-right"><button class="btn-link">View →</button></td>
+      </tr>`).join('')}
+  </tbody>
+</table>`;
+}
+
+/* HR COSTING */
+function screen_hrcost(){
+  const rows = [
+    ['Marketing',      12, 48000, 9200,  5400, 62600],
+    ['HR',              4, 18200, 3400,  1800, 23400],
+    ['Finance',         6, 29400, 5500,  2600, 37500],
+    ['Director Office', 3, 42000, 7900,  4200, 54100],
+    ['Operations',      9, 36400, 6820,  3100, 46320],
+  ];
+  const sum = rows.reduce((acc,r)=>({count:acc.count+r[1],basic:acc.basic+r[2],stat:acc.stat+r[3],allow:acc.allow+r[4],ctc:acc.ctc+r[5]}),{count:0,basic:0,stat:0,allow:0,ctc:0});
+  return `
+<div class="page-head">
+  <div><h1 class="page">HR Costing</h1><p class="page-sub">Monthly HR cost snapshots. <em>HR submits the totals Finance uses for billing.</em></p></div>
+  <div class="row"><button class="btn-ghost">Manage staff</button><button class="btn-ghost">Monthly payroll</button></div>
+</div>
+
+<div class="hero">
+  <div>
+    <div class="hero-label">Live Apr 2026 — what would snapshot</div>
+    <div class="hero-num">${bigRM(sum.ctc)}</div>
+    <div class="hero-meta">${sum.count} staff · ${rows.length} departments · not yet submitted</div>
+  </div>
+  <div class="hero-sm">
+    <div class="stack-2" style="margin-top:8px">
+      <div class="between"><em class="serif grap" style="font-size:15px">Total basic</em><span class="mono tabular">${RM(sum.basic)}</span></div>
+      <div class="between"><em class="serif grap" style="font-size:15px">Total statutory</em><span class="mono tabular">${RM(sum.stat)}</span></div>
+      <div class="between"><em class="serif grap" style="font-size:15px">Total allowance</em><span class="mono tabular">${RM(sum.allow)}</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="sect">
+  <h2>Live breakdown</h2>
+  <p class="sub">Computed from staff master — <em>click Submit to freeze as the Apr snapshot</em></p>
+  <table class="ledger">
+    <thead><tr><th>Department</th><th class="th-right">Staff</th><th class="th-right">Basic</th><th class="th-right">Statutory</th><th class="th-right">Allowance</th><th class="th-right">Total CTC</th></tr></thead>
+    <tbody>
+      ${rows.map(r=>`
+        <tr>
+          <td class="serif">${r[0]}</td>
+          <td class="num">${r[1]}</td>
+          <td class="num">${RM(r[2])}</td>
+          <td class="num grap">${RM(r[3])}</td>
+          <td class="num grap">${RM(r[4])}</td>
+          <td class="num" style="font-weight:600">${RM(r[5])}</td>
+        </tr>`).join('')}
+      <tr style="background:var(--surface-2)">
+        <td class="serif" style="font-weight:600">Totals</td>
+        <td class="num" style="font-weight:600">${sum.count}</td>
+        <td class="num" style="font-weight:600">${RM(sum.basic)}</td>
+        <td class="num" style="font-weight:600">${RM(sum.stat)}</td>
+        <td class="num" style="font-weight:600">${RM(sum.allow)}</td>
+        <td class="num" style="font-weight:700;color:var(--accent)">${RM(sum.ctc)}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="sect">
+  <h2>Submissions — last 6 periods</h2>
+  <table class="ledger">
+    <thead><tr><th>Period</th><th>Submitted</th><th>By</th><th class="th-right">Total CTC</th><th>State</th><th></th></tr></thead>
+    <tbody>
+      <tr><td class="mono-xs">Mar 2026</td><td class="mono-xs">30 Mar 17:12</td><td class="serif">Tan Y.L.</td><td class="num">${RM(223820)}</td><td><em class="stat stat-ledger">executed</em></td><td class="th-right"><button class="btn-link">Open →</button></td></tr>
+      <tr><td class="mono-xs">Feb 2026</td><td class="mono-xs">28 Feb 16:48</td><td class="serif">Tan Y.L.</td><td class="num">${RM(219440)}</td><td><em class="stat stat-ledger">executed</em></td><td class="th-right"><button class="btn-link">Open →</button></td></tr>
+      <tr><td class="mono-xs">Jan 2026</td><td class="mono-xs">31 Jan 18:02</td><td class="serif">Tan Y.L.</td><td class="num">${RM(218100)}</td><td><em class="stat stat-ledger">executed</em></td><td class="th-right"><button class="btn-link">Open →</button></td></tr>
+    </tbody>
+  </table>
+</div>`;
+}
+
+/* DIRECTOR SALARY */
+function screen_dsalary(){
+  const rows = [
+    ['Ng Boon Beng (D01)',      0.35, 48200, 12400,  800, 2410, 58190],
+    ['Tan Wei Ming (D02)',      0.25, 34450, 8850,   500, 1720, 40580],
+    ['Lim Chee Yong (D03)',     0.20, 27560, 7080,   400, 1380, 32460],
+    ['Ong Siew Hoon (D04)',     0.12, 16540, 4248,     0, 826, 19462],
+    ['Chua Mei Ling (D05)',     0.08, 11020, 2832,     0, 551, 12701],
+  ];
+  const pool = 168420;
+  return `
+<div class="page-head">
+  <div><h1 class="page">Director Salary</h1><p class="page-sub">月度薪水计算引擎。<em>CTC → Pool → Weightage → Payout.</em></p></div>
+  <div class="row"><label class="field" style="margin-right:4px">Period</label><input type="month" value="2026-04"></div>
+</div>
+
+<div class="hero">
+  <div>
+    <div class="hero-label">Salary Pool — April 2026</div>
+    <div class="hero-num">${bigRM(pool)}</div>
+    <div class="hero-meta">5 directors · <em class="serif alert">draft</em></div>
+  </div>
+  <div class="hero-sm stack-2">
+    <div class="between"><em class="serif grap" style="font-size:13px">Total Payroll (75%)</em><span class="mono tabular">${RM(126315)}</span></div>
+    <div class="between"><em class="serif grap" style="font-size:13px">Total Invoice (25%)</em><span class="mono tabular">${RM(42105)}</span></div>
+    <div class="between"><em class="serif grap" style="font-size:13px">Total 5% Saving</em><span class="mono tabular ledger">${RM(8421)}</span></div>
+    <div class="between"><em class="serif grap" style="font-size:13px">Total Advance</em><span class="mono tabular alert">${RM(1700)}</span></div>
+    <div class="between hairline-t"><em class="serif" style="font-size:14px">Net payout</em><span class="mono tabular" style="font-weight:700">${RM(158299)}</span></div>
+  </div>
+</div>
+
+<div class="sect">
+  <h2>CTC inputs</h2>
+  <p class="sub">Per-subsidiary CTC claims for this period. <em>25% becomes invoice, 75% becomes payroll.</em></p>
+  <table class="ledger">
+    <thead><tr><th>Subsidiary</th><th class="th-right">CTC claim</th><th class="th-right">Invoice (25%)</th><th class="th-right">Payroll (75%)</th></tr></thead>
+    <tbody>
+      <tr><td class="serif">HOUZS Century</td><td class="num">${RM(68000)}</td><td class="num">${RM(17000)}</td><td class="num">${RM(51000)}</td></tr>
+      <tr><td class="serif">HOUZS Contracts</td><td class="num">${RM(46500)}</td><td class="num">${RM(11625)}</td><td class="num">${RM(34875)}</td></tr>
+      <tr><td class="serif">HOUZS Living</td><td class="num">${RM(32200)}</td><td class="num">${RM(8050)}</td><td class="num">${RM(24150)}</td></tr>
+      <tr><td class="serif">HOUZS Furniture</td><td class="num">${RM(21720)}</td><td class="num">${RM(5430)}</td><td class="num">${RM(16290)}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="sect">
+  <div class="sect-head"><h2>Payouts</h2><button class="btn-seal">Confirm payouts</button></div>
+  <table class="ledger">
+    <thead><tr><th>Director</th><th class="th-right">Weightage</th><th class="th-right">Gross</th><th class="th-right">Payroll</th><th class="th-right">Invoice</th><th class="th-right">5% Saving</th><th class="th-right">Advance</th><th class="th-right">Net</th></tr></thead>
+    <tbody>
+      ${rows.map(r=>`
+        <tr>
+          <td class="serif">${r[0]}</td>
+          <td class="num">${(r[1]*100).toFixed(0)}%</td>
+          <td class="num">${RM(r[2]+r[3])}</td>
+          <td class="num">${RM(r[2])}</td>
+          <td class="num">${RM(r[3])}</td>
+          <td class="num ledger">${RM(r[4])}</td>
+          <td class="num alert">${RM(r[5])}</td>
+          <td class="num" style="font-weight:600">${RM(r[6])}</td>
+        </tr>`).join('')}
+    </tbody>
+  </table>
+</div>`;
+}
+
+/* DIRECTOR POOL */
+function screen_dpool(){
+  const rows = [
+    ['22 Apr 2026','np_in','CTC Apr — HOUZS Century',68000],
+    ['22 Apr 2026','np_in','CTC Apr — HOUZS Contracts',46500],
+    ['21 Apr 2026','expense_out','Payout Mar — D01 Ng B.B.',-58190],
+    ['21 Apr 2026','expense_out','Payout Mar — D02 Tan W.M.',-40580],
+    ['15 Apr 2026','np_in','CTC Apr — HOUZS Living',32200],
+    ['31 Mar 2026','np_in','Mar pooled — closing',152400],
+  ];
+  return `
+<div class="page-head">
+  <div><h1 class="page">Director Pool</h1><p class="page-sub">Revenue pooling from subsidiary CTC payments (includes 5% saving + 25% invoice accumulator + 75% unpaid payroll).</p></div>
+</div>
+
+<div class="grid-3" style="margin-bottom:36px">
+  <div class="card">
+    <div class="hero-label" style="font-size:13px">Director Pool</div>
+    <div class="serif" style="font-size:28px;margin-top:2px">${RM(945300)}</div>
+    <div class="mono-xs">Accumulated CTC − payouts</div>
+  </div>
+  <div class="card">
+    <div class="hero-label" style="font-size:13px">Invoice Accumulator</div>
+    <div class="serif" style="font-size:28px;margin-top:2px">${RM(312800)}</div>
+    <div class="mono-xs">25% per-director ledger (lives inside Director Pool)</div>
+  </div>
+  <div class="card">
+    <div class="hero-label" style="font-size:13px">Claims Deducted</div>
+    <div class="serif danger" style="font-size:28px;margin-top:2px">${RM(-18400)}</div>
+    <div class="mono-xs">Approved director project claims</div>
+  </div>
+</div>
+
+<div class="sect">
+  <h2>Director Pool Activity</h2>
+  <p class="sub">Monthly revenue pooling from subs + payouts over time. <em>Balance = full CTC less payroll drained.</em></p>
+  <table class="ledger">
+    <thead><tr><th>Date</th><th>Type</th><th>Description</th><th class="th-right">Amount</th></tr></thead>
+    <tbody>
+      ${rows.map(r=>`
+        <tr>
+          <td class="mono-xs">${r[0]}</td>
+          <td class="mono-xs" style="color:${r[1]==='np_in'?'var(--ledger)':'var(--graphite)'}">${r[1]}</td>
+          <td class="serif">${r[2]}</td>
+          <td class="num ${r[3]>=0?'ledger':'grap'}">${r[3]>=0?'+ ':'− '}${RM(Math.abs(r[3])).replace('RM ','')}</td>
+        </tr>`).join('')}
+    </tbody>
+  </table>
+</div>`;
+}
+
+/* CLAIMS */
+function screen_claims(){
+  const rows = [
+    ['Tan Y.L.','Optical · Mar 2026',420,'approved','19 Apr 2026'],
+    ['Ng Boon Beng','Project travel · CONTS kickoff',3840,'pending','20 Apr 2026'],
+    ['Chua Mei Ling','Medical · dental',280,'paid','15 Apr 2026'],
+    ['Lim Chee Yong','Client entertainment · HLIV',1250,'rejected','14 Apr 2026'],
+    ['Ong Siew Hoon','Mobile reimbursement Mar',120,'approved','12 Apr 2026'],
+  ];
+  return `
+<div class="page-head">
+  <div><h1 class="page">Claims</h1><p class="page-sub">Benefit claims (HR approves) and pool claims (Finance approves).</p></div>
+  <button class="btn-seal">New claim</button>
+</div>
+
+<div class="tabs">
+  <a class="on">Benefit Claims <span class="ct">18</span></a>
+  <a>Pool Claims <span class="ct">7</span></a>
+</div>
+
+<table class="ledger">
+  <thead><tr><th>Claimant</th><th>Description</th><th class="th-right">Amount</th><th>Status</th><th>Date</th><th></th></tr></thead>
+  <tbody>
+    ${rows.map(r=>`
+      <tr>
+        <td class="serif">${r[0]}</td>
+        <td class="grap">${r[1]}</td>
+        <td class="num">${RM(r[2])}</td>
+        <td><em class="stat ${r[3]==='approved'?'stat-ledger':r[3]==='paid'?'stat-muted':r[3]==='rejected'?'stat-danger':'stat-alert'}">${r[3]}</em></td>
+        <td class="mono-xs">${r[4]}</td>
+        <td class="th-right"><button class="btn-link">Review →</button></td>
+      </tr>`).join('')}
+  </tbody>
+</table>`;
+}
+
+/* REPORTS */
+function screen_reports(){
+  const reports = [
+    ['HV Profit & Loss','Monthly view. Bank model: treasury spread, marketing, shared services bill-back.'],
+    ['Fund Summary','Paid capital, free capital, allocated, free cash.'],
+    ['Base Rate History','Quarterly weighted cost + margin = base rate over time.'],
+    ['Claims Summary','Benefit and pool claims by status and amount.'],
+  ];
+  return `
+<div class="page-head">
+  <div><h1 class="page">Reports</h1><p class="page-sub">财务报表。<em>All modules consolidated.</em></p></div>
+</div>
+<div class="grid-2">
+  ${reports.map(r=>`
+    <div class="card" style="padding:28px">
+      <h2 class="serif" style="font-size:22px;margin:0">${r[0]}</h2>
+      <p class="serif" style="font-style:italic;color:var(--graphite);margin:6px 0 14px">${r[1]}</p>
+      <button class="btn-link">Open report →</button>
+    </div>`).join('')}
+</div>`;
+}
+
+/* AUDIT LOG */
+function screen_audit(){
+  const rows = [
+    ['22 Apr 14:02','LCY','viewed','director_payouts','period=2026-04'],
+    ['22 Apr 13:48','Tan Y.L.','exported','director_salary_print','period=2026-03'],
+    ['21 Apr 18:20','LCY','viewed','hr_staff_costs','all staff'],
+    ['21 Apr 09:12','Finance (PL)','viewed','director_payouts','summary only'],
+    ['20 Apr 17:44','LCY','approved','fund_sources','src=FS-0038'],
+    ['20 Apr 11:02','Tan Y.L.','viewed','director_salary_print','period=2026-03 · D01'],
+  ];
+  return `
+<div class="page-head">
+  <div><h1 class="page">Access Audit Log</h1><p class="page-sub">Tracks who viewed sensitive salary and director data. <em>LHDN + internal governance compliance.</em></p></div>
+</div>
+
+<div class="row" style="gap:8px;margin-bottom:18px;align-items:center">
+  <span class="serif" style="font-style:italic;font-size:14px;color:var(--graphite);margin-right:4px">Filter:</span>
+  <div class="seg">
+    <button class="on">All</button>
+    <button>Director Payouts</button>
+    <button>Director Print</button>
+    <button>HR Staff Costs</button>
+  </div>
+</div>
+
+<p class="mono-xs" style="margin-bottom:14px">843 total entries · Page 1 of 17</p>
+
+<table class="ledger">
+  <thead><tr><th>When</th><th>User</th><th>Action</th><th>Resource</th><th>Detail</th></tr></thead>
+  <tbody>
+    ${rows.map(r=>`
+      <tr>
+        <td class="mono-xs">${r[0]}</td>
+        <td class="serif">${r[1]}</td>
+        <td class="mono-xs" style="color:var(--graphite)">${r[2]}</td>
+        <td class="mono-xs" style="color:var(--accent)">${r[3]}</td>
+        <td class="grap" style="font-size:12.5px">${r[4]}</td>
+      </tr>`).join('')}
+  </tbody>
+</table>`;
+}
+
+/* SETTINGS */
+function screen_settings(){
+  return `
+<div class="page-head" style="margin-bottom:12px">
+  <div><h1 class="page">Settings</h1><p class="page-sub">Treasury config, overdue stages, splits, and subsidiaries. <em>Principal only.</em></p></div>
+</div>
+
+<div class="tabs">
+  <a class="on">Treasury</a><a>Overdue</a><a>Splits</a><a>Directors</a><a>Companies</a><a>Banks</a><a>Periods</a><a>Simulator</a>
+</div>
+
+<div class="sect">
+  <h2>Treasury config</h2>
+  <p class="sub">Base rate inputs + buffer. <em>Weighted cost + op margin = base rate.</em></p>
+  <div class="grid-3" style="max-width:780px;margin-bottom:16px">
+    <div><label class="field">Op margin</label><div class="row" style="gap:6px"><input value="0.400" style="width:100%"><span class="grap mono">%</span></div></div>
+    <div><label class="field">Buffer amount</label><div class="row" style="gap:6px"><span class="grap mono">RM</span><input value="50000" style="width:100%"></div></div>
+    <div><label class="field">5% Saving rate</label><div class="row" style="gap:6px"><input value="5.0" style="width:100%"><span class="grap mono">%</span></div></div>
+  </div>
+  <div class="row"><button class="btn-seal">Save Treasury</button><button class="btn-ghost">Revert</button></div>
+</div>
+
+<div class="sect">
+  <h2>Current base rate</h2>
+  <p class="sub">Weighted cost of fund sources + op margin. <em>Locked to each loan at creation.</em></p>
+  <div class="card" style="max-width:560px;padding:22px 24px">
+    <div class="grid-3" style="gap:24px">
+      <div>
+        <div class="mono-xs" style="text-transform:uppercase;letter-spacing:.1em">Weighted cost</div>
+        <div class="serif" style="font-size:24px;margin-top:4px">0.740<span class="unit" style="color:var(--graphite);font-size:16px">%</span></div>
+      </div>
+      <div>
+        <div class="mono-xs" style="text-transform:uppercase;letter-spacing:.1em">+ Op margin</div>
+        <div class="serif" style="font-size:24px;margin-top:4px">0.400<span class="unit" style="color:var(--graphite);font-size:16px">%</span></div>
+      </div>
+      <div>
+        <div class="mono-xs" style="text-transform:uppercase;letter-spacing:.1em;color:var(--accent)">= Base rate</div>
+        <div class="serif" style="font-size:24px;margin-top:4px;color:var(--accent)">1.140<span class="unit" style="color:var(--accent);font-size:16px;opacity:.8">% /mo</span></div>
+      </div>
+    </div>
+    <div class="mono-xs" style="margin-top:14px">Last updated 01 Apr 2026 · quarterly cycle · next review 01 Jul 2026</div>
+  </div>
+</div>`;
+}
+
+/* ──────────────── MOUNT ──────────────── */
+
+const SCREENS = {
+  overview:screen_overview, approvals:screen_approvals, payments:screen_payments,
+  fundin:screen_fundin, fundout:screen_fundout, overdue:screen_overdue,
+  statements:screen_statements, recon:screen_recon,
+  deptpool:screen_deptpool, hrcost:screen_hrcost,
+  dsalary:screen_dsalary, dpool:screen_dpool,
+  claims:screen_claims, reports:screen_reports, audit:screen_audit, settings:screen_settings,
+};
+
+const content = document.getElementById('content');
+Object.entries(SCREENS).forEach(([id,fn])=>{
+  const sec = document.createElement('div');
+  sec.className='screen';
+  sec.id='scr-'+id;
+  sec.innerHTML = fn();
+  content.appendChild(sec);
+  // Finance: tag any .num cell containing a minus sign as negative
+  sec.querySelectorAll('table.ledger td.num').forEach(td=>{
+    if(td.textContent.trim().startsWith('−') || td.textContent.trim().startsWith('-')){
+      td.classList.add('neg');
+    }
+  });
+});
+
+let initial = 'overview';
+try{
+  const saved = localStorage.getItem('vp.page');
+  if(saved && SCREENS[saved]) initial = saved;
+  const hash = location.hash.replace('#','');
+  if(hash && SCREENS[hash]) initial = hash;
+}catch(e){}
+
+renderNav(initial);
+renderPageBar();
+updateActiveNav(initial);
+
+window.addEventListener('hashchange',()=>{
+  const h = location.hash.replace('#','');
+  if(SCREENS[h]) goto(h);
+});
+</script>
+</body>
+</html>

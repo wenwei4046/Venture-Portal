@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en-MY">
+<head>
+<meta charset="utf-8" />
+<title>Venture · Operations Manager · All Tabs</title>
+<meta name="viewport" content="width=1440" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+TC:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="portals/tabs-shared.css">
+<script src="portals/data.js"></script>
+</head>
+<body>
+
+<nav class="pagebar" id="pagebar">
+  <span class="label">Operations tabs</span>
+</nav>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="wordmark">HOUZS</div>
+      <div class="tag">Venture <em>— Operations</em></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label"><span class="rom">I.</span><span>Overview</span><span class="rule"></span></div>
+      <div class="nav" id="nav-overview"></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label"><span class="rom">II.</span><span>Spend</span><span class="rule"></span></div>
+      <div class="nav" id="nav-spend"></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label"><span class="rom">III.</span><span>People</span><span class="rule"></span></div>
+      <div class="nav" id="nav-people"></div>
+    </div>
+  </aside>
+
+  <section class="main">
+    <div class="topbar">
+      <div class="greet">Good morning, <em>Operations</em>.</div>
+      <div class="topmeta">
+        <span>Wed 22 Apr 2026</span>
+        <span>· period <em style="font-family:'Instrument Serif',serif">Apr 2026</em></span>
+        <span class="user"><span class="dot"></span>Muhamad Faizal · Ops Lead</span>
+      </div>
+    </div>
+    <div class="content" id="content"></div>
+  </section>
+</div>
+
+<script>
+const NAV = [
+  {group:'overview', id:'overview', label:'Overview'},
+  {group:'overview', id:'pool',     label:'Pool Ledger'},
+  {group:'spend',    id:'opex',     label:'OPEX Requests', count:2},
+  {group:'spend',    id:'claims',   label:'Claims'},
+  {group:'people',   id:'team',     label:'Team'},
+];
+const GROUP_EL={overview:'nav-overview',spend:'nav-spend',people:'nav-people'};
+
+function renderNav(active){
+  NAV.forEach(n=>{
+    const host=document.getElementById(GROUP_EL[n.group]); if(!host) return;
+    const a=document.createElement('a'); a.href='#'+n.id; a.dataset.id=n.id;
+    a.className=(n.id===active)?'active':'';
+    a.innerHTML=`<span>${n.label}</span>${n.count?`<span class="count">${n.count}</span>`:''}`;
+    a.onclick=(e)=>{e.preventDefault();goto(n.id)}; host.appendChild(a);
+  });
+}
+function updateActiveNav(id){
+  document.querySelectorAll('.sidebar .nav a').forEach(a=>a.classList.toggle('active',a.dataset.id===id));
+  document.querySelectorAll('#pagebar button').forEach(b=>b.classList.toggle('on',b.dataset.id===id));
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id==='scr-'+id));
+  try{localStorage.setItem('vp.ops.page',id)}catch(e){}
+  window.scrollTo({top:0,behavior:'instant'});
+}
+function goto(id){updateActiveNav(id)}
+function renderPageBar(){
+  const bar=document.getElementById('pagebar');
+  NAV.forEach(n=>{const b=document.createElement('button');b.textContent=n.label;b.dataset.id=n.id;b.onclick=()=>goto(n.id);bar.appendChild(b)});
+}
+
+/* RM, bigRM come from portals/data.js. */
+
+/* Operations dept pool — pulls from shared DEPTS */
+const OPS = DEPTS.find(d=>d.code==='operations');
+
+const TEAM = [
+  ['EMP-0031','Muhamad Faizal','Ops Lead',      '2022-05-02','active',   6400,1280, 450],
+  ['EMP-0042','Hafiz Rahman',  'Warehouse',     '2024-09-11','active',   3400, 680, 240],
+  ['EMP-0051','Yap Jun Hao',   'Driver',        '2025-06-10','probation',2800, 560, 200],
+  ['EMP-0054','Rashid Abdullah','Warehouse',    '2024-02-17','active',   3600, 720, 260],
+  ['EMP-0055','Jeremy Lim',    'Dispatch',      '2023-11-04','active',   3800, 760, 260],
+  ['EMP-0061','Siti Mariam',   'Coordinator',   '2024-04-21','active',   4200, 840, 310],
+  ['EMP-0065','Goh Kheng Hock','Driver',        '2025-01-18','active',   3000, 600, 210],
+  ['EMP-0068','Tan Jia Xin',   'Coordinator',   '2024-07-30','active',   4000, 800, 280],
+  ['EMP-0072','Raja Kumar',    'Warehouse',     '2025-08-02','active',   3200, 640, 230],
+];
+
+const OPS_LEDGER = [
+  ['22 Apr 2026','credit','Invoice settlement — HLIV Q1 logistics',28000,449000],
+  ['21 Apr 2026','debit', 'Fuel cards · April top-up',          -6400,421000],
+  ['19 Apr 2026','debit', 'PV-0419 · warehouse maintenance',    -3800,427400],
+  ['18 Apr 2026','credit','Shared services bill-back · CONTS',  40000,431200],
+  ['15 Apr 2026','debit', 'Payroll · Mar 2026 · Operations',   -46320,391200],
+  ['10 Apr 2026','credit','Opening balance Apr',                     0,437520],
+];
+
+const OPEX = [
+  ['OPEX-0042','Forklift replacement blade set','capex',4800,'pending_principal','22 Apr'],
+  ['OPEX-0041','Warehouse shelving · zone B',   'capex',9600,'pending_principal','21 Apr'],
+  ['OPEX-0040','Fuel cards · April top-up',     'opex', 6400,'approved','18 Apr'],
+  ['OPEX-0039','Driver uniform bulk',           'opex', 1800,'approved','15 Apr'],
+  ['OPEX-0038','Van service · JHY 4829',        'opex', 2200,'paid','12 Apr'],
+  ['OPEX-0037','Packing material Q2',           'opex', 3400,'paid','08 Apr'],
+  ['OPEX-0036','Safety training · 6 staff',     'opex', 1500,'rejected','05 Apr'],
+];
+
+const TEAM_CLAIMS = [
+  ['Hafiz Rahman','Transport reimbursement',140,'pending','21 Apr'],
+  ['Yap Jun Hao','Uniform · boots',220,'draft','22 Apr'],
+  ['Jeremy Lim','Parking · client delivery',38,'approved','19 Apr'],
+  ['Rashid Abdullah','Medical GP',95,'paid','14 Apr'],
+  ['Siti Mariam','Mobile reimbursement Mar',120,'paid','12 Apr'],
+];
+
+/* ───────────── SCREENS ───────────── */
+
+function screen_overview(){
+  return `
+<div class="page-head">
+  <div><h1 class="page">Operations</h1><p class="page-sub">Single-department view. <em>Pool · people · spend for the Ops team only.</em></p></div>
+  <div class="row"><button class="btn-ghost">Export snapshot</button><button class="btn-seal">New OPEX request</button></div>
+</div>
+
+<div class="hero-trio">
+  <div>
+    <div class="hero-label">Pool balance</div>
+    <div class="hero-num">${bigRM(OPS.balance)}</div>
+    <svg class="spark" viewBox="0 0 320 40" preserveAspectRatio="none"><polyline fill="none" stroke="var(--ink)" stroke-width="1.25" points="0,22 32,24 64,18 96,20 128,14 160,18 192,12 224,16 256,10 288,12 320,8"/></svg>
+    <div class="hero-meta">Healthy · 7.6× monthly burn · next credit 01 May</div>
+  </div>
+  <div class="hero-med">
+    <div class="hero-label">Apr net flow</div>
+    <div class="hero-num"><span class="ledger">+ ${RM(OPS.netIn-OPS.out).replace('RM ','')}</span></div>
+    <div class="hero-meta">In <span class="ledger">${RM(OPS.netIn)}</span> · Out <span class="grap">${RM(OPS.out)}</span></div>
+  </div>
+  <div class="hero-med">
+    <div class="hero-label">Headcount</div>
+    <div class="hero-num">${OPS.staff} <span class="unit">staff</span></div>
+    <div class="hero-meta">1 on probation · 0 leaving · 0 onboarding</div>
+  </div>
+</div>
+
+<div class="grid-2" style="grid-template-columns:1.4fr 1fr;gap:40px">
+  <div>
+    <div class="sect-head"><h2>Recent pool activity</h2><span class="mono-xs">last 10 days</span></div>
+    <table class="ledger">
+      <thead><tr><th>Date</th><th>Type</th><th>Description</th><th class="th-right">Amount</th><th class="th-right">Balance</th></tr></thead>
+      <tbody>
+        ${OPS_LEDGER.slice(0,6).map(r=>`
+          <tr>
+            <td class="mono-xs">${r[0]}</td>
+            <td class="mono-xs" style="color:${r[1]==='credit'?'var(--ledger)':'var(--graphite)'}">${r[1]}</td>
+            <td class="serif">${r[2]}</td>
+            <td class="num ${r[3]<0?'grap':'ledger'}">${r[3]>=0?'+ ':'− '}${RM(Math.abs(r[3])).replace('RM ','')}</td>
+            <td class="num">${RM(r[4])}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  <aside>
+    <div class="sect-head"><h2 style="font-size:20px">Open items</h2><span class="mono-xs">3 blocked</span></div>
+    <div class="stack-3">
+      <div class="card">
+        <div class="card-tag">OPEX · PENDING PRINCIPAL</div>
+        <div class="card-title">Forklift replacement blade set</div>
+        <div class="card-amount">RM 4,800.00 · capex</div>
+        <div class="card-meta">Submitted 22 Apr · awaiting LCY</div>
+      </div>
+      <div class="card">
+        <div class="card-tag">OPEX · PENDING PRINCIPAL</div>
+        <div class="card-title">Warehouse shelving · zone B</div>
+        <div class="card-amount">RM 9,600.00 · capex</div>
+        <div class="card-meta">Submitted 21 Apr</div>
+      </div>
+      <div class="card">
+        <div class="card-tag">CLAIM · TEAM</div>
+        <div class="card-title">Hafiz · Transport reimbursement</div>
+        <div class="card-amount">RM 140.00</div>
+        <div class="card-meta">Forwarded to HR · 21 Apr</div>
+      </div>
+    </div>
+  </aside>
+</div>`;
+}
+
+function screen_pool(){
+  return `
+<div class="page-head">
+  <div><h1 class="page">Pool Ledger</h1><p class="page-sub">Full Operations pool activity. <em>Credits from invoice settlement + shared services · debits from payroll + OPEX.</em></p></div>
+  <div class="row"><button class="btn-ghost">Export CSV</button></div>
+</div>
+
+<div class="hero">
+  <div>
+    <div class="hero-label">Balance · Apr 2026</div>
+    <div class="hero-num">${bigRM(OPS.balance)}</div>
+    <div class="hero-meta">Opening ${RM(437520)} · net ${RM(OPS.netIn-OPS.out-16520)}</div>
+  </div>
+  <div class="hero-sm stack-2">
+    <div class="between"><em class="serif grap" style="font-size:15px">Credits</em><span class="mono tabular ledger">+ ${RM(OPS.netIn).replace('RM ','')}</span></div>
+    <div class="between"><em class="serif grap" style="font-size:15px">Debits</em><span class="mono tabular grap">− ${RM(OPS.out).replace('RM ','')}</span></div>
+    <div class="between"><em class="serif grap" style="font-size:15px">Payroll Mar</em><span class="mono tabular grap">− ${RM(46320).replace('RM ','')}</span></div>
+  </div>
+</div>
+
+<div class="row" style="gap:12px;margin-bottom:16px;flex-wrap:wrap">
+  <input placeholder="Search description / voucher #" style="flex:1;min-width:280px">
+  <select><option>All types</option><option>Credit</option><option>Debit</option></select>
+  <input type="date"><input type="date">
+</div>
+
+<table class="ledger">
+  <thead><tr><th>Date</th><th>Type</th><th>Description</th><th class="th-right">Amount</th><th class="th-right">Running balance</th></tr></thead>
+  <tbody>
+    ${OPS_LEDGER.map(r=>`
+      <tr>
+        <td class="mono-xs">${r[0]}</td>
+        <td class="mono-xs" style="color:${r[1]==='credit'?'var(--ledger)':'var(--graphite)'}">${r[1]}</td>
+        <td class="serif">${r[2]}</td>
+        <td class="num ${r[3]<0?'grap':'ledger'}">${r[3]===0?'—':(r[3]>0?'+ ':'− ')+RM(Math.abs(r[3])).replace('RM ','')}</td>
+        <td class="num">${RM(r[4])}</td>
+      </tr>`).join('')}
+  </tbody>
+</table>`;
+}
+
+function screen_opex(){
+  const pending = OPEX.filter(r=>r[4]==='pending_principal');
+  return `
+<div class="page-head">
+  <div><h1 class="page">OPEX Requests</h1><p class="page-sub">Operational spend requests. <em>I draft · Finance reviews · Principal approves capex &gt; RM 3,000.</em></p></div>
+  <button class="btn-seal">+ New OPEX request</button>
+</div>
+
+<div class="hero">
+  <div>
+    <div class="hero-label">In flight — pending Principal</div>
+    <div class="hero-num">${bigRM(pending.reduce((s,r)=>s+r[3],0))}</div>
+    <div class="hero-meta">${pending.length} capex items · average age 1.2 days</div>
+  </div>
+  <div class="hero-sm stack-2">
+    <div class="between"><em class="stat stat-alert">Pending Principal</em><span class="mono">2</span></div>
+    <div class="between"><em class="stat" style="color:var(--accent)">Approved · unpaid</em><span class="mono">2</span></div>
+    <div class="between"><em class="stat stat-ledger">Paid</em><span class="mono">2</span></div>
+    <div class="between"><em class="stat stat-danger">Rejected</em><span class="mono">1</span></div>
+  </div>
+</div>
+
+<div class="tabs">
+  <a class="on">All <span class="ct">${OPEX.length}</span></a>
+  <a>Pending <span class="ct">${pending.length}</span></a>
+  <a>Approved <span class="ct">2</span></a>
+  <a>Paid <span class="ct">2</span></a>
+  <a>Rejected <span class="ct">1</span></a>
+</div>
+
+<table class="ledger">
+  <thead><tr><th>Ref</th><th>Description</th><th>Kind</th><th class="th-right">Amount</th><th>Status</th><th>Submitted</th><th></th></tr></thead>
+  <tbody>
+    ${OPEX.map(r=>`
+      <tr>
+        <td class="mono" style="color:var(--ink);font-weight:600">${r[0]}</td>
+        <td class="serif">${r[1]}</td>
+        <td><span class="chip ${r[2]==='capex'?'accent':''}">${r[2]}</span></td>
+        <td class="num">${RM(r[3])}</td>
+        <td><em class="stat ${r[4]==='paid'?'stat-ledger':r[4]==='approved'?'':r[4]==='rejected'?'stat-danger':'stat-alert'}" ${r[4]==='approved'?'style="color:var(--accent)"':''}>${r[4].replace('_',' ')}</em></td>
+        <td class="mono-xs">${r[5]}</td>
+        <td class="th-right"><button class="btn-link">View →</button></td>
+      </tr>`).join('')}
+  </tbody>
+</table>`;
+}
+
+function screen_claims(){
+  return `
+<div class="page-head">
+  <div><h1 class="page">Team Claims</h1><p class="page-sub">Claims filed by my team. <em>Benefit claims route to HR · pool claims to Finance.</em></p></div>
+  <button class="btn-seal">File on behalf</button>
+</div>
+
+<div class="hero">
+  <div>
+    <div class="hero-label">Outstanding for my team</div>
+    <div class="hero-num">${bigRM(140+220)}</div>
+    <div class="hero-meta">2 items with HR · 0 items with Finance</div>
+  </div>
+  <div class="hero-sm stack-2">
+    <div class="between"><em class="stat stat-muted">Draft</em><span class="mono">1</span></div>
+    <div class="between"><em class="stat stat-alert">Pending</em><span class="mono">1</span></div>
+    <div class="between"><em class="stat stat-ledger">Approved</em><span class="mono">1</span></div>
+    <div class="between"><em class="stat stat-muted">Paid</em><span class="mono">2</span></div>
+  </div>
+</div>
+
+<table class="ledger">
+  <thead><tr><th>Claimant</th><th>Description</th><th class="th-right">Amount</th><th>Status</th><th>Date</th><th></th></tr></thead>
+  <tbody>
+    ${TEAM_CLAIMS.map(r=>`
+      <tr>
+        <td class="serif">${r[0]}</td>
+        <td class="grap">${r[1]}</td>
+        <td class="num">${RM(r[2])}</td>
+        <td><em class="stat ${r[3]==='approved'?'stat-ledger':r[3]==='paid'?'stat-muted':r[3]==='rejected'?'stat-danger':r[3]==='draft'?'stat-muted':'stat-alert'}">${r[3]}</em></td>
+        <td class="mono-xs">${r[4]}</td>
+        <td class="th-right"><button class="btn-link">View →</button></td>
+      </tr>`).join('')}
+  </tbody>
+</table>`;
+}
+
+function screen_team(){
+  const t = TEAM.reduce((a,r)=>({b:a.b+r[5],s:a.s+r[6],al:a.al+r[7]}),{b:0,s:0,al:0});
+  return `
+<div class="page-head">
+  <div><h1 class="page">Team</h1><p class="page-sub">Operations roster. <em>Read-only — staff changes go through HR.</em></p></div>
+  <div class="row"><button class="btn-ghost">Export</button><button class="btn-ghost">Request new hire</button></div>
+</div>
+
+<div class="hero">
+  <div>
+    <div class="hero-label">Ops CTC · Apr 2026 live</div>
+    <div class="hero-num">${bigRM(t.b+t.s+t.al)}</div>
+    <div class="hero-meta">${TEAM.length} staff · bills from dept_pool_operations on execute</div>
+  </div>
+  <div class="hero-sm stack-2">
+    <div class="between"><em class="serif grap" style="font-size:15px">Total basic</em><span class="mono tabular">${RM(t.b)}</span></div>
+    <div class="between"><em class="serif grap" style="font-size:15px">Total statutory</em><span class="mono tabular">${RM(t.s)}</span></div>
+    <div class="between"><em class="serif grap" style="font-size:15px">Total allowance</em><span class="mono tabular">${RM(t.al)}</span></div>
+  </div>
+</div>
+
+<table class="ledger">
+  <thead><tr><th>EMP #</th><th>Name</th><th>Role</th><th>Joined</th><th class="th-right">Basic</th><th class="th-right">Stat.</th><th class="th-right">Allow.</th><th>State</th></tr></thead>
+  <tbody>
+    ${TEAM.map(r=>`
+      <tr>
+        <td class="mono" style="color:var(--ink);font-weight:600">${r[0]}</td>
+        <td class="serif">${r[1]}</td>
+        <td class="grap">${r[2]}</td>
+        <td class="mono-xs">${r[3]}</td>
+        <td class="num">${RM(r[5])}</td>
+        <td class="num grap">${RM(r[6])}</td>
+        <td class="num grap">${RM(r[7])}</td>
+        <td><em class="stat ${r[4]==='active'?'stat-ledger':'stat-alert'}">${r[4]}</em></td>
+      </tr>`).join('')}
+  </tbody>
+</table>`;
+}
+
+/* MOUNT */
+const SCREENS = {
+  overview:screen_overview, pool:screen_pool,
+  opex:screen_opex, claims:screen_claims,
+  team:screen_team,
+};
+
+const content=document.getElementById('content');
+Object.entries(SCREENS).forEach(([id,fn])=>{
+  const sec=document.createElement('div'); sec.className='screen'; sec.id='scr-'+id;
+  sec.innerHTML=fn(); content.appendChild(sec);
+  sec.querySelectorAll('table.ledger td.num').forEach(td=>{if(td.textContent.trim().startsWith('−')||td.textContent.trim().startsWith('-'))td.classList.add('neg')});
+});
+
+let initial='overview';
+try{
+  const saved=localStorage.getItem('vp.ops.page'); if(saved&&SCREENS[saved]) initial=saved;
+  const hash=location.hash.replace('#',''); if(hash&&SCREENS[hash]) initial=hash;
+}catch(e){}
+
+renderNav(initial); renderPageBar(); updateActiveNav(initial);
+window.addEventListener('hashchange',()=>{const h=location.hash.replace('#','');if(SCREENS[h]) goto(h)});
+</script>
+</body>
+</html>

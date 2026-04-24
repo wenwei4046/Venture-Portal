@@ -59,10 +59,13 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
   return (
     <div>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10">
+      <div className="page-head">
         <div>
-          <h1 className="font-serif text-3xl text-ink">Director Salary</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
+          <div className="page-eyebrow">
+            <em>I.</em> DIRECTOR · SALARY ENGINE
+          </div>
+          <h1 className="page-title">Director Salary</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
             月度薪水计算引擎。<em>CTC → Pool → Weightage → Payout.</em>
           </p>
         </div>
@@ -86,16 +89,16 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
             <div className="font-serif italic text-accent text-base mb-1">
               Salary Pool — {periodLabel}
             </div>
-            <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
+            <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
               {formatMoney(Number(summary.out_pool_total ?? 0))}
             </div>
-            <div className="font-mono text-xs text-muted mt-2">
-              {summary.out_payout_count} directors ·{' '}
-              <em className={`font-serif text-sm ${
+            <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
+              {summary.out_payout_count} DIRECTORS ·{' '}
+              <em className={`font-serif text-sm not-italic ${
                 summary.out_status === 'draft' ? 'text-alert' :
                 summary.out_status === 'confirmed' ? 'text-ledger' : 'text-graphite'
               }`}>
-                {summary.out_status}
+                {summary.out_status.toUpperCase()}
               </em>
             </div>
           </div>
@@ -103,11 +106,11 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
           <div className="lg:col-span-5 space-y-3">
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">Total Payroll (75%)</span>
-              <span className="font-mono tabular text-sm font-medium text-ink">{formatMoney(Number(summary.out_total_payroll_gross))}</span>
+              <span className="font-mono tabular text-sm font-medium text-num-ink">{formatMoney(Number(summary.out_total_payroll_gross))}</span>
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">Total Invoice (25%)</span>
-              <span className="font-mono tabular text-sm font-medium text-ink">{formatMoney(Number(summary.out_total_invoice))}</span>
+              <span className="font-mono tabular text-sm font-medium text-num-ink">{formatMoney(Number(summary.out_total_invoice))}</span>
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">Total 5% Saving</span>
@@ -119,7 +122,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
             </div>
             <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
               <span className="font-serif italic text-sm text-graphite">Net to Directors</span>
-              <span className="font-mono tabular text-md font-medium text-ink font-semibold">{formatMoney(Number(summary.out_total_payroll_net))}</span>
+              <span className="font-mono tabular text-md font-medium text-num-ink font-semibold">{formatMoney(Number(summary.out_total_payroll_net))}</span>
             </div>
           </div>
         </div>
@@ -228,33 +231,33 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="ledger-table">
                   <thead>
-                    <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                      <th className="text-left py-3 pr-4 font-medium">Director</th>
-                      <th className="text-right py-3 pr-4 font-medium">Gross</th>
-                      <th className="text-right py-3 pr-4 font-medium">Saving</th>
-                      <th className="text-right py-3 pr-4 font-medium">Payroll (75%)</th>
-                      <th className="text-right py-3 pr-4 font-medium">Invoice (25%)</th>
-                      <th className="text-right py-3 pr-4 font-medium">Net</th>
-                      <th className="py-3 text-right"></th>
+                    <tr>
+                      <th>Director</th>
+                      <th className="right">Gross</th>
+                      <th className="right">Saving</th>
+                      <th className="right">Payroll (75%)</th>
+                      <th className="right">Invoice (25%)</th>
+                      <th className="right">Net</th>
+                      <th className="right"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {payouts?.map(p => {
                       const dir = directors?.find(d => d.id === p.director_id)
                       return (
-                        <tr key={p.id} className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors">
-                          <td className="py-4 pr-4">
-                            <div className="font-serif text-md text-ink">{dir?.code ?? '?'}</div>
-                            <div className="font-mono text-xs text-muted">{dir?.name}</div>
+                        <tr key={p.id}>
+                          <td>
+                            <div className="font-serif text-[15px] text-ink">{dir?.code ?? '?'}</div>
+                            <div className="font-mono text-[11px] text-graphite mt-0.5">{dir?.name}</div>
                           </td>
-                          <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">{formatMoney(p.gross_amount ?? 0)}</td>
-                          <td className="py-4 pr-4 text-right font-mono tabular font-medium text-danger">{formatMoney(-(p.saving_amount ?? 0))}</td>
-                          <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">{formatMoney(p.payroll_gross ?? 0)}</td>
-                          <td className="py-4 pr-4 text-right font-mono tabular font-medium text-graphite">{formatMoney(p.invoice_total ?? 0)}</td>
-                          <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">{formatMoney(p.payroll_net ?? 0)}</td>
-                          <td className="py-4 text-right">
+                          <td className="num">{formatMoney(p.gross_amount ?? 0)}</td>
+                          <td className="num neg">{formatMoney(-(p.saving_amount ?? 0))}</td>
+                          <td className="num">{formatMoney(p.payroll_gross ?? 0)}</td>
+                          <td className="num">{formatMoney(p.invoice_total ?? 0)}</td>
+                          <td className="num font-semibold">{formatMoney(p.payroll_net ?? 0)}</td>
+                          <td className="right">
                             <Link
                               href={`/director-salary/${p.director_id}?period=${period}`}
                               className="text-sm text-accent hover:text-accent-hover font-serif italic"

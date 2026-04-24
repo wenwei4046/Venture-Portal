@@ -82,10 +82,13 @@ export default async function HRCostingPage() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10">
+      <div className="page-head">
         <div>
-          <h1 className="font-serif text-3xl text-ink">HR Costing</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
+          <div className="page-eyebrow">
+            <em>I.</em> HR · MONTHLY COSTING
+          </div>
+          <h1 className="page-title">HR Costing</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
             Monthly HR cost snapshots. <em>HR submits the totals Finance uses for billing.</em>
           </p>
         </div>
@@ -117,32 +120,32 @@ export default async function HRCostingPage() {
           <div className="font-serif italic text-accent text-base mb-1">
             {currentSubmission ? 'Submitted period' : 'Live preview'}
           </div>
-          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
+          <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tracking-[-0.01em]">
             {dayjs(currentPeriod).format('MMMM YYYY')}
           </div>
-          <div className="font-mono text-xs text-muted mt-2">
+          <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
             {currentSubmission
-              ? `Snapshotted ${dayjs(currentSubmission.submitted_at).format('D MMM YYYY HH:mm')} by ${submitterName.get(currentSubmission.submitted_by) ?? '—'}`
-              : `${liveTotals.staff_count} active staff across ${liveRowList.length} departments`}
+              ? `SNAPSHOTTED ${dayjs(currentSubmission.submitted_at).format('D MMM HH:mm').toUpperCase()} BY ${(submitterName.get(currentSubmission.submitted_by) ?? '—').toUpperCase()}`
+              : `${liveTotals.staff_count} ACTIVE STAFF · ${liveRowList.length} DEPARTMENTS`}
           </div>
         </div>
 
         <div className="lg:col-span-5 space-y-2">
           <div className="flex items-baseline justify-between font-mono text-sm">
             <em className="font-serif text-md text-graphite">basic</em>
-            <span className="text-ink tabular">{formatMoney(liveTotals.total_basic)}</span>
+            <span className="text-num-ink tabular font-medium">{formatMoney(liveTotals.total_basic)}</span>
           </div>
           <div className="flex items-baseline justify-between font-mono text-sm">
             <em className="font-serif text-md text-graphite">statutory</em>
-            <span className="text-ink tabular">{formatMoney(liveTotals.total_statutory)}</span>
+            <span className="text-num-ink tabular font-medium">{formatMoney(liveTotals.total_statutory)}</span>
           </div>
           <div className="flex items-baseline justify-between font-mono text-sm">
             <em className="font-serif text-md text-graphite">allowance</em>
-            <span className="text-ink tabular">{formatMoney(liveTotals.total_allowance)}</span>
+            <span className="text-num-ink tabular font-medium">{formatMoney(liveTotals.total_allowance)}</span>
           </div>
           <div className="flex items-baseline justify-between font-mono text-sm border-t border-hairline pt-2 mt-2">
             <em className="font-serif text-md text-ink">total CTC</em>
-            <span className="text-ink tabular font-semibold">
+            <span className="text-num-ink tabular font-semibold">
               {formatMoney(liveTotals.total_ctc)}
             </span>
           </div>
@@ -151,10 +154,11 @@ export default async function HRCostingPage() {
 
       {/* ───────── Live aggregate by department (HR + Principal only) ───────── */}
       <section className="mb-12">
-        <h2 className="font-serif text-xl text-ink mb-1">By department</h2>
-        <p className="font-serif italic text-graphite text-sm mb-4">
-          Live aggregate from staff records. <em>Individual salaries visible to HR + Principal only.</em>
-        </p>
+        <div className="sect-head">
+          <h2>By department</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">LIVE · HR + PRINCIPAL ONLY</span>
+        </div>
 
         {liveRowList.length === 0 ? (
           <div className="border border-hairline rounded-md bg-surface p-6 text-center">
@@ -164,41 +168,28 @@ export default async function HRCostingPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="ledger-table">
               <thead>
-                <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                  <th className="text-left py-3 pr-4 font-medium">Department</th>
-                  <th className="text-right py-3 pr-4 font-medium">Staff</th>
-                  <th className="text-right py-3 pr-4 font-medium">Basic</th>
-                  <th className="text-right py-3 pr-4 font-medium">Statutory</th>
-                  <th className="text-right py-3 pr-4 font-medium">Allowance</th>
-                  <th className="text-right py-3 font-medium">Total CTC</th>
+                <tr>
+                  <th>Department</th>
+                  <th className="right">Staff</th>
+                  <th className="right">Basic</th>
+                  <th className="right">Statutory</th>
+                  <th className="right">Allowance</th>
+                  <th className="right">Total CTC</th>
                 </tr>
               </thead>
               <tbody>
                 {liveRowList.map((row) => (
-                  <tr
-                    key={row.department_id ?? row.department_name ?? 'unknown'}
-                    className="border-b border-hairline last:border-0"
-                  >
-                    <td className="py-3 pr-4 font-serif text-md text-ink">
+                  <tr key={row.department_id ?? row.department_name ?? 'unknown'}>
+                    <td className="font-serif text-[15px] text-ink">
                       {row.department_name ?? '—'}
                     </td>
-                    <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
-                      {row.staff_count ?? 0}
-                    </td>
-                    <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
-                      {formatMoney(Number(row.total_basic ?? 0))}
-                    </td>
-                    <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
-                      {formatMoney(Number(row.total_statutory ?? 0))}
-                    </td>
-                    <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
-                      {formatMoney(Number(row.total_allowance ?? 0))}
-                    </td>
-                    <td className="py-3 text-right font-mono tabular font-medium text-ink font-semibold">
-                      {formatMoney(Number(row.total_ctc ?? 0))}
-                    </td>
+                    <td className="num">{row.staff_count ?? 0}</td>
+                    <td className="num">{formatMoney(Number(row.total_basic ?? 0))}</td>
+                    <td className="num">{formatMoney(Number(row.total_statutory ?? 0))}</td>
+                    <td className="num">{formatMoney(Number(row.total_allowance ?? 0))}</td>
+                    <td className="num font-semibold">{formatMoney(Number(row.total_ctc ?? 0))}</td>
                   </tr>
                 ))}
               </tbody>
@@ -209,11 +200,11 @@ export default async function HRCostingPage() {
 
       {/* ───────── Submission history ───────── */}
       <section className="mb-12">
-        <h2 className="font-serif text-xl text-ink mb-1">Submission history</h2>
-        <p className="font-serif italic text-graphite text-sm mb-4">
-          Immutable snapshots. Once submitted, a period cannot be edited — create a new
-          period if corrections are needed.
-        </p>
+        <div className="sect-head">
+          <h2>Submission history</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">LAST {Math.min(submissionList.length, 12)} PERIODS · IMMUTABLE</span>
+        </div>
 
         {submissionList.length === 0 ? (
           <div className="border border-hairline rounded-md bg-surface p-6 text-center">
@@ -223,15 +214,15 @@ export default async function HRCostingPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="ledger-table">
               <thead>
-                <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                  <th className="text-left py-3 pr-4 font-medium">Period</th>
-                  <th className="text-left py-3 pr-4 font-medium">Submitted by</th>
-                  <th className="text-left py-3 pr-4 font-medium">State</th>
-                  <th className="text-right py-3 pr-4 font-medium">Basic</th>
-                  <th className="text-right py-3 pr-4 font-medium">Total CTC</th>
-                  <th className="py-3 text-right"></th>
+                <tr>
+                  <th>Period</th>
+                  <th>Submitted by</th>
+                  <th>State</th>
+                  <th className="right">Basic</th>
+                  <th className="right">Total CTC</th>
+                  <th className="right"></th>
                 </tr>
               </thead>
               <tbody>
@@ -248,28 +239,21 @@ export default async function HRCostingPage() {
                     (acc, d) => acc + Number(d.total_ctc ?? 0),
                     0
                   )
-                  const state = s.execution_state ?? 'approved_for_execution' // legacy NULL
+                  const state = s.execution_state ?? 'approved_for_execution'
                   return (
-                    <tr
-                      key={s.id}
-                      className="border-b border-hairline last:border-0"
-                    >
-                      <td className="py-3 pr-4 font-serif text-md text-ink">
+                    <tr key={s.id}>
+                      <td className="font-serif text-[15px] text-ink">
                         {dayjs(s.period_month).format('MMMM YYYY')}
                       </td>
-                      <td className="py-3 pr-4 font-serif italic text-graphite">
+                      <td className="font-serif italic text-graphite">
                         {submitterName.get(s.submitted_by) ?? '—'}
                       </td>
-                      <td className="py-3 pr-4">
+                      <td>
                         <StateBadge state={state} />
                       </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
-                        {formatMoney(totalBasic)}
-                      </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">
-                        {formatMoney(totalCtc)}
-                      </td>
-                      <td className="py-3 text-right">
+                      <td className="num">{formatMoney(totalBasic)}</td>
+                      <td className="num font-semibold">{formatMoney(totalCtc)}</td>
+                      <td className="right">
                         {canExecute && state === 'approved_for_execution' ? (
                           <form action={executeHrCosting}>
                             <input type="hidden" name="id" value={s.id} />

@@ -84,11 +84,16 @@ export default async function SettingsPage({ searchParams }: Props) {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="font-serif text-3xl text-ink">Settings</h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          Treasury config, overdue stages, splits, and subsidiaries. Principal only.
-        </p>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> ADMIN · CONFIGURATION
+          </div>
+          <h1 className="page-title">Settings</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            Treasury config, overdue stages, splits, and subsidiaries. Principal only.
+          </p>
+        </div>
       </div>
 
       <Suspense fallback={null}>

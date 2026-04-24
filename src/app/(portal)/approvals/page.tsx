@@ -80,20 +80,24 @@ export default async function ApprovalsPage() {
 
   return (
     <div>
-      <div className="mb-10">
-        <h1 className="font-serif text-3xl text-ink">Approvals</h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          Pending decisions that require <em>your hand</em>. Principal only.
-        </p>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> APPROVALS · PRINCIPAL QUEUE
+          </div>
+          <h1 className="page-title">Approvals</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            Pending decisions that require <em>your hand</em>. Principal only.
+          </p>
+        </div>
       </div>
 
       {/* ───────── Pending queue ───────── */}
       <section className="mb-12">
-        <div className="flex items-baseline justify-between mb-4">
-          <h2 className="font-serif text-2xl text-ink">Pending</h2>
-          <span className="font-mono text-xs text-muted">
-            {items.length} {items.length === 1 ? 'item' : 'items'}
-          </span>
+        <div className="sect-head">
+          <h2>Pending</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">{items.length} {items.length === 1 ? 'ITEM' : 'ITEMS'}</span>
         </div>
 
         {items.length === 0 ? (
@@ -151,7 +155,7 @@ export default async function ApprovalsPage() {
                   </div>
                   <div className="flex items-baseline gap-4 mt-2">
                     {item.row.amount ? (
-                      <div className="font-mono tabular text-md font-medium text-ink">
+                      <div className="font-mono tabular text-md font-semibold text-num-ink">
                         {formatMoney(Number(item.row.amount))}
                       </div>
                     ) : null}
@@ -172,10 +176,11 @@ export default async function ApprovalsPage() {
       {/* ───────── Recent history ───────── */}
       {recent.length > 0 ? (
         <section>
-          <h2 className="font-serif text-2xl text-ink mb-1">Recent decisions</h2>
-          <p className="font-serif italic text-graphite text-sm mb-4">
-            Last 10 resolved requests
-          </p>
+          <div className="sect-head">
+            <h2>Recent decisions</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">LAST {recent.length} RESOLVED</span>
+          </div>
           <div className="border-t border-hairline row-stagger">
             {recent.map((req, i) => (
               <div
@@ -200,7 +205,7 @@ export default async function ApprovalsPage() {
                   </div>
                 </div>
                 {req.amount ? (
-                  <div className="font-mono tabular text-sm font-medium text-graphite">
+                  <div className="font-mono tabular text-sm font-medium text-ink">
                     {formatMoney(Number(req.amount))}
                   </div>
                 ) : null}
