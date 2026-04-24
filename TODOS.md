@@ -154,3 +154,27 @@ See `~/.gstack/projects/wenwei4046-Venture-Portal/main-autoplan-phase1-*-2026040
 - Design review (DESIGN.md, state components, hierarchy, a11y)
 - Eng review (rate lock, idempotency, RLS matrix, indexes, test plan)
 - Test plan artifact (~150 tests across unit/integration/RLS/E2E)
+
+---
+
+## mig 209-211 follow-ups (surfaced by vp-e2e-role-auditor on 2026-04-25)
+
+### Low severity
+- [ ] **Align statutory-lookup B+K wage basis with engine `offsetBkRatio`.**
+  - **What:** `src/app/(portal)/director-salary/actions.ts:197,212` computes
+    statutory lookup keys using `pool.basicRatio` on `payrollGross / invoiceBase`,
+    but the engine (`src/lib/salary.ts:164`) splits the actual `payrollBk/allow`
+    using the post-offset `offsetBkRatio = bkShare/afterOffset`. When advance
+    offset consumes part of allowance, `offsetBkRatio` > `pool.basicRatio`.
+  - **Why:** Effect is small (WL example on 2026-05 test: statutory-lookup basis
+    8,063.90 vs stored `payroll_bk=8,961.67`) and does NOT cause journal drift —
+    component totals are self-consistent within the stored row. But the
+    "lookup wage" and the "reported wage" are off by a slice when advance
+    offset fires.
+  - **Pros:** Perfect self-consistency across payout fields; avoids a future
+    auditor question.
+  - **Cons:** Requires restructuring `actions.ts` to compute statutory
+    deductions from `offsetBkRatio` post-engine, not pre-engine from
+    `pool.basicRatio`.
+  - **Context:** vp-e2e-role-auditor 🟢 GREEN verdict on 2026-04-25, finding #3.
+  - **Depends on:** nothing.
