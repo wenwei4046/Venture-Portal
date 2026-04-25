@@ -157,9 +157,11 @@ export default async function DirectorPoolPage() {
         <div className="border border-hairline rounded-md bg-surface p-5">
           <div className="font-serif italic text-sm text-accent mb-1">Invoice</div>
           <div className="font-serif text-2xl text-ink">{formatMoney(invoiceBucket)}</div>
-          <div className="font-mono text-xs text-muted mt-1">
-            25% per-director accumulator (`invoice_payout_pool`)
-          </div>
+          {isPrincipal && (
+            <div className="font-mono text-xs text-muted mt-1">
+              25% per-director accumulator (`invoice_payout_pool`)
+            </div>
+          )}
         </div>
         <div className="border border-hairline rounded-md bg-surface p-5">
           <div className="font-serif italic text-sm text-accent mb-1">Total Advance</div>
