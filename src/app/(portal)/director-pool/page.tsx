@@ -31,6 +31,7 @@ export default async function DirectorPoolPage() {
     { data: invoiceTxns },
     { data: claims },
     { data: payouts },
+    { data: advancePayouts },
     { data: directors },
   ] = await Promise.all([
     directorDept
@@ -43,6 +44,12 @@ export default async function DirectorPoolPage() {
     supabase.from('invoice_payout_pool').select('*').order('created_at', { ascending: false }),
     supabase.from('claims').select('*').eq('claim_type', 'project').in('status', ['approved', 'paid']),
     supabase.from('director_payouts').select('saving_amount, statutory_surplus'),
+    // For Total Advance: latest confirmed/paid closing balance per director
+    supabase
+      .from('director_payouts')
+      .select('director_id, period_month, advance_balance')
+      .in('status', ['confirmed', 'paid'])
+      .order('period_month', { ascending: false }),
     supabase.from('directors').select('id, code, name').order('code'),
   ])
 
@@ -68,6 +75,19 @@ export default async function DirectorPoolPage() {
 
   // Invoice bucket = invoice_payout_pool balance
   const invoiceBucket = invoiceBalance
+
+  // Total Advance = sum of each director's latest confirmed/paid advance_balance.
+  // advancePayouts is ordered by period_month DESC, so first row per director_id wins.
+  const latestAdvancePerDirector = new Map<string, number>()
+  for (const p of advancePayouts ?? []) {
+    if (!latestAdvancePerDirector.has(p.director_id)) {
+      latestAdvancePerDirector.set(p.director_id, Number(p.advance_balance ?? 0))
+    }
+  }
+  const totalAdvance = Array.from(latestAdvancePerDirector.values()).reduce((s, v) => s + v, 0)
+
+  // Total Pool = net amount HV holds on directors' behalf
+  const totalPool = savingBucket + invoiceBucket - totalAdvance
 
   // Per-director invoice accumulation rollup
   type DirectorRow = { id: string | null; code: string | null; name: string; accumulated: number; released: number; balance: number }
@@ -110,8 +130,20 @@ export default async function DirectorPoolPage() {
         </div>
       </div>
 
-      {/* Pool Summary Cards — 2 buckets */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+      {/* Hero — Total Pool (Saving + Invoice − Advance) */}
+      <div className="mb-8 pb-6 border-b border-hairline">
+        <div className="font-serif italic text-sm text-accent mb-1">Total Pool</div>
+        <div className={`font-serif text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${totalPool >= 0 ? 'text-num-ink' : 'text-danger'}`}>
+          {formatMoney(totalPool)}
+        </div>
+        <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em]">
+          {formatMoneyBare(savingBucket)} saving + {formatMoneyBare(invoiceBucket)} invoice
+          {totalAdvance > 0 ? ` − ${formatMoneyBare(totalAdvance)} advance` : ''}
+        </div>
+      </div>
+
+      {/* Pool Sub-buckets — Saving / Invoice / Total Advance */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
         <div className="border border-hairline rounded-md bg-surface p-5">
           <div className="font-serif italic text-sm text-accent mb-1">Saving</div>
           <div className={`font-serif text-2xl ${savingBucket >= 0 ? 'text-ink' : 'text-danger'}`}>
@@ -127,6 +159,15 @@ export default async function DirectorPoolPage() {
           <div className="font-serif text-2xl text-ink">{formatMoney(invoiceBucket)}</div>
           <div className="font-mono text-xs text-muted mt-1">
             25% per-director accumulator (`invoice_payout_pool`)
+          </div>
+        </div>
+        <div className="border border-hairline rounded-md bg-surface p-5">
+          <div className="font-serif italic text-sm text-accent mb-1">Total Advance</div>
+          <div className={`font-serif text-2xl ${totalAdvance > 0 ? 'text-alert' : 'text-ink'}`}>
+            {formatMoney(totalAdvance)}
+          </div>
+          <div className="font-mono text-xs text-muted mt-1">
+            Outstanding advance owed by directors
           </div>
         </div>
       </div>
