@@ -36,8 +36,8 @@ export default function TopBar({ user, onMenuClick }: TopBarProps) {
   const displayName = user.name || getRoleLabel(user.role)
 
   return (
-    <div className="h-[60px] bg-paper border-b border-hairline px-4 md:px-8 flex items-baseline justify-between shrink-0 gap-3">
-      <div className="flex items-baseline gap-3 min-w-0">
+    <div className="h-[60px] bg-paper border-b border-hairline px-4 md:px-8 flex items-center justify-between shrink-0 gap-3">
+      <div className="flex items-center gap-3 min-w-0">
         {/* Hamburger — mobile only */}
         {onMenuClick ? (
           <button
@@ -67,7 +67,7 @@ export default function TopBar({ user, onMenuClick }: TopBarProps) {
         </div>
       </div>
 
-      <div className="flex items-baseline gap-4 md:gap-5 shrink-0">
+      <div className="flex items-center gap-4 md:gap-5 shrink-0">
         <div className="hidden sm:flex items-baseline gap-3 font-mono text-[11px] text-muted tracking-[0.02em]">
           <span className="inline-flex items-baseline gap-1.5 font-serif italic text-[13.5px] text-graphite">
             <span aria-hidden className="w-[5px] h-[5px] rounded-full bg-ledger inline-block translate-y-[-2px]" />
