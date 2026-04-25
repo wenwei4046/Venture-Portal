@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import RequestPayrollPaymentButton, {
   type RequestState,
 } from '../payroll/_components/RequestPayrollPaymentButton'
@@ -199,12 +199,16 @@ export default async function HRPaymentPage() {
 
   return (
     <div>
-      <div className="mt-2 mb-10">
-        <div className="font-serif italic text-accent text-base mb-1">HR · {periodLabel}</div>
-        <h1 className="font-serif text-3xl text-ink">Payment</h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          Request payroll funding from Finance, then disburse to staff from the HR Pool.
-        </p>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> HR · PAYMENT · {periodLabel.toUpperCase()}
+          </div>
+          <h1 className="page-title">Payment</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            Request payroll funding from Finance, then disburse to staff from the HR Pool.
+          </p>
+        </div>
       </div>
 
       {/* Hero — Total Amount + HR Pool balance */}
@@ -213,7 +217,7 @@ export default async function HRPaymentPage() {
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide mb-2">
             Total amount this month
           </div>
-          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
+          <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
             {formatMoney(totalAmount)}
           </div>
           <div className="font-mono text-xs text-muted mt-2">
@@ -227,8 +231,8 @@ export default async function HRPaymentPage() {
             HR Pool balance
           </div>
           <div
-            className={`font-serif text-[44px] md:text-hero leading-none ${
-              poolBal >= 0 ? 'text-ink' : 'text-danger'
+            className={`font-serif text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${
+              poolBal >= 0 ? 'text-num-ink' : 'text-danger'
             }`}
           >
             {formatMoney(poolBal)}
@@ -242,51 +246,40 @@ export default async function HRPaymentPage() {
       {/* Per-department breakdown */}
       {hasPayroll && (
         <section className="mb-10">
-          <h2 className="font-serif text-xl text-ink mb-1">By department</h2>
+          <div className="sect-head">
+            <h2>By department</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">{deptBreakdown.length} DEPT{deptBreakdown.length === 1 ? '' : 'S'} · STAFF · NET · GROSS</span>
+          </div>
           <p className="font-serif italic text-graphite text-sm mb-4">
             Gross is what Finance funds; net is what lands in staff accounts.
           </p>
-          <div className="overflow-x-auto border border-hairline rounded-md bg-surface">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+            <table className="ledger-table">
               <thead>
-                <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                  <th className="text-left py-3 px-5 font-medium">Department</th>
-                  <th className="text-right py-3 px-5 font-medium">Staff</th>
-                  <th className="text-right py-3 px-5 font-medium">Net</th>
-                  <th className="text-right py-3 px-5 font-medium">Gross</th>
+                <tr>
+                  <th>Department</th>
+                  <th className="right">Staff</th>
+                  <th className="right">Net</th>
+                  <th className="right">Gross</th>
                 </tr>
               </thead>
               <tbody>
                 {deptBreakdown.map(d => (
-                  <tr
-                    key={d.dept_name}
-                    className="border-b border-hairline last:border-0"
-                  >
-                    <td className="py-3 px-5 font-serif text-md text-ink">
-                      {d.dept_name}
+                  <tr key={d.dept_name}>
+                    <td>
+                      <div className="font-serif text-md text-ink">{d.dept_name}</div>
                     </td>
-                    <td className="py-3 px-5 text-right font-mono tabular text-graphite">
-                      {d.staff_count}
-                    </td>
-                    <td className="py-3 px-5 text-right font-mono tabular text-graphite">
-                      {formatMoney(d.total_net)}
-                    </td>
-                    <td className="py-3 px-5 text-right font-mono tabular font-medium text-ink">
-                      {formatMoney(d.total_gross)}
-                    </td>
+                    <td className="num text-graphite">{d.staff_count}</td>
+                    <td className="num text-graphite">{formatMoney(d.total_net)}</td>
+                    <td className="num">{formatMoney(d.total_gross)}</td>
                   </tr>
                 ))}
-                <tr className="bg-surface-2/40 border-t-2 border-hairline">
-                  <td className="py-3 px-5 font-serif italic text-ink">Total</td>
-                  <td className="py-3 px-5 text-right font-mono tabular font-semibold text-ink">
-                    {staffCount}
-                  </td>
-                  <td className="py-3 px-5 text-right font-mono tabular font-semibold text-ink">
-                    {formatMoney(totalNet)}
-                  </td>
-                  <td className="py-3 px-5 text-right font-mono tabular font-semibold text-ink">
-                    {formatMoney(totalGross)}
-                  </td>
+                <tr className="border-t-2 border-hairline bg-surface-2/40">
+                  <td className="font-serif italic text-accent">Total</td>
+                  <td className="num text-num-ink font-semibold">{staffCount}</td>
+                  <td className="num text-num-ink font-semibold">{formatMoney(totalNet)}</td>
+                  <td className="num text-num-ink font-semibold">{formatMoney(totalGross)}</td>
                 </tr>
               </tbody>
             </table>
@@ -362,11 +355,11 @@ export default async function HRPaymentPage() {
           phase === 'pv-generated') &&
           run && (
             <div className="border border-hairline rounded-md bg-surface p-8">
-              <h2 className="font-serif text-xl text-ink mb-2">
+              <h2 className="font-serif italic text-ink text-md mb-2">
                 Request Fund out from Finance
               </h2>
               <p className="font-serif italic text-graphite text-sm mb-6">
-                Finance generates a Payment Voucher for <strong>RM {formatMoney(totalAmount).replace('RM ', '')}</strong>.
+                Finance generates a Payment Voucher for <strong className="num text-num-ink">RM {formatMoneyBare(totalAmount)}</strong>.
                 Principal approves the PV and money moves from the HV operating account into the HR Pool.
               </p>
               <RequestPayrollPaymentButton

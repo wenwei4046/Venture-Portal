@@ -108,15 +108,14 @@ export default async function FundSourceDetailPage({ params }: Props) {
       </Link>
 
       {/* ───────── Header ───────── */}
-      <div className="flex items-baseline justify-between mt-3 mb-10">
+      <div className="page-head">
         <div>
-          <p className="font-serif italic text-accent text-base mb-1">
-            {SOURCE_TYPE_LABELS[source.source_type] ?? source.source_type}
-          </p>
-          <h1 className="font-serif text-3xl text-ink">{fromLabel}</h1>
-          <p className="font-mono text-xs text-muted mt-1">
-            {fromSubLabel}{fromSubLabel ? ' · ' : ''}Recorded{' '}
-            {dayjs(source.created_at).format('D MMM YYYY')}
+          <div className="page-eyebrow">
+            <em>I.</em> TREASURY · {(SOURCE_TYPE_LABELS[source.source_type] ?? source.source_type).toUpperCase()}
+          </div>
+          <h1 className="page-title">{fromLabel}</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            {fromSubLabel}{fromSubLabel ? ' · ' : ''}Recorded <em>{dayjs(source.created_at).format('D MMMM YYYY')}</em>
           </p>
         </div>
         <StatusBadge status={source.status} />
@@ -125,69 +124,66 @@ export default async function FundSourceDetailPage({ params }: Props) {
       {/* ───────── Hero: principal + outstanding ───────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
         <div className="lg:col-span-4">
-          <div className="font-serif italic text-graphite text-sm mb-1">
+          <div className="font-serif italic text-accent text-base mb-1">
             Principal
           </div>
-          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
-            RM {formatMoney(Number(source.amount)).replace('RM ', '').replace(/\.\d{2}$/, '')}
-            <span className="text-[32px] text-graphite">
-              {formatMoney(Number(source.amount)).slice(-3)}
-            </span>
+          <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
+            {formatMoney(Number(source.amount))}
           </div>
-          <div className="font-mono text-xs text-muted mt-2">
-            Effective {dayjs(source.effective_date).format('D MMMM YYYY')}
+          <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
+            EFFECTIVE {dayjs(source.effective_date).format('D MMMM YYYY').toUpperCase()}
           </div>
         </div>
 
         <div className="lg:col-span-4">
-          <div className="font-serif italic text-graphite text-sm mb-1">
+          <div className="font-serif italic text-accent text-base mb-1">
             Outstanding
           </div>
-          <div className="font-serif text-3xl text-ink">
+          <div className="font-serif text-3xl text-num-ink tabular tracking-[-0.01em]">
             {formatMoney(outstanding)}
           </div>
           {totalPrincipalPaid > 0 ? (
-            <div className="font-mono text-xs text-muted mt-1">
-              Repaid <span className="text-ledger">{formatMoney(totalPrincipalPaid)}</span> of {formatMoney(Number(source.amount))}
+            <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
+              REPAID <span className="text-ledger">{formatMoney(totalPrincipalPaid)}</span> OF {formatMoney(Number(source.amount))}
             </div>
           ) : null}
         </div>
 
         <div className="lg:col-span-4 space-y-4">
           <div>
-            <div className="font-serif italic text-graphite text-sm mb-1">
+            <div className="font-serif italic text-accent text-base mb-1">
               Interest rate
             </div>
-            <div className="font-serif text-xl text-ink">
+            <div className="font-serif text-xl text-num-ink tabular">
               {(Number(source.cost_rate) * 100).toFixed(3)}
               <span className="text-graphite text-base">% /mo</span>
             </div>
-            <div className="font-mono text-xs text-muted mt-1">
-              Monthly interest{' '}
-              <span className="text-ink">{formatMoney(monthlyInterest)}</span>
-              {' · '}Total interest{' '}
-              <span className="text-ink">{formatMoney(totalInterestDue)}</span>
+            <div className="font-mono text-[11.5px] text-graphite mt-2 tracking-[0.02em] font-medium">
+              MONTHLY INTEREST{' '}
+              <span className="text-num-ink">{formatMoney(monthlyInterest)}</span>
+              {' · '}TOTAL{' '}
+              <span className="text-num-ink">{formatMoney(totalInterestDue)}</span>
             </div>
           </div>
 
           {source.lock_in_months ? (
             <div>
-              <div className="font-serif italic text-graphite text-sm mb-1">
+              <div className="font-serif italic text-accent text-base mb-1">
                 Monthly payment
               </div>
-              <div className="font-serif text-xl text-ink">
+              <div className="font-serif text-xl text-num-ink tabular">
                 {formatMoney(monthlyPayment)}
               </div>
-              <div className="font-mono text-xs text-muted mt-1">
-                ({source.lock_in_months} months ·{' '}
+              <div className="font-mono text-[11.5px] text-graphite mt-2 tracking-[0.02em] font-medium">
+                {source.lock_in_months}M ·{' '}
                 {source.maturity_date
-                  ? `matures ${dayjs(source.maturity_date).format('D MMM YYYY')}`
-                  : 'no maturity'}
+                  ? `MATURES ${dayjs(source.maturity_date).format('D MMM YYYY').toUpperCase()}`
+                  : 'NO MATURITY'}
                 {isActive && maturityDays !== null ? (
                   maturityDays < 0
-                    ? ` · past maturity by ${Math.abs(maturityDays)}d`
-                    : ` · ${maturityDays}d remaining`
-                ) : null})
+                    ? ` · PAST BY ${Math.abs(maturityDays)}D`
+                    : ` · ${maturityDays}D REMAINING`
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -197,7 +193,10 @@ export default async function FundSourceDetailPage({ params }: Props) {
       {/* ───────── Notes ───────── */}
       {source.notes ? (
         <section className="mb-12">
-          <h2 className="font-serif text-xl text-ink mb-2">Notes</h2>
+          <div className="sect-head">
+            <h2>Notes</h2>
+            <span className="rule" aria-hidden />
+          </div>
           <p className="font-serif italic text-graphite text-md max-w-3xl whitespace-pre-wrap">
             {source.notes}
           </p>
@@ -206,10 +205,11 @@ export default async function FundSourceDetailPage({ params }: Props) {
 
       {/* ───────── Repayment history ───────── */}
       <section className="mb-12">
-        <h2 className="font-serif text-xl text-ink mb-1">Repayment history</h2>
-        <p className="font-serif italic text-graphite text-sm mb-4">
-          Principal + interest payments recorded against this fund source
-        </p>
+        <div className="sect-head">
+          <h2>Repayment history</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">{repaymentsList.length} ENTR{repaymentsList.length === 1 ? 'Y' : 'IES'} · PRINCIPAL + INTEREST</span>
+        </div>
 
         {repaymentsList.length === 0 ? (
           <div className="border border-hairline rounded-md bg-surface p-6 text-center">
@@ -220,28 +220,28 @@ export default async function FundSourceDetailPage({ params }: Props) {
         ) : (
           <>
             <div className="overflow-x-auto mb-4">
-              <table className="w-full text-sm">
+              <table className="ledger-table">
                 <thead>
-                  <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                    <th className="text-left py-3 pr-4 font-medium">Date</th>
-                    <th className="text-left py-3 pr-4 font-medium">Type</th>
-                    <th className="text-right py-3 pr-4 font-medium">Amount</th>
-                    <th className="text-left py-3 pr-4 font-medium">Notes</th>
+                  <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th className="right">Amount</th>
+                    <th>Notes</th>
                   </tr>
                 </thead>
                 <tbody>
                   {repaymentsList.map((r) => (
-                    <tr key={r.id} className="border-b border-hairline last:border-0">
-                      <td className="py-3 pr-4 font-mono text-xs text-ink">
+                    <tr key={r.id}>
+                      <td className="font-mono text-xs text-ink">
                         {dayjs(r.payment_date).format('D MMM YYYY')}
                       </td>
-                      <td className="py-3 pr-4 font-serif italic text-graphite text-sm">
+                      <td className="font-serif italic text-graphite text-sm">
                         {r.payment_type}
                       </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">
+                      <td className="num">
                         {formatMoney(Number(r.amount))}
                       </td>
-                      <td className="py-3 pr-4 font-serif italic text-muted text-sm truncate max-w-[200px]">
+                      <td className="font-serif italic text-muted text-sm truncate max-w-[200px]">
                         {r.notes ?? '—'}
                       </td>
                     </tr>
@@ -254,11 +254,11 @@ export default async function FundSourceDetailPage({ params }: Props) {
             <div className="flex gap-8 text-sm font-mono">
               <div>
                 <span className="text-muted">Principal paid: </span>
-                <span className="text-ink font-medium">{formatMoney(totalPrincipalPaid)}</span>
+                <span className="num">{formatMoney(totalPrincipalPaid)}</span>
               </div>
               <div>
                 <span className="text-muted">Interest paid: </span>
-                <span className="text-ink font-medium">{formatMoney(totalInterestPaid)}</span>
+                <span className="num">{formatMoney(totalInterestPaid)}</span>
               </div>
             </div>
           </>
@@ -279,7 +279,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
       {/* ───────── Fully repaid audit ───────── */}
       {isRepaid && source.repaid_at ? (
         <section className="mb-12 border-l-2 border-ledger pl-4 py-2 max-w-3xl">
-          <h2 className="font-serif text-xl text-ink mb-1">Fully repaid</h2>
+          <h2 className="font-serif italic text-xl text-ink mb-1">Fully repaid</h2>
           <p className="font-serif text-md text-ink">
             Repaid on{' '}
             <em className="font-serif italic text-ledger">
@@ -296,10 +296,11 @@ export default async function FundSourceDetailPage({ params }: Props) {
       {/* ───────── Actions (Finance only) ───────── */}
       {canFinanceEdit && isActive ? (
         <section className="border-t border-hairline pt-8">
-          <h2 className="font-serif text-xl text-ink mb-1">Actions</h2>
-          <p className="font-serif italic text-graphite text-sm mb-4">
-            Cancellation requires Principal approval.
-          </p>
+          <div className="sect-head">
+            <h2>Actions</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">CANCELLATION NEEDS PRINCIPAL APPROVAL</span>
+          </div>
           <ConfirmButton
             id={source.id}
             action={cancelFundSource}

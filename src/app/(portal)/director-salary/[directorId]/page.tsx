@@ -49,7 +49,18 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
         <Link href={`/director-salary?period=${period}`} className="text-sm text-muted hover:text-accent font-sans transition-colors">
           ← Back to Director Salary
         </Link>
-        <div className="mt-8 py-16 text-center border border-hairline rounded-md bg-surface">
+        <div className="page-head">
+          <div>
+            <div className="page-eyebrow">
+              <em>I.</em> DIRECTOR · PAYOUT · {periodLabel.toUpperCase()}
+            </div>
+            <h1 className="page-title">Director {director.code}</h1>
+            <p className="font-serif italic text-graphite text-base mt-3">
+              <em>Payout not yet calculated for this period.</em>
+            </p>
+          </div>
+        </div>
+        <div className="py-16 text-center border border-hairline rounded-md bg-surface">
           <p className="font-serif italic text-graphite text-lg mb-1">
             尚未计算。
           </p>
@@ -81,10 +92,13 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
         ← Back to Director Salary
       </Link>
 
-      <div className="flex items-baseline justify-between mt-6 mb-10">
+      <div className="page-head">
         <div>
-          <h1 className="font-serif text-3xl text-ink">Director {director.code} — {periodLabel}</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
+          <div className="page-eyebrow">
+            <em>I.</em> DIRECTOR · PAYOUT · {periodLabel.toUpperCase()}
+          </div>
+          <h1 className="page-title">{director.name} — {director.code}</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
             Payout detail. <em className={`font-serif text-sm ${
               payout.status === 'draft' ? 'text-alert' :
               payout.status === 'confirmed' ? 'text-ledger' : 'text-graphite'
@@ -107,61 +121,61 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
           <div className="border border-hairline rounded-md bg-surface p-5 space-y-3">
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">Gross Allocation</span>
-              <span className="font-mono tabular text-md font-medium text-ink font-semibold">{formatMoney(n(payout.gross_amount))}</span>
+              <span className="num text-num-ink font-semibold">{formatMoney(n(payout.gross_amount))}</span>
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">5% Saving</span>
-              <span className="font-mono tabular text-sm font-medium text-danger">({formatMoneyBare(n(payout.saving_amount))})</span>
+              <span className="num neg">({formatMoneyBare(n(payout.saving_amount))})</span>
             </div>
             <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
               <span className="font-serif italic text-sm text-accent">After Saving</span>
-              <span className="font-mono tabular text-md font-medium text-ink">{formatMoney(n(payout.after_saving))}</span>
+              <span className="num text-num-ink">{formatMoney(n(payout.after_saving))}</span>
             </div>
           </div>
 
           {/* 75% Payroll */}
           <div className="border border-hairline rounded-md bg-surface p-5 space-y-3">
-            <h3 className="font-serif text-lg text-ink mb-2">75% Payroll</h3>
+            <h3 className="font-serif italic text-ink text-md mb-2">75% Payroll</h3>
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">Calculated (75%)</span>
-              <span className="font-mono tabular text-sm font-medium text-graphite">{formatMoney(n(payout.payroll_calc))}</span>
+              <span className="num text-graphite">{formatMoney(n(payout.payroll_calc))}</span>
             </div>
             {n(payout.advance_amount) > 0 && (
               <div className="flex items-baseline justify-between">
                 <span className="font-serif italic text-sm text-alert">Advance (below min RM {formatMoneyBare(director.min_payout)})</span>
-                <span className="font-mono tabular text-sm font-medium text-alert">+{formatMoneyBare(n(payout.advance_amount))}</span>
+                <span className="num text-alert">+{formatMoneyBare(n(payout.advance_amount))}</span>
               </div>
             )}
             <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
               <span className="font-serif italic text-sm text-accent">Payroll Gross</span>
-              <span className="font-mono tabular text-md font-medium text-ink font-semibold">{formatMoney(n(payout.payroll_gross))}</span>
+              <span className="num text-num-ink font-semibold">{formatMoney(n(payout.payroll_gross))}</span>
             </div>
 
             <div className="pt-3 border-t border-hairline space-y-2">
-              <p className="font-sans text-xs uppercase tracking-wide text-muted">Deductions</p>
+              <p className="font-sans text-xs uppercase tracking-wide text-graphite">Deductions</p>
               <div className="flex items-baseline justify-between">
                 <span className="font-serif italic text-sm text-graphite">EPF ER</span>
-                <span className="font-mono tabular text-sm font-medium text-graphite">({formatMoneyBare(n(payout.payroll_epf_er))})</span>
+                <span className="num text-graphite">({formatMoneyBare(n(payout.payroll_epf_er))})</span>
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="font-serif italic text-sm text-graphite">EPF EE</span>
-                <span className="font-mono tabular text-sm font-medium text-graphite">({formatMoneyBare(n(payout.payroll_epf_ee))})</span>
+                <span className="num text-graphite">({formatMoneyBare(n(payout.payroll_epf_ee))})</span>
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="font-serif italic text-sm text-graphite">SOCSO ER</span>
-                <span className="font-mono tabular text-sm font-medium text-graphite">({formatMoneyBare(n(payout.payroll_socso_er))})</span>
+                <span className="num text-graphite">({formatMoneyBare(n(payout.payroll_socso_er))})</span>
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="font-serif italic text-sm text-graphite">SOCSO EE</span>
-                <span className="font-mono tabular text-sm font-medium text-graphite">({formatMoneyBare(n(payout.payroll_socso_ee))})</span>
+                <span className="num text-graphite">({formatMoneyBare(n(payout.payroll_socso_ee))})</span>
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="font-serif italic text-sm text-graphite">EIS ER</span>
-                <span className="font-mono tabular text-sm font-medium text-graphite">({formatMoneyBare(n(payout.payroll_eis_er))})</span>
+                <span className="num text-graphite">({formatMoneyBare(n(payout.payroll_eis_er))})</span>
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="font-serif italic text-sm text-graphite">EIS EE</span>
-                <span className="font-mono tabular text-sm font-medium text-graphite">({formatMoneyBare(n(payout.payroll_eis_ee))})</span>
+                <span className="num text-graphite">({formatMoneyBare(n(payout.payroll_eis_ee))})</span>
               </div>
             </div>
 
@@ -182,43 +196,43 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
         <div className="space-y-6">
           {/* 25% Invoice */}
           <div className="border border-hairline rounded-md bg-surface p-5 space-y-3">
-            <h3 className="font-serif text-lg text-ink mb-2">25% Invoice</h3>
+            <h3 className="font-serif italic text-ink text-md mb-2">25% Invoice</h3>
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">Base</span>
-              <span className="font-mono tabular text-sm font-medium text-ink">{formatMoney(n(payout.invoice_base))}</span>
+              <span className="num">{formatMoney(n(payout.invoice_base))}</span>
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">+ EPF ER</span>
-              <span className="font-mono tabular text-sm font-medium text-graphite">{formatMoney(n(payout.invoice_epf_er))}</span>
+              <span className="num text-graphite">{formatMoney(n(payout.invoice_epf_er))}</span>
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">+ SOCSO ER</span>
-              <span className="font-mono tabular text-sm font-medium text-graphite">{formatMoney(n(payout.invoice_socso_er))}</span>
+              <span className="num text-graphite">{formatMoney(n(payout.invoice_socso_er))}</span>
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">+ EIS ER</span>
-              <span className="font-mono tabular text-sm font-medium text-graphite">{formatMoney(n(payout.invoice_eis_er))}</span>
+              <span className="num text-graphite">{formatMoney(n(payout.invoice_eis_er))}</span>
             </div>
             <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
               <span className="font-serif italic text-sm text-accent">Invoice Total</span>
-              <span className="font-mono tabular text-md font-medium text-ink font-semibold">{formatMoney(n(payout.invoice_total))}</span>
+              <span className="num text-num-ink font-semibold">{formatMoney(n(payout.invoice_total))}</span>
             </div>
           </div>
 
           {/* Statutory Surplus */}
           <div className="border border-hairline rounded-md bg-surface p-5 space-y-3">
-            <h3 className="font-serif text-lg text-ink mb-2">Statutory Surplus</h3>
+            <h3 className="font-serif italic text-ink text-md mb-2">Statutory Surplus</h3>
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">ER IN (share)</span>
-              <span className="font-mono tabular text-sm font-medium text-ink">{formatMoney(n(payout.statutory_er_in))}</span>
+              <span className="num">{formatMoney(n(payout.statutory_er_in))}</span>
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">ER OUT (75%+25%)</span>
-              <span className="font-mono tabular text-sm font-medium text-ink">{formatMoney(n(payout.statutory_er_out))}</span>
+              <span className="num">{formatMoney(n(payout.statutory_er_out))}</span>
             </div>
             <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
               <span className="font-serif italic text-sm text-accent">Surplus</span>
-              <span className={`font-mono tabular text-md font-semibold ${n(payout.statutory_surplus) >= 0 ? 'text-ledger' : 'text-danger'}`}>
+              <span className={`num font-semibold ${n(payout.statutory_surplus) >= 0 ? 'text-ledger' : 'neg'}`}>
                 {formatMoney(n(payout.statutory_surplus))}
               </span>
             </div>
@@ -226,22 +240,22 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
 
           {/* Advance Tracking */}
           <div className="border border-hairline rounded-md bg-surface p-5 space-y-3">
-            <h3 className="font-serif text-lg text-ink mb-2">Advance Tracking</h3>
+            <h3 className="font-serif italic text-ink text-md mb-2">Advance Tracking</h3>
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">This month advance</span>
-              <span className="font-mono tabular text-sm font-medium text-alert">
+              <span className="num text-alert">
                 {n(payout.advance_amount) > 0 ? `+${formatMoneyBare(n(payout.advance_amount))}` : '—'}
               </span>
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">Repaid</span>
-              <span className="font-mono tabular text-sm font-medium text-ledger">
+              <span className="num text-ledger">
                 {n(payout.advance_repaid) > 0 ? `-${formatMoneyBare(n(payout.advance_repaid))}` : '—'}
               </span>
             </div>
             <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
               <span className="font-serif italic text-sm text-accent">Balance</span>
-              <span className="font-mono tabular text-md font-medium text-ink font-semibold">{formatMoney(n(payout.advance_balance))}</span>
+              <span className="num text-num-ink font-semibold">{formatMoney(n(payout.advance_balance))}</span>
             </div>
           </div>
         </div>

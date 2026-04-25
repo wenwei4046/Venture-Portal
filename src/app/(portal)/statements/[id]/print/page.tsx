@@ -66,7 +66,7 @@ export default async function StatementPrintPage({ params }: Props) {
           }
           body {
             font-family: 'Georgia', 'Times New Roman', serif;
-            color: #1A1613;
+            color: #1C160F;
             max-width: 720px;
             margin: 0 auto;
             padding: 40px;
@@ -77,7 +77,7 @@ export default async function StatementPrintPage({ params }: Props) {
             text-align: center;
             margin-bottom: 32px;
             padding-bottom: 20px;
-            border-bottom: 2px solid #1A1613;
+            border-bottom: 2px solid #1C160F;
           }
           .header .company-name {
             font-size: 20px;
@@ -87,7 +87,7 @@ export default async function StatementPrintPage({ params }: Props) {
           }
           .header .company-reg {
             font-size: 11px;
-            color: #6B5F52;
+            color: #5A4E40;
             margin-top: 2px;
             letter-spacing: 1px;
           }
@@ -102,15 +102,15 @@ export default async function StatementPrintPage({ params }: Props) {
             justify-content: space-between;
             margin-bottom: 24px;
             padding-bottom: 12px;
-            border-bottom: 1px solid #DFD4BE;
+            border-bottom: 1px solid #C6B99E;
           }
           .meta-left, .meta-right { font-size: 12px; }
-          .meta-label { color: #6B5F52; font-style: italic; }
+          .meta-label { color: #5A4E40; font-style: italic; }
           .meta-value { font-weight: bold; }
           h2 {
             font-size: 13px;
             margin: 24px 0 8px;
-            color: #6B5F52;
+            color: #5A4E40;
             text-transform: uppercase;
             letter-spacing: 1px;
             font-weight: normal;
@@ -118,21 +118,21 @@ export default async function StatementPrintPage({ params }: Props) {
           }
           table { width: 100%; border-collapse: collapse; }
           td, th { padding: 5px 0; font-size: 12px; }
-          th { text-align: left; font-weight: normal; color: #6B5F52; font-style: italic; border-bottom: 1px solid #DFD4BE; }
-          th:last-child, td:last-child { text-align: right; font-family: 'Courier New', monospace; }
-          .line-desc { font-size: 11px; color: #9E8F7F; font-style: italic; }
-          .separator { border-top: 1px solid #DFD4BE; }
-          .double-separator { border-top: 2px solid #1A1613; }
+          th { text-align: left; font-weight: normal; color: #5A4E40; font-style: italic; border-bottom: 1px solid #C6B99E; }
+          th:last-child, td:last-child { text-align: right; font-family: 'Courier New', monospace; color: #1A130B; font-variant-numeric: tabular-nums slashed-zero; }
+          .line-desc { font-size: 11px; color: #85775F; font-style: italic; }
+          .separator { border-top: 1px solid #C6B99E; }
+          .double-separator { border-top: 2px solid #1C160F; }
           .total td { font-weight: bold; padding-top: 8px; }
-          .grand-total td { font-size: 15px; font-weight: bold; padding-top: 12px; }
+          .grand-total td { font-size: 15px; font-weight: bold; padding-top: 12px; color: #1A130B; }
           .negative { color: #A3371A; }
           .positive { color: #3D6B45; }
           .footer {
             margin-top: 48px;
             padding-top: 16px;
-            border-top: 1px solid #DFD4BE;
+            border-top: 1px solid #C6B99E;
             font-size: 10px;
-            color: #9E8F7F;
+            color: #85775F;
             text-align: center;
           }
           .status-badge {

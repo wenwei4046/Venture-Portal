@@ -46,22 +46,21 @@ export default async function StaffDetailPage({ params }: PageProps) {
         ← Back to Staff
       </Link>
 
-      <div className="flex items-baseline justify-between mt-6 mb-10 gap-4">
+      <div className="page-head">
         <div>
-          <h1 className="font-serif text-3xl text-ink">{staff.employee_name}</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
-            {deptName}
+          <div className="page-eyebrow">
+            <em>I.</em> HR · STAFF · {(deptName ?? '—').toUpperCase()}
+          </div>
+          <h1 className="page-title">{staff.employee_name}</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
             {staff.employee_code && (
-              <>
-                {' · '}
-                <span className="font-mono text-sm text-muted">{staff.employee_code}</span>
-              </>
+              <span className="font-mono text-sm text-muted mr-2">{staff.employee_code}</span>
             )}
             {staff.resignation_date && (
-              <>
-                {' · '}
-                <em className="text-danger">Resigned {staff.resignation_date}</em>
-              </>
+              <em className="text-danger">Resigned {staff.resignation_date}</em>
+            )}
+            {!staff.employee_code && !staff.resignation_date && (
+              <em>Active employee.</em>
             )}
           </p>
         </div>
@@ -129,7 +128,7 @@ export default async function StaffDetailPage({ params }: PageProps) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="font-serif text-lg text-ink mb-4 pb-2 border-b border-hairline">{title}</h2>
+      <h2 className="font-serif italic text-ink text-md mb-4 pb-2 border-b border-hairline">{title}</h2>
       <dl className="space-y-3">{children}</dl>
     </section>
   )
@@ -149,7 +148,7 @@ function Field({
   const isEmpty = value == null || value === ''
   return (
     <div className="grid grid-cols-[140px_1fr] gap-4 items-baseline">
-      <dt className="font-sans text-xs uppercase tracking-wide text-muted">{label}</dt>
+      <dt className="font-sans text-xs uppercase tracking-wide text-graphite">{label}</dt>
       <dd
         className={[
           mono ? 'font-mono tabular text-sm' : 'font-serif text-sm',

@@ -110,12 +110,13 @@ export default async function PayrollRunApprovalPage({ params }: PageProps) {
         ← Back to Approvals
       </Link>
 
-      <div className="flex items-baseline justify-between mt-6 mb-8">
+      <div className="page-head">
         <div>
-          <h1 className="font-serif text-3xl text-ink">
-            Payroll Run · {formatPeriodLabel(run.period_month)}
-          </h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
+          <div className="page-eyebrow">
+            <em>IV.</em> APPROVALS · PAYROLL RUN · {formatPeriodLabel(run.period_month).toUpperCase()}
+          </div>
+          <h1 className="page-title">Payroll Run</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
             {statusBadge(run.status)}
             {run.submitted_at && (
               <span className="ml-3 text-muted">
@@ -156,7 +157,7 @@ export default async function PayrollRunApprovalPage({ params }: PageProps) {
         <span className="font-serif italic text-graphite text-sm uppercase tracking-wide">
           Total payroll outflow
         </span>
-        <span className="font-mono tabular text-2xl text-ink font-semibold">
+        <span className="font-serif text-2xl text-num-ink tabular tracking-[-0.01em]">
           {formatMoney(Number(run.total_amount))}
         </span>
       </div>
@@ -165,25 +166,29 @@ export default async function PayrollRunApprovalPage({ params }: PageProps) {
         <>
           {detailRows.length > 0 && (
             <div className="mb-10">
-              <h2 className="font-serif text-lg text-ink mb-4">Staff</h2>
-              <table className="w-full text-sm">
+              <div className="sect-head">
+                <h2>Staff</h2>
+                <span className="rule" aria-hidden />
+                <span className="count">{detailRows.length} EMPLOYEE{detailRows.length === 1 ? '' : 'S'}</span>
+              </div>
+              <table className="ledger-table">
                 <thead>
-                  <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                    <th className="text-left py-2 pr-4 font-medium">Name</th>
-                    <th className="text-left py-2 pr-4 font-medium">Dept</th>
-                    <th className="text-right py-2 pr-4 font-medium">Gross</th>
-                    <th className="text-right py-2 pr-4 font-medium">Stat ER</th>
-                    <th className="text-right py-2 pr-4 font-medium">Net</th>
+                  <tr>
+                    <th>Name</th>
+                    <th>Dept</th>
+                    <th className="right">Gross</th>
+                    <th className="right">Stat ER</th>
+                    <th className="right">Net</th>
                   </tr>
                 </thead>
                 <tbody>
                   {detailRows.map(r => (
-                    <tr key={r.id} className="border-b border-hairline last:border-0">
-                      <td className="py-2 pr-4 font-serif text-ink">{r.employeeName}</td>
-                      <td className="py-2 pr-4 font-serif italic text-graphite">{r.deptName}</td>
-                      <td className="py-2 pr-4 text-right font-mono tabular text-ink">{formatMoney(r.gross)}</td>
-                      <td className="py-2 pr-4 text-right font-mono tabular text-graphite">{formatMoney(r.totalStatEr)}</td>
-                      <td className="py-2 pr-4 text-right font-mono tabular text-ink font-medium">{formatMoney(r.net)}</td>
+                    <tr key={r.id}>
+                      <td className="font-serif text-ink">{r.employeeName}</td>
+                      <td className="font-serif italic text-graphite">{r.deptName}</td>
+                      <td className="num">{formatMoney(r.gross)}</td>
+                      <td className="num text-graphite">{formatMoney(r.totalStatEr)}</td>
+                      <td className="num">{formatMoney(r.net)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -193,8 +198,12 @@ export default async function PayrollRunApprovalPage({ params }: PageProps) {
 
           {directorRows.length > 0 && (
             <div className="mb-10">
-              <div className="flex items-baseline justify-between mb-4">
-                <h2 className="font-serif text-lg text-ink">Directors</h2>
+              <div className="sect-head">
+                <h2>Directors</h2>
+                <span className="rule" aria-hidden />
+                <span className="count">{directorRows.length} DIRECTOR{directorRows.length === 1 ? '' : 'S'}</span>
+              </div>
+              <div className="flex items-baseline justify-end -mt-3 mb-4">
                 <Link
                   href={`/approvals/payroll-run/${run.id}/director-report`}
                   className="text-sm text-accent hover:underline font-serif italic"
@@ -202,20 +211,20 @@ export default async function PayrollRunApprovalPage({ params }: PageProps) {
                   View full breakdown →
                 </Link>
               </div>
-              <table className="w-full text-sm">
+              <table className="ledger-table">
                 <thead>
-                  <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                    <th className="text-left py-2 pr-4 font-medium">Name</th>
-                    <th className="text-right py-2 pr-4 font-medium">Gross</th>
-                    <th className="text-right py-2 pr-4 font-medium">Payroll Net</th>
+                  <tr>
+                    <th>Name</th>
+                    <th className="right">Gross</th>
+                    <th className="right">Payroll Net</th>
                   </tr>
                 </thead>
                 <tbody>
                   {directorRows.map(r => (
-                    <tr key={r.id} className="border-b border-hairline last:border-0">
-                      <td className="py-2 pr-4 font-serif text-ink">{r.directorName}</td>
-                      <td className="py-2 pr-4 text-right font-mono tabular text-graphite">{formatMoney(r.gross)}</td>
-                      <td className="py-2 pr-4 text-right font-mono tabular text-ink font-medium">{formatMoney(r.net)}</td>
+                    <tr key={r.id}>
+                      <td className="font-serif text-ink">{r.directorName}</td>
+                      <td className="num text-graphite">{formatMoney(r.gross)}</td>
+                      <td className="num">{formatMoney(r.net)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -238,7 +247,7 @@ function OpexCard({ label, amount }: { label: string; amount: number }) {
   return (
     <div className="border border-hairline rounded-md p-4 bg-surface">
       <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">{label}</div>
-      <div className="font-mono tabular text-xl text-ink mt-2">{formatMoney(amount)}</div>
+      <div className="font-serif text-xl text-num-ink tabular tracking-[-0.01em] mt-2">{formatMoney(amount)}</div>
     </div>
   )
 }

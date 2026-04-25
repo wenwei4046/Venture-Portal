@@ -14,12 +14,17 @@ export default async function ImportStaffPage() {
         ← Back to Staff
       </Link>
 
-      <div className="mt-6 mb-10">
-        <h1 className="font-serif text-3xl text-ink">Import Staff from InfoTech</h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          Upload the <em>Active, Newly Joined &amp; Resigned Employees List</em> xlsx export.
-          Active + newly joined employees are imported; resigned rows are ignored.
-        </p>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> HR · STAFF · IMPORT
+          </div>
+          <h1 className="page-title">Import Staff from InfoTech</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            Upload the <em>Active, Newly Joined &amp; Resigned Employees List</em> xlsx export.
+            Active + newly joined employees are imported; resigned rows are ignored.
+          </p>
+        </div>
       </div>
 
       <ImportStaffWizard />

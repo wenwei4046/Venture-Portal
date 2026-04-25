@@ -72,11 +72,16 @@ export default async function DirectorPoolPage() {
 
   return (
     <div>
-      <div className="mb-10">
-        <h1 className="font-serif text-3xl text-ink">Director Pool</h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          Two earmarked buckets: <span className="text-ink">Saving</span> (5% + statutory surplus, net of project claims) and <span className="text-ink">Invoice</span> (25% per-director accumulator). Together they equal the pool once all period payroll has been PV&apos;d out.
-        </p>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> DIRECTOR · POOL OVERVIEW
+          </div>
+          <h1 className="page-title">Director Pool</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            Two earmarked buckets: <span className="text-ink">Saving</span> (5% + statutory surplus, net of project claims) and <span className="text-ink">Invoice</span> (25% per-director accumulator). Together they equal the pool once all period payroll has been PV&apos;d out.
+          </p>
+        </div>
       </div>
 
       {/* Pool Summary Cards — 2 buckets */}

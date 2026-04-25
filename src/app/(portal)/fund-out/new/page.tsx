@@ -35,18 +35,23 @@ export default async function NewLoanPage() {
 
   return (
     <div>
-      <div className="mb-10">
-        <Link
-          href="/fund-out"
-          className="text-sm text-muted hover:text-accent font-sans transition-colors"
-        >
-          ← Back to Fund OUT
-        </Link>
-        <h1 className="font-serif text-3xl text-ink mt-3">New loan</h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          Submit a new loan for <em>Principal approval</em>. Rate locks at
-          submission using the active base rate + your custom interest rate.
-        </p>
+      <Link
+        href="/fund-out"
+        className="text-sm text-muted hover:text-accent font-sans transition-colors"
+      >
+        ← Back to Fund OUT
+      </Link>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> TREASURY · NEW LOAN
+          </div>
+          <h1 className="page-title">New loan</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            Submit a new loan for <em>Principal approval</em>. Rate locks at
+            submission using the active base rate + your custom interest rate.
+          </p>
+        </div>
       </div>
 
       {baseRate ? (

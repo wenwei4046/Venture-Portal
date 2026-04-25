@@ -38,15 +38,20 @@ export default async function DeptRequestsPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <Link href="/payments" className="text-sm text-muted hover:text-accent font-sans transition-colors">
-          ← Back to Payments
-        </Link>
-        <h1 className="font-serif text-3xl text-ink mt-3">Dept Payment Requests</h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          Department managers requesting vendor payment from their pool. Approved by Principal,
-          ready for you to generate a PV.
-        </p>
+      <Link href="/payments" className="text-sm text-muted hover:text-accent font-sans transition-colors">
+        ← Back to Payments
+      </Link>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> TREASURY · DEPT PAYMENT REQUESTS
+          </div>
+          <h1 className="page-title">Dept Payment Requests</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            Department managers requesting vendor payment from their pool. Approved by Principal,
+            ready for you to generate a PV.
+          </p>
+        </div>
       </div>
 
       {/* ── Awaiting Finance ────────────────────────────────────────────── */}

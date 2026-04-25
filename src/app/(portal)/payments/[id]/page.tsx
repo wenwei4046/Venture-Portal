@@ -129,16 +129,14 @@ export default async function PaymentDetailPage({ params }: Props) {
       </Link>
 
       {/* ── Header ── */}
-      <div className="flex items-baseline justify-between mt-3 mb-10">
+      <div className="page-head">
         <div>
-          {categoryLabel ? (
-            <p className="font-serif italic text-accent text-base mb-1 capitalize">
-              {categoryLabel}
-            </p>
-          ) : null}
-          <h1 className="font-serif text-3xl text-ink">{voucher.voucher_no ?? 'Draft'}</h1>
-          <p className="font-mono text-xs text-muted mt-1">
-            Created by {createdByName ?? 'Unknown'} on {dayjs(voucher.created_at).format('D MMM YYYY HH:mm')}
+          <div className="page-eyebrow">
+            <em>I.</em> TREASURY · PAYMENT VOUCHER{categoryLabel ? ` · ${categoryLabel.toUpperCase()}` : ''}
+          </div>
+          <h1 className="page-title">{voucher.voucher_no ?? 'Draft'}</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            Created by <em>{createdByName ?? 'Unknown'}</em> on {dayjs(voucher.created_at).format('D MMMM YYYY HH:mm')}
           </p>
         </div>
         <StatusBadge status={voucher.status} />
@@ -147,20 +145,20 @@ export default async function PaymentDetailPage({ params }: Props) {
       {/* ── Details grid ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
         <div className="lg:col-span-5">
-          <div className="font-serif italic text-graphite text-sm mb-1">Amount</div>
-          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
+          <div className="font-serif italic text-accent text-base mb-1">Amount</div>
+          <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
             {voucher.direction === 'credit' ? '+' : ''}{formatMoney(Number(voucher.amount))}
           </div>
           <div className="mt-3 space-y-1">
             {bankName ? (
-              <div className="font-mono text-xs text-muted">
-                {voucher.direction === 'debit' ? 'Pay from:' : 'Receive into:'} {bankName}
+              <div className="font-mono text-[11.5px] text-graphite tracking-[0.02em] font-medium">
+                {voucher.direction === 'debit' ? 'PAY FROM:' : 'RECEIVE INTO:'} <span className="text-num-ink">{bankName}</span>
               </div>
             ) : null}
             {poolLabel ? (
-              <div className="font-mono text-xs text-muted">
-                {voucher.direction === 'debit' ? 'Deduct from pool:' : 'Credit to pool:'}{' '}
-                <span className="text-ink">{poolLabel}</span>
+              <div className="font-mono text-[11.5px] text-graphite tracking-[0.02em] font-medium">
+                {voucher.direction === 'debit' ? 'DEDUCT FROM POOL:' : 'CREDIT TO POOL:'}{' '}
+                <span className="text-num-ink">{poolLabel}</span>
               </div>
             ) : null}
           </div>
@@ -168,7 +166,7 @@ export default async function PaymentDetailPage({ params }: Props) {
 
         <div className="lg:col-span-7 space-y-4">
           <div>
-            <div className="font-serif italic text-graphite text-sm mb-1">
+            <div className="font-serif italic text-accent text-base mb-1">
               {voucher.direction === 'debit' ? 'Pay to' : 'Received from'}
             </div>
             <div className="font-serif text-xl text-ink">{voucher.payee_name}</div>
@@ -178,20 +176,20 @@ export default async function PaymentDetailPage({ params }: Props) {
           </div>
 
           <div>
-            <div className="font-serif italic text-graphite text-sm mb-1">Description</div>
+            <div className="font-serif italic text-accent text-base mb-1">Description</div>
             <p className="font-serif text-md text-ink whitespace-pre-wrap">{voucher.description}</p>
           </div>
 
           {voucher.payment_method ? (
             <div>
-              <div className="font-serif italic text-graphite text-sm mb-1">Payment method</div>
+              <div className="font-serif italic text-accent text-base mb-1">Payment method</div>
               <div className="font-serif text-md text-ink">{voucher.payment_method.replace('_', ' ')}</div>
             </div>
           ) : null}
 
           {voucher.notes ? (
             <div>
-              <div className="font-serif italic text-graphite text-sm mb-1">Notes</div>
+              <div className="font-serif italic text-accent text-base mb-1">Notes</div>
               <p className="font-serif italic text-graphite text-sm">{voucher.notes}</p>
             </div>
           ) : null}
@@ -200,7 +198,11 @@ export default async function PaymentDetailPage({ params }: Props) {
 
       {/* ── Audit trail ── */}
       <section className="mb-12">
-        <h2 className="font-serif text-xl text-ink mb-4">Audit trail</h2>
+        <div className="sect-head">
+          <h2>Audit trail</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">CREATED → SUBMITTED → APPROVED → EXECUTED</span>
+        </div>
         <div className="space-y-3 max-w-3xl">
           <TrailItem
             label="Created"
@@ -232,10 +234,11 @@ export default async function PaymentDetailPage({ params }: Props) {
 
       {/* ── Attachments ── */}
       <section className="mb-12">
-        <h2 className="font-serif text-xl text-ink mb-1">Attachments</h2>
-        <p className="font-serif italic text-graphite text-sm mb-4">
-          Contracts, invoices, receipts, photos — evidence for the Principal to review.
-        </p>
+        <div className="sect-head">
+          <h2>Attachments</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">{(attachments ?? []).length} FILE{(attachments ?? []).length === 1 ? '' : 'S'} · EVIDENCE FOR PRINCIPAL</span>
+        </div>
         <AttachmentUploader
           voucherId={voucher.id}
           voucherStatus={voucher.status}

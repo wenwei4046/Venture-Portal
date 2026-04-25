@@ -21,11 +21,16 @@ export default async function NewStaffPage() {
         ← Back to Staff
       </Link>
 
-      <div className="mt-6 mb-10">
-        <h1 className="font-serif text-3xl text-ink">Add Staff</h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          New employee. Statutory ER auto-calculated on basic salary. Non-statutory allowances (transport, benefits) don&apos;t attract EPF/SOCSO/EIS.
-        </p>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> HR · STAFF · NEW
+          </div>
+          <h1 className="page-title">Add Staff</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            New employee. Statutory ER auto-calculated on basic salary. Non-statutory allowances (transport, benefits) don&apos;t attract EPF/SOCSO/EIS.
+          </p>
+        </div>
       </div>
 
       <AddStaffForm departments={departments ?? []} />

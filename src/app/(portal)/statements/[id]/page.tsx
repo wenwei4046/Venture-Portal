@@ -55,15 +55,14 @@ export default async function StatementDetailPage({ params }: Props) {
       </Link>
 
       {/* ───────── Header ───────── */}
-      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mt-3 mb-10">
+      <div className="page-head">
         <div>
-          <p className="font-serif italic text-accent text-base mb-1">
-            {dayjs(statement.period_month).format('MMMM YYYY')} statement
-          </p>
-          <h1 className="font-serif text-3xl text-ink">{company?.name ?? '—'}</h1>
-          <p className="font-mono text-xs text-muted mt-1">
-            {company?.short_code} · Created{' '}
-            {dayjs(statement.created_at).format('D MMM YYYY')}
+          <div className="page-eyebrow">
+            <em>I.</em> TREASURY · STATEMENT · {dayjs(statement.period_month).format('MMM YYYY').toUpperCase()}
+          </div>
+          <h1 className="page-title">{company?.name ?? '—'}</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            {company?.short_code} · Created <em>{dayjs(statement.created_at).format('D MMMM YYYY')}</em>
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -80,22 +79,20 @@ export default async function StatementDetailPage({ params }: Props) {
 
       {/* ───────── Hero net amount ───────── */}
       <div className="mb-12 pb-12 border-b border-hairline">
-        <div className="font-serif italic text-graphite text-sm mb-1">
+        <div className="font-serif italic text-accent text-base mb-1">
           Net amount
         </div>
-        <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
-          <span className={Number(statement.net_amount) < 0 ? 'text-danger' : ''}>
-            {formatMoney(Number(statement.net_amount))}
-          </span>
+        <div className={`font-serif text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${Number(statement.net_amount) < 0 ? 'text-danger' : 'text-num-ink'}`}>
+          {formatMoney(Number(statement.net_amount))}
         </div>
-        <div className="font-mono text-xs text-muted mt-2">
+        <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
           {Number(statement.net_amount) >= 0 ? (
             <>
-              {company?.name} <em className="font-serif text-graphite">pays HV</em>
+              {(company?.name ?? '—').toUpperCase()} <em className="font-serif italic normal-case text-graphite">pays HV</em>
             </>
           ) : (
             <>
-              HV <em className="font-serif text-graphite">owes</em> {company?.name}
+              HV <em className="font-serif italic normal-case text-graphite">owes</em> {(company?.name ?? '—').toUpperCase()}
             </>
           )}
         </div>
@@ -103,11 +100,10 @@ export default async function StatementDetailPage({ params }: Props) {
 
       {/* ───────── Invoice items ───────── */}
       <section className="mb-10">
-        <div className="flex items-baseline justify-between mb-4">
-          <h2 className="font-serif text-xl text-ink">Invoice items</h2>
-          <span className="font-mono tabular text-sm font-medium text-ink">
-            {formatMoney(Number(statement.total_invoice))}
-          </span>
+        <div className="sect-head">
+          <h2>Invoice items</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">{invoiceLines.length} ITEM{invoiceLines.length === 1 ? '' : 'S'} · <span className="num">{formatMoney(Number(statement.total_invoice))}</span></span>
         </div>
         {invoiceLines.length === 0 ? (
           <div className="border border-hairline rounded-md bg-surface p-5 text-center">
@@ -133,9 +129,9 @@ export default async function StatementDetailPage({ params }: Props) {
                     </div>
                   ) : null}
                 </div>
-                <div className="font-mono tabular text-sm font-medium text-ink">
+                <span className="num">
                   {formatMoney(Number(line.amount))}
-                </div>
+                </span>
               </div>
             ))}
           </div>
@@ -144,11 +140,10 @@ export default async function StatementDetailPage({ params }: Props) {
 
       {/* ───────── Contra items ───────── */}
       <section className="mb-10">
-        <div className="flex items-baseline justify-between mb-4">
-          <h2 className="font-serif text-xl text-ink">Contra items</h2>
-          <span className="font-mono tabular text-sm font-medium text-ink">
-            {formatMoney(-Number(statement.total_contra))}
-          </span>
+        <div className="sect-head">
+          <h2>Contra items</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">{contraLines.length} ITEM{contraLines.length === 1 ? '' : 'S'} · <span className="num neg">{formatMoney(-Number(statement.total_contra))}</span></span>
         </div>
         {contraLines.length === 0 ? (
           <div className="border border-hairline rounded-md bg-surface p-5 text-center">
@@ -174,9 +169,9 @@ export default async function StatementDetailPage({ params }: Props) {
                     </div>
                   ) : null}
                 </div>
-                <div className="font-mono tabular text-sm font-medium text-ink">
+                <span className="num neg">
                   {formatMoney(-Number(line.amount))}
-                </div>
+                </span>
               </div>
             ))}
           </div>
@@ -187,19 +182,19 @@ export default async function StatementDetailPage({ params }: Props) {
       <div className="bg-surface border border-hairline rounded-md p-5 mb-10 max-w-md ml-auto">
         <div className="flex justify-between font-mono text-sm text-graphite mb-1">
           <span>Subtotal invoice</span>
-          <span className="tabular text-ink">
+          <span className="num">
             {formatMoney(Number(statement.total_invoice))}
           </span>
         </div>
         <div className="flex justify-between font-mono text-sm text-graphite mb-2 pb-2 border-b border-hairline">
           <span>Subtotal contra</span>
-          <span className="tabular text-ink">
+          <span className="num neg">
             {formatMoney(-Number(statement.total_contra))}
           </span>
         </div>
         <div className="flex items-baseline justify-between">
           <span className="font-serif italic text-md text-accent">Net payable</span>
-          <span className={`font-serif text-2xl tabular ${Number(statement.net_amount) < 0 ? 'text-danger' : 'text-ink'}`}>
+          <span className={`font-serif text-2xl tabular tracking-[-0.01em] ${Number(statement.net_amount) < 0 ? 'text-danger' : 'text-num-ink'}`}>
             {formatMoney(Number(statement.net_amount))}
           </span>
         </div>
@@ -208,10 +203,11 @@ export default async function StatementDetailPage({ params }: Props) {
       {/* ───────── Actions ───────── */}
       {canFinanceAct && (isDraft || isIssued) ? (
         <section className="border-t border-hairline pt-8">
-          <h2 className="font-serif text-xl text-ink mb-1">Actions</h2>
-          <p className="font-serif italic text-graphite text-sm mb-4">
-            Finance only. Statements issued to subsidiaries cannot be regenerated.
-          </p>
+          <div className="sect-head">
+            <h2>Actions</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">FINANCE ONLY · ISSUED STATEMENTS LOCK</span>
+          </div>
           <div className="flex items-center gap-3">
             {isDraft ? (
               <form action={issueStatement}>

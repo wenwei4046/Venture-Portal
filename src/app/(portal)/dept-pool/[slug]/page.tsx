@@ -82,12 +82,14 @@ export default async function DeptPoolDetailPage({ params, searchParams }: Props
         ← Back to Dept Pools
       </Link>
 
-      <div className="flex items-baseline justify-between mt-3 mb-8">
+      <div className="page-head">
         <div>
-          <p className="font-serif italic text-accent text-base mb-1">Department pool</p>
-          <h1 className="font-serif text-3xl text-ink">{dept.name}</h1>
-          <p className="font-mono text-xs text-muted mt-1">
-            Period {dayjs(period).format('MMMM YYYY')}
+          <div className="page-eyebrow">
+            <em>I.</em> DEPARTMENTS · {dept.name.toUpperCase()} POOL · {dayjs(period).format('MMM YYYY').toUpperCase()}
+          </div>
+          <h1 className="page-title">{dept.name}</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            <em>Department pool · period {dayjs(period).format('MMMM YYYY')}</em>
           </p>
         </div>
       </div>
@@ -98,10 +100,8 @@ export default async function DeptPoolDetailPage({ params, searchParams }: Props
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
           <div className="lg:col-span-7">
             <div className="font-serif italic text-graphite text-sm mb-1">Pool balance</div>
-            <div className="font-serif text-[44px] md:text-hero leading-none">
-              <span className={balance < 0 ? 'text-danger' : 'text-ink'}>
-                {formatMoney(balance)}
-              </span>
+            <div className={`font-serif text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${balance < 0 ? 'text-danger' : 'text-num-ink'}`}>
+              {formatMoney(balance)}
             </div>
             <div className="font-mono text-xs text-muted mt-2">
               {balance === 0 ? 'No movements yet' : 'Running balance — see History tab for full ledger'}
@@ -110,17 +110,17 @@ export default async function DeptPoolDetailPage({ params, searchParams }: Props
 
           <div className="lg:col-span-5 space-y-2">
             <div className="font-serif italic text-graphite text-sm mb-2">This month</div>
-            <div className="flex items-baseline justify-between font-mono text-sm">
+            <div className="flex items-baseline justify-between text-sm">
               <em className="font-serif text-graphite text-md">In</em>
-              <span className="text-ledger tabular">{formatMoney(monthIn)}</span>
+              <span className="num text-ledger">{formatMoney(monthIn)}</span>
             </div>
-            <div className="flex items-baseline justify-between font-mono text-sm">
+            <div className="flex items-baseline justify-between text-sm">
               <em className="font-serif text-graphite text-md">Out</em>
-              <span className="text-ink tabular">{formatMoney(-monthOut)}</span>
+              <span className="num">{formatMoney(-monthOut)}</span>
             </div>
-            <div className="flex items-baseline justify-between font-mono text-sm border-t border-hairline pt-2 mt-2">
+            <div className="flex items-baseline justify-between text-sm border-t border-hairline pt-2 mt-2">
               <em className="font-serif text-ink text-md">Net</em>
-              <span className={`font-serif italic text-md ${monthIn - monthOut < 0 ? 'text-danger' : 'text-ink'}`}>
+              <span className={`num text-md ${monthIn - monthOut < 0 ? 'neg' : 'text-num-ink'}`}>
                 {formatMoney(monthIn - monthOut)}
               </span>
             </div>

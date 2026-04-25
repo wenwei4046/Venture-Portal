@@ -52,11 +52,16 @@ export default async function PastMonthSubmissionsPage() {
         ← Back to Department Pools
       </Link>
 
-      <div className="mt-6 mb-10">
-        <h1 className="font-serif text-3xl text-ink">Past Month Submission</h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          Every HR cost snapshot submitted to Principal. Dept-level totals only — individual salaries are not shown here.
-        </p>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> DEPARTMENTS · HR COST SUBMISSIONS
+          </div>
+          <h1 className="page-title">Past Month Submission</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            Every HR cost snapshot submitted to Principal. Dept-level totals only — individual salaries are not shown here.
+          </p>
+        </div>
       </div>
 
       {submissions.length === 0 ? (
@@ -96,7 +101,7 @@ export default async function PastMonthSubmissionsPage() {
                     <em className={`font-serif italic text-sm ${label.className}`}>
                       {label.text}
                     </em>
-                    <span className="font-mono tabular text-xl text-ink">
+                    <span className="num text-num-ink text-xl tracking-[-0.01em]">
                       {formatMoney(total)}
                     </span>
                     {user.role === 'finance' && sub.execution_state === 'approved_for_execution' && (
@@ -119,48 +124,35 @@ export default async function PastMonthSubmissionsPage() {
                       Empty submission.
                     </p>
                   ) : (
-                    <table className="w-full text-sm">
+                    <table className="ledger-table">
                       <thead>
-                        <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                          <th className="text-left py-2 pr-4 font-medium">Department</th>
-                          <th className="text-right py-2 pr-4 font-medium">Staff</th>
-                          <th className="text-right py-2 pr-4 font-medium">Basic</th>
-                          <th className="text-right py-2 pr-4 font-medium">Stat ER</th>
-                          <th className="text-right py-2 pr-4 font-medium">Allowance</th>
-                          <th className="text-right py-2 pr-4 font-medium">Total CTC</th>
+                        <tr>
+                          <th>Department</th>
+                          <th className="right">Staff</th>
+                          <th className="right">Basic</th>
+                          <th className="right">Stat ER</th>
+                          <th className="right">Allowance</th>
+                          <th className="right">Total CTC</th>
                         </tr>
                       </thead>
                       <tbody>
                         {depts.map(([deptName, d]) => (
-                          <tr
-                            key={deptName}
-                            className="border-b border-hairline last:border-0"
-                          >
-                            <td className="py-2 pr-4 font-serif text-ink">{deptName}</td>
-                            <td className="py-2 pr-4 text-right font-mono tabular text-graphite">
-                              {d.staff_count ?? 0}
+                          <tr key={deptName}>
+                            <td>
+                              <div className="font-serif text-ink">{deptName}</div>
                             </td>
-                            <td className="py-2 pr-4 text-right font-mono tabular text-graphite">
-                              {formatMoney(Number(d.total_basic ?? 0))}
-                            </td>
-                            <td className="py-2 pr-4 text-right font-mono tabular text-graphite">
-                              {formatMoney(Number(d.total_statutory ?? 0))}
-                            </td>
-                            <td className="py-2 pr-4 text-right font-mono tabular text-graphite">
-                              {formatMoney(Number(d.total_allowance ?? 0))}
-                            </td>
-                            <td className="py-2 pr-4 text-right font-mono tabular font-medium text-ink">
-                              {formatMoney(Number(d.total_ctc ?? 0))}
-                            </td>
+                            <td className="num text-graphite">{d.staff_count ?? 0}</td>
+                            <td className="num text-graphite">{formatMoney(Number(d.total_basic ?? 0))}</td>
+                            <td className="num text-graphite">{formatMoney(Number(d.total_statutory ?? 0))}</td>
+                            <td className="num text-graphite">{formatMoney(Number(d.total_allowance ?? 0))}</td>
+                            <td className="num">{formatMoney(Number(d.total_ctc ?? 0))}</td>
                           </tr>
                         ))}
                         <tr className="border-t-2 border-hairline bg-surface-2/40">
-                          <td className="py-2 pr-4 font-serif italic text-accent" colSpan={5}>
+                          <td className="font-serif italic text-accent" colSpan={5}>
                             Total
                           </td>
-                          <td className="py-2 pr-4 text-right font-mono tabular font-semibold text-ink">
-                            {formatMoney(total)}
-                          </td>
+                          <td className="num text-num-ink font-semibold">{formatMoney(total)}</td>
                         </tr>
                       </tbody>
                     </table>

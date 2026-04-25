@@ -33,12 +33,17 @@ export default async function PayrollLandingPage() {
 
   return (
     <div>
-      <div className="mt-2 mb-10">
-        <h1 className="font-serif text-3xl text-ink">Payroll</h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          One snapshot per employee per month. Pro-rata, statutory, PCB auto-computed.
-          <em> HR edits drafts; Principal approves.</em>
-        </p>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> HR · PAYROLL · {formattedPeriod.toUpperCase()}
+          </div>
+          <h1 className="page-title">Payroll</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            One snapshot per employee per month. Pro-rata, statutory, PCB auto-computed.
+            <em> HR edits drafts; Principal approves.</em>
+          </p>
+        </div>
       </div>
 
       <div className="py-16 text-center border border-hairline rounded-md bg-surface">

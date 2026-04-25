@@ -92,14 +92,14 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
       </Link>
 
       {/* ───────── Header ───────── */}
-      <div className="flex items-baseline justify-between mt-3 mb-8">
+      <div className="page-head">
         <div>
-          <p className="font-serif italic text-accent text-base mb-1">
-            Department pool
-          </p>
-          <h1 className="font-serif text-3xl text-ink">Marketing</h1>
-          <p className="font-mono text-xs text-muted mt-1">
-            Period {dayjs(period).format('MMMM YYYY')}
+          <div className="page-eyebrow">
+            <em>I.</em> DEPARTMENTS · MARKETING POOL · {dayjs(period).format('MMM YYYY').toUpperCase()}
+          </div>
+          <h1 className="page-title">Marketing</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            <em>Department pool · period {dayjs(period).format('MMMM YYYY')}</em>
           </p>
         </div>
       </div>
@@ -119,10 +119,8 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
               <div className="font-serif italic text-graphite text-sm mb-1">
                 Pool balance
               </div>
-              <div className="font-serif text-[44px] md:text-hero leading-none">
-                <span className={balance < 0 ? 'text-danger' : 'text-ink'}>
-                  {formatMoney(balance)}
-                </span>
+              <div className={`font-serif text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${balance < 0 ? 'text-danger' : 'text-num-ink'}`}>
+                {formatMoney(balance)}
               </div>
               <div className="font-mono text-xs text-muted mt-2">
                 {balance === 0
@@ -132,21 +130,21 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
             </div>
 
             <div className="lg:col-span-5 space-y-2">
-              <div className="flex items-baseline justify-between font-mono text-sm">
+              <div className="flex items-baseline justify-between text-sm">
                 <em className="font-serif text-graphite text-md">Revenue</em>
-                <span className="text-ink tabular">{formatMoney(np.revenue)}</span>
+                <span className="num">{formatMoney(np.revenue)}</span>
               </div>
-              <div className="flex items-baseline justify-between font-mono text-sm">
+              <div className="flex items-baseline justify-between text-sm">
                 <em className="font-serif text-graphite text-md">Staff cost</em>
-                <span className="text-ink tabular">{formatMoney(-np.staff_cost)}</span>
+                <span className="num">{formatMoney(-np.staff_cost)}</span>
               </div>
-              <div className="flex items-baseline justify-between font-mono text-sm">
+              <div className="flex items-baseline justify-between text-sm">
                 <em className="font-serif text-graphite text-md">Dept expenses</em>
-                <span className="text-ink tabular">{formatMoney(-np.expenses)}</span>
+                <span className="num">{formatMoney(-np.expenses)}</span>
               </div>
-              <div className="flex items-baseline justify-between font-mono text-sm border-t border-hairline pt-2 mt-2">
+              <div className="flex items-baseline justify-between text-sm border-t border-hairline pt-2 mt-2">
                 <em className="font-serif text-ink text-md">Net profit</em>
-                <span className={`font-serif italic text-md ${np.net_profit < 0 ? 'text-danger' : 'text-ink'}`}>
+                <span className={`num text-md ${np.net_profit < 0 ? 'neg' : 'text-num-ink'}`}>
                   {formatMoney(np.net_profit)}
                 </span>
               </div>
@@ -205,7 +203,11 @@ async function RequestCreditTabContent({ deptId }: { deptId: string }) {
   return (
     <div className="space-y-10">
       <section>
-        <h2 className="font-serif text-xl text-ink mb-1">New invoice request</h2>
+        <div className="sect-head">
+          <h2>New invoice request</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">DRAFT · ONE ROW PER SUBSIDIARY</span>
+        </div>
         <p className="font-serif italic text-graphite text-sm mb-4">
           Submits a draft invoice to Finance for generation. One row per subsidiary becomes one
           invoice. Marketing pool credits when the subsidiary settles the invoice.
@@ -214,37 +216,47 @@ async function RequestCreditTabContent({ deptId }: { deptId: string }) {
       </section>
 
       <section>
-        <h2 className="font-serif text-xl text-ink mb-1">Recent requests</h2>
+        <div className="sect-head">
+          <h2>Recent requests</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">{(requests ?? []).length} REQUEST{(requests ?? []).length === 1 ? '' : 'S'} · LATEST 20</span>
+        </div>
         {(requests ?? []).length === 0 ? (
           <div className="border border-hairline rounded-md bg-surface p-6 text-center">
             <p className="font-serif italic text-muted text-sm">No invoice requests yet.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="ledger-table">
               <thead>
-                <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                  <th className="text-left py-3 pr-4 font-medium">Submitted</th>
-                  <th className="text-left py-3 pr-4 font-medium">Period</th>
-                  <th className="text-left py-3 pr-4 font-medium">Description</th>
-                  <th className="text-left py-3 pr-4 font-medium">Lines</th>
-                  <th className="text-left py-3 font-medium">Status</th>
+                <tr>
+                  <th>Submitted</th>
+                  <th>Period</th>
+                  <th>Description</th>
+                  <th className="right">Lines</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {(requests ?? []).map((r) => {
                   const lineCount = Array.isArray(r.line_items) ? r.line_items.length : 0
                   return (
-                    <tr key={r.id} className="border-b border-hairline last:border-0">
-                      <td className="py-3 pr-4 font-mono text-xs text-muted">
-                        {dayjs(r.requested_at).format('D MMM HH:mm')}
+                    <tr key={r.id}>
+                      <td>
+                        <div className="font-mono text-xs text-muted">
+                          {dayjs(r.requested_at).format('D MMM HH:mm')}
+                        </div>
                       </td>
-                      <td className="py-3 pr-4 font-mono text-xs text-graphite">
-                        {dayjs(r.period_month).format('MMM YYYY')}
+                      <td>
+                        <div className="font-mono text-xs text-graphite">
+                          {dayjs(r.period_month).format('MMM YYYY')}
+                        </div>
                       </td>
-                      <td className="py-3 pr-4 font-serif italic text-graphite">{r.description}</td>
-                      <td className="py-3 pr-4 font-mono text-xs text-graphite">{lineCount}</td>
-                      <td className="py-3">
+                      <td>
+                        <div className="font-serif italic text-graphite">{r.description}</div>
+                      </td>
+                      <td className="num text-graphite">{lineCount}</td>
+                      <td>
                         <span
                           className={
                             r.status === 'rejected'
@@ -305,7 +317,11 @@ async function RequestPaymentTabContent({
   return (
     <div className="space-y-10">
       <section>
-        <h2 className="font-serif text-xl text-ink mb-1">New request</h2>
+        <div className="sect-head">
+          <h2>New request</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">PRINCIPAL → FINANCE → PRINCIPAL · 3-STAGE FLOW</span>
+        </div>
         <p className="font-serif italic text-graphite text-sm mb-4">
           Submits to Principal for expense approval, then to Finance to generate the PV, then back
           to Principal to approve the PV. Pool is debited at Principal sign-off; cash leaves the
@@ -319,7 +335,11 @@ async function RequestPaymentTabContent({
       </section>
 
       <section>
-        <h2 className="font-serif text-xl text-ink mb-1">In flight</h2>
+        <div className="sect-head">
+          <h2>In flight</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">{(requests ?? []).length} REQUEST{(requests ?? []).length === 1 ? '' : 'S'} · NOT YET COMPLETED</span>
+        </div>
         <p className="font-serif italic text-graphite text-sm mb-4">
           Submitted requests that haven&rsquo;t completed yet.
         </p>
@@ -329,30 +349,34 @@ async function RequestPaymentTabContent({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="ledger-table">
               <thead>
-                <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                  <th className="text-left py-3 pr-4 font-medium">Submitted</th>
-                  <th className="text-left py-3 pr-4 font-medium">Payee</th>
-                  <th className="text-left py-3 pr-4 font-medium">Description</th>
-                  <th className="text-left py-3 pr-4 font-medium">Stage</th>
-                  <th className="text-right py-3 font-medium">Amount</th>
+                <tr>
+                  <th>Submitted</th>
+                  <th>Payee</th>
+                  <th>Description</th>
+                  <th>Stage</th>
+                  <th className="right">Amount</th>
                 </tr>
               </thead>
               <tbody>
                 {(requests ?? []).map((r) => (
-                  <tr key={r.id} className="border-b border-hairline last:border-0">
-                    <td className="py-3 pr-4 font-mono text-xs text-muted">
-                      {dayjs(r.requested_at).format('D MMM HH:mm')}
+                  <tr key={r.id}>
+                    <td>
+                      <div className="font-mono text-xs text-muted">
+                        {dayjs(r.requested_at).format('D MMM HH:mm')}
+                      </div>
                     </td>
-                    <td className="py-3 pr-4 font-serif italic text-graphite">{r.payee_name}</td>
-                    <td className="py-3 pr-4 font-serif italic text-graphite">{r.description}</td>
-                    <td className="py-3 pr-4">
+                    <td>
+                      <div className="font-serif italic text-graphite">{r.payee_name}</div>
+                    </td>
+                    <td>
+                      <div className="font-serif italic text-graphite">{r.description}</div>
+                    </td>
+                    <td>
                       <StageBadge status={r.status} />
                     </td>
-                    <td className="py-3 text-right font-mono tabular font-medium text-ink">
-                      {formatMoney(Number(r.amount))}
-                    </td>
+                    <td className="num">{formatMoney(Number(r.amount))}</td>
                   </tr>
                 ))}
               </tbody>

@@ -104,19 +104,24 @@ export default async function PayrollRequestsPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <Link
-          href="/payments"
-          className="text-sm text-muted hover:text-accent font-sans transition-colors"
-        >
-          ← Back to Payments
-        </Link>
-        <h1 className="font-serif text-3xl text-ink mt-3">Payroll Requests</h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          HR has requested payroll payment. Allocate the total across each
-          Department Pool, pick the source bank, then submit to Principal.
-          <em> Bank and pool balances are checked before the PV is created.</em>
-        </p>
+      <Link
+        href="/payments"
+        className="text-sm text-muted hover:text-accent font-sans transition-colors"
+      >
+        ← Back to Payments
+      </Link>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> TREASURY · PAYROLL REQUESTS
+          </div>
+          <h1 className="page-title">Payroll Requests</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            HR has requested payroll payment. Allocate the total across each
+            Department Pool, pick the source bank, then submit to Principal.
+            <em> Bank and pool balances are checked before the PV is created.</em>
+          </p>
+        </div>
       </div>
 
       {/* ── Submitted (awaiting Finance action) ───────────────────────────── */}

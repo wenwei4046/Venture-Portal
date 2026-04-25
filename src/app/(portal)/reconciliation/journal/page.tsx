@@ -47,17 +47,22 @@ export default async function JournalPage() {
 
   return (
     <div>
-      <div className="mb-10">
-        <Link
-          href="/reconciliation"
-          className="text-sm text-muted hover:text-accent font-sans transition-colors"
-        >
-          ← Back to Reconciliation
-        </Link>
-        <h1 className="font-serif text-3xl text-ink mt-3">General Ledger</h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          Double-entry journal entries. Every debit has a matching credit.
-        </p>
+      <Link
+        href="/reconciliation"
+        className="text-sm text-muted hover:text-accent font-sans transition-colors"
+      >
+        ← Back to Reconciliation
+      </Link>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> TREASURY · GENERAL LEDGER
+          </div>
+          <h1 className="page-title">General Ledger</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            Double-entry journal entries. Every debit has a matching credit.
+          </p>
+        </div>
       </div>
 
       {/* ── Trial Balance ── */}

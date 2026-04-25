@@ -39,12 +39,17 @@ export default async function NewContractPage() {
       >
         ← {backLabel}
       </Link>
-      <div className="mt-6 mb-10">
-        <h1 className="font-serif text-3xl text-ink">New Marketing Contract</h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          Create a project-based service contract. Requires{' '}
-          <em>Principal approval</em> before invoices are generated.
-        </p>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> BILLING · NEW MARKETING CONTRACT
+          </div>
+          <h1 className="page-title">New Marketing Contract</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            Create a project-based service contract. Requires{' '}
+            <em>Principal approval</em> before invoices are generated.
+          </p>
+        </div>
       </div>
       <ContractForm companies={companies ?? []} returnPath={backHref} />
     </div>

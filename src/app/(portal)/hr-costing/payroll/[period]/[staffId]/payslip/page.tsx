@@ -63,37 +63,37 @@ export default async function PayslipPage({ params }: PageProps) {
         {/* Employee block */}
         <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
           <div>
-            <div className="font-sans text-xs uppercase tracking-wide text-muted">Employee</div>
+            <div className="font-sans text-xs uppercase tracking-wide text-graphite">Employee</div>
             <div className="font-serif text-md text-ink mt-0.5">{staff.employee_name}</div>
             {staff.employee_code && (
               <div className="font-mono text-xs text-graphite">Code: {staff.employee_code}</div>
             )}
           </div>
           <div>
-            <div className="font-sans text-xs uppercase tracking-wide text-muted">Department</div>
+            <div className="font-sans text-xs uppercase tracking-wide text-graphite">Department</div>
             <div className="font-serif text-md text-ink mt-0.5">{deptName}</div>
           </div>
           <div>
-            <div className="font-sans text-xs uppercase tracking-wide text-muted">Period</div>
+            <div className="font-sans text-xs uppercase tracking-wide text-graphite">Period</div>
             <div className="font-mono text-sm text-ink mt-0.5">{row.period_month}</div>
           </div>
           <div>
-            <div className="font-sans text-xs uppercase tracking-wide text-muted">Days Worked</div>
+            <div className="font-sans text-xs uppercase tracking-wide text-graphite">Days Worked</div>
             <div className="font-mono text-sm text-ink mt-0.5">{prorated}</div>
           </div>
           <div>
-            <div className="font-sans text-xs uppercase tracking-wide text-muted">EPF Part</div>
+            <div className="font-sans text-xs uppercase tracking-wide text-graphite">EPF Part</div>
             <div className="font-mono text-sm text-ink mt-0.5">{staff.epf_category}</div>
           </div>
           <div>
-            <div className="font-sans text-xs uppercase tracking-wide text-muted">SOCSO Cat</div>
+            <div className="font-sans text-xs uppercase tracking-wide text-graphite">SOCSO Cat</div>
             <div className="font-mono text-sm text-ink mt-0.5">{staff.socso_category}</div>
           </div>
         </div>
 
         {/* Earnings */}
         <section className="mb-5">
-          <div className="font-serif text-sm uppercase tracking-wide text-graphite mb-2 pb-1 border-b border-hairline">
+          <div className="font-serif italic text-graphite text-sm uppercase tracking-wide mb-2 pb-1 border-b border-hairline">
             Earnings
           </div>
           <div className="space-y-1 text-sm">
@@ -107,14 +107,14 @@ export default async function PayslipPage({ params }: PageProps) {
             )}
             <div className="border-t border-hairline pt-2 mt-2 flex justify-between">
               <span className="font-serif text-ink">Gross Pay</span>
-              <span className="font-mono tabular font-semibold text-ink">{formatMoney(Number(row.gross))}</span>
+              <span className="num text-num-ink font-semibold">{formatMoney(Number(row.gross))}</span>
             </div>
           </div>
         </section>
 
         {/* Deductions */}
         <section className="mb-5">
-          <div className="font-serif text-sm uppercase tracking-wide text-graphite mb-2 pb-1 border-b border-hairline">
+          <div className="font-serif italic text-graphite text-sm uppercase tracking-wide mb-2 pb-1 border-b border-hairline">
             Deductions
           </div>
           <div className="space-y-1 text-sm">
@@ -124,7 +124,7 @@ export default async function PayslipPage({ params }: PageProps) {
             <Line label={`PCB (${staff.pcb_category})`} value={row.pcb} />
             <div className="border-t border-hairline pt-2 mt-2 flex justify-between">
               <span className="font-serif text-ink">Total Deductions</span>
-              <span className="font-mono tabular font-semibold text-ink">{formatMoney(totalDeductions)}</span>
+              <span className="num text-num-ink font-semibold">{formatMoney(totalDeductions)}</span>
             </div>
           </div>
         </section>
@@ -133,37 +133,37 @@ export default async function PayslipPage({ params }: PageProps) {
         <section className="mb-6 pt-3 border-t-2 border-ink">
           <div className="flex justify-between items-baseline">
             <span className="font-serif text-lg text-ink">Net Pay</span>
-            <span className="font-mono tabular text-2xl font-semibold text-ink">
+            <span className="num text-num-ink text-2xl font-semibold tracking-[-0.01em]">
               {formatMoney(Number(row.net))}
             </span>
           </div>
-          <div className="font-serif italic text-muted text-xs mt-1">
+          <div className="font-serif italic text-graphite text-xs mt-1">
             Credited to the employee&apos;s bank account on payroll approval.
           </div>
         </section>
 
         {/* Employer contributions (informational) */}
         <section className="mb-6 pt-3 border-t border-hairline">
-          <div className="font-serif text-xs uppercase tracking-wide text-muted mb-2">
+          <div className="font-serif italic text-graphite text-xs uppercase tracking-wide mb-2">
             Employer Contributions <span className="italic normal-case">(paid on your behalf, not deducted from you)</span>
           </div>
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div>
-              <div className="text-xs text-muted">EPF ER</div>
-              <div className="font-mono tabular">{formatMoney(Number(row.epf_er))}</div>
+              <div className="text-xs text-graphite">EPF ER</div>
+              <div className="num">{formatMoney(Number(row.epf_er))}</div>
             </div>
             <div>
-              <div className="text-xs text-muted">SOCSO ER</div>
-              <div className="font-mono tabular">{formatMoney(Number(row.socso_er))}</div>
+              <div className="text-xs text-graphite">SOCSO ER</div>
+              <div className="num">{formatMoney(Number(row.socso_er))}</div>
             </div>
             <div>
-              <div className="text-xs text-muted">EIS ER</div>
-              <div className="font-mono tabular">{formatMoney(Number(row.eis_er))}</div>
+              <div className="text-xs text-graphite">EIS ER</div>
+              <div className="num">{formatMoney(Number(row.eis_er))}</div>
             </div>
           </div>
           <div className="mt-2 pt-2 border-t border-hairline flex justify-between">
-            <span className="text-xs text-muted">Total Employer Contribution</span>
-            <span className="font-mono tabular text-sm text-graphite">{formatMoney(totalEr)}</span>
+            <span className="text-xs text-graphite">Total Employer Contribution</span>
+            <span className="num text-graphite text-sm">{formatMoney(totalEr)}</span>
           </div>
         </section>
 
@@ -187,7 +187,7 @@ function Line({ label, value, muted }: { label: string; value: number | string |
   return (
     <div className="flex justify-between">
       <span className={`font-sans ${muted ? 'text-muted italic' : 'text-graphite'}`}>{label}</span>
-      <span className={`font-mono tabular ${muted ? 'text-muted' : 'text-ink'}`}>{formatMoney(Number(value ?? 0))}</span>
+      <span className={`num ${muted ? 'text-muted' : ''}`}>{formatMoney(Number(value ?? 0))}</span>
     </div>
   )
 }

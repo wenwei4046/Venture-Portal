@@ -137,10 +137,13 @@ export default async function BillingView({ searchParams }: Props) {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10">
+      <div className="page-head">
         <div>
-          <h1 className="font-serif text-3xl text-ink">Service Billing</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
+          <div className="page-eyebrow">
+            <em>I.</em> BILLING · SERVICE INVOICES
+          </div>
+          <h1 className="page-title">Service Billing</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
             Department OPEX billing and marketing contracts feed the monthly consolidated statement.{' '}
             <em>Finance creates + issues invoices, Principal approves new contracts.</em>
           </p>

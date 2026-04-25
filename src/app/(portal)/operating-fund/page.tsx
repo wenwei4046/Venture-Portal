@@ -33,18 +33,23 @@ export default async function OperatingFundPage() {
 
   return (
     <div>
-      <div className="mb-10">
-        <h1 className="font-serif text-3xl text-ink">Venture Pool</h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          Fund deposits, loan disbursements, director savings, and statutory surplus.
-        </p>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> TREASURY · VENTURE POOL
+          </div>
+          <h1 className="page-title">Venture Pool</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            Fund deposits, loan disbursements, director savings, and statutory surplus.
+          </p>
+        </div>
       </div>
 
       {/* Hero balance */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
         <div className="lg:col-span-7">
-          <div className="font-serif italic text-accent text-base mb-1">Current Balance</div>
-          <div className={`font-serif text-[44px] md:text-hero leading-none ${balance >= 0 ? 'text-ink' : 'text-danger'}`}>
+          <div className="font-serif italic text-graphite text-xs uppercase tracking-wide mb-2">Current Balance</div>
+          <div className={`font-serif text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${balance >= 0 ? 'text-num-ink' : 'text-danger'}`}>
             {formatMoney(balance)}
           </div>
           <div className="font-mono text-xs text-muted mt-2">
@@ -64,39 +69,50 @@ export default async function OperatingFundPage() {
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                <th className="text-left py-3 pr-4 font-medium">Date</th>
-                <th className="text-left py-3 pr-4 font-medium">Type</th>
-                <th className="text-left py-3 pr-4 font-medium">Description</th>
-                <th className="text-right py-3 pr-4 font-medium">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.map(t => {
-                const isIn = IN_TYPES.includes(t.transaction_type)
-                return (
-                  <tr key={t.id} className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors">
-                    <td className="py-4 pr-4 font-mono text-xs text-muted">
-                      {new Date(t.created_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </td>
-                    <td className="py-4 pr-4">
-                      <em className={`font-serif text-sm ${isIn ? 'text-ledger' : 'text-danger'}`}>
-                        {t.transaction_type.replace('_', ' ')}
-                      </em>
-                    </td>
-                    <td className="py-4 pr-4 font-sans text-sm text-graphite">{t.description}</td>
-                    <td className={`py-4 pr-4 text-right font-mono tabular font-semibold ${isIn ? 'text-ledger' : 'text-danger'}`}>
-                      {isIn ? '+' : '('}{formatMoneyBare(t.amount)}{isIn ? '' : ')'}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div className="sect-head">
+            <h2>Recent transactions</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">{transactions.length} ENTR{transactions.length === 1 ? 'Y' : 'IES'} · LATEST 100</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="ledger-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Description</th>
+                  <th className="right">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transactions.map(t => {
+                  const isIn = IN_TYPES.includes(t.transaction_type)
+                  return (
+                    <tr key={t.id}>
+                      <td>
+                        <div className="font-mono text-xs text-muted">
+                          {new Date(t.created_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </div>
+                      </td>
+                      <td>
+                        <em className={`font-serif text-sm ${isIn ? 'text-ledger' : 'text-danger'}`}>
+                          {t.transaction_type.replace('_', ' ')}
+                        </em>
+                      </td>
+                      <td>
+                        <div className="font-sans text-sm text-graphite">{t.description}</div>
+                      </td>
+                      <td className={`num font-semibold ${isIn ? 'text-ledger' : 'neg'}`}>
+                        {isIn ? '+' : '('}{formatMoneyBare(t.amount)}{isIn ? '' : ')'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   )

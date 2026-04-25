@@ -112,20 +112,16 @@ export default async function ApprovalDetailPage({ params }: Props) {
         ← {user.role === 'principal' ? 'Back to Approvals' : 'Back to Overview'}
       </Link>
 
-      <div className="flex items-baseline justify-between mt-3 mb-10">
+      <div className="page-head">
         <div>
-          <p className="font-serif italic text-accent text-base mb-1">
-            {formatRequestType(approval.request_type)}
-          </p>
-          <h1 className="font-serif text-3xl text-ink">
+          <div className="page-eyebrow">
+            <em>IV.</em> APPROVALS · {formatRequestType(approval.request_type).toUpperCase()}
+          </div>
+          <h1 className="page-title">
             {approval.description ?? 'Approval request'}
           </h1>
-          <p className="font-mono text-xs text-muted mt-1">
-            Submitted by{' '}
-            <span className="text-ink font-serif italic">
-              {submitter?.name ?? 'Unknown'}
-            </span>{' '}
-            on {dayjs(approval.created_at).format('D MMM YYYY HH:mm')}
+          <p className="font-serif italic text-graphite text-base mt-3">
+            Submitted by <em>{submitter?.name ?? 'Unknown'}</em> on {dayjs(approval.created_at).format('D MMMM YYYY HH:mm')}
           </p>
         </div>
         <ApprovalStatus status={approval.status} />
@@ -134,7 +130,10 @@ export default async function ApprovalDetailPage({ params }: Props) {
       {/* ───────── Loan context (if new_loan) ───────── */}
       {loanContext ? (
         <div className="bg-surface border border-hairline rounded-md p-6 mb-10 max-w-3xl">
-          <h2 className="font-serif text-xl text-ink mb-4">Loan details</h2>
+          <div className="sect-head">
+            <h2>Loan details</h2>
+            <span className="rule" aria-hidden />
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5 text-sm">
             <div>
@@ -150,7 +149,7 @@ export default async function ApprovalDetailPage({ params }: Props) {
               <div className="text-xs text-muted uppercase tracking-wide font-sans mb-1">
                 Principal
               </div>
-              <div className="font-serif text-lg text-ink">
+              <div className="font-serif text-lg text-num-ink tabular tracking-[-0.01em]">
                 {formatMoney(loanContext.principal ?? 0)}
               </div>
             </div>
@@ -159,7 +158,7 @@ export default async function ApprovalDetailPage({ params }: Props) {
               <div className="text-xs text-muted uppercase tracking-wide font-sans mb-1">
                 Effective rate
               </div>
-              <div className="font-serif text-lg text-ink">
+              <div className="font-serif text-lg text-num-ink tabular">
                 {((loanContext.effective_rate ?? 0) * 100).toFixed(3)}
                 <span className="text-graphite text-base"> % /mo</span>
               </div>
@@ -173,7 +172,7 @@ export default async function ApprovalDetailPage({ params }: Props) {
               <div className="text-xs text-muted uppercase tracking-wide font-sans mb-1">
                 Monthly interest (at full principal)
               </div>
-              <div className="font-serif text-lg text-ink">
+              <div className="font-serif text-lg text-num-ink tabular tracking-[-0.01em]">
                 {formatMoney(
                   (loanContext.principal ?? 0) * (loanContext.effective_rate ?? 0)
                 )}
@@ -196,11 +195,10 @@ export default async function ApprovalDetailPage({ params }: Props) {
       {voucherContext ? (
         <div className="mb-10 max-w-3xl">
           <div className="bg-surface border border-hairline rounded-md p-6">
-            <div className="flex items-baseline justify-between mb-4">
-              <h2 className="font-serif text-xl text-ink">Voucher details</h2>
-              <span className="font-mono text-xs text-muted">
-                {voucherContext.voucher.voucher_no ?? 'Draft'}
-              </span>
+            <div className="sect-head">
+              <h2>Voucher details</h2>
+              <span className="rule" aria-hidden />
+              <span className="count">{voucherContext.voucher.voucher_no ?? 'DRAFT'}</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5 text-sm mb-5">
@@ -208,7 +206,7 @@ export default async function ApprovalDetailPage({ params }: Props) {
                 <div className="text-xs text-muted uppercase tracking-wide font-sans mb-1">
                   Amount
                 </div>
-                <div className="font-serif text-2xl text-ink">
+                <div className="font-serif text-2xl text-num-ink tabular tracking-[-0.01em]">
                   {voucherContext.voucher.direction === 'credit' ? '+' : ''}
                   {formatMoney(Number(voucherContext.voucher.amount))}
                 </div>
@@ -241,11 +239,7 @@ export default async function ApprovalDetailPage({ params }: Props) {
                   </div>
                   <div className="font-mono text-xs text-muted">
                     Acct {voucherContext.bank.account_number} · Balance{' '}
-                    <span
-                      className={
-                        insufficientBalance ? 'text-danger font-medium' : 'text-ink'
-                      }
-                    >
+                    <span className={`num ${insufficientBalance ? 'neg' : ''}`}>
                       {formatMoney(voucherContext.bank.current_balance)}
                     </span>
                   </div>
@@ -319,7 +313,11 @@ export default async function ApprovalDetailPage({ params }: Props) {
           </div>
 
           <div className="mt-4">
-            <h3 className="font-serif text-lg text-ink mb-2">Attachments</h3>
+            <div className="sect-head">
+              <h2>Attachments</h2>
+              <span className="rule" aria-hidden />
+              <span className="count">{voucherContext.attachments.length} FILE{voucherContext.attachments.length === 1 ? '' : 'S'}</span>
+            </div>
             <AttachmentList
               attachments={voucherContext.attachments.map((a) => ({
                 id: a.id,
@@ -338,7 +336,10 @@ export default async function ApprovalDetailPage({ params }: Props) {
       {/* ───────── Approval notes (if resolved) ───────── */}
       {!isPending && approval.notes ? (
         <div className="mb-10 max-w-3xl">
-          <h2 className="font-serif text-xl text-ink mb-2">Decision notes</h2>
+          <div className="sect-head">
+            <h2>Decision notes</h2>
+            <span className="rule" aria-hidden />
+          </div>
           <p className="font-serif italic text-graphite text-md whitespace-pre-wrap">
             {approval.notes}
           </p>

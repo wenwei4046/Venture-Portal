@@ -47,25 +47,25 @@ export default async function PrintPayoutPage({ params, searchParams }: Props) {
           }
           body {
             font-family: 'Georgia', 'Times New Roman', serif;
-            color: #1A1613;
+            color: #1C160F;
             max-width: 700px;
             margin: 0 auto;
             padding: 40px;
             line-height: 1.6;
           }
           h1 { font-size: 20px; margin: 0 0 4px; }
-          h2 { font-size: 14px; margin: 20px 0 8px; color: #6B5F52; text-transform: uppercase; letter-spacing: 1px; }
-          .header { text-align: center; margin-bottom: 30px; border-bottom: 1px solid #DFD4BE; padding-bottom: 20px; }
+          h2 { font-size: 14px; margin: 20px 0 8px; color: #5A4E40; text-transform: uppercase; letter-spacing: 1px; }
+          .header { text-align: center; margin-bottom: 30px; border-bottom: 1px solid #C6B99E; padding-bottom: 20px; }
           .header .company { font-size: 16px; font-weight: bold; letter-spacing: 2px; }
-          .header .subtitle { font-size: 12px; color: #6B5F52; margin-top: 4px; }
+          .header .subtitle { font-size: 12px; color: #5A4E40; margin-top: 4px; }
           table { width: 100%; border-collapse: collapse; margin: 8px 0; }
           td { padding: 4px 0; font-size: 13px; }
-          td:last-child { text-align: right; font-family: 'Courier New', monospace; }
-          .separator { border-top: 1px solid #DFD4BE; }
-          .total td { font-weight: bold; padding-top: 8px; }
+          td:last-child { text-align: right; font-family: 'Courier New', monospace; font-variant-numeric: tabular-nums slashed-zero; }
+          .separator { border-top: 1px solid #C6B99E; }
+          .total td { font-weight: bold; padding-top: 8px; color: #1A130B; }
           .negative { color: #A3371A; }
           .positive { color: #3D6B45; }
-          .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #DFD4BE; font-size: 11px; color: #9E8F7F; }
+          .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #C6B99E; font-size: 11px; color: #85775F; }
           .print-btn {
             position: fixed; top: 20px; right: 20px;
             background: #CC5A2E; color: white; border: none;

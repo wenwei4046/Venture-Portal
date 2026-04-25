@@ -54,11 +54,16 @@ export default async function FundSummaryPage() {
         ← Back to Reports
       </Link>
 
-      <div className="mt-6 mb-10">
-        <h1 className="font-serif text-3xl text-ink">Fund Summary</h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          Capital structure. <em>As of {dayjs().format('D MMM YYYY')}.</em>
-        </p>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> REPORTS · FUND SUMMARY
+          </div>
+          <h1 className="page-title">Fund Summary</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            Capital structure. <em>As of {dayjs().format('D MMM YYYY')}.</em>
+          </p>
+        </div>
       </div>
 
       <div className="max-w-3xl space-y-8">
@@ -67,22 +72,24 @@ export default async function FundSummaryPage() {
           <h2 className="font-sans text-xs uppercase tracking-wide text-muted font-semibold mb-4">Paid Capital</h2>
           {(fundSources ?? []).length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="ledger-table">
                 <thead>
-                  <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                    <th className="text-left py-3 pr-4 font-medium">Source</th>
-                    <th className="text-right py-3 pr-4 font-medium">Amount</th>
-                    <th className="text-right py-3 pr-4 font-medium">Rate</th>
-                    <th className="text-right py-3 pr-4 font-medium">Maturity</th>
+                  <tr>
+                    <th>Source</th>
+                    <th className="right">Amount</th>
+                    <th className="right">Rate</th>
+                    <th className="right">Maturity</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(fundSources ?? []).map(f => (
-                    <tr key={f.id} className="border-b border-hairline last:border-0">
-                      <td className="py-3 pr-4 font-serif text-md text-ink">{f.source_type === 'director_loan' ? 'Director Loan' : 'Subsidiary Savings'}</td>
-                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">{formatMoney(f.amount)}</td>
-                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">{(Number(f.cost_rate) * 100).toFixed(3)}%</td>
-                      <td className="py-3 pr-4 text-right font-mono text-xs text-muted">{f.maturity_date ? dayjs(f.maturity_date).format('D MMM YYYY') : '—'}</td>
+                    <tr key={f.id}>
+                      <td>
+                        <div className="font-serif text-md text-ink">{f.source_type === 'director_loan' ? 'Director Loan' : 'Subsidiary Savings'}</div>
+                      </td>
+                      <td className="num">{formatMoney(f.amount)}</td>
+                      <td className="num text-graphite">{(Number(f.cost_rate) * 100).toFixed(3)}%</td>
+                      <td className="num text-muted">{f.maturity_date ? dayjs(f.maturity_date).format('D MMM YYYY') : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -93,11 +100,11 @@ export default async function FundSummaryPage() {
           )}
           <div className="flex items-baseline justify-between pt-3 mt-3 border-t border-hairline">
             <span className="font-serif italic text-sm text-ink">Total Paid</span>
-            <span className="font-mono tabular text-md font-medium text-ink font-semibold">{formatMoney(totalPaid)}</span>
+            <span className="num text-num-ink font-semibold">{formatMoney(totalPaid)}</span>
           </div>
           <div className="flex items-baseline justify-between mt-1">
             <span className="font-serif italic text-sm text-graphite">Weighted Cost</span>
-            <span className="font-mono tabular text-sm font-medium text-graphite">{(weightedCost * 100).toFixed(3)}%/mo</span>
+            <span className="num text-graphite">{(weightedCost * 100).toFixed(3)}%/mo</span>
           </div>
         </section>
 
@@ -107,16 +114,16 @@ export default async function FundSummaryPage() {
           <div className="space-y-2">
             <div className="flex items-baseline justify-between">
               <span className="font-serif text-sm text-graphite">Venture Pool</span>
-              <span className="font-mono tabular text-sm font-medium text-ink">{formatMoney(hvFundBalance)}</span>
+              <span className="num">{formatMoney(hvFundBalance)}</span>
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif text-sm text-graphite">Dept Pool (Marketing)</span>
-              <span className="font-mono tabular text-sm font-medium text-ink">{formatMoney(deptPoolBalance)}</span>
+              <span className="num">{formatMoney(deptPoolBalance)}</span>
             </div>
           </div>
           <div className="flex items-baseline justify-between pt-3 mt-3 border-t border-hairline">
             <span className="font-serif italic text-sm text-ink">Total Free</span>
-            <span className="font-mono tabular text-md font-medium text-ink font-semibold">{formatMoney(hvFundBalance + deptPoolBalance)}</span>
+            <span className="num text-num-ink font-semibold">{formatMoney(hvFundBalance + deptPoolBalance)}</span>
           </div>
         </section>
 
@@ -126,11 +133,11 @@ export default async function FundSummaryPage() {
           <div className="space-y-2">
             <div className="flex items-baseline justify-between">
               <span className="font-serif text-sm text-graphite">Loans Outstanding</span>
-              <span className="font-mono tabular text-sm font-medium text-ink">{formatMoney(loansOutstanding)}</span>
+              <span className="num">{formatMoney(loansOutstanding)}</span>
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif text-sm text-graphite">Invoice Payout Pool</span>
-              <span className="font-mono tabular text-sm font-medium text-ink">{formatMoney(invoicePoolBalance)}</span>
+              <span className="num">{formatMoney(invoicePoolBalance)}</span>
             </div>
           </div>
         </section>

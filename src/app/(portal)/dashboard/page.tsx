@@ -253,18 +253,22 @@ export default async function DashboardPage() {
 
       return (
         <div>
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-10">
+          <div className="page-head">
             <div>
-              <div className="font-serif italic text-accent text-base mb-1">HR · {dayjs().format('MMMM YYYY')}</div>
-              <h1 className="font-serif text-3xl text-ink mb-1">Monthly Payroll Cycle</h1>
-              <p className="font-mono text-xs text-muted">{dayjs().format('dddd, D MMMM YYYY')} · {doneCount} of 9 steps complete</p>
+              <div className="page-eyebrow">
+                <em>II.</em> HR · MONTHLY CYCLE
+              </div>
+              <h1 className="page-title">Monthly Payroll Cycle</h1>
+              <p className="font-serif italic text-graphite text-base mt-3">
+                {dayjs().format('MMMM YYYY')} · <em>{doneCount} of 9 steps complete</em>
+              </p>
             </div>
             <Link
               href="/hr-costing/payment"
               className="shrink-0 border border-hairline bg-surface hover:bg-surface-2 rounded-md px-5 py-3 transition-colors block text-right"
             >
               <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">HR Pool balance</div>
-              <div className={`font-mono tabular text-xl mt-0.5 ${poolBalance >= 0 ? 'text-ink' : 'text-danger'}`}>
+              <div className={`num text-xl mt-0.5 ${poolBalance < 0 ? 'neg' : ''}`}>
                 {formatMoney(poolBalance)}
               </div>
               <div className="font-sans text-[11px] text-muted mt-0.5">Open Payment →</div>
@@ -397,21 +401,22 @@ export default async function DashboardPage() {
 
           {/* Snapshot — small panel with cross-cycle info */}
           <section className="mb-12">
-            <h2 className="font-serif text-2xl text-ink mb-1">Snapshot</h2>
-            <p className="font-serif italic text-graphite text-sm mb-4">
-              Everything else you track, <em>at a glance</em>
-            </p>
+            <div className="sect-head">
+              <h2>Snapshot</h2>
+              <span className="rule" aria-hidden />
+              <span className="count">CROSS-CYCLE · AT A GLANCE</span>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="border border-hairline rounded-md bg-surface p-5">
                 <div className="font-serif italic text-accent text-sm mb-1">Pending claims</div>
-                <div className="font-serif text-2xl text-ink leading-none">{totalPending}</div>
+                <div className="font-serif text-2xl text-num-ink tabular leading-none">{totalPending}</div>
                 <div className="font-mono text-xs text-muted mt-2">
                   {pendingBenefit} benefit · {pendingPool} pool
                 </div>
               </div>
               <div className="border border-hairline rounded-md bg-surface p-5">
                 <div className="font-serif italic text-accent text-sm mb-1">Director Salary</div>
-                <div className={`font-serif text-lg leading-none ${payoutStatus === 'confirmed' ? 'text-ledger' : payoutStatus === 'draft' ? 'text-alert' : 'text-muted'}`}>
+                <div className={`font-serif italic text-lg leading-none ${payoutStatus === 'confirmed' ? 'text-ledger' : payoutStatus === 'draft' ? 'text-alert' : 'text-muted'}`}>
                   {payoutStatus === 'confirmed' ? 'Confirmed' : payoutStatus === 'draft' ? 'Draft' : 'Not calculated'}
                 </div>
                 <div className="font-mono text-xs text-muted mt-2">
@@ -420,7 +425,7 @@ export default async function DashboardPage() {
               </div>
               <div className="border border-hairline rounded-md bg-surface p-5">
                 <div className="font-serif italic text-accent text-sm mb-1">Total Net (payroll)</div>
-                <div className="font-serif text-2xl text-ink leading-none">{formatMoney(totalNet)}</div>
+                <div className="font-serif text-2xl text-num-ink tabular tracking-[-0.01em] leading-none">{formatMoney(totalNet)}</div>
                 <div className="font-mono text-xs text-muted mt-2">
                   {rows.length} row{rows.length === 1 ? '' : 's'} · {dayjs().format('MMM YYYY')}
                 </div>
@@ -431,10 +436,11 @@ export default async function DashboardPage() {
           {/* Pending claims drill-down — kept for HR to act without leaving dashboard */}
           {(pendingClaims ?? []).length > 0 ? (
             <section className="mb-12">
-              <h2 className="font-serif text-2xl text-ink mb-1">Needs your review</h2>
-              <p className="font-serif italic text-graphite text-sm mb-4">
-                Claims awaiting approval. <em>Benefit claims go to HR, pool claims to Finance.</em>
-              </p>
+              <div className="sect-head">
+                <h2>Needs your review</h2>
+                <span className="rule" aria-hidden />
+                <span className="count">{(pendingClaims ?? []).length} CLAIM{(pendingClaims ?? []).length === 1 ? '' : 'S'} · BENEFIT → HR · POOL → FINANCE</span>
+              </div>
               <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
                 {(pendingClaims ?? []).slice(0, 5).map((c) => (
                   <Link
@@ -456,9 +462,7 @@ export default async function DashboardPage() {
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="font-mono tabular font-medium text-ink text-sm">
-                        {formatMoney(Number(c.amount))}
-                      </div>
+                      <span className="num">{formatMoney(Number(c.amount))}</span>
                       <div className="font-mono text-xs text-muted">
                         {dayjs(c.created_at).format('D MMM')}
                       </div>
@@ -558,16 +562,16 @@ export default async function DashboardPage() {
 
       return (
         <div>
-          <div className="mb-10">
-            <div className="font-serif italic text-accent text-base mb-1">
-              {dept.name} Overview
+          <div className="page-head">
+            <div>
+              <div className="page-eyebrow">
+                <em>·</em> {dept.name.toUpperCase()} · OVERVIEW
+              </div>
+              <h1 className="page-title">{dept.name} Department</h1>
+              <p className="font-serif italic text-graphite text-base mt-3">
+                {dayjs().format('dddd, D MMMM YYYY')} · <em>{dayjs().format('MMMM YYYY')}</em>
+              </p>
             </div>
-            <h1 className="font-serif text-3xl text-ink mb-1">
-              {dayjs().format('MMMM YYYY')}
-            </h1>
-            <p className="font-mono text-xs text-muted">
-              {dayjs().format('dddd, D MMMM YYYY')}
-            </p>
           </div>
 
           {/* KPI Cards */}
@@ -576,9 +580,7 @@ export default async function DashboardPage() {
               <div className="font-serif italic text-sm text-accent mb-1">
                 Pool balance
               </div>
-              <div
-                className={`font-serif text-2xl leading-none ${balance < 0 ? 'text-danger' : 'text-ink'}`}
-              >
+              <div className={`font-serif text-2xl tabular tracking-[-0.01em] leading-none ${balance < 0 ? 'text-danger' : 'text-num-ink'}`}>
                 {formatMoney(balance)}
               </div>
               <div className="font-mono text-xs text-muted mt-2">
@@ -589,7 +591,7 @@ export default async function DashboardPage() {
               <div className="font-serif italic text-sm text-accent mb-1">
                 Revenue {dayjs(period).format('MMM')}
               </div>
-              <div className="font-serif text-2xl text-ink leading-none">
+              <div className="font-serif text-2xl text-num-ink tabular tracking-[-0.01em] leading-none">
                 {formatMoney(np.revenue)}
               </div>
               <div className="font-mono text-xs text-muted mt-2">
@@ -600,9 +602,7 @@ export default async function DashboardPage() {
               <div className="font-serif italic text-sm text-accent mb-1">
                 This month NP
               </div>
-              <div
-                className={`font-serif text-2xl leading-none ${np.net_profit < 0 ? 'text-danger' : 'text-ink'}`}
-              >
+              <div className={`font-serif text-2xl tabular tracking-[-0.01em] leading-none ${np.net_profit < 0 ? 'text-danger' : 'text-num-ink'}`}>
                 {formatMoney(np.net_profit)}
               </div>
               <div className="font-mono text-xs text-muted mt-2">
@@ -613,7 +613,7 @@ export default async function DashboardPage() {
               <div className="font-serif italic text-sm text-accent mb-1">
                 Awaiting Principal
               </div>
-              <div className="font-serif text-3xl text-ink leading-none">
+              <div className="font-serif text-3xl text-num-ink tabular leading-none">
                 {pendingCount}
               </div>
               <div className="font-mono text-xs text-muted mt-2">
@@ -626,12 +626,11 @@ export default async function DashboardPage() {
 
           {/* Your submissions awaiting Principal sign-off */}
           <section className="mb-12">
-            <h2 className="font-serif text-2xl text-ink mb-1">
-              Awaiting Principal sign-off
-            </h2>
-            <p className="font-serif italic text-graphite text-sm mb-4">
-              Your submitted expense requests. <em>They post to the pool once approved.</em>
-            </p>
+            <div className="sect-head">
+              <h2>Awaiting Principal sign-off</h2>
+              <span className="rule" aria-hidden />
+              <span className="count">{pendingCount} REQUEST{pendingCount === 1 ? '' : 'S'} · POSTS TO POOL ONCE APPROVED</span>
+            </div>
             {pendingCount === 0 ? (
               <div className="border border-hairline rounded-md bg-surface p-6">
                 <p className="font-serif italic text-ledger text-base">All caught up.</p>
@@ -656,9 +655,7 @@ export default async function DashboardPage() {
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="font-mono tabular font-medium text-ink text-sm">
-                        {formatMoney(Number(r.amount))}
-                      </div>
+                      <span className="num">{formatMoney(Number(r.amount))}</span>
                       <div className="font-mono text-xs text-muted">
                         {dayjs(r.created_at).format('D MMM')}
                       </div>
@@ -679,8 +676,12 @@ export default async function DashboardPage() {
 
           {/* Recent approved expenses */}
           <section className="mb-12">
-            <div className="flex items-baseline justify-between mb-1">
-              <h2 className="font-serif text-2xl text-ink">Recent approved</h2>
+            <div className="sect-head">
+              <h2>Recent approved</h2>
+              <span className="rule" aria-hidden />
+              <span className="count">LAST {Math.min(5, recentList.length || 5)} · POSTED TO POOL</span>
+            </div>
+            <div className="flex items-baseline justify-end -mt-3 mb-4">
               <Link
                 href={deptDetailHref}
                 className="font-serif italic text-sm text-accent hover:text-accent-hover"
@@ -688,9 +689,6 @@ export default async function DashboardPage() {
                 See full pool →
               </Link>
             </div>
-            <p className="font-serif italic text-graphite text-sm mb-4">
-              Last {Math.min(5, recentList.length || 5)} expenses posted to the pool.
-            </p>
             {recentList.length === 0 ? (
               <div className="border border-hairline rounded-md bg-surface p-6">
                 <p className="font-serif italic text-graphite text-base">
@@ -710,9 +708,7 @@ export default async function DashboardPage() {
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="font-mono tabular font-medium text-ink text-sm">
-                        {formatMoney(-Number(e.amount))}
-                      </div>
+                      <span className="num neg">{formatMoney(-Number(e.amount))}</span>
                       <div className="font-mono text-xs text-muted">
                         {dayjs(e.created_at).format('D MMM YYYY')}
                       </div>

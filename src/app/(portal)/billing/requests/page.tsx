@@ -32,15 +32,20 @@ export default async function InvoiceRequestsPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <Link href="/statements" className="text-sm text-muted hover:text-accent font-sans transition-colors">
-          ← Back to Statements
-        </Link>
-        <h1 className="font-serif text-3xl text-ink mt-3">Request Generate Invoice</h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          Department managers requesting invoices to subsidiaries. Review the auto-filled details
-          and click <em>Generate</em> to create the invoice rows, or <em>Reject</em> to send back.
-        </p>
+      <Link href="/statements" className="text-sm text-muted hover:text-accent font-sans transition-colors">
+        ← Back to Statements
+      </Link>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> BILLING · INVOICE GENERATION QUEUE
+          </div>
+          <h1 className="page-title">Request Generate Invoice</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            Department managers requesting invoices to subsidiaries. Review the auto-filled details
+            and click <em>Generate</em> to create the invoice rows, or <em>Reject</em> to send back.
+          </p>
+        </div>
       </div>
 
       {(requests ?? []).length === 0 ? (
@@ -72,7 +77,7 @@ export default async function InvoiceRequestsPage() {
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="font-mono tabular font-semibold text-ink text-lg">
+                    <div className="num text-num-ink font-semibold text-lg">
                       {formatMoney(total)}
                     </div>
                     <div className="font-mono text-xs text-muted mt-0.5">total</div>
@@ -81,39 +86,39 @@ export default async function InvoiceRequestsPage() {
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 text-xs font-mono">
                   <div>
-                    <div className="text-muted uppercase tracking-wide">Period</div>
+                    <div className="text-graphite uppercase tracking-wide">Period</div>
                     <div className="text-ink mt-1">{dayjs(r.period_month).format('MMM YYYY')}</div>
                   </div>
                   <div>
-                    <div className="text-muted uppercase tracking-wide">Invoice date</div>
+                    <div className="text-graphite uppercase tracking-wide">Invoice date</div>
                     <div className="text-ink mt-1">{dayjs(r.invoice_date).format('D MMM YYYY')}</div>
                   </div>
                   <div>
-                    <div className="text-muted uppercase tracking-wide">Due date</div>
+                    <div className="text-graphite uppercase tracking-wide">Due date</div>
                     <div className="text-ink mt-1">{dayjs(r.due_date).format('D MMM YYYY')}</div>
                   </div>
                   <div>
-                    <div className="text-muted uppercase tracking-wide">Reference</div>
+                    <div className="text-graphite uppercase tracking-wide">Reference</div>
                     <div className="text-ink mt-1">{r.reference_no ?? '—'}</div>
                   </div>
                 </div>
 
-                <table className="w-full text-sm mb-4">
+                <table className="ledger-table mb-4">
                   <thead>
-                    <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                      <th className="text-left py-2 pr-4 font-medium">Subsidiary</th>
-                      <th className="text-right py-2 font-medium">Amount</th>
+                    <tr>
+                      <th>Subsidiary</th>
+                      <th className="right">Amount</th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((it, i) => (
-                      <tr key={i} className="border-b border-hairline last:border-0">
-                        <td className="py-2 pr-4 font-serif text-ink">
-                          {companyName.get(it.subsidiary_id) ?? it.subsidiary_id}
+                      <tr key={i}>
+                        <td>
+                          <div className="font-serif text-ink">
+                            {companyName.get(it.subsidiary_id) ?? it.subsidiary_id}
+                          </div>
                         </td>
-                        <td className="py-2 text-right font-mono tabular text-ink">
-                          {formatMoney(Number(it.amount))}
-                        </td>
+                        <td className="num">{formatMoney(Number(it.amount))}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -78,43 +78,54 @@ export default async function NewPaymentPage({ searchParams }: Props) {
     }
   }
 
+  const headingTitle = invoicePreset
+    ? 'Settle invoice'
+    : nonBillablePreset
+      ? 'Non-billable expense'
+      : 'Create payment'
+
+  const headingEyebrow = invoicePreset
+    ? 'PAYMENT VOUCHER · SETTLE INVOICE'
+    : nonBillablePreset
+      ? 'PAYMENT VOUCHER · NON-BILLABLE'
+      : 'PAYMENT VOUCHER · NEW'
+
   return (
     <div>
-      <div className="mb-10">
-        <Link
-          href={invoicePreset ? '/billing' : '/payments'}
-          className="text-sm text-muted hover:text-accent font-sans transition-colors"
-        >
-          ← Back to {invoicePreset ? 'Billing' : 'Payments'}
-        </Link>
-        <h1 className="font-serif text-3xl text-ink mt-3">
-          {invoicePreset
-            ? 'Settle invoice'
-            : nonBillablePreset
-              ? 'Non-billable expense'
-              : 'Create payment'}
-        </h1>
-        <p className="font-serif italic text-graphite text-base mt-2">
-          {invoicePreset ? (
-            <>
-              Recording payment received for invoice{' '}
-              <span className="font-mono text-ink">{invoicePreset.invoice_no}</span> —{' '}
-              {invoicePreset.company_name} · {dayjs(invoicePreset.period_month).format('MMM YYYY')}.
-              Credit voucher, auto-approved on save.
-            </>
-          ) : nonBillablePreset ? (
-            <>
-              Group-level expense deducted from the Venture Pool. HV retreats,
-              brand upgrades, HV&apos;s own rent share, etc.{' '}
-              <em>Principal must approve before execution.</em>
-            </>
-          ) : (
-            <>
-              Every bank transfer, expense, repayment, or claim payout goes through a payment voucher.
-              Principal must approve before execution.
-            </>
-          )}
-        </p>
+      <Link
+        href={invoicePreset ? '/billing' : '/payments'}
+        className="text-sm text-muted hover:text-accent font-sans transition-colors"
+      >
+        ← Back to {invoicePreset ? 'Billing' : 'Payments'}
+      </Link>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> TREASURY · {headingEyebrow}
+          </div>
+          <h1 className="page-title">{headingTitle}</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            {invoicePreset ? (
+              <>
+                Recording payment received for invoice{' '}
+                <span className="font-mono text-ink">{invoicePreset.invoice_no}</span> —{' '}
+                {invoicePreset.company_name} · {dayjs(invoicePreset.period_month).format('MMM YYYY')}.
+                Credit voucher, auto-approved on save.
+              </>
+            ) : nonBillablePreset ? (
+              <>
+                Group-level expense deducted from the Venture Pool. HV retreats,
+                brand upgrades, HV&apos;s own rent share, etc.{' '}
+                <em>Principal must approve before execution.</em>
+              </>
+            ) : (
+              <>
+                Every bank transfer, expense, repayment, or claim payout goes through a payment voucher.
+                Principal must approve before execution.
+              </>
+            )}
+          </p>
+        </div>
       </div>
 
       <NewPaymentForm

@@ -65,8 +65,17 @@ export default async function PayrollGridPage({ params }: PageProps) {
   if (!rows || rows.length === 0) {
     return (
       <div>
-        <h1 className="font-serif text-3xl text-ink mt-2 mb-2">{formatPeriodLabel(period)}</h1>
-        <p className="font-serif italic text-graphite mb-8">No rows for this period yet.</p>
+        <div className="page-head">
+          <div>
+            <div className="page-eyebrow">
+              <em>I.</em> HR · PAYROLL · {formatPeriodLabel(period).toUpperCase()}
+            </div>
+            <h1 className="page-title">{formatPeriodLabel(period)}</h1>
+            <p className="font-serif italic text-graphite text-base mt-3">
+              <em>No rows for this period yet.</em>
+            </p>
+          </div>
+        </div>
         <p className="font-sans text-sm text-muted">
           Open <Link href="/hr-costing/payroll" className="text-accent hover:underline">Payroll</Link> to create the current period.
         </p>
@@ -222,10 +231,13 @@ export default async function PayrollGridPage({ params }: PageProps) {
       ) : null}
 
       {/* Row 1 — title + primary CTA varies by phase */}
-      <div className="flex items-baseline justify-between mt-2 mb-6 gap-6">
+      <div className="page-head">
         <div>
-          <h1 className="font-serif text-3xl text-ink">{formatPeriodLabel(period)}</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
+          <div className="page-eyebrow">
+            <em>I.</em> HR · PAYROLL · {formatPeriodLabel(period).toUpperCase()}
+          </div>
+          <h1 className="page-title">{formatPeriodLabel(period)}</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
             {totals.staff} staff ·{' '}
             <PhaseLabel phase={phase} rejectionReason={run?.rejection_reason} />
           </p>
@@ -285,25 +297,25 @@ export default async function PayrollGridPage({ params }: PageProps) {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mb-10 border-y border-hairline py-6">
         <div>
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total Gross</div>
-          <div className="font-mono tabular text-xl text-ink mt-1">{formatMoney(totals.gross)}</div>
+          <div className="num text-num-ink text-xl tracking-[-0.01em] mt-1">{formatMoney(totals.gross)}</div>
         </div>
         <div>
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total Net</div>
-          <div className="font-mono tabular text-xl text-ink mt-1">{formatMoney(totals.net)}</div>
+          <div className="num text-num-ink text-xl tracking-[-0.01em] mt-1">{formatMoney(totals.net)}</div>
         </div>
         <div>
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">EPF ER</div>
-          <div className="font-mono tabular text-md text-graphite mt-1">{formatMoney(totals.epf_er)}</div>
+          <div className="num text-graphite text-md mt-1">{formatMoney(totals.epf_er)}</div>
         </div>
         <div>
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">SOCSO+EIS ER</div>
-          <div className="font-mono tabular text-md text-graphite mt-1">
+          <div className="num text-graphite text-md mt-1">
             {formatMoney(totals.socso_er + totals.eis_er)}
           </div>
         </div>
         <div>
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total PCB</div>
-          <div className="font-mono tabular text-md text-graphite mt-1">{formatMoney(totals.pcb)}</div>
+          <div className="num text-graphite text-md mt-1">{formatMoney(totals.pcb)}</div>
         </div>
       </div>
 
