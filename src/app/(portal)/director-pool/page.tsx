@@ -212,18 +212,17 @@ export default async function DirectorPoolPage() {
             <table className="ledger-table">
               <thead>
                 <tr>
-                  <th className="text-left">Director</th>
-                  <th className="num">Accumulated</th>
-                  <th className="num">Released</th>
-                  <th className="num">Balance</th>
+                  <th>Director</th>
+                  <th className="right">Accumulated</th>
+                  <th className="right">Released</th>
+                  <th className="right">Balance</th>
                 </tr>
               </thead>
               <tbody>
                 {directorRows.map(r => (
                   <tr key={r.id ?? 'unassigned'}>
                     <td>
-                      <span className="font-mono text-xs text-graphite mr-2">{r.code ?? '—'}</span>
-                      <span className="font-serif italic text-ink">{r.name}</span>
+                      <span className="font-mono text-sm text-ink">{r.code ?? r.name}</span>
                     </td>
                     <td className="num">{r.accumulated > 0 ? formatMoneyBare(r.accumulated) : '—'}</td>
                     <td className="num">
