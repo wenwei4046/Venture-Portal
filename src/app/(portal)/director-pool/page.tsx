@@ -30,6 +30,7 @@ export default async function DirectorPoolPage() {
     { data: invoiceTxns },
     { data: claims },
     { data: payouts },
+    { data: directors },
   ] = await Promise.all([
     directorDept
       ? supabase
@@ -41,6 +42,7 @@ export default async function DirectorPoolPage() {
     supabase.from('invoice_payout_pool').select('*').order('created_at', { ascending: false }),
     supabase.from('claims').select('*').eq('claim_type', 'project').in('status', ['approved', 'paid']),
     supabase.from('director_payouts').select('saving_amount, statutory_surplus'),
+    supabase.from('directors').select('id, code, name').order('code'),
   ])
 
   // Director Pool balance — SUM(np_in) - SUM(expense_out) for Director dept
@@ -65,6 +67,32 @@ export default async function DirectorPoolPage() {
 
   // Invoice bucket = invoice_payout_pool balance
   const invoiceBucket = invoiceBalance
+
+  // Per-director invoice accumulation rollup
+  type DirectorRow = { id: string | null; code: string | null; name: string; accumulated: number; released: number; balance: number }
+  const directorRollup = new Map<string | null, DirectorRow>()
+  for (const d of directors ?? []) {
+    directorRollup.set(d.id, { id: d.id, code: d.code, name: d.name, accumulated: 0, released: 0, balance: 0 })
+  }
+  for (const t of invoiceTxns ?? []) {
+    const key = t.director_id ?? null
+    const row = directorRollup.get(key) ?? { id: key, code: null, name: 'Unassigned', accumulated: 0, released: 0, balance: 0 }
+    const amt = Number(t.amount)
+    if (t.transaction_type === 'accumulate') {
+      row.accumulated += amt
+      row.balance += amt
+    } else {
+      row.released += amt
+      row.balance -= amt
+    }
+    directorRollup.set(key, row)
+  }
+  // Sort: balance desc, then code asc — keeps biggest holders on top
+  const directorRows = Array.from(directorRollup.values()).sort((a, b) =>
+    b.balance - a.balance || (a.code ?? 'zz').localeCompare(b.code ?? 'zz'),
+  )
+  const totalAccumulated = directorRows.reduce((s, r) => s + r.accumulated, 0)
+  const totalReleased = directorRows.reduce((s, r) => s + r.released, 0)
 
   // Reconciliation: Saving + Invoice should equal Director Pool once all period payroll is PV'd out
   const bucketsTotal = savingBucket + invoiceBucket
@@ -177,6 +205,48 @@ export default async function DirectorPoolPage() {
         <p className="font-serif italic text-graphite text-sm mb-4">
           25% of each director&apos;s salary accumulated in isolated pool. Release requires Principal approval.
         </p>
+
+        {/* Per-director rollup */}
+        {directorRows.length > 0 && (invoiceTxns ?? []).length > 0 ? (
+          <div className="mb-6 overflow-x-auto">
+            <table className="ledger-table">
+              <thead>
+                <tr>
+                  <th className="text-left">Director</th>
+                  <th className="num">Accumulated</th>
+                  <th className="num">Released</th>
+                  <th className="num">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {directorRows.map(r => (
+                  <tr key={r.id ?? 'unassigned'}>
+                    <td>
+                      <span className="font-mono text-xs text-graphite mr-2">{r.code ?? '—'}</span>
+                      <span className="font-serif italic text-ink">{r.name}</span>
+                    </td>
+                    <td className="num">{r.accumulated > 0 ? formatMoneyBare(r.accumulated) : '—'}</td>
+                    <td className="num">
+                      {r.released > 0 ? <span className="neg">({formatMoneyBare(r.released)})</span> : '—'}
+                    </td>
+                    <td className="num font-medium">
+                      {r.balance < 0 ? <span className="neg">({formatMoneyBare(Math.abs(r.balance))})</span> : formatMoneyBare(r.balance)}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="border-t border-hairline">
+                  <td className="font-serif italic text-ink">Total</td>
+                  <td className="num font-medium">{formatMoneyBare(totalAccumulated)}</td>
+                  <td className="num font-medium">
+                    {totalReleased > 0 ? <span className="neg">({formatMoneyBare(totalReleased)})</span> : '—'}
+                  </td>
+                  <td className="num font-medium">{formatMoneyBare(invoiceBucket)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+
         {(invoiceTxns ?? []).length === 0 ? (
           <div className="py-8 text-center border border-hairline rounded-md bg-surface">
             <p className="font-serif italic text-muted">No invoice accumulations yet.</p>
