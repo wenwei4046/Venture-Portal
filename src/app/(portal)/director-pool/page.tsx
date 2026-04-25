@@ -42,7 +42,10 @@ export default async function DirectorPoolPage() {
           .order('created_at', { ascending: false })
       : Promise.resolve({ data: [] as never[] }),
     supabase.from('invoice_payout_pool').select('*').order('created_at', { ascending: false }),
-    supabase.from('claims').select('*').eq('claim_type', 'project').in('status', ['approved', 'paid']),
+    // Saving bucket only deducts pool claims whose source_pool is dept_pool_director.
+    // Other source_pool values (venture_pool / dept_pool_marketing / etc) come out
+    // of their own pool's ledger — not Saving — so they must not subtract here.
+    supabase.from('claims').select('*').eq('claim_type', 'project').eq('source_pool', 'dept_pool_director').in('status', ['approved', 'paid']),
     supabase.from('director_payouts').select('saving_amount, statutory_surplus'),
     // For Total Advance: latest confirmed/paid closing balance per director
     supabase
@@ -65,10 +68,10 @@ export default async function DirectorPoolPage() {
     return s - Number(t.amount)
   }, 0)
 
-  // Project claims — now deducted from Director Pool (Saving bucket)
+  // Pool claims with source=Director Pool — deducted from the Saving sub-bucket
   const totalClaimed = (claims ?? []).reduce((s, c) => s + Number(c.amount ?? 0), 0)
 
-  // Saving bucket = 5% saving + statutory surplus − project claims
+  // Saving bucket = 5% saving + statutory surplus − pool claims (source=Director Pool)
   const totalSaving = (payouts ?? []).reduce((s, p) => s + Number(p.saving_amount ?? 0), 0)
   const totalSurplus = (payouts ?? []).reduce((s, p) => s + Number(p.statutory_surplus ?? 0), 0)
   const savingBucket = totalSaving + totalSurplus - totalClaimed

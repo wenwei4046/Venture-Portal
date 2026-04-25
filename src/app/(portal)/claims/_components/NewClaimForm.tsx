@@ -104,6 +104,7 @@ export default function NewClaimForm() {
           >
             <option value="venture_pool">Venture Pool</option>
             <option value="dept_pool_director">Director Pool</option>
+            <option value="dept_pool_director_office">Director Office Dept Pool</option>
             <option value="dept_pool_marketing">Marketing Dept Pool</option>
             <option value="dept_pool_finance">Finance Dept Pool</option>
             <option value="dept_pool_hr">HR Dept Pool</option>

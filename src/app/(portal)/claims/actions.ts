@@ -70,7 +70,7 @@ export async function approveClaim(claimId: string) {
 
   if (claimErr) throw new Error(`Failed to approve: ${claimErr.message}`)
 
-  // Only project claims create a voucher — benefit claims remain on the
+  // Only pool claims create a voucher — benefit claims remain on the
   // HR payroll path (unchanged).
   if (claim.claim_type === 'project' && Number(claim.amount) > 0) {
     const amount = Number(claim.amount)
@@ -158,9 +158,9 @@ export async function markClaimPaid(claimId: string) {
   if (!claim) throw new Error('Claim not found')
   if (claim.status !== 'approved') throw new Error('Only approved claims can be marked as paid')
 
-  // Finance marks project claims paid, HR marks benefit claims paid
+  // Finance marks pool claims paid, HR marks benefit claims paid
   if (claim.claim_type === 'project' && user.role !== 'finance' && user.role !== 'principal') {
-    throw new Error('Only Finance or Principal can mark project claims as paid')
+    throw new Error('Only Finance or Principal can mark pool claims as paid')
   }
   if (claim.claim_type === 'benefit' && user.role !== 'hr' && user.role !== 'principal') {
     throw new Error('Only HR or Principal can mark benefit claims as paid')
