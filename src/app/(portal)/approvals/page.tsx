@@ -86,9 +86,6 @@ export default async function ApprovalsPage() {
             <em>I.</em> APPROVALS · PRINCIPAL QUEUE
           </div>
           <h1 className="page-title">Approvals</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Pending decisions that require <em>your hand</em>. Principal only.
-          </p>
         </div>
       </div>
 

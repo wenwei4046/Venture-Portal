@@ -36,9 +36,6 @@ export default async function InvoicePoolPage() {
             <em>I.</em> DIRECTOR · INVOICE POOL
           </div>
           <h1 className="page-title">Invoice Payout Pool</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            25% director invoice portion. <em>Isolated pool. Release requires Principal approval.</em>
-          </p>
         </div>
       </div>
 

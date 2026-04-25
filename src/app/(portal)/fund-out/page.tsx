@@ -71,10 +71,6 @@ export default async function FundOutPage() {
             <em>I.</em> TREASURY · LOANS OUT
           </div>
           <h1 className="page-title">Fund OUT</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Loans disbursed by HV to subsidiaries.{' '}
-            <em>Rates lock at creation, never change.</em>
-          </p>
         </div>
         <div className="flex items-center gap-3">
           <ExportCSVButton />

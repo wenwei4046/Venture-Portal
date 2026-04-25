@@ -60,9 +60,6 @@ export default async function FundSummaryPage() {
             <em>I.</em> REPORTS · FUND SUMMARY
           </div>
           <h1 className="page-title">Fund Summary</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Capital structure. <em>As of {dayjs().format('D MMM YYYY')}.</em>
-          </p>
         </div>
       </div>
 

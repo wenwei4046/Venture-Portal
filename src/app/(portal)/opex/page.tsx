@@ -122,9 +122,6 @@ export default async function OpexPage() {
           <span className="rule" aria-hidden />
           <span className="count">{currentRows.length} STAFF · BASIC · KPI · ALLOWANCE · ER STAT</span>
         </div>
-        <p className="font-serif italic text-graphite text-sm mb-4">
-          {dayjs(period).format('MMMM YYYY')} · per-staff cost components
-        </p>
         {currentRows.length === 0 ? (
           <div className="border border-hairline rounded-md bg-surface p-6 text-center">
             <p className="font-serif italic text-muted text-sm">

@@ -34,9 +34,6 @@ export default async function ClaimsPage({ searchParams }: Props) {
             <em>I.</em> CLAIMS · BENEFIT &amp; POOL
           </div>
           <h1 className="page-title">Claims</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Benefit claims (HR approves) and pool claims (Finance approves).
-          </p>
         </div>
         <NewClaimForm />
       </div>

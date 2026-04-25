@@ -43,10 +43,6 @@ export default function MarketingProjectList({ contracts, companyMap, canCreate,
           )}
         </div>
       </div>
-      <p className="font-serif italic text-graphite text-sm mb-4">
-        Project-based service contracts between Marketing and subsidiaries. Fixed
-        amount per project, <em>Principal-approved before activation</em>.
-      </p>
 
       {contracts.length === 0 ? (
         <div className="border border-hairline rounded-md bg-surface p-6 text-center">

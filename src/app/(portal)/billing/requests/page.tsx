@@ -41,10 +41,6 @@ export default async function InvoiceRequestsPage() {
             <em>I.</em> BILLING · INVOICE GENERATION QUEUE
           </div>
           <h1 className="page-title">Request Generate Invoice</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Department managers requesting invoices to subsidiaries. Review the auto-filled details
-            and click <em>Generate</em> to create the invoice rows, or <em>Reject</em> to send back.
-          </p>
         </div>
       </div>
 

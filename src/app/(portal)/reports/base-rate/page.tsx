@@ -26,9 +26,6 @@ export default async function BaseRateHistoryPage() {
             <em>I.</em> REPORTS · BASE RATE HISTORY
           </div>
           <h1 className="page-title">Base Rate History</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Quarterly weighted cost + op margin = base rate.
-          </p>
         </div>
       </div>
 

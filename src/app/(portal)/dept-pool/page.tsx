@@ -118,9 +118,6 @@ export default async function DeptPoolPage() {
             <em>I.</em> DEPARTMENTS · POOL OVERVIEW
           </div>
           <h1 className="page-title">Department Pools</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
-            Running balance per department — credits from invoice settlement + P&amp;L, debits from payroll + expenses.
-          </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <Link
@@ -159,9 +156,6 @@ export default async function DeptPoolPage() {
       {/* ───────── By department ───────── */}
       <section className="mb-12">
         <h2 className="font-serif text-xl text-ink mb-1">By department</h2>
-        <p className="font-serif italic text-graphite text-sm mb-4">
-          Balance = running credits − debits. HR / Finance / Director Office / Director are pure in-and-out pools; <em>Marketing</em> also tracks P&amp;L — open its detail view.
-        </p>
 
         {visible.length === 0 ? (
           <div className="border border-hairline rounded-md bg-surface p-6 text-center">

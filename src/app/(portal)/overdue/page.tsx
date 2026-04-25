@@ -68,9 +68,6 @@ export default async function OverduePage() {
             <em>I.</em> TREASURY · OVERDUE &amp; NETTING
           </div>
           <h1 className="page-title">Overdue &amp; Netting</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Loans past grace period. <em>Penalty accrues per stage until escalated.</em>
-          </p>
         </div>
         {canFinanceAct ? <DetectOverdueButton /> : null}
       </div>
@@ -209,9 +206,6 @@ export default async function OverduePage() {
       {rows.length > active.length ? (
         <section className="mt-12 pt-8 border-t border-hairline">
           <h2 className="font-serif text-xl text-ink mb-1">History</h2>
-          <p className="font-serif italic text-graphite text-sm mb-4">
-            Escalated and paid records
-          </p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

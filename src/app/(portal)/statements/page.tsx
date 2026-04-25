@@ -49,10 +49,6 @@ export default async function StatementsPage() {
             <em>I.</em> TREASURY · MONTHLY STATEMENTS
           </div>
           <h1 className="page-title">Statements</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Monthly consolidated statements. <em>Invoice items minus contra items</em>{' '}
-            per subsidiary per month.
-          </p>
         </div>
         {canGenerate ? <GenerateStatementsButton /> : null}
       </div>

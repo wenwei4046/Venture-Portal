@@ -47,9 +47,6 @@ export default function DirectorSalarySection({ directors }: { directors: Direct
     <section className="bg-surface border border-hairline rounded-md p-6">
       <header className="mb-5">
         <h2 className="font-serif text-xl text-ink">Director Salary</h2>
-        <p className="font-serif italic text-graphite text-sm mt-0.5">
-          Weightage per director (must sum to 4.0) and minimum monthly payout.
-        </p>
       </header>
 
       <div className="space-y-4">

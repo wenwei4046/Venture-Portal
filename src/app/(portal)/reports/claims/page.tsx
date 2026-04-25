@@ -40,9 +40,6 @@ export default async function ClaimsSummaryPage() {
             <em>I.</em> REPORTS · CLAIMS SUMMARY
           </div>
           <h1 className="page-title">Claims Summary</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Benefit and pool claims overview.
-          </p>
         </div>
       </div>
 

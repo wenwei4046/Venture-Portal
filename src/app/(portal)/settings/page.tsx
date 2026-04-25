@@ -90,9 +90,6 @@ export default async function SettingsPage({ searchParams }: Props) {
             <em>I.</em> ADMIN · CONFIGURATION
           </div>
           <h1 className="page-title">Settings</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Treasury config, overdue stages, splits, and subsidiaries. Principal only.
-          </p>
         </div>
       </div>
 

@@ -43,14 +43,6 @@ export default async function EditContractPage({ params }: Props) {
             <em>I.</em> BILLING · EDIT CONTRACT
           </div>
           <h1 className="page-title">Edit Contract</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Update this Marketing project contract.
-            {contract.approved_by ? (
-              <em> Already approved — changes will take effect next billing cycle.</em>
-            ) : (
-              <em> Still pending Principal approval.</em>
-            )}
-          </p>
         </div>
       </div>
       <ContractForm

@@ -39,9 +39,6 @@ export default async function OperatingFundPage() {
             <em>I.</em> TREASURY · VENTURE POOL
           </div>
           <h1 className="page-title">Venture Pool</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Fund deposits, loan disbursements, director savings, and statutory surplus.
-          </p>
         </div>
       </div>
 

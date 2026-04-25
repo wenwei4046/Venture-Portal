@@ -143,10 +143,6 @@ export default async function BillingView({ searchParams }: Props) {
             <em>I.</em> BILLING · SERVICE INVOICES
           </div>
           <h1 className="page-title">Service Billing</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Department OPEX billing and marketing contracts feed the monthly consolidated statement.{' '}
-            <em>Finance creates + issues invoices, Principal approves new contracts.</em>
-          </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <PeriodSelector currentPeriod={period} />

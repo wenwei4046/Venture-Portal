@@ -66,9 +66,6 @@ export default function CompaniesSection({ companies }: Props) {
           {showAdd ? 'Cancel' : '+ Add subsidiary'}
         </button>
       </div>
-      <p className="font-serif italic text-graphite text-sm mb-6">
-        Manage subsidiary companies. Changes apply to all modules.
-      </p>
 
       {error ? (
         <div className="bg-danger-bg border border-danger text-danger rounded-md p-3 mb-4 text-sm font-sans">

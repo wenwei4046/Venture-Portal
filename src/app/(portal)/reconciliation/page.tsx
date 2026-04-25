@@ -38,9 +38,6 @@ export default async function ReconciliationPage() {
             <em>I.</em> TREASURY · BANK RECONCILIATION
           </div>
           <h1 className="page-title">Bank Reconciliation</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Compare bank balances against GL, import CSV statements for matching.
-          </p>
         </div>
         <Link
           href="/reconciliation/journal"
@@ -54,9 +51,6 @@ export default async function ReconciliationPage() {
       {banks.length > 0 ? (
         <section className="mb-12">
           <h2 className="font-serif text-2xl text-ink mb-1">Bank vs GL Balance</h2>
-          <p className="font-serif italic text-graphite text-sm mb-6">
-            Portal bank balance (from payment vouchers) vs GL balance (from journal entries). Manual reconciliation.
-          </p>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -108,9 +102,6 @@ export default async function ReconciliationPage() {
       {/* ── CSV Upload (existing) ── */}
       <section>
         <h2 className="font-serif text-2xl text-ink mb-1">CSV Import</h2>
-        <p className="font-serif italic text-graphite text-sm mb-6">
-          Upload a bank statement CSV to compare individual transactions.
-        </p>
         <CSVUpload />
       </section>
     </div>

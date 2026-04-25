@@ -35,9 +35,6 @@ export default async function ReportsPage() {
             <em>I.</em> REPORTS · CONSOLIDATED
           </div>
           <h1 className="page-title">Reports</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            财务报表。<em>All modules consolidated.</em>
-          </p>
         </div>
       </div>
 

@@ -110,10 +110,6 @@ export default async function DirectorReportPage({ params }: PageProps) {
             <em>IV.</em> APPROVALS · DIRECTOR SALARY · {formatPeriodLabel(run.period_month).toUpperCase()}
           </div>
           <h1 className="page-title">Director Salary Breakdown</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Per-company CTC, per-director payout, and calculation details attached to this payroll submission.
-            <em> Restricted to Principal and HR.</em>
-          </p>
         </div>
       </div>
 

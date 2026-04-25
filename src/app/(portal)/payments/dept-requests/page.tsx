@@ -47,10 +47,6 @@ export default async function DeptRequestsPage() {
             <em>I.</em> TREASURY · DEPT PAYMENT REQUESTS
           </div>
           <h1 className="page-title">Dept Payment Requests</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Department managers requesting vendor payment from their pool. Approved by Principal,
-            ready for you to generate a PV.
-          </p>
         </div>
       </div>
 

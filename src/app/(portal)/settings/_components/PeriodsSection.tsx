@@ -75,9 +75,6 @@ export default function PeriodsSection({ locks }: Props) {
     <div>
       <div className="mb-6">
         <h2 className="font-serif text-2xl text-ink">Period closing</h2>
-        <p className="font-serif italic text-graphite text-sm mt-1">
-          Close a completed month to freeze its transactions. Principal only. Reopen any time for corrections.
-        </p>
       </div>
 
       {error ? (

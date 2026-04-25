@@ -106,9 +106,6 @@ export default async function DirectorPoolPage() {
             <em>I.</em> DIRECTOR · POOL OVERVIEW
           </div>
           <h1 className="page-title">Director Pool</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Two earmarked buckets: <span className="text-ink">Saving</span> (5% + statutory surplus, net of project claims) and <span className="text-ink">Invoice</span> (25% per-director accumulator). Together they equal the pool once all period payroll has been PV&apos;d out.
-          </p>
         </div>
       </div>
 
@@ -153,9 +150,6 @@ export default async function DirectorPoolPage() {
       {/* Director Pool Activity */}
       <section className="mb-12">
         <h2 className="font-serif text-2xl text-ink mb-1">Director Pool Activity</h2>
-        <p className="font-serif italic text-graphite text-sm mb-4">
-          Monthly revenue pooling from subs + payouts over time. Balance = full CTC less payroll drained.
-        </p>
         {(directorPoolTxns ?? []).length === 0 ? (
           <div className="py-8 text-center border border-hairline rounded-md bg-surface">
             <p className="font-serif italic text-muted">No director pool activity yet.</p>
@@ -202,9 +196,6 @@ export default async function DirectorPoolPage() {
       {/* Director Invoice Pool */}
       <section className="mb-12">
         <h2 className="font-serif text-2xl text-ink mb-1">Director Invoice</h2>
-        <p className="font-serif italic text-graphite text-sm mb-4">
-          25% of each director&apos;s salary accumulated in isolated pool. Release requires Principal approval.
-        </p>
 
         {/* Per-director rollup */}
         {directorRows.length > 0 && (invoiceTxns ?? []).length > 0 ? (

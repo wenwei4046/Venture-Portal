@@ -65,9 +65,6 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
             <em>I.</em> DIRECTOR · SALARY ENGINE
           </div>
           <h1 className="page-title">Director Salary</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            月度薪水计算引擎。<em>CTC → Pool → Weightage → Payout.</em>
-          </p>
         </div>
         <div className="flex items-center gap-3">
           <label className="font-sans text-xs uppercase tracking-wide text-muted">Period</label>
@@ -145,7 +142,6 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
           {hasSummaryData && summary && (
             <section className="mb-16">
               <h2 className="font-serif text-2xl text-ink mb-1">Statutory Remittance</h2>
-              <p className="font-serif italic text-graphite text-sm mb-6">法定扣款汇总。</p>
 
               <div className="border border-hairline rounded-md bg-surface p-5 space-y-3 max-w-xl">
                 <div className="flex items-baseline justify-between">
@@ -184,9 +180,6 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
           {/* CTC Input Section */}
           <section className="mb-16">
             <h2 className="font-serif text-2xl text-ink mb-1">CTC Input</h2>
-            <p className="font-serif italic text-graphite text-sm mb-6">
-              录入每间子公司的 Director Portion。<em>Save & Calculate 会同时存 CTC 并立刻重算所有 draft payout。</em>
-            </p>
 
             <CTCInputGrid
               directors={(directors ?? []).map(d => ({
@@ -220,9 +213,6 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
               <div className="flex items-baseline justify-between mb-6">
                 <div>
                   <h2 className="font-serif text-2xl text-ink mb-1">Per-Director Payouts</h2>
-                  <p className="font-serif italic text-graphite text-sm">
-                    点击 Director 查看完整明细。
-                  </p>
                 </div>
                 <ConfirmPayoutsButton
                   period={period}

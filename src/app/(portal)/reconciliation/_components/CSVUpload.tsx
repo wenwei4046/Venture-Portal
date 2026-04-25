@@ -103,9 +103,6 @@ export default function CSVUpload() {
           {/* Transaction table */}
           <section>
             <h2 className="font-serif text-2xl text-ink mb-1">Bank Transactions</h2>
-            <p className="font-serif italic text-graphite text-sm mb-6">
-              {result.bankTransactions.length} rows imported from CSV.
-            </p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>

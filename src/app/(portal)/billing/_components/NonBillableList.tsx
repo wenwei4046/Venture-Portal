@@ -30,10 +30,6 @@ export default function NonBillableList({ transactions, period, canAdd }: Props)
       <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-4">
         <div>
           <h2 className="font-serif text-xl text-ink">Non-billable · {monthLabel}</h2>
-          <p className="font-serif italic text-graphite text-sm mt-1">
-            Group-level expenses deducted from the Venture Pool instead of
-            invoiced. HV rent share and other auto-deductions land here too.
-          </p>
         </div>
         {canAdd ? (
           <Link

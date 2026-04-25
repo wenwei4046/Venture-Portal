@@ -25,9 +25,6 @@ export default function BaseRateSimulator({
       <section className="bg-surface border border-hairline rounded-md p-6">
         <header className="mb-5">
           <h2 className="font-serif text-xl text-ink">Base Rate Simulator</h2>
-          <p className="font-serif italic text-graphite text-sm mt-0.5">
-            What-if: simulate adding new paid capital.
-          </p>
         </header>
         <button
           onClick={() => setShowSim(true)}
@@ -51,9 +48,6 @@ export default function BaseRateSimulator({
     <section id="base-rate-simulator" className="bg-surface border border-hairline rounded-md p-6 scroll-mt-8">
       <header className="mb-5">
         <h2 className="font-serif text-xl text-ink">Base Rate Simulator</h2>
-        <p className="font-serif italic text-graphite text-sm mt-0.5">
-          What-if: simulate adding new paid capital and see the impact on base rate.
-        </p>
       </header>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">

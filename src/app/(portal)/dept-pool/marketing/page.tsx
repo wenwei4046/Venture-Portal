@@ -98,9 +98,6 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
             <em>I.</em> DEPARTMENTS · MARKETING POOL · {dayjs(period).format('MMM YYYY').toUpperCase()}
           </div>
           <h1 className="page-title">Marketing</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            <em>Department pool · period {dayjs(period).format('MMMM YYYY')}</em>
-          </p>
         </div>
       </div>
 
@@ -208,10 +205,6 @@ async function RequestCreditTabContent({ deptId }: { deptId: string }) {
           <span className="rule" aria-hidden />
           <span className="count">DRAFT · ONE ROW PER SUBSIDIARY</span>
         </div>
-        <p className="font-serif italic text-graphite text-sm mb-4">
-          Submits a draft invoice to Finance for generation. One row per subsidiary becomes one
-          invoice. Marketing pool credits when the subsidiary settles the invoice.
-        </p>
         <RequestCreditForm subsidiaries={subsidiaries ?? []} />
       </section>
 
@@ -322,11 +315,6 @@ async function RequestPaymentTabContent({
           <span className="rule" aria-hidden />
           <span className="count">PRINCIPAL → FINANCE → PRINCIPAL · 3-STAGE FLOW</span>
         </div>
-        <p className="font-serif italic text-graphite text-sm mb-4">
-          Submits to Principal for expense approval, then to Finance to generate the PV, then back
-          to Principal to approve the PV. Pool is debited at Principal sign-off; cash leaves the
-          bank when the PV is approved + executed.
-        </p>
         <RequestPaymentForm
           companies={companies ?? []}
           categories={categories ?? []}
@@ -340,9 +328,6 @@ async function RequestPaymentTabContent({
           <span className="rule" aria-hidden />
           <span className="count">{(requests ?? []).length} REQUEST{(requests ?? []).length === 1 ? '' : 'S'} · NOT YET COMPLETED</span>
         </div>
-        <p className="font-serif italic text-graphite text-sm mb-4">
-          Submitted requests that haven&rsquo;t completed yet.
-        </p>
         {(requests ?? []).length === 0 ? (
           <div className="border border-hairline rounded-md bg-surface p-6 text-center">
             <p className="font-serif italic text-muted text-sm">No requests in flight.</p>

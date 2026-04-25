@@ -88,9 +88,6 @@ export default async function HRCostingPage() {
             <em>I.</em> HR · MONTHLY COSTING
           </div>
           <h1 className="page-title">HR Costing</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Monthly HR cost snapshots. <em>HR submits the totals Finance uses for billing.</em>
-          </p>
         </div>
         <div className="flex items-center gap-3">
           <Link

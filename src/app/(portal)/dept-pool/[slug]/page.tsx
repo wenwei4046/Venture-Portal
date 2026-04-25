@@ -88,9 +88,6 @@ export default async function DeptPoolDetailPage({ params, searchParams }: Props
             <em>I.</em> DEPARTMENTS · {dept.name.toUpperCase()} POOL · {dayjs(period).format('MMM YYYY').toUpperCase()}
           </div>
           <h1 className="page-title">{dept.name}</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            <em>Department pool · period {dayjs(period).format('MMMM YYYY')}</em>
-          </p>
         </div>
       </div>
 

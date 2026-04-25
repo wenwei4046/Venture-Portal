@@ -116,11 +116,6 @@ export default async function PayrollRequestsPage() {
             <em>I.</em> TREASURY · PAYROLL REQUESTS
           </div>
           <h1 className="page-title">Payroll Requests</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            HR has requested payroll payment. Allocate the total across each
-            Department Pool, pick the source bank, then submit to Principal.
-            <em> Bank and pool balances are checked before the PV is created.</em>
-          </p>
         </div>
       </div>
 

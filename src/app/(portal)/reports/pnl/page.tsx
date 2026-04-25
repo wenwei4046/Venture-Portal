@@ -82,9 +82,6 @@ export default async function PnLPage({ searchParams }: Props) {
             <em>I.</em> REPORTS · HV P&amp;L · {periodLabel.toUpperCase()}
           </div>
           <h1 className="page-title">HV Profit &amp; Loss</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            {periodLabel} — Bank model: interest spread + marketing + shared services
-          </p>
         </div>
         <form className="shrink-0">
           <input

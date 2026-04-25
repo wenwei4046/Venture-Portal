@@ -104,27 +104,6 @@ export default async function NewPaymentPage({ searchParams }: Props) {
             <em>I.</em> TREASURY · {headingEyebrow}
           </div>
           <h1 className="page-title">{headingTitle}</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            {invoicePreset ? (
-              <>
-                Recording payment received for invoice{' '}
-                <span className="font-mono text-ink">{invoicePreset.invoice_no}</span> —{' '}
-                {invoicePreset.company_name} · {dayjs(invoicePreset.period_month).format('MMM YYYY')}.
-                Credit voucher, auto-approved on save.
-              </>
-            ) : nonBillablePreset ? (
-              <>
-                Group-level expense deducted from the Venture Pool. HV retreats,
-                brand upgrades, HV&apos;s own rent share, etc.{' '}
-                <em>Principal must approve before execution.</em>
-              </>
-            ) : (
-              <>
-                Every bank transfer, expense, repayment, or claim payout goes through a payment voucher.
-                Principal must approve before execution.
-              </>
-            )}
-          </p>
         </div>
       </div>
 

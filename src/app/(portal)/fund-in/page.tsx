@@ -106,9 +106,6 @@ export default async function FundInPage({ searchParams }: Props) {
             <em>I.</em> TREASURY · CAPITAL IN
           </div>
           <h1 className="page-title">Fund IN</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Capital borrowed from subsidiaries, directors, department pools, and director savings.
-          </p>
         </div>
         <Link
           href="/fund-in/new"

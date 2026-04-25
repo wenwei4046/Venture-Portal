@@ -39,10 +39,6 @@ export default async function PayrollLandingPage() {
             <em>I.</em> HR · PAYROLL · {formattedPeriod.toUpperCase()}
           </div>
           <h1 className="page-title">Payroll</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            One snapshot per employee per month. Pro-rata, statutory, PCB auto-computed.
-            <em> HR edits drafts; Principal approves.</em>
-          </p>
         </div>
       </div>
 

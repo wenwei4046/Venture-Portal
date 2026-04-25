@@ -9,10 +9,6 @@ export default function UtilitySplitSection({ companies, initial }: Props) {
   return (
     <section className="border border-hairline rounded-md bg-surface p-6">
       <h2 className="font-serif text-xl text-ink mb-1">Utility Split</h2>
-      <p className="font-serif italic text-graphite text-sm mb-4">
-        Percentage template for monthly utility allocation. Same mechanics as
-        Rent Split. HV&apos;s share is non-billable. Total must equal 100%.
-      </p>
       <SplitEditor kind="utility" companies={companies} initial={initial} />
     </section>
   )

@@ -36,11 +36,6 @@ export default async function NewFundInPage() {
             <em>I.</em> TREASURY · NEW FUND SOURCE
           </div>
           <h1 className="page-title">New fund source</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Record a new capital source — <em>subsidiary loan</em>,{' '}
-            <em>director loan</em>, or <em>department pool transfer</em>.
-            Interest rate is mandatory (enter 0 if interest-free). Rate locks at creation.
-          </p>
         </div>
       </div>
 

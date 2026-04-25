@@ -37,9 +37,6 @@ export default async function StaffListPage() {
             <em>I.</em> HR · STAFF DIRECTORY
           </div>
           <h1 className="page-title">Staff</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Individual employee records. Salary is adjustable. <em>Finance cannot see this page.</em>
-          </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Link

@@ -147,9 +147,6 @@ export default async function PaymentsPage({ searchParams }: Props) {
             <em>I.</em> TREASURY · PAYMENT VOUCHERS
           </div>
           <h1 className="page-title">Payments</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            All money in and out goes through a payment voucher. Finance creates, Principal approves, Finance executes.
-          </p>
         </div>
         <div className="flex items-center gap-3">
           <Link

@@ -24,9 +24,6 @@ export default function BankAccountsSection({ accounts }: Props) {
   return (
     <section>
       <h2 className="font-serif text-2xl text-ink mb-1">Bank Accounts</h2>
-      <p className="font-serif italic text-graphite text-sm mb-6">
-        HV bank accounts used for payment voucher execution. Balance auto-deducts when payments are executed.
-      </p>
 
       {accounts.length === 0 ? (
         <div className="border border-hairline rounded-md bg-surface p-8 text-center">

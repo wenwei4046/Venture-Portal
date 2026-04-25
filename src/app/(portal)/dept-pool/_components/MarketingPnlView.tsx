@@ -141,9 +141,6 @@ export default async function MarketingPnlView({ deptId, period }: Props) {
       {/* PV history */}
       <section>
         <h2 className="font-serif text-xl text-ink mb-1">Payment voucher history</h2>
-        <p className="font-serif italic text-graphite text-sm mb-4">
-          PVs that move money in or out of Marketing dept pool. Last 50.
-        </p>
         {(pvRows ?? []).length === 0 ? (
           <div className="border border-hairline rounded-md bg-surface p-6 text-center">
             <p className="font-serif italic text-muted text-sm">No payment vouchers yet for Marketing.</p>

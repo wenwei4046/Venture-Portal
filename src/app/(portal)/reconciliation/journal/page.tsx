@@ -59,18 +59,12 @@ export default async function JournalPage() {
             <em>I.</em> TREASURY · GENERAL LEDGER
           </div>
           <h1 className="page-title">General Ledger</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Double-entry journal entries. Every debit has a matching credit.
-          </p>
         </div>
       </div>
 
       {/* ── Trial Balance ── */}
       <section className="mb-12">
         <h2 className="font-serif text-2xl text-ink mb-1">Trial Balance</h2>
-        <p className="font-serif italic text-graphite text-sm mb-4">
-          Aggregated debits and credits by account (all periods)
-        </p>
 
         {tbRows.length === 0 ? (
           <div className="border border-hairline rounded-md bg-surface p-6 text-center">
@@ -133,9 +127,6 @@ export default async function JournalPage() {
       {/* ── Journal Entries ── */}
       <section className="mb-12">
         <h2 className="font-serif text-2xl text-ink mb-1">Recent Journal Entries</h2>
-        <p className="font-serif italic text-graphite text-sm mb-4">
-          Last 50 entries, most recent first
-        </p>
 
         {entryList.length === 0 ? (
           <div className="border border-hairline rounded-md bg-surface p-6 text-center">

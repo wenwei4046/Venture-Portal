@@ -32,9 +32,6 @@ export default async function ImportPage({ params }: PageProps) {
             <em>I.</em> HR · PAYROLL IMPORT · {formatPeriodLabel(period).toUpperCase()}
           </div>
           <h1 className="page-title">Import InfoTech</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Two stages: upload the xlsx export → review the preview → apply. Only draft rows are touched.
-          </p>
         </div>
       </div>
 

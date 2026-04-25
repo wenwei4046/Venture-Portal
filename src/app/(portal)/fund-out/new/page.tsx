@@ -47,10 +47,6 @@ export default async function NewLoanPage() {
             <em>I.</em> TREASURY · NEW LOAN
           </div>
           <h1 className="page-title">New loan</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Submit a new loan for <em>Principal approval</em>. Rate locks at
-            submission using the active base rate + your custom interest rate.
-          </p>
         </div>
       </div>
 

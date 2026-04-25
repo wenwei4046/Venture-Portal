@@ -205,9 +205,6 @@ export default async function HRPaymentPage() {
             <em>I.</em> HR · PAYMENT · {periodLabel.toUpperCase()}
           </div>
           <h1 className="page-title">Payment</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Request payroll funding from Finance, then disburse to staff from the HR Pool.
-          </p>
         </div>
       </div>
 
@@ -251,9 +248,6 @@ export default async function HRPaymentPage() {
             <span className="rule" aria-hidden />
             <span className="count">{deptBreakdown.length} DEPT{deptBreakdown.length === 1 ? '' : 'S'} · STAFF · NET · GROSS</span>
           </div>
-          <p className="font-serif italic text-graphite text-sm mb-4">
-            Gross is what Finance funds; net is what lands in staff accounts.
-          </p>
           <div className="overflow-x-auto">
             <table className="ledger-table">
               <thead>

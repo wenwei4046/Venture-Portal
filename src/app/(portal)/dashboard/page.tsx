@@ -568,9 +568,6 @@ export default async function DashboardPage() {
                 <em>·</em> {dept.name.toUpperCase()} · OVERVIEW
               </div>
               <h1 className="page-title">{dept.name} Department</h1>
-              <p className="font-serif italic text-graphite text-base mt-3">
-                {dayjs().format('dddd, D MMMM YYYY')} · <em>{dayjs().format('MMMM YYYY')}</em>
-              </p>
             </div>
           </div>
 
@@ -1040,9 +1037,6 @@ export default async function DashboardPage() {
       {isPrincipal && hasAnyData ? (
         <section className="mb-16">
           <h2 className="font-serif text-2xl text-ink mb-1">Margin panel</h2>
-          <p className="font-serif italic text-graphite text-sm mb-6">
-            Weighted cost vs. lending rate, <em>this month</em>
-          </p>
           <MarginPanel summary={summary} />
         </section>
       ) : null}
@@ -1060,9 +1054,6 @@ export default async function DashboardPage() {
                   {financePendingList.length === 1 ? 'item' : 'items'}
                 </span>
               </div>
-              <p className="font-serif italic text-graphite text-sm mb-4">
-                Pending requests you submitted.
-              </p>
               {financePendingList.length === 0 ? (
                 <div className="border border-hairline rounded-md bg-surface p-6">
                   <p className="font-serif italic text-ledger text-base">All caught up.</p>
@@ -1114,9 +1105,6 @@ export default async function DashboardPage() {
                   {financeRecentList.length === 1 ? 'item' : 'items'}
                 </span>
               </div>
-              <p className="font-serif italic text-graphite text-sm mb-4">
-                Latest decisions from Principal.
-              </p>
               {financeRecentList.length === 0 ? (
                 <div className="border border-hairline rounded-md bg-surface p-6">
                   <p className="font-serif italic text-muted text-base">No recent actions.</p>
@@ -1244,9 +1232,6 @@ export default async function DashboardPage() {
       {alerts.length > 0 ? (
         <section className="mb-16">
           <h2 className="font-serif text-2xl text-ink mb-1">Alerts</h2>
-          <p className="font-serif italic text-graphite text-sm mb-4">
-            {alerts.length} item{alerts.length === 1 ? '' : 's'} to watch
-          </p>
           <div className="space-y-2">
             {alerts.map((alert, i) => (
               <div
@@ -1277,9 +1262,6 @@ export default async function DashboardPage() {
       {banks.length > 0 ? (
         <section className="mb-16">
           <h2 className="font-serif text-2xl text-ink mb-1">Bank Accounts</h2>
-          <p className="font-serif italic text-graphite text-sm mb-6">
-            HV operating accounts, <em>balance as of last executed payment</em>
-          </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {banks.map((b) => (
               <div
@@ -1314,9 +1296,6 @@ export default async function DashboardPage() {
       {/* ───────── Phase 2 — Billing + Dept Pool snapshot ───────── */}
       <section className="mb-16">
         <h2 className="font-serif text-2xl text-ink mb-1">Billing &amp; Dept Pool</h2>
-        <p className="font-serif italic text-graphite text-sm mb-6">
-          Unpaid invoices, dept pool totals, Marketing P&amp;L <em>this month</em>
-        </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="border border-hairline rounded-md bg-surface p-5">
@@ -1364,9 +1343,6 @@ export default async function DashboardPage() {
             Director Pool →
           </Link>
         </div>
-        <p className="font-serif italic text-graphite text-sm mb-6">
-          Monthly payroll plus the unified Director Pool: <em>saving + invoice accumulation</em>
-        </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="border border-hairline rounded-md bg-surface p-5">

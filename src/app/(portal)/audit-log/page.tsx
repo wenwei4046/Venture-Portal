@@ -44,10 +44,6 @@ export default async function AuditLogPage({ searchParams }: Props) {
             <em>I.</em> ADMIN · ACCESS AUDIT
           </div>
           <h1 className="page-title">Access Audit Log</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Tracks who viewed sensitive salary and director data.{' '}
-            <em>LHDN + internal governance compliance.</em>
-          </p>
         </div>
       </div>
 

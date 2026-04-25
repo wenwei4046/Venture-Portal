@@ -71,8 +71,7 @@ export default function EditStaffForm({ staff }: Props) {
   return (
     <form ref={formRef} action={handleSubmit} className="bg-surface border border-hairline rounded-md p-6 max-w-3xl">
       {/* Section 1 — Identity */}
-      <h3 className="font-serif text-lg text-ink mb-1">Identity</h3>
-      <p className="font-serif italic text-graphite text-sm mb-4">Name + department + employment window.</p>
+      <h3 className="font-serif text-lg text-ink mb-4">Identity</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div>
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Name</label>
@@ -151,10 +150,7 @@ export default function EditStaffForm({ staff }: Props) {
       </div>
 
       {/* Section 2 — Salary */}
-      <h3 className="font-serif text-lg text-ink mb-1">Salary</h3>
-      <p className="font-serif italic text-graphite text-sm mb-4">
-        Changing basic writes a row to <em>salary history</em>, effective first of next month.
-      </p>
+      <h3 className="font-serif text-lg text-ink mb-4">Salary</h3>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div>
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
@@ -199,10 +195,7 @@ export default function EditStaffForm({ staff }: Props) {
       </div>
 
       {/* Section 3 — Statutory categories */}
-      <h3 className="font-serif text-lg text-ink mb-1">Statutory</h3>
-      <p className="font-serif italic text-graphite text-sm mb-4">
-        Category-aware. Malaysian non-citizens typically use EPF Part C/E/F and SOCSO second. PCB depends on marital + children.
-      </p>
+      <h3 className="font-serif text-lg text-ink mb-4">Statutory</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div>
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">EPF Category</label>
@@ -269,10 +262,7 @@ export default function EditStaffForm({ staff }: Props) {
       </div>
 
       {/* Section 4 — Bank account (Spec 5) */}
-      <h3 className="font-serif text-lg text-ink mb-1">Bank account</h3>
-      <p className="font-serif italic text-graphite text-sm mb-4">
-        Receiving account for bulk salary transfers. Exported in the monthly bank-transfer CSV.
-      </p>
+      <h3 className="font-serif text-lg text-ink mb-4">Bank account</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div>
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
@@ -299,10 +289,7 @@ export default function EditStaffForm({ staff }: Props) {
       </div>
 
       {/* Section 5 — Contact */}
-      <h3 className="font-serif text-lg text-ink mb-1">Contact</h3>
-      <p className="font-serif italic text-graphite text-sm mb-4">
-        Personal phone, email, and address. Used for payslip delivery and HR records.
-      </p>
+      <h3 className="font-serif text-lg text-ink mb-4">Contact</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div>
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
@@ -339,10 +326,7 @@ export default function EditStaffForm({ staff }: Props) {
       </div>
 
       {/* Section 6 — Emergency Contact */}
-      <h3 className="font-serif text-lg text-ink mb-1">Emergency Contact</h3>
-      <p className="font-serif italic text-graphite text-sm mb-4">
-        Person to notify in case of emergency.
-      </p>
+      <h3 className="font-serif text-lg text-ink mb-4">Emergency Contact</h3>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div>
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Name</label>

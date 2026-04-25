@@ -44,9 +44,6 @@ export default function OverdueStagesSection({ stages }: Props) {
     <section className="bg-surface border border-hairline rounded-md p-6">
       <header className="mb-5">
         <h2 className="font-serif text-xl text-ink">Overdue Stages</h2>
-        <p className="font-serif italic text-graphite text-sm mt-0.5">
-          Days-overdue thresholds and penalty rates. Escalation stage has no upper bound.
-        </p>
       </header>
 
       <form action={handleSubmit} className="space-y-4">

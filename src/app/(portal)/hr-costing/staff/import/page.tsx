@@ -20,10 +20,6 @@ export default async function ImportStaffPage() {
             <em>I.</em> HR · STAFF · IMPORT
           </div>
           <h1 className="page-title">Import Staff from InfoTech</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Upload the <em>Active, Newly Joined &amp; Resigned Employees List</em> xlsx export.
-            Active + newly joined employees are imported; resigned rows are ignored.
-          </p>
         </div>
       </div>
 

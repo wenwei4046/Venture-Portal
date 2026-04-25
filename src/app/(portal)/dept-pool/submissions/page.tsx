@@ -58,9 +58,6 @@ export default async function PastMonthSubmissionsPage() {
             <em>I.</em> DEPARTMENTS · HR COST SUBMISSIONS
           </div>
           <h1 className="page-title">Past Month Submission</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Every HR cost snapshot submitted to Principal. Dept-level totals only — individual salaries are not shown here.
-          </p>
         </div>
       </div>
 

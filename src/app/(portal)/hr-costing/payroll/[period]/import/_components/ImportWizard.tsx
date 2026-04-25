@@ -81,10 +81,6 @@ export default function ImportWizard({ period }: Props) {
     return (
       <div className="bg-surface border border-hairline rounded-md p-8 max-w-2xl">
         <h2 className="font-serif text-xl text-ink mb-2">Upload InfoTech export</h2>
-        <p className="font-serif italic text-graphite text-sm mb-6">
-          Drop the xlsx file from InfoTech &mdash; <em>PayRoll Summary Detailed Report (By Department)</em>.
-          Columns are read by position, no mapping needed.
-        </p>
         <label className="block cursor-pointer border-2 border-dashed border-hairline hover:border-accent rounded-md p-10 text-center transition-colors">
           <input
             type="file"

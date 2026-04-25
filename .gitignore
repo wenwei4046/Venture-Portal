@@ -66,4 +66,6 @@ scripts/pcb-data.json
 .superpowers/
 qa-*.png
 motion-*.png
+spatial-*.png
+visual-*.png
 .gstack/
