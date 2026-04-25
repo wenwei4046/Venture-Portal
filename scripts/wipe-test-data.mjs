@@ -36,7 +36,6 @@ async function countAll() {
     'invoice_payout_pool',
     'dept_pools',
     'venture_pool',
-    'hv_operating_fund',
     'journal_lines',
     'journal_entries',
     'hr_staff_allocation',
@@ -44,6 +43,8 @@ async function countAll() {
     'hr_monthly_payroll',
     'hr_staff_costs',
     'service_contracts',
+    'payroll_payment_requests',
+    'payroll_runs',
     'config_audit_log',
   ]
   const counts = {}
@@ -104,7 +105,14 @@ async function main() {
   await deleteAll('invoices')
   await deleteAll('journal_entries')
 
-  // Step 5: approval_requests (now unreferenced)
+  // Step 5a: payroll_payment_requests + payroll_runs MUST go before approval_requests
+  // because payroll_runs.approval_id has FK to approval_requests; otherwise the
+  // approval_requests delete fails with: violates foreign key constraint
+  // "payroll_runs_approval_id_fkey".
+  await deleteAll('payroll_payment_requests')
+  await deleteAll('payroll_runs')
+
+  // Step 5b: approval_requests (now truly unreferenced)
   await deleteAll('approval_requests')
 
   // Step 6: standalone
@@ -112,7 +120,7 @@ async function main() {
   await deleteAll('monthly_headcounts')
   await deleteAll('director_ctc')
   await deleteAll('venture_pool')
-  await deleteAll('hv_operating_fund')
+  // hv_operating_fund table was dropped in mig 192 (cash ledger replaced by venture_pool).
 
   // Step 7: HR staff + contracts + config audit log (deep wipe)
   // FK order: allocation + salary_history first, then monthly_payroll,
