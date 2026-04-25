@@ -19,16 +19,27 @@
  *   Sub-total rows (between departments): "Sub Total:" in col 2
  *   Grand total row (last): "Grand Total:" in col 2
  *
- * Our mapping (InfoTech col → hr_monthly_payroll field):
+ * Our mapping (InfoTech col → hr_monthly_payroll field). Updated 2026-04-26
+ * (Bug 2, option γ+):
  *   col 1 Code          → matches hr_staff_costs.employee_code (primary match)
  *   col 2 Emp. Name     → matches hr_staff_costs.employee_name (fallback fuzzy)
- *   col 3 Tot. Sal      → basic_salary
+ *   col 3 Tot. Sal      → PARSED but NOT WRITTEN to DB. InfoTech's "Tot. Sal"
+ *                         is the total monthly payable (basic + fixed
+ *                         allowances ± EL deduction), not the contract basic.
+ *                         Writing it to basic_salary was overwriting the
+ *                         master contract value with a derived per-month
+ *                         number — wrong. basic_salary stays at the
+ *                         hr_staff_costs (master) value; HR edits it there
+ *                         when contracts genuinely change.
  *   col 4 OT Amt        → ot_amount
  *   col 7 Allowance Add → non_statutory_allowance
  *     (our schema treats InfoTech's "Allowance" as non-statutory; HR adjusts
  *      statutory_allowance manually on the grid if needed.)
- *   col 8 No Pay        → unpaid_leave_amount (informational, not stored; HR
- *                         can enter unpaid_leave_days on the grid).
+ *   col 8 No Pay        → unpaid_leave_days (NEW). The wizard converts the
+ *                         dollar amount into days using contract_basic and
+ *                         days_in_month: days = (noPay / basic) * dim. The
+ *                         DB trigger then pro-rates basic by the same days,
+ *                         so the EL deduction round-trips correctly.
  *   other cols (OT hours, Bonus, EPF/SOCSO/EIS values, PCB, NettWgs): NOT
  *     imported. DB trigger recomputes statutory + net from the inputs so
  *     the grid is always the source of truth.

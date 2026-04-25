@@ -26,10 +26,21 @@ function normalise(name: string): string {
  * Dry-run the InfoTech import: match each row to a staff record, compute the
  * diff against the period's hr_monthly_payroll row, report updates + skips.
  *
- * Only the three input fields InfoTech provides are touched:
- *   basic_salary            ← Tot. Sal
- *   ot_amount               ← OT Amt
- *   non_statutory_allowance ← Allowance Add
+ * Fields touched by import (user decision 2026-04-26, Bug 2 option γ+):
+ *   ot_amount               ← OT Amt              (col 4)
+ *   non_statutory_allowance ← Allowance Add       (col 7)
+ *   unpaid_leave_days       ← No Pay (col 8) → days conversion
+ *
+ * basic_salary is NEVER touched by import. It stays at the contract value
+ * from hr_staff_costs (master). Reason: InfoTech "Tot. Sal" (col 3) is
+ * the total monthly payable (basic + fixed allowances ± EL deduction),
+ * not the contract basic, so writing it back was overwriting good master
+ * data with a derived/dynamic value.
+ *
+ * No Pay → unpaid_leave_days conversion:
+ *   days = (noPayDeduction / contract_basic) * days_in_month
+ * The DB trigger (mig 122) then applies pro-rata using days_in_month
+ * (calendar days), so the round-trip is consistent.
  *
  * DB trigger then recomputes pro-rata + statutory + gross + net.
  */
@@ -43,13 +54,20 @@ export async function previewInfotechImport(
   const [{ data: staffList }, { data: payroll }] = await Promise.all([
     supabase
       .from('hr_staff_costs')
-      .select('id, employee_name, employee_code')
+      .select('id, employee_name, employee_code, basic_salary')
       .eq('status', 'active'),
     supabase
       .from('hr_monthly_payroll')
-      .select('id, staff_id, basic_salary, ot_amount, non_statutory_allowance')
+      .select('id, staff_id, ot_amount, non_statutory_allowance, unpaid_leave_days')
       .eq('period_month', period),
   ])
+
+  // days_in_month from the period (period is 'YYYY-MM-01').
+  // Matches mig 122's EXTRACT(DAY FROM v_period_end) so the round-trip
+  // (days → trigger pro-rata → effective basic) stays consistent.
+  const periodDate = new Date(period)
+  const lastDay = new Date(periodDate.getFullYear(), periodDate.getMonth() + 1, 0)
+  const daysInMonth = lastDay.getDate()
 
   const staff = staffList ?? []
   const payrollByStaff = new Map((payroll ?? []).map(p => [p.staff_id, p]))
@@ -68,7 +86,7 @@ export async function previewInfotechImport(
     const code = row.employeeCode
     const name = row.employeeName
 
-    let matched: { id: string; employee_name: string; employee_code: string | null } | undefined
+    let matched: { id: string; employee_name: string; employee_code: string | null; basic_salary: number } | undefined
     let matchedBy: 'employee_code' | 'employee_name_fuzzy' | null = null
 
     if (code) {
@@ -102,11 +120,19 @@ export async function previewInfotechImport(
       return
     }
 
+    // No Pay ($) → unpaid_leave_days conversion. Guard: zero contract basic
+    // means we can't divide — skip the leave update for that staff.
+    const contractBasic = Number(matched.basic_salary)
+    const incomingLeaveDays =
+      contractBasic > 0
+        ? Math.round((row.noPayDeduction / contractBasic) * daysInMonth * 100) / 100
+        : 0
+
     const changes: Array<{ field: string; from: number; to: number }> = []
     const deltas: Array<{ field: string; incoming: number; current: number }> = [
-      { field: 'basic_salary', incoming: row.basicSalary, current: Number(existing.basic_salary) },
       { field: 'ot_amount', incoming: row.otAmount, current: Number(existing.ot_amount) },
       { field: 'non_statutory_allowance', incoming: row.nonStatutoryAllowance, current: Number(existing.non_statutory_allowance) },
+      { field: 'unpaid_leave_days', incoming: incomingLeaveDays, current: Number(existing.unpaid_leave_days ?? 0) },
     ]
     for (const d of deltas) {
       if (Math.abs(d.incoming - d.current) < 0.005) continue
@@ -147,9 +173,9 @@ export async function applyInfotechImport(
   let updated = 0
   for (const item of preview.toUpdate) {
     const fields: Partial<{
-      basic_salary: number
       ot_amount: number
       non_statutory_allowance: number
+      unpaid_leave_days: number
     }> = {}
     for (const c of item.changes) {
       ;(fields as Record<string, number>)[c.field] = c.to
