@@ -343,21 +343,26 @@ select:focus {
    Pull money + tabular figures forward; push decoration back.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* Money / tabular numbers — the highest-priority pixels on every screen */
-.num,
-.num-hero {
-  font-family: var(--font-mono), 'JetBrains Mono', Menlo, monospace;
-  font-variant-numeric: tabular-nums slashed-zero;
-  color: rgb(var(--num-ink));
-  letter-spacing: 0;
+/* Money / tabular numbers — the highest-priority pixels on every screen.
+   Wrapped in @layer components so Tailwind utilities (text-ledger, text-danger,
+   text-lg, font-semibold, etc.) can override the base color/size/weight when
+   a page deliberately mixes them — sign-sensitive totals on the P&L need this. */
+@layer components {
+  .num,
+  .num-hero {
+    font-family: var(--font-mono), 'JetBrains Mono', Menlo, monospace;
+    font-variant-numeric: tabular-nums slashed-zero;
+    color: rgb(var(--num-ink));
+    letter-spacing: 0;
+  }
+  .num { font-weight: 500; font-size: 13.5px; }
+  .num-hero { font-weight: 400; font-size: 56px; line-height: 0.95; letter-spacing: -0.01em; }
+  .num.neg, .num-hero.neg { color: rgb(var(--danger)); }
+  /* Decoration (RM, %, /mo, cents) sits one tier back so the digit jumps */
+  .num .unit, .num .cents, .num-hero .unit, .num-hero .cents { color: rgb(var(--graphite)); font-weight: 400; }
+  .num-hero .cents { font-size: 28px; }
+  .num-hero .unit  { font-size: 22px; }
 }
-.num { font-weight: 500; font-size: 13.5px; }
-.num-hero { font-weight: 400; font-size: 56px; line-height: 0.95; letter-spacing: -0.01em; }
-.num.neg, .num-hero.neg { color: rgb(var(--danger)); }
-/* Decoration (RM, %, /mo, cents) sits one tier back so the digit jumps */
-.num .unit, .num .cents, .num-hero .unit, .num-hero .cents { color: rgb(var(--graphite)); font-weight: 400; }
-.num-hero .cents { font-size: 28px; }
-.num-hero .unit  { font-size: 22px; }
 
 /* Ledger table — surface panel + zebra + accent hover. Opt-in via class. */
 table.ledger-table {
@@ -393,16 +398,26 @@ table.ledger-table td {
 table.ledger-table td.num,
 table.ledger-table td.right { text-align: right; }
 
-/* Page header — eyebrow + accent rule under the title (newspaper editorial) */
+/* Page header — eyebrow + accent rule under the title (newspaper editorial).
+   Mobile-first: stack vertically so right-side action/control doesn't get
+   squeezed off-screen. At sm (640px) and above, switch to row alignment. */
 .page-head {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
   margin-bottom: 28px;
   padding-bottom: 18px;
   border-bottom: 1px solid rgb(var(--hairline));
   position: relative;
+}
+@media (min-width: 640px) {
+  .page-head {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+  }
 }
 .page-head::after {
   content: '';
