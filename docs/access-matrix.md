@@ -115,10 +115,10 @@ MODULE 7: DIRECTOR SALARY ENGINE
 查看 Invoice Payout Pool 余额	✅ 看	✅ 看	❌	❌
 Release Invoice Payout Pool	✅ 批	❌	❌	❌
 RLS 规则:
-`director_ctc` / `director_payouts` — Principal 和 HR 看完整明细，Finance 只能通过 aggregate view 看 total
+`director_ctc` / `director_payouts` — Principal 和 HR 看完整明细，Finance **完全没有** access（页面 + RPC 双重 block）
 `salary_pool` — Principal 和 HR 可读
-Finance 看到的是：本月 Director Salary Total Payout = RM XX,XXX（不看个别 Director 拆分）
-Finance 看到的 Director Salary Summary:
+Finance 看 Director 数据只能走 `/director-pool`，看到的是 aggregate Saving + Invoice bucket totals（不进 Director Salary 模块；per-director rollup 也只对 Principal 显示）
+Finance 在 `/director-pool` 看到的 aggregate:
 ```
 Director Salary — April 2025
   Total 75% Payroll (Net):     RM XX,XXX
@@ -299,7 +299,7 @@ NOTES FOR FORGE
 每个 API endpoint 必须检查 role — 不能只靠前端 UI 隐藏
 RLS 是第二道防线 — API 检查 + RLS 双重保护
 Finance 看 HR 数据必须走 aggregate view — 不能直接 query hr_staff_costs 表
-Finance 看 Director Salary 必须走 summary view — 不能看个别 Director 明细
+Finance 不能 access Director Salary 模块 — 只能走 /director-pool 看 Saving + Invoice bucket aggregate；per-director rollup 是 Principal-only
 所有写操作记录 created_by — audit trail
 Settings 修改记录 updated_by + updated_at — 知道谁改了什么
 Approval 是横切 — 任何需要审批的操作先写 approval_requests，Principal 批了才执行

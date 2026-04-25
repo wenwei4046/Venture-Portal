@@ -15,14 +15,17 @@ export function canAccessDeptPool(role: UserRole): boolean {
 }
 
 export function canAccessDirectorSalary(role: UserRole): boolean {
-  // Finance sees lump-sum only (via get_director_payout_summary RPC)
-  return role === 'principal' || role === 'hr' || role === 'finance'
+  // Director Salary engine — Principal + HR only.
+  // Finance is excluded; they see aggregated totals via /director-pool,
+  // never per-director salary detail (segregation of duties).
+  return role === 'principal' || role === 'hr'
 }
 
 export function canAccessDirectorPool(role: UserRole): boolean {
-  // Director Pool shows accumulated running balance — Principal + Finance only.
-  // HR sees current-month calculation via /director-salary but not the
-  // all-time pool balance.
+  // Director Pool shows accumulated running balance — Principal + Finance.
+  // HR is excluded; their visibility ends at the current-month calculation
+  // in /director-salary. Finance sees aggregate buckets only — per-director
+  // detail is gated to Principal inside the page.
   return role === 'principal' || role === 'finance'
 }
 

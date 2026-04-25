@@ -1,59 +1,40 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { canSeeIndividualSalary } from '@/lib/roles'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import dayjs from 'dayjs'
 import Link from 'next/link'
 import CTCInputGrid from './_components/CTCInputGrid'
 import ConfirmPayoutsButton from './_components/ConfirmPayoutsButton'
-import DirectorPinGate from '@/components/DirectorPinGate'
-import { isDirectorPinVerified } from './pin-actions'
 
 interface Props {
   searchParams: Promise<{ period?: string }>
 }
 
 export default async function DirectorSalaryPage({ searchParams }: Props) {
-  const user = await requireRole(['principal', 'hr', 'finance'])
-
-  // Finance needs PIN verification to access Director section
-  if (user.role === 'finance') {
-    const verified = await isDirectorPinVerified()
-    if (!verified) {
-      return <DirectorPinGate verified={false}><div /></DirectorPinGate>
-    }
-  }
+  await requireRole(['principal', 'hr'])
   const supabase = await createClient()
 
   const { period: rawPeriod } = await searchParams
   const period = dayjs(rawPeriod ?? getPeriodMonth()).startOf('month').format('YYYY-MM-DD')
   const periodLabel = dayjs(period).format('MMMM YYYY')
 
-  const isHROrPrincipal = canSeeIndividualSalary(user.role)
-
-  // Fetch data in parallel
   const [
     { data: directors },
     { data: companies },
     { data: ctcRows },
     { data: payouts },
-    { data: financeSummary },
+    { data: payoutSummary },
   ] = await Promise.all([
     supabase.from('directors').select('id, name, code, weightage, min_payout').eq('status', 'active').order('code'),
     supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('name'),
-    isHROrPrincipal
-      ? supabase.from('director_ctc').select('*').eq('period_month', period)
-      : Promise.resolve({ data: [] as never[] }),
-    isHROrPrincipal
-      ? supabase.from('director_payouts').select('*').eq('period_month', period).order('gross_amount', { ascending: false })
-      : Promise.resolve({ data: [] as never[] }),
+    supabase.from('director_ctc').select('*').eq('period_month', period),
+    supabase.from('director_payouts').select('*').eq('period_month', period).order('gross_amount', { ascending: false }),
     supabase.rpc('get_director_payout_summary', { p_period: period }),
   ])
 
   const hasPayouts = (payouts?.length ?? 0) > 0
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const summary = (financeSummary as any)?.[0] ?? null
-  // Finance doesn't fetch payouts directly — use summary count instead
+  const summary = (payoutSummary as any)?.[0] ?? null
   const hasSummaryData = summary && summary.out_payout_count > 0
 
   return (
@@ -125,60 +106,8 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
         </div>
       )}
 
-      {/* Finance view — lump sum only */}
-      {!isHROrPrincipal && (
-        <div>
-          {(!hasSummaryData) && (
-            <div className="py-16 text-center border border-hairline rounded-md bg-surface">
-              <p className="font-serif italic text-graphite text-lg mb-1">
-                本月尚未提交 Director Salary。
-              </p>
-              <p className="font-serif italic text-muted text-sm">
-                HR 计算完成后会在这里显示汇总数据。
-              </p>
-            </div>
-          )}
-
-          {hasSummaryData && summary && (
-            <section className="mb-16">
-              <h2 className="font-serif text-2xl text-ink mb-1">Statutory Remittance</h2>
-
-              <div className="border border-hairline rounded-md bg-surface p-5 space-y-3 max-w-xl">
-                <div className="flex items-baseline justify-between">
-                  <span className="font-serif italic text-sm text-graphite">EPF (ER+EE)</span>
-                  <span className="font-mono tabular text-sm font-medium text-ink">
-                    {formatMoney(Number(summary.out_total_epf_er) + Number(summary.out_total_epf_ee))}
-                  </span>
-                </div>
-                <div className="flex items-baseline justify-between">
-                  <span className="font-serif italic text-sm text-graphite">SOCSO (ER+EE)</span>
-                  <span className="font-mono tabular text-sm font-medium text-ink">
-                    {formatMoney(Number(summary.out_total_socso_er) + Number(summary.out_total_socso_ee))}
-                  </span>
-                </div>
-                <div className="flex items-baseline justify-between">
-                  <span className="font-serif italic text-sm text-graphite">EIS (ER+EE)</span>
-                  <span className="font-mono tabular text-sm font-medium text-ink">
-                    {formatMoney(Number(summary.out_total_eis_er) + Number(summary.out_total_eis_ee))}
-                  </span>
-                </div>
-                <div className="flex items-baseline justify-between">
-                  <span className="font-serif italic text-sm text-graphite">PCB</span>
-                  <span className="font-mono tabular text-sm font-medium text-ink">
-                    {formatMoney(Number(summary.out_total_pcb))}
-                  </span>
-                </div>
-              </div>
-            </section>
-          )}
-        </div>
-      )}
-
-      {/* HR / Principal view — CTC input + calculation */}
-      {isHROrPrincipal && (
-        <>
-          {/* CTC Input Section */}
-          <section className="mb-16">
+      {/* CTC Input Section */}
+      <section className="mb-16">
             <h2 className="font-serif text-2xl text-ink mb-1">CTC Input</h2>
 
             <CTCInputGrid
@@ -263,8 +192,6 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
               </div>
             </section>
           )}
-        </>
-      )}
     </div>
   )
 }

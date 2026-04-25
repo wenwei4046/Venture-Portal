@@ -7,6 +7,7 @@ import { isDirectorPinVerified } from '../director-salary/pin-actions'
 
 export default async function DirectorPoolPage() {
   const user = await requireRole(['principal', 'finance'])
+  const isPrincipal = user.role === 'principal'
 
   // Finance needs PIN verification
   if (user.role === 'finance') {
@@ -193,7 +194,8 @@ export default async function DirectorPoolPage() {
         )}
       </section>
 
-      {/* Director Invoice Pool */}
+      {/* Director Invoice Pool — per-director detail; Principal only */}
+      {isPrincipal && (
       <section className="mb-12">
         <h2 className="font-serif text-2xl text-ink mb-1">Director Invoice</h2>
 
@@ -279,6 +281,7 @@ export default async function DirectorPoolPage() {
           </div>
         )}
       </section>
+      )}
     </div>
   )
 }

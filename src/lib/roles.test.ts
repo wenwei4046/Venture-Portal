@@ -65,10 +65,10 @@ describe('canAccessHRCosting', () => {
 })
 
 describe('canAccessDirectorSalary', () => {
-  it('allows principal, hr, and finance (finance sees lump sum only)', () => {
+  it('allows principal and hr only (finance excluded — segregation of duties)', () => {
     expect(canAccessDirectorSalary('principal')).toBe(true)
     expect(canAccessDirectorSalary('hr')).toBe(true)
-    expect(canAccessDirectorSalary('finance')).toBe(true)
+    expect(canAccessDirectorSalary('finance')).toBe(false)
     expect(canAccessDirectorSalary('dept_manager')).toBe(false)
   })
 })
