@@ -468,7 +468,11 @@ export async function updatePaymentVoucher(formData: FormData) {
     }
   }
 
-  const { error: updErr } = await supabase
+  // .select() forces Supabase to return the matched rows so we can detect
+  // the TOCTOU race where Principal approves between our SELECT and UPDATE.
+  // Without this, UPDATE matches 0 rows (status no longer in our filter set)
+  // and updErr stays null — we'd silently corrupt the now-paid voucher.
+  const { data: updated, error: updErr } = await supabase
     .from('payment_vouchers')
     .update({
       amount,
@@ -483,8 +487,12 @@ export async function updatePaymentVoucher(formData: FormData) {
     })
     .eq('id', id)
     .in('status', ['pending_approval', 'draft'])
+    .select('id')
 
   if (updErr) throw new Error(`Failed to update voucher: ${updErr.message}`)
+  if (!updated || updated.length === 0) {
+    throw new Error('Voucher status changed mid-edit (already approved or voided) — refresh and try again')
+  }
 
   // Replace source rows. Mig 205: every voucher carries ≥1 PVS row;
   // sum must match amount; per-row override constraint enforced at DB.
@@ -527,8 +535,25 @@ export async function updatePaymentVoucher(formData: FormData) {
       throw new Error(`source rows sum (${sum.toFixed(2)}) does not match voucher amount (${amount.toFixed(2)})`)
     }
 
-    await supabase.from('payment_voucher_sources').delete().eq('voucher_id', id)
-    await supabase.from('payment_voucher_sources').insert(
+    // Replace source rows. Mig 221 broadens RLS to allow DELETE on
+    // pending_approval vouchers (was draft-only); confirm post-delete that
+    // the voucher truly has zero PVS rows before we INSERT — catches RLS
+    // regressions and any future status restriction.
+    const { error: delErr } = await supabase
+      .from('payment_voucher_sources')
+      .delete()
+      .eq('voucher_id', id)
+    if (delErr) throw new Error(`Failed to clear old source rows: ${delErr.message}`)
+
+    const { count: leftover } = await supabase
+      .from('payment_voucher_sources')
+      .select('*', { count: 'exact', head: true })
+      .eq('voucher_id', id)
+    if ((leftover ?? 0) > 0) {
+      throw new Error(`PVS RLS blocked delete (status=${current.status}) — ${leftover} stale rows remain. Apply mig 221 or contact Principal.`)
+    }
+
+    const { error: insErr } = await supabase.from('payment_voucher_sources').insert(
       rows.map(r => ({
         voucher_id: id,
         pool: r.pool,
@@ -539,16 +564,32 @@ export async function updatePaymentVoucher(formData: FormData) {
         override_reason: r.override_reason,
       })),
     )
+    if (insErr) throw new Error(`Failed to write new source rows: ${insErr.message}`)
   } else if (current.direction === 'credit') {
     if (!targetPool) throw new Error('Target pool is required for credit voucher')
     const categoryCode = (formData.get('category_code') as string)?.trim() || null
-    await supabase.from('payment_voucher_sources').delete().eq('voucher_id', id)
-    await supabase.from('payment_voucher_sources').insert({
+
+    const { error: delErr } = await supabase
+      .from('payment_voucher_sources')
+      .delete()
+      .eq('voucher_id', id)
+    if (delErr) throw new Error(`Failed to clear old source rows: ${delErr.message}`)
+
+    const { count: leftover } = await supabase
+      .from('payment_voucher_sources')
+      .select('*', { count: 'exact', head: true })
+      .eq('voucher_id', id)
+    if ((leftover ?? 0) > 0) {
+      throw new Error(`PVS RLS blocked delete (status=${current.status}) — ${leftover} stale rows remain.`)
+    }
+
+    const { error: insErr } = await supabase.from('payment_voucher_sources').insert({
       voucher_id: id,
       pool: targetPool,
       amount,
       category_code: categoryCode,
     })
+    if (insErr) throw new Error(`Failed to write new source rows: ${insErr.message}`)
   }
 
   // Audit trail: who edited (best-effort — schema mismatch shouldn't block edit)
