@@ -8,6 +8,9 @@ import { requireRole } from '@/lib/auth'
 import { postJournalEntry, r2 } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
 
+const VALID_ACCOUNT_TYPES = ['asset', 'liability', 'equity', 'revenue', 'expense'] as const
+type AccountType = (typeof VALID_ACCOUNT_TYPES)[number]
+
 // ─── Create payment voucher (Finance) ────────────────────────────────────────
 
 export async function createPaymentVoucher(formData: FormData) {
@@ -177,18 +180,45 @@ export async function createPaymentVoucher(formData: FormData) {
   // CREDIT: synthetic single row (pool = target_pool, amount = voucher amount).
   if (direction === 'debit') {
     const rowCount = parseInt((formData.get('source_rows_count') as string) ?? '0', 10)
-    const rows: { pool: string; amount: number; category_code: string | null }[] = []
+    const rows: {
+      pool: string
+      amount: number
+      category_code: string | null
+      override_account_type: AccountType | null
+      override_gl_account_code: string | null
+      override_reason: string | null
+    }[] = []
     if (rowCount > 0) {
       for (let i = 0; i < rowCount; i++) {
         const pool = (formData.get(`source_rows[${i}][pool]`) as string)?.trim() ?? ''
         const amt = parseFloat((formData.get(`source_rows[${i}][amount]`) as string) ?? '0')
         const cat = (formData.get(`source_rows[${i}][category_code]`) as string)?.trim() || null
-        if (pool && amt > 0) rows.push({ pool, amount: amt, category_code: cat })
+        const ovType = (formData.get(`source_rows[${i}][override_account_type]`) as string)?.trim() ?? ''
+        const ovGl   = (formData.get(`source_rows[${i}][override_gl_account_code]`) as string)?.trim() ?? ''
+        const ovRsn  = (formData.get(`source_rows[${i}][override_reason]`) as string)?.trim() ?? ''
+        const isOverride = !!ovType && !!ovGl && !!ovRsn
+        if (!isOverride && (ovType || ovGl || ovRsn)) {
+          throw new Error(`source row ${i + 1}: override requires account type, GL, AND reason — fill all three or clear all`)
+        }
+        if (isOverride && !VALID_ACCOUNT_TYPES.includes(ovType as AccountType)) {
+          throw new Error(`source row ${i + 1}: invalid override account type "${ovType}"`)
+        }
+        if (pool && amt > 0) {
+          rows.push({
+            pool, amount: amt, category_code: cat,
+            override_account_type: isOverride ? (ovType as AccountType) : null,
+            override_gl_account_code: isOverride ? ovGl : null,
+            override_reason: isOverride ? ovRsn : null,
+          })
+        }
       }
     } else if (sourcePool) {
       // Legacy single-source form path — category falls back to the voucher-level
       // field name still sent by older UIs.
-      rows.push({ pool: sourcePool, amount, category_code: categoryCode })
+      rows.push({
+        pool: sourcePool, amount, category_code: categoryCode,
+        override_account_type: null, override_gl_account_code: null, override_reason: null,
+      })
     }
     if (rows.length > 0) {
       const sum = rows.reduce((s, r) => s + r.amount, 0)
@@ -201,7 +231,10 @@ export async function createPaymentVoucher(formData: FormData) {
           pool: r.pool,
           amount: r.amount,
           category_code: r.category_code,
-        }))
+          override_account_type: r.override_account_type,
+          override_gl_account_code: r.override_gl_account_code,
+          override_reason: r.override_reason,
+        })),
       )
     }
   } else if (direction === 'credit' && targetPool) {
@@ -423,6 +456,9 @@ export async function voidVoucher(formData: FormData) {
 }
 
 // ─── Create payment category (Finance) ──────────────────────────────────────
+// Mig 214 enforces an account_type (BS vs P&L) and a GL account on every
+// category so journal_entries route correctly. Both are required — no more
+// silently-NULL categories that fall back to coarse voucher_type GL routing.
 
 export async function createPaymentCategory(formData: FormData) {
   await requireRole(['finance', 'principal'])
@@ -430,15 +466,81 @@ export async function createPaymentCategory(formData: FormData) {
 
   const code = (formData.get('code') as string)?.trim() ?? ''
   const label = (formData.get('label') as string)?.trim() ?? ''
+  const accountType = (formData.get('account_type') as string)?.trim() as AccountType
+  const glAccountCode = (formData.get('gl_account_code') as string)?.trim() ?? ''
 
   if (!code || !label) throw new Error('Code and label are required')
+  if (!accountType || !VALID_ACCOUNT_TYPES.includes(accountType)) {
+    throw new Error('Account type is required (asset / liability / equity / revenue / expense)')
+  }
+  if (!glAccountCode) throw new Error('GL account code is required')
+
+  // Defence-in-depth: verify GL exists and its type matches account_type
+  const { data: gl } = await supabase
+    .from('chart_of_accounts')
+    .select('code, type')
+    .eq('code', glAccountCode)
+    .maybeSingle()
+  if (!gl) throw new Error(`GL account ${glAccountCode} does not exist`)
+  if (gl.type !== accountType) {
+    throw new Error(
+      `GL account ${glAccountCode} is type "${gl.type}" but category was tagged "${accountType}". They must match.`,
+    )
+  }
 
   const { error } = await supabase
     .from('payment_categories')
-    .upsert({ code, label, is_active: true }, { onConflict: 'code' })
+    .upsert(
+      { code, label, account_type: accountType, gl_account_code: glAccountCode, is_active: true },
+      { onConflict: 'code' },
+    )
 
   if (error) throw new Error(`Failed to create category: ${error.message}`)
 
+  revalidatePath('/payments/new')
+  revalidatePath('/settings?tab=categories')
+}
+
+export async function updatePaymentCategory(formData: FormData) {
+  await requireRole(['finance', 'principal'])
+  const supabase = await createClient()
+
+  const code = (formData.get('code') as string)?.trim() ?? ''
+  const label = (formData.get('label') as string)?.trim() ?? ''
+  const accountType = (formData.get('account_type') as string)?.trim() as AccountType
+  const glAccountCode = (formData.get('gl_account_code') as string)?.trim() ?? ''
+  const isActiveRaw = (formData.get('is_active') as string) ?? 'true'
+
+  if (!code) throw new Error('Code is required')
+  if (!label) throw new Error('Label is required')
+  if (!accountType || !VALID_ACCOUNT_TYPES.includes(accountType)) {
+    throw new Error('Account type is required')
+  }
+  if (!glAccountCode) throw new Error('GL account code is required')
+
+  const { data: gl } = await supabase
+    .from('chart_of_accounts')
+    .select('code, type')
+    .eq('code', glAccountCode)
+    .maybeSingle()
+  if (!gl) throw new Error(`GL account ${glAccountCode} does not exist`)
+  if (gl.type !== accountType) {
+    throw new Error(`GL account ${glAccountCode} type "${gl.type}" mismatches category "${accountType}"`)
+  }
+
+  const { error } = await supabase
+    .from('payment_categories')
+    .update({
+      label,
+      account_type: accountType,
+      gl_account_code: glAccountCode,
+      is_active: isActiveRaw === 'true',
+    })
+    .eq('code', code)
+
+  if (error) throw new Error(`Failed to update category: ${error.message}`)
+
+  revalidatePath('/settings?tab=categories')
   revalidatePath('/payments/new')
 }
 

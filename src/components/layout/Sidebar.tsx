@@ -14,6 +14,7 @@ import {
   canAccessHRCosting,
   canAccessReports,
   canAccessSettings,
+  canAccessCategories,
   canApprove,
 } from '@/lib/roles'
 
@@ -103,7 +104,8 @@ const navEntries: NavEntry[] = [
   // ── Reports & Admin ──
   { href: '/reports', label: 'Reports', section: 'Reports & Admin', visible: canAccessReports },
   { href: '/audit-log', label: 'Audit Log', section: 'Reports & Admin', visible: canAccessSettings },
-  { href: '/settings', label: 'Settings', section: 'Reports & Admin', visible: canAccessSettings },
+  // Finance lands on the Categories tab (the only one they can edit); Principal sees all tabs.
+  { href: '/settings', label: 'Settings', section: 'Reports & Admin', visible: canAccessCategories },
 ]
 
 interface SidebarProps {

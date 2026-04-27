@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { createPaymentVoucher, createPaymentCategory } from '../actions'
+import { createPaymentVoucher } from '../actions'
 
 interface InvoicePreset {
   id: string
@@ -33,13 +33,37 @@ interface PayableFundSource {
   remaining_periods: number
 }
 
+type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense'
+
+interface Category {
+  code: string
+  label: string
+  account_type: AccountType | null
+  gl_account_code: string | null
+}
+
+interface GlAccount {
+  code: string
+  name: string
+  type: AccountType
+}
+
 interface Props {
   companies: { id: string; name: string; short_code: string }[]
   bankAccounts: { id: string; bank_name: string; account_number: string; current_balance: number }[]
-  categories: { code: string; label: string }[]
+  categories: Category[]
+  glAccounts: GlAccount[]
   invoicePreset?: InvoicePreset | null
   nonBillablePreset?: boolean
   payableFundSources?: PayableFundSource[]
+}
+
+const TYPE_BADGE: Record<AccountType, { label: string; className: string }> = {
+  asset:     { label: 'BS · Asset',     className: 'text-info' },
+  liability: { label: 'BS · Liability', className: 'text-info' },
+  equity:    { label: 'BS · Equity',    className: 'text-info' },
+  revenue:   { label: 'P&L · Revenue',  className: 'text-ledger' },
+  expense:   { label: 'P&L · Expense',  className: 'text-danger' },
 }
 
 const POOL_OPTIONS = [
@@ -63,9 +87,12 @@ interface SourceRow {
   pool: string
   amount: string
   category_code: string
+  override_account_type?: AccountType | ''
+  override_gl_account_code?: string
+  override_reason?: string
 }
 
-export default function NewPaymentForm({ companies, bankAccounts, categories, invoicePreset, nonBillablePreset, payableFundSources = [] }: Props) {
+export default function NewPaymentForm({ companies, bankAccounts, categories, glAccounts, invoicePreset, nonBillablePreset, payableFundSources = [] }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const isInvoicePay = !!invoicePreset
@@ -98,9 +125,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
     isInvoicePay ? invoicePreset!.target_pool : direction === 'credit' ? 'venture_pool' : ''
   )
   const [files, setFiles] = useState<File[]>([])
-  const [showNewCategory, setShowNewCategory] = useState(categories.length === 0)
-  const [newCatLabel, setNewCatLabel] = useState('')
-  const [catList, setCatList] = useState(categories)
+  const [catList] = useState(categories)
   const formRef = useRef<HTMLFormElement>(null)
 
   const totalAmount = parseFloat(amount) || 0
@@ -199,11 +224,21 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
     formData.delete('source_pool') // replaced by source_rows for debit
     if (direction === 'debit') {
       formData.set('source_rows_count', String(sourceRows.length))
-      sourceRows.forEach((r, i) => {
+      for (let i = 0; i < sourceRows.length; i++) {
+        const r = sourceRows[i]
         formData.set(`source_rows[${i}][pool]`, r.pool)
         formData.set(`source_rows[${i}][amount]`, r.amount)
         formData.set(`source_rows[${i}][category_code]`, r.category_code)
-      })
+        // Per-row BS/PL + GL override (mig 218). All-or-none guard at DB level.
+        if (r.override_account_type && r.override_gl_account_code && r.override_reason?.trim()) {
+          formData.set(`source_rows[${i}][override_account_type]`, r.override_account_type)
+          formData.set(`source_rows[${i}][override_gl_account_code]`, r.override_gl_account_code)
+          formData.set(`source_rows[${i}][override_reason]`, r.override_reason.trim())
+        } else if (r.override_account_type || r.override_gl_account_code || r.override_reason) {
+          setError(`Source row ${i + 1}: override requires account type, GL account, AND reason — fill all three or clear all.`)
+          return
+        }
+      }
       // Back-compat: write source_pool = first row's pool (Step 16 drops this)
       formData.set('source_pool', sourceRows[0]?.pool ?? '')
     }
@@ -519,9 +554,21 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
               <div className="w-6"></div>
             </div>
           ) : null}
-          <div className="space-y-2">
-            {sourceRows.map((row, i) => (
-              <div key={i} className="flex gap-2 items-start">
+          <div className="space-y-3">
+            {sourceRows.map((row, i) => {
+              const cat = catList.find((c) => c.code === row.category_code)
+              const derivedType = cat?.account_type ?? null
+              const derivedGl = cat?.gl_account_code ?? null
+              const hasOverride = !!row.override_account_type
+              const effType = (row.override_account_type || derivedType) as AccountType | null
+              const effGl = row.override_gl_account_code || derivedGl
+              const effGlName = glAccounts.find((g) => g.code === effGl)?.name
+              const overrideGlOptions = row.override_account_type
+                ? glAccounts.filter((g) => g.type === row.override_account_type)
+                : []
+              return (
+              <div key={i} className="border border-hairline rounded-md p-3 bg-surface">
+                <div className="flex gap-2 items-start">
                 <select
                   value={row.pool}
                   onChange={(e) => {
@@ -583,8 +630,89 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
                 ) : (
                   <div className="w-6" />
                 )}
+                </div>
+                {/* BS/PL preview + override (mig 218 / Option B) */}
+                {row.category_code && !isLoanRepayment ? (
+                  <div className="mt-2 flex items-baseline justify-between gap-3">
+                    <div className="text-xs font-mono">
+                      {effType ? (
+                        <span className={TYPE_BADGE[effType].className}>
+                          → {TYPE_BADGE[effType].label} · {effGl ?? '—'}
+                          {effGlName ? <span className="text-muted ml-1">({effGlName})</span> : null}
+                          {hasOverride ? (
+                            <span className="ml-2 text-alert font-serif italic">overridden</span>
+                          ) : null}
+                        </span>
+                      ) : (
+                        <span className="text-danger italic font-serif">
+                          Category has no BS/PL classification — fix in Settings
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = [...sourceRows]
+                        if (hasOverride) {
+                          next[i] = { ...next[i], override_account_type: '', override_gl_account_code: '', override_reason: '' }
+                        } else {
+                          next[i] = { ...next[i], override_account_type: derivedType ?? 'expense', override_gl_account_code: derivedGl ?? '', override_reason: '' }
+                        }
+                        setSourceRows(next)
+                      }}
+                      className="text-xs text-graphite hover:text-accent font-serif italic"
+                    >
+                      {hasOverride ? 'Clear override' : 'Override'}
+                    </button>
+                  </div>
+                ) : null}
+                {hasOverride ? (
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 border border-alert/40 bg-alert/5 rounded">
+                    <select
+                      value={row.override_account_type}
+                      onChange={(e) => {
+                        const next = [...sourceRows]
+                        next[i] = { ...next[i], override_account_type: e.target.value as AccountType, override_gl_account_code: '' }
+                        setSourceRows(next)
+                      }}
+                      className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+                    >
+                      <option value="asset">BS · Asset</option>
+                      <option value="liability">BS · Liability</option>
+                      <option value="equity">BS · Equity</option>
+                      <option value="revenue">P&L · Revenue</option>
+                      <option value="expense">P&L · Expense</option>
+                    </select>
+                    <select
+                      value={row.override_gl_account_code ?? ''}
+                      onChange={(e) => {
+                        const next = [...sourceRows]
+                        next[i] = { ...next[i], override_gl_account_code: e.target.value }
+                        setSourceRows(next)
+                      }}
+                      className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+                    >
+                      <option value="">Select GL…</option>
+                      {overrideGlOptions.map((g) => (
+                        <option key={g.code} value={g.code}>{g.code} — {g.name}</option>
+                      ))}
+                    </select>
+                    <textarea
+                      value={row.override_reason ?? ''}
+                      onChange={(e) => {
+                        const next = [...sourceRows]
+                        next[i] = { ...next[i], override_reason: e.target.value }
+                        setSourceRows(next)
+                      }}
+                      placeholder="Reason for override (required — auditor will see this)"
+                      rows={2}
+                      className="sm:col-span-2 px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+                    />
+                  </div>
+                ) : null}
               </div>
-            ))}
+              )
+            })}
           </div>
           {totalAmount > 0 ? (
             <p className={`font-mono italic text-xs mt-2 ${sourceSumMismatch ? 'text-danger' : 'text-ledger'}`}>
@@ -634,50 +762,14 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, in
           <label className="block text-sm font-sans font-medium text-graphite">
             {direction === 'credit' ? 'Category' : 'Manage categories'}
           </label>
-          <button
-            type="button"
-            onClick={() => setShowNewCategory(!showNewCategory)}
+          <Link
+            href="/settings?tab=categories"
+            target="_blank"
             className="text-xs text-accent hover:text-accent-hover font-serif italic"
           >
-            {showNewCategory ? 'Cancel' : '+ Create new'}
-          </button>
+            Manage in Settings →
+          </Link>
         </div>
-
-        {showNewCategory ? (
-          <div className="flex gap-2 mb-2">
-            <input
-              type="text"
-              value={newCatLabel}
-              onChange={(e) => setNewCatLabel(e.target.value)}
-              placeholder="e.g. Logistics, Insurance..."
-              className="flex-1 px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-            />
-            <button
-              type="button"
-              onClick={async () => {
-                if (!newCatLabel.trim()) return
-                const code = newCatLabel.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_')
-                const fd = new FormData()
-                fd.set('code', code)
-                fd.set('label', newCatLabel.trim())
-                try {
-                  await createPaymentCategory(fd)
-                  setCatList((prev) => [...prev, { code, label: newCatLabel.trim() }])
-                  setCategoryCode(code)
-                  setNewCatLabel('')
-                  setShowNewCategory(false)
-                } catch {
-                  // ignore — category might already exist
-                  setCategoryCode(code)
-                  setShowNewCategory(false)
-                }
-              }}
-              className="px-3 py-2 bg-accent text-white text-sm font-serif italic rounded-md hover:bg-accent-hover"
-            >
-              Add
-            </button>
-          </div>
-        ) : null}
 
         {direction === 'credit' ? (
           catList.length === 0 ? (

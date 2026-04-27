@@ -5,6 +5,7 @@ export type Json =
   | null
   | { [key: string]: Json | undefined }
   | Json[]
+
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
@@ -2078,6 +2079,7 @@ export type Database = {
           reference_id: string | null
           reference_type: string | null
           reversed_by_id: string | null
+          segment: Database["public"]["Enums"]["gl_segment"]
           total_amount: number
           transaction_date: string
         }
@@ -2092,6 +2094,7 @@ export type Database = {
           reference_id?: string | null
           reference_type?: string | null
           reversed_by_id?: string | null
+          segment?: Database["public"]["Enums"]["gl_segment"]
           total_amount: number
           transaction_date: string
         }
@@ -2106,6 +2109,7 @@ export type Database = {
           reference_id?: string | null
           reference_type?: string | null
           reversed_by_id?: string | null
+          segment?: Database["public"]["Enums"]["gl_segment"]
           total_amount?: number
           transaction_date?: string
         }
@@ -2551,6 +2555,7 @@ export type Database = {
       }
       payment_categories: {
         Row: {
+          account_type: Database["public"]["Enums"]["account_type"] | null
           code: string
           created_at: string
           created_by: string | null
@@ -2561,6 +2566,7 @@ export type Database = {
           sort_order: number
         }
         Insert: {
+          account_type?: Database["public"]["Enums"]["account_type"] | null
           code: string
           created_at?: string
           created_by?: string | null
@@ -2571,6 +2577,7 @@ export type Database = {
           sort_order?: number
         }
         Update: {
+          account_type?: Database["public"]["Enums"]["account_type"] | null
           code?: string
           created_at?: string
           created_by?: string | null
@@ -2603,6 +2610,11 @@ export type Database = {
           category_code: string | null
           created_at: string
           id: string
+          override_account_type:
+            | Database["public"]["Enums"]["account_type"]
+            | null
+          override_gl_account_code: string | null
+          override_reason: string | null
           pool: string
           voucher_id: string
         }
@@ -2611,6 +2623,11 @@ export type Database = {
           category_code?: string | null
           created_at?: string
           id?: string
+          override_account_type?:
+            | Database["public"]["Enums"]["account_type"]
+            | null
+          override_gl_account_code?: string | null
+          override_reason?: string | null
           pool: string
           voucher_id: string
         }
@@ -2619,6 +2636,11 @@ export type Database = {
           category_code?: string | null
           created_at?: string
           id?: string
+          override_account_type?:
+            | Database["public"]["Enums"]["account_type"]
+            | null
+          override_gl_account_code?: string | null
+          override_reason?: string | null
           pool?: string
           voucher_id?: string
         }
@@ -2628,6 +2650,13 @@ export type Database = {
             columns: ["category_code"]
             isOneToOne: false
             referencedRelation: "payment_categories"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "payment_voucher_sources_override_gl_account_code_fkey"
+            columns: ["override_gl_account_code"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
             referencedColumns: ["code"]
           },
           {
@@ -3771,6 +3800,10 @@ export type Database = {
           voucher_no: string
         }[]
       }
+      billing_mode_to_segment: {
+        Args: { p_mode: string }
+        Returns: Database["public"]["Enums"]["gl_segment"]
+      }
       build_hr_cost_submission_payload: {
         Args: { p_period: string }
         Returns: {
@@ -3842,6 +3875,14 @@ export type Database = {
       }
       dashboard_summary: { Args: never; Returns: Json }
       dept_pool_gl_code: { Args: { p_dept_name: string }; Returns: string }
+      dept_to_segment: {
+        Args: { p_dept_name: string }
+        Returns: Database["public"]["Enums"]["gl_segment"]
+      }
+      derive_journal_segment: {
+        Args: { p_reference_id: string; p_reference_type: string }
+        Returns: Database["public"]["Enums"]["gl_segment"]
+      }
       format_invoice_no: { Args: { p_period: string }; Returns: string }
       generate_invoices_from_request: {
         Args: { p_request_id: string }
@@ -4031,6 +4072,7 @@ export type Database = {
           p_lines: Json
           p_reference_id: string
           p_reference_type: string
+          p_segment?: Database["public"]["Enums"]["gl_segment"]
           p_transaction_date: string
         }
         Returns: string
@@ -4139,6 +4181,14 @@ export type Database = {
         | "director_loan"
         | "department_pool"
         | "director_saving"
+      gl_segment:
+        | "treasury"
+        | "marketing"
+        | "hr"
+        | "finance"
+        | "director_office"
+        | "corporate"
+        | "unallocated"
       hr_employment_type: "salaried" | "commission_eligible"
       hr_monthly_payroll_source: "imported" | "manual" | "carried_forward"
       hr_monthly_payroll_status: "draft" | "submitted" | "paid"
@@ -4201,8 +4251,11 @@ export type Database = {
     }
   }
 }
+
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
 type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
@@ -4231,6 +4284,7 @@ export type Tables<
       ? R
       : never
     : never
+
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
@@ -4255,6 +4309,7 @@ export type TablesInsert<
       ? I
       : never
     : never
+
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
@@ -4279,6 +4334,7 @@ export type TablesUpdate<
       ? U
       : never
     : never
+
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
@@ -4295,6 +4351,7 @@ export type Enums<
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
+
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
@@ -4311,6 +4368,7 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+
 export const Constants = {
   public: {
     Enums: {
@@ -4384,6 +4442,15 @@ export const Constants = {
         "director_loan",
         "department_pool",
         "director_saving",
+      ],
+      gl_segment: [
+        "treasury",
+        "marketing",
+        "hr",
+        "finance",
+        "director_office",
+        "corporate",
+        "unallocated",
       ],
       hr_employment_type: ["salaried", "commission_eligible"],
       hr_monthly_payroll_source: ["imported", "manual", "carried_forward"],

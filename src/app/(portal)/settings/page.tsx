@@ -10,10 +10,11 @@ import DirectorSalarySection from './_components/DirectorSalarySection'
 import BaseRateSimulator from './_components/BaseRateSimulator'
 import BankAccountsSection from './_components/BankAccountsSection'
 import CompaniesSection from './_components/CompaniesSection'
+import CategoriesSection from './_components/CategoriesSection'
 import PeriodsSection from './_components/PeriodsSection'
 import SettingsTabs, { type SettingsTab } from './_components/SettingsTabs'
 
-const VALID_TABS: SettingsTab[] = ['treasury', 'overdue', 'splits', 'directors', 'companies', 'banks', 'periods', 'simulator']
+const VALID_TABS: SettingsTab[] = ['treasury', 'overdue', 'splits', 'directors', 'companies', 'banks', 'categories', 'periods', 'simulator']
 function isValidTab(s: string | undefined): s is SettingsTab {
   return !!s && (VALID_TABS as string[]).includes(s)
 }
@@ -30,10 +31,20 @@ interface Props {
 }
 
 export default async function SettingsPage({ searchParams }: Props) {
-  await requireRole(['principal'])
+  // Finance is allowed in for the Categories tab only — every other tab
+  // re-checks role inside the conditional below and renders nothing for
+  // non-Principal. SettingsTabs hides the disallowed tabs from the rail.
+  const user = await requireRole(['principal', 'finance'])
+  const isPrincipal = user.role === 'principal'
 
   const { tab: rawTab } = await searchParams
-  const activeTab: SettingsTab = isValidTab(rawTab) ? rawTab : 'treasury'
+  const defaultTab: SettingsTab = isPrincipal ? 'treasury' : 'categories'
+  const activeTab: SettingsTab = isValidTab(rawTab) ? rawTab : defaultTab
+
+  // Finance hitting a Principal-only tab via direct URL falls back to Categories.
+  const activeTabResolved: SettingsTab = !isPrincipal && activeTab !== 'categories'
+    ? 'categories'
+    : activeTab
 
   const supabase = await createClient()
 
@@ -48,6 +59,8 @@ export default async function SettingsPage({ searchParams }: Props) {
     { data: latestBaseRate },
     { data: bankAccountRows },
     { data: periodLockRows },
+    { data: categoryRows },
+    { data: glRows },
   ] = await Promise.all([
     supabase.from('treasury_config').select('*'),
     supabase.from('overdue_config').select('*'),
@@ -59,6 +72,8 @@ export default async function SettingsPage({ searchParams }: Props) {
     supabase.from('base_rate_history').select('weighted_cost, op_margin, base_rate').order('approved_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('bank_accounts').select('*').order('is_primary', { ascending: false }),
     supabase.from('period_locks').select('period_month, is_locked, closed_at, notes').order('period_month', { ascending: false }),
+    supabase.from('payment_categories').select('code, label, account_type, gl_account_code, is_active').order('sort_order').order('label'),
+    supabase.from('chart_of_accounts').select('code, name, type').eq('is_active', true).order('code'),
   ])
 
   const treasury = (treasuryRows ?? []) as TreasuryConfig[]
@@ -94,21 +109,21 @@ export default async function SettingsPage({ searchParams }: Props) {
       </div>
 
       <Suspense fallback={null}>
-        <SettingsTabs active={activeTab} />
+        <SettingsTabs active={activeTabResolved} role={user.role} />
       </Suspense>
 
-      {activeTab === 'treasury' && (
+      {activeTabResolved === 'treasury' && (
         <TreasuryConfigSection
           opMargin={opMargin}
           savingRate={savingRate}
         />
       )}
 
-      {activeTab === 'overdue' && (
+      {activeTabResolved === 'overdue' && (
         <OverdueStagesSection stages={overdueStages} />
       )}
 
-      {activeTab === 'splits' && (
+      {activeTabResolved === 'splits' && (
         <div className="space-y-6">
           <RentSplitSection
             companies={companies.map((c) => ({
@@ -129,7 +144,7 @@ export default async function SettingsPage({ searchParams }: Props) {
         </div>
       )}
 
-      {activeTab === 'directors' && (
+      {activeTabResolved === 'directors' && (
         <DirectorSalarySection
           directors={(directorRows ?? []).map((d) => ({
             id: d.id,
@@ -141,7 +156,7 @@ export default async function SettingsPage({ searchParams }: Props) {
         />
       )}
 
-      {activeTab === 'companies' && (
+      {activeTabResolved === 'companies' && (
         <CompaniesSection
           companies={companies.map((c) => ({
             id: c.id,
@@ -152,7 +167,7 @@ export default async function SettingsPage({ searchParams }: Props) {
         />
       )}
 
-      {activeTab === 'banks' && (
+      {activeTabResolved === 'banks' && (
         <BankAccountsSection
           accounts={(bankAccountRows ?? []).map((a) => ({
             id: a.id,
@@ -170,7 +185,24 @@ export default async function SettingsPage({ searchParams }: Props) {
         />
       )}
 
-      {activeTab === 'periods' && (
+      {activeTabResolved === 'categories' && (
+        <CategoriesSection
+          categories={(categoryRows ?? []).map((c) => ({
+            code: c.code,
+            label: c.label,
+            account_type: c.account_type as 'asset' | 'liability' | 'equity' | 'revenue' | 'expense' | null,
+            gl_account_code: c.gl_account_code,
+            is_active: c.is_active,
+          }))}
+          glAccounts={(glRows ?? []).map((g) => ({
+            code: g.code,
+            name: g.name,
+            type: g.type as 'asset' | 'liability' | 'equity' | 'revenue' | 'expense',
+          }))}
+        />
+      )}
+
+      {activeTabResolved === 'periods' && (
         <PeriodsSection
           locks={(periodLockRows ?? []).map((l) => ({
             period_month: l.period_month,
@@ -181,7 +213,7 @@ export default async function SettingsPage({ searchParams }: Props) {
         />
       )}
 
-      {activeTab === 'simulator' && (
+      {activeTabResolved === 'simulator' && (
         <BaseRateSimulator
           currentPaidCapital={(fundSourceRows ?? []).reduce((s, f) => s + Number(f.amount), 0)}
           currentWeightedCost={Number(latestBaseRate?.weighted_cost ?? 0)}

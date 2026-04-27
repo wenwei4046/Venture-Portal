@@ -48,6 +48,13 @@ export function canAccessSettings(role: UserRole): boolean {
   return role === 'principal'
 }
 
+// Categories drive GL routing for every PV — Finance creates PVs all day so
+// they need to add/edit categories themselves rather than blocking on Principal.
+// Principal still sees all Settings tabs; Finance only sees Categories.
+export function canAccessCategories(role: UserRole): boolean {
+  return role === 'principal' || role === 'finance'
+}
+
 export function canApprove(role: UserRole): boolean {
   return role === 'principal'
 }

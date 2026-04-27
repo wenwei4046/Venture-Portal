@@ -3,9 +3,24 @@ import Link from 'next/link'
 
 const reports = [
   {
-    href: '/reports/pnl',
-    title: 'HV Profit & Loss',
-    description: 'Monthly view. Bank model: treasury spread, marketing, shared services bill-back.',
+    href: '/reports/income-statement',
+    title: 'Income Statement',
+    description: 'Company-wide P&L from the general ledger. Revenue − Expenses = Net Profit.',
+  },
+  {
+    href: '/reports/segment-pnl',
+    title: 'Segment P&L',
+    description: 'Same GL pivoted by segment (Treasury / Marketing / HR / Finance / Director Office). Tallies to Income Statement.',
+  },
+  {
+    href: '/reports/balance-sheet',
+    title: 'Balance Sheet',
+    description: 'Assets, Liabilities, Equity at a point in time. Includes YTD retained earnings.',
+  },
+  {
+    href: '/reports/cash-flow',
+    title: 'Cash Flow Statement',
+    description: 'Direct method. Operating, Investing, Financing classified by counterpart account.',
   },
   {
     href: '/reports/fund-summary',
