@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Link from 'next/link'
 
 interface Props {
   voucherId: string
@@ -67,7 +68,7 @@ export default function VoucherActions({
     <section className="border-t border-hairline pt-8 max-w-3xl">
       <h2 className="font-serif text-xl text-ink mb-4">Actions</h2>
 
-      {/* Draft: Finance can submit or void */}
+      {/* Draft: Finance can edit, submit or void */}
       {status === 'draft' && isFinance ? (
         <div className="flex flex-wrap items-center gap-3">
           <button
@@ -78,6 +79,12 @@ export default function VoucherActions({
           >
             {isPending ? 'Submitting…' : 'Submit for approval'}
           </button>
+          <Link
+            href={`/payments/${voucherId}/edit`}
+            className="border border-hairline text-graphite hover:text-ink hover:bg-surface text-sm font-serif italic px-4 py-2 rounded-md transition-colors"
+          >
+            Edit
+          </Link>
           <button
             type="button"
             disabled={isPending}
@@ -165,17 +172,37 @@ export default function VoucherActions({
             <div>
               <div className="bg-surface border border-hairline rounded-md p-4 mb-3">
                 <p className="font-serif italic text-graphite text-sm">
-                  Awaiting Principal approval. <em>You can track the status here.</em>
+                  Awaiting Principal approval. <em>You can edit details or void the voucher until it&apos;s approved.</em>
                 </p>
               </div>
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={() => handleAction(voidVoucher)}
-                className="text-sm text-muted hover:text-danger font-sans transition-colors px-2"
+              <div className="flex flex-wrap items-center gap-3">
+                <Link
+                  href={`/payments/${voucherId}/edit`}
+                  className="border border-hairline text-graphite hover:text-ink hover:bg-surface text-sm font-serif italic px-4 py-2 rounded-md transition-colors"
+                >
+                  Edit
+                </Link>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => handleAction(voidVoucher)}
+                  className="text-sm text-muted hover:text-danger font-sans transition-colors px-2"
+                >
+                  Void this voucher
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Principal sees Edit alongside Approve, before they confirm */}
+          {isPrincipal && !confirmAction ? (
+            <div className="mt-2">
+              <Link
+                href={`/payments/${voucherId}/edit`}
+                className="text-sm text-graphite hover:text-accent font-serif italic"
               >
-                Void this voucher
-              </button>
+                Edit voucher details
+              </Link>
             </div>
           ) : null}
         </>

@@ -409,6 +409,166 @@ export async function approveVoucher(formData: FormData) {
   revalidatePath('/dashboard')
 }
 
+// ─── Update voucher (Finance + Principal, only pending_approval / draft) ───
+// Lets the operator fix typos, wrong amount, wrong category, etc. before
+// Principal approves. Once approved/paid/voided the voucher is frozen —
+// edits would mean reversing the GL posting which we don't allow.
+//
+// Editable: payee, bank, amount, description, notes, payment_method,
+// payment_reference, target_pool (credit), source rows (pool/category/amount/override).
+// NOT editable: voucher_no, voucher_type, direction, fund_source_id, loan_id,
+// repayment_breakdown, invoice_id, status, audit fields.
+
+export async function updatePaymentVoucher(formData: FormData) {
+  const user = await requireRole(['finance', 'principal'])
+  const supabase = await createClient()
+
+  const id = (formData.get('id') as string) ?? ''
+  if (!id) throw new Error('Voucher id is required')
+
+  // Load current voucher to validate state + lock direction/voucher_type
+  const { data: current } = await supabase
+    .from('payment_vouchers')
+    .select('id, status, direction, voucher_type, fund_source_id, loan_id, repayment_breakdown, invoice_id')
+    .eq('id', id)
+    .single()
+  if (!current) throw new Error('Voucher not found')
+  if (current.status !== 'pending_approval' && current.status !== 'draft') {
+    throw new Error(`Cannot edit voucher in status "${current.status}" — only pending_approval / draft are editable`)
+  }
+
+  const amount = parseFloat((formData.get('amount') as string) ?? '0')
+  let payeeName = ((formData.get('payee_name') as string) ?? '').trim()
+  const payeeCompanyId = (formData.get('payee_company_id') as string) || null
+  const bankAccountId = (formData.get('bank_account_id') as string) || null
+  const description = ((formData.get('description') as string) ?? '').trim()
+  const paymentMethod = (formData.get('payment_method') as string) || 'bank_transfer'
+  const targetPool = (formData.get('target_pool') as string) || null
+  const notes = ((formData.get('notes') as string) ?? '').trim() || null
+
+  if (isNaN(amount) || amount <= 0) throw new Error('Amount must be greater than 0')
+  if (!description) throw new Error('Description is required')
+
+  if (!payeeName && payeeCompanyId) {
+    const { data: co } = await supabase.from('companies').select('name').eq('id', payeeCompanyId).single()
+    if (co) payeeName = co.name
+  }
+  if (!payeeName) throw new Error('Payee name is required')
+
+  // Loan-repayment vouchers are locked: amount must match the stored
+  // repayment_breakdown sum because changing it desyncs the principal /
+  // interest / penalty allocation. Operator must void + recreate instead.
+  if (current.repayment_breakdown && (current.fund_source_id || current.loan_id)) {
+    const bd = current.repayment_breakdown as { principal: number; interest: number; penalty: number }
+    const sum = Number(bd.principal ?? 0) + Number(bd.interest ?? 0) + Number(bd.penalty ?? 0)
+    if (Math.abs(sum - amount) > 0.005) {
+      throw new Error(
+        `This is a loan repayment voucher with a fixed breakdown (RM ${sum.toFixed(2)}). Changing amount requires voiding and recreating.`,
+      )
+    }
+  }
+
+  const { error: updErr } = await supabase
+    .from('payment_vouchers')
+    .update({
+      amount,
+      payee_name: payeeName,
+      payee_company_id: payeeCompanyId,
+      bank_account_id: bankAccountId,
+      description,
+      payment_method: paymentMethod,
+      notes,
+      target_pool: current.direction === 'credit' ? targetPool : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .in('status', ['pending_approval', 'draft'])
+
+  if (updErr) throw new Error(`Failed to update voucher: ${updErr.message}`)
+
+  // Replace source rows. Mig 205: every voucher carries ≥1 PVS row;
+  // sum must match amount; per-row override constraint enforced at DB.
+  if (current.direction === 'debit') {
+    const rowCount = parseInt((formData.get('source_rows_count') as string) ?? '0', 10)
+    const rows: {
+      pool: string
+      amount: number
+      category_code: string | null
+      override_account_type: AccountType | null
+      override_gl_account_code: string | null
+      override_reason: string | null
+    }[] = []
+    for (let i = 0; i < rowCount; i++) {
+      const pool = (formData.get(`source_rows[${i}][pool]`) as string)?.trim() ?? ''
+      const amt = parseFloat((formData.get(`source_rows[${i}][amount]`) as string) ?? '0')
+      const cat = (formData.get(`source_rows[${i}][category_code]`) as string)?.trim() || null
+      const ovType = (formData.get(`source_rows[${i}][override_account_type]`) as string)?.trim() ?? ''
+      const ovGl = (formData.get(`source_rows[${i}][override_gl_account_code]`) as string)?.trim() ?? ''
+      const ovRsn = (formData.get(`source_rows[${i}][override_reason]`) as string)?.trim() ?? ''
+      const isOverride = !!ovType && !!ovGl && !!ovRsn
+      if (!isOverride && (ovType || ovGl || ovRsn)) {
+        throw new Error(`source row ${i + 1}: override requires account type, GL, AND reason`)
+      }
+      if (isOverride && !VALID_ACCOUNT_TYPES.includes(ovType as AccountType)) {
+        throw new Error(`source row ${i + 1}: invalid override account type "${ovType}"`)
+      }
+      if (pool && amt > 0) {
+        rows.push({
+          pool, amount: amt, category_code: cat,
+          override_account_type: isOverride ? (ovType as AccountType) : null,
+          override_gl_account_code: isOverride ? ovGl : null,
+          override_reason: isOverride ? ovRsn : null,
+        })
+      }
+    }
+    if (rows.length === 0) throw new Error('At least one source row is required for a debit voucher')
+    const sum = rows.reduce((s, r) => s + r.amount, 0)
+    if (Math.abs(sum - amount) > 0.005) {
+      throw new Error(`source rows sum (${sum.toFixed(2)}) does not match voucher amount (${amount.toFixed(2)})`)
+    }
+
+    await supabase.from('payment_voucher_sources').delete().eq('voucher_id', id)
+    await supabase.from('payment_voucher_sources').insert(
+      rows.map(r => ({
+        voucher_id: id,
+        pool: r.pool,
+        amount: r.amount,
+        category_code: r.category_code,
+        override_account_type: r.override_account_type,
+        override_gl_account_code: r.override_gl_account_code,
+        override_reason: r.override_reason,
+      })),
+    )
+  } else if (current.direction === 'credit') {
+    if (!targetPool) throw new Error('Target pool is required for credit voucher')
+    const categoryCode = (formData.get('category_code') as string)?.trim() || null
+    await supabase.from('payment_voucher_sources').delete().eq('voucher_id', id)
+    await supabase.from('payment_voucher_sources').insert({
+      voucher_id: id,
+      pool: targetPool,
+      amount,
+      category_code: categoryCode,
+    })
+  }
+
+  // Audit trail: who edited (best-effort — schema mismatch shouldn't block edit)
+  await supabase
+    .from('access_log')
+    .insert({
+      user_id: user.id,
+      action: 'update_payment_voucher',
+      resource_type: 'payment_voucher',
+      resource_id: id,
+      metadata: { status_at_edit: current.status, voucher_type: current.voucher_type },
+    })
+    .then(() => {/* ok */}, () => {/* ignore audit failure */})
+
+  revalidatePath(`/payments/${id}`)
+  revalidatePath('/payments')
+  revalidatePath('/approvals')
+  redirect(`/payments/${id}`)
+}
+
 // ─── Void voucher (Finance, only draft/pending) ─────────────────────────────
 
 export async function voidVoucher(formData: FormData) {
