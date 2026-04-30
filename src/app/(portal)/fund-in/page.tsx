@@ -11,6 +11,7 @@ const SOURCE_TYPE_LABELS: Record<string, string> = {
   director_loan: 'Director loan',
   department_pool: 'Dept pool',
   director_saving: 'Director saving',
+  outsource: 'Outsource',
 }
 
 type FundSourceRow = {
@@ -18,6 +19,8 @@ type FundSourceRow = {
   source_type: string
   from_company_id: string | null
   from_director_id: string | null
+  from_department_id: string | null
+  from_freetext_name: string | null
   amount: number
   cost_rate: number
   lock_in_months: number | null
@@ -40,6 +43,7 @@ export default async function FundInPage({ searchParams }: Props) {
     { data: fundSources },
     { data: companies },
     { data: directors },
+    { data: departments },
   ] = await Promise.all([
     supabase
       .from('fund_sources')
@@ -47,6 +51,7 @@ export default async function FundInPage({ searchParams }: Props) {
       .order('effective_date', { ascending: false }),
     supabase.from('companies').select('id, name, short_code'),
     supabase.from('directors').select('id, name, code'),
+    supabase.from('departments').select('id, name'),
   ])
 
   const sources = (fundSources ?? []) as FundSourceRow[]
@@ -55,6 +60,9 @@ export default async function FundInPage({ searchParams }: Props) {
   )
   const directorMap = new Map(
     (directors ?? []).map((d) => [d.id, { name: d.name, code: d.code }])
+  )
+  const deptMap = new Map(
+    (departments ?? []).map((d) => [d.id, d.name])
   )
 
   // Active sources for hero metrics (always based on active, regardless of tab)
@@ -89,6 +97,15 @@ export default async function FundInPage({ searchParams }: Props) {
     if (s.from_company_id) {
       const c = companyMap.get(s.from_company_id)
       return c ? `${c.name} (${c.code})` : '—'
+    }
+    if (s.from_department_id) {
+      const name = deptMap.get(s.from_department_id)
+      return name ?? '—'
+    }
+    // Item 4: free-text takes priority over legacy from_director_id; fallback
+    // for old director_loan rows where free-text wasn't backfilled.
+    if (s.from_freetext_name) {
+      return s.from_freetext_name
     }
     if (s.from_director_id) {
       const d = directorMap.get(s.from_director_id)

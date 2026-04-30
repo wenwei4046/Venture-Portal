@@ -27,6 +27,13 @@ interface TrendDatum {
 interface Props {
   composition: CompositionDatum[]
   trend: TrendDatum[]
+  // Optional overrides for the trend bars. Defaults match Marketing's P&L:
+  // {revenue: 'Revenue', cost: 'Total cost'}. Pass custom labels to repurpose
+  // for views like "Venture Pool In" where the bars represent In/Out.
+  trendLabels?: { revenue: string; cost: string }
+  compositionTitle?: string
+  trendTitle?: string
+  trendSubtitle?: string
 }
 
 const COLORS = ['#a86c5e', '#7d6f56', '#4f5d4f', '#a89c83']
@@ -36,13 +43,22 @@ function fmtRm(value: number): string {
   return `RM ${value.toFixed(0)}`
 }
 
-export default function PnlCharts({ composition, trend }: Props) {
+export default function PnlCharts({
+  composition,
+  trend,
+  trendLabels,
+  compositionTitle = 'Cost composition',
+  trendTitle = '12-month trend',
+  trendSubtitle = 'Revenue vs total cost (expenses + OPEX)',
+}: Props) {
+  const revenueLabel = trendLabels?.revenue ?? 'Revenue'
+  const costLabel = trendLabels?.cost ?? 'Total cost'
   const totalComp = composition.reduce((s, d) => s + d.value, 0)
   const nonZeroMonths = trend.filter((t) => t.revenue > 0 || t.cost > 0).length
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       <div className="border border-hairline rounded-md bg-surface p-6">
-        <h3 className="font-serif text-lg text-ink mb-1">Cost composition</h3>
+        <h3 className="font-serif text-lg text-ink mb-1">{compositionTitle}</h3>
         <p className="font-serif italic text-graphite text-xs mb-4">This month</p>
         {totalComp === 0 ? (
           <p className="font-serif italic text-muted text-sm py-12 text-center">No costs this month.</p>
@@ -73,9 +89,9 @@ export default function PnlCharts({ composition, trend }: Props) {
       </div>
 
       <div className="border border-hairline rounded-md bg-surface p-6">
-        <h3 className="font-serif text-lg text-ink mb-1">12-month trend</h3>
+        <h3 className="font-serif text-lg text-ink mb-1">{trendTitle}</h3>
         <p className="font-serif italic text-graphite text-xs mb-4">
-          Revenue vs total cost (expenses + OPEX)
+          {trendSubtitle}
           {nonZeroMonths > 0 && nonZeroMonths < 12 ? (
             <span className="text-muted"> · {nonZeroMonths} of 12 months have data</span>
           ) : null}
@@ -86,8 +102,8 @@ export default function PnlCharts({ composition, trend }: Props) {
             <YAxis stroke="#8c7e62" fontSize={11} tickFormatter={fmtRm} />
             <Tooltip formatter={(v: number) => fmtRm(v)} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Bar dataKey="revenue" fill="#7d6f56" name="Revenue" />
-            <Bar dataKey="cost" fill="#a86c5e" name="Total cost" />
+            <Bar dataKey="revenue" fill="#7d6f56" name={revenueLabel} />
+            <Bar dataKey="cost" fill="#a86c5e" name={costLabel} />
           </BarChart>
         </ResponsiveContainer>
       </div>

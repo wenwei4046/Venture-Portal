@@ -19,6 +19,7 @@ export async function createLoan(formData: FormData) {
   const principal = parseFloat((formData.get('principal') as string) ?? '0')
   const tenureMonths = parseInt((formData.get('tenure_months') as string) ?? '', 10)
   const repaymentTerms = (formData.get('repayment_terms') as string) ?? ''
+  const loanStartDate = (formData.get('loan_start_date') as string) ?? ''
 
   if (!companyId) throw new Error('Company is required')
   if (isNaN(principal) || principal <= 0) {
@@ -29,6 +30,9 @@ export async function createLoan(formData: FormData) {
   }
   if (isNaN(tenureMonths) || tenureMonths < 1 || tenureMonths > 12) {
     throw new Error('Tenure must be between 1 and 12 months')
+  }
+  if (!loanStartDate || !dayjs(loanStartDate).isValid()) {
+    throw new Error('Loan start date is required')
   }
 
   // ─── Look up active base rate ───
@@ -97,6 +101,7 @@ export async function createLoan(formData: FormData) {
       p_tenure_months: tenureMonths,
       p_repayment_terms: repaymentTerms || undefined,
       p_company_name: company.name,
+      p_disbursement_date: loanStartDate,
     }
   )
 
@@ -240,34 +245,55 @@ export async function recordRepayment(formData: FormData) {
   revalidatePath('/dashboard')
 }
 
-// ─── Cancel loan (Finance — only pending_approval) ───────────────────────────
+// ─── Cancel loan (Finance) ───────────────────────────────────────────────────
+// Two paths depending on current loan status:
+//  - pending_approval → cancel directly via cancel_loan_and_approval (mig 17/107)
+//  - active           → file a loan_cancel approval_request (mig 226). Principal
+//                        approves, then approveRequest fires execute_loan_cancel
+//                        and reverses the bank/venture-pool/JE side.
 
 export async function cancelLoan(formData: FormData) {
   await requireRole(['finance'])
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
+  const reason = ((formData.get('reason') as string) ?? '').trim() || null
   if (!id) throw new Error('Loan id is required')
 
-  // M2 fix (Phase 2 Step 2): atomic cancel via SECURITY DEFINER RPC.
-  // Both the loan and its paired approval_request are updated in one
-  // transaction. Previously Finance could only reject the approval, leaving
-  // the loan stuck in pending_approval forever because loans_principal_update
-  // RLS blocks Finance from updating loans.
-  //
-  // See supabase/migrations/20260101000017_approval_cascade_trigger.sql
-  const { error: rpcErr } = await supabase.rpc('cancel_loan_and_approval', {
-    p_loan_id: id,
-  })
+  const { data: loan, error: loanErr } = await supabase
+    .from('loans')
+    .select('status')
+    .eq('id', id)
+    .single()
+  if (loanErr || !loan) throw new Error('Loan not found')
 
-  if (rpcErr) {
-    throw new Error(`Failed to cancel loan: ${rpcErr.message}`)
+  if (loan.status === 'pending_approval') {
+    const { error: rpcErr } = await supabase.rpc('cancel_loan_and_approval', {
+      p_loan_id: id,
+    })
+    if (rpcErr) throw new Error(`Failed to cancel loan: ${rpcErr.message}`)
+    revalidatePath('/fund-out')
+    revalidatePath('/approvals')
+    revalidatePath('/dashboard')
+    redirect('/fund-out')
   }
 
-  revalidatePath('/fund-out')
-  revalidatePath('/approvals')
-  revalidatePath('/dashboard')
-  redirect('/fund-out')
+  if (loan.status === 'active') {
+    // Item 3: active-loan cancellation requires Principal approval. RPC files
+    // the approval_request and refuses if any repayment is recorded.
+    const { error: reqErr } = await supabase.rpc('request_loan_cancel', {
+      p_loan_id: id,
+      p_reason: reason ?? undefined,
+    })
+    if (reqErr) {
+      throw new Error(`Failed to file cancellation request: ${reqErr.message}`)
+    }
+    revalidatePath(`/fund-out/${id}`)
+    revalidatePath('/approvals')
+    return
+  }
+
+  throw new Error(`Cannot cancel a ${loan.status} loan`)
 }
 
 // ─── List loans payable via debit voucher (Finance) — Phase 7 Step 12b ──────

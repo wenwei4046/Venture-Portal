@@ -6,6 +6,7 @@ import dayjs from 'dayjs'
 import {
   createManualInvoice,
   fetchDirectorCtcByCompany,
+  type BillableToKind,
   type CreateInvoiceMode,
 } from '../actions'
 
@@ -13,6 +14,11 @@ interface Company {
   id: string
   name: string
   short_code: string
+}
+
+interface Department {
+  id: string
+  name: string
 }
 
 interface Props {
@@ -30,7 +36,16 @@ interface Props {
   compact?: boolean
   /** label override for the button; defaults to "+ Create Invoice" */
   label?: string
+  /** Item 5: pass departments so dept-pool billable target gets a select. */
+  departments?: Department[]
 }
+
+const BILLABLE_OPTIONS: Array<{ value: BillableToKind; label: string; hint: string }> = [
+  { value: 'subsidiary', label: 'Subsidiary', hint: 'Bill a HOUZS group company. Supports multi-row split.' },
+  { value: 'director',   label: 'Director',   hint: 'Bill a director (free-text name).' },
+  { value: 'dept_pool',  label: 'Dept Pool',  hint: 'Bill an internal department pool.' },
+  { value: 'freetext',   label: 'Other',      hint: 'External party — vendor, partner, anyone (free text).' },
+]
 
 // Each option labels the Department Pool the invoice credits on settlement.
 const POOL_OPTIONS: Array<{ value: CreateInvoiceMode; label: string; hint: string }> = [
@@ -63,6 +78,7 @@ export default function CreateInvoiceButton({
   alreadyInvoiced = 0,
   compact = false,
   label,
+  departments = [],
 }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -70,6 +86,13 @@ export default function CreateInvoiceButton({
   const [error, setError] = useState<string | null>(null)
 
   // Form state
+  // Item 5: bill-to type selector. Subsidiary keeps the multi-row split flow;
+  // the other 3 types use a single-target form (one invoice per submit).
+  const [billableType, setBillableType] = useState<BillableToKind>('subsidiary')
+  const [singleName, setSingleName] = useState('')          // director + freetext
+  const [singleDeptId, setSingleDeptId] = useState('')      // dept_pool
+  const [singleAmount, setSingleAmount] = useState('')      // non-subsidiary single amount
+
   const [mode, setMode] = useState<CreateInvoiceMode>(prefillMode)
   const [period, setPeriod] = useState(dayjs(currentPeriod).format('YYYY-MM'))
   const [invoiceDate, setInvoiceDate] = useState(dayjs().format('YYYY-MM-DD'))
@@ -93,6 +116,10 @@ export default function CreateInvoiceButton({
   const overTarget = hasTarget && gap < -0.005
 
   function reset() {
+    setBillableType('subsidiary')
+    setSingleName('')
+    setSingleDeptId('')
+    setSingleAmount('')
     setMode(prefillMode)
     setPeriod(dayjs(currentPeriod).format('YYYY-MM'))
     setInvoiceDate(dayjs().format('YYYY-MM-DD'))
@@ -180,10 +207,50 @@ export default function CreateInvoiceButton({
     setError(null)
     if (!description.trim()) return setError('Description is required')
 
+    // Item 5: split-by-subsidiary flow only applies to billableType=subsidiary.
+    if (billableType !== 'subsidiary') {
+      const amt = Number(singleAmount)
+      if (!Number.isFinite(amt) || amt <= 0) {
+        return setError('Amount must be a positive number')
+      }
+      if (billableType === 'dept_pool' && !singleDeptId) {
+        return setError('Pick the department to bill')
+      }
+      if ((billableType === 'director' || billableType === 'freetext') && !singleName.trim()) {
+        return setError('Enter the party name')
+      }
+
+      startTransition(async () => {
+        const fd = new FormData()
+        fd.set('billable_to_type', billableType)
+        fd.set('billing_mode', mode)
+        fd.set('period_month', dayjs(period + '-01').format('YYYY-MM-DD'))
+        fd.set('invoice_date', invoiceDate)
+        fd.set('due_date', dueDate)
+        fd.set('amount', amt.toFixed(2))
+        fd.set('description', description.trim())
+        fd.set('reference_no', referenceNo.trim())
+        if (billableType === 'dept_pool') {
+          fd.set('billable_to_department_id', singleDeptId)
+        } else {
+          fd.set('billable_to_freetext_name', singleName.trim())
+        }
+        try {
+          await createManualInvoice(fd)
+          setOpen(false)
+          reset()
+          router.refresh()
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Create failed')
+        }
+      })
+      return
+    }
+
+    // Subsidiary mode — multi-row split, one invoice per row.
     const validRows = rows.filter((r) => r.companyId && Number(r.amount) > 0)
     if (validRows.length === 0) return setError('Add at least one subsidiary with an amount')
 
-    // Reject duplicate subsidiary within this submit
     const seen = new Set<string>()
     for (const r of validRows) {
       if (seen.has(r.companyId)) {
@@ -198,6 +265,7 @@ export default function CreateInvoiceButton({
         const company = companies.find((c) => c.id === r.companyId)
         const label = company?.short_code ?? company?.name ?? r.companyId
         const fd = new FormData()
+        fd.set('billable_to_type', 'subsidiary')
         fd.set('company_id', r.companyId)
         fd.set('billing_mode', mode)
         fd.set('period_month', dayjs(period + '-01').format('YYYY-MM-DD'))
@@ -272,6 +340,84 @@ export default function CreateInvoiceButton({
             </div>
 
             <div className="p-6 space-y-5">
+              {/* Bill-to type toggle (Item 5) */}
+              <div>
+                <div className="text-xs font-sans font-medium text-graphite mb-1">
+                  Bill to <span className="text-danger">*</span>
+                </div>
+                <div className="flex flex-wrap gap-0 border border-hairline rounded-md overflow-hidden w-fit">
+                  {BILLABLE_OPTIONS.map((opt, i) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setBillableType(opt.value)}
+                      disabled={isPending}
+                      className={
+                        billableType === opt.value
+                          ? 'px-4 py-2 bg-accent-bg text-accent font-serif italic text-sm'
+                          : `px-4 py-2 text-graphite font-sans text-sm hover:bg-surface-2${i > 0 ? ' border-l border-hairline' : ''}`
+                      }
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="font-serif italic text-muted text-xs mt-1">
+                  {BILLABLE_OPTIONS.find((o) => o.value === billableType)?.hint}
+                </div>
+              </div>
+
+              {/* Single-target inputs for non-subsidiary modes (Item 5) */}
+              {billableType === 'director' || billableType === 'freetext' ? (
+                <Field
+                  label={billableType === 'director' ? 'Director name' : 'Bill to (free text)'}
+                  required
+                  hint="Free text — no master data lookup"
+                >
+                  <input
+                    type="text"
+                    value={singleName}
+                    onChange={(e) => setSingleName(e.target.value)}
+                    disabled={isPending}
+                    maxLength={120}
+                    placeholder={billableType === 'director' ? 'e.g., Tan Wei Liang' : 'e.g., Maybank, ABC Holdings'}
+                    className={inputCls}
+                  />
+                </Field>
+              ) : null}
+
+              {billableType === 'dept_pool' ? (
+                <Field label="Bill to department" required hint="The department whose pool gets debited on settlement">
+                  <select
+                    value={singleDeptId}
+                    onChange={(e) => setSingleDeptId(e.target.value)}
+                    disabled={isPending}
+                    className={inputCls}
+                  >
+                    <option value="">Select a department…</option>
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                </Field>
+              ) : null}
+
+              {billableType !== 'subsidiary' ? (
+                <Field label="Amount" required>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={singleAmount}
+                    onChange={(e) =>
+                      setSingleAmount(e.target.value.replace(/[^\d.]/g, ''))
+                    }
+                    disabled={isPending}
+                    placeholder="0.00"
+                    className={inputCls + ' font-mono tabular text-right max-w-xs'}
+                  />
+                </Field>
+              ) : null}
+
               {/* Pool + Period */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Field label="Credit to pool" required>
@@ -303,8 +449,8 @@ export default function CreateInvoiceButton({
                 </Field>
               </div>
 
-              {/* Target / Allocated tracker */}
-              {hasTarget && (
+              {/* Target / Allocated tracker — subsidiary multi-row only */}
+              {hasTarget && billableType === 'subsidiary' && (
                 <div className="bg-surface border border-hairline rounded-md p-4">
                   <div className="grid grid-cols-3 gap-4 text-sm">
                     <div>
@@ -351,7 +497,8 @@ export default function CreateInvoiceButton({
                 </div>
               )}
 
-              {/* Subsidiary rows */}
+              {/* Subsidiary rows — subsidiary mode only (Item 5) */}
+              {billableType === 'subsidiary' ? (
               <div>
                 <div className="flex items-baseline justify-between mb-2">
                   <div className="text-xs font-sans font-medium text-graphite">
@@ -433,6 +580,7 @@ export default function CreateInvoiceButton({
                   + Add subsidiary
                 </button>
               </div>
+              ) : null}
 
               {/* Invoice date + Due date */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -489,8 +637,11 @@ export default function CreateInvoiceButton({
 
             <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-hairline bg-surface">
               <div className="font-serif italic text-muted text-xs">
-                {rows.filter((r) => r.companyId && Number(r.amount) > 0).length} invoice
-                {rows.filter((r) => r.companyId && Number(r.amount) > 0).length === 1 ? '' : 's'} will be created
+                {billableType === 'subsidiary'
+                  ? `${rows.filter((r) => r.companyId && Number(r.amount) > 0).length} invoice${
+                      rows.filter((r) => r.companyId && Number(r.amount) > 0).length === 1 ? '' : 's'
+                    } will be created`
+                  : '1 invoice will be created'}
               </div>
               <div className="flex items-center gap-3">
                 <button

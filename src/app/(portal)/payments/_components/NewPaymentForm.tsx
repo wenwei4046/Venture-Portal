@@ -7,7 +7,9 @@ import { createPaymentVoucher } from '../actions'
 interface InvoicePreset {
   id: string
   invoice_no: string | null
-  company_id: string
+  // Item 5: company_id is null for invoices billed to non-subsidiary parties
+  // (director / dept_pool / freetext). The form falls back to free-text payee.
+  company_id: string | null
   company_name: string
   total_amount: number
   period_month: string
@@ -107,7 +109,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, gl
   const [amount, setAmount] = useState(isInvoicePay ? invoicePreset!.total_amount.toFixed(2) : '')
   // Controlled payee fields so loan-repayment mode can auto-fill them
   const [payeeName, setPayeeName] = useState(isInvoicePay ? invoicePreset!.company_name : '')
-  const [payeeCompanyId, setPayeeCompanyId] = useState(isInvoicePay ? invoicePreset!.company_id : '')
+  const [payeeCompanyId, setPayeeCompanyId] = useState(isInvoicePay ? (invoicePreset!.company_id ?? '') : '')
   // Loan repayment mode — HV repaying a fund source (subsidiary savings / director loan)
   const [isLoanRepayment, setIsLoanRepayment] = useState(false)
   const [fundSourceId, setFundSourceId] = useState<string>('')

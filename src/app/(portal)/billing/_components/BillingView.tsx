@@ -43,6 +43,7 @@ export default async function BillingView({ searchParams }: Props) {
     { data: invoices },
     { data: companies },
     { data: nonBillableTxns },
+    { data: departments },
   ] = await Promise.all([
     supabase.rpc('get_submitted_hr_summary', { p_period: period }).maybeSingle(),
     supabase
@@ -54,7 +55,7 @@ export default async function BillingView({ searchParams }: Props) {
       .order('created_at', { ascending: false }),
     supabase
       .from('invoices')
-      .select('id, invoice_no, company_id, period_month, billing_mode, total_amount, status')
+      .select('id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name')
       .eq('period_month', period)
       .order('billing_mode', { ascending: true }),
     supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('short_code'),
@@ -64,6 +65,7 @@ export default async function BillingView({ searchParams }: Props) {
       .gte('created_at', periodStart)
       .lte('created_at', periodEnd)
       .order('created_at', { ascending: false }),
+    supabase.from('departments').select('id, name').order('name'),
   ])
 
   if (hrSummaryError) {
@@ -147,7 +149,11 @@ export default async function BillingView({ searchParams }: Props) {
         <div className="flex items-center gap-3 shrink-0">
           <PeriodSelector currentPeriod={period} />
           {user.role === 'finance' && (
-            <CreateInvoiceButton companies={companyList} currentPeriod={period} />
+            <CreateInvoiceButton
+              companies={companyList}
+              currentPeriod={period}
+              departments={departments ?? []}
+            />
           )}
         </div>
       </div>
@@ -319,6 +325,7 @@ function DeptCostCard({
   canCreate: boolean
   companies: Array<{ id: string; name: string; short_code: string }>
   currentPeriod: string
+  departments?: Array<{ id: string; name: string }>
   marketingNote?: boolean
 }) {
   const hasInvoices = invoiceCount > 0
@@ -356,6 +363,7 @@ function DeptCostCard({
           <CreateInvoiceButton
             companies={companies}
             currentPeriod={currentPeriod}
+            departments={[]}
             prefillMode={invoiceMode}
             targetAmount={required}
             alreadyInvoiced={invoiced}

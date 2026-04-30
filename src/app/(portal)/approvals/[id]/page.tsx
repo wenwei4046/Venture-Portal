@@ -412,6 +412,9 @@ function formatRequestType(type: string): string {
     payment_voucher: 'Payment voucher',
     hr_costing: 'HR costing',
     new_fund_source: 'New fund source',
+    payroll_run: 'Payroll run',
+    dept_payment_request: 'Dept payment request',
+    loan_cancel: 'Loan cancel',
   }
   return labels[type] ?? type
 }

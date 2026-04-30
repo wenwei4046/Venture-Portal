@@ -38,11 +38,20 @@ const CREATE_INVOICE_MODES = [
 
 export type CreateInvoiceMode = (typeof CREATE_INVOICE_MODES)[number]
 
+export type BillableToKind = 'subsidiary' | 'director' | 'dept_pool' | 'freetext'
+
 export async function createManualInvoice(formData: FormData): Promise<void> {
   const user = await requireRole(['finance'])
   const supabase = await createClient()
 
+  // Item 5: 4-way billable target. Subsidiary still uses the existing
+  // company_id column; director/dept_pool/freetext use the new columns
+  // added in mig 225.
+  const billableToType = (String(formData.get('billable_to_type') ?? 'subsidiary')) as BillableToKind
   const companyId = String(formData.get('company_id') ?? '')
+  const billableDeptId = String(formData.get('billable_to_department_id') ?? '')
+  const billableFreetext = String(formData.get('billable_to_freetext_name') ?? '').trim()
+
   const rawPeriod = String(formData.get('period_month') ?? '')
   const rawMode = String(formData.get('billing_mode') ?? '')
   const rawAmount = String(formData.get('amount') ?? '')
@@ -51,7 +60,21 @@ export async function createManualInvoice(formData: FormData): Promise<void> {
   const description = String(formData.get('description') ?? '').trim() || null
   const referenceNo = String(formData.get('reference_no') ?? '').trim() || null
 
-  if (!companyId) throw new Error('Subsidiary is required')
+  if (!['subsidiary', 'director', 'dept_pool', 'freetext'].includes(billableToType)) {
+    throw new Error(`Unsupported billable_to_type: ${billableToType}`)
+  }
+  if (billableToType === 'subsidiary' && !companyId) {
+    throw new Error('Subsidiary is required')
+  }
+  if (billableToType === 'director' && !billableFreetext) {
+    throw new Error('Director name is required')
+  }
+  if (billableToType === 'dept_pool' && !billableDeptId) {
+    throw new Error('Department is required')
+  }
+  if (billableToType === 'freetext' && !billableFreetext) {
+    throw new Error('Billable party name is required')
+  }
   if (!rawPeriod) throw new Error('Period is required')
   if (!CREATE_INVOICE_MODES.includes(rawMode as CreateInvoiceMode)) {
     throw new Error(`Unsupported billing mode: ${rawMode}`)
@@ -77,7 +100,6 @@ export async function createManualInvoice(formData: FormData): Promise<void> {
 
   const { error } = await supabase.from('invoices').insert({
     invoice_no: invoiceNo,
-    company_id: companyId,
     period_month: period,
     billing_mode: billingMode,
     base_amount: amount,
@@ -88,6 +110,11 @@ export async function createManualInvoice(formData: FormData): Promise<void> {
     description,
     reference_no: referenceNo,
     created_by: user.id,
+    billable_to_type: billableToType,
+    company_id: billableToType === 'subsidiary' ? companyId : null,
+    billable_to_department_id: billableToType === 'dept_pool' ? billableDeptId : null,
+    billable_to_freetext_name:
+      billableToType === 'director' || billableToType === 'freetext' ? billableFreetext : null,
   })
 
   if (error) throw new Error(`Failed to create invoice: ${error.message}`)
@@ -309,10 +336,14 @@ export async function createCreditNote(formData: FormData) {
   if (isNaN(amount) || amount <= 0) throw new Error('Amount must be greater than 0')
   if (!reason) throw new Error('Reason is required')
 
-  // Fetch invoice to get company_id and validate amount
+  // Item 5: credit note inherits billable_to from its parent invoice. The
+  // 4 polymorphic columns are mirrored across — saves needing a separate
+  // selector on the credit-note form.
   const { data: invoice, error: invErr } = await supabase
     .from('invoices')
-    .select('id, company_id, total_amount')
+    .select(
+      'id, company_id, total_amount, billable_to_type, billable_to_department_id, billable_to_freetext_name'
+    )
     .eq('id', invoiceId)
     .single()
 
@@ -321,13 +352,14 @@ export async function createCreditNote(formData: FormData) {
     throw new Error(`Credit note amount cannot exceed invoice total (RM ${Number(invoice.total_amount).toFixed(2)})`)
   }
 
-  // Generate credit note number
-  const period = dayjs().format('YYYYMM')
-  const { count } = await supabase
-    .from('credit_notes')
-    .select('*', { count: 'exact', head: true })
-  const seq = (count ?? 0) + 1
-  const creditNoteNo = `HV-CN-${period}-${String(seq).padStart(4, '0')}`
+  // Mint CN number under advisory lock (mig 227). Replaces the old
+  // SELECT count(*) + 1 pattern which collided under concurrent creates.
+  const { data: creditNoteNo, error: mintErr } = await supabase.rpc('mint_credit_note_no', {
+    p_period: dayjs().format('YYYY-MM-DD'),
+  })
+  if (mintErr || !creditNoteNo) {
+    throw new Error(`Failed to mint credit note number: ${mintErr?.message ?? 'unknown'}`)
+  }
 
   const { data, error } = await supabase
     .from('credit_notes')
@@ -335,6 +367,9 @@ export async function createCreditNote(formData: FormData) {
       credit_note_no: creditNoteNo,
       invoice_id: invoiceId,
       company_id: invoice.company_id,
+      billable_to_type: invoice.billable_to_type,
+      billable_to_department_id: invoice.billable_to_department_id,
+      billable_to_freetext_name: invoice.billable_to_freetext_name,
       amount,
       reason,
       status: 'draft',

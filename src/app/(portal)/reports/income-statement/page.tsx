@@ -1,7 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
-import { fetchGlForPeriod, startOfMonth, endOfMonth } from '@/lib/gl-reports'
+import {
+  fetchIncomeStatement,
+  startOfMonth,
+  endOfMonth,
+  SEGMENT_LABEL,
+} from '@/lib/cfo-reports'
 import dayjs from 'dayjs'
 import Link from 'next/link'
 
@@ -14,22 +19,11 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
   const supabase = await createClient()
 
   const { from: rawFrom, to: rawTo, period } = await searchParams
-  // Period selector: month picker is the default; explicit from/to overrides.
   const from = rawFrom ?? startOfMonth(period)
   const to = rawTo ?? endOfMonth(period ?? from)
-
-  const accounts = await fetchGlForPeriod(supabase, {
-    from, to,
-    types: ['revenue', 'expense'],
-  })
-
-  const revenueAccounts = accounts.filter((a) => a.type === 'revenue')
-  const expenseAccounts = accounts.filter((a) => a.type === 'expense')
-  const totalRevenue = revenueAccounts.reduce((s, a) => s + a.balance, 0)
-  const totalExpenses = expenseAccounts.reduce((s, a) => s + a.balance, 0)
-  const netProfit = totalRevenue - totalExpenses
-
   const periodLabel = formatPeriodLabel(from, to)
+
+  const stmt = await fetchIncomeStatement(supabase, { from, to })
 
   return (
     <div>
@@ -44,106 +38,100 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
           </div>
           <h1 className="page-title">Income Statement</h1>
         </div>
-        <PeriodPicker from={from} to={to} />
+        <form className="shrink-0">
+          <input
+            type="month"
+            name="period"
+            defaultValue={dayjs(from).format('YYYY-MM')}
+            className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+          />
+        </form>
       </div>
 
+      <p className="font-serif italic text-muted text-sm mb-8 max-w-3xl">
+        Per-department P&amp;L plus group-level overhead. Each dept&apos;s revenue
+        comes from invoices billed in that period; cost is what the dept pool
+        actually spent. General expenses sit at the group level.
+      </p>
+
       <div className="max-w-3xl space-y-10">
-        <p className="font-serif italic text-muted text-sm">
-          Company-wide P&L sourced directly from the general ledger
-          ({dayjs(from).format('D MMM YYYY')} → {dayjs(to).format('D MMM YYYY')}).
-        </p>
-
-        {/* ── Revenue ── */}
+        {/* Per-dept P&L */}
         <section>
-          <h2 className="font-sans text-xs uppercase tracking-wide text-ledger font-semibold mb-3">
-            Revenue
-          </h2>
-          {revenueAccounts.length === 0 ? (
-            <p className="font-serif italic text-muted text-sm">No revenue posted in this period.</p>
+          <h2 className="font-serif text-xl text-ink mb-4">Department P&amp;L</h2>
+          <table className="ledger-table">
+            <thead>
+              <tr>
+                <th>Department</th>
+                <th className="right">Revenue</th>
+                <th className="right">Cost</th>
+                <th className="right">Margin</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stmt.perDept.map((d) => (
+                <tr key={d.segment}>
+                  <td className="font-serif text-md text-ink">{SEGMENT_LABEL[d.segment]}</td>
+                  <td className="num text-ledger">{formatMoney(d.revenue)}</td>
+                  <td className="num"><span className="neg">{formatMoney(-d.cost)}</span></td>
+                  <td className={`num font-medium ${d.margin >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                    {formatMoney(d.margin)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-hairline">
+                <td className="font-serif italic text-ink font-medium">Group total</td>
+                <td className="num text-ledger font-semibold">{formatMoney(stmt.groupRevenue)}</td>
+                <td className="num"><span className="neg font-semibold">{formatMoney(-stmt.groupDeptCost)}</span></td>
+                <td className="num font-semibold">{formatMoney(stmt.groupRevenue - stmt.groupDeptCost)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </section>
+
+        {/* Group general expenses */}
+        <section>
+          <h2 className="font-serif text-xl text-ink mb-2">General expenses</h2>
+          <p className="font-serif italic text-muted text-xs mb-4">
+            Group-level — rent, utility, statutory, audit, software, mgmt overhead.
+          </p>
+          {stmt.groupGeneral.length === 0 ? (
+            <p className="font-serif italic text-muted text-sm">No general expenses booked this period.</p>
           ) : (
             <table className="ledger-table">
               <tbody>
-                {revenueAccounts.map((a) => (
-                  <tr key={a.code}>
-                    <td className="font-mono text-xs text-graphite w-20">{a.code}</td>
-                    <td>{a.name}</td>
-                    <td className="num">{formatMoney(a.balance)}</td>
+                {stmt.groupGeneral.map((l) => (
+                  <tr key={l.label}>
+                    <td>{l.label}</td>
+                    <td className="num"><span className="neg">{formatMoney(-l.amount)}</span></td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-hairline">
+                  <td className="font-serif italic text-ink font-medium">Total general</td>
+                  <td className="num font-semibold"><span className="neg">{formatMoney(-stmt.groupGeneralTotal)}</span></td>
+                </tr>
+              </tfoot>
             </table>
           )}
-          <div className="flex items-baseline justify-between pt-3 mt-3 border-t border-hairline">
-            <span className="font-serif italic text-base text-ink font-medium">Total Revenue</span>
-            <span className="num text-num-ink text-lg font-semibold">{formatMoney(totalRevenue)}</span>
-          </div>
         </section>
 
-        {/* ── Expenses ── */}
-        <section>
-          <h2 className="font-sans text-xs uppercase tracking-wide text-danger font-semibold mb-3">
-            Operating Expenses
-          </h2>
-          {expenseAccounts.length === 0 ? (
-            <p className="font-serif italic text-muted text-sm">No expenses posted in this period.</p>
-          ) : (
-            <table className="ledger-table">
-              <tbody>
-                {expenseAccounts.map((a) => (
-                  <tr key={a.code}>
-                    <td className="font-mono text-xs text-graphite w-20">{a.code}</td>
-                    <td>{a.name}</td>
-                    <td className="num">
-                      <span className="neg">{formatMoney(-a.balance)}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          <div className="flex items-baseline justify-between pt-3 mt-3 border-t border-hairline">
-            <span className="font-serif italic text-base text-ink font-medium">Total Expenses</span>
-            <span className="num text-num-ink text-lg font-semibold">
-              <span className="neg">{formatMoney(-totalExpenses)}</span>
-            </span>
-          </div>
-        </section>
-
-        {/* ── Net Profit ── */}
+        {/* Group net profit */}
         <div className="border-t-2 border-hairline pt-6">
           <div className="flex items-baseline justify-between">
-            <span className="font-serif text-2xl text-ink">Net Profit</span>
-            <span className={`font-serif text-2xl font-semibold tabular tracking-[-0.01em] ${netProfit >= 0 ? 'text-ledger' : 'text-danger'}`}>
-              {formatMoney(netProfit)}
+            <span className="font-serif text-lg text-ink">Group net profit</span>
+            <span className={`font-serif text-2xl font-semibold tabular ${stmt.groupNetProfit >= 0 ? 'text-ledger' : 'text-danger'}`}>
+              {formatMoney(stmt.groupNetProfit)}
             </span>
           </div>
-          <p className="font-serif italic text-muted text-xs mt-3">
-            Net Profit = Total Revenue − Total Expenses · Sourced from
-            <span className="font-mono"> journal_lines</span> WHERE account.type ∈ (&apos;revenue&apos;, &apos;expense&apos;).
+          <p className="font-serif italic text-muted text-xs mt-2">
+            Group revenue − dept costs − general expenses.
           </p>
         </div>
       </div>
     </div>
-  )
-}
-
-function PeriodPicker({ from, to }: { from: string; to: string }) {
-  const monthValue = dayjs(from).format('YYYY-MM')
-  const wholeMonth = dayjs(from).startOf('month').isSame(from, 'day')
-                     && dayjs(to).endOf('month').isSame(to, 'day')
-                     && dayjs(from).isSame(to, 'month')
-  return (
-    <form className="shrink-0 flex items-center gap-2">
-      <input
-        type="month"
-        name="period"
-        defaultValue={wholeMonth ? monthValue : undefined}
-        className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
-      />
-      <noscript>
-        <button type="submit" className="text-xs text-accent font-serif italic">Apply</button>
-      </noscript>
-    </form>
   )
 }
 

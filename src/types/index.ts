@@ -65,7 +65,7 @@ export interface ApprovalRequest {
 
 // ─── Treasury ─────────────────────────────────────────────────────────────────
 
-export type FundSourceType = 'subsidiary' | 'director_loan' | 'department_pool' | 'director_saving'
+export type FundSourceType = 'subsidiary' | 'director_loan' | 'department_pool' | 'director_saving' | 'outsource'
 export type FundSourceStatus = 'pending_approval' | 'active' | 'matured' | 'repaid' | 'cancelled'
 
 export interface FundSource {
@@ -74,6 +74,8 @@ export interface FundSource {
   capital_type: 'paid'
   from_company_id?: string
   from_director_id?: string
+  from_department_id?: string
+  from_freetext_name?: string
   amount: number
   cost_rate: number
   lock_in_months?: number
@@ -181,11 +183,17 @@ export interface ServiceContract {
 
 export type InvoiceStatus = 'draft' | 'issued' | 'paid' | 'paid_via_netting'
 
+export type BillableToKind = 'subsidiary' | 'director' | 'dept_pool' | 'freetext'
+
 export interface Invoice {
   id: string
   invoice_no?: string
   contract_id?: string
-  company_id: string
+  // Item 5: company_id is now nullable — only populated when billable_to_type='subsidiary'.
+  company_id: string | null
+  billable_to_type?: BillableToKind
+  billable_to_department_id?: string | null
+  billable_to_freetext_name?: string | null
   period_month: string
   billing_mode: BillingMode
   base_amount?: number

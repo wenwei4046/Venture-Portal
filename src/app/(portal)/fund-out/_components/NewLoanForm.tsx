@@ -15,6 +15,9 @@ export default function NewLoanForm({ companies, baseRate }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string>('')
   const [customRate, setCustomRate] = useState<string>('0.000')
+  const [startDate, setStartDate] = useState<string>(
+    () => new Date().toISOString().slice(0, 10)
+  )
   const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
@@ -188,6 +191,29 @@ export default function NewLoanForm({ companies, baseRate }: Props) {
             1–12 months (maximum 12)
           </p>
         </div>
+      </div>
+
+      {/* ───────── Loan start date ───────── */}
+      <div className="mb-6">
+        <label
+          htmlFor="loan_start_date"
+          className="block text-sm font-sans font-medium text-graphite mb-1.5"
+        >
+          Loan start date
+        </label>
+        <input
+          id="loan_start_date"
+          name="loan_start_date"
+          type="date"
+          required
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+          className="w-full sm:max-w-xs px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+        />
+        <p className="font-serif italic text-muted text-xs mt-1.5">
+          Contractual start date. Defaults to today; back- or future-date as needed.
+          Maturity = start date + tenure.
+        </p>
       </div>
 
       {/* ───────── Repayment terms ───────── */}

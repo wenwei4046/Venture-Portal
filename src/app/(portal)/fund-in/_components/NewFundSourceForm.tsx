@@ -4,7 +4,7 @@ import { useState, useTransition, useRef, useEffect } from 'react'
 import dayjs from 'dayjs'
 import Link from 'next/link'
 import { createFundSource } from '../actions'
-import type { Company, Director, FundSourceType } from '@/types'
+import type { Company, FundSourceType } from '@/types'
 
 interface Department {
   id: string
@@ -13,17 +13,17 @@ interface Department {
 
 interface Props {
   companies: Company[]
-  directors: Director[]
   departments: Department[]
 }
 
 const SOURCE_TYPES: { value: FundSourceType; label: string; hint: string }[] = [
   { value: 'subsidiary', label: 'Subsidiary', hint: 'Loan from a subsidiary company' },
-  { value: 'director_loan', label: 'Director Loan', hint: 'Personal loan from a director' },
+  { value: 'director_loan', label: 'Director Loan', hint: 'Personal loan from a director (free text)' },
   { value: 'department_pool', label: 'Dept Pool', hint: 'Idle funds from a department pool' },
+  { value: 'outsource', label: 'Outsource', hint: 'External party — bank, vendor, individual investor (free text)' },
 ]
 
-export default function NewFundSourceForm({ companies, directors, departments }: Props) {
+export default function NewFundSourceForm({ companies, departments }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [sourceType, setSourceType] = useState<FundSourceType>('subsidiary')
@@ -43,9 +43,9 @@ export default function NewFundSourceForm({ companies, directors, departments }:
 
   const today = dayjs().format('YYYY-MM-DD')
 
-  // Determine which "from" options to show based on source type
+  // Determine which "from" input to show based on source type
   const needsCompanySelect = sourceType === 'subsidiary'
-  const needsDirectorSelect = sourceType === 'director_loan'
+  const needsFreetextInput = sourceType === 'director_loan' || sourceType === 'outsource'
   const needsDeptSelect = sourceType === 'department_pool'
 
   async function handleSubmit(formData: FormData) {
@@ -114,26 +114,24 @@ export default function NewFundSourceForm({ companies, directors, departments }:
             The subsidiary lending money to HV
           </p>
         </div>
-      ) : needsDirectorSelect ? (
+      ) : needsFreetextInput ? (
         <div className="mb-6">
-          <label htmlFor="from_id" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Director
+          <label htmlFor="from_freetext_name" className="block text-sm font-sans font-medium text-graphite mb-1.5">
+            {sourceType === 'director_loan' ? 'Director name' : 'Outsource party name'}
           </label>
-          <select
-            id="from_id"
-            name="from_id"
+          <input
+            id="from_freetext_name"
+            name="from_freetext_name"
+            type="text"
             required
+            maxLength={120}
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-          >
-            <option value="">Select a director…</option>
-            {directors.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name} ({d.code})
-              </option>
-            ))}
-          </select>
+            placeholder={sourceType === 'director_loan' ? 'e.g., Tan Wei Liang' : 'e.g., Maybank, ABC Holdings, John Smith'}
+          />
           <p className="font-serif italic text-muted text-xs mt-1.5">
-            The director extending a personal loan to HV
+            {sourceType === 'director_loan'
+              ? 'Free text — the director extending a personal loan to HV'
+              : 'Free text — external party lending to HV (bank, vendor, individual)'}
           </p>
         </div>
       ) : needsDeptSelect ? (

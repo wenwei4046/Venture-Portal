@@ -102,14 +102,15 @@ export async function approveRequest(formData: FormData) {
 
   // ─── Side effects based on request_type ───
   if (approval.request_type === 'new_loan') {
-    // Activate the loan
+    // Activate the loan. disbursement_date is preserved if Finance set it on
+    // creation; the loans_default_disbursement_on_activate trigger (mig 222)
+    // backfills CURRENT_DATE for legacy NULL rows.
     const { error: loanError } = await supabase
       .from('loans')
       .update({
         status: 'active',
         approved_by: user.id,
         approved_at: now,
-        disbursement_date: new Date().toISOString().slice(0, 10),
       })
       .eq('id', approval.reference_id)
       .eq('status', 'pending_approval')
@@ -311,6 +312,16 @@ export async function approveRequest(formData: FormData) {
       throw new Error(
         `Approval recorded but dept payment expense step failed: ${dprErr.message}`
       )
+    }
+  } else if (approval.request_type === 'loan_cancel') {
+    // Item 3 + Codex review fix: atomic cancellation. The RPC now owns the
+    // entire reversal (loan status, voucher void, venture_pool, bank bump,
+    // reversing JE) inside one transaction, so a failure anywhere rolls
+    // everything back. Caller is just a thin shim.
+    const { error: ecErr } = await supabase
+      .rpc('execute_loan_cancel', { p_loan_id: approval.reference_id })
+    if (ecErr) {
+      throw new Error(`Approval recorded but loan reversal failed: ${ecErr.message}`)
     }
   }
   // Other request types (base_rate, tier_change, etc) handled in Phase 1.5+
@@ -544,13 +555,14 @@ export async function approveRequestGroup(formData: FormData) {
   }
 
   // ─── 2) Activate the loan ───
+  // disbursement_date preserved if Finance set it on creation; trigger
+  // loans_default_disbursement_on_activate (mig 222) backfills today for NULLs.
   const { error: loanError } = await supabase
     .from('loans')
     .update({
       status: 'active',
       approved_by: user.id,
       approved_at: now,
-      disbursement_date: todayStr,
     })
     .eq('id', loanApproval.reference_id)
     .eq('status', 'pending_approval')

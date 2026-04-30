@@ -3,24 +3,19 @@ import Link from 'next/link'
 
 const reports = [
   {
-    href: '/reports/income-statement',
-    title: 'Income Statement',
-    description: 'Company-wide P&L from the general ledger. Revenue − Expenses = Net Profit.',
+    href: '/reports/cash-flow',
+    title: 'Cash Flow',
+    description: 'CFO view — money in, dept-level outflow, group general expenses. Categories follow Settings labels.',
   },
   {
-    href: '/reports/segment-pnl',
-    title: 'Segment P&L',
-    description: 'Same GL pivoted by segment (Treasury / Marketing / HR / Finance / Director Office). Tallies to Income Statement.',
+    href: '/reports/income-statement',
+    title: 'Income Statement',
+    description: 'Per-department P&L (revenue − cost = margin) plus group general expenses and net profit.',
   },
   {
     href: '/reports/balance-sheet',
     title: 'Balance Sheet',
-    description: 'Assets, Liabilities, Equity at a point in time. Includes YTD retained earnings.',
-  },
-  {
-    href: '/reports/cash-flow',
-    title: 'Cash Flow Statement',
-    description: 'Direct method. Operating, Investing, Financing classified by counterpart account.',
+    description: 'Assets, Liabilities, Equity at a point in time. Retained earnings is YTD net profit.',
   },
   {
     href: '/reports/fund-summary',

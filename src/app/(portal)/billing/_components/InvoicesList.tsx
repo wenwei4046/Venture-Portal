@@ -2,15 +2,21 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
 import { ApproveInvoiceButton, BulkIssueInvoicesButton } from './InvoiceActions'
+import CreateCreditNoteButton from './CreateCreditNoteButton'
 
 interface Invoice {
   id: string
   invoice_no: string | null
-  company_id: string
+  company_id: string | null
   period_month: string
   billing_mode: string
   total_amount: number
   status: string
+  // Item 5: 4-way billable target. Subsidiary still uses company_id;
+  // others use these polymorphic columns.
+  billable_to_type?: 'subsidiary' | 'director' | 'dept_pool' | 'freetext' | null
+  billable_to_department_id?: string | null
+  billable_to_freetext_name?: string | null
 }
 
 // Humanize the billing mode enum values for UI display — raw snake_case
@@ -47,7 +53,10 @@ export default function InvoicesList({ invoices, companyMap, period }: Props) {
     const amt = Number(inv.total_amount)
     grandTotal += amt
     totalsByMode.set(inv.billing_mode, (totalsByMode.get(inv.billing_mode) ?? 0) + amt)
-    totalsByCompany.set(inv.company_id, (totalsByCompany.get(inv.company_id) ?? 0) + amt)
+    // Item 5: company_id is null for non-subsidiary invoices. Bucket those
+    // under the freetext / dept name instead so totals don't crash.
+    const bucketKey = inv.company_id ?? `__${inv.billable_to_type ?? 'unknown'}__`
+    totalsByCompany.set(bucketKey, (totalsByCompany.get(bucketKey) ?? 0) + amt)
     if (inv.status === 'draft') draftCount++
   }
 
@@ -113,7 +122,23 @@ export default function InvoicesList({ invoices, companyMap, period }: Props) {
               </thead>
               <tbody>
                 {invoices.map((inv) => {
-                  const company = companyMap.get(inv.company_id)
+                  // Item 5: render the actual billable party. For subsidiary
+                  // we look up the company; for the other 3 types we show the
+                  // freetext / department label sitting on the invoice row.
+                  const company = inv.company_id ? companyMap.get(inv.company_id) : undefined
+                  let primaryLabel = company?.name ?? '—'
+                  let subLabel = company?.code ?? ''
+                  if (!inv.company_id) {
+                    primaryLabel = inv.billable_to_freetext_name ?? '—'
+                    subLabel =
+                      inv.billable_to_type === 'director'
+                        ? 'Director'
+                        : inv.billable_to_type === 'dept_pool'
+                          ? 'Dept pool'
+                          : inv.billable_to_type === 'freetext'
+                            ? 'Free text'
+                            : '—'
+                  }
                   return (
                     <tr
                       key={inv.id}
@@ -124,10 +149,10 @@ export default function InvoicesList({ invoices, companyMap, period }: Props) {
                       </td>
                       <td className="py-3 pr-4">
                         <div className="font-serif text-md text-ink">
-                          {company?.name ?? '—'}
+                          {primaryLabel}
                         </div>
                         <div className="font-mono text-xs text-muted">
-                          {company?.code ?? ''}
+                          {subLabel}
                         </div>
                       </td>
                       <td className="py-3 pr-4 font-serif italic text-graphite text-sm">
@@ -140,16 +165,26 @@ export default function InvoicesList({ invoices, companyMap, period }: Props) {
                         <InvoiceStatus status={inv.status} />
                       </td>
                       <td className="py-3 text-right">
-                        {inv.status === 'draft' ? (
-                          <ApproveInvoiceButton id={inv.id} />
-                        ) : inv.status === 'issued' ? (
-                          <Link
-                            href={`/payments/new?invoice_id=${inv.id}`}
-                            className="text-xs text-accent hover:text-accent-hover font-serif italic"
-                          >
-                            Settle →
-                          </Link>
-                        ) : null}
+                        <div className="flex items-center justify-end gap-3">
+                          {inv.status === 'draft' ? (
+                            <ApproveInvoiceButton id={inv.id} />
+                          ) : inv.status === 'issued' ? (
+                            <Link
+                              href={`/payments/new?invoice_id=${inv.id}`}
+                              className="text-xs text-accent hover:text-accent-hover font-serif italic"
+                            >
+                              Settle →
+                            </Link>
+                          ) : null}
+                          {inv.status !== 'draft' ? (
+                            <CreateCreditNoteButton
+                              invoiceId={inv.id}
+                              invoiceNo={inv.invoice_no}
+                              invoiceTotal={Number(inv.total_amount)}
+                              payeeLabel={primaryLabel}
+                            />
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   )

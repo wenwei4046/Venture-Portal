@@ -82,7 +82,12 @@ export default async function FundSummaryPage() {
                   {(fundSources ?? []).map(f => (
                     <tr key={f.id}>
                       <td>
-                        <div className="font-serif text-md text-ink">{f.source_type === 'director_loan' ? 'Director Loan' : 'Subsidiary Savings'}</div>
+                        <div className="font-serif text-md text-ink">{
+                          f.source_type === 'director_loan' ? 'Director Loan'
+                            : f.source_type === 'outsource' ? 'Outsource'
+                            : f.source_type === 'department_pool' ? 'Dept Pool'
+                            : 'Subsidiary Savings'
+                        }</div>
                       </td>
                       <td className="num">{formatMoney(f.amount)}</td>
                       <td className="num text-graphite">{(Number(f.cost_rate) * 100).toFixed(3)}%</td>

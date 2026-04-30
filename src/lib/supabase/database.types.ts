@@ -597,7 +597,10 @@ export type Database = {
           applied_to_statement_id: string | null
           approved_at: string | null
           approved_by: string | null
-          company_id: string
+          billable_to_department_id: string | null
+          billable_to_freetext_name: string | null
+          billable_to_type: Database["public"]["Enums"]["billable_to_kind"]
+          company_id: string | null
           created_at: string
           created_by: string
           credit_note_no: string | null
@@ -612,7 +615,10 @@ export type Database = {
           applied_to_statement_id?: string | null
           approved_at?: string | null
           approved_by?: string | null
-          company_id: string
+          billable_to_department_id?: string | null
+          billable_to_freetext_name?: string | null
+          billable_to_type: Database["public"]["Enums"]["billable_to_kind"]
+          company_id?: string | null
           created_at?: string
           created_by: string
           credit_note_no?: string | null
@@ -627,7 +633,10 @@ export type Database = {
           applied_to_statement_id?: string | null
           approved_at?: string | null
           approved_by?: string | null
-          company_id?: string
+          billable_to_department_id?: string | null
+          billable_to_freetext_name?: string | null
+          billable_to_type?: Database["public"]["Enums"]["billable_to_kind"]
+          company_id?: string | null
           created_at?: string
           created_by?: string
           credit_note_no?: string | null
@@ -1281,6 +1290,7 @@ export type Database = {
           from_company_id: string | null
           from_department_id: string | null
           from_director_id: string | null
+          from_freetext_name: string | null
           id: string
           lock_in_months: number | null
           maturity_date: string | null
@@ -1305,6 +1315,7 @@ export type Database = {
           from_company_id?: string | null
           from_department_id?: string | null
           from_director_id?: string | null
+          from_freetext_name?: string | null
           id?: string
           lock_in_months?: number | null
           maturity_date?: string | null
@@ -1329,6 +1340,7 @@ export type Database = {
           from_company_id?: string | null
           from_department_id?: string | null
           from_director_id?: string | null
+          from_freetext_name?: string | null
           id?: string
           lock_in_months?: number | null
           maturity_date?: string | null
@@ -1985,8 +1997,11 @@ export type Database = {
       invoices: {
         Row: {
           base_amount: number | null
+          billable_to_department_id: string | null
+          billable_to_freetext_name: string | null
+          billable_to_type: Database["public"]["Enums"]["billable_to_kind"]
           billing_mode: Database["public"]["Enums"]["billing_mode"]
-          company_id: string
+          company_id: string | null
           contract_id: string | null
           created_at: string
           created_by: string
@@ -2005,8 +2020,11 @@ export type Database = {
         }
         Insert: {
           base_amount?: number | null
+          billable_to_department_id?: string | null
+          billable_to_freetext_name?: string | null
+          billable_to_type: Database["public"]["Enums"]["billable_to_kind"]
           billing_mode: Database["public"]["Enums"]["billing_mode"]
-          company_id: string
+          company_id?: string | null
           contract_id?: string | null
           created_at?: string
           created_by: string
@@ -2025,8 +2043,11 @@ export type Database = {
         }
         Update: {
           base_amount?: number | null
+          billable_to_department_id?: string | null
+          billable_to_freetext_name?: string | null
+          billable_to_type?: Database["public"]["Enums"]["billable_to_kind"]
           billing_mode?: Database["public"]["Enums"]["billing_mode"]
-          company_id?: string
+          company_id?: string | null
           contract_id?: string | null
           created_at?: string
           created_by?: string
@@ -3856,6 +3877,7 @@ export type Database = {
           p_base_rate: number
           p_company_id: string
           p_company_name?: string
+          p_disbursement_date?: string
           p_effective_rate: number
           p_principal: number
           p_repayment_terms?: string
@@ -4077,6 +4099,22 @@ export type Database = {
         }
         Returns: string
       }
+      refresh_base_rate: {
+        Args: { p_op_margin: number }
+        Returns: string
+      }
+      mint_credit_note_no: {
+        Args: { p_period?: string }
+        Returns: string
+      }
+      request_loan_cancel: {
+        Args: { p_loan_id: string; p_reason?: string }
+        Returns: string
+      }
+      execute_loan_cancel: {
+        Args: { p_loan_id: string }
+        Returns: string
+      }
       reject_dept_payment_request: {
         Args: { p_approval_id: string }
         Returns: undefined
@@ -4134,6 +4172,7 @@ export type Database = {
         | "hr_costing"
         | "payroll_run"
         | "dept_payment_request"
+        | "loan_cancel"
       approval_status: "pending" | "approved" | "rejected"
       approval_workflow_state:
         | "submitted"
@@ -4143,6 +4182,11 @@ export type Database = {
         | "approved"
         | "rejected"
         | "expired"
+      billable_to_kind:
+        | "subsidiary"
+        | "director"
+        | "dept_pool"
+        | "freetext"
       billing_mode:
         | "marketing_project"
         | "non_billable"
@@ -4181,6 +4225,7 @@ export type Database = {
         | "director_loan"
         | "department_pool"
         | "director_saving"
+        | "outsource"
       gl_segment:
         | "treasury"
         | "marketing"
@@ -4389,6 +4434,7 @@ export const Constants = {
         "hr_costing",
         "payroll_run",
         "dept_payment_request",
+        "loan_cancel",
       ],
       approval_status: ["pending", "approved", "rejected"],
       approval_workflow_state: [
@@ -4399,6 +4445,12 @@ export const Constants = {
         "approved",
         "rejected",
         "expired",
+      ],
+      billable_to_kind: [
+        "subsidiary",
+        "director",
+        "dept_pool",
+        "freetext",
       ],
       billing_mode: [
         "marketing_project",
@@ -4442,6 +4494,7 @@ export const Constants = {
         "director_loan",
         "department_pool",
         "director_saving",
+        "outsource",
       ],
       gl_segment: [
         "treasury",

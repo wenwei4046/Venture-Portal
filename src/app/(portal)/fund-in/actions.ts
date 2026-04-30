@@ -10,7 +10,8 @@ import type { FundSourceType } from '@/types'
 
 interface CreateFundSourceInput {
   source_type: FundSourceType
-  from_id: string
+  from_id: string                  // company_id (subsidiary) or department_id (department_pool)
+  from_freetext_name: string       // director_loan + outsource (Item 4)
   amount: number
   cost_rate_percent: number
   lock_in_months: number
@@ -19,8 +20,8 @@ interface CreateFundSourceInput {
   notes?: string
 }
 
-// Only 3 types now (director_saving removed per user feedback)
-const VALID_TYPES: FundSourceType[] = ['subsidiary', 'director_loan', 'department_pool']
+// Item 4: 'outsource' added; director_loan keeps free-text input now.
+const VALID_TYPES: FundSourceType[] = ['subsidiary', 'director_loan', 'department_pool', 'outsource']
 
 export async function createFundSource(formData: FormData) {
   const user = await requireRole(['finance'])
@@ -29,6 +30,7 @@ export async function createFundSource(formData: FormData) {
   const raw: CreateFundSourceInput = {
     source_type: formData.get('source_type') as FundSourceType,
     from_id: (formData.get('from_id') as string) ?? '',
+    from_freetext_name: ((formData.get('from_freetext_name') as string) ?? '').trim(),
     amount: parseFloat((formData.get('amount') as string) ?? '0'),
     cost_rate_percent: parseFloat((formData.get('cost_rate_percent') as string) ?? '0'),
     lock_in_months: parseInt((formData.get('lock_in_months') as string) ?? '0', 10),
@@ -41,15 +43,19 @@ export async function createFundSource(formData: FormData) {
     throw new Error('Invalid source type')
   }
 
-  // Validate from_id based on type
+  // Validate "from" input based on type. Director loan + outsource use a
+  // free-text name (Item 4); subsidiary + dept pool still use FK ids.
   if (raw.source_type === 'subsidiary' && !raw.from_id) {
     throw new Error('Company is required for subsidiary')
   }
-  if (raw.source_type === 'director_loan' && !raw.from_id) {
-    throw new Error('Director is required for director loan')
+  if (raw.source_type === 'director_loan' && !raw.from_freetext_name) {
+    throw new Error('Director name is required for director loan')
   }
   if (raw.source_type === 'department_pool' && !raw.from_id) {
     throw new Error('Department is required for department pool transfer')
+  }
+  if (raw.source_type === 'outsource' && !raw.from_freetext_name) {
+    throw new Error('Outsource party name is required')
   }
 
   if (isNaN(raw.amount) || raw.amount <= 0) {
@@ -116,14 +122,35 @@ export async function createFundSource(formData: FormData) {
     created_by: user.id,
   }
 
-  // Polymorphic FK based on type — each type uses exactly one "from_*" slot.
+  // Polymorphic "from" slot based on type — see source_has_from CHECK constraint
+  // (mig 224). subsidiary → from_company_id; department_pool → from_department_id;
+  // director_loan + outsource → from_freetext_name (free text only since Item 4).
   let payload
   if (raw.source_type === 'subsidiary') {
-    payload = { ...basePayload, from_company_id: raw.from_id || null, from_director_id: null, from_department_id: null }
+    payload = {
+      ...basePayload,
+      from_company_id: raw.from_id || null,
+      from_director_id: null,
+      from_department_id: null,
+      from_freetext_name: null,
+    }
   } else if (raw.source_type === 'department_pool') {
-    payload = { ...basePayload, from_company_id: null, from_director_id: null, from_department_id: raw.from_id || null }
+    payload = {
+      ...basePayload,
+      from_company_id: null,
+      from_director_id: null,
+      from_department_id: raw.from_id || null,
+      from_freetext_name: null,
+    }
   } else {
-    payload = { ...basePayload, from_company_id: null, from_director_id: raw.from_id || null, from_department_id: null }
+    // director_loan + outsource
+    payload = {
+      ...basePayload,
+      from_company_id: null,
+      from_director_id: null,
+      from_department_id: null,
+      from_freetext_name: raw.from_freetext_name,
+    }
   }
 
   const { data, error } = await supabase
@@ -139,8 +166,10 @@ export async function createFundSource(formData: FormData) {
   // Phase 7: no longer posts venture_pool.fund_in on submit. Money moves
   // when Principal approves — see approvals/actions.ts::approveRequest's
   // 'new_fund_source' branch. Here we only queue the approval request.
-  const typeLabel = raw.source_type === 'subsidiary' ? 'subsidiary deposit'
-    : raw.source_type === 'director_loan' ? 'director loan'
+  const typeLabel =
+    raw.source_type === 'subsidiary' ? 'subsidiary deposit'
+    : raw.source_type === 'director_loan' ? `director loan (${raw.from_freetext_name})`
+    : raw.source_type === 'outsource' ? `outsource (${raw.from_freetext_name})`
     : 'dept pool transfer'
 
   const { error: approvalError } = await supabase

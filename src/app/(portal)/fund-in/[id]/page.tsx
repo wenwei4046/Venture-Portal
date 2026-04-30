@@ -12,6 +12,7 @@ const SOURCE_TYPE_LABELS: Record<string, string> = {
   director_loan: 'Director loan',
   department_pool: 'Dept pool transfer',
   director_saving: 'Director saving',
+  outsource: 'Outsource',
 }
 
 interface Props {
@@ -53,6 +54,21 @@ export default async function FundSourceDetailPage({ params }: Props) {
       fromLabel = c.name
       fromSubLabel = c.short_code
     }
+  } else if (source.from_department_id) {
+    const { data: d } = await supabase
+      .from('departments')
+      .select('name')
+      .eq('id', source.from_department_id)
+      .single()
+    if (d) {
+      fromLabel = d.name
+      fromSubLabel = 'Department pool'
+    }
+  } else if (source.from_freetext_name) {
+    // Item 4: director_loan + outsource use free text (no FK lookup).
+    fromLabel = source.from_freetext_name
+    fromSubLabel =
+      source.source_type === 'director_loan' ? 'Director (free text)' : 'Outsource party'
   } else if (source.from_director_id) {
     const { data: d } = await supabase
       .from('directors')

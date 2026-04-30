@@ -232,6 +232,7 @@ function formatRequestType(type: string): string {
     hr_costing: 'HR COSTING',
     payroll_run: 'PAYROLL RUN',
     dept_payment_request: 'DEPT REQUEST PAYMENT',
+    loan_cancel: 'LOAN CANCEL',
   }
   return labels[type] ?? type.toUpperCase()
 }

@@ -23,10 +23,23 @@ export async function updateTreasuryConfig(formData: FormData) {
   }
 
   // Convert percent values (0-100) to decimal (0-1) for storage
+  const opMarginDecimal = opMarginPercent / 100
   const updates: Array<{ key: string; value: number }> = [
-    { key: 'op_margin', value: opMarginPercent / 100 },
+    { key: 'op_margin', value: opMarginDecimal },
     { key: 'saving_rate', value: savingRatePercent / 100 },
   ]
+
+  // Detect if op_margin actually changed so we only refresh base_rate_history
+  // when the live rate would shift. Saving the form unchanged shouldn't
+  // generate noise rows.
+  const { data: existingOp } = await supabase
+    .from('treasury_config')
+    .select('config_value')
+    .eq('config_key', 'op_margin')
+    .maybeSingle()
+  const opMarginChanged =
+    existingOp == null ||
+    Math.abs(Number(existingOp.config_value ?? 0) - opMarginDecimal) > 1e-9
 
   for (const { key, value } of updates) {
     const { error } = await supabase
@@ -36,7 +49,24 @@ export async function updateTreasuryConfig(formData: FormData) {
     if (error) throw new Error(`Failed to update ${key}: ${error.message}`)
   }
 
+  // Item 2: keep base_rate_history in sync with Settings. Without this, the
+  // fund-out form keeps reading the stale approved snapshot and the user sees
+  // 0.3% even after setting op_margin to 0. Principal is the gate for both
+  // Settings and base rate, so we auto-approve here.
+  if (opMarginChanged) {
+    const { error: rateErr } = await supabase.rpc('refresh_base_rate', {
+      p_op_margin: opMarginDecimal,
+    })
+    if (rateErr) {
+      throw new Error(
+        `Treasury config saved but base rate refresh failed: ${rateErr.message}`
+      )
+    }
+  }
+
   revalidatePath('/settings')
+  revalidatePath('/fund-out/new')
+  revalidatePath('/dashboard')
 }
 
 // ─── Overdue Stages (grace / late_1 / late_2 / escalation) ────────────────────

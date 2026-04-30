@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import type { UserRole } from '@/types'
 
-type Tab = 'overview' | 'history' | 'pnl' | 'request-payment' | 'request-credit'
+type Tab = 'overview' | 'history' | 'pnl' | 'venture-in' | 'request-payment' | 'request-credit'
 
 interface Props {
   basePath: string

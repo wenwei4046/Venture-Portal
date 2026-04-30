@@ -63,7 +63,15 @@ export default async function LoanDetailPage({ params }: Props) {
     : null
 
   const canRecordRepayment = user.role === 'finance' && loan.status === 'active'
-  const canCancelLoan = user.role === 'finance' && loan.status === 'pending_approval'
+  // Item 3: Finance can cancel pending OR active loans. Active cancellation
+  // requires Principal approval downstream and is blocked when repayments
+  // already exist (RPC guards this too).
+  const isPendingApproval = loan.status === 'pending_approval'
+  const isActive = loan.status === 'active'
+  const noRepayments = repaymentList.length === 0
+  const canCancelLoan =
+    user.role === 'finance' &&
+    (isPendingApproval || (isActive && noRepayments))
 
   return (
     <div>
@@ -201,17 +209,40 @@ export default async function LoanDetailPage({ params }: Props) {
         {canCancelLoan ? (
           <form action={cancelLoan} className="mt-5">
             <input type="hidden" name="id" value={loan.id} />
+            {isActive ? (
+              <>
+                <label htmlFor="reason" className="block text-xs uppercase tracking-wide text-muted font-sans mb-1">
+                  Reason for cancellation
+                </label>
+                <input
+                  id="reason"
+                  name="reason"
+                  type="text"
+                  maxLength={200}
+                  required
+                  placeholder="e.g., wrong borrower, agreement voided"
+                  className="w-full sm:max-w-md px-3 py-2 mb-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+                />
+              </>
+            ) : null}
             <button
               type="submit"
               className="text-sm text-alert border border-alert/30 px-4 py-2 rounded-md hover:bg-alert/5 font-sans transition-colors"
             >
-              Cancel this loan
+              {isActive ? 'Request cancellation (needs Principal)' : 'Cancel this loan'}
             </button>
             <p className="text-xs text-muted mt-1.5 italic font-serif">
-              Finance can cancel before Principal approves. The loan and its approval request are
-              both marked rejected in one transaction.
+              {isActive
+                ? 'Active loan: files an approval request. Once Principal approves, bank balance, Venture Pool, and GL entries are reversed and the loan is marked cancelled.'
+                : 'Finance can cancel before Principal approves. The loan and its approval request are both marked rejected in one transaction.'}
             </p>
           </form>
+        ) : null}
+        {isActive && !noRepayments && user.role === 'finance' ? (
+          <p className="text-xs text-muted mt-3 italic font-serif">
+            Cannot cancel — {repaymentList.length} repayment
+            {repaymentList.length === 1 ? '' : 's'} recorded. Reverse those first.
+          </p>
         ) : null}
 
         {loan.repayment_terms ? (

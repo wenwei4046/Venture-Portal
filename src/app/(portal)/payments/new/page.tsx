@@ -49,7 +49,7 @@ export default async function NewPaymentPage({ searchParams }: Props) {
   let invoicePreset: {
     id: string
     invoice_no: string | null
-    company_id: string
+    company_id: string | null
     company_name: string
     total_amount: number
     period_month: string
@@ -69,7 +69,7 @@ export default async function NewPaymentPage({ searchParams }: Props) {
       invoicePreset = {
         id: inv.id,
         invoice_no: inv.invoice_no,
-        company_id: inv.company_id,
+        company_id: inv.company_id, // may be null for non-subsidiary invoices (Item 5)
         company_name: company?.name ?? '—',
         total_amount: Number(inv.total_amount),
         period_month: inv.period_month,

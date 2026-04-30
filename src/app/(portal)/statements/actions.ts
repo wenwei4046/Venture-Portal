@@ -69,6 +69,9 @@ export async function generateStatements(formData: FormData) {
     Array<{ id: string; billing_mode: BillingMode; total_amount: number }>
   >()
   for (const inv of periodInvoices ?? []) {
+    // Item 5: invoices billed to non-subsidiary parties (director / dept_pool /
+    // freetext) don't roll into per-company statements. Skip them here.
+    if (!inv.company_id) continue
     const list = invoicesByCompany.get(inv.company_id) ?? []
     list.push({
       id: inv.id,

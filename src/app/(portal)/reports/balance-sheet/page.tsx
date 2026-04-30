@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
-import { fetchGlForPeriod, type AccountType } from '@/lib/gl-reports'
+import { fetchBalanceSheet } from '@/lib/cfo-reports'
 import dayjs from 'dayjs'
 import Link from 'next/link'
 
@@ -9,48 +9,15 @@ interface Props {
   searchParams: Promise<{ as_of?: string }>
 }
 
-const TYPE_HEADER: Record<'asset' | 'liability' | 'equity', { label: string; className: string }> = {
-  asset:     { label: 'Assets',      className: 'text-info' },
-  liability: { label: 'Liabilities', className: 'text-danger' },
-  equity:    { label: 'Equity',      className: 'text-ledger' },
-}
-
 export default async function BalanceSheetPage({ searchParams }: Props) {
   await requireRole(['principal', 'finance'])
   const supabase = await createClient()
 
   const { as_of: rawAsOf } = await searchParams
-  const asOf = rawAsOf ?? dayjs().endOf('month').format('YYYY-MM-DD')
+  const asOf = rawAsOf ?? dayjs().format('YYYY-MM-DD')
 
-  // Cumulative GL balances from inception → as-of date.
-  const accounts = await fetchGlForPeriod(supabase, {
-    asOf,
-    types: ['asset', 'liability', 'equity'],
-  })
-
-  // Retained earnings = cumulative net profit (revenue − expense) from inception
-  // through as-of, posted into a virtual "Retained Earnings" line so the BS
-  // balances. Without this, P&L accounts never close out and Equity is short
-  // by the YTD net profit.
-  const pnlAccounts = await fetchGlForPeriod(supabase, {
-    asOf,
-    types: ['revenue', 'expense'],
-  })
-  const totalRevenue = pnlAccounts.filter((a) => a.type === 'revenue').reduce((s, a) => s + a.balance, 0)
-  const totalExpense = pnlAccounts.filter((a) => a.type === 'expense').reduce((s, a) => s + a.balance, 0)
-  const retainedEarnings = totalRevenue - totalExpense
-
-  const assets = accounts.filter((a) => a.type === 'asset').filter((a) => a.balance !== 0)
-  const liabilities = accounts.filter((a) => a.type === 'liability').filter((a) => a.balance !== 0)
-  const equity = accounts.filter((a) => a.type === 'equity').filter((a) => a.balance !== 0)
-
-  const totalAssets = assets.reduce((s, a) => s + a.balance, 0)
-  const totalLiabilities = liabilities.reduce((s, a) => s + a.balance, 0)
-  const totalEquityBefore = equity.reduce((s, a) => s + a.balance, 0)
-  const totalEquity = totalEquityBefore + retainedEarnings
-  const totalLiabAndEquity = totalLiabilities + totalEquity
-  const reconcileDiff = totalAssets - totalLiabAndEquity
-  const reconciles = Math.abs(reconcileDiff) < 0.01
+  const bs = await fetchBalanceSheet(supabase, { asOf })
+  const dateLabel = dayjs(asOf).format('D MMMM YYYY')
 
   return (
     <div>
@@ -61,7 +28,7 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> REPORTS · BALANCE SHEET · AS OF {dayjs(asOf).format('D MMM YYYY').toUpperCase()}
+            <em>I.</em> REPORTS · BALANCE SHEET · {dateLabel.toUpperCase()}
           </div>
           <h1 className="page-title">Balance Sheet</h1>
         </div>
@@ -75,136 +42,113 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
         </form>
       </div>
 
-      <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
-        Cumulative GL balances from inception through {dayjs(asOf).format('D MMM YYYY')}.
-        Retained Earnings = YTD revenue − YTD expense.
+      <p className="font-serif italic text-muted text-sm mb-8 max-w-3xl">
+        Snapshot at end of <strong>{dateLabel}</strong>. Group-level. Retained
+        earnings is YTD net profit (Jan 1 → as-of date).
       </p>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl">
-        {/* ── Assets ── */}
-        <div>
-          <BalanceSheetSection
-            type="asset"
-            accounts={assets}
-            total={totalAssets}
-          />
-        </div>
-
-        {/* ── Liabilities + Equity ── */}
-        <div className="space-y-8">
-          <BalanceSheetSection
-            type="liability"
-            accounts={liabilities}
-            total={totalLiabilities}
-          />
-          <div>
-            <h2 className={`font-sans text-xs uppercase tracking-wide ${TYPE_HEADER.equity.className} font-semibold mb-3`}>
-              Equity
-            </h2>
-            {equity.length === 0 && retainedEarnings === 0 ? (
-              <p className="font-serif italic text-muted text-sm">No equity balances.</p>
-            ) : (
-              <table className="ledger-table">
-                <tbody>
-                  {equity.map((a) => (
-                    <tr key={a.code}>
-                      <td className="font-mono text-xs text-graphite w-20">{a.code}</td>
-                      <td>{a.name}</td>
-                      <td className="num">{formatMoney(a.balance)}</td>
-                    </tr>
-                  ))}
-                  <tr>
-                    <td className="font-mono text-xs text-graphite w-20">—</td>
-                    <td className="italic text-graphite">Retained Earnings (YTD)</td>
-                    <td className={`num ${retainedEarnings >= 0 ? 'text-ledger' : 'text-danger'}`}>
-                      {formatMoney(retainedEarnings)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            )}
-            <div className="flex items-baseline justify-between pt-3 mt-3 border-t border-hairline">
-              <span className="font-serif italic text-base text-ink font-medium">Total Equity</span>
-              <span className="num text-num-ink text-lg font-semibold">{formatMoney(totalEquity)}</span>
-            </div>
-          </div>
-
-          <div className="border-t-2 border-hairline pt-4">
-            <div className="flex items-baseline justify-between">
-              <span className="font-serif italic text-base text-ink font-medium">Total Liabilities + Equity</span>
-              <span className="num text-num-ink text-lg font-semibold">{formatMoney(totalLiabAndEquity)}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Reconciliation ── */}
-      <div className="max-w-3xl mt-10 border border-hairline rounded-md bg-surface p-5">
-        <h3 className="font-sans text-xs uppercase tracking-wide text-ledger font-semibold mb-3">
-          Reconciliation
-        </h3>
-        <div className="space-y-2 text-sm">
-          <div className="flex items-baseline justify-between">
-            <span className="font-serif text-graphite">Total Assets</span>
-            <span className="num">{formatMoney(totalAssets)}</span>
-          </div>
-          <div className="flex items-baseline justify-between">
-            <span className="font-serif text-graphite">Total Liabilities + Equity</span>
-            <span className="num">{formatMoney(totalLiabAndEquity)}</span>
-          </div>
-          <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
-            <span className="font-serif italic font-medium text-ink">Balance Check</span>
-            <span className={`num font-semibold ${reconciles ? 'text-ledger' : 'text-danger'}`}>
-              {formatMoney(reconcileDiff)} {reconciles ? '✓' : '⚠'}
-            </span>
-          </div>
-        </div>
-        {!reconciles ? (
-          <p className="font-serif italic text-danger text-xs mt-3">
-            Balance Sheet does not balance — investigate journal_entries with unbalanced
-            lines, or unmatched debit/credit pairs in non-double-entry posts.
-          </p>
-        ) : (
-          <p className="font-serif italic text-muted text-xs mt-3">
-            Assets ≡ Liabilities + Equity. GL is balanced.
-          </p>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function BalanceSheetSection({
-  type, accounts, total,
-}: {
-  type: 'asset' | 'liability'
-  accounts: { code: string; name: string; balance: number; type: AccountType }[]
-  total: number
-}) {
-  const header = TYPE_HEADER[type]
-  return (
-    <div>
-      <h2 className={`font-sans text-xs uppercase tracking-wide ${header.className} font-semibold mb-3`}>
-        {header.label}
-      </h2>
-      {accounts.length === 0 ? (
-        <p className="font-serif italic text-muted text-sm">No balances.</p>
-      ) : (
-        <table className="ledger-table">
-          <tbody>
-            {accounts.map((a) => (
-              <tr key={a.code}>
-                <td className="font-mono text-xs text-graphite w-20">{a.code}</td>
-                <td>{a.name}</td>
-                <td className="num">{formatMoney(a.balance)}</td>
+      <div className="max-w-3xl space-y-10">
+        {/* Assets */}
+        <section>
+          <h2 className="font-serif text-xl text-ink mb-4">Assets</h2>
+          <table className="ledger-table">
+            <tbody>
+              <tr>
+                <td>Bank cash</td>
+                <td className="num">{formatMoney(bs.bank)}</td>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <div className="flex items-baseline justify-between pt-3 mt-3 border-t border-hairline">
-        <span className="font-serif italic text-base text-ink font-medium">Total {header.label}</span>
-        <span className="num text-num-ink text-lg font-semibold">{formatMoney(total)}</span>
+              <tr>
+                <td>Invoice receivable</td>
+                <td className="num">{formatMoney(bs.invoiceReceivable)}</td>
+              </tr>
+              <tr>
+                <td>Loan receivable</td>
+                <td className="num">{formatMoney(bs.loanReceivable)}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-hairline">
+                <td className="font-serif italic text-ink font-medium">Total assets</td>
+                <td className="num font-semibold text-num-ink">{formatMoney(bs.totalAssets)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </section>
+
+        {/* Liabilities */}
+        <section>
+          <h2 className="font-serif text-xl text-ink mb-4">Liabilities</h2>
+          <table className="ledger-table">
+            <tbody>
+              <tr>
+                <td>Fund sources payable</td>
+                <td className="num">{formatMoney(bs.fundSourcesPayable)}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-hairline">
+                <td className="font-serif italic text-ink font-medium">Total liabilities</td>
+                <td className="num font-semibold text-num-ink">{formatMoney(bs.fundSourcesPayable)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </section>
+
+        {/* Equity */}
+        <section>
+          <h2 className="font-serif text-xl text-ink mb-4">Equity</h2>
+          <table className="ledger-table">
+            <tbody>
+              <tr>
+                <td>Retained earnings (YTD)</td>
+                <td className={`num ${bs.retainedEarnings >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                  {formatMoney(bs.retainedEarnings)}
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-hairline">
+                <td className="font-serif italic text-ink font-medium">Total equity</td>
+                <td className={`num font-semibold ${bs.retainedEarnings >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                  {formatMoney(bs.retainedEarnings)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </section>
+
+        {/* Reconciliation */}
+        <div className="border border-hairline rounded-md bg-surface p-5">
+          <h3 className="font-sans text-xs uppercase tracking-wide text-ledger font-semibold mb-3">
+            Balance check
+          </h3>
+          <div className="space-y-2 text-sm">
+            <div className="flex items-baseline justify-between">
+              <span className="font-serif text-graphite">Total assets</span>
+              <span className="num">{formatMoney(bs.totalAssets)}</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="font-serif text-graphite">Total liabilities + equity</span>
+              <span className="num">{formatMoney(bs.totalLiabilitiesEquity)}</span>
+            </div>
+            <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
+              <span className="font-serif italic font-medium text-ink">Difference</span>
+              <span className={`num font-semibold ${bs.reconciles ? 'text-ledger' : 'text-danger'}`}>
+                {formatMoney(bs.totalAssets - bs.totalLiabilitiesEquity)} {bs.reconciles ? '✓' : '⚠'}
+              </span>
+            </div>
+          </div>
+          {!bs.reconciles ? (
+            <p className="font-serif italic text-danger text-xs mt-3">
+              Balance sheet does not tie. Check fund-source / receivable balances and
+              YTD net profit on the Income Statement.
+            </p>
+          ) : (
+            <p className="font-serif italic text-muted text-xs mt-3">
+              Assets ≡ Liabilities + Equity ✓
+            </p>
+          )}
+        </div>
       </div>
     </div>
   )
