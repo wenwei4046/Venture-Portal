@@ -29,6 +29,12 @@ export function canAccessDirectorPool(role: UserRole): boolean {
   return role === 'principal' || role === 'finance'
 }
 
+export function canAccessVenturePool(role: UserRole): boolean {
+  // Venture Pool = HV holding-company cash ledger (5 txn types).
+  // Mirrors Director Pool gating: Principal + Finance only.
+  return role === 'principal' || role === 'finance'
+}
+
 export function canAccessHRCosting(role: UserRole): boolean {
   // HR submits monthly snapshots; Principal approves via the Approvals queue.
   // Finance no longer sees the tab — they consume the aggregate from Dept Pool

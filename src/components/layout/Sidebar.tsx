@@ -10,6 +10,7 @@ import {
   canAccessBilling,
   canAccessDirectorSalary,
   canAccessDirectorPool,
+  canAccessVenturePool,
   canAccessClaims,
   canAccessHRCosting,
   canAccessReports,
@@ -80,6 +81,10 @@ const navEntries: NavEntry[] = [
 
   // ── Departments ──
   { href: '/dept-pool', label: 'Dept Pool', section: 'Departments', visible: canAccessDeptPool },
+  // Venture Pool = HV holding-company cash ledger (5 txn types). Sits next to
+  // Dept Pool because users navigate between "department view" and "HV view"
+  // when reasoning about money flow. Not under Treasury — Loo grouped it here.
+  { href: '/venture-pool', label: 'Venture Pool', section: 'Departments', visible: canAccessVenturePool },
   // OPEX is a dept_manager-only view of their own department's payroll
   // breakdown (per-employee Basic / KPI / Allowance / ER statutory).
   { href: '/opex', label: 'OPEX', section: 'Departments', visible: (r) => r === 'dept_manager' },

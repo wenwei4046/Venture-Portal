@@ -6,7 +6,6 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import DeptPoolTabs from '../_components/DeptPoolTabs'
 import HistoryTable from '../_components/HistoryTable'
-import VenturePoolInView from '../_components/VenturePoolInView'
 
 // Slug → dept name. Director (the special director payout pool) is intentionally
 // excluded — it has its own /director-pool view and is not a regular dept pool.
@@ -28,12 +27,7 @@ export default async function DeptPoolDetailPage({ params, searchParams }: Props
   if (!deptName) notFound()
 
   const { tab: rawTab, filter: rawFilter } = await searchParams
-  const activeTab =
-    rawTab === 'history'
-      ? 'history'
-      : rawTab === 'venture-in'
-        ? 'venture-in'
-        : 'overview'
+  const activeTab = rawTab === 'history' ? 'history' : 'overview'
   const historyFilter =
     rawFilter === 'in' ? 'in' : rawFilter === 'out' ? 'out' : 'all'
 
@@ -101,7 +95,6 @@ export default async function DeptPoolDetailPage({ params, searchParams }: Props
         basePath={`/dept-pool/${slug}`}
         role={user.role}
         isOwnDept={isOwnDept}
-        extraTabs={[{ key: 'venture-in', label: 'Venture Pool' }]}
       />
 
       {activeTab === 'overview' ? (
@@ -138,10 +131,6 @@ export default async function DeptPoolDetailPage({ params, searchParams }: Props
 
       {activeTab === 'history' ? (
         <HistoryTable deptId={dept.id} filter={historyFilter} />
-      ) : null}
-
-      {activeTab === 'venture-in' ? (
-        <VenturePoolInView deptId={dept.id} deptName={dept.name} period={period} />
       ) : null}
     </div>
   )

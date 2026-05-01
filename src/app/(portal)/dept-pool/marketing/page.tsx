@@ -7,7 +7,6 @@ import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import DeptPoolTabs from '../_components/DeptPoolTabs'
 import HistoryTable from '../_components/HistoryTable'
 import MarketingPnlView from '../_components/MarketingPnlView'
-import VenturePoolInView from '../_components/VenturePoolInView'
 import RequestPaymentForm from '../_components/RequestPaymentForm'
 import RequestCreditForm from '../_components/RequestCreditForm'
 import StageBadge from '../_components/StageBadge'
@@ -26,13 +25,11 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
       ? 'history'
       : rawTab === 'pnl'
         ? 'pnl'
-        : rawTab === 'venture-in'
-          ? 'venture-in'
-          : rawTab === 'request-payment'
-            ? 'request-payment'
-            : rawTab === 'request-credit'
-              ? 'request-credit'
-              : 'overview'
+        : rawTab === 'request-payment'
+          ? 'request-payment'
+          : rawTab === 'request-credit'
+            ? 'request-credit'
+            : 'overview'
   const historyFilter =
     rawFilter === 'in' ? 'in' : rawFilter === 'out' ? 'out' : 'all'
 
@@ -108,10 +105,7 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
         basePath="/dept-pool/marketing"
         role={user.role}
         isOwnDept={isOwnDept}
-        extraTabs={[
-          { key: 'pnl', label: 'P&L' },
-          { key: 'venture-in', label: 'Venture Pool' },
-        ]}
+        extraTabs={[{ key: 'pnl', label: 'P&L' }]}
       />
 
       {activeTab === 'overview' ? (
@@ -171,10 +165,6 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
 
       {activeTab === 'pnl' ? (
         <MarketingPnlView deptId={marketing.id} period={period} />
-      ) : null}
-
-      {activeTab === 'venture-in' ? (
-        <VenturePoolInView deptId={marketing.id} deptName="Marketing" period={period} />
       ) : null}
 
       {activeTab === 'request-payment' && canSubmitExpense ? (
