@@ -4,6 +4,8 @@ import { formatMoney, formatMoneyBare, getPeriodMonth } from '@/lib/utils'
 import dayjs from 'dayjs'
 import Link from 'next/link'
 import PCBInput from './_components/PCBInput'
+import EditableDeduction from './_components/EditableDeduction'
+import ResetStatutoryButton from './_components/ResetStatutoryButton'
 
 interface Props {
   params: Promise<{ directorId: string }>
@@ -86,6 +88,24 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
 
   const n = (v: number | null) => Number(v ?? 0)
 
+  // Phase 11.2: payslip earnings breakdown.
+  // Use payroll_bk + payroll_allow stored on the row (already accounts for
+  // post-offset ratios + advance top-up). Loo's spec:
+  //   Basic = min_payout floor (always show 14,400 if BK >= floor)
+  //   KPI   = BK portion - floor (the EPF-able balance above 14,400)
+  //   Allowance = non-EPF portion of gross
+  // Sum = payroll_bk + payroll_allow = payroll_gross
+  const minPayout = Number(director.min_payout ?? 14400)
+  const bkPortion = n(payout.payroll_bk)
+  const allowancePortion = n(payout.payroll_allow)
+  const basicLine = Math.min(minPayout, bkPortion)
+  const kpiLine = Math.max(0, bkPortion - minPayout)
+  const allowanceLine = allowancePortion
+  const isOverridden = !!payout.statutory_overridden_at
+  const overriddenLabel = payout.statutory_overridden_at
+    ? dayjs(payout.statutory_overridden_at).format('D MMM YYYY HH:mm')
+    : ''
+
   return (
     <div>
       <Link href={`/director-salary?period=${period}`} className="text-sm text-muted hover:text-accent font-sans transition-colors">
@@ -151,32 +171,54 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
               <span className="num text-num-ink font-semibold">{formatMoney(n(payout.payroll_gross))}</span>
             </div>
 
+            {/* Phase 11.2: Earnings breakdown — display only, sums to payroll_gross */}
             <div className="pt-3 border-t border-hairline space-y-2">
-              <p className="font-sans text-xs uppercase tracking-wide text-graphite">Deductions</p>
+              <p className="font-sans text-xs uppercase tracking-wide text-graphite">Earnings breakdown</p>
+              <div className="flex items-baseline justify-between">
+                <span className="font-serif italic text-sm text-graphite">Basic <span className="text-muted">(min RM {formatMoneyBare(minPayout)})</span></span>
+                <span className="num text-num-ink">{formatMoney(basicLine)}</span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="font-serif italic text-sm text-graphite">KPI <span className="text-muted">(EPF-able)</span></span>
+                <span className="num text-num-ink">{formatMoney(kpiLine)}</span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="font-serif italic text-sm text-graphite">Allowance <span className="text-muted">(non-EPF)</span></span>
+                <span className="num text-num-ink">{formatMoney(allowanceLine)}</span>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-hairline space-y-2">
+              <p className="font-sans text-xs uppercase tracking-wide text-graphite">Deductions <span className="text-muted normal-case font-serif italic">— click any value to override</span></p>
               <div className="flex items-baseline justify-between">
                 <span className="font-serif italic text-sm text-graphite">EPF ER</span>
-                <span className="num text-graphite">({formatMoneyBare(n(payout.payroll_epf_er))})</span>
+                <EditableDeduction payoutId={payout.id} field="payroll_epf_er" value={n(payout.payroll_epf_er)} kind="payroll" readOnly={payout.status !== 'draft'} />
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="font-serif italic text-sm text-graphite">EPF EE</span>
-                <span className="num text-graphite">({formatMoneyBare(n(payout.payroll_epf_ee))})</span>
+                <EditableDeduction payoutId={payout.id} field="payroll_epf_ee" value={n(payout.payroll_epf_ee)} kind="payroll" readOnly={payout.status !== 'draft'} />
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="font-serif italic text-sm text-graphite">SOCSO ER</span>
-                <span className="num text-graphite">({formatMoneyBare(n(payout.payroll_socso_er))})</span>
+                <EditableDeduction payoutId={payout.id} field="payroll_socso_er" value={n(payout.payroll_socso_er)} kind="payroll" readOnly={payout.status !== 'draft'} />
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="font-serif italic text-sm text-graphite">SOCSO EE</span>
-                <span className="num text-graphite">({formatMoneyBare(n(payout.payroll_socso_ee))})</span>
+                <EditableDeduction payoutId={payout.id} field="payroll_socso_ee" value={n(payout.payroll_socso_ee)} kind="payroll" readOnly={payout.status !== 'draft'} />
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="font-serif italic text-sm text-graphite">EIS ER</span>
-                <span className="num text-graphite">({formatMoneyBare(n(payout.payroll_eis_er))})</span>
+                <EditableDeduction payoutId={payout.id} field="payroll_eis_er" value={n(payout.payroll_eis_er)} kind="payroll" readOnly={payout.status !== 'draft'} />
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="font-serif italic text-sm text-graphite">EIS EE</span>
-                <span className="num text-graphite">({formatMoneyBare(n(payout.payroll_eis_ee))})</span>
+                <EditableDeduction payoutId={payout.id} field="payroll_eis_ee" value={n(payout.payroll_eis_ee)} kind="payroll" readOnly={payout.status !== 'draft'} />
               </div>
+              {payout.status === 'draft' && isOverridden ? (
+                <div className="pt-2">
+                  <ResetStatutoryButton payoutId={payout.id} overridden={isOverridden} overriddenLabel={overriddenLabel} />
+                </div>
+              ) : null}
             </div>
 
             {/* PCB Input */}
@@ -203,15 +245,15 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">+ EPF ER</span>
-              <span className="num text-graphite">{formatMoney(n(payout.invoice_epf_er))}</span>
+              <EditableDeduction payoutId={payout.id} field="invoice_epf_er" value={n(payout.invoice_epf_er)} kind="invoice" readOnly={payout.status !== 'draft'} />
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">+ SOCSO ER</span>
-              <span className="num text-graphite">{formatMoney(n(payout.invoice_socso_er))}</span>
+              <EditableDeduction payoutId={payout.id} field="invoice_socso_er" value={n(payout.invoice_socso_er)} kind="invoice" readOnly={payout.status !== 'draft'} />
             </div>
             <div className="flex items-baseline justify-between">
               <span className="font-serif italic text-sm text-graphite">+ EIS ER</span>
-              <span className="num text-graphite">{formatMoney(n(payout.invoice_eis_er))}</span>
+              <EditableDeduction payoutId={payout.id} field="invoice_eis_er" value={n(payout.invoice_eis_er)} kind="invoice" readOnly={payout.status !== 'draft'} />
             </div>
             <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
               <span className="font-serif italic text-sm text-accent">Invoice Total</span>

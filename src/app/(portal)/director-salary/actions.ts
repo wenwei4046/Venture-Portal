@@ -366,6 +366,169 @@ export async function updatePCB(payoutId: string, pcbAmount: number) {
   revalidatePath('/director-salary')
 }
 
+// ─── Override / Reset Statutory (Phase 11.2) ───────────────────────────────
+//
+// HR (and Principal) can override the JADUAL-driven EPF / SOCSO / EIS
+// values per payout — e.g. director has a custom EPF rate, or HR adjusts
+// for arrears. updateDirectorStatutory writes any subset of the 9 numeric
+// fields and recomputes payroll_net. resetDirectorStatutoryToLookup
+// re-runs the lookup RPCs against the row's stored payroll_bk / invoice_bk
+// wage bases and overwrites all 9 fields back to the table value.
+
+const PAYROLL_STAT_FIELDS = [
+  'payroll_epf_er',
+  'payroll_epf_ee',
+  'payroll_socso_er',
+  'payroll_socso_ee',
+  'payroll_eis_er',
+  'payroll_eis_ee',
+] as const
+const INVOICE_STAT_FIELDS = [
+  'invoice_epf_er',
+  'invoice_socso_er',
+  'invoice_eis_er',
+] as const
+type DirectorStatutoryField = (typeof PAYROLL_STAT_FIELDS)[number] | (typeof INVOICE_STAT_FIELDS)[number]
+
+export type DirectorStatutoryUpdate = Partial<Record<DirectorStatutoryField, number>>
+
+function recomputePayrollNet(row: {
+  payroll_gross: number | null
+  payroll_epf_er: number | null
+  payroll_epf_ee: number | null
+  payroll_socso_er: number | null
+  payroll_socso_ee: number | null
+  payroll_eis_er: number | null
+  payroll_eis_ee: number | null
+  payroll_pcb: number | null
+}): number {
+  const gross = Number(row.payroll_gross ?? 0)
+  const deductions =
+    Number(row.payroll_epf_er ?? 0) + Number(row.payroll_epf_ee ?? 0) +
+    Number(row.payroll_socso_er ?? 0) + Number(row.payroll_socso_ee ?? 0) +
+    Number(row.payroll_eis_er ?? 0) + Number(row.payroll_eis_ee ?? 0)
+  const pcb = Number(row.payroll_pcb ?? 0)
+  return Math.round((gross - deductions - pcb) * 100) / 100
+}
+
+export async function updateDirectorStatutory(payoutId: string, fields: DirectorStatutoryUpdate) {
+  const user = await requireRole(['hr', 'principal'])
+  const supabase = await createClient()
+
+  // Validate inbound fields: numeric, non-negative, must be a recognised key.
+  const allowed = new Set<DirectorStatutoryField>([...PAYROLL_STAT_FIELDS, ...INVOICE_STAT_FIELDS])
+  const writes: Record<string, number> = {}
+  for (const [k, v] of Object.entries(fields)) {
+    if (!allowed.has(k as DirectorStatutoryField)) {
+      throw new Error(`Unknown statutory field: ${k}`)
+    }
+    const n = Number(v)
+    if (!Number.isFinite(n) || n < 0) {
+      throw new Error(`${k} must be a non-negative number`)
+    }
+    writes[k] = Math.round(n * 100) / 100
+  }
+  if (Object.keys(writes).length === 0) throw new Error('No statutory fields provided')
+
+  const { data: row, error: fetchErr } = await supabase
+    .from('director_payouts')
+    .select(
+      'id, status, payroll_gross, payroll_epf_er, payroll_epf_ee, payroll_socso_er, payroll_socso_ee, payroll_eis_er, payroll_eis_ee, payroll_pcb',
+    )
+    .eq('id', payoutId)
+    .single()
+  if (fetchErr || !row) throw new Error('Payout not found')
+  if (row.status !== 'draft') throw new Error('Cannot edit statutory on a confirmed/paid payout')
+
+  // Merge incoming overrides with existing row values for net recompute.
+  const merged = { ...row, ...writes }
+  const payrollNet = recomputePayrollNet(merged)
+
+  const { error: updErr } = await supabase
+    .from('director_payouts')
+    .update({
+      ...writes,
+      payroll_net: payrollNet,
+      statutory_overridden_at: new Date().toISOString(),
+      statutory_overridden_by: user.id,
+    })
+    .eq('id', payoutId)
+    .eq('status', 'draft')
+  if (updErr) throw new Error(`Failed to update statutory: ${updErr.message}`)
+
+  revalidatePath('/director-salary')
+}
+
+export async function resetDirectorStatutoryToLookup(payoutId: string) {
+  await requireRole(['hr', 'principal'])
+  const supabase = await createClient()
+
+  const { data: row, error: fetchErr } = await supabase
+    .from('director_payouts')
+    .select(
+      'id, status, payroll_bk, invoice_bk, payroll_gross, payroll_pcb',
+    )
+    .eq('id', payoutId)
+    .single()
+  if (fetchErr || !row) throw new Error('Payout not found')
+  if (row.status !== 'draft') throw new Error('Cannot reset statutory on a confirmed/paid payout')
+
+  const payrollBk = Number(row.payroll_bk ?? 0)
+  const invoiceBk = Number(row.invoice_bk ?? 0)
+
+  // Re-run the same lookups the calculate action uses.
+  const [{ data: epfP }, { data: socsoP }, { data: eisP }, { data: epfI }, { data: socsoI }, { data: eisI }] =
+    await Promise.all([
+      supabase.rpc('lookup_epf', { p_wages: payrollBk }),
+      supabase.rpc('lookup_socso', { p_wages: payrollBk }),
+      supabase.rpc('lookup_eis', { p_wages: payrollBk }),
+      supabase.rpc('lookup_epf', { p_wages: invoiceBk }),
+      supabase.rpc('lookup_socso', { p_wages: invoiceBk }),
+      supabase.rpc('lookup_eis', { p_wages: invoiceBk }),
+    ])
+
+  const payrollEpfEr = Number(epfP?.[0]?.employer ?? 0)
+  const payrollEpfEe = Number(epfP?.[0]?.employee ?? 0)
+  const payrollSocsoEr = Number(socsoP?.[0]?.employer ?? 0)
+  const payrollSocsoEe = Number(socsoP?.[0]?.employee ?? 0)
+  const payrollEisEr = Number(eisP?.[0]?.employer ?? 0)
+  const payrollEisEe = Number(eisP?.[0]?.employee ?? 0)
+
+  const merged = {
+    payroll_gross: row.payroll_gross,
+    payroll_epf_er: payrollEpfEr,
+    payroll_epf_ee: payrollEpfEe,
+    payroll_socso_er: payrollSocsoEr,
+    payroll_socso_ee: payrollSocsoEe,
+    payroll_eis_er: payrollEisEr,
+    payroll_eis_ee: payrollEisEe,
+    payroll_pcb: row.payroll_pcb,
+  }
+  const payrollNet = recomputePayrollNet(merged)
+
+  const { error: updErr } = await supabase
+    .from('director_payouts')
+    .update({
+      payroll_epf_er: payrollEpfEr,
+      payroll_epf_ee: payrollEpfEe,
+      payroll_socso_er: payrollSocsoEr,
+      payroll_socso_ee: payrollSocsoEe,
+      payroll_eis_er: payrollEisEr,
+      payroll_eis_ee: payrollEisEe,
+      invoice_epf_er: Number(epfI?.[0]?.employer ?? 0),
+      invoice_socso_er: Number(socsoI?.[0]?.employer ?? 0),
+      invoice_eis_er: Number(eisI?.[0]?.employer ?? 0),
+      payroll_net: payrollNet,
+      statutory_overridden_at: null,
+      statutory_overridden_by: null,
+    })
+    .eq('id', payoutId)
+    .eq('status', 'draft')
+  if (updErr) throw new Error(`Failed to reset statutory: ${updErr.message}`)
+
+  revalidatePath('/director-salary')
+}
+
 // ─── Confirm Payouts ───────────────────────────────────────────────
 
 export async function confirmPayouts(period: string) {

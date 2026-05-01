@@ -64,6 +64,110 @@ export async function updatePayrollRow(
   revalidatePath('/hr-costing/payroll', 'layout')
 }
 
+// ─── Override / Reset Statutory (Phase 11.2) ───────────────────────────────
+//
+// The compute trigger on hr_monthly_payroll only fires when one of basic_salary,
+// statutory_allowance, non_statutory_allowance, ot_*, commission_amount,
+// unpaid_leave_days, period_month, or staff_id is in the UPDATE clause. So we
+// can update epf_*/socso_*/eis_* directly without the trigger overwriting us.
+// Reset fires a no-op update on basic_salary to force the trigger to re-run
+// the JADUAL lookups + recompute gross/net.
+
+const STAFF_STAT_FIELDS = [
+  'epf_er',
+  'epf_ee',
+  'socso_er',
+  'socso_ee',
+  'eis_er',
+  'eis_ee',
+] as const
+type StaffStatutoryField = (typeof STAFF_STAT_FIELDS)[number]
+export type StaffStatutoryUpdate = Partial<Record<StaffStatutoryField, number>>
+
+export async function updateStaffStatutory(
+  id: string,
+  fields: StaffStatutoryUpdate,
+): Promise<void> {
+  const user = await requireRole(['hr', 'principal'])
+  const supabase = await createClient()
+
+  const allowed = new Set<StaffStatutoryField>(STAFF_STAT_FIELDS)
+  const writes: Record<string, number> = {}
+  for (const [k, v] of Object.entries(fields)) {
+    if (!allowed.has(k as StaffStatutoryField)) {
+      throw new Error(`Unknown statutory field: ${k}`)
+    }
+    const n = Number(v)
+    if (!Number.isFinite(n) || n < 0) {
+      throw new Error(`${k} must be a non-negative number`)
+    }
+    writes[k] = Math.round(n * 100) / 100
+  }
+  if (Object.keys(writes).length === 0) throw new Error('No statutory fields provided')
+
+  const { data: row, error: fetchErr } = await supabase
+    .from('hr_monthly_payroll')
+    .select('id, status, gross, epf_ee, socso_ee, eis_ee, pcb')
+    .eq('id', id)
+    .single()
+  if (fetchErr || !row) throw new Error('Payroll row not found')
+  if (row.status !== 'draft') throw new Error('Cannot edit statutory on a non-draft payroll row')
+
+  // Net = gross - epf_ee - socso_ee - eis_ee - pcb. Apply the override values
+  // for whichever EE fields the caller passed; existing values stand for the rest.
+  const merged = { ...row, ...writes }
+  const net = Math.round(
+    (Number(merged.gross ?? 0) -
+      Number(merged.epf_ee ?? 0) -
+      Number(merged.socso_ee ?? 0) -
+      Number(merged.eis_ee ?? 0) -
+      Number(merged.pcb ?? 0)) * 100
+  ) / 100
+
+  const { error: updErr } = await supabase
+    .from('hr_monthly_payroll')
+    .update({
+      ...writes,
+      net,
+      statutory_overridden_at: new Date().toISOString(),
+      statutory_overridden_by: user.id,
+    })
+    .eq('id', id)
+    .eq('status', 'draft')
+  if (updErr) throw new Error(`Failed to update statutory: ${updErr.message}`)
+
+  revalidatePath('/hr-costing/payroll', 'layout')
+}
+
+export async function resetStaffStatutoryToLookup(id: string): Promise<void> {
+  await requireRole(['hr', 'principal'])
+  const supabase = await createClient()
+
+  // Pull basic_salary so we can fire a no-op UPDATE that re-triggers the
+  // compute_hr_monthly_payroll function. The trigger watches basic_salary,
+  // so writing the same value back forces it to recompute statutory + net.
+  const { data: row, error: fetchErr } = await supabase
+    .from('hr_monthly_payroll')
+    .select('id, status, basic_salary')
+    .eq('id', id)
+    .single()
+  if (fetchErr || !row) throw new Error('Payroll row not found')
+  if (row.status !== 'draft') throw new Error('Cannot reset statutory on a non-draft payroll row')
+
+  const { error: updErr } = await supabase
+    .from('hr_monthly_payroll')
+    .update({
+      basic_salary: row.basic_salary,
+      statutory_overridden_at: null,
+      statutory_overridden_by: null,
+    })
+    .eq('id', id)
+    .eq('status', 'draft')
+  if (updErr) throw new Error(`Failed to reset statutory: ${updErr.message}`)
+
+  revalidatePath('/hr-costing/payroll', 'layout')
+}
+
 /**
  * Delete one or more draft payroll rows for a given period. Used to drop
  * staff who shouldn't be on this month's payroll (no pay leave, late joiners,

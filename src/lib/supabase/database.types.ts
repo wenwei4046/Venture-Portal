@@ -1012,6 +1012,8 @@ export type Database = {
           status: Database["public"]["Enums"]["payout_status"]
           statutory_er_in: number | null
           statutory_er_out: number | null
+          statutory_overridden_at: string | null
+          statutory_overridden_by: string | null
           statutory_surplus: number | null
         }
         Insert: {
@@ -1049,6 +1051,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["payout_status"]
           statutory_er_in?: number | null
           statutory_er_out?: number | null
+          statutory_overridden_at?: string | null
+          statutory_overridden_by?: string | null
           statutory_surplus?: number | null
         }
         Update: {
@@ -1086,6 +1090,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["payout_status"]
           statutory_er_in?: number | null
           statutory_er_out?: number | null
+          statutory_overridden_at?: string | null
+          statutory_overridden_by?: string | null
           statutory_surplus?: number | null
         }
         Relationships: [
@@ -1509,6 +1515,8 @@ export type Database = {
           staff_id: string
           status: Database["public"]["Enums"]["hr_monthly_payroll_status"]
           statutory_allowance: number
+          statutory_overridden_at: string | null
+          statutory_overridden_by: string | null
           unpaid_leave_days: number
           updated_at: string
         }
@@ -1537,6 +1545,8 @@ export type Database = {
           staff_id: string
           status?: Database["public"]["Enums"]["hr_monthly_payroll_status"]
           statutory_allowance?: number
+          statutory_overridden_at?: string | null
+          statutory_overridden_by?: string | null
           unpaid_leave_days?: number
           updated_at?: string
         }
@@ -1565,6 +1575,8 @@ export type Database = {
           staff_id?: string
           status?: Database["public"]["Enums"]["hr_monthly_payroll_status"]
           statutory_allowance?: number
+          statutory_overridden_at?: string | null
+          statutory_overridden_by?: string | null
           unpaid_leave_days?: number
           updated_at?: string
         }

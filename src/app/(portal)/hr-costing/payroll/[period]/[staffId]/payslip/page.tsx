@@ -1,8 +1,11 @@
 import { notFound } from 'next/navigation'
+import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import PrintButton from './_components/PrintButton'
+import EditableStatLine from './_components/EditableStatLine'
+import ResetStaffStatutoryButton from './_components/ResetStaffStatutoryButton'
 
 interface PageProps {
   params: Promise<{ period: string; staffId: string }>
@@ -28,7 +31,7 @@ export default async function PayslipPage({ params }: PageProps) {
       ot_hours, ot_amount, commission_amount, unpaid_leave_days,
       prorata_days_worked, prorata_days_in_month,
       epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb,
-      gross, net, status,
+      gross, net, status, statutory_overridden_at,
       hr_staff_costs (
         employee_name, employee_code, epf_category, socso_category, pcb_category,
         departments(name)
@@ -118,14 +121,30 @@ export default async function PayslipPage({ params }: PageProps) {
             Deductions
           </div>
           <div className="space-y-1 text-sm">
-            <Line label="EPF (Employee)" value={row.epf_ee} />
-            <Line label="SOCSO (Employee)" value={row.socso_ee} />
-            <Line label="EIS (Employee)" value={row.eis_ee} />
+            <div className="flex items-baseline justify-between">
+              <span className="font-serif">EPF (Employee)</span>
+              <EditableStatLine payrollId={row.id} field="epf_ee" value={Number(row.epf_ee)} readOnly={row.status !== 'draft'} />
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="font-serif">SOCSO (Employee)</span>
+              <EditableStatLine payrollId={row.id} field="socso_ee" value={Number(row.socso_ee)} readOnly={row.status !== 'draft'} />
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="font-serif">EIS (Employee)</span>
+              <EditableStatLine payrollId={row.id} field="eis_ee" value={Number(row.eis_ee)} readOnly={row.status !== 'draft'} />
+            </div>
             <Line label={`PCB (${staff.pcb_category})`} value={row.pcb} />
             <div className="border-t border-hairline pt-2 mt-2 flex justify-between">
               <span className="font-serif text-ink">Total Deductions</span>
               <span className="num text-num-ink font-semibold">{formatMoney(totalDeductions)}</span>
             </div>
+            {row.status === 'draft' && row.statutory_overridden_at ? (
+              <ResetStaffStatutoryButton
+                payrollId={row.id}
+                overridden={true}
+                overriddenLabel={dayjs(row.statutory_overridden_at).format('D MMM YYYY HH:mm')}
+              />
+            ) : null}
           </div>
         </section>
 
@@ -150,15 +169,15 @@ export default async function PayslipPage({ params }: PageProps) {
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div>
               <div className="text-xs text-graphite">EPF ER</div>
-              <div className="num">{formatMoney(Number(row.epf_er))}</div>
+              <div><EditableStatLine payrollId={row.id} field="epf_er" value={Number(row.epf_er)} readOnly={row.status !== 'draft'} /></div>
             </div>
             <div>
               <div className="text-xs text-graphite">SOCSO ER</div>
-              <div className="num">{formatMoney(Number(row.socso_er))}</div>
+              <div><EditableStatLine payrollId={row.id} field="socso_er" value={Number(row.socso_er)} readOnly={row.status !== 'draft'} /></div>
             </div>
             <div>
               <div className="text-xs text-graphite">EIS ER</div>
-              <div className="num">{formatMoney(Number(row.eis_er))}</div>
+              <div><EditableStatLine payrollId={row.id} field="eis_er" value={Number(row.eis_er)} readOnly={row.status !== 'draft'} /></div>
             </div>
           </div>
           <div className="mt-2 pt-2 border-t border-hairline flex justify-between">
