@@ -40,11 +40,13 @@ interface Props {
   invoices: Invoice[]
   companyMap: Map<string, { name: string; code: string }>
   period: string
+  /** Phase 11: payment_categories for credit-note multi-pool routing. */
+  categories?: Array<{ code: string; label: string }>
 }
 
 // Invoices for the selected period. Populated by Step 5's generate_monthly_invoices
 // RPC. Until Step 5 ships, this section shows the empty state with an explanation.
-export default function InvoicesList({ invoices, companyMap, period }: Props) {
+export default function InvoicesList({ invoices, companyMap, period, categories = [] }: Props) {
   const totalsByMode = new Map<string, number>()
   const totalsByCompany = new Map<string, number>()
   let grandTotal = 0
@@ -182,6 +184,7 @@ export default function InvoicesList({ invoices, companyMap, period }: Props) {
                               invoiceNo={inv.invoice_no}
                               invoiceTotal={Number(inv.total_amount)}
                               payeeLabel={primaryLabel}
+                              categories={categories}
                             />
                           ) : null}
                         </div>

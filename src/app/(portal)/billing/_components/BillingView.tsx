@@ -44,6 +44,7 @@ export default async function BillingView({ searchParams }: Props) {
     { data: companies },
     { data: nonBillableTxns },
     { data: departments },
+    { data: categories },
   ] = await Promise.all([
     supabase.rpc('get_submitted_hr_summary', { p_period: period }).maybeSingle(),
     supabase
@@ -66,6 +67,11 @@ export default async function BillingView({ searchParams }: Props) {
       .lte('created_at', periodEnd)
       .order('created_at', { ascending: false }),
     supabase.from('departments').select('id, name').order('name'),
+    supabase
+      .from('payment_categories')
+      .select('code, label')
+      .eq('is_active', true)
+      .order('sort_order'),
   ])
 
   if (hrSummaryError) {
@@ -153,6 +159,7 @@ export default async function BillingView({ searchParams }: Props) {
               companies={companyList}
               currentPeriod={period}
               departments={departments ?? []}
+              categories={categories ?? []}
             />
           )}
         </div>
@@ -214,6 +221,7 @@ export default async function BillingView({ searchParams }: Props) {
           canCreate={user.role === 'finance'}
           companies={companyList}
           currentPeriod={period}
+          categories={categories ?? []}
         />
         <DeptCostCard
           label="Finance OPEX"
@@ -225,6 +233,7 @@ export default async function BillingView({ searchParams }: Props) {
           canCreate={user.role === 'finance'}
           companies={companyList}
           currentPeriod={period}
+          categories={categories ?? []}
         />
         <DeptCostCard
           label="Director Office OPEX"
@@ -236,6 +245,7 @@ export default async function BillingView({ searchParams }: Props) {
           canCreate={user.role === 'finance'}
           companies={companyList}
           currentPeriod={period}
+          categories={categories ?? []}
         />
         <DeptCostCard
           label="Director OPEX"
@@ -247,6 +257,7 @@ export default async function BillingView({ searchParams }: Props) {
           canCreate={user.role === 'finance'}
           companies={companyList}
           currentPeriod={period}
+          categories={categories ?? []}
         />
         <DeptCostCard
           label="Marketing OPEX"
@@ -258,11 +269,12 @@ export default async function BillingView({ searchParams }: Props) {
           canCreate={user.role === 'finance'}
           companies={companyList}
           currentPeriod={period}
+          categories={categories ?? []}
           marketingNote
         />
       </div>
 
-      <InvoicesList invoices={invoiceList} companyMap={companyMap} period={period} />
+      <InvoicesList invoices={invoiceList} companyMap={companyMap} period={period} categories={categories ?? []} />
 
       <MarketingProjectList
         contracts={(marketingContracts ?? [])
@@ -314,6 +326,7 @@ function DeptCostCard({
   canCreate,
   companies,
   currentPeriod,
+  categories,
   marketingNote,
 }: {
   label: string
@@ -326,6 +339,7 @@ function DeptCostCard({
   companies: Array<{ id: string; name: string; short_code: string }>
   currentPeriod: string
   departments?: Array<{ id: string; name: string }>
+  categories?: Array<{ code: string; label: string }>
   marketingNote?: boolean
 }) {
   const hasInvoices = invoiceCount > 0
@@ -364,6 +378,7 @@ function DeptCostCard({
             companies={companies}
             currentPeriod={currentPeriod}
             departments={[]}
+            categories={categories ?? []}
             prefillMode={invoiceMode}
             targetAmount={required}
             alreadyInvoiced={invoiced}

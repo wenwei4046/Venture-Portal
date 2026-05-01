@@ -21,16 +21,18 @@ interface Department {
   name: string
 }
 
+interface Category {
+  code: string
+  label: string
+}
+
 interface Props {
   companies: Company[]
   currentPeriod: string
   prefillMode?: CreateInvoiceMode
-  /** Amount the dept payroll tells us we need to bill this period. Shown as
-   *  the target that the subsidiary allocations should add up to. Pass 0
-   *  when there's no target yet (header button use-case). */
+  /** Amount the dept payroll tells us we need to bill this period. */
   targetAmount?: number
-  /** Amount already invoiced for this mode in the period. Subtracted from
-   *  target to compute the remaining gap the modal is filling. */
+  /** Amount already invoiced for this mode in the period. */
   alreadyInvoiced?: number
   /** compact mode renders a small link-style button for embedding in KPI cards */
   compact?: boolean
@@ -38,32 +40,49 @@ interface Props {
   label?: string
   /** Item 5: pass departments so dept-pool billable target gets a select. */
   departments?: Department[]
+  /** Phase 11: payment_categories for GL routing. Required for new flow. */
+  categories?: Category[]
 }
 
 const BILLABLE_OPTIONS: Array<{ value: BillableToKind; label: string; hint: string }> = [
-  { value: 'subsidiary', label: 'Subsidiary', hint: 'Bill a HOUZS group company. Supports multi-row split.' },
-  { value: 'director',   label: 'Director',   hint: 'Bill a director (free-text name).' },
-  { value: 'dept_pool',  label: 'Dept Pool',  hint: 'Bill an internal department pool.' },
-  { value: 'freetext',   label: 'Other',      hint: 'External party — vendor, partner, anyone (free text).' },
+  { value: 'subsidiary', label: 'Subsidiary', hint: 'Bill a HOUZS group company. Supports multi-row split + multi-pool template.' },
+  { value: 'director',   label: 'Director',   hint: 'Bill a director (free-text name). Single pool + category.' },
+  { value: 'dept_pool',  label: 'Dept Pool',  hint: 'Bill an internal department pool. Supports multi-pool split.' },
+  { value: 'freetext',   label: 'Other',      hint: 'External party — vendor, partner, anyone. Supports multi-pool split.' },
 ]
 
-// Each option labels the Department Pool the invoice credits on settlement.
-const POOL_OPTIONS: Array<{ value: CreateInvoiceMode; label: string; hint: string }> = [
-  { value: 'hr_attribution',              label: 'HR Department Pool',              hint: 'Credits HR Dept Pool on settlement' },
-  { value: 'finance_attribution',         label: 'Finance Department Pool',         hint: 'Credits Finance Dept Pool on settlement' },
-  { value: 'director_office_attribution', label: 'Director Office Department Pool', hint: 'Credits Director Office Dept Pool on settlement' },
-  { value: 'director_attribution',        label: 'Director Department Pool',        hint: 'Credits Director Dept Pool on settlement' },
-  { value: 'marketing_project',           label: 'Marketing Department Pool',       hint: 'Marketing project billing' },
+const POOL_OPTIONS: Array<{ value: CreateInvoiceMode; label: string }> = [
+  { value: 'hr_attribution',              label: 'HR Department Pool' },
+  { value: 'finance_attribution',         label: 'Finance Department Pool' },
+  { value: 'director_office_attribution', label: 'Director Office Department Pool' },
+  { value: 'director_attribution',        label: 'Director Department Pool' },
+  { value: 'marketing_project',           label: 'Marketing Department Pool' },
 ]
 
-interface Row {
+interface SubRow {
   uid: string
   companyId: string
   amount: string
 }
 
-function newRow(): Row {
+interface PoolRow {
+  uid: string
+  mode: CreateInvoiceMode | ''
+  categoryCode: string
+  amount: string
+}
+
+function newSubRow(): SubRow {
   return { uid: crypto.randomUUID(), companyId: '', amount: '' }
+}
+
+function newPoolRow(prefillMode?: CreateInvoiceMode): PoolRow {
+  return {
+    uid: crypto.randomUUID(),
+    mode: prefillMode ?? '',
+    categoryCode: '',
+    amount: '',
+  }
 }
 
 function fmt(n: number): string {
@@ -79,69 +98,101 @@ export default function CreateInvoiceButton({
   compact = false,
   label,
   departments = [],
+  categories = [],
 }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  // Form state
-  // Item 5: bill-to type selector. Subsidiary keeps the multi-row split flow;
-  // the other 3 types use a single-target form (one invoice per submit).
+  // Bill-to type. Subsidiary / Dept Pool / Other support multi-pool template.
+  // Director keeps the simple single-pool + single-category flow.
   const [billableType, setBillableType] = useState<BillableToKind>('subsidiary')
   const [singleName, setSingleName] = useState('')          // director + freetext
   const [singleDeptId, setSingleDeptId] = useState('')      // dept_pool
-  const [singleAmount, setSingleAmount] = useState('')      // non-subsidiary single amount
 
-  const [mode, setMode] = useState<CreateInvoiceMode>(prefillMode)
+  // Director-only single-pool fields
+  const [directorMode, setDirectorMode] = useState<CreateInvoiceMode>(prefillMode)
+  const [directorCategory, setDirectorCategory] = useState('')
+  const [directorAmount, setDirectorAmount] = useState('')
+
+  // Multi-pool table — used by subsidiary / dept_pool / freetext
+  const [poolRows, setPoolRows] = useState<PoolRow[]>([newPoolRow(prefillMode)])
+
   const [period, setPeriod] = useState(dayjs(currentPeriod).format('YYYY-MM'))
   const [invoiceDate, setInvoiceDate] = useState(dayjs().format('YYYY-MM-DD'))
   const [dueDate, setDueDate] = useState(dayjs().add(30, 'day').format('YYYY-MM-DD'))
   const [description, setDescription] = useState('')
   const [referenceNo, setReferenceNo] = useState('')
-  const [rows, setRows] = useState<Row[]>([newRow()])
+  const [subRows, setSubRows] = useState<SubRow[]>([newSubRow()])
   const [autoFillNote, setAutoFillNote] = useState<string | null>(null)
-  // Track the mode+period combo we last auto-filled so we don't clobber user edits on every re-render.
   const autoFilledKey = useRef<string | null>(null)
 
   const remaining = Math.round((targetAmount - alreadyInvoiced) * 100) / 100
   const hasTarget = targetAmount > 0.005
 
-  const allocated = useMemo(
-    () => rows.reduce((s, r) => s + (Number(r.amount) || 0), 0),
-    [rows],
+  // Pool ratio sum (subsidiary mode = ratio template) and absolute total
+  // (dept_pool / freetext mode = absolute amounts).
+  const poolTotal = useMemo(
+    () => poolRows.reduce((s, r) => s + (Number(r.amount) || 0), 0),
+    [poolRows],
   )
-  const gap = Math.round((remaining - allocated) * 100) / 100
-  const onTarget = hasTarget && Math.abs(gap) < 0.01
-  const overTarget = hasTarget && gap < -0.005
+
+  // Subsidiary allocation = sum of per-sub amounts (dictates ratios applied to pools).
+  const subAllocated = useMemo(
+    () => subRows.reduce((s, r) => s + (Number(r.amount) || 0), 0),
+    [subRows],
+  )
+
+  const validSubs = useMemo(
+    () => subRows.filter((r) => r.companyId && Number(r.amount) > 0),
+    [subRows],
+  )
+  const validPools = useMemo(
+    () => poolRows.filter((r) => r.mode && r.categoryCode && Number(r.amount) > 0),
+    [poolRows],
+  )
+
+  // Predicted invoice count.
+  const projectedInvoices = (() => {
+    if (billableType === 'director') return directorAmount && Number(directorAmount) > 0 ? 1 : 0
+    if (billableType === 'subsidiary') return validSubs.length * validPools.length
+    return validPools.length // dept_pool / freetext: one invoice per pool row
+  })()
 
   function reset() {
     setBillableType('subsidiary')
     setSingleName('')
     setSingleDeptId('')
-    setSingleAmount('')
-    setMode(prefillMode)
+    setDirectorMode(prefillMode)
+    setDirectorCategory('')
+    setDirectorAmount('')
+    setPoolRows([newPoolRow(prefillMode)])
     setPeriod(dayjs(currentPeriod).format('YYYY-MM'))
     setInvoiceDate(dayjs().format('YYYY-MM-DD'))
     setDueDate(dayjs().add(30, 'day').format('YYYY-MM-DD'))
     setDescription('')
     setReferenceNo('')
-    setRows([newRow()])
+    setSubRows([newSubRow()])
     setError(null)
     setAutoFillNote(null)
     autoFilledKey.current = null
   }
 
-  // Mig 206: auto-fill subsidiary rows from HR's director_ctc when the user
-  // picks director_attribution. Runs on mode OR period change to that combo,
-  // but only once per combo so manual edits afterwards stick.
+  // Mig 206: auto-fill subsidiary rows from director_ctc when the user picks
+  // director_attribution as the FIRST pool entry. We trigger off the first
+  // pool row's mode + period, and only when there's exactly one pool row
+  // (otherwise auto-fill semantics get muddy).
   useEffect(() => {
     if (!open) return
-    if (mode !== 'director_attribution') {
+    if (billableType !== 'subsidiary') return
+    if (poolRows.length !== 1) return
+    const firstMode = poolRows[0].mode
+    if (firstMode !== 'director_attribution') {
       setAutoFillNote(null)
       return
     }
-    const key = `${mode}|${period}`
+    const key = `${firstMode}|${period}`
     if (autoFilledKey.current === key) return
     autoFilledKey.current = key
 
@@ -155,7 +206,7 @@ export default function CreateInvoiceButton({
           )
           return
         }
-        setRows(
+        setSubRows(
           ctcRows.map((r) => ({
             uid: crypto.randomUUID(),
             companyId: r.companyId,
@@ -172,71 +223,87 @@ export default function CreateInvoiceButton({
       .catch((err: unknown) => {
         setAutoFillNote(`Auto-fill failed: ${err instanceof Error ? err.message : String(err)}`)
       })
-  }, [open, mode, period, description])
+  }, [open, billableType, poolRows, period, description])
 
-  function updateRow(uid: string, patch: Partial<Row>) {
-    setRows((prev) => prev.map((r) => (r.uid === uid ? { ...r, ...patch } : r)))
+  function updateSubRow(uid: string, patch: Partial<SubRow>) {
+    setSubRows((prev) => prev.map((r) => (r.uid === uid ? { ...r, ...patch } : r)))
+  }
+  function addSubRow() {
+    setSubRows((prev) => [...prev, newSubRow()])
+  }
+  function removeSubRow(uid: string) {
+    setSubRows((prev) => (prev.length === 1 ? prev : prev.filter((r) => r.uid !== uid)))
   }
 
-  function addRow() {
-    setRows((prev) => [...prev, newRow()])
+  function updatePoolRow(uid: string, patch: Partial<PoolRow>) {
+    setPoolRows((prev) => prev.map((r) => (r.uid === uid ? { ...r, ...patch } : r)))
+  }
+  function addPoolRow() {
+    setPoolRows((prev) => [...prev, newPoolRow()])
+  }
+  function removePoolRow(uid: string) {
+    setPoolRows((prev) => (prev.length === 1 ? prev : prev.filter((r) => r.uid !== uid)))
   }
 
-  function removeRow(uid: string) {
-    setRows((prev) => (prev.length === 1 ? prev : prev.filter((r) => r.uid !== uid)))
-  }
-
-  /** Auto-fill remaining gap into the last empty row. Called by the "Fill remaining" link. */
   function fillRemaining() {
-    const remainingToFill = Math.round((remaining - allocated) * 100) / 100
+    const remainingToFill = Math.round((remaining - subAllocated) * 100) / 100
     if (remainingToFill <= 0) return
-    setRows((prev) => {
+    setSubRows((prev) => {
       const copy = [...prev]
-      // Find the first row with empty amount, or append a new row
       const idx = copy.findIndex((r) => !r.amount || Number(r.amount) === 0)
       if (idx >= 0) {
         copy[idx] = { ...copy[idx], amount: remainingToFill.toFixed(2) }
       } else {
-        copy.push({ ...newRow(), amount: remainingToFill.toFixed(2) })
+        copy.push({ ...newSubRow(), amount: remainingToFill.toFixed(2) })
       }
       return copy
     })
+  }
+
+  async function submitInvoice(payload: {
+    billableType: BillableToKind
+    companyId?: string
+    deptId?: string
+    freetextName?: string
+    mode: CreateInvoiceMode
+    categoryCode: string
+    amount: number
+  }): Promise<void> {
+    const fd = new FormData()
+    fd.set('billable_to_type', payload.billableType)
+    fd.set('billing_mode', payload.mode)
+    fd.set('category_code', payload.categoryCode)
+    fd.set('period_month', dayjs(period + '-01').format('YYYY-MM-DD'))
+    fd.set('invoice_date', invoiceDate)
+    fd.set('due_date', dueDate)
+    fd.set('amount', payload.amount.toFixed(2))
+    fd.set('description', description.trim())
+    fd.set('reference_no', referenceNo.trim())
+    if (payload.companyId) fd.set('company_id', payload.companyId)
+    if (payload.deptId) fd.set('billable_to_department_id', payload.deptId)
+    if (payload.freetextName) fd.set('billable_to_freetext_name', payload.freetextName)
+    await createManualInvoice(fd)
   }
 
   function handleSubmit() {
     setError(null)
     if (!description.trim()) return setError('Description is required')
 
-    // Item 5: split-by-subsidiary flow only applies to billableType=subsidiary.
-    if (billableType !== 'subsidiary') {
-      const amt = Number(singleAmount)
-      if (!Number.isFinite(amt) || amt <= 0) {
-        return setError('Amount must be a positive number')
-      }
-      if (billableType === 'dept_pool' && !singleDeptId) {
-        return setError('Pick the department to bill')
-      }
-      if ((billableType === 'director' || billableType === 'freetext') && !singleName.trim()) {
-        return setError('Enter the party name')
-      }
-
+    // ─── Director: single pool + single category + single amount ───
+    if (billableType === 'director') {
+      const amt = Number(directorAmount)
+      if (!Number.isFinite(amt) || amt <= 0) return setError('Amount must be a positive number')
+      if (!directorCategory) return setError('Pick a category')
+      if (!singleName.trim()) return setError('Enter the director name')
       startTransition(async () => {
-        const fd = new FormData()
-        fd.set('billable_to_type', billableType)
-        fd.set('billing_mode', mode)
-        fd.set('period_month', dayjs(period + '-01').format('YYYY-MM-DD'))
-        fd.set('invoice_date', invoiceDate)
-        fd.set('due_date', dueDate)
-        fd.set('amount', amt.toFixed(2))
-        fd.set('description', description.trim())
-        fd.set('reference_no', referenceNo.trim())
-        if (billableType === 'dept_pool') {
-          fd.set('billable_to_department_id', singleDeptId)
-        } else {
-          fd.set('billable_to_freetext_name', singleName.trim())
-        }
         try {
-          await createManualInvoice(fd)
+          await submitInvoice({
+            billableType: 'director',
+            mode: directorMode,
+            categoryCode: directorCategory,
+            freetextName: singleName.trim(),
+            amount: amt,
+          })
           setOpen(false)
           reset()
           router.refresh()
@@ -247,53 +314,108 @@ export default function CreateInvoiceButton({
       return
     }
 
-    // Subsidiary mode — multi-row split, one invoice per row.
-    const validRows = rows.filter((r) => r.companyId && Number(r.amount) > 0)
-    if (validRows.length === 0) return setError('Add at least one subsidiary with an amount')
-
-    const seen = new Set<string>()
-    for (const r of validRows) {
-      if (seen.has(r.companyId)) {
-        return setError('Same subsidiary listed twice — merge or remove one')
+    // ─── Validate pool table for subsidiary / dept_pool / freetext ───
+    if (validPools.length === 0) {
+      return setError('Add at least one pool row with pool / category / amount')
+    }
+    // Same pool×category twice is suspicious — surface it but allow.
+    const seenPC = new Set<string>()
+    for (const r of validPools) {
+      const key = `${r.mode}|${r.categoryCode}`
+      if (seenPC.has(key)) {
+        return setError('Duplicate pool + category combination — merge or change one')
       }
-      seen.add(r.companyId)
+      seenPC.add(key)
     }
 
+    // ─── Dept Pool / Other (freetext): each pool row → one invoice ───
+    if (billableType !== 'subsidiary') {
+      if (billableType === 'dept_pool' && !singleDeptId) return setError('Pick the department to bill')
+      if (billableType === 'freetext' && !singleName.trim()) return setError('Enter the party name')
+
+      startTransition(async () => {
+        const failures: Array<{ label: string; error: string }> = []
+        for (const r of validPools) {
+          try {
+            await submitInvoice({
+              billableType,
+              mode: r.mode as CreateInvoiceMode,
+              categoryCode: r.categoryCode,
+              deptId: billableType === 'dept_pool' ? singleDeptId : undefined,
+              freetextName: billableType === 'freetext' ? singleName.trim() : undefined,
+              amount: Number(r.amount),
+            })
+          } catch (err) {
+            const lbl = POOL_OPTIONS.find((o) => o.value === r.mode)?.label ?? String(r.mode)
+            failures.push({ label: lbl, error: err instanceof Error ? err.message : 'Create failed' })
+          }
+        }
+        if (failures.length === 0) {
+          setOpen(false)
+          reset()
+          router.refresh()
+        } else {
+          setError(
+            `Created ${validPools.length - failures.length}/${validPools.length}. Failed: ` +
+              failures.map((f) => `${f.label} (${f.error})`).join('; '),
+          )
+          router.refresh()
+        }
+      })
+      return
+    }
+
+    // ─── Subsidiary: cartesian (sub × pool); pool amounts = ratio template ───
+    if (validSubs.length === 0) return setError('Add at least one subsidiary with an amount')
+
+    const seenSub = new Set<string>()
+    for (const r of validSubs) {
+      if (seenSub.has(r.companyId)) {
+        return setError('Same subsidiary listed twice — merge or remove one')
+      }
+      seenSub.add(r.companyId)
+    }
+
+    const ratioSum = poolTotal
+    if (ratioSum <= 0) return setError('Pool amounts cannot all be zero')
+
     startTransition(async () => {
-      const results: Array<{ company: string; error?: string }> = []
-      for (const r of validRows) {
-        const company = companies.find((c) => c.id === r.companyId)
-        const label = company?.short_code ?? company?.name ?? r.companyId
-        const fd = new FormData()
-        fd.set('billable_to_type', 'subsidiary')
-        fd.set('company_id', r.companyId)
-        fd.set('billing_mode', mode)
-        fd.set('period_month', dayjs(period + '-01').format('YYYY-MM-DD'))
-        fd.set('invoice_date', invoiceDate)
-        fd.set('due_date', dueDate)
-        fd.set('amount', Number(r.amount).toFixed(2))
-        fd.set('description', description.trim())
-        fd.set('reference_no', referenceNo.trim())
-        try {
-          await createManualInvoice(fd)
-          results.push({ company: label })
-        } catch (err) {
-          results.push({
-            company: label,
-            error: err instanceof Error ? err.message : 'Create failed',
-          })
+      const failures: Array<{ label: string; error: string }> = []
+      let created = 0
+      for (const sub of validSubs) {
+        const company = companies.find((c) => c.id === sub.companyId)
+        const subLabel = company?.short_code ?? company?.name ?? sub.companyId
+        const subAmount = Number(sub.amount)
+        for (const pool of validPools) {
+          // Distribute by ratio: this pool's slice of subAmount.
+          const slice = Math.round((subAmount * Number(pool.amount) / ratioSum) * 100) / 100
+          if (slice <= 0) continue
+          const poolLabel = POOL_OPTIONS.find((o) => o.value === pool.mode)?.label ?? String(pool.mode)
+          try {
+            await submitInvoice({
+              billableType: 'subsidiary',
+              mode: pool.mode as CreateInvoiceMode,
+              categoryCode: pool.categoryCode,
+              companyId: sub.companyId,
+              amount: slice,
+            })
+            created += 1
+          } catch (err) {
+            failures.push({
+              label: `${subLabel} × ${poolLabel}`,
+              error: err instanceof Error ? err.message : 'Create failed',
+            })
+          }
         }
       }
-
-      const failures = results.filter((r) => r.error)
       if (failures.length === 0) {
         setOpen(false)
         reset()
         router.refresh()
       } else {
         setError(
-          `Created ${results.length - failures.length}/${results.length}. Failed: ` +
-            failures.map((f) => `${f.company} (${f.error})`).join('; '),
+          `Created ${created}. Failed ${failures.length}: ` +
+            failures.map((f) => `${f.label} (${f.error})`).join('; '),
         )
         router.refresh()
       }
@@ -304,8 +426,7 @@ export default function CreateInvoiceButton({
     ? 'text-xs font-sans text-accent hover:text-accent-hover underline-offset-2 hover:underline transition-colors'
     : 'bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors'
 
-  const currentPoolLabel =
-    POOL_OPTIONS.find((o) => o.value === mode)?.label ?? 'Pool'
+  const usesMultiPool = billableType !== 'director'
 
   return (
     <>
@@ -326,7 +447,9 @@ export default function CreateInvoiceButton({
               <div>
                 <h2 className="font-serif text-2xl text-ink">Create Invoice</h2>
                 <p className="font-serif italic text-graphite text-xs mt-1">
-                  Split one dept&apos;s cost across multiple subsidiaries — each row becomes one draft invoice.
+                  {usesMultiPool
+                    ? 'Pool table acts as a credit-split template — each pool row becomes its own invoice.'
+                    : 'Single-pool invoice for a director.'}
                 </p>
               </div>
               <button
@@ -340,7 +463,7 @@ export default function CreateInvoiceButton({
             </div>
 
             <div className="p-6 space-y-5">
-              {/* Bill-to type toggle (Item 5) */}
+              {/* Bill-to type toggle */}
               <div>
                 <div className="text-xs font-sans font-medium text-graphite mb-1">
                   Bill to <span className="text-danger">*</span>
@@ -367,7 +490,7 @@ export default function CreateInvoiceButton({
                 </div>
               </div>
 
-              {/* Single-target inputs for non-subsidiary modes (Item 5) */}
+              {/* Director name (director mode) or freetext name (Other) */}
               {billableType === 'director' || billableType === 'freetext' ? (
                 <Field
                   label={billableType === 'director' ? 'Director name' : 'Bill to (free text)'}
@@ -402,184 +525,189 @@ export default function CreateInvoiceButton({
                 </Field>
               ) : null}
 
-              {billableType !== 'subsidiary' ? (
-                <Field label="Amount" required>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={singleAmount}
-                    onChange={(e) =>
-                      setSingleAmount(e.target.value.replace(/[^\d.]/g, ''))
-                    }
-                    disabled={isPending}
-                    placeholder="0.00"
-                    className={inputCls + ' font-mono tabular text-right max-w-xs'}
-                  />
-                </Field>
+              {/* Period */}
+              <Field label="Period" required hint="Month the invoice belongs to">
+                <input
+                  type="month"
+                  value={period}
+                  onChange={(e) => setPeriod(e.target.value)}
+                  disabled={isPending}
+                  className={inputCls + ' font-mono max-w-xs'}
+                />
+              </Field>
+
+              {/* Director: single pool + category + amount */}
+              {billableType === 'director' ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Field label="Credit to pool" required>
+                    <select
+                      value={directorMode}
+                      onChange={(e) => setDirectorMode(e.target.value as CreateInvoiceMode)}
+                      disabled={isPending}
+                      className={inputCls}
+                    >
+                      {POOL_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Category" required>
+                    <select
+                      value={directorCategory}
+                      onChange={(e) => setDirectorCategory(e.target.value)}
+                      disabled={isPending}
+                      className={inputCls}
+                    >
+                      <option value="">Select category…</option>
+                      {categories.map((c) => (
+                        <option key={c.code} value={c.code}>{c.label}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Amount" required>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={directorAmount}
+                      onChange={(e) => setDirectorAmount(e.target.value.replace(/[^\d.]/g, ''))}
+                      disabled={isPending}
+                      placeholder="0.00"
+                      className={inputCls + ' font-mono tabular text-right'}
+                    />
+                  </Field>
+                </div>
               ) : null}
 
-              {/* Pool + Period */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Field label="Credit to pool" required>
-                  <select
-                    value={mode}
-                    onChange={(e) => setMode(e.target.value as CreateInvoiceMode)}
-                    disabled={isPending}
-                    className={inputCls}
-                  >
-                    {POOL_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="font-serif italic text-muted text-xs mt-1">
-                    {POOL_OPTIONS.find((o) => o.value === mode)?.hint}
-                  </div>
-                </Field>
-
-                <Field label="Period" required hint="Month the invoice belongs to">
-                  <input
-                    type="month"
-                    value={period}
-                    onChange={(e) => setPeriod(e.target.value)}
-                    disabled={isPending}
-                    className={inputCls + ' font-mono'}
-                  />
-                </Field>
-              </div>
-
-              {/* Target / Allocated tracker — subsidiary multi-row only */}
-              {hasTarget && billableType === 'subsidiary' && (
-                <div className="bg-surface border border-hairline rounded-md p-4">
-                  <div className="grid grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <div className="text-[10px] uppercase tracking-wider font-sans text-muted">
-                        {currentPoolLabel} target
-                      </div>
-                      <div className="font-mono tabular text-base text-ink mt-1">RM {fmt(remaining)}</div>
-                      {alreadyInvoiced > 0.005 && (
-                        <div className="font-serif italic text-muted text-xs mt-0.5">
-                          RM {fmt(targetAmount)} total · RM {fmt(alreadyInvoiced)} already invoiced
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <div className="text-[10px] uppercase tracking-wider font-sans text-muted">
-                        Allocated
-                      </div>
-                      <div className="font-mono tabular text-base text-ink mt-1">RM {fmt(allocated)}</div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] uppercase tracking-wider font-sans text-muted">
-                        {onTarget ? 'On target' : overTarget ? 'Over' : 'Remaining'}
-                      </div>
-                      <div
-                        className={
-                          'font-mono tabular text-base mt-1 ' +
-                          (onTarget ? 'text-ledger' : overTarget ? 'text-danger' : 'text-ink')
-                        }
-                      >
-                        {onTarget ? '✓' : `RM ${fmt(Math.abs(gap))}`}
-                      </div>
-                      {!onTarget && !overTarget && gap > 0.005 && (
-                        <button
-                          onClick={fillRemaining}
-                          disabled={isPending}
-                          className="text-xs font-sans text-accent hover:text-accent-hover underline-offset-2 hover:underline mt-0.5"
-                          type="button"
-                        >
-                          Fill remaining
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Subsidiary rows — subsidiary mode only (Item 5) */}
+              {/* Subsidiary mode: target tracker + subsidiary multi-row + pool template */}
               {billableType === 'subsidiary' ? (
-              <div>
-                <div className="flex items-baseline justify-between mb-2">
-                  <div className="text-xs font-sans font-medium text-graphite">
-                    Subsidiaries <span className="text-danger">*</span>
-                  </div>
-                  <span className="font-serif italic text-muted text-xs">
-                    {rows.length} {rows.length === 1 ? 'row' : 'rows'}
-                  </span>
-                </div>
-                {autoFillNote ? (
-                  <div className="font-serif italic text-graphite text-xs mb-2 px-3 py-2 bg-accent/5 border border-accent/20 rounded-md">
-                    {autoFillNote}
-                  </div>
-                ) : null}
-                <div className="border border-hairline rounded-md overflow-hidden bg-surface">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans bg-paper">
-                        <th className="text-left py-2 px-3 font-medium">Subsidiary</th>
-                        <th className="text-right py-2 px-3 font-medium w-40">Amount (RM)</th>
-                        <th className="w-10 py-2"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((r) => (
-                        <tr key={r.uid} className="border-b border-hairline last:border-0">
-                          <td className="py-2 px-3">
-                            <select
-                              value={r.companyId}
-                              onChange={(e) => updateRow(r.uid, { companyId: e.target.value })}
-                              disabled={isPending}
-                              className={inputCls}
-                            >
-                              <option value="">Select subsidiary…</option>
-                              {companies.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {c.name} · {c.short_code}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="py-2 px-3">
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              value={r.amount}
-                              onChange={(e) =>
-                                updateRow(r.uid, {
-                                  amount: e.target.value.replace(/[^\d.]/g, ''),
-                                })
-                              }
-                              placeholder="0.00"
-                              disabled={isPending}
-                              className={inputCls + ' font-mono tabular text-right'}
-                            />
-                          </td>
-                          <td className="py-2 px-3 text-right">
+                <>
+                  {hasTarget && (
+                    <div className="bg-surface border border-hairline rounded-md p-4">
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider font-sans text-muted">Target</div>
+                          <div className="font-mono tabular text-base text-ink mt-1">RM {fmt(remaining)}</div>
+                          {alreadyInvoiced > 0.005 && (
+                            <div className="font-serif italic text-muted text-xs mt-0.5">
+                              RM {fmt(targetAmount)} total · RM {fmt(alreadyInvoiced)} already invoiced
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider font-sans text-muted">Sub allocated</div>
+                          <div className="font-mono tabular text-base text-ink mt-1">RM {fmt(subAllocated)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider font-sans text-muted">Gap</div>
+                          <div className="font-mono tabular text-base text-ink mt-1">
+                            RM {fmt(Math.abs(remaining - subAllocated))}
+                          </div>
+                          {remaining - subAllocated > 0.005 && (
                             <button
-                              onClick={() => removeRow(r.uid)}
-                              disabled={isPending || rows.length === 1}
-                              className="text-muted hover:text-danger disabled:opacity-30 disabled:cursor-not-allowed text-lg leading-none"
-                              aria-label="Remove row"
+                              onClick={fillRemaining}
+                              disabled={isPending}
+                              className="text-xs font-sans text-accent hover:text-accent-hover underline-offset-2 hover:underline mt-0.5"
                               type="button"
                             >
-                              ×
+                              Fill remaining
                             </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <button
-                  onClick={addRow}
-                  disabled={isPending}
-                  className="mt-2 text-xs font-sans text-accent hover:text-accent-hover underline-offset-2 hover:underline"
-                  type="button"
-                >
-                  + Add subsidiary
-                </button>
-              </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="flex items-baseline justify-between mb-2">
+                      <div className="text-xs font-sans font-medium text-graphite">
+                        Subsidiaries <span className="text-danger">*</span>
+                      </div>
+                      <span className="font-serif italic text-muted text-xs">
+                        {subRows.length} {subRows.length === 1 ? 'row' : 'rows'}
+                      </span>
+                    </div>
+                    {autoFillNote ? (
+                      <div className="font-serif italic text-graphite text-xs mb-2 px-3 py-2 bg-accent/5 border border-accent/20 rounded-md">
+                        {autoFillNote}
+                      </div>
+                    ) : null}
+                    <div className="border border-hairline rounded-md overflow-hidden bg-surface">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans bg-paper">
+                            <th className="text-left py-2 px-3 font-medium">Subsidiary</th>
+                            <th className="text-right py-2 px-3 font-medium w-40">Amount (RM)</th>
+                            <th className="w-10 py-2"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {subRows.map((r) => (
+                            <tr key={r.uid} className="border-b border-hairline last:border-0">
+                              <td className="py-2 px-3">
+                                <select
+                                  value={r.companyId}
+                                  onChange={(e) => updateSubRow(r.uid, { companyId: e.target.value })}
+                                  disabled={isPending}
+                                  className={inputCls}
+                                >
+                                  <option value="">Select subsidiary…</option>
+                                  {companies.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                      {c.name} · {c.short_code}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="py-2 px-3">
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={r.amount}
+                                  onChange={(e) => updateSubRow(r.uid, { amount: e.target.value.replace(/[^\d.]/g, '') })}
+                                  placeholder="0.00"
+                                  disabled={isPending}
+                                  className={inputCls + ' font-mono tabular text-right'}
+                                />
+                              </td>
+                              <td className="py-2 px-3 text-right">
+                                <button
+                                  onClick={() => removeSubRow(r.uid)}
+                                  disabled={isPending || subRows.length === 1}
+                                  className="text-muted hover:text-danger disabled:opacity-30 disabled:cursor-not-allowed text-lg leading-none"
+                                  aria-label="Remove row"
+                                  type="button"
+                                >
+                                  ×
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <button
+                      onClick={addSubRow}
+                      disabled={isPending}
+                      className="mt-2 text-xs font-sans text-accent hover:text-accent-hover underline-offset-2 hover:underline"
+                      type="button"
+                    >
+                      + Add subsidiary
+                    </button>
+                  </div>
+                </>
+              ) : null}
+
+              {/* Multi-pool table — Subsidiary / Dept Pool / Other */}
+              {usesMultiPool ? (
+                <PoolTable
+                  poolRows={poolRows}
+                  categories={categories}
+                  isPending={isPending}
+                  isRatioTemplate={billableType === 'subsidiary'}
+                  onUpdate={updatePoolRow}
+                  onAdd={addPoolRow}
+                  onRemove={removePoolRow}
+                />
               ) : null}
 
               {/* Invoice date + Due date */}
@@ -637,11 +765,7 @@ export default function CreateInvoiceButton({
 
             <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-hairline bg-surface">
               <div className="font-serif italic text-muted text-xs">
-                {billableType === 'subsidiary'
-                  ? `${rows.filter((r) => r.companyId && Number(r.amount) > 0).length} invoice${
-                      rows.filter((r) => r.companyId && Number(r.amount) > 0).length === 1 ? '' : 's'
-                    } will be created`
-                  : '1 invoice will be created'}
+                {projectedInvoices} invoice{projectedInvoices === 1 ? '' : 's'} will be created
               </div>
               <div className="flex items-center gap-3">
                 <button
@@ -664,6 +788,115 @@ export default function CreateInvoiceButton({
         </div>
       )}
     </>
+  )
+}
+
+function PoolTable({
+  poolRows,
+  categories,
+  isPending,
+  isRatioTemplate,
+  onUpdate,
+  onAdd,
+  onRemove,
+}: {
+  poolRows: PoolRow[]
+  categories: Category[]
+  isPending: boolean
+  isRatioTemplate: boolean
+  onUpdate: (uid: string, patch: Partial<PoolRow>) => void
+  onAdd: () => void
+  onRemove: (uid: string) => void
+}) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-2">
+        <div className="text-xs font-sans font-medium text-graphite">
+          Pool split <span className="text-danger">*</span>
+        </div>
+        <span className="font-serif italic text-muted text-xs">
+          {isRatioTemplate
+            ? 'Amounts act as ratio template — each subsidiary is split by these proportions'
+            : 'Each row creates one invoice with this pool / category / amount'}
+        </span>
+      </div>
+      <div className="border border-hairline rounded-md overflow-hidden bg-surface">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans bg-paper">
+              <th className="text-left py-2 px-3 font-medium">Pool</th>
+              <th className="text-left py-2 px-3 font-medium">Category</th>
+              <th className="text-right py-2 px-3 font-medium w-40">
+                {isRatioTemplate ? 'Ratio (RM)' : 'Amount (RM)'}
+              </th>
+              <th className="w-10 py-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {poolRows.map((r) => (
+              <tr key={r.uid} className="border-b border-hairline last:border-0">
+                <td className="py-2 px-3">
+                  <select
+                    value={r.mode}
+                    onChange={(e) => onUpdate(r.uid, { mode: e.target.value as CreateInvoiceMode })}
+                    disabled={isPending}
+                    className={inputCls}
+                  >
+                    <option value="">Select pool…</option>
+                    {POOL_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </td>
+                <td className="py-2 px-3">
+                  <select
+                    value={r.categoryCode}
+                    onChange={(e) => onUpdate(r.uid, { categoryCode: e.target.value })}
+                    disabled={isPending}
+                    className={inputCls}
+                  >
+                    <option value="">Select category…</option>
+                    {categories.map((c) => (
+                      <option key={c.code} value={c.code}>{c.label}</option>
+                    ))}
+                  </select>
+                </td>
+                <td className="py-2 px-3">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={r.amount}
+                    onChange={(e) => onUpdate(r.uid, { amount: e.target.value.replace(/[^\d.]/g, '') })}
+                    placeholder="0.00"
+                    disabled={isPending}
+                    className={inputCls + ' font-mono tabular text-right'}
+                  />
+                </td>
+                <td className="py-2 px-3 text-right">
+                  <button
+                    onClick={() => onRemove(r.uid)}
+                    disabled={isPending || poolRows.length === 1}
+                    className="text-muted hover:text-danger disabled:opacity-30 disabled:cursor-not-allowed text-lg leading-none"
+                    aria-label="Remove row"
+                    type="button"
+                  >
+                    ×
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <button
+        onClick={onAdd}
+        disabled={isPending}
+        className="mt-2 text-xs font-sans text-accent hover:text-accent-hover underline-offset-2 hover:underline"
+        type="button"
+      >
+        + Add pool entry
+      </button>
+    </div>
   )
 }
 

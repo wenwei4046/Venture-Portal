@@ -600,6 +600,8 @@ export type Database = {
           billable_to_department_id: string | null
           billable_to_freetext_name: string | null
           billable_to_type: Database["public"]["Enums"]["billable_to_kind"]
+          billing_mode: Database["public"]["Enums"]["billing_mode"] | null
+          category_code: string | null
           company_id: string | null
           created_at: string
           created_by: string
@@ -618,6 +620,8 @@ export type Database = {
           billable_to_department_id?: string | null
           billable_to_freetext_name?: string | null
           billable_to_type: Database["public"]["Enums"]["billable_to_kind"]
+          billing_mode?: Database["public"]["Enums"]["billing_mode"] | null
+          category_code?: string | null
           company_id?: string | null
           created_at?: string
           created_by: string
@@ -636,6 +640,8 @@ export type Database = {
           billable_to_department_id?: string | null
           billable_to_freetext_name?: string | null
           billable_to_type?: Database["public"]["Enums"]["billable_to_kind"]
+          billing_mode?: Database["public"]["Enums"]["billing_mode"] | null
+          category_code?: string | null
           company_id?: string | null
           created_at?: string
           created_by?: string
@@ -2001,6 +2007,7 @@ export type Database = {
           billable_to_freetext_name: string | null
           billable_to_type: Database["public"]["Enums"]["billable_to_kind"]
           billing_mode: Database["public"]["Enums"]["billing_mode"]
+          category_code: string | null
           company_id: string | null
           contract_id: string | null
           created_at: string
@@ -2024,6 +2031,7 @@ export type Database = {
           billable_to_freetext_name?: string | null
           billable_to_type: Database["public"]["Enums"]["billable_to_kind"]
           billing_mode: Database["public"]["Enums"]["billing_mode"]
+          category_code?: string | null
           company_id?: string | null
           contract_id?: string | null
           created_at?: string
@@ -2047,6 +2055,7 @@ export type Database = {
           billable_to_freetext_name?: string | null
           billable_to_type?: Database["public"]["Enums"]["billable_to_kind"]
           billing_mode?: Database["public"]["Enums"]["billing_mode"]
+          category_code?: string | null
           company_id?: string | null
           contract_id?: string | null
           created_at?: string

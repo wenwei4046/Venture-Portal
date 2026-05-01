@@ -13,6 +13,35 @@ function revenueGlCode(billingMode: string | null): string {
   return billingMode === 'marketing_project' ? '4040' : '4030'
 }
 
+// Phase 11: invoices may carry a category_code for tagging/slicing. The category's
+// gl_account_code in payment_categories was originally seeded for the PV/expense
+// side (e.g., logistics → 5050). When an invoice issue posts AR accrual we must
+// credit a revenue account (type='revenue'). So we only honour the category's GL
+// code when it actually points at a revenue-type account; otherwise fall back to
+// the billing_mode mapping. Category remains useful as a tag on the invoice row.
+async function resolveRevenueGlCode(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  categoryCode: string | null,
+  billingMode: string | null,
+): Promise<string> {
+  if (categoryCode) {
+    const { data: cat } = await supabase
+      .from('payment_categories')
+      .select('gl_account_code')
+      .eq('code', categoryCode)
+      .maybeSingle()
+    if (cat?.gl_account_code) {
+      const { data: acct } = await supabase
+        .from('chart_of_accounts')
+        .select('type')
+        .eq('code', cat.gl_account_code)
+        .maybeSingle()
+      if (acct?.type === 'revenue') return cat.gl_account_code
+    }
+  }
+  return revenueGlCode(billingMode)
+}
+
 export interface GenerateInvoicesResult {
   generated: number
   skipped: number
@@ -59,6 +88,7 @@ export async function createManualInvoice(formData: FormData): Promise<void> {
   const dueDate = String(formData.get('due_date') ?? '').trim() || null
   const description = String(formData.get('description') ?? '').trim() || null
   const referenceNo = String(formData.get('reference_no') ?? '').trim() || null
+  const categoryCode = String(formData.get('category_code') ?? '').trim() || null
 
   if (!['subsidiary', 'director', 'dept_pool', 'freetext'].includes(billableToType)) {
     throw new Error(`Unsupported billable_to_type: ${billableToType}`)
@@ -102,6 +132,7 @@ export async function createManualInvoice(formData: FormData): Promise<void> {
     invoice_no: invoiceNo,
     period_month: period,
     billing_mode: billingMode,
+    category_code: categoryCode,
     base_amount: amount,
     total_amount: amount,
     status: 'draft',
@@ -331,6 +362,14 @@ export async function createCreditNote(formData: FormData) {
   const invoiceId = (formData.get('invoice_id') as string) ?? ''
   const amount = parseFloat((formData.get('amount') as string) ?? '0')
   const reason = (formData.get('reason') as string)?.trim() ?? ''
+  // Phase 11: each CN carries its own pool + category for GL routing.
+  // Optional on action input — caller may omit to inherit from invoice.
+  const rawBillingMode = String(formData.get('billing_mode') ?? '').trim() || null
+  const billingMode =
+    rawBillingMode && CREATE_INVOICE_MODES.includes(rawBillingMode as CreateInvoiceMode)
+      ? (rawBillingMode as CreateInvoiceMode)
+      : null
+  const categoryCode = String(formData.get('category_code') ?? '').trim() || null
 
   if (!invoiceId) throw new Error('Invoice is required')
   if (isNaN(amount) || amount <= 0) throw new Error('Amount must be greater than 0')
@@ -339,10 +378,11 @@ export async function createCreditNote(formData: FormData) {
   // Item 5: credit note inherits billable_to from its parent invoice. The
   // 4 polymorphic columns are mirrored across — saves needing a separate
   // selector on the credit-note form.
+  // Phase 11: also inherit billing_mode if the caller didn't override.
   const { data: invoice, error: invErr } = await supabase
     .from('invoices')
     .select(
-      'id, company_id, total_amount, billable_to_type, billable_to_department_id, billable_to_freetext_name'
+      'id, company_id, total_amount, billable_to_type, billable_to_department_id, billable_to_freetext_name, billing_mode'
     )
     .eq('id', invoiceId)
     .single()
@@ -370,6 +410,8 @@ export async function createCreditNote(formData: FormData) {
       billable_to_type: invoice.billable_to_type,
       billable_to_department_id: invoice.billable_to_department_id,
       billable_to_freetext_name: invoice.billable_to_freetext_name,
+      billing_mode: billingMode ?? invoice.billing_mode,
+      category_code: categoryCode,
       amount,
       reason,
       status: 'draft',
@@ -395,7 +437,7 @@ export async function approveInvoice(formData: FormData) {
 
   const { data: inv } = await supabase
     .from('invoices')
-    .select('id, invoice_no, period_month, status, total_amount, billing_mode, company_id')
+    .select('id, invoice_no, period_month, status, total_amount, billing_mode, company_id, category_code')
     .eq('id', id)
     .single()
   if (!inv) throw new Error('Invoice not found')
@@ -412,11 +454,12 @@ export async function approveInvoice(formData: FormData) {
   if (error) throw new Error(`Failed to issue invoice: ${error.message}`)
 
   // Mig 200/P1-6a: AR accrual at invoice issue.
-  //   dr 1040 AR — Subs   / cr 4030 (or 4040) Revenue
+  //   dr 1040 AR — Subs   / cr <category.gl_account_code or fallback> Revenue
   // Paired with the invoice-paid flow which settles AR via
   //   dr Bank / cr 1040 AR (approve_single_voucher billing_payment branch)
   const amount = Number(inv.total_amount ?? 0)
   if (amount > 0) {
+    const revenueCode = await resolveRevenueGlCode(supabase, inv.category_code, inv.billing_mode)
     try {
       await postJournalEntry(supabase, {
         transactionDate: dayjs(inv.period_month).endOf('month').format('YYYY-MM-DD'),
@@ -426,7 +469,7 @@ export async function approveInvoice(formData: FormData) {
         createdBy: user.id,
         lines: [
           { accountCode: '1040', debit: amount, description: `AR — invoice ${inv.invoice_no ?? ''}`.trim() },
-          { accountCode: revenueGlCode(inv.billing_mode), credit: amount, description: 'Service billing revenue recognised' },
+          { accountCode: revenueCode, credit: amount, description: 'Service billing revenue recognised' },
         ],
       })
     } catch (jeErr) {
@@ -452,7 +495,7 @@ export async function approveInvoicesForPeriod(formData: FormData) {
   // Pull draft rows up-front so we can post AR accrual JEs after the bulk update.
   const { data: draftInvoices } = await supabase
     .from('invoices')
-    .select('id, invoice_no, total_amount, billing_mode')
+    .select('id, invoice_no, total_amount, billing_mode, category_code')
     .eq('period_month', period)
     .eq('status', 'draft')
 
@@ -469,6 +512,7 @@ export async function approveInvoicesForPeriod(formData: FormData) {
   for (const row of draftInvoices ?? []) {
     const amount = Number(row.total_amount ?? 0)
     if (amount <= 0) continue
+    const revenueCode = await resolveRevenueGlCode(supabase, row.category_code, row.billing_mode)
     try {
       await postJournalEntry(supabase, {
         transactionDate: txnDate,
@@ -478,7 +522,7 @@ export async function approveInvoicesForPeriod(formData: FormData) {
         createdBy: user.id,
         lines: [
           { accountCode: '1040', debit: amount, description: `AR — invoice ${row.invoice_no ?? ''}`.trim() },
-          { accountCode: revenueGlCode(row.billing_mode), credit: amount, description: 'Service billing revenue recognised' },
+          { accountCode: revenueCode, credit: amount, description: 'Service billing revenue recognised' },
         ],
       })
     } catch (jeErr) {
