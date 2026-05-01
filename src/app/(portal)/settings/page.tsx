@@ -72,7 +72,7 @@ export default async function SettingsPage({ searchParams }: Props) {
     supabase.from('base_rate_history').select('weighted_cost, op_margin, base_rate').order('approved_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('bank_accounts').select('*').order('is_primary', { ascending: false }),
     supabase.from('period_locks').select('period_month, is_locked, closed_at, notes').order('period_month', { ascending: false }),
-    supabase.from('payment_categories').select('code, label, account_type, gl_account_code, is_active').order('sort_order').order('label'),
+    supabase.from('payment_categories').select('code, label, account_type, gl_account_code, revenue_gl_account_code, is_active').order('sort_order').order('label'),
     supabase.from('chart_of_accounts').select('code, name, type').eq('is_active', true).order('code'),
   ])
 
@@ -192,6 +192,7 @@ export default async function SettingsPage({ searchParams }: Props) {
             label: c.label,
             account_type: c.account_type as 'asset' | 'liability' | 'equity' | 'revenue' | 'expense' | null,
             gl_account_code: c.gl_account_code,
+            revenue_gl_account_code: c.revenue_gl_account_code,
             is_active: c.is_active,
           }))}
           glAccounts={(glRows ?? []).map((g) => ({

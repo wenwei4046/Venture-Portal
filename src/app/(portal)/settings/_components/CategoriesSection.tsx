@@ -10,6 +10,9 @@ interface Category {
   label: string
   account_type: AccountType | null
   gl_account_code: string | null
+  // Phase 11.1: opt-in revenue GL for invoices using this category. NULL =
+  // fall back to billing_mode→4030/4040 mapping at JE post.
+  revenue_gl_account_code: string | null
   is_active: boolean
 }
 
@@ -120,6 +123,7 @@ export default function CategoriesSection({ categories, glAccounts }: Props) {
                 <th>Label</th>
                 <th>Classification</th>
                 <th>GL Account</th>
+                <th>Invoice Revenue GL</th>
                 <th>Status</th>
                 <th></th>
               </tr>
@@ -132,7 +136,7 @@ export default function CategoriesSection({ categories, glAccounts }: Props) {
                 return (
                   <tr key={cat.code}>
                     {isEditing ? (
-                      <td colSpan={6} className="p-0">
+                      <td colSpan={7} className="p-0">
                         <div className="p-4 bg-surface">
                           <CategoryForm
                             glAccounts={glAccounts}
@@ -175,6 +179,20 @@ export default function CategoriesSection({ categories, glAccounts }: Props) {
                             <span className="text-danger italic">—</span>
                           )}
                         </td>
+                        <td className="font-mono text-xs text-graphite">
+                          {(() => {
+                            const rgl = glAccounts.find((g) => g.code === cat.revenue_gl_account_code)
+                            if (!cat.revenue_gl_account_code) {
+                              return <span className="text-muted italic font-serif">fallback</span>
+                            }
+                            return (
+                              <>
+                                {cat.revenue_gl_account_code}
+                                {rgl ? <span className="text-muted ml-2">— {rgl.name}</span> : null}
+                              </>
+                            )
+                          })()}
+                        </td>
                         <td>
                           <span className={`font-serif italic text-xs ${cat.is_active ? 'text-ledger' : 'text-muted'}`}>
                             {cat.is_active ? 'active' : 'inactive'}
@@ -216,11 +234,16 @@ function CategoryForm({ glAccounts, initial, mode, isPending, onSubmit, onCancel
   const [label, setLabel] = useState(initial?.label ?? '')
   const [accountType, setAccountType] = useState<AccountType | ''>(initial?.account_type ?? '')
   const [glAccountCode, setGlAccountCode] = useState(initial?.gl_account_code ?? '')
+  const [revenueGlAccountCode, setRevenueGlAccountCode] = useState(initial?.revenue_gl_account_code ?? '')
   const [isActive, setIsActive] = useState(initial?.is_active ?? true)
 
   const filteredGl = useMemo(
     () => accountType ? glAccounts.filter((g) => g.type === accountType) : [],
     [glAccounts, accountType],
+  )
+  const revenueGlOptions = useMemo(
+    () => glAccounts.filter((g) => g.type === 'revenue'),
+    [glAccounts],
   )
 
   // Auto-derive code from label on create
@@ -240,6 +263,7 @@ function CategoryForm({ glAccounts, initial, mode, isPending, onSubmit, onCancel
         fd.set('label', label)
         fd.set('account_type', accountType)
         fd.set('gl_account_code', glAccountCode)
+        fd.set('revenue_gl_account_code', revenueGlAccountCode)
         fd.set('is_active', isActive ? 'true' : 'false')
         onSubmit(fd)
       }}
@@ -311,6 +335,25 @@ function CategoryForm({ glAccounts, initial, mode, isPending, onSubmit, onCancel
             <option key={g.code} value={g.code}>{g.code} — {g.name}</option>
           ))}
         </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+          Invoice revenue GL <span className="text-muted font-serif italic text-xs">(optional)</span>
+        </label>
+        <select
+          value={revenueGlAccountCode}
+          onChange={(e) => setRevenueGlAccountCode(e.target.value)}
+          className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+        >
+          <option value="">Fallback to billing_mode (4030 / 4040)</option>
+          {revenueGlOptions.map((g) => (
+            <option key={g.code} value={g.code}>{g.code} — {g.name}</option>
+          ))}
+        </select>
+        <p className="font-serif italic text-muted text-xs mt-1.5">
+          Only used when this category appears on an invoice. Leave blank to keep the default OPEX-recovery / Marketing-project routing by pool.
+        </p>
       </div>
 
       {mode === 'edit' ? (

@@ -13,12 +13,16 @@ function revenueGlCode(billingMode: string | null): string {
   return billingMode === 'marketing_project' ? '4040' : '4030'
 }
 
-// Phase 11: invoices may carry a category_code for tagging/slicing. The category's
-// gl_account_code in payment_categories was originally seeded for the PV/expense
-// side (e.g., logistics → 5050). When an invoice issue posts AR accrual we must
-// credit a revenue account (type='revenue'). So we only honour the category's GL
-// code when it actually points at a revenue-type account; otherwise fall back to
-// the billing_mode mapping. Category remains useful as a tag on the invoice row.
+// Phase 11.1: invoice GL routing precedence (high → low):
+//   1. payment_categories.revenue_gl_account_code (Phase 11.1, opt-in per-category
+//      via Settings → Categories). Only honoured if it points at a revenue-type
+//      account.
+//   2. payment_categories.gl_account_code (legacy/PV side) — only honoured if it
+//      happens to be revenue-typed (rare, since seeded categories are expense-side).
+//   3. billing_mode → 4030 / 4040 fallback.
+//
+// Step 1 is the path Loo configures explicitly. Steps 2 & 3 are safety nets so
+// invoice JEs never accidentally credit an expense or asset account.
 async function resolveRevenueGlCode(
   supabase: Awaited<ReturnType<typeof createClient>>,
   categoryCode: string | null,
@@ -27,16 +31,19 @@ async function resolveRevenueGlCode(
   if (categoryCode) {
     const { data: cat } = await supabase
       .from('payment_categories')
-      .select('gl_account_code')
+      .select('gl_account_code, revenue_gl_account_code')
       .eq('code', categoryCode)
       .maybeSingle()
-    if (cat?.gl_account_code) {
+    const candidates = [cat?.revenue_gl_account_code, cat?.gl_account_code].filter(
+      (c): c is string => !!c,
+    )
+    for (const code of candidates) {
       const { data: acct } = await supabase
         .from('chart_of_accounts')
         .select('type')
-        .eq('code', cat.gl_account_code)
+        .eq('code', code)
         .maybeSingle()
-      if (acct?.type === 'revenue') return cat.gl_account_code
+      if (acct?.type === 'revenue') return code
     }
   }
   return revenueGlCode(billingMode)

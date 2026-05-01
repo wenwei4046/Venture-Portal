@@ -669,6 +669,10 @@ export async function createPaymentCategory(formData: FormData) {
   const label = (formData.get('label') as string)?.trim() ?? ''
   const accountType = (formData.get('account_type') as string)?.trim() as AccountType
   const glAccountCode = (formData.get('gl_account_code') as string)?.trim() ?? ''
+  // Phase 11.1: optional revenue GL for invoices using this category. NULL =
+  // fallback to billing_mode→4030/4040 mapping at invoice JE post time.
+  const revenueGlRaw = (formData.get('revenue_gl_account_code') as string)?.trim() ?? ''
+  const revenueGl = revenueGlRaw || null
 
   if (!code || !label) throw new Error('Code and label are required')
   if (!accountType || !VALID_ACCOUNT_TYPES.includes(accountType)) {
@@ -689,10 +693,29 @@ export async function createPaymentCategory(formData: FormData) {
     )
   }
 
+  if (revenueGl) {
+    const { data: rgl } = await supabase
+      .from('chart_of_accounts')
+      .select('code, type')
+      .eq('code', revenueGl)
+      .maybeSingle()
+    if (!rgl) throw new Error(`Revenue GL ${revenueGl} does not exist`)
+    if (rgl.type !== 'revenue') {
+      throw new Error(`Revenue GL ${revenueGl} is type "${rgl.type}" — must be revenue`)
+    }
+  }
+
   const { error } = await supabase
     .from('payment_categories')
     .upsert(
-      { code, label, account_type: accountType, gl_account_code: glAccountCode, is_active: true },
+      {
+        code,
+        label,
+        account_type: accountType,
+        gl_account_code: glAccountCode,
+        revenue_gl_account_code: revenueGl,
+        is_active: true,
+      },
       { onConflict: 'code' },
     )
 
@@ -711,6 +734,8 @@ export async function updatePaymentCategory(formData: FormData) {
   const accountType = (formData.get('account_type') as string)?.trim() as AccountType
   const glAccountCode = (formData.get('gl_account_code') as string)?.trim() ?? ''
   const isActiveRaw = (formData.get('is_active') as string) ?? 'true'
+  const revenueGlRaw = (formData.get('revenue_gl_account_code') as string)?.trim() ?? ''
+  const revenueGl = revenueGlRaw || null
 
   if (!code) throw new Error('Code is required')
   if (!label) throw new Error('Label is required')
@@ -729,12 +754,25 @@ export async function updatePaymentCategory(formData: FormData) {
     throw new Error(`GL account ${glAccountCode} type "${gl.type}" mismatches category "${accountType}"`)
   }
 
+  if (revenueGl) {
+    const { data: rgl } = await supabase
+      .from('chart_of_accounts')
+      .select('code, type')
+      .eq('code', revenueGl)
+      .maybeSingle()
+    if (!rgl) throw new Error(`Revenue GL ${revenueGl} does not exist`)
+    if (rgl.type !== 'revenue') {
+      throw new Error(`Revenue GL ${revenueGl} is type "${rgl.type}" — must be revenue`)
+    }
+  }
+
   const { error } = await supabase
     .from('payment_categories')
     .update({
       label,
       account_type: accountType,
       gl_account_code: glAccountCode,
+      revenue_gl_account_code: revenueGl,
       is_active: isActiveRaw === 'true',
     })
     .eq('code', code)

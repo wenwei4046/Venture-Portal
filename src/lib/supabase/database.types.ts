@@ -2593,6 +2593,7 @@ export type Database = {
           gl_account_code: string | null
           is_active: boolean
           label: string
+          revenue_gl_account_code: string | null
           sort_order: number
         }
         Insert: {
@@ -2604,6 +2605,7 @@ export type Database = {
           gl_account_code?: string | null
           is_active?: boolean
           label: string
+          revenue_gl_account_code?: string | null
           sort_order?: number
         }
         Update: {
@@ -2615,6 +2617,7 @@ export type Database = {
           gl_account_code?: string | null
           is_active?: boolean
           label?: string
+          revenue_gl_account_code?: string | null
           sort_order?: number
         }
         Relationships: [
