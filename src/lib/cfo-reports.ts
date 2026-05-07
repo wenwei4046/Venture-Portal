@@ -190,13 +190,32 @@ export async function fetchCashflowBuckets(
 
 export interface DeptPnl {
   segment: GlSegment
-  revenue: number   // invoices issued in window with billing_mode mapping to this segment
-  cost: number      // dept_pools expense_out + payroll
+  // Revenue lines: one entry per invoice issued/paid in window. Label is
+  // "<company short_code> — <invoice_no>" so Finance can see who got billed.
+  revenueLines: CashflowLine[]
+  revenue: number
+  // Cost lines: category-label aggregated from paid PV sources (same path as
+  // cashflow report's deptOutflow). Gives buckets like "Logistics",
+  // "Marketing fees" instead of a single dept-level total.
+  costLines: CashflowLine[]
+  cost: number
   margin: number
+}
+
+// Treasury net = interest income on loans + penalty income on overdue
+// repayments − interest expense paid to fund sources. Pulled from
+// journal_lines in window so it includes both PV-driven and direct
+// recordRepayment posts.
+export interface TreasurySection {
+  interestIncome: number
+  penaltyIncome: number
+  interestExpense: number
+  net: number
 }
 
 export interface IncomeStatement {
   perDept: DeptPnl[]
+  treasury: TreasurySection
   groupGeneral: CashflowLine[]
   groupGeneralTotal: number
   groupRevenue: number
@@ -218,71 +237,75 @@ export async function fetchIncomeStatement(
 ): Promise<IncomeStatement> {
   const { from, to } = args
 
-  // Revenue = invoices in window, allocated by billing_mode → segment.
+  // ── Revenue: per-invoice lines, segmented by billing_mode ──
   // invoice_status enum: draft | issued | paid | paid_via_netting (no 'cancelled').
   // Issued/paid/paid_via_netting all count as recognised revenue; draft means
   // not yet booked, so we exclude it.
   const { data: invoices, error: iErr } = await supabase
     .from('invoices')
-    .select('total_amount, billing_mode, period_month, status')
+    .select('invoice_no, total_amount, billing_mode, period_month, status, company_id')
     .gte('period_month', from)
     .lte('period_month', to)
     .in('status', ['issued', 'paid', 'paid_via_netting'])
   if (iErr) throw new Error(`fetchIncomeStatement invoices: ${iErr.message}`)
 
-  const revenueBySegment = new Map<GlSegment, number>()
+  const companyIds = Array.from(new Set((invoices ?? []).map((i) => i.company_id as string)))
+  const { data: companies } = companyIds.length
+    ? await supabase
+        .from('companies')
+        .select('id, short_code')
+        .in('id', companyIds)
+    : { data: [] as { id: string; short_code: string }[] }
+  const shortCodeById = new Map((companies ?? []).map((c) => [c.id as string, c.short_code as string]))
+
+  // Group by segment, with each invoice as one line
+  const revenueLinesBySegment = new Map<GlSegment, CashflowLine[]>()
   for (const inv of invoices ?? []) {
     const seg = BILLING_MODE_TO_SEGMENT[inv.billing_mode as string]
     if (!seg) continue
-    revenueBySegment.set(seg, (revenueBySegment.get(seg) ?? 0) + Number(inv.total_amount ?? 0))
+    const code = shortCodeById.get(inv.company_id as string) ?? '—'
+    const label = `${code} · ${inv.invoice_no}`
+    const lines = revenueLinesBySegment.get(seg) ?? []
+    lines.push({ label, amount: Number(inv.total_amount ?? 0) })
+    revenueLinesBySegment.set(seg, lines)
   }
 
-  // Dept costs = expense_out from dept_pools (already segment-aware via the
-  // department_id → name → segment mapping).
-  const { data: depts, error: dErr } = await supabase
-    .from('departments')
-    .select('id, name')
-  if (dErr) throw new Error(`fetchIncomeStatement depts: ${dErr.message}`)
-  const deptIdToSegment = new Map<string, GlSegment>()
-  for (const d of depts ?? []) {
-    const seg = mapDeptNameToSegment(d.name as string)
-    if (seg) deptIdToSegment.set(d.id as string, seg)
-  }
-
-  const { data: deptPools, error: dpErr } = await supabase
-    .from('dept_pools')
-    .select('department_id, transaction_type, amount, created_at')
-    .eq('transaction_type', 'expense_out')
-    .gte('created_at', from)
-    .lte('created_at', dayjs(to).endOf('day').toISOString())
-  if (dpErr) throw new Error(`fetchIncomeStatement dept_pools: ${dpErr.message}`)
-
-  const costBySegment = new Map<GlSegment, number>()
-  for (const r of deptPools ?? []) {
-    const seg = deptIdToSegment.get(r.department_id as string)
-    if (!seg) continue
-    costBySegment.set(seg, (costBySegment.get(seg) ?? 0) + Number(r.amount ?? 0))
+  // ── Cost: per-category lines from paid-PV sources (same path as cashflow) ──
+  // We reuse fetchCashflowBuckets so the dept cost breakdown stays in lock-step
+  // with the cashflow report's deptOutflow section.
+  const buckets = await fetchCashflowBuckets(supabase, { from, to })
+  const costLinesBySegment = new Map<GlSegment, CashflowLine[]>()
+  for (const b of buckets.deptOutflow) {
+    costLinesBySegment.set(b.segment, b.lines)
   }
 
   // Build per-dept P&L
   const perDept: DeptPnl[] = DEPT_SEGMENTS.map((segment) => {
-    const revenue = revenueBySegment.get(segment) ?? 0
-    const cost = costBySegment.get(segment) ?? 0
-    return { segment, revenue, cost, margin: revenue - cost }
+    const revenueLines = (revenueLinesBySegment.get(segment) ?? [])
+      .sort((a, b) => b.amount - a.amount)
+    const costLines = costLinesBySegment.get(segment) ?? []
+    const revenue = revenueLines.reduce((s, l) => s + l.amount, 0)
+    const cost = costLines.reduce((s, l) => s + l.amount, 0)
+    return { segment, revenueLines, revenue, costLines, cost, margin: revenue - cost }
   })
 
-  // Group general expenses (corporate / unallocated) — pulled via the
-  // cashflow general bucket so it stays aligned with the cashflow report.
-  const buckets = await fetchCashflowBuckets(supabase, { from, to })
+  // ── Treasury: 4010 + 4020 income, 5010 expense from journal_lines in window ──
+  const treasury = await fetchTreasurySection(supabase, { from, to })
+
+  // Group general expenses (corporate / unallocated) — already line-itemised
+  // by cashflow.generalExpenses.
   const groupGeneral = buckets.generalExpenses
   const groupGeneralTotal = buckets.totalGeneral
 
   const groupRevenue = perDept.reduce((s, d) => s + d.revenue, 0)
   const groupDeptCost = perDept.reduce((s, d) => s + d.cost, 0)
-  const groupNetProfit = groupRevenue - groupDeptCost - groupGeneralTotal
+  // Net profit now includes treasury (loan interest in/out) which previously
+  // sat outside the income statement.
+  const groupNetProfit = groupRevenue - groupDeptCost + treasury.net - groupGeneralTotal
 
   return {
     perDept,
+    treasury,
     groupGeneral,
     groupGeneralTotal,
     groupRevenue,
@@ -291,13 +314,46 @@ export async function fetchIncomeStatement(
   }
 }
 
-function mapDeptNameToSegment(name: string): GlSegment | null {
-  const n = name.toLowerCase()
-  if (n === 'marketing') return 'marketing'
-  if (n === 'hr') return 'hr'
-  if (n === 'finance') return 'finance'
-  if (n === 'director office') return 'director_office'
-  return null
+// Treasury revenue/expense from journal_lines (mig 48). 4010 = Interest Income
+// — Loans, 4020 = Penalty Income, 5010 = Interest Expense — Fund Sources.
+async function fetchTreasurySection(
+  supabase: SupabaseClient,
+  args: { from: string; to: string },
+): Promise<TreasurySection> {
+  const { from, to } = args
+
+  // journal_entries in window, not reversed
+  const { data: jes, error: jeErr } = await supabase
+    .from('journal_entries')
+    .select('id, transaction_date, is_reversed')
+    .gte('transaction_date', from)
+    .lte('transaction_date', to)
+    .eq('is_reversed', false)
+  if (jeErr) throw new Error(`fetchTreasurySection JEs: ${jeErr.message}`)
+
+  const entryIds = (jes ?? []).map((j) => j.id as string)
+  if (entryIds.length === 0) {
+    return { interestIncome: 0, penaltyIncome: 0, interestExpense: 0, net: 0 }
+  }
+
+  const { data: lines, error: lErr } = await supabase
+    .from('journal_lines')
+    .select('account_code, debit, credit')
+    .in('entry_id', entryIds)
+    .in('account_code', ['4010', '4020', '5010'])
+  if (lErr) throw new Error(`fetchTreasurySection lines: ${lErr.message}`)
+
+  let interestIncome = 0
+  let penaltyIncome = 0
+  let interestExpense = 0
+  for (const l of lines ?? []) {
+    // Revenue accounts increase via credit; expense accounts increase via debit.
+    if (l.account_code === '4010') interestIncome += Number(l.credit ?? 0) - Number(l.debit ?? 0)
+    if (l.account_code === '4020') penaltyIncome += Number(l.credit ?? 0) - Number(l.debit ?? 0)
+    if (l.account_code === '5010') interestExpense += Number(l.debit ?? 0) - Number(l.credit ?? 0)
+  }
+  const net = interestIncome + penaltyIncome - interestExpense
+  return { interestIncome, penaltyIncome, interestExpense, net }
 }
 
 // ────────────────────────────────────────────────────────────────────────────
