@@ -201,6 +201,121 @@ export async function createFundSource(formData: FormData) {
   redirect(`/fund-in/${data.id}`)
 }
 
+// ─── Update Fund Source (Finance, only pending_approval) ────────────────────
+//
+// Lets Finance fix typos / wrong amount / wrong rate / wrong dates before
+// Principal approves. Once approved (status flips to 'active'), the row
+// freezes — editing would mean rewriting the venture_pool credit + bank
+// bump that already happened.
+//
+// Editable: amount, cost_rate_percent, lock_in_months, effective_date,
+//   repayment_date (drives maturity_date), notes.
+// Locked: source_type, from_company_id/from_director_id/from_department_id,
+//   status, audit fields, created_by/at.
+//
+// Returns `{ error }` for validation failures so the message survives
+// Next.js production error redaction.
+
+export type FundSourceActionResult = { error: string } | undefined
+
+export async function updateFundSource(formData: FormData): Promise<FundSourceActionResult> {
+  await requireRole(['finance'])
+  const supabase = await createClient()
+
+  const id = (formData.get('id') as string) ?? ''
+  if (!id) return { error: 'Fund source id is required' }
+
+  const amount = parseFloat((formData.get('amount') as string) ?? '0')
+  const costRatePercent = parseFloat((formData.get('cost_rate_percent') as string) ?? '0')
+  const lockInMonths = parseInt((formData.get('lock_in_months') as string) ?? '0', 10)
+  const effectiveDate = (formData.get('effective_date') as string) ?? ''
+  const repaymentDate = (formData.get('repayment_date') as string) ?? ''
+  const notes = (formData.get('notes') as string) || null
+
+  if (isNaN(amount) || amount <= 0) return { error: 'Amount must be greater than 0' }
+  if (isNaN(costRatePercent) || costRatePercent < 0 || costRatePercent >= 100) {
+    return { error: 'Interest rate must be between 0 and 100%' }
+  }
+  if (isNaN(lockInMonths) || lockInMonths < 1) {
+    return { error: 'Repayment period must be at least 1 month' }
+  }
+  if (!effectiveDate) return { error: 'Effective date is required' }
+  if (dayjs(effectiveDate).isAfter(dayjs(), 'day')) {
+    return { error: 'Effective date cannot be in the future' }
+  }
+  if (!repaymentDate) return { error: 'Repayment date is required' }
+  if (dayjs(repaymentDate).isBefore(dayjs(effectiveDate), 'day')) {
+    return { error: 'Repayment date must be on or after effective date' }
+  }
+
+  // Status guard — only pending_approval is editable.
+  const { data: current } = await supabase
+    .from('fund_sources')
+    .select('id, status, source_type, amount')
+    .eq('id', id)
+    .single()
+  if (!current) return { error: 'Fund source not found' }
+  if (current.status !== 'pending_approval') {
+    return {
+      error: `Cannot edit fund source with status "${current.status}" — only pending_approval is editable`,
+    }
+  }
+
+  await assertPeriodOpen(supabase, effectiveDate)
+
+  const cost_rate = costRatePercent / 100
+
+  // .select() forces Supabase to return matched rows so we detect the TOCTOU
+  // race where Principal approves between our SELECT and UPDATE. Without it,
+  // UPDATE matches 0 rows (status no longer pending_approval) and updErr stays
+  // null — we'd silently corrupt an already-active fund source.
+  const { data: updated, error: updErr } = await supabase
+    .from('fund_sources')
+    .update({
+      amount,
+      cost_rate,
+      lock_in_months: lockInMonths || null,
+      effective_date: effectiveDate,
+      repayment_date: repaymentDate,
+      maturity_date: repaymentDate,
+      notes,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .eq('status', 'pending_approval')
+    .select('id')
+
+  if (updErr) return { error: `Failed to update fund source: ${updErr.message}` }
+  if (!updated || updated.length === 0) {
+    return {
+      error: 'Fund source status changed mid-edit (already approved or cancelled) — refresh and try again',
+    }
+  }
+
+  // If amount changed, refresh the approval_request so Principal sees the
+  // updated number in the queue + email/digest descriptions.
+  if (Number(current.amount) !== amount) {
+    const typeLabel =
+      current.source_type === 'subsidiary' ? 'subsidiary deposit'
+      : current.source_type === 'director_loan' ? 'director loan'
+      : 'dept pool transfer'
+    await supabase
+      .from('approval_requests')
+      .update({
+        description: `New fund source: ${typeLabel} — RM ${amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${costRatePercent}%/mo`,
+        amount,
+      })
+      .eq('reference_id', id)
+      .eq('reference_table', 'fund_sources')
+      .eq('status', 'pending')
+  }
+
+  revalidatePath(`/fund-in/${id}`)
+  revalidatePath('/fund-in')
+  revalidatePath('/approvals')
+  redirect(`/fund-in/${id}`)
+}
+
 // ─── Cancel Fund Source (requires Principal approval) ────────────────────────
 
 export async function cancelFundSource(formData: FormData) {

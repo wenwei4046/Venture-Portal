@@ -95,6 +95,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
   const isActive = source.status === 'active'
   const isMatured = source.status === 'matured'
   const isRepaid = source.status === 'repaid'
+  const isPending = source.status === 'pending_approval'
   const canFinanceEdit = user.role === 'finance'
 
   const maturityDays = source.maturity_date
@@ -310,7 +311,24 @@ export default async function FundSourceDetailPage({ params }: Props) {
       ) : null}
 
       {/* ───────── Actions (Finance only) ───────── */}
-      {canFinanceEdit && isActive ? (
+      {canFinanceEdit && isPending ? (
+        <section className="border-t border-hairline pt-8">
+          <div className="sect-head">
+            <h2>Actions</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">EDITABLE UNTIL PRINCIPAL APPROVES</span>
+          </div>
+          <Link
+            href={`/fund-in/${source.id}/edit`}
+            className="text-sm text-accent hover:text-accent-hover font-serif italic border border-hairline px-4 py-2 rounded-md transition-colors inline-block"
+          >
+            Edit fund source
+          </Link>
+          <p className="text-xs text-muted mt-2 italic font-serif">
+            Fix typos, wrong amount, wrong rate, or wrong dates while the request is still pending. Locks once Principal approves.
+          </p>
+        </section>
+      ) : canFinanceEdit && isActive ? (
         <section className="border-t border-hairline pt-8">
           <div className="sect-head">
             <h2>Actions</h2>
@@ -332,6 +350,9 @@ export default async function FundSourceDetailPage({ params }: Props) {
 }
 
 function StatusBadge({ status }: { status: string }) {
+  if (status === 'pending_approval') {
+    return <span className="status-morph font-serif italic text-alert text-md">pending approval</span>
+  }
   if (status === 'active') {
     return <span className="status-morph font-serif italic text-graphite text-md">active</span>
   }
