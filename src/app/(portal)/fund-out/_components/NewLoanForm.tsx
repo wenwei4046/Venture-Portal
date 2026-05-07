@@ -40,8 +40,10 @@ export default function NewLoanForm({ companies, baseRate }: Props) {
     setError(null)
     startTransition(async () => {
       try {
-        await createLoan(formData)
+        const result = await createLoan(formData)
+        if (result?.error) setError(result.error)
       } catch (err) {
+        // Only NEXT_REDIRECT is expected to throw past the action — let it bubble.
         if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) {
           throw err
         }

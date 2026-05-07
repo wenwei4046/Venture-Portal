@@ -10,8 +10,14 @@ import { postJournalEntry } from '@/lib/journal'
 import type { PaymentType } from '@/types'
 
 // ─── Create new loan (Finance) ────────────────────────────────────────────────
+//
+// Returns `{ error }` for validation/RPC failures so the message survives
+// Next.js 15's production error redaction. Only `redirect()` (which throws
+// NEXT_REDIRECT internally) propagates as a throw.
 
-export async function createLoan(formData: FormData) {
+export type CreateLoanResult = { error: string } | undefined
+
+export async function createLoan(formData: FormData): Promise<CreateLoanResult> {
   await requireRole(['finance'])
   const supabase = await createClient()
 
@@ -21,15 +27,15 @@ export async function createLoan(formData: FormData) {
   const repaymentTerms = (formData.get('repayment_terms') as string) ?? ''
   const loanStartDate = (formData.get('loan_start_date') as string) ?? ''
 
-  if (!companyId) throw new Error('Company is required')
+  if (!companyId) return { error: 'Company is required' }
   if (isNaN(principal) || principal <= 0) {
-    throw new Error('Principal must be greater than 0')
+    return { error: 'Principal must be greater than 0' }
   }
   if (principal > 100_000_000) {
-    throw new Error('Principal exceeds RM 100M ceiling')
+    return { error: 'Principal exceeds RM 100M ceiling' }
   }
   if (isNaN(tenureMonths) || tenureMonths < 1 || tenureMonths > 12) {
-    throw new Error('Tenure must be between 1 and 12 months')
+    return { error: 'Tenure must be between 1 and 12 months' }
   }
   if (!loanStartDate || !dayjs(loanStartDate).isValid()) {
     throw new Error('Loan start date is required')
@@ -45,11 +51,12 @@ export async function createLoan(formData: FormData) {
     .limit(1)
     .maybeSingle()
 
-  if (brError) throw new Error(`Base rate lookup failed: ${brError.message}`)
+  if (brError) return { error: `Base rate lookup failed: ${brError.message}` }
   if (!baseRate) {
-    throw new Error(
-      'No approved base rate found. Principal must approve a base rate before loans can be created.'
-    )
+    return {
+      error:
+        'No approved base rate found. Principal must approve a base rate before loans can be created.',
+    }
   }
 
   // ─── Look up company ───
@@ -60,12 +67,12 @@ export async function createLoan(formData: FormData) {
     .eq('is_active', true)
     .single()
 
-  if (cError || !company) throw new Error('Company not found or inactive')
+  if (cError || !company) return { error: 'Company not found or inactive' }
 
   // Custom interest rate from form (% per month → decimal)
   const customRatePercent = parseFloat((formData.get('custom_rate_percent') as string) ?? '0')
   if (isNaN(customRatePercent) || customRatePercent < 0 || customRatePercent >= 100) {
-    throw new Error('Custom interest rate must be between 0 and 100%')
+    return { error: 'Custom interest rate must be between 0 and 100%' }
   }
   const customRate = customRatePercent / 100
 
@@ -73,21 +80,10 @@ export async function createLoan(formData: FormData) {
   const premium = customRate
   const effective = base + premium
 
-  // ─── Check primary bank has sufficient cash to lend ───
-  const { data: primaryBank } = await supabase
-    .from('bank_accounts')
-    .select('current_balance')
-    .eq('is_primary', true)
-    .eq('status', 'active')
-    .maybeSingle()
-  if (primaryBank) {
-    const bankBalance = Number(primaryBank.current_balance ?? 0)
-    if (bankBalance < principal) {
-      throw new Error(
-        `Insufficient bank balance. Available: RM ${bankBalance.toLocaleString('en-MY', { minimumFractionDigits: 2 })}, requested: RM ${principal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}.`
-      )
-    }
-  }
+  // Bank balance check moved to approval/disbursement time. At creation the
+  // loan is only pending_approval — no money moves — so blocking Finance
+  // here was premature (the bank can be capitalised between submit and
+  // Principal's approval).
 
   // ─── Atomic loan + approval creation (M1 fix) ───
   const { data: loanId, error: rpcError } = await supabase.rpc(
@@ -106,7 +102,7 @@ export async function createLoan(formData: FormData) {
   )
 
   if (rpcError || !loanId) {
-    throw new Error(`Failed to create loan: ${rpcError?.message ?? 'unknown'}`)
+    return { error: `Failed to create loan: ${rpcError?.message ?? 'unknown'}` }
   }
 
   revalidatePath('/fund-out')
