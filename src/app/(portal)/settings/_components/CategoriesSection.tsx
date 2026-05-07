@@ -83,7 +83,11 @@ export default function CategoriesSection({ categories, glAccounts }: Props) {
           glAccounts={glAccounts}
           onSubmit={(fd) => startTransition(async () => {
             try {
-              await createPaymentCategory(fd)
+              const result = await createPaymentCategory(fd)
+              if (result?.error) {
+                setError(result.error)
+                return
+              }
               setShowCreate(false)
               setError(null)
             } catch (e) {
@@ -145,7 +149,11 @@ export default function CategoriesSection({ categories, glAccounts }: Props) {
                             isPending={isPending}
                             onSubmit={(fd) => startTransition(async () => {
                               try {
-                                await updatePaymentCategory(fd)
+                                const result = await updatePaymentCategory(fd)
+                                if (result?.error) {
+                                  setError(result.error)
+                                  return
+                                }
                                 setEditing(null)
                                 setError(null)
                               } catch (e) {

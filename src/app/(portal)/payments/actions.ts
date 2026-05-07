@@ -660,8 +660,13 @@ export async function voidVoucher(formData: FormData) {
 // Mig 214 enforces an account_type (BS vs P&L) and a GL account on every
 // category so journal_entries route correctly. Both are required — no more
 // silently-NULL categories that fall back to coarse voucher_type GL routing.
+//
+// Returns `{ error }` for validation/DB failures so the message survives
+// Next.js 15's production error redaction.
 
-export async function createPaymentCategory(formData: FormData) {
+export type CategoryActionResult = { error: string } | undefined
+
+export async function createPaymentCategory(formData: FormData): Promise<CategoryActionResult> {
   await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
@@ -674,11 +679,11 @@ export async function createPaymentCategory(formData: FormData) {
   const revenueGlRaw = (formData.get('revenue_gl_account_code') as string)?.trim() ?? ''
   const revenueGl = revenueGlRaw || null
 
-  if (!code || !label) throw new Error('Code and label are required')
+  if (!code || !label) return { error: 'Code and label are required' }
   if (!accountType || !VALID_ACCOUNT_TYPES.includes(accountType)) {
-    throw new Error('Account type is required (asset / liability / equity / revenue / expense)')
+    return { error: 'Account type is required (asset / liability / equity / revenue / expense)' }
   }
-  if (!glAccountCode) throw new Error('GL account code is required')
+  if (!glAccountCode) return { error: 'GL account code is required' }
 
   // Defence-in-depth: verify GL exists and its type matches account_type
   const { data: gl } = await supabase
@@ -686,11 +691,11 @@ export async function createPaymentCategory(formData: FormData) {
     .select('code, type')
     .eq('code', glAccountCode)
     .maybeSingle()
-  if (!gl) throw new Error(`GL account ${glAccountCode} does not exist`)
+  if (!gl) return { error: `GL account ${glAccountCode} does not exist` }
   if (gl.type !== accountType) {
-    throw new Error(
-      `GL account ${glAccountCode} is type "${gl.type}" but category was tagged "${accountType}". They must match.`,
-    )
+    return {
+      error: `GL account ${glAccountCode} is type "${gl.type}" but category was tagged "${accountType}". They must match.`,
+    }
   }
 
   if (revenueGl) {
@@ -719,13 +724,13 @@ export async function createPaymentCategory(formData: FormData) {
       { onConflict: 'code' },
     )
 
-  if (error) throw new Error(`Failed to create category: ${error.message}`)
+  if (error) return { error: `Failed to create category: ${error.message}` }
 
   revalidatePath('/payments/new')
   revalidatePath('/settings?tab=categories')
 }
 
-export async function updatePaymentCategory(formData: FormData) {
+export async function updatePaymentCategory(formData: FormData): Promise<CategoryActionResult> {
   await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
@@ -737,21 +742,23 @@ export async function updatePaymentCategory(formData: FormData) {
   const revenueGlRaw = (formData.get('revenue_gl_account_code') as string)?.trim() ?? ''
   const revenueGl = revenueGlRaw || null
 
-  if (!code) throw new Error('Code is required')
-  if (!label) throw new Error('Label is required')
+  if (!code) return { error: 'Code is required' }
+  if (!label) return { error: 'Label is required' }
   if (!accountType || !VALID_ACCOUNT_TYPES.includes(accountType)) {
-    throw new Error('Account type is required')
+    return { error: 'Account type is required' }
   }
-  if (!glAccountCode) throw new Error('GL account code is required')
+  if (!glAccountCode) return { error: 'GL account code is required' }
 
   const { data: gl } = await supabase
     .from('chart_of_accounts')
     .select('code, type')
     .eq('code', glAccountCode)
     .maybeSingle()
-  if (!gl) throw new Error(`GL account ${glAccountCode} does not exist`)
+  if (!gl) return { error: `GL account ${glAccountCode} does not exist` }
   if (gl.type !== accountType) {
-    throw new Error(`GL account ${glAccountCode} type "${gl.type}" mismatches category "${accountType}"`)
+    return {
+      error: `GL account ${glAccountCode} type "${gl.type}" mismatches category "${accountType}"`,
+    }
   }
 
   if (revenueGl) {
@@ -777,7 +784,7 @@ export async function updatePaymentCategory(formData: FormData) {
     })
     .eq('code', code)
 
-  if (error) throw new Error(`Failed to update category: ${error.message}`)
+  if (error) return { error: `Failed to update category: ${error.message}` }
 
   revalidatePath('/settings?tab=categories')
   revalidatePath('/payments/new')
