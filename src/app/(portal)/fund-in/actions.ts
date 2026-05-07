@@ -114,6 +114,10 @@ export async function createFundSource(formData: FormData) {
     lock_in_months: raw.lock_in_months || null,
     effective_date: raw.effective_date,
     repayment_date: raw.repayment_date,
+    // Mig 12 trigger auto-fills maturity_date from effective_date + lock_in_months
+    // when null. Set it explicitly to the user-entered repayment_date so the
+    // detail page's "MATURES …" line matches what Finance promised.
+    maturity_date: raw.repayment_date,
     early_withdrawal: false,
     // Phase 7: starts in pending_approval. Principal approval flips to 'active'
     // and posts the Venture Pool credit + bank balance bump.
