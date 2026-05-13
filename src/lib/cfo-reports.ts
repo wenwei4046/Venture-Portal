@@ -744,12 +744,41 @@ export async function fetchBalanceSheet(
 ): Promise<BalanceSheet> {
   const { asOf } = args
 
-  // 1) Bank cash = sum of bank_accounts.current_balance
-  const { data: banks } = await supabase
+  // 1) Bank cash from the GL (NOT bank_accounts.current_balance — that field
+  //    is a cache and has been observed to drift when a write path forgets to
+  //    bump it. The GL is the source of truth.). Sum (debit − credit) on every
+  //    journal line whose account_code matches an active bank account's
+  //    gl_account_code, restricted to non-reversed JEs dated on/before asOf.
+  const { data: bankRows } = await supabase
     .from('bank_accounts')
-    .select('current_balance')
+    .select('gl_account_code')
     .eq('status', 'active')
-  const bank = (banks ?? []).reduce((s, b) => s + Number(b.current_balance ?? 0), 0)
+  const bankCodes = Array.from(
+    new Set(
+      (bankRows ?? [])
+        .map((b) => (b.gl_account_code as string | null) ?? '1010')
+        .filter((c): c is string => !!c),
+    ),
+  )
+  let bank = 0
+  if (bankCodes.length > 0) {
+    const { data: bankJes } = await supabase
+      .from('journal_entries')
+      .select('id')
+      .lte('transaction_date', asOf)
+      .eq('is_reversed', false)
+    const bankJeIds = (bankJes ?? []).map((j) => j.id as string)
+    if (bankJeIds.length > 0) {
+      const { data: bankLines } = await supabase
+        .from('journal_lines')
+        .select('debit, credit')
+        .in('entry_id', bankJeIds)
+        .in('account_code', bankCodes)
+      for (const l of bankLines ?? []) {
+        bank += Number(l.debit ?? 0) - Number(l.credit ?? 0)
+      }
+    }
+  }
 
   // 2) AR — invoices issued but not yet paid
   const { data: invoices } = await supabase
