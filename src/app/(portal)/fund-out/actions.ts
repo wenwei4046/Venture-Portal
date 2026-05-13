@@ -113,9 +113,9 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
   // Principal's approval).
 
   // ─── Atomic loan + approval creation (M1 fix) ───
-  // Mig 238 renamed payment_voucher_sources.category_code → account_code but
-  // kept the 9-arg create_loan_with_approval RPC signature (the RPC inserts
-  // a placeholder source row; we patch the account_code post-hoc here).
+  // Mig 239: the 10-arg create_loan_with_approval RPC accepts the BS account
+  // code and writes it on the disbursement PV source row in a single
+  // transaction. No post-RPC patch needed.
   const { data: loanId, error: rpcError } = await supabase.rpc(
     'create_loan_with_approval',
     {
@@ -128,42 +128,12 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
       p_repayment_terms: repaymentTerms || undefined,
       p_company_name: company.name,
       p_disbursement_date: loanStartDate,
+      p_disbursement_account_code: disbursementAccountCode,
     }
   )
 
   if (rpcError || !loanId) {
     return { error: `Failed to create loan: ${rpcError?.message ?? 'unknown'}` }
-  }
-
-  // Post-RPC patch: locate the disbursement PV the RPC just created
-  // (reference_type='loan', reference_id=loanId, voucher_type='other',
-  // direction='debit') and set the BS account on its single source row.
-  // Without this the report engine would throw on a NULL account_code.
-  const { data: disbursementPv } = await supabase
-    .from('payment_vouchers')
-    .select('id')
-    .eq('reference_type', 'loan')
-    .eq('reference_id', loanId)
-    .eq('voucher_type', 'other')
-    .eq('direction', 'debit')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (disbursementPv?.id) {
-    const { error: updErr } = await supabase
-      .from('payment_voucher_sources')
-      .update({ account_code: disbursementAccountCode })
-      .eq('voucher_id', disbursementPv.id)
-    if (updErr) {
-      // Loan + PV are created; only the account-code patch failed. Surface
-      // it to Finance so they know to either retry or fix manually before
-      // reports are viewed.
-      return {
-        error: `Loan created but failed to set disbursement account (${updErr.message}). ` +
-               `Open /fund-out/${loanId} and contact engineering.`,
-      }
-    }
   }
 
   revalidatePath('/fund-out')
