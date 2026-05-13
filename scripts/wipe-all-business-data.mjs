@@ -72,18 +72,19 @@ const DRY_RUN = !args.includes('--confirm')
 // All tables use `id` UUID PK — delete via .not('id', 'is', null).
 //
 // CRITICAL ORDER (FK-safe):
-//   1. journal_lines → journal_entries (GL)
+//   1. journal_lines (child of journal_entries, no other dependents)
 //   2. payment_attachments → payment_voucher_sources (PV children)
 //   3. claims (claims.voucher_id → payment_vouchers — must go BEFORE PVs)
 //   4. payment_vouchers (special: void-flip first to bypass pvs-sum trigger)
 //   5. invoices (PVs may reference invoices via reference_id/reference_type)
-//   6. fund_source_repayments → repayments → overdue_records
-//   7. loans → fund_sources (PV.loan_id / PV.fund_source_id had to be gone)
-//   8. rest unchanged
+//   6. journal_entries (PVs reference JEs via journal_entry_id, no ON DELETE;
+//      JEs can only go after PVs are deleted)
+//   7. fund_source_repayments → repayments → overdue_records
+//   8. loans → fund_sources (PV.loan_id / PV.fund_source_id had to be gone)
+//   9. rest unchanged
 const WIPE_TABLES = [
-  // 1. GL
+  // 1. GL line items (no dependents)
   'journal_lines',
-  'journal_entries',
   // 2. PV children
   'payment_attachments',
   'payment_voucher_sources',
@@ -196,6 +197,24 @@ async function safeDeleteCreatedAt(table) {
   console.log(`  ✓ ${table}: ${before} → ${after ?? 0}`)
 }
 
+async function safeDeletePeriodLocks() {
+  // period_locks PK is (period_month) — no `id` and no `created_at`. Delete
+  // every row by filtering on period_month (a date column, NOT NULL).
+  const table = 'period_locks'
+  const before = await rowCount(table)
+  if (before === null) {
+    console.log(`  — ${table}: skipped (table not found)`)
+    return
+  }
+  const { error } = await admin.from(table).delete().gte('period_month', '1900-01-01')
+  if (error) {
+    console.log(`  ⚠ ${table}: ${error.message}`)
+    return
+  }
+  const after = await rowCount(table)
+  console.log(`  ✓ ${table}: ${before} → ${after ?? 0}`)
+}
+
 // ── main ─────────────────────────────────────────────────────────────────────
 async function main() {
   if (DRY_RUN) {
@@ -276,14 +295,17 @@ async function main() {
       // claims are gone → delete payment_vouchers (its child sources rows are
       // already gone from step 1, and the trigger was disarmed via the
       // void-flip above). Then invoices, before monthly_statement_lines and
-      // credit_notes which may FK into invoices.
+      // credit_notes which may FK into invoices. THEN journal_entries — PVs
+      // reference JEs via journal_entry_id (no ON DELETE), so JEs can only
+      // be safely deleted after PVs are gone.
       await safeDelete('payment_vouchers')
       await safeDelete('invoices')
+      await safeDelete('journal_entries')
     }
   }
 
-  // Step 3: Wipe period_locks (may not have id column — use created_at)
-  await safeDeleteCreatedAt('period_locks')
+  // Step 3: Wipe period_locks (uses period_month column, no created_at)
+  await safeDeletePeriodLocks()
 
   // --- AFTER counts ---
   console.log()
