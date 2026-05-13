@@ -112,8 +112,11 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
   // Principal's approval).
 
   // ─── Atomic loan + approval creation (M1 fix) ───
-  // Mig 236: RPC now takes p_disbursement_category_code so the PVS row is
-  // inserted already-classified. No more post-RPC UPDATE patch needed.
+  // TEMPORARY: migration 236 (10-arg RPC) isn't applied yet. Call the old
+  // 9-arg RPC and then patch the disbursement PVS row with the BS category.
+  // Revert to the 10-arg call once mig 235 + 236 are applied — diff hints:
+  //   1) re-add `p_disbursement_category_code: disbursementCategoryCode,`
+  //   2) drop the post-RPC UPDATE block below.
   const { data: loanId, error: rpcError } = await supabase.rpc(
     'create_loan_with_approval',
     {
@@ -126,12 +129,42 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
       p_repayment_terms: repaymentTerms || undefined,
       p_company_name: company.name,
       p_disbursement_date: loanStartDate,
-      p_disbursement_category_code: disbursementCategoryCode,
     }
   )
 
   if (rpcError || !loanId) {
     return { error: `Failed to create loan: ${rpcError?.message ?? 'unknown'}` }
+  }
+
+  // TEMP patch: locate the disbursement PV the RPC just created (reference_type='loan',
+  // reference_id=loanId, voucher_type='other', direction='debit') and set the
+  // BS category on its single source row. Without this the report engine
+  // would later throw on a NULL category_code.
+  const { data: disbursementPv } = await supabase
+    .from('payment_vouchers')
+    .select('id')
+    .eq('reference_type', 'loan')
+    .eq('reference_id', loanId)
+    .eq('voucher_type', 'other')
+    .eq('direction', 'debit')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (disbursementPv?.id) {
+    const { error: updErr } = await supabase
+      .from('payment_voucher_sources')
+      .update({ category_code: disbursementCategoryCode })
+      .eq('voucher_id', disbursementPv.id)
+    if (updErr) {
+      // Loan + PV are created; only the category-code patch failed. Surface
+      // it to Finance so they know to either retry or fix manually before
+      // reports are viewed.
+      return {
+        error: `Loan created but failed to set disbursement category (${updErr.message}). ` +
+               `Open /fund-out/${loanId} and contact engineering.`,
+      }
+    }
   }
 
   revalidatePath('/fund-out')
