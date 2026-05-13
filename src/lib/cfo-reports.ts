@@ -421,9 +421,27 @@ async function gatherPvSources(
 
   const voucherMeta = new Map<string, { voucherType: string; direction: 'credit' | 'debit' }>()
   for (const v of vouchers ?? []) {
+    // Defense in depth: voucher_type / direction are NOT NULL at the DB level
+    // (mig 50) but the supabase generated types still mark them nullable.
+    // Refuse to classify silently if either is missing — better to surface
+    // a corrupt row than to silently misclassify a PV as an expense (which
+    // would happen if we defaulted voucher_type to 'expense' and direction
+    // to 'debit').
+    const rawType = v.voucher_type as string | null
+    const rawDir = v.direction as string | null
+    if (rawType === null || rawType === undefined) {
+      throw new Error(
+        `payment_voucher row ${v.id} has NULL voucher_type — refuse to classify silently`,
+      )
+    }
+    if (rawDir !== 'credit' && rawDir !== 'debit') {
+      throw new Error(
+        `payment_voucher row ${v.id} has NULL/invalid direction "${rawDir}" — refuse to classify silently`,
+      )
+    }
     voucherMeta.set(v.id as string, {
-      voucherType: (v.voucher_type as string) ?? 'expense',
-      direction: v.direction === 'credit' ? 'credit' : 'debit',
+      voucherType: rawType,
+      direction: rawDir,
     })
   }
 
