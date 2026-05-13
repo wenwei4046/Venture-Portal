@@ -43,6 +43,12 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
     throw new Error('Loan start date is required')
   }
 
+  // Surface period-lock conflicts at creation time rather than at approval
+  // time — the auto-generated disbursement PV will be dated loanStartDate
+  // and would otherwise fail on approval if its period is locked. Mirrors
+  // the assertPeriodOpen call in recordRepayment.
+  await assertPeriodOpen(supabase, loanStartDate)
+
   // Validate the disbursement category: must exist, be active, and be
   // BS-classified (asset/liability). This guarantees the loan principal
   // can never leak into the P&L via the auto-created disbursement PV.
