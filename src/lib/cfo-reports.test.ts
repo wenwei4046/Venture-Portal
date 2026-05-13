@@ -85,4 +85,45 @@ describe('classifyRows', () => {
     expect(allLabels).not.toContain('Uncategorised')
     expect(allLabels).toContain('Office Rental')
   })
+
+  it('does NOT double-count loan interest (revenue PV source on loan_repayment is ignored; treasury is sole source)', () => {
+    const out = classifyRows({
+      pvSources: [
+        // Hypothetical: a loan_repayment voucher with two source rows — principal (asset, BS) + interest (revenue).
+        pv({ voucherType: 'loan_repayment', direction: 'credit', accountType: 'asset', amount: 10000, pool: 'venture_pool', categoryLabel: 'Loan principal received' }),
+        pv({ voucherType: 'loan_repayment', direction: 'credit', accountType: 'revenue', amount: 200, pool: 'venture_pool', categoryLabel: 'Interest income (PV-side)' }),
+      ],
+      invoices: [],
+      treasury: { interestIncome: 200, penaltyIncome: 0, interestExpense: 0 },
+    })
+    const vp = out.income.pools.find((p) => p.pool === 'venture_pool')!
+    // Revenue is 200 (from treasury), NOT 400. The PV revenue source is skipped.
+    expect(vp.revenue).toBeCloseTo(200, 2)
+    // The principal row appears as BS movement + cash fundIn
+    expect(out.balanceMovements.find((m) => m.label === 'Loan principal received')?.amount).toBe(10000)
+  })
+
+  it('counts fund_sources (deposits received) as cash inflow + BS liability increase, never P&L', () => {
+    const out = classifyRows({
+      pvSources: [], invoices: [], treasury: noTreasury,
+      fundSourceInflows: [{ fundSourceId: 'fs1', pool: 'venture_pool', label: 'Subsidiary deposit — CONTS', amount: 100000 }],
+      repaymentPrincipalInflows: [],
+    })
+    expect(out.income.groupNetProfit).toBe(0)
+    const vp = out.cashflow.pools.find((p) => p.pool === 'venture_pool')!
+    expect(vp.inflow.fundIn.reduce((s, l) => s + l.amount, 0)).toBe(100000)
+    expect(out.balanceMovements.find((m) => m.label.includes('CONTS'))?.amount).toBe(100000)
+  })
+
+  it('counts loan principal received as cash inflow + BS asset decrease, never P&L', () => {
+    const out = classifyRows({
+      pvSources: [], invoices: [], treasury: noTreasury,
+      fundSourceInflows: [],
+      repaymentPrincipalInflows: [{ repaymentId: 'r1', pool: 'venture_pool', label: 'Loan principal — HOOKA', amount: 30000 }],
+    })
+    expect(out.income.groupNetProfit).toBe(0)
+    const vp = out.cashflow.pools.find((p) => p.pool === 'venture_pool')!
+    expect(vp.inflow.fundIn.reduce((s, l) => s + l.amount, 0)).toBe(30000)
+    expect(out.balanceMovements.find((m) => m.label.includes('HOOKA'))?.amount).toBe(-30000)  // reduces Loans Receivable
+  })
 })

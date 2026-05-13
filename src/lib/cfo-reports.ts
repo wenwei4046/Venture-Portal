@@ -50,10 +50,33 @@ export interface RawTreasury {
   interestExpense: number // GL 5010 net debit
 }
 
+// Fund-IN doesn't create a payment_voucher (the PV system is the single exit
+// point for money OUT only — see mig 20260101000050). To make deposits
+// received show up as cash inflow + BS liability increase we surface
+// fund_sources rows separately.
+export interface RawFundSourceInflow {
+  fundSourceId: string
+  pool: string // target pool the funds went INTO — typically 'venture_pool'
+  label: string // e.g. "Subsidiary deposit — CONTS"
+  amount: number // positive principal received
+}
+
+// Loan-repayment principal received from subsidiaries. The interest portion
+// is captured via the journal-derived treasury section; the principal portion
+// reduces Loans Receivable (BS asset) and lands as a cash inflow.
+export interface RawRepaymentPrincipalInflow {
+  repaymentId: string
+  pool: string // typically 'venture_pool' (loans live in Venture Pool)
+  label: string // e.g. "Loan principal — CONTS"
+  amount: number // positive principal portion received
+}
+
 export interface ClassifyInput {
   pvSources: RawPvSourceRow[]
   invoices: RawInvoiceRow[]
   treasury: RawTreasury
+  fundSourceInflows?: RawFundSourceInflow[]
+  repaymentPrincipalInflows?: RawRepaymentPrincipalInflow[]
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -185,6 +208,8 @@ function linesFrom(m: Map<string, number>): Line[] {
 
 export function classifyRows(input: ClassifyInput): ClassifyOutput {
   const { pvSources, invoices, treasury } = input
+  const fundSourceInflows = input.fundSourceInflows ?? []
+  const repaymentPrincipalInflows = input.repaymentPrincipalInflows ?? []
 
   const pools = new Map<string, PoolAcc>()
   const acc = (pool: string): PoolAcc => {
@@ -205,6 +230,18 @@ export function classifyRows(input: ClassifyInput): ClassifyOutput {
   for (const src of pvSources) {
     // Rule 1: skip internal_transfer vouchers entirely (bank-to-bank moves).
     if (src.voucherType === 'internal_transfer') continue
+    // Rule 1b: on loan_repayment / loan_disbursement vouchers, the P&L portion
+    // (interest income, penalty income, interest expense) is already captured
+    // via the journal-derived treasury section (GL 4010/4020/5010 in
+    // `fetchTreasury`). If a categorised PV source row also tries to land in
+    // P&L revenue/expense, it would double-count. Only honour BS-classified
+    // rows (asset/liability/equity = principal movement) on these vouchers.
+    if (
+      (src.voucherType === 'loan_repayment' || src.voucherType === 'loan_disbursement') &&
+      (src.accountType === 'revenue' || src.accountType === 'expense')
+    ) {
+      continue
+    }
     const amt = Number(src.amount ?? 0)
     if (amt === 0) continue
     const isCredit = src.direction === 'credit'
@@ -243,6 +280,30 @@ export function classifyRows(input: ClassifyInput): ClassifyOutput {
     const label = `${inv.companyShortCode} · ${inv.invoiceNo}`
     bump(p.revenue, label, amt)
     bump(p.inRevenue, label, amt)
+  }
+
+  // ── 3b: fund_sources deposits received — cash inflow + BS liability increase ──
+  // These never touch the P&L (principal, not income). Liability side: HV
+  // owes the depositor back the principal, so the BS movement is +amount
+  // (Fund sources payable rises).
+  for (const fs of fundSourceInflows) {
+    const amt = Number(fs.amount ?? 0)
+    if (amt === 0) continue
+    const p = acc(fs.pool)
+    bump(p.inFundIn, fs.label, amt)
+    pushBalanceMovement(fs.pool, fs.label, amt)
+  }
+
+  // ── 3c: loan principal received — cash inflow + BS asset decrease ──
+  // Loans Receivable (asset) drops by the principal portion received, so the
+  // BS movement is -amount even though cash is positive. The interest portion
+  // is captured separately via the journal-derived treasury section.
+  for (const rp of repaymentPrincipalInflows) {
+    const amt = Number(rp.amount ?? 0)
+    if (amt === 0) continue
+    const p = acc(rp.pool)
+    bump(p.inFundIn, rp.label, amt)
+    pushBalanceMovement(rp.pool, rp.label, -amt)
   }
 
   // ── 4: treasury interest folded into the Venture Pool's P&L lines ──
@@ -481,16 +542,127 @@ async function gatherTreasury(
   return { interestIncome, penaltyIncome, interestExpense }
 }
 
+// Fund-IN inflows: fund_sources rows activated within [from, to]. The PV
+// system is the single exit point for money OUT only (mig 50), so a fund-in
+// deposit never creates a PV — gather it directly from fund_sources to make
+// it visible on the Cash Flow + Balance Sheet. Pool = venture_pool (all
+// deposits land in the Venture Pool, including the dept_pool → HV transfer
+// in source_type='department_pool').
+async function gatherFundSourceInflows(
+  supabase: SupabaseClient,
+  args: { from: string; to: string },
+): Promise<RawFundSourceInflow[]> {
+  const { from, to } = args
+  const { data, error } = await supabase
+    .from('fund_sources')
+    .select(
+      'id, source_type, amount, effective_date, status, from_company_id, from_department_id, from_freetext_name',
+    )
+    .eq('status', 'active')
+    .gte('effective_date', from)
+    .lte('effective_date', to)
+  if (error) throw new Error(`cfo-reports fund_sources: ${error.message}`)
+  if (!data || data.length === 0) return []
+
+  const companyIds = Array.from(
+    new Set(data.map((d) => d.from_company_id as string | null).filter(Boolean) as string[]),
+  )
+  const departmentIds = Array.from(
+    new Set(data.map((d) => d.from_department_id as string | null).filter(Boolean) as string[]),
+  )
+  const [{ data: companies }, { data: departments }] = await Promise.all([
+    companyIds.length
+      ? supabase.from('companies').select('id, short_code').in('id', companyIds)
+      : Promise.resolve({ data: [] as { id: string; short_code: string }[] }),
+    departmentIds.length
+      ? supabase.from('departments').select('id, name').in('id', departmentIds)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ])
+  const shortCodeById = new Map((companies ?? []).map((c) => [c.id as string, c.short_code as string]))
+  const deptNameById = new Map((departments ?? []).map((d) => [d.id as string, d.name as string]))
+
+  const TYPE_LABEL: Record<string, string> = {
+    subsidiary: 'Subsidiary deposit',
+    director_loan: 'Director loan',
+    department_pool: 'Dept pool transfer',
+    director_saving: 'Director saving',
+    outsource: 'Outsource',
+  }
+
+  return data.map((d) => {
+    const sourceType = (d.source_type as string) ?? 'subsidiary'
+    let counterparty = '—'
+    if (d.from_company_id) {
+      counterparty = shortCodeById.get(d.from_company_id as string) ?? 'Company'
+    } else if (d.from_department_id) {
+      counterparty = `from ${deptNameById.get(d.from_department_id as string) ?? 'Department'}`
+    } else if (d.from_freetext_name) {
+      counterparty = d.from_freetext_name as string
+    }
+    const typeLabel = TYPE_LABEL[sourceType] ?? sourceType
+    return {
+      fundSourceId: d.id as string,
+      pool: 'venture_pool',
+      label: `${typeLabel} — ${counterparty}`,
+      amount: Number(d.amount ?? 0),
+    }
+  })
+}
+
+// Loan principal received from subsidiaries during the window. Interest /
+// penalty / netting portions are captured via the journal-derived treasury
+// section (and would double-count if we added them here).
+async function gatherRepaymentPrincipalInflows(
+  supabase: SupabaseClient,
+  args: { from: string; to: string },
+): Promise<RawRepaymentPrincipalInflow[]> {
+  const { from, to } = args
+  const { data, error } = await supabase
+    .from('repayments')
+    .select('id, loan_id, amount, payment_type, payment_date')
+    .eq('payment_type', 'principal')
+    .gte('payment_date', from)
+    .lte('payment_date', to)
+  if (error) throw new Error(`cfo-reports repayments: ${error.message}`)
+  if (!data || data.length === 0) return []
+
+  const loanIds = Array.from(new Set(data.map((r) => r.loan_id as string)))
+  const { data: loans } = loanIds.length
+    ? await supabase.from('loans').select('id, company_id').in('id', loanIds)
+    : { data: [] as { id: string; company_id: string }[] }
+  const companyIdByLoanId = new Map((loans ?? []).map((l) => [l.id as string, l.company_id as string]))
+
+  const companyIds = Array.from(new Set(Array.from(companyIdByLoanId.values())))
+  const { data: companies } = companyIds.length
+    ? await supabase.from('companies').select('id, short_code').in('id', companyIds)
+    : { data: [] as { id: string; short_code: string }[] }
+  const shortCodeById = new Map((companies ?? []).map((c) => [c.id as string, c.short_code as string]))
+
+  return data.map((r) => {
+    const companyId = companyIdByLoanId.get(r.loan_id as string)
+    const shortCode = companyId ? shortCodeById.get(companyId) ?? '—' : '—'
+    return {
+      repaymentId: r.id as string,
+      pool: 'venture_pool',
+      label: `Loan principal — ${shortCode}`,
+      amount: Number(r.amount ?? 0),
+    }
+  })
+}
+
 async function gatherAll(
   supabase: SupabaseClient,
   args: { from: string; to: string },
 ): Promise<ClassifyInput> {
-  const [pvSources, invoices, treasury] = await Promise.all([
-    gatherPvSources(supabase, args),
-    gatherInvoices(supabase, args),
-    gatherTreasury(supabase, args),
-  ])
-  return { pvSources, invoices, treasury }
+  const [pvSources, invoices, treasury, fundSourceInflows, repaymentPrincipalInflows] =
+    await Promise.all([
+      gatherPvSources(supabase, args),
+      gatherInvoices(supabase, args),
+      gatherTreasury(supabase, args),
+      gatherFundSourceInflows(supabase, args),
+      gatherRepaymentPrincipalInflows(supabase, args),
+    ])
+  return { pvSources, invoices, treasury, fundSourceInflows, repaymentPrincipalInflows }
 }
 
 export async function fetchIncomeStatement(
