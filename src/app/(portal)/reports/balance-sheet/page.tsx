@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
-import { fetchBalanceSheet } from '@/lib/cfo-reports'
+import { fetchBalanceSheet, type BalanceMovementLine } from '@/lib/cfo-reports'
 import dayjs from 'dayjs'
 import Link from 'next/link'
 
@@ -149,7 +149,84 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
             </p>
           )}
         </div>
+
+        {/* Capital cash movements this period */}
+        <CapitalMovementsSection movements={bs.movements} asOf={asOf} />
       </div>
     </div>
+  )
+}
+
+function CapitalMovementsSection({ movements, asOf }: { movements: BalanceMovementLine[]; asOf: string }) {
+  const monthLabel = dayjs(asOf).format('MMMM YYYY')
+  const grandTotal = movements.reduce((s, m) => s + m.amount, 0)
+
+  // Group by pool, preserving the (already-sorted) order of first appearance.
+  const groups: Array<{ pool: string; poolLabel: string; lines: BalanceMovementLine[]; subtotal: number }> = []
+  for (const m of movements) {
+    let g = groups.find((x) => x.pool === m.pool)
+    if (!g) {
+      g = { pool: m.pool, poolLabel: m.poolLabel, lines: [], subtotal: 0 }
+      groups.push(g)
+    }
+    g.lines.push(m)
+    g.subtotal += m.amount
+  }
+
+  return (
+    <section>
+      <div className="sect-head">
+        <h2>Capital cash movements</h2>
+        <span className="rule" aria-hidden />
+        <span className="count">{monthLabel.toUpperCase()}</span>
+      </div>
+      <p className="font-serif italic text-muted text-xs mb-4">
+        Asset / liability / equity movements (loans disbursed, principal received,
+        fund-in, deposits) this month — grouped by pool. Excludes P&amp;L items.
+      </p>
+      {movements.length === 0 ? (
+        <p className="font-serif italic text-muted text-sm">No capital movements this period.</p>
+      ) : (
+        <table className="ledger-table">
+          <tbody>
+            {groups.map((g) => (
+              <PoolGroupRows key={g.pool} group={g} />
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t-2 border-hairline">
+              <td className="font-serif italic text-ink font-medium">Net capital movement</td>
+              <td className={`num font-semibold ${grandTotal >= 0 ? 'text-num-ink' : 'text-danger'}`}>
+                {grandTotal < 0 ? <span className="neg">{formatMoney(grandTotal)}</span> : formatMoney(grandTotal)}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      )}
+    </section>
+  )
+}
+
+function PoolGroupRows({ group }: { group: { pool: string; poolLabel: string; lines: BalanceMovementLine[]; subtotal: number } }) {
+  return (
+    <>
+      <tr>
+        <td colSpan={2} className="font-mono text-[11px] uppercase tracking-wide text-muted pt-3">{group.poolLabel}</td>
+      </tr>
+      {group.lines.map((l, i) => (
+        <tr key={`${group.pool}-${i}`}>
+          <td className="text-sm pl-4">{l.label}</td>
+          <td className="num">
+            {l.amount < 0 ? <span className="neg">{formatMoney(l.amount)}</span> : formatMoney(l.amount)}
+          </td>
+        </tr>
+      ))}
+      <tr>
+        <td className="font-serif italic text-graphite text-sm pl-4">{group.poolLabel} subtotal</td>
+        <td className="num font-semibold">
+          {group.subtotal < 0 ? <span className="neg">{formatMoney(group.subtotal)}</span> : formatMoney(group.subtotal)}
+        </td>
+      </tr>
+    </>
   )
 }
