@@ -43,7 +43,9 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
       </div>
 
       <p className="font-serif italic text-muted text-sm mb-8 max-w-3xl">
-        Snapshot at end of <strong>{dateLabel}</strong>. Group-level. Retained
+        Snapshot at end of <strong>{dateLabel}</strong>. Group-level. Driven by
+        the unified chart of accounts — assets, fixed assets, liabilities, and
+        permanent equity accounts each roll up to their own row. Retained
         earnings is YTD net profit (Jan 1 → as-of date).
       </p>
 
@@ -65,6 +67,12 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
                 <td>Loan receivable</td>
                 <td className="num">{formatMoney(bs.loanReceivable)}</td>
               </tr>
+              {Math.abs(bs.fixedAssets) > 0.005 ? (
+                <tr>
+                  <td>Fixed assets</td>
+                  <td className="num">{formatMoney(bs.fixedAssets)}</td>
+                </tr>
+              ) : null}
               {Math.abs(bs.otherAssets) > 0.005 ? (
                 <tr>
                   <td>Other assets</td>
