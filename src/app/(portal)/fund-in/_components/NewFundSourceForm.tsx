@@ -5,6 +5,7 @@ import dayjs from 'dayjs'
 import Link from 'next/link'
 import { createFundSource } from '../actions'
 import type { Company, FundSourceType } from '@/types'
+import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
 
 interface Department {
   id: string
@@ -28,6 +29,10 @@ export default function NewFundSourceForm({ companies, departments }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [sourceType, setSourceType] = useState<FundSourceType>('subsidiary')
   const formRef = useRef<HTMLFormElement>(null)
+
+  const defaultRepaymentDate = dayjs().add(12, 'month').format('YYYY-MM-DD')
+  const [repaymentDate, setRepaymentDate] = useState<string>(defaultRepaymentDate)
+  const [lockInMonths, setLockInMonths] = useState<number>(12)
 
   useEffect(() => {
     if (error && formRef.current) {
@@ -226,6 +231,10 @@ export default function NewFundSourceForm({ companies, departments }: Props) {
               max="120"
               defaultValue="12"
               required
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10)
+                if (!isNaN(v) && v >= 1) setLockInMonths(v)
+              }}
               className="w-full px-3 py-2 pr-16 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted font-mono">
@@ -266,12 +275,18 @@ export default function NewFundSourceForm({ companies, departments }: Props) {
           name="repayment_date"
           type="date"
           required
-          defaultValue={dayjs().add(12, 'month').format('YYYY-MM-DD')}
+          defaultValue={defaultRepaymentDate}
+          onChange={(e) => setRepaymentDate(e.target.value)}
           className="w-full max-w-sm px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
         />
         <p className="font-serif italic text-muted text-xs mt-1.5">
-          Target date HV repays the full principal. Must be on or after the effective date.
+          Date the first installment is due. Must be on or after the effective date.
         </p>
+        {repaymentDate && lockInMonths >= 1 ? (
+          <p className="font-serif italic text-muted text-xs mt-1.5">
+            Fully repaid by ~{expectedFullRepaymentDate(repaymentDate, lockInMonths)} ({lockInMonths} installment{lockInMonths === 1 ? '' : 's'})
+          </p>
+        ) : null}
       </div>
 
       {/* ───────── Notes ───────── */}

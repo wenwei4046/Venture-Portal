@@ -3,7 +3,8 @@ import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { formatMoney, formatMoneyBare } from '@/lib/utils'
+import { formatMoney, formatMoneyBare, formatDate } from '@/lib/utils'
+import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
 import { cancelFundSource } from '../actions'
 import { ConfirmButton } from './_components/ConfirmButton'
 
@@ -202,6 +203,25 @@ export default async function FundSourceDetailPage({ params }: Props) {
                     : ` · ${maturityDays}D REMAINING`
                 ) : null}
               </div>
+            </div>
+          ) : null}
+
+          {source.repayment_date ? (
+            <div>
+              <div className="font-serif italic text-accent text-base mb-1">
+                Expected repayment date (first installment)
+              </div>
+              <div className="font-serif text-xl text-num-ink tabular">
+                {formatDate(source.repayment_date)}
+              </div>
+              {source.lock_in_months ? (
+                <div className="font-mono text-[11.5px] text-graphite mt-2 tracking-[0.02em] font-medium">
+                  EXPECTED FULL REPAYMENT:{' '}
+                  <span className="text-num-ink">
+                    {formatDate(expectedFullRepaymentDate(source.repayment_date, source.lock_in_months))}
+                  </span>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>
