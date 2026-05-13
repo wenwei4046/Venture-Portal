@@ -2,12 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import {
-  fetchCashflowBuckets,
+  fetchCashflowStatement,
   startOfMonth,
   endOfMonth,
-  SEGMENT_LABEL,
-  type CashflowBuckets,
-  type GlSegment,
+  type PoolCashflow,
+  type Line,
 } from '@/lib/cfo-reports'
 import dayjs from 'dayjs'
 import Link from 'next/link'
@@ -24,7 +23,7 @@ export default async function CashFlowPage({ searchParams }: Props) {
   const from = rawFrom ?? startOfMonth(period)
   const to = rawTo ?? endOfMonth(period ?? from)
 
-  const buckets = await fetchCashflowBuckets(supabase, { from, to })
+  const stmt = await fetchCashflowStatement(supabase, { from, to })
   const periodLabel = formatPeriodLabel(from, to)
 
   return (
@@ -51,158 +50,140 @@ export default async function CashFlowPage({ searchParams }: Props) {
       </div>
 
       <p className="font-serif italic text-muted text-sm mb-8 max-w-3xl">
-        Three-bucket CFO view. <strong>A.</strong> where money came from this period;
-        <strong> B.</strong> what each department spent; <strong>C.</strong> group-level
-        general expenses. Categories are user-defined labels (Settings → Categories).
+        One section per pool. <strong>Inflow</strong> splits fund-in (borrowed
+        principal / capital) from revenue; <strong>Outflow</strong> splits capital
+        (loans disbursed / principal repaid) from expenses. Internal bank-to-bank
+        transfers are excluded.
       </p>
 
       <div className="max-w-3xl space-y-12">
-        <BucketSection
-          letter="A"
-          title="Source of fund"
-          subtitle="Subs savings, loans in, invoice settlement, other inflows"
-          lines={buckets.sourceOfFund}
-          total={buckets.totalIn}
-          isPositive
-        />
-
-        <DeptOutflowSection buckets={buckets} />
-
-        <BucketSection
-          letter="C"
-          title="General expenses"
-          subtitle="Group-level — rent, utility, statutory, audit, software, mgmt overhead"
-          lines={buckets.generalExpenses}
-          total={buckets.totalGeneral}
-        />
-
-        {/* Net change */}
-        <div className="border-t-2 border-hairline pt-6">
-          <div className="flex items-baseline justify-between mb-2">
-            <span className="font-serif text-lg text-ink">Net cash change</span>
-            <span className={`font-serif text-2xl font-semibold tabular ${buckets.netChange >= 0 ? 'text-ledger' : 'text-danger'}`}>
-              {formatMoney(buckets.netChange)}
-            </span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm pt-3">
-            <div className="flex items-baseline justify-between">
-              <span className="font-serif italic text-graphite">A. In</span>
-              <span className="num text-ledger">{formatMoney(buckets.totalIn)}</span>
-            </div>
-            <div className="flex items-baseline justify-between">
-              <span className="font-serif italic text-graphite">B. Dept out</span>
-              <span className="num">{formatMoney(-buckets.totalDeptOut)}</span>
-            </div>
-            <div className="flex items-baseline justify-between">
-              <span className="font-serif italic text-graphite">C. General out</span>
-              <span className="num">{formatMoney(-buckets.totalGeneral)}</span>
-            </div>
-          </div>
-        </div>
-
-        {buckets.sourceOfFund.length === 0 &&
-        buckets.deptOutflow.length === 0 &&
-        buckets.generalExpenses.length === 0 ? (
+        {stmt.pools.length === 0 ? (
           <div className="border border-hairline rounded-md bg-surface p-6 text-center">
             <p className="font-serif italic text-muted text-sm">
               No paid vouchers in this period. Approve and pay vouchers to populate the cashflow.
             </p>
           </div>
-        ) : null}
+        ) : (
+          stmt.pools.map((p) => <PoolBlock key={p.pool} pool={p} />)
+        )}
+
+        {/* Net cash change */}
+        <section className="border-t-2 border-hairline pt-6">
+          <div className="sect-head">
+            <h2>Net cash change</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">ALL POOLS</span>
+          </div>
+          <div className="flex items-baseline justify-between mb-4">
+            <span className="font-serif text-lg text-ink">Net change this period</span>
+            <span className={`font-serif text-2xl font-semibold tabular ${stmt.netChange >= 0 ? 'text-ledger' : 'text-danger'}`}>
+              {formatMoney(stmt.netChange)}
+            </span>
+          </div>
+          {stmt.pools.length > 0 ? (
+            <table className="ledger-table">
+              <tbody>
+                {stmt.pools.map((p) => (
+                  <tr key={p.pool}>
+                    <td>{p.poolLabel}</td>
+                    <td className="num">
+                      {p.net < 0 ? <span className="neg">{formatMoney(p.net)}</span> : formatMoney(p.net)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : null}
+        </section>
       </div>
     </div>
   )
 }
 
-function BucketSection({
-  letter,
-  title,
-  subtitle,
-  lines,
-  total,
-  isPositive = false,
-}: {
-  letter: string
-  title: string
-  subtitle?: string
-  lines: { label: string; amount: number }[]
-  total: number
-  isPositive?: boolean
-}) {
+function LineGroup({ title, lines, subtotal, positive }: { title: string; lines: Line[]; subtotal: number; positive: boolean }) {
+  if (lines.length === 0) return null
   return (
-    <section>
-      <div className="flex items-baseline gap-3 mb-3">
-        <span className="font-serif text-2xl text-accent">{letter}.</span>
-        <h2 className="font-serif text-xl text-ink">{title}</h2>
-      </div>
-      {subtitle ? <p className="font-serif italic text-muted text-xs mb-4">{subtitle}</p> : null}
-      {lines.length === 0 ? (
-        <p className="font-serif italic text-muted text-sm">No activity in this bucket.</p>
-      ) : (
-        <table className="ledger-table">
-          <tbody>
-            {lines.map((l) => (
-              <tr key={l.label}>
-                <td>{l.label}</td>
-                <td className={`num ${isPositive ? 'text-ledger' : ''}`}>
-                  {isPositive ? formatMoney(l.amount) : <span className="neg">{formatMoney(-l.amount)}</span>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <div className="flex items-baseline justify-between pt-3 mt-3 border-t border-hairline">
-        <span className="font-serif italic text-base text-ink font-medium">Subtotal</span>
-        <span className={`num text-lg font-semibold ${isPositive ? 'text-ledger' : 'text-ink'}`}>
-          {isPositive ? formatMoney(total) : formatMoney(-total)}
-        </span>
-      </div>
-    </section>
+    <>
+      <tr>
+        <td colSpan={2} className="font-mono text-[11px] uppercase tracking-wide text-muted pt-3">{title}</td>
+      </tr>
+      {lines.map((l) => (
+        <tr key={`${title}-${l.label}`}>
+          <td className="text-sm pl-4">{l.label}</td>
+          <td className={`num ${positive ? 'text-ledger' : ''}`}>
+            {positive
+              ? (l.amount < 0 ? <span className="neg">{formatMoney(l.amount)}</span> : formatMoney(l.amount))
+              : <span className="neg">{formatMoney(-l.amount)}</span>}
+          </td>
+        </tr>
+      ))}
+      <tr>
+        <td className="font-serif italic text-graphite text-sm pl-4">{title} subtotal</td>
+        <td className={`num font-semibold ${positive ? 'text-ledger' : ''}`}>
+          {positive ? formatMoney(subtotal) : <span className="neg">{formatMoney(-subtotal)}</span>}
+        </td>
+      </tr>
+    </>
   )
 }
 
-function DeptOutflowSection({ buckets }: { buckets: CashflowBuckets }) {
+function PoolBlock({ pool }: { pool: PoolCashflow }) {
+  const fundInTotal = pool.inflow.fundIn.reduce((s, l) => s + l.amount, 0)
+  const revenueTotal = pool.inflow.revenue.reduce((s, l) => s + l.amount, 0)
+  const capitalTotal = pool.outflow.capital.reduce((s, l) => s + l.amount, 0)
+  const expenseTotal = pool.outflow.expense.reduce((s, l) => s + l.amount, 0)
   return (
     <section>
-      <div className="flex items-baseline gap-3 mb-3">
-        <span className="font-serif text-2xl text-accent">B.</span>
-        <h2 className="font-serif text-xl text-ink">Dept outflow</h2>
+      <div className="sect-head">
+        <h2>{pool.poolLabel}</h2>
+        <span className="rule" aria-hidden />
+        <span className={`count ${pool.net >= 0 ? 'text-ledger' : 'text-danger'}`}>
+          NET {formatMoney(pool.net)}
+        </span>
       </div>
-      <p className="font-serif italic text-muted text-xs mb-4">
-        What each department spent this period. Drill into <Link href="/dept-pool" className="text-accent hover:text-accent-hover">/dept-pool</Link> for line-item detail.
-      </p>
 
-      {buckets.deptOutflow.length === 0 ? (
-        <p className="font-serif italic text-muted text-sm">No dept-level outflows in this period.</p>
-      ) : (
-        <div className="space-y-6">
-          {buckets.deptOutflow.map((dept) => (
-            <div key={dept.segment} className="border border-hairline rounded-md bg-surface p-5">
-              <div className="flex items-baseline justify-between mb-3">
-                <h3 className="font-serif text-lg text-ink">{SEGMENT_LABEL[dept.segment as GlSegment]}</h3>
-                <span className="font-mono tabular text-base text-ink font-semibold">
-                  {formatMoney(-dept.total)}
-                </span>
-              </div>
-              <table className="ledger-table">
-                <tbody>
-                  {dept.lines.map((l) => (
-                    <tr key={l.label}>
-                      <td>{l.label}</td>
-                      <td className="num"><span className="neg">{formatMoney(-l.amount)}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ))}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6">
+        {/* Inflow */}
+        <div>
+          <h3 className="font-serif italic text-accent text-sm mb-2">Inflow</h3>
+          {pool.inflow.fundIn.length === 0 && pool.inflow.revenue.length === 0 ? (
+            <p className="font-serif italic text-muted text-xs">No inflows.</p>
+          ) : (
+            <table className="ledger-table">
+              <tbody>
+                <LineGroup title="Fund-in / capital" lines={pool.inflow.fundIn} subtotal={fundInTotal} positive />
+                <LineGroup title="Revenue" lines={pool.inflow.revenue} subtotal={revenueTotal} positive />
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-hairline">
+                  <td className="font-serif italic text-graphite text-sm">Total inflow</td>
+                  <td className="num text-ledger font-semibold">{formatMoney(pool.inflow.total)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          )}
         </div>
-      )}
 
-      <div className="flex items-baseline justify-between pt-3 mt-3 border-t border-hairline">
-        <span className="font-serif italic text-base text-ink font-medium">Total dept outflow</span>
-        <span className="num text-lg font-semibold">{formatMoney(-buckets.totalDeptOut)}</span>
+        {/* Outflow */}
+        <div>
+          <h3 className="font-serif italic text-accent text-sm mb-2">Outflow</h3>
+          {pool.outflow.capital.length === 0 && pool.outflow.expense.length === 0 ? (
+            <p className="font-serif italic text-muted text-xs">No outflows.</p>
+          ) : (
+            <table className="ledger-table">
+              <tbody>
+                <LineGroup title="Capital" lines={pool.outflow.capital} subtotal={capitalTotal} positive={false} />
+                <LineGroup title="Expense" lines={pool.outflow.expense} subtotal={expenseTotal} positive={false} />
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-hairline">
+                  <td className="font-serif italic text-graphite text-sm">Total outflow</td>
+                  <td className="num font-semibold"><span className="neg">{formatMoney(-pool.outflow.total)}</span></td>
+                </tr>
+              </tfoot>
+            </table>
+          )}
+        </div>
       </div>
     </section>
   )
