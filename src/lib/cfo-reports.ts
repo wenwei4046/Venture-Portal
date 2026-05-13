@@ -248,6 +248,25 @@ export function classifyRows(input: ClassifyInput): ClassifyOutput {
     const p = acc(src.pool)
     const label = src.categoryLabel
 
+    // Rule 1c: billing_payment vouchers are settling an invoice (AR collection).
+    // The revenue was already accrued when the invoice was issued (booked in
+    // the invoices array below); the cash side here is just AR going down +
+    // bank going up. Treat every source row as AR collection regardless of
+    // the category picked: cash inflow `fundIn` + BS asset decrease, NEVER
+    // P&L. Without this, a `revenue`-categorised billing_payment source
+    // double-counts the invoice as revenue.
+    if (src.voucherType === 'billing_payment') {
+      if (isCredit) {
+        bump(p.inFundIn, label, amt)
+        pushBalanceMovement(src.pool, label, -amt) // AR (asset) down
+      } else {
+        // Refund of a billing_payment (uncommon): cash out, AR up.
+        bump(p.outCapital, label, amt)
+        pushBalanceMovement(src.pool, label, amt)
+      }
+      continue
+    }
+
     if (src.accountType === 'revenue') {
       // revenue row → P&L revenue (+amt if credit, -amt if debit) + cash inflow `revenue`
       const signed = isCredit ? amt : -amt

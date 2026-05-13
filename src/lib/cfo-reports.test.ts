@@ -86,6 +86,29 @@ describe('classifyRows', () => {
     expect(allLabels).toContain('Office Rental')
   })
 
+  it('does NOT double-count invoice revenue on billing_payment (invoice already accrued revenue at issue)', () => {
+    // Scenario: issued invoice INV-1 for RM 10,000 → revenue accrues. Customer pays
+    // → a billing_payment PV source row exists. The PV source row must NOT add to
+    // P&L revenue (would double-count); it should appear only as cash inflow + BS AR drop.
+    const out = classifyRows({
+      pvSources: [
+        pv({ voucherType: 'billing_payment', direction: 'credit', accountType: 'revenue', amount: 10000, pool: 'venture_pool', categoryLabel: 'Revenue (paid)' }),
+      ],
+      invoices: [
+        { invoiceNo: 'INV-1', companyShortCode: 'CAR', pool: 'venture_pool', amount: 10000 },
+      ],
+      treasury: noTreasury,
+    })
+    const vpIncome = out.income.pools.find((p) => p.pool === 'venture_pool')!
+    // Revenue is RM 10,000 (from invoice), NOT RM 20,000.
+    expect(vpIncome.revenue).toBeCloseTo(10000, 2)
+    expect(out.income.groupNetProfit).toBeCloseTo(10000, 2)
+    // The billing_payment shows as cash inflow + BS AR-down (-amount)
+    const vpCash = out.cashflow.pools.find((p) => p.pool === 'venture_pool')!
+    expect(vpCash.inflow.fundIn.reduce((s, l) => s + l.amount, 0)).toBe(10000)
+    expect(out.balanceMovements.find((m) => m.label === 'Revenue (paid)')?.amount).toBe(-10000)
+  })
+
   it('does NOT double-count loan interest (revenue PV source on loan_repayment is ignored; treasury is sole source)', () => {
     const out = classifyRows({
       pvSources: [
