@@ -792,12 +792,34 @@ export async function fetchBalanceSheet(
   const { data: loanOuts } = await supabase.from('loan_outstanding').select('outstanding')
   const loanReceivable = (loanOuts ?? []).reduce((s, l) => s + Number(l.outstanding ?? 0), 0)
 
-  // 4) Fund sources payable — outstanding balances we owe
-  const { data: fundSources } = await supabase
-    .from('fund_sources')
-    .select('amount, status')
-    .in('status', ['active', 'matured'])
-  const fundSourcesPayable = (fundSources ?? []).reduce((s, f) => s + Number(f.amount ?? 0), 0)
+  // 4) Total liabilities from the GL (NOT fund_sources.amount cache — that
+  //    ignores repayments and any non-fund-source liability). Sum (credit −
+  //    debit) on every journal line whose account_code is a liability-type
+  //    COA entry, restricted to non-reversed JEs dated on/before asOf.
+  const { data: liabCoaRows } = await supabase
+    .from('chart_of_accounts')
+    .select('code')
+    .eq('type', 'liability')
+  const liabCodes = (liabCoaRows ?? []).map((r) => r.code as string).filter(Boolean)
+  let fundSourcesPayable = 0
+  if (liabCodes.length > 0) {
+    const { data: liabJes } = await supabase
+      .from('journal_entries')
+      .select('id')
+      .lte('transaction_date', asOf)
+      .eq('is_reversed', false)
+    const liabJeIds = (liabJes ?? []).map((j) => j.id as string)
+    if (liabJeIds.length > 0) {
+      const { data: liabLines } = await supabase
+        .from('journal_lines')
+        .select('debit, credit')
+        .in('entry_id', liabJeIds)
+        .in('account_code', liabCodes)
+      for (const l of liabLines ?? []) {
+        fundSourcesPayable += Number(l.credit ?? 0) - Number(l.debit ?? 0)
+      }
+    }
+  }
 
   // 5) Retained earnings YTD — net profit from start-of-fiscal to asOf
   const fiscalFrom = dayjs(asOf).startOf('year').format('YYYY-MM-DD')
