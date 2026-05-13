@@ -103,9 +103,15 @@ describe('classifyRows', () => {
     // Revenue is RM 10,000 (from invoice), NOT RM 20,000.
     expect(vpIncome.revenue).toBeCloseTo(10000, 2)
     expect(out.income.groupNetProfit).toBeCloseTo(10000, 2)
-    // The billing_payment shows as cash inflow + BS AR-down (-amount)
+    // The billing_payment shows as OPERATING cash inflow (revenue, not fundIn)
+    // + BS AR-down (-amount). It does NOT also flow through inRevenue from the
+    // invoice — only the billing_payment puts cash into the Cash Flow.
     const vpCash = out.cashflow.pools.find((p) => p.pool === 'venture_pool')!
-    expect(vpCash.inflow.fundIn.reduce((s, l) => s + l.amount, 0)).toBe(10000)
+    expect(vpCash.inflow.revenue.reduce((s, l) => s + l.amount, 0)).toBe(10000)
+    expect(vpCash.inflow.fundIn.reduce((s, l) => s + l.amount, 0)).toBe(0)
+    // Cash flow netChange = +10,000 (matches actual bank delta, not RM 20,000)
+    expect(vpCash.net).toBeCloseTo(10000, 2)
+    expect(out.cashflow.netChange).toBeCloseTo(10000, 2)
     expect(out.balanceMovements.find((m) => m.label === 'Revenue (paid)')?.amount).toBe(-10000)
   })
 

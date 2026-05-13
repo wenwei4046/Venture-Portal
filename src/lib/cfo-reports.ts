@@ -257,11 +257,14 @@ export function classifyRows(input: ClassifyInput): ClassifyOutput {
     // double-counts the invoice as revenue.
     if (src.voucherType === 'billing_payment') {
       if (isCredit) {
-        bump(p.inFundIn, label, amt)
-        pushBalanceMovement(src.pool, label, -amt) // AR (asset) down
+        // Operating cash inflow (customer paid the invoice). Not a financing
+        // inflow — keep it in `inRevenue`, not `inFundIn`. AR (asset) goes
+        // down by the same amount on the balance sheet.
+        bump(p.inRevenue, label, amt)
+        pushBalanceMovement(src.pool, label, -amt)
       } else {
-        // Refund of a billing_payment (uncommon): cash out, AR up.
-        bump(p.outCapital, label, amt)
+        // Refund of a billing_payment (uncommon): operating cash out, AR up.
+        bump(p.outExpense, label, amt)
         pushBalanceMovement(src.pool, label, amt)
       }
       continue
@@ -291,14 +294,19 @@ export function classifyRows(input: ClassifyInput): ClassifyOutput {
     }
   }
 
-  // ── 3: invoices — every invoice counts as revenue for its mapped pool ──
+  // ── 3: invoices — accrued P&L revenue ONLY, not cash flow ──
+  // Invoices are accrual events: revenue is recognised at issue time, but no
+  // cash moves until the customer pays (handled via the billing_payment PV
+  // branch above, which adds the operating cash inflow). Adding invoices to
+  // `inRevenue` here would double-count the same RM 10,000 once on accrual
+  // and once on collection, making Cash Flow's netChange diverge from the
+  // actual bank balance delta.
   for (const inv of invoices) {
     const amt = Number(inv.amount ?? 0)
     if (amt === 0) continue
     const p = acc(inv.pool)
     const label = `${inv.companyShortCode} · ${inv.invoiceNo}`
     bump(p.revenue, label, amt)
-    bump(p.inRevenue, label, amt)
   }
 
   // ── 3b: fund_sources deposits received — cash inflow + BS liability increase ──
