@@ -65,6 +65,12 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
                 <td>Loan receivable</td>
                 <td className="num">{formatMoney(bs.loanReceivable)}</td>
               </tr>
+              {Math.abs(bs.otherAssets) > 0.005 ? (
+                <tr>
+                  <td>Other assets</td>
+                  <td className="num">{formatMoney(bs.otherAssets)}</td>
+                </tr>
+              ) : null}
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-hairline">
@@ -99,6 +105,14 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
           <h2 className="font-serif text-xl text-ink mb-4">Equity</h2>
           <table className="ledger-table">
             <tbody>
+              {Math.abs(bs.equityBalances) > 0.005 ? (
+                <tr>
+                  <td>Pool / equity balances</td>
+                  <td className={`num ${bs.equityBalances >= 0 ? '' : 'text-danger'}`}>
+                    {formatMoney(bs.equityBalances)}
+                  </td>
+                </tr>
+              ) : null}
               <tr>
                 <td>Retained earnings (YTD)</td>
                 <td className={`num ${bs.retainedEarnings >= 0 ? 'text-ledger' : 'text-danger'}`}>
@@ -109,8 +123,8 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
             <tfoot>
               <tr className="border-t-2 border-hairline">
                 <td className="font-serif italic text-ink font-medium">Total equity</td>
-                <td className={`num font-semibold ${bs.retainedEarnings >= 0 ? 'text-ledger' : 'text-danger'}`}>
-                  {formatMoney(bs.retainedEarnings)}
+                <td className={`num font-semibold ${(bs.equityBalances + bs.retainedEarnings) >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                  {formatMoney(bs.equityBalances + bs.retainedEarnings)}
                 </td>
               </tr>
             </tfoot>

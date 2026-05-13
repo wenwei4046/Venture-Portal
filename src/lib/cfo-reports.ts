@@ -738,12 +738,43 @@ export interface BalanceSheet {
   bank: number
   invoiceReceivable: number
   loanReceivable: number
-  fundSourcesPayable: number
-  retainedEarnings: number
+  otherAssets: number          // assets not in the named line items above
+  fundSourcesPayable: number   // total liabilities (all liability-type COA)
+  equityBalances: number       // permanent equity-type COA (excl. retained earnings)
+  retainedEarnings: number     // YTD net income from the income statement
   totalAssets: number
   totalLiabilitiesEquity: number
   reconciles: boolean
   movements: BalanceMovementLine[]
+}
+
+// ─── GL aggregation helper ──────────────────────────────────────────────────
+//
+// Sum journal_lines net amount across the given account codes, restricted to
+// non-reversed journal entries dated on/before `asOf`. `sign='dr-cr'` is used
+// for assets / expenses (normal debit balance); `sign='cr-dr'` for liabilities,
+// equity, and revenue (normal credit balance).
+//
+// One round-trip is shared across all line items in fetchBalanceSheet via
+// the explicit `jeIds` argument so we only fetch journal_entries once.
+async function sumGlNetAcrossCodes(
+  supabase: SupabaseClient,
+  args: { jeIds: string[]; codes: string[]; sign: 'dr-cr' | 'cr-dr' },
+): Promise<number> {
+  const { jeIds, codes, sign } = args
+  if (jeIds.length === 0 || codes.length === 0) return 0
+  const { data: lines } = await supabase
+    .from('journal_lines')
+    .select('debit, credit')
+    .in('entry_id', jeIds)
+    .in('account_code', codes)
+  let net = 0
+  for (const l of lines ?? []) {
+    const dr = Number(l.debit ?? 0)
+    const cr = Number(l.credit ?? 0)
+    net += sign === 'dr-cr' ? dr - cr : cr - dr
+  }
+  return net
 }
 
 export async function fetchBalanceSheet(
@@ -752,11 +783,37 @@ export async function fetchBalanceSheet(
 ): Promise<BalanceSheet> {
   const { asOf } = args
 
-  // 1) Bank cash from the GL (NOT bank_accounts.current_balance — that field
-  //    is a cache and has been observed to drift when a write path forgets to
-  //    bump it. The GL is the source of truth.). Sum (debit − credit) on every
-  //    journal line whose account_code matches an active bank account's
-  //    gl_account_code, restricted to non-reversed JEs dated on/before asOf.
+  // ── 1: Period-bounded JE id set ──
+  // Every snapshot line below reads journal_lines restricted to these JEs, so
+  // they all see a consistent point-in-time view of the GL. (Reversed JEs are
+  // excluded — they represent cancelled postings whose original is also
+  // marked reversed via journal.ts.)
+  const { data: jes } = await supabase
+    .from('journal_entries')
+    .select('id')
+    .lte('transaction_date', asOf)
+    .eq('is_reversed', false)
+  const jeIds = (jes ?? []).map((j) => j.id as string)
+
+  // ── 2: Chart of accounts grouped by type ──
+  // Used to compute Total Assets / Total Liab / Total Equity as the source of
+  // truth (double-entry guarantees they tie if the books are balanced) and to
+  // pick out the specific account codes each named line item draws from.
+  const { data: coaRows } = await supabase
+    .from('chart_of_accounts')
+    .select('code, type')
+  const codesByType: Record<string, string[]> = {
+    asset: [], liability: [], equity: [], revenue: [], expense: [],
+  }
+  for (const r of coaRows ?? []) {
+    const code = r.code as string
+    const t = r.type as keyof typeof codesByType
+    if (code && t in codesByType) codesByType[t].push(code)
+  }
+
+  // ── 3: Bank cash — sum the GL codes of active bank_accounts (1010 / 1011 / …).
+  //    Reads GL not bank_accounts.current_balance: the cache field can drift
+  //    when a write path forgets to bump it; the GL is the source of truth.
   const { data: bankRows } = await supabase
     .from('bank_accounts')
     .select('gl_account_code')
@@ -768,77 +825,53 @@ export async function fetchBalanceSheet(
         .filter((c): c is string => !!c),
     ),
   )
-  let bank = 0
-  if (bankCodes.length > 0) {
-    const { data: bankJes } = await supabase
-      .from('journal_entries')
-      .select('id')
-      .lte('transaction_date', asOf)
-      .eq('is_reversed', false)
-    const bankJeIds = (bankJes ?? []).map((j) => j.id as string)
-    if (bankJeIds.length > 0) {
-      const { data: bankLines } = await supabase
-        .from('journal_lines')
-        .select('debit, credit')
-        .in('entry_id', bankJeIds)
-        .in('account_code', bankCodes)
-      for (const l of bankLines ?? []) {
-        bank += Number(l.debit ?? 0) - Number(l.credit ?? 0)
-      }
-    }
-  }
+  const bank = await sumGlNetAcrossCodes(supabase, { jeIds, codes: bankCodes, sign: 'dr-cr' })
 
-  // 2) AR — invoices issued but not yet paid
-  const { data: invoices } = await supabase
-    .from('invoices')
-    .select('total_amount, status, period_month')
-    .lte('period_month', asOf)
-    .in('status', ['issued', 'draft'])
-  const invoiceReceivable = (invoices ?? []).reduce((s, i) => s + Number(i.total_amount ?? 0), 0)
+  // ── 4: Named asset line items via specific GL codes ──
+  //    AR = 1040 (Accounts Receivable — Subs); Loans Receivable = 1020.
+  //    These read the GL net debit; an issued-but-unpaid invoice shows up
+  //    here, a paid invoice does NOT (its credit on 1040 cancels the debit).
+  const invoiceReceivable = await sumGlNetAcrossCodes(
+    supabase, { jeIds, codes: ['1040'], sign: 'dr-cr' },
+  )
+  const loanReceivable = await sumGlNetAcrossCodes(
+    supabase, { jeIds, codes: ['1020'], sign: 'dr-cr' },
+  )
 
-  // 3) Loans receivable — sum loan_outstanding view
-  const { data: loanOuts } = await supabase.from('loan_outstanding').select('outstanding')
-  const loanReceivable = (loanOuts ?? []).reduce((s, l) => s + Number(l.outstanding ?? 0), 0)
+  // ── 5: Total assets across every asset-type account (source-of-truth for
+  //    the balance check). otherAssets = whatever is on asset-type accounts
+  //    but not bank / AR / loans receivable (1000, 1030, 1050, …).
+  const totalAssets = await sumGlNetAcrossCodes(
+    supabase, { jeIds, codes: codesByType.asset, sign: 'dr-cr' },
+  )
+  const otherAssets = totalAssets - bank - invoiceReceivable - loanReceivable
 
-  // 4) Total liabilities from the GL (NOT fund_sources.amount cache — that
-  //    ignores repayments and any non-fund-source liability). Sum (credit −
-  //    debit) on every journal line whose account_code is a liability-type
-  //    COA entry, restricted to non-reversed JEs dated on/before asOf.
-  const { data: liabCoaRows } = await supabase
-    .from('chart_of_accounts')
-    .select('code')
-    .eq('type', 'liability')
-  const liabCodes = (liabCoaRows ?? []).map((r) => r.code as string).filter(Boolean)
-  let fundSourcesPayable = 0
-  if (liabCodes.length > 0) {
-    const { data: liabJes } = await supabase
-      .from('journal_entries')
-      .select('id')
-      .lte('transaction_date', asOf)
-      .eq('is_reversed', false)
-    const liabJeIds = (liabJes ?? []).map((j) => j.id as string)
-    if (liabJeIds.length > 0) {
-      const { data: liabLines } = await supabase
-        .from('journal_lines')
-        .select('debit, credit')
-        .in('entry_id', liabJeIds)
-        .in('account_code', liabCodes)
-      for (const l of liabLines ?? []) {
-        fundSourcesPayable += Number(l.credit ?? 0) - Number(l.debit ?? 0)
-      }
-    }
-  }
+  // ── 6: Total liabilities — sum every liability-type account.
+  const fundSourcesPayable = await sumGlNetAcrossCodes(
+    supabase, { jeIds, codes: codesByType.liability, sign: 'cr-dr' },
+  )
 
-  // 5) Retained earnings YTD — net profit from start-of-fiscal to asOf
+  // ── 7: Permanent equity balances (excl. retained earnings YTD which is
+  //    computed from the income statement below).
+  const equityBalances = await sumGlNetAcrossCodes(
+    supabase, { jeIds, codes: codesByType.equity, sign: 'cr-dr' },
+  )
+
+  // ── 8: Retained earnings YTD — net profit from start-of-fiscal-year to asOf.
+  //    Note: the income statement is currently driven from payment_voucher_sources
+  //    + invoices + journal-derived treasury, not raw revenue/expense GL totals.
+  //    For the BS check to tie exactly, IS.groupNetProfit must equal the GL net
+  //    (revenue cr-dr) − (expense dr-cr). If it drifts, the `reconciles` flag
+  //    below will surface it.
   const fiscalFrom = dayjs(asOf).startOf('year').format('YYYY-MM-DD')
   const ytd = await fetchIncomeStatement(supabase, { from: fiscalFrom, to: asOf })
   const retainedEarnings = ytd.groupNetProfit
 
-  const totalAssets = bank + invoiceReceivable + loanReceivable
-  const totalLiabilitiesEquity = fundSourcesPayable + retainedEarnings
+  // ── 9: Balance check via the fundamental accounting equation.
+  const totalLiabilitiesEquity = fundSourcesPayable + equityBalances + retainedEarnings
   const reconciles = Math.abs(totalAssets - totalLiabilitiesEquity) < 1 // RM 1 tolerance
 
-  // 6) Capital cash movements this period (current month up to asOf).
+  // ── 10: Capital cash movements this period (current month up to asOf).
   const movFrom = startOfMonth(asOf)
   const movInput = await gatherAll(supabase, { from: movFrom, to: asOf })
   const movements = classifyRows(movInput).balanceMovements
@@ -848,7 +881,9 @@ export async function fetchBalanceSheet(
     bank,
     invoiceReceivable,
     loanReceivable,
+    otherAssets,
     fundSourcesPayable,
+    equityBalances,
     retainedEarnings,
     totalAssets,
     totalLiabilitiesEquity,
