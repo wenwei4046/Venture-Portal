@@ -106,6 +106,8 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
   // Principal's approval).
 
   // ─── Atomic loan + approval creation (M1 fix) ───
+  // Mig 236: RPC now takes p_disbursement_category_code so the PVS row is
+  // inserted already-classified. No more post-RPC UPDATE patch needed.
   const { data: loanId, error: rpcError } = await supabase.rpc(
     'create_loan_with_approval',
     {
@@ -118,43 +120,12 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
       p_repayment_terms: repaymentTerms || undefined,
       p_company_name: company.name,
       p_disbursement_date: loanStartDate,
+      p_disbursement_category_code: disbursementCategoryCode,
     }
   )
 
   if (rpcError || !loanId) {
     return { error: `Failed to create loan: ${rpcError?.message ?? 'unknown'}` }
-  }
-
-  // The RPC `create_loan_with_approval` (mig 222) inserts a
-  // payment_voucher_sources row WITHOUT a category_code. We can't pass it
-  // in because the RPC signature doesn't accept one (the per-source GL
-  // approval path expects category_code on the source rows). Patch it
-  // here so the disbursement is properly classified on the Balance Sheet.
-  // If this UPDATE fails we surface the error — the loan & PV are already
-  // created so a manual fix is fine, but the user must know.
-  const { data: voucher, error: vErr } = await supabase
-    .from('payment_vouchers')
-    .select('id')
-    .eq('reference_type', 'loan')
-    .eq('reference_id', loanId as string)
-    .eq('voucher_type', 'other')
-    .eq('direction', 'debit')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (vErr || !voucher?.id) {
-    return {
-      error: `Loan created but disbursement voucher not found to assign category: ${vErr?.message ?? 'no PV'}`,
-    }
-  }
-  const { error: pvsErr } = await supabase
-    .from('payment_voucher_sources')
-    .update({ category_code: disbursementCategoryCode })
-    .eq('voucher_id', voucher.id as string)
-  if (pvsErr) {
-    return {
-      error: `Loan created but failed to set disbursement category: ${pvsErr.message}`,
-    }
   }
 
   revalidatePath('/fund-out')
