@@ -15,9 +15,10 @@
 //
 // TABLES WIPED (children-first FK order)
 //   journal_lines, journal_entries,
-//   payment_attachments, payment_voucher_sources, payment_vouchers,
+//   payment_attachments, payment_voucher_sources,
+//   claims, payment_vouchers, invoices,
 //   fund_source_repayments, repayments, overdue_records, loans, fund_sources,
-//   monthly_statement_lines, monthly_statements, invoices,
+//   monthly_statement_lines, monthly_statements,
 //   credit_notes, dept_payment_requests, invoice_submission_requests,
 //   access_log, commission_inputs,
 //   dept_pools, operating_pools, venture_pool, invoice_payout_pool,
@@ -26,8 +27,18 @@
 //   director_payouts, director_ctc, salary_pool, payroll_payment_requests,
 //   payroll_runs, hr_staff_allocation, hr_pool_allocation, hr_staff_costs,
 //   hr_monthly_payroll, hr_staff_salary_history, monthly_headcounts,
-//   hr_cost_submissions, claims, approval_requests,
+//   hr_cost_submissions, approval_requests,
 //   base_rate_history, config_audit_log
+//
+// FK NOTES (why this exact order matters):
+//   - payment_vouchers.loan_id (mig 110) and .fund_source_id (mig 118) have
+//     no ON DELETE clause → loans/fund_sources can't be deleted while PVs
+//     still reference them. So PVs must go first.
+//   - claims.voucher_id → payment_vouchers(id) (mig 111) has no ON DELETE →
+//     claims must go before payment_vouchers.
+//   - invoices may be referenced by credit_notes / monthly_statement_lines,
+//     and credit_notes.invoice_id is checked first → invoices after PVs but
+//     before credit_notes (handled inline below).
 //
 // ALSO WIPED (special — no PK named id)
 //   period_locks (if it has rows — cleared via is_locked predicate)
@@ -59,40 +70,54 @@ const DRY_RUN = !args.includes('--confirm')
 
 // ── wipe list (children before parents, FK-safe order) ──────────────────────
 // All tables use `id` UUID PK — delete via .not('id', 'is', null).
+//
+// CRITICAL ORDER (FK-safe):
+//   1. journal_lines → journal_entries (GL)
+//   2. payment_attachments → payment_voucher_sources (PV children)
+//   3. claims (claims.voucher_id → payment_vouchers — must go BEFORE PVs)
+//   4. payment_vouchers (special: void-flip first to bypass pvs-sum trigger)
+//   5. invoices (PVs may reference invoices via reference_id/reference_type)
+//   6. fund_source_repayments → repayments → overdue_records
+//   7. loans → fund_sources (PV.loan_id / PV.fund_source_id had to be gone)
+//   8. rest unchanged
 const WIPE_TABLES = [
-  // GL
+  // 1. GL
   'journal_lines',
   'journal_entries',
-  // Vouchers
+  // 2. PV children
   'payment_attachments',
   'payment_voucher_sources',
-  // payment_vouchers handled specially below (pvs-sum trigger)
-  // Treasury
-  'fund_source_repayments',
-  'repayments',
-  'overdue_records',
-  'loans',
-  'fund_sources',
-  // Statements / billing
+  // 3. claims (must precede payment_vouchers — FK voucher_id, mig 111)
+  'claims',
+  // 4. payment_vouchers — handled inline below (sentinel triggers void-flip +
+  //    delete of payment_vouchers AND invoices, so loans/fund_sources are
+  //    safe to delete in step 7).
+  // 5. Statements / billing children
   'monthly_statement_lines',
   'monthly_statements',
   'credit_notes',
-  // invoices handled after payment_vouchers
-  // Payment requests (mig 173/177)
+  // 6. Treasury children
+  'fund_source_repayments',
+  'repayments',
+  'overdue_records',
+  // 7. Treasury parents (PVs gone by now, so FKs hold)
+  'loans',
+  'fund_sources',
+  // 8. Payment requests (mig 173/177)
   'dept_payment_requests',
   'invoice_submission_requests',
-  // Pools (children before parents)
+  // 9. Pools (children before parents)
   'dept_pools',
   'operating_pools',
   'alliance_bank_pool',
   'hv_operating_fund',
   'venture_pool',
   'invoice_payout_pool',
-  // Director salary
+  // 10. Director salary
   'director_payouts',
   'director_ctc',
   'salary_pool',
-  // HR / payroll
+  // 11. HR / payroll
   'payroll_payment_requests',
   'payroll_runs',
   'hr_staff_allocation',
@@ -103,14 +128,18 @@ const WIPE_TABLES = [
   'monthly_headcounts',
   'hr_cost_submissions',
   'commission_inputs',
-  // Claims & approvals
-  'claims',
+  // 12. Approvals (after every reference_id row is gone)
   'approval_requests',
-  // Misc transactional logs
+  // 13. Misc transactional logs
   'access_log',
   'base_rate_history',
   'config_audit_log',
 ]
+
+// Sentinel marker — the loop in step 2 of `main()` injects payment_vouchers +
+// invoices deletion AFTER 'claims' (claims FK PV) and BEFORE 'monthly_statement_lines'
+// (so that statement_line.invoice_id FK stays valid until invoices go).
+const PV_INVOICE_SENTINEL_AFTER = 'claims'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 async function rowCount(table) {
@@ -242,12 +271,15 @@ async function main() {
 
   // Step 2: Delete tables in FK-safe order
   for (const t of WIPE_TABLES) {
-    if (t === 'credit_notes') {
-      // Delete invoices before credit_notes (credit_notes may FK -> invoices)
+    await safeDelete(t)
+    if (t === PV_INVOICE_SENTINEL_AFTER) {
+      // claims are gone → delete payment_vouchers (its child sources rows are
+      // already gone from step 1, and the trigger was disarmed via the
+      // void-flip above). Then invoices, before monthly_statement_lines and
+      // credit_notes which may FK into invoices.
       await safeDelete('payment_vouchers')
       await safeDelete('invoices')
     }
-    await safeDelete(t)
   }
 
   // Step 3: Wipe period_locks (may not have id column — use created_at)
