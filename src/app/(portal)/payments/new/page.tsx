@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import type { AccountType } from '@/lib/coa'
 import NewPaymentForm from '../_components/NewPaymentForm'
 import { listPayableFundSources } from '../../fund-in/actions'
 
@@ -35,14 +36,18 @@ export default async function NewPaymentPage({ searchParams }: Props) {
   const [
     { data: companies },
     { data: bankAccounts },
-    { data: categories },
-    { data: glAccounts },
+    { data: accountRows },
     payableFundSources,
   ] = await Promise.all([
     supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('name'),
     supabase.from('bank_accounts').select('id, bank_name, account_number, current_balance').eq('status', 'active').order('is_primary', { ascending: false }),
-    supabase.from('payment_categories').select('code, label, account_type, gl_account_code').eq('is_active', true).order('sort_order'),
-    supabase.from('chart_of_accounts').select('code, name, type').eq('is_active', true).order('code'),
+    supabase
+      .from('chart_of_accounts')
+      .select('code, name, type, is_active')
+      .eq('is_active', true)
+      .order('type')
+      .order('sort_order')
+      .order('code'),
     listPayableFundSources().catch(() => []),
   ])
 
@@ -111,16 +116,11 @@ export default async function NewPaymentPage({ searchParams }: Props) {
       <NewPaymentForm
         companies={companies ?? []}
         bankAccounts={bankAccounts ?? []}
-        categories={(categories ?? []).map((c) => ({
-          code: c.code,
-          label: c.label,
-          account_type: c.account_type as 'asset' | 'liability' | 'equity' | 'revenue' | 'expense' | null,
-          gl_account_code: c.gl_account_code,
-        }))}
-        glAccounts={(glAccounts ?? []).map((g) => ({
-          code: g.code,
-          name: g.name,
-          type: g.type as 'asset' | 'liability' | 'equity' | 'revenue' | 'expense',
+        accounts={(accountRows ?? []).map((a) => ({
+          code: a.code,
+          name: a.name,
+          type: a.type as AccountType,
+          is_active: a.is_active,
         }))}
         invoicePreset={invoicePreset}
         nonBillablePreset={nonBillablePreset}

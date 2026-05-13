@@ -7,9 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { postJournalEntry, r2 } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
-
-const VALID_ACCOUNT_TYPES = ['asset', 'liability', 'equity', 'revenue', 'expense'] as const
-type AccountType = (typeof VALID_ACCOUNT_TYPES)[number]
+import { ACCOUNT_TYPES, type AccountType } from '@/lib/coa'
 
 // ─── Create payment voucher (Finance) ────────────────────────────────────────
 
@@ -28,7 +26,7 @@ export async function createPaymentVoucher(formData: FormData) {
   const description = (formData.get('description') as string)?.trim() ?? ''
   const paymentMethod = (formData.get('payment_method') as string) || 'bank_transfer'
   const direction = (formData.get('direction') as string) || 'debit'
-  const categoryCode = (formData.get('category_code') as string) || null
+  const accountCode = (formData.get('account_code') as string) || null
   const sourcePool = (formData.get('source_pool') as string) || null
   // Phase 7 Step 10: Credit vouchers default to Venture Pool when unspecified.
   const targetPoolRaw = (formData.get('target_pool') as string) || null
@@ -183,7 +181,7 @@ export async function createPaymentVoucher(formData: FormData) {
     const rows: {
       pool: string
       amount: number
-      category_code: string | null
+      account_code: string
       override_account_type: AccountType | null
       override_gl_account_code: string | null
       override_reason: string | null
@@ -192,7 +190,7 @@ export async function createPaymentVoucher(formData: FormData) {
       for (let i = 0; i < rowCount; i++) {
         const pool = (formData.get(`source_rows[${i}][pool]`) as string)?.trim() ?? ''
         const amt = parseFloat((formData.get(`source_rows[${i}][amount]`) as string) ?? '0')
-        const cat = (formData.get(`source_rows[${i}][category_code]`) as string)?.trim() || null
+        const acct = (formData.get(`source_rows[${i}][account_code]`) as string)?.trim() || ''
         const ovType = (formData.get(`source_rows[${i}][override_account_type]`) as string)?.trim() ?? ''
         const ovGl   = (formData.get(`source_rows[${i}][override_gl_account_code]`) as string)?.trim() ?? ''
         const ovRsn  = (formData.get(`source_rows[${i}][override_reason]`) as string)?.trim() ?? ''
@@ -200,12 +198,15 @@ export async function createPaymentVoucher(formData: FormData) {
         if (!isOverride && (ovType || ovGl || ovRsn)) {
           throw new Error(`source row ${i + 1}: override requires account type, GL, AND reason — fill all three or clear all`)
         }
-        if (isOverride && !VALID_ACCOUNT_TYPES.includes(ovType as AccountType)) {
+        if (isOverride && !ACCOUNT_TYPES.includes(ovType as AccountType)) {
           throw new Error(`source row ${i + 1}: invalid override account type "${ovType}"`)
         }
         if (pool && amt > 0) {
+          if (!acct) {
+            throw new Error(`source row ${i + 1}: account is required (every PV source row must reference a chart_of_accounts code)`)
+          }
           rows.push({
-            pool, amount: amt, category_code: cat,
+            pool, amount: amt, account_code: acct,
             override_account_type: isOverride ? (ovType as AccountType) : null,
             override_gl_account_code: isOverride ? ovGl : null,
             override_reason: isOverride ? ovRsn : null,
@@ -213,10 +214,13 @@ export async function createPaymentVoucher(formData: FormData) {
         }
       }
     } else if (sourcePool) {
-      // Legacy single-source form path — category falls back to the voucher-level
+      // Legacy single-source form path — account falls back to the voucher-level
       // field name still sent by older UIs.
+      if (!accountCode) {
+        throw new Error('Account is required on debit voucher source rows')
+      }
       rows.push({
-        pool: sourcePool, amount, category_code: categoryCode,
+        pool: sourcePool, amount, account_code: accountCode,
         override_account_type: null, override_gl_account_code: null, override_reason: null,
       })
     }
@@ -230,7 +234,7 @@ export async function createPaymentVoucher(formData: FormData) {
           voucher_id: data.id,
           pool: r.pool,
           amount: r.amount,
-          category_code: r.category_code,
+          account_code: r.account_code,
           override_account_type: r.override_account_type,
           override_gl_account_code: r.override_gl_account_code,
           override_reason: r.override_reason,
@@ -238,17 +242,17 @@ export async function createPaymentVoucher(formData: FormData) {
       )
     }
   } else if (direction === 'credit' && targetPool) {
-    // Every PV source row must carry a category — the reports route lines by
-    // payment_categories.account_type. A NULL category would crash the
+    // Every PV source row must carry an account — reports route lines by the
+    // referenced chart_of_accounts.type. A NULL account_code would crash the
     // P&L / Cash Flow render (see src/lib/cfo-reports.ts:gatherPvSources).
-    if (!categoryCode) {
-      throw new Error('Category is required on inbound (credit) vouchers')
+    if (!accountCode) {
+      throw new Error('Account is required on inbound (credit) vouchers')
     }
     await supabase.from('payment_voucher_sources').insert({
       voucher_id: data.id,
       pool: targetPool,
       amount,
-      category_code: categoryCode,
+      account_code: accountCode,
     })
   }
 
@@ -507,7 +511,7 @@ export async function updatePaymentVoucher(formData: FormData) {
     const rows: {
       pool: string
       amount: number
-      category_code: string | null
+      account_code: string
       override_account_type: AccountType | null
       override_gl_account_code: string | null
       override_reason: string | null
@@ -515,7 +519,7 @@ export async function updatePaymentVoucher(formData: FormData) {
     for (let i = 0; i < rowCount; i++) {
       const pool = (formData.get(`source_rows[${i}][pool]`) as string)?.trim() ?? ''
       const amt = parseFloat((formData.get(`source_rows[${i}][amount]`) as string) ?? '0')
-      const cat = (formData.get(`source_rows[${i}][category_code]`) as string)?.trim() || null
+      const acct = (formData.get(`source_rows[${i}][account_code]`) as string)?.trim() || ''
       const ovType = (formData.get(`source_rows[${i}][override_account_type]`) as string)?.trim() ?? ''
       const ovGl = (formData.get(`source_rows[${i}][override_gl_account_code]`) as string)?.trim() ?? ''
       const ovRsn = (formData.get(`source_rows[${i}][override_reason]`) as string)?.trim() ?? ''
@@ -523,12 +527,15 @@ export async function updatePaymentVoucher(formData: FormData) {
       if (!isOverride && (ovType || ovGl || ovRsn)) {
         throw new Error(`source row ${i + 1}: override requires account type, GL, AND reason`)
       }
-      if (isOverride && !VALID_ACCOUNT_TYPES.includes(ovType as AccountType)) {
+      if (isOverride && !ACCOUNT_TYPES.includes(ovType as AccountType)) {
         throw new Error(`source row ${i + 1}: invalid override account type "${ovType}"`)
       }
       if (pool && amt > 0) {
+        if (!acct) {
+          throw new Error(`source row ${i + 1}: account is required (every PV source row must reference a chart_of_accounts code)`)
+        }
         rows.push({
-          pool, amount: amt, category_code: cat,
+          pool, amount: amt, account_code: acct,
           override_account_type: isOverride ? (ovType as AccountType) : null,
           override_gl_account_code: isOverride ? ovGl : null,
           override_reason: isOverride ? ovRsn : null,
@@ -564,7 +571,7 @@ export async function updatePaymentVoucher(formData: FormData) {
         voucher_id: id,
         pool: r.pool,
         amount: r.amount,
-        category_code: r.category_code,
+        account_code: r.account_code,
         override_account_type: r.override_account_type,
         override_gl_account_code: r.override_gl_account_code,
         override_reason: r.override_reason,
@@ -573,7 +580,7 @@ export async function updatePaymentVoucher(formData: FormData) {
     if (insErr) throw new Error(`Failed to write new source rows: ${insErr.message}`)
   } else if (current.direction === 'credit') {
     if (!targetPool) throw new Error('Target pool is required for credit voucher')
-    const categoryCode = (formData.get('category_code') as string)?.trim() || null
+    const accountCode = (formData.get('account_code') as string)?.trim() || null
 
     const { error: delErr } = await supabase
       .from('payment_voucher_sources')
@@ -589,15 +596,15 @@ export async function updatePaymentVoucher(formData: FormData) {
       throw new Error(`PVS RLS blocked delete (status=${current.status}) — ${leftover} stale rows remain.`)
     }
 
-    // See comment on create path: credit vouchers must carry a category.
-    if (!categoryCode) {
-      throw new Error('Category is required on inbound (credit) vouchers')
+    // See comment on create path: credit vouchers must carry an account.
+    if (!accountCode) {
+      throw new Error('Account is required on inbound (credit) vouchers')
     }
     const { error: insErr } = await supabase.from('payment_voucher_sources').insert({
       voucher_id: id,
       pool: targetPool,
       amount,
-      category_code: categoryCode,
+      account_code: accountCode,
     })
     if (insErr) throw new Error(`Failed to write new source rows: ${insErr.message}`)
   }
@@ -666,139 +673,9 @@ export async function voidVoucher(formData: FormData) {
   redirect('/payments')
 }
 
-// ─── Create payment category (Finance) ──────────────────────────────────────
-// Mig 214 enforces an account_type (BS vs P&L) and a GL account on every
-// category so journal_entries route correctly. Both are required — no more
-// silently-NULL categories that fall back to coarse voucher_type GL routing.
-//
-// Returns `{ error }` for validation/DB failures so the message survives
-// Next.js 15's production error redaction.
-
-export type CategoryActionResult = { error: string } | undefined
-
-export async function createPaymentCategory(formData: FormData): Promise<CategoryActionResult> {
-  await requireRole(['finance', 'principal'])
-  const supabase = await createClient()
-
-  const code = (formData.get('code') as string)?.trim() ?? ''
-  const label = (formData.get('label') as string)?.trim() ?? ''
-  const accountType = (formData.get('account_type') as string)?.trim() as AccountType
-  const glAccountCode = (formData.get('gl_account_code') as string)?.trim() ?? ''
-  // Phase 11.1: optional revenue GL for invoices using this category. NULL =
-  // fallback to billing_mode→4030/4040 mapping at invoice JE post time.
-  const revenueGlRaw = (formData.get('revenue_gl_account_code') as string)?.trim() ?? ''
-  const revenueGl = revenueGlRaw || null
-
-  if (!code || !label) return { error: 'Code and label are required' }
-  if (!accountType || !VALID_ACCOUNT_TYPES.includes(accountType)) {
-    return { error: 'Account type is required (asset / liability / equity / revenue / expense)' }
-  }
-  if (!glAccountCode) return { error: 'GL account code is required' }
-
-  // Defence-in-depth: verify GL exists and its type matches account_type
-  const { data: gl } = await supabase
-    .from('chart_of_accounts')
-    .select('code, type')
-    .eq('code', glAccountCode)
-    .maybeSingle()
-  if (!gl) return { error: `GL account ${glAccountCode} does not exist` }
-  if (gl.type !== accountType) {
-    return {
-      error: `GL account ${glAccountCode} is type "${gl.type}" but category was tagged "${accountType}". They must match.`,
-    }
-  }
-
-  if (revenueGl) {
-    const { data: rgl } = await supabase
-      .from('chart_of_accounts')
-      .select('code, type')
-      .eq('code', revenueGl)
-      .maybeSingle()
-    if (!rgl) throw new Error(`Revenue GL ${revenueGl} does not exist`)
-    if (rgl.type !== 'revenue') {
-      throw new Error(`Revenue GL ${revenueGl} is type "${rgl.type}" — must be revenue`)
-    }
-  }
-
-  const { error } = await supabase
-    .from('payment_categories')
-    .upsert(
-      {
-        code,
-        label,
-        account_type: accountType,
-        gl_account_code: glAccountCode,
-        revenue_gl_account_code: revenueGl,
-        is_active: true,
-      },
-      { onConflict: 'code' },
-    )
-
-  if (error) return { error: `Failed to create category: ${error.message}` }
-
-  revalidatePath('/payments/new')
-  revalidatePath('/settings?tab=categories')
-}
-
-export async function updatePaymentCategory(formData: FormData): Promise<CategoryActionResult> {
-  await requireRole(['finance', 'principal'])
-  const supabase = await createClient()
-
-  const code = (formData.get('code') as string)?.trim() ?? ''
-  const label = (formData.get('label') as string)?.trim() ?? ''
-  const accountType = (formData.get('account_type') as string)?.trim() as AccountType
-  const glAccountCode = (formData.get('gl_account_code') as string)?.trim() ?? ''
-  const isActiveRaw = (formData.get('is_active') as string) ?? 'true'
-  const revenueGlRaw = (formData.get('revenue_gl_account_code') as string)?.trim() ?? ''
-  const revenueGl = revenueGlRaw || null
-
-  if (!code) return { error: 'Code is required' }
-  if (!label) return { error: 'Label is required' }
-  if (!accountType || !VALID_ACCOUNT_TYPES.includes(accountType)) {
-    return { error: 'Account type is required' }
-  }
-  if (!glAccountCode) return { error: 'GL account code is required' }
-
-  const { data: gl } = await supabase
-    .from('chart_of_accounts')
-    .select('code, type')
-    .eq('code', glAccountCode)
-    .maybeSingle()
-  if (!gl) return { error: `GL account ${glAccountCode} does not exist` }
-  if (gl.type !== accountType) {
-    return {
-      error: `GL account ${glAccountCode} type "${gl.type}" mismatches category "${accountType}"`,
-    }
-  }
-
-  if (revenueGl) {
-    const { data: rgl } = await supabase
-      .from('chart_of_accounts')
-      .select('code, type')
-      .eq('code', revenueGl)
-      .maybeSingle()
-    if (!rgl) throw new Error(`Revenue GL ${revenueGl} does not exist`)
-    if (rgl.type !== 'revenue') {
-      throw new Error(`Revenue GL ${revenueGl} is type "${rgl.type}" — must be revenue`)
-    }
-  }
-
-  const { error } = await supabase
-    .from('payment_categories')
-    .update({
-      label,
-      account_type: accountType,
-      gl_account_code: glAccountCode,
-      revenue_gl_account_code: revenueGl,
-      is_active: isActiveRaw === 'true',
-    })
-    .eq('code', code)
-
-  if (error) return { error: `Failed to update category: ${error.message}` }
-
-  revalidatePath('/settings?tab=categories')
-  revalidatePath('/payments/new')
-}
+// NOTE: createPaymentCategory / updatePaymentCategory were removed by the
+// unified-COA migration (237/238). The Chart of Accounts IS the GL now —
+// create/edit accounts via createAccount / updateAccount in settings/actions.ts.
 
 // ─── Attachment signed URL (Principal + Finance) ────────────────────────────
 // Defense-in-depth: the storage bucket policy allows any authenticated user to
