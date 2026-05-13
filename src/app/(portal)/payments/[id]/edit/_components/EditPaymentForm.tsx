@@ -3,15 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { updatePaymentVoucher } from '../../../actions'
-
-type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense'
-
-interface Category {
-  code: string
-  label: string
-  account_type: AccountType | null
-  gl_account_code: string | null
-}
+import type { AccountType } from '@/lib/coa'
 
 interface GlAccount {
   code: string
@@ -22,7 +14,7 @@ interface GlAccount {
 interface SourceRow {
   pool: string
   amount: string
-  category_code: string
+  account_code: string
   override_account_type?: AccountType | ''
   override_gl_account_code?: string
   override_reason?: string
@@ -47,10 +39,9 @@ interface Props {
     repayment_breakdown: { principal: number; interest: number; penalty: number } | null
   }
   initialSources: SourceRow[]
-  initialCreditCategoryCode: string | null
+  initialCreditAccountCode: string | null
   companies: { id: string; name: string; short_code: string }[]
   bankAccounts: { id: string; bank_name: string; account_number: string; current_balance: number }[]
-  categories: Category[]
   glAccounts: GlAccount[]
 }
 
@@ -71,17 +62,28 @@ const PAYMENT_METHODS = [
   { value: 'netting', label: 'Netting / offset' },
 ]
 
+// Post-mig 238: account_type has 8 values. Group them for display.
 const TYPE_BADGE: Record<AccountType, { label: string; className: string }> = {
-  asset:     { label: 'BS · Asset',     className: 'text-info' },
-  liability: { label: 'BS · Liability', className: 'text-info' },
-  equity:    { label: 'BS · Equity',    className: 'text-info' },
-  revenue:   { label: 'P&L · Revenue',  className: 'text-ledger' },
-  expense:   { label: 'P&L · Expense',  className: 'text-danger' },
+  asset:        { label: 'BS · Asset',          className: 'text-info' },
+  fixed_asset:  { label: 'BS · Fixed asset',    className: 'text-info' },
+  liability:    { label: 'BS · Liability',      className: 'text-info' },
+  equity:       { label: 'BS · Equity',         className: 'text-info' },
+  revenue:      { label: 'P&L · Revenue',       className: 'text-ledger' },
+  cost:         { label: 'P&L · Cost',          className: 'text-danger' },
+  other_income: { label: 'P&L · Other income',  className: 'text-ledger' },
+  expense:      { label: 'P&L · Expense',       className: 'text-danger' },
 }
 
+// Override-picker options — same 8 values, listed in the same order as the
+// COA enum (asset families grouped, then P&L).
+const OVERRIDE_TYPES: AccountType[] = [
+  'asset', 'fixed_asset', 'liability', 'equity',
+  'revenue', 'cost', 'other_income', 'expense',
+]
+
 export default function EditPaymentForm({
-  voucher, initialSources, initialCreditCategoryCode,
-  companies, bankAccounts, categories, glAccounts,
+  voucher, initialSources, initialCreditAccountCode,
+  companies, bankAccounts, glAccounts,
 }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -97,9 +99,9 @@ export default function EditPaymentForm({
   const [paymentMethod, setPaymentMethod] = useState(voucher.payment_method ?? 'bank_transfer')
   const [notes, setNotes] = useState(voucher.notes ?? '')
   const [targetPool, setTargetPool] = useState(voucher.target_pool ?? '')
-  const [categoryCode, setCategoryCode] = useState(initialCreditCategoryCode ?? '')
+  const [accountCode, setAccountCode] = useState(initialCreditAccountCode ?? '')
   const [sourceRows, setSourceRows] = useState<SourceRow[]>(
-    initialSources.length > 0 ? initialSources : [{ pool: '', amount: '', category_code: '' }],
+    initialSources.length > 0 ? initialSources : [{ pool: '', amount: '', account_code: '' }],
   )
 
   const totalAmount = parseFloat(amount) || 0
@@ -131,7 +133,7 @@ export default function EditPaymentForm({
         const r = sourceRows[i]
         formData.set(`source_rows[${i}][pool]`, r.pool)
         formData.set(`source_rows[${i}][amount]`, r.amount)
-        formData.set(`source_rows[${i}][category_code]`, r.category_code)
+        formData.set(`source_rows[${i}][account_code]`, r.account_code)
         if (r.override_account_type && r.override_gl_account_code && r.override_reason?.trim()) {
           formData.set(`source_rows[${i}][override_account_type]`, r.override_account_type)
           formData.set(`source_rows[${i}][override_gl_account_code]`, r.override_gl_account_code)
@@ -143,7 +145,7 @@ export default function EditPaymentForm({
       }
     } else {
       formData.set('target_pool', targetPool)
-      formData.set('category_code', categoryCode)
+      formData.set('account_code', accountCode)
     }
 
     startTransition(async () => {
@@ -278,7 +280,7 @@ export default function EditPaymentForm({
             </label>
             <button
               type="button"
-              onClick={() => setSourceRows([...sourceRows, { pool: '', amount: '', category_code: '' }])}
+              onClick={() => setSourceRows([...sourceRows, { pool: '', amount: '', account_code: '' }])}
               className="text-xs text-accent hover:text-accent-hover font-serif italic"
             >
               + Add source
@@ -286,9 +288,9 @@ export default function EditPaymentForm({
           </div>
           <div className="space-y-3">
             {sourceRows.map((row, i) => {
-              const cat = categories.find((c) => c.code === row.category_code)
-              const derivedType = cat?.account_type ?? null
-              const derivedGl = cat?.gl_account_code ?? null
+              const acct = glAccounts.find((g) => g.code === row.account_code)
+              const derivedType = acct?.type ?? null
+              const derivedGl = acct?.code ?? null
               const hasOverride = !!row.override_account_type
               const effType = (row.override_account_type || derivedType) as AccountType | null
               const effGl = row.override_gl_account_code || derivedGl
@@ -315,17 +317,17 @@ export default function EditPaymentForm({
                       ))}
                     </select>
                     <select
-                      value={row.category_code}
+                      value={row.account_code}
                       onChange={(e) => {
                         const next = [...sourceRows]
-                        next[i] = { ...next[i], category_code: e.target.value }
+                        next[i] = { ...next[i], account_code: e.target.value }
                         setSourceRows(next)
                       }}
                       className="flex-1 px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
                     >
-                      <option value="">Select category…</option>
-                      {categories.map((c) => (
-                        <option key={c.code} value={c.code}>{c.label}</option>
+                      <option value="">Select account…</option>
+                      {glAccounts.map((g) => (
+                        <option key={g.code} value={g.code}>{g.code} — {g.name}</option>
                       ))}
                     </select>
                     <div className="relative w-40">
@@ -358,7 +360,7 @@ export default function EditPaymentForm({
                     )}
                   </div>
                   {/* BS/PL preview + override */}
-                  {row.category_code ? (
+                  {row.account_code ? (
                     <div className="mt-2 flex items-baseline justify-between gap-3">
                       <div className="text-xs font-mono">
                         {effType ? (
@@ -369,7 +371,7 @@ export default function EditPaymentForm({
                           </span>
                         ) : (
                           <span className="text-danger italic font-serif">
-                            Category has no BS/PL classification
+                            Account has no classification
                           </span>
                         )}
                       </div>
@@ -401,11 +403,9 @@ export default function EditPaymentForm({
                         }}
                         className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
                       >
-                        <option value="asset">BS · Asset</option>
-                        <option value="liability">BS · Liability</option>
-                        <option value="equity">BS · Equity</option>
-                        <option value="revenue">P&L · Revenue</option>
-                        <option value="expense">P&L · Expense</option>
+                        {OVERRIDE_TYPES.map((t) => (
+                          <option key={t} value={t}>{TYPE_BADGE[t].label}</option>
+                        ))}
                       </select>
                       <select
                         value={row.override_gl_account_code ?? ''}
@@ -466,16 +466,16 @@ export default function EditPaymentForm({
           </div>
           <div>
             <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-              Category
+              Account
             </label>
             <select
-              value={categoryCode}
-              onChange={(e) => setCategoryCode(e.target.value)}
+              value={accountCode}
+              onChange={(e) => setAccountCode(e.target.value)}
               className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
             >
               <option value="">—</option>
-              {categories.map((c) => (
-                <option key={c.code} value={c.code}>{c.label}</option>
+              {glAccounts.map((g) => (
+                <option key={g.code} value={g.code}>{g.code} — {g.name}</option>
               ))}
             </select>
           </div>

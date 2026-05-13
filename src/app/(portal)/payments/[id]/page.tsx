@@ -81,26 +81,27 @@ export default async function PaymentDetailPage({ params }: Props) {
   const isPrincipal = user.role === 'principal'
   const isFinance = user.role === 'finance'
 
-  // Mig 205: category_code now lives on payment_voucher_sources (per row).
-  // Pool + category both come from the sources subtable for debit AND credit
-  // (mig 205 backfilled one synthetic row for every credit voucher).
+  // Post-mig 238: PVS rows reference chart_of_accounts directly via account_code
+  // (the COA `code` IS the GL). Pool + account name both come from the sources
+  // subtable for debit AND credit (mig 205 backfilled one synthetic row for
+  // every credit voucher).
   const { data: pvsRows } = await supabase
     .from('payment_voucher_sources')
-    .select('pool, amount, category_code, payment_categories(label)')
+    .select('pool, amount, account_code, chart_of_accounts!pvs_account_code_fk(name)')
     .eq('voucher_id', id)
     .order('amount', { ascending: false })
 
   const sourceRows = (pvsRows ?? []) as Array<{
     pool: string
     amount: string | number
-    category_code: string | null
-    payment_categories: { label: string } | null
+    account_code: string | null
+    chart_of_accounts: { name: string } | null
   }>
 
   const categoryLabels = Array.from(
     new Set(
       sourceRows
-        .map((r) => r.payment_categories?.label ?? (r.category_code ? r.category_code.replace(/_/g, ' ') : null))
+        .map((r) => r.chart_of_accounts?.name ?? (r.account_code ? r.account_code.replace(/_/g, ' ') : null))
         .filter((l): l is string => !!l)
     )
   )

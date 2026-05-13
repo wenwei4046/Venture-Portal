@@ -102,10 +102,14 @@ export async function approveClaim(claimId: string) {
 
     if (vchErr) throw new Error(`Failed to draft claim voucher: ${vchErr.message}`)
 
+    // Post-mig 238: PVS rows must reference a chart_of_accounts code via
+    // account_code (NOT NULL). Claims book to G&A Expenses (9000) by default
+    // — Principal can override at approval time if needed.
     await supabase.from('payment_voucher_sources').insert({
       voucher_id: voucher.id,
       pool: sourcePool,
       amount,
+      account_code: '9000',
     })
 
     await supabase.from('approval_requests').insert({

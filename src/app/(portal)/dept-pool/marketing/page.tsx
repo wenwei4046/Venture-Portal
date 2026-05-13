@@ -280,9 +280,16 @@ async function RequestPaymentTabContent({
   balance: number
 }) {
   const supabase = await createClient()
-  const [{ data: companies }, { data: categories }, { data: requests }, { data: inflightRows }] = await Promise.all([
+  const [{ data: companies }, { data: coaRows }, { data: requests }, { data: inflightRows }] = await Promise.all([
     supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('name'),
-    supabase.from('payment_categories').select('code, label').eq('is_active', true).order('sort_order'),
+    // Post-mig 238: payment_categories is gone. Pull expense/cost accounts
+    // from chart_of_accounts for the dept-pool payment-request category picker.
+    supabase
+      .from('chart_of_accounts')
+      .select('code, name, type')
+      .in('type', ['expense', 'cost'])
+      .eq('is_active', true)
+      .order('sort_order'),
     supabase
       .from('dept_payment_requests')
       .select('id, amount, payee_name, description, status, requested_at, pv_id')
@@ -317,7 +324,7 @@ async function RequestPaymentTabContent({
         </div>
         <RequestPaymentForm
           companies={companies ?? []}
-          categories={categories ?? []}
+          categories={(coaRows ?? []).map((c) => ({ code: c.code, label: c.name }))}
           availableBalance={available}
         />
       </section>

@@ -11,7 +11,8 @@ interface Props {
   /** Label shown for the party being credited. Already resolved by the parent
    *  list (subsidiary name OR free-text/dept name from Item 5 polymorphism). */
   payeeLabel: string
-  /** Phase 11: payment_categories for GL routing per CN row. */
+  /** Phase 11 / post-unified-COA: chart_of_accounts rows projected to
+   *  { code, label } for GL routing per CN row. */
   categories?: Array<{ code: string; label: string }>
 }
 

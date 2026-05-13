@@ -40,7 +40,8 @@ interface Props {
   invoices: Invoice[]
   companyMap: Map<string, { name: string; code: string }>
   period: string
-  /** Phase 11: payment_categories for credit-note multi-pool routing. */
+  /** Phase 11 / post-unified-COA: chart_of_accounts rows projected to
+   *  { code, label } for credit-note multi-pool routing. */
   categories?: Array<{ code: string; label: string }>
 }
 

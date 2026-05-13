@@ -40,7 +40,8 @@ interface Props {
   label?: string
   /** Item 5: pass departments so dept-pool billable target gets a select. */
   departments?: Department[]
-  /** Phase 11: payment_categories for GL routing. Required for new flow. */
+  /** Phase 11 / post-unified-COA: chart_of_accounts rows projected to
+   *  { code, label } for GL routing. Required for new flow. */
   categories?: Category[]
 }
 

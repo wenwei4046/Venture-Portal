@@ -145,6 +145,8 @@ export async function generatePvFromRequest(
   }
 
   // ── Insert source pool allocations (up to 5 rows) ─────────────────────────
+  // Post-mig 238: PVS rows must reference chart_of_accounts via account_code.
+  // Payroll bank transfers post to Salary Expense (9030).
   const { error: srcErr } = await supabase
     .from('payment_voucher_sources')
     .insert(
@@ -152,6 +154,7 @@ export async function generatePvFromRequest(
         voucher_id: voucher.id,
         pool: s.pool,
         amount: s.amount,
+        account_code: '9030',
       })),
     )
 

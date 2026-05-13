@@ -64,28 +64,29 @@ export default async function PaymentsPage({ searchParams }: Props) {
     .select('*', { count: 'exact', head: true })
     .eq('status', 'submitted')
 
-  // Mig 205: sources also carry category_code. Load once, index by voucher_id,
-  // then derive pool list + category list for the table cells.
+  // Post-mig 238: PVS rows reference chart_of_accounts via account_code
+  // (the COA `code` IS the GL). Load once, index by voucher_id, then derive
+  // pool list + account name list for the table cells.
   const sourcesByVoucher = new Map<string, string[]>()
   const categoriesByVoucher = new Map<string, string[]>()
   {
     const { data: srcs } = await supabase
       .from('payment_voucher_sources')
-      .select('voucher_id, pool, amount, category_code, payment_categories(label)')
+      .select('voucher_id, pool, amount, account_code, chart_of_accounts!pvs_account_code_fk(name)')
       .order('amount', { ascending: false })
     for (const s of (srcs ?? []) as Array<{
       voucher_id: string
       pool: string
-      category_code: string | null
-      payment_categories: { label: string } | null
+      account_code: string | null
+      chart_of_accounts: { name: string } | null
     }>) {
       const pools = sourcesByVoucher.get(s.voucher_id) ?? []
       pools.push(s.pool)
       sourcesByVoucher.set(s.voucher_id, pools)
 
       const label =
-        s.payment_categories?.label ??
-        (s.category_code ? s.category_code.replace(/_/g, ' ') : null)
+        s.chart_of_accounts?.name ??
+        (s.account_code ? s.account_code.replace(/_/g, ' ') : null)
       if (label) {
         const cats = categoriesByVoucher.get(s.voucher_id) ?? []
         if (!cats.includes(label)) cats.push(label)
