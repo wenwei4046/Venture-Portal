@@ -3,6 +3,7 @@
 import { useState, useTransition, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { updateFundSource } from '../../../actions'
+import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
 
 interface Props {
   id: string
@@ -21,6 +22,8 @@ interface Props {
 export default function EditFundSourceForm({ id, typeLabel, fromLabel, initial }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [repaymentDate, setRepaymentDate] = useState<string>(initial.repayment_date)
+  const [lockInMonths, setLockInMonths] = useState<number>(initial.lock_in_months)
   const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
@@ -141,6 +144,10 @@ export default function EditFundSourceForm({ id, typeLabel, fromLabel, initial }
               max="120"
               required
               defaultValue={initial.lock_in_months}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10)
+                if (!isNaN(v) && v >= 1) setLockInMonths(v)
+              }}
               className="w-full px-3 py-2 pr-16 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted font-mono">
@@ -181,11 +188,17 @@ export default function EditFundSourceForm({ id, typeLabel, fromLabel, initial }
           type="date"
           required
           defaultValue={initial.repayment_date}
+          onChange={(e) => setRepaymentDate(e.target.value)}
           className="w-full max-w-sm px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
         />
         <p className="font-serif italic text-muted text-xs mt-1.5">
-          Target date HV repays the full principal. Drives the maturity date shown on the detail view.
+          Date the first installment is due. Must be on or after the effective date.
         </p>
+        {repaymentDate && lockInMonths >= 1 ? (
+          <p className="font-serif italic text-muted text-xs mt-1.5">
+            Fully repaid by ~{expectedFullRepaymentDate(repaymentDate, lockInMonths)} ({lockInMonths} installment{lockInMonths === 1 ? '' : 's'})
+          </p>
+        ) : null}
       </div>
 
       {/* ───────── Notes ───────── */}
