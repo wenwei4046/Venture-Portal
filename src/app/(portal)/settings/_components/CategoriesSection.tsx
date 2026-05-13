@@ -28,11 +28,11 @@ interface Props {
 }
 
 const TYPE_LABELS: Record<AccountType, string> = {
-  asset:     'Asset (Balance Sheet)',
-  liability: 'Liability (Balance Sheet)',
-  equity:    'Equity (Balance Sheet)',
-  revenue:   'Revenue (P&L)',
-  expense:   'Expense (P&L)',
+  asset:     'Balance Sheet · Asset',
+  liability: 'Balance Sheet · Liability',
+  equity:    'Balance Sheet · Equity',
+  revenue:   'P&L · Revenue',
+  expense:   'P&L · Expense',
 }
 
 const TYPE_BADGE: Record<AccountType, { label: string; className: string }> = {
@@ -300,13 +300,13 @@ function CategoryForm({ glAccounts, initial, mode, isPending, onSubmit, onCancel
           required
           className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
         >
-          <option value="">Select…</option>
+          <option value="" disabled>Select classification…</option>
           {(Object.keys(TYPE_LABELS) as AccountType[]).map((t) => (
             <option key={t} value={t}>{TYPE_LABELS[t]}</option>
           ))}
         </select>
         <p className="font-serif italic text-muted text-xs mt-1.5">
-          Asset / Liability / Equity → Balance Sheet · Revenue / Expense → P&L
+          This classification decides whether the line shows on the P&L or the Balance Sheet, and in the revenue or expense section.
         </p>
       </div>
 
