@@ -5,14 +5,21 @@ import {
   fetchCashflowStatement,
   startOfMonth,
   endOfMonth,
-  type PoolCashflow,
-  type Line,
+  type CashflowSection,
+  type CashflowPoolBlock,
 } from '@/lib/cfo-reports'
+import type { CashFlowCategory } from '@/lib/coa'
 import dayjs from 'dayjs'
 import Link from 'next/link'
 
 interface Props {
   searchParams: Promise<{ from?: string; to?: string; period?: string }>
+}
+
+const SECTION_INTRO: Record<CashFlowCategory, string> = {
+  operating: 'A. Operating activities',
+  investing: 'B. Investing activities',
+  financing: 'C. Financing activities',
 }
 
 export default async function CashFlowPage({ searchParams }: Props) {
@@ -50,142 +57,134 @@ export default async function CashFlowPage({ searchParams }: Props) {
       </div>
 
       <p className="font-serif italic text-muted text-sm mb-8 max-w-3xl">
-        One section per pool. <strong>Inflow</strong> splits fund-in (borrowed
-        principal / capital) from revenue; <strong>Outflow</strong> splits capital
-        (loans disbursed / principal repaid) from expenses. Internal bank-to-bank
-        transfers are excluded.
+        Three sections — Operating, Investing, Financing — driven by each
+        account&apos;s <code className="font-mono text-xs">cash_flow_category</code>
+        in the chart of accounts. Each section breaks down by pool. Internal
+        bank-to-bank transfers are excluded.
       </p>
 
       <div className="max-w-3xl space-y-12">
-        {stmt.pools.length === 0 ? (
-          <div className="border border-hairline rounded-md bg-surface p-6 text-center">
-            <p className="font-serif italic text-muted text-sm">
-              No paid vouchers in this period. Approve and pay vouchers to populate the cashflow.
-            </p>
-          </div>
-        ) : (
-          stmt.pools.map((p) => <PoolBlock key={p.pool} pool={p} />)
-        )}
+        {stmt.sections.map((section) => (
+          <CashflowSectionBlock key={section.category} section={section} />
+        ))}
 
         {/* Net cash change */}
         <section className="border-t-2 border-hairline pt-6">
           <div className="sect-head">
             <h2>Net cash change</h2>
             <span className="rule" aria-hidden />
-            <span className="count">ALL POOLS</span>
+            <span className="count">ALL SECTIONS</span>
           </div>
-          <div className="flex items-baseline justify-between mb-4">
-            <span className="font-serif text-lg text-ink">Net change this period</span>
-            <span className={`font-serif text-2xl font-semibold tabular ${stmt.netChange >= 0 ? 'text-ledger' : 'text-danger'}`}>
-              {formatMoney(stmt.netChange)}
-            </span>
-          </div>
-          {stmt.pools.length > 0 ? (
-            <table className="ledger-table">
-              <tbody>
-                {stmt.pools.map((p) => (
-                  <tr key={p.pool}>
-                    <td>{p.poolLabel}</td>
-                    <td className="num">
-                      {p.net < 0 ? <span className="neg">{formatMoney(p.net)}</span> : formatMoney(p.net)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : null}
+          <table className="ledger-table">
+            <tbody>
+              {stmt.sections.map((s) => (
+                <tr key={s.category}>
+                  <td>{SECTION_INTRO[s.category]}</td>
+                  <td className="num">
+                    {s.net < 0
+                      ? <span className="neg">{formatMoney(s.net)}</span>
+                      : formatMoney(s.net)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-hairline">
+                <td className="font-serif italic text-ink font-medium">Net change this period</td>
+                <td className={`num font-semibold ${stmt.netChange >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                  <span className={`font-serif text-2xl font-semibold tabular tracking-[-0.01em] ${stmt.netChange >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                    {formatMoney(stmt.netChange)}
+                  </span>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
         </section>
       </div>
     </div>
   )
 }
 
-function LineGroup({ title, lines, subtotal, positive }: { title: string; lines: Line[]; subtotal: number; positive: boolean }) {
-  if (lines.length === 0) return null
-  return (
-    <>
-      <tr>
-        <td colSpan={2} className="font-mono text-[11px] uppercase tracking-wide text-muted pt-3">{title}</td>
-      </tr>
-      {lines.map((l) => (
-        <tr key={`${title}-${l.label}`}>
-          <td className="text-sm pl-4">{l.label}</td>
-          <td className={`num ${positive ? 'text-ledger' : ''}`}>
-            {positive
-              ? (l.amount < 0 ? <span className="neg">{formatMoney(l.amount)}</span> : formatMoney(l.amount))
-              : <span className="neg">{formatMoney(-l.amount)}</span>}
-          </td>
-        </tr>
-      ))}
-      <tr>
-        <td className="font-serif italic text-graphite text-sm pl-4">{title} subtotal</td>
-        <td className={`num font-semibold ${positive ? 'text-ledger' : ''}`}>
-          {positive ? formatMoney(subtotal) : <span className="neg">{formatMoney(-subtotal)}</span>}
-        </td>
-      </tr>
-    </>
-  )
-}
-
-function PoolBlock({ pool }: { pool: PoolCashflow }) {
-  const fundInTotal = pool.inflow.fundIn.reduce((s, l) => s + l.amount, 0)
-  const revenueTotal = pool.inflow.revenue.reduce((s, l) => s + l.amount, 0)
-  const capitalTotal = pool.outflow.capital.reduce((s, l) => s + l.amount, 0)
-  const expenseTotal = pool.outflow.expense.reduce((s, l) => s + l.amount, 0)
+function CashflowSectionBlock({ section }: { section: CashflowSection }) {
+  const heading = SECTION_INTRO[section.category]
+  const empty = section.pools.length === 0
   return (
     <section>
       <div className="sect-head">
-        <h2>{pool.poolLabel}</h2>
+        <h2>{heading}</h2>
         <span className="rule" aria-hidden />
-        <span className={`count ${pool.net >= 0 ? 'text-ledger' : 'text-danger'}`}>
-          NET {formatMoney(pool.net)}
+        <span className={`count ${section.net >= 0 ? 'text-ledger' : 'text-danger'}`}>
+          NET {formatMoney(section.net)}
         </span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6">
-        {/* Inflow */}
-        <div>
-          <h3 className="font-serif italic text-accent text-sm mb-2">Inflow</h3>
-          {pool.inflow.fundIn.length === 0 && pool.inflow.revenue.length === 0 ? (
-            <p className="font-serif italic text-muted text-xs">No inflows.</p>
-          ) : (
-            <table className="ledger-table">
-              <tbody>
-                <LineGroup title="Fund-in / capital" lines={pool.inflow.fundIn} subtotal={fundInTotal} positive />
-                <LineGroup title="Revenue" lines={pool.inflow.revenue} subtotal={revenueTotal} positive />
-              </tbody>
-              <tfoot>
-                <tr className="border-t border-hairline">
-                  <td className="font-serif italic text-graphite text-sm">Total inflow</td>
-                  <td className="num text-ledger font-semibold">{formatMoney(pool.inflow.total)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          )}
+      {empty ? (
+        <p className="font-serif italic text-muted text-sm">No activity in this period.</p>
+      ) : (
+        <div className="space-y-6">
+          {section.pools.map((pool) => (
+            <PoolCashBlock key={pool.pool} pool={pool} />
+          ))}
+          <table className="ledger-table">
+            <tfoot>
+              <tr className="border-t-2 border-hairline">
+                <td className="font-serif italic text-ink font-medium">{heading} subtotal</td>
+                <td className={`num font-semibold ${section.net >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                  <span className={`font-serif text-lg font-semibold tabular tracking-[-0.01em] ${section.net >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                    {formatMoney(section.net)}
+                  </span>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
-
-        {/* Outflow */}
-        <div>
-          <h3 className="font-serif italic text-accent text-sm mb-2">Outflow</h3>
-          {pool.outflow.capital.length === 0 && pool.outflow.expense.length === 0 ? (
-            <p className="font-serif italic text-muted text-xs">No outflows.</p>
-          ) : (
-            <table className="ledger-table">
-              <tbody>
-                <LineGroup title="Capital" lines={pool.outflow.capital} subtotal={capitalTotal} positive={false} />
-                <LineGroup title="Expense" lines={pool.outflow.expense} subtotal={expenseTotal} positive={false} />
-              </tbody>
-              <tfoot>
-                <tr className="border-t border-hairline">
-                  <td className="font-serif italic text-graphite text-sm">Total outflow</td>
-                  <td className="num font-semibold"><span className="neg">{formatMoney(-pool.outflow.total)}</span></td>
-                </tr>
-              </tfoot>
-            </table>
-          )}
-        </div>
-      </div>
+      )}
     </section>
+  )
+}
+
+function PoolCashBlock({ pool }: { pool: CashflowPoolBlock }) {
+  const noFlow = pool.inflowLines.length === 0 && pool.outflowLines.length === 0
+  if (noFlow) return null
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-2">
+        <h3 className="font-serif italic text-accent text-sm">{pool.poolLabel}</h3>
+        <span className={`font-mono text-xs ${pool.net >= 0 ? 'text-ledger' : 'text-danger'}`}>
+          NET {formatMoney(pool.net)}
+        </span>
+      </div>
+      <table className="ledger-table">
+        <tbody>
+          {pool.inflowLines.map((l) => (
+            <tr key={`in-${l.label}`}>
+              <td className="text-sm">{l.label}</td>
+              <td className="num text-ledger">
+                {l.amount < 0
+                  ? <span className="neg">{formatMoney(l.amount)}</span>
+                  : formatMoney(l.amount)}
+              </td>
+            </tr>
+          ))}
+          {pool.outflowLines.map((l) => (
+            <tr key={`out-${l.label}`}>
+              <td className="text-sm">{l.label}</td>
+              <td className="num"><span className="neg">{formatMoney(-l.amount)}</span></td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="border-t border-hairline">
+            <td className="font-serif italic text-graphite text-sm">{pool.poolLabel} net</td>
+            <td className={`num font-semibold ${pool.net >= 0 ? 'text-ledger' : 'text-danger'}`}>
+              {pool.net < 0
+                ? <span className="neg">{formatMoney(pool.net)}</span>
+                : formatMoney(pool.net)}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
   )
 }
 
