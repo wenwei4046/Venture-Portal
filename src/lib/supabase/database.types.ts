@@ -273,6 +273,7 @@ export type Database = {
       }
       chart_of_accounts: {
         Row: {
+          cash_flow_category: Database["public"]["Enums"]["cash_flow_category"]
           code: string
           created_at: string
           is_active: boolean
@@ -283,6 +284,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cash_flow_category?: Database["public"]["Enums"]["cash_flow_category"]
           code: string
           created_at?: string
           is_active?: boolean
@@ -293,6 +295,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cash_flow_category?: Database["public"]["Enums"]["cash_flow_category"]
           code?: string
           created_at?: string
           is_active?: boolean
@@ -2595,64 +2598,10 @@ export type Database = {
           },
         ]
       }
-      payment_categories: {
-        Row: {
-          account_type: Database["public"]["Enums"]["account_type"] | null
-          code: string
-          created_at: string
-          created_by: string | null
-          description: string | null
-          gl_account_code: string | null
-          is_active: boolean
-          label: string
-          revenue_gl_account_code: string | null
-          sort_order: number
-        }
-        Insert: {
-          account_type?: Database["public"]["Enums"]["account_type"] | null
-          code: string
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          gl_account_code?: string | null
-          is_active?: boolean
-          label: string
-          revenue_gl_account_code?: string | null
-          sort_order?: number
-        }
-        Update: {
-          account_type?: Database["public"]["Enums"]["account_type"] | null
-          code?: string
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          gl_account_code?: string | null
-          is_active?: boolean
-          label?: string
-          revenue_gl_account_code?: string | null
-          sort_order?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payment_categories_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payment_categories_gl_account_code_fkey"
-            columns: ["gl_account_code"]
-            isOneToOne: false
-            referencedRelation: "chart_of_accounts"
-            referencedColumns: ["code"]
-          },
-        ]
-      }
       payment_voucher_sources: {
         Row: {
+          account_code: string
           amount: number
-          category_code: string | null
           created_at: string
           id: string
           override_account_type:
@@ -2664,8 +2613,8 @@ export type Database = {
           voucher_id: string
         }
         Insert: {
+          account_code: string
           amount: number
-          category_code?: string | null
           created_at?: string
           id?: string
           override_account_type?:
@@ -2677,8 +2626,8 @@ export type Database = {
           voucher_id: string
         }
         Update: {
+          account_code?: string
           amount?: number
-          category_code?: string | null
           created_at?: string
           id?: string
           override_account_type?:
@@ -2691,10 +2640,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "payment_voucher_sources_category_code_fkey"
-            columns: ["category_code"]
+            foreignKeyName: "pvs_account_code_fk"
+            columns: ["account_code"]
             isOneToOne: false
-            referencedRelation: "payment_categories"
+            referencedRelation: "chart_of_accounts"
             referencedColumns: ["code"]
           },
           {
@@ -4127,6 +4076,10 @@ export type Database = {
         Args: { p_op_margin: number }
         Returns: string
       }
+      next_account_code: {
+        Args: { p_type: Database["public"]["Enums"]["account_type"] }
+        Returns: string
+      }
       mint_credit_note_no: {
         Args: { p_period?: string }
         Returns: string
@@ -4179,7 +4132,16 @@ export type Database = {
       }
     }
     Enums: {
-      account_type: "asset" | "liability" | "equity" | "revenue" | "expense"
+      account_type:
+        | "asset"
+        | "liability"
+        | "equity"
+        | "revenue"
+        | "expense"
+        | "fixed_asset"
+        | "cost"
+        | "other_income"
+      cash_flow_category: "operating" | "investing" | "financing"
       approval_request_type:
         | "new_loan"
         | "base_rate"

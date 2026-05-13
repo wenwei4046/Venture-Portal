@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import type { TreasuryConfig, OverdueConfig, Company } from '@/types'
+import type { AccountType, CashFlowCategory } from '@/lib/coa'
 import TreasuryConfigSection from './_components/TreasuryConfigSection'
 import OverdueStagesSection from './_components/OverdueStagesSection'
 import RentSplitSection from './_components/RentSplitSection'
@@ -10,11 +11,11 @@ import DirectorSalarySection from './_components/DirectorSalarySection'
 import BaseRateSimulator from './_components/BaseRateSimulator'
 import BankAccountsSection from './_components/BankAccountsSection'
 import CompaniesSection from './_components/CompaniesSection'
-import CategoriesSection from './_components/CategoriesSection'
+import AccountsSection from './_components/AccountsSection'
 import PeriodsSection from './_components/PeriodsSection'
 import SettingsTabs, { type SettingsTab } from './_components/SettingsTabs'
 
-const VALID_TABS: SettingsTab[] = ['treasury', 'overdue', 'splits', 'directors', 'companies', 'banks', 'categories', 'periods', 'simulator']
+const VALID_TABS: SettingsTab[] = ['treasury', 'overdue', 'splits', 'directors', 'companies', 'banks', 'accounts', 'periods', 'simulator']
 function isValidTab(s: string | undefined): s is SettingsTab {
   return !!s && (VALID_TABS as string[]).includes(s)
 }
@@ -38,12 +39,12 @@ export default async function SettingsPage({ searchParams }: Props) {
   const isPrincipal = user.role === 'principal'
 
   const { tab: rawTab } = await searchParams
-  const defaultTab: SettingsTab = isPrincipal ? 'treasury' : 'categories'
+  const defaultTab: SettingsTab = isPrincipal ? 'treasury' : 'accounts'
   const activeTab: SettingsTab = isValidTab(rawTab) ? rawTab : defaultTab
 
-  // Finance hitting a Principal-only tab via direct URL falls back to Categories.
-  const activeTabResolved: SettingsTab = !isPrincipal && activeTab !== 'categories'
-    ? 'categories'
+  // Finance hitting a Principal-only tab via direct URL falls back to Accounts.
+  const activeTabResolved: SettingsTab = !isPrincipal && activeTab !== 'accounts'
+    ? 'accounts'
     : activeTab
 
   const supabase = await createClient()
@@ -59,8 +60,7 @@ export default async function SettingsPage({ searchParams }: Props) {
     { data: latestBaseRate },
     { data: bankAccountRows },
     { data: periodLockRows },
-    { data: categoryRows },
-    { data: glRows },
+    { data: accountRows },
   ] = await Promise.all([
     supabase.from('treasury_config').select('*'),
     supabase.from('overdue_config').select('*'),
@@ -72,8 +72,12 @@ export default async function SettingsPage({ searchParams }: Props) {
     supabase.from('base_rate_history').select('weighted_cost, op_margin, base_rate').order('approved_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('bank_accounts').select('*').order('is_primary', { ascending: false }),
     supabase.from('period_locks').select('period_month, is_locked, closed_at, notes').order('period_month', { ascending: false }),
-    supabase.from('payment_categories').select('code, label, account_type, gl_account_code, revenue_gl_account_code, is_active').order('sort_order').order('label'),
-    supabase.from('chart_of_accounts').select('code, name, type').eq('is_active', true).order('code'),
+    supabase
+      .from('chart_of_accounts')
+      .select('code, name, type, cash_flow_category, is_active, sort_order')
+      .order('type')
+      .order('sort_order')
+      .order('code'),
   ])
 
   const treasury = (treasuryRows ?? []) as TreasuryConfig[]
@@ -185,20 +189,15 @@ export default async function SettingsPage({ searchParams }: Props) {
         />
       )}
 
-      {activeTabResolved === 'categories' && (
-        <CategoriesSection
-          categories={(categoryRows ?? []).map((c) => ({
-            code: c.code,
-            label: c.label,
-            account_type: c.account_type as 'asset' | 'liability' | 'equity' | 'revenue' | 'expense' | null,
-            gl_account_code: c.gl_account_code,
-            revenue_gl_account_code: c.revenue_gl_account_code,
-            is_active: c.is_active,
-          }))}
-          glAccounts={(glRows ?? []).map((g) => ({
-            code: g.code,
-            name: g.name,
-            type: g.type as 'asset' | 'liability' | 'equity' | 'revenue' | 'expense',
+      {activeTabResolved === 'accounts' && (
+        <AccountsSection
+          accounts={(accountRows ?? []).map((a) => ({
+            code: a.code,
+            name: a.name,
+            type: a.type as AccountType,
+            cash_flow_category: a.cash_flow_category as CashFlowCategory,
+            is_active: a.is_active,
+            sort_order: a.sort_order,
           }))}
         />
       )}
