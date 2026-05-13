@@ -3,7 +3,7 @@ import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import type { Company } from '@/types'
-import { bsCategoriesForDisbursement } from '@/lib/loan-disbursement'
+import { bsAccountsForDisbursement } from '@/lib/loan-disbursement'
 import NewLoanForm from '../_components/NewLoanForm'
 
 export default async function NewLoanPage() {
@@ -13,7 +13,7 @@ export default async function NewLoanPage() {
   const [
     { data: companyRows },
     { data: baseRateRow },
-    { data: catRows },
+    { data: acctRows },
   ] = await Promise.all([
     supabase.from('companies').select('*').eq('is_active', true).order('short_code'),
     supabase
@@ -25,19 +25,20 @@ export default async function NewLoanPage() {
       .limit(1)
       .maybeSingle(),
     supabase
-      .from('payment_categories')
-      .select('code, label, account_type, is_active')
+      .from('chart_of_accounts')
+      .select('code, name, type, is_active')
       .eq('is_active', true)
-      .order('label'),
+      .order('type')
+      .order('code'),
   ])
 
   const companies = (companyRows ?? []) as Company[]
-  const bsCategories = bsCategoriesForDisbursement(
-    (catRows ?? []).map((r) => ({
-      code: r.code as string,
-      label: r.label as string,
-      account_type: (r.account_type as string | null) ?? '',
-      is_active: r.is_active as boolean,
+  const bsAccounts = bsAccountsForDisbursement(
+    (acctRows ?? []).map((r) => ({
+      code: r.code,
+      name: r.name,
+      account_type: r.type as string,
+      is_active: r.is_active,
     })),
   )
 
@@ -66,7 +67,7 @@ export default async function NewLoanPage() {
       </div>
 
       {baseRate ? (
-        <NewLoanForm companies={companies} baseRate={baseRate} bsCategories={bsCategories} />
+        <NewLoanForm companies={companies} baseRate={baseRate} bsAccounts={bsAccounts} />
       ) : (
         <div className="bg-alert-bg border border-alert rounded-md p-6 max-w-3xl">
           <p className="font-serif text-lg text-alert mb-1">

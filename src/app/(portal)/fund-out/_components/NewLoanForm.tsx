@@ -4,15 +4,22 @@ import { useState, useTransition, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { createLoan } from '../actions'
 import type { Company } from '@/types'
-import type { BsCategoryOption } from '@/lib/loan-disbursement'
+import type { BsAccountOption } from '@/lib/loan-disbursement'
 
 interface Props {
   companies: Company[]
   baseRate: { rate: number; quarter: string }
-  bsCategories: BsCategoryOption[]
+  bsAccounts: BsAccountOption[]
 }
 
-export default function NewLoanForm({ companies, baseRate, bsCategories }: Props) {
+const ACCOUNT_TYPE_LABEL: Record<string, string> = {
+  asset:        'BS · Asset',
+  fixed_asset:  'BS · Fixed Asset',
+  liability:    'BS · Liability',
+  equity:       'BS · Equity',
+}
+
+export default function NewLoanForm({ companies, baseRate, bsAccounts }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string>('')
@@ -220,27 +227,27 @@ export default function NewLoanForm({ companies, baseRate, bsCategories }: Props
         </p>
       </div>
 
-      {/* ───────── Disbursement category (Balance Sheet) ───────── */}
+      {/* ───────── Disbursement account (Balance Sheet) ───────── */}
       <div className="mb-6">
         <label
-          htmlFor="disbursement_category_code"
+          htmlFor="disbursement_account_code"
           className="block text-sm font-sans font-medium text-graphite mb-1.5"
         >
-          Disbursement category <span className="text-danger">*</span>
+          Disbursement account <span className="text-danger">*</span>
         </label>
         <select
-          id="disbursement_category_code"
-          name="disbursement_category_code"
+          id="disbursement_account_code"
+          name="disbursement_account_code"
           required
           defaultValue=""
           className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
         >
           <option value="" disabled>
-            Select a balance-sheet category…
+            Select a balance-sheet account…
           </option>
-          {bsCategories.map((c) => (
-            <option key={c.code} value={c.code}>
-              {c.label} · {c.account_type === 'asset' ? 'BS · Asset' : 'BS · Liability'}
+          {bsAccounts.map((a) => (
+            <option key={a.code} value={a.code}>
+              {a.code} · {a.name} ({ACCOUNT_TYPE_LABEL[a.account_type] ?? a.account_type})
             </option>
           ))}
         </select>

@@ -13,38 +13,23 @@ function revenueGlCode(billingMode: string | null): string {
   return billingMode === 'marketing_project' ? '4040' : '4030'
 }
 
-// Phase 11.1: invoice GL routing precedence (high → low):
-//   1. payment_categories.revenue_gl_account_code (Phase 11.1, opt-in per-category
-//      via Settings → Categories). Only honoured if it points at a revenue-type
-//      account.
-//   2. payment_categories.gl_account_code (legacy/PV side) — only honoured if it
-//      happens to be revenue-typed (rare, since seeded categories are expense-side).
-//   3. billing_mode → 4030 / 4040 fallback.
-//
-// Step 1 is the path Loo configures explicitly. Steps 2 & 3 are safety nets so
-// invoice JEs never accidentally credit an expense or asset account.
+// Note: invoices.category_code (added by mig 230) keeps its column name; only
+// payment_voucher_sources.category_code was renamed by mig 238. Values stored
+// here are chart_of_accounts.code post-unified-COA — the COA IS the GL now,
+// so if the invoice declares a revenue account directly we credit that code;
+// otherwise fall back to the billing_mode → 4030 / 4040 mapping.
 async function resolveRevenueGlCode(
   supabase: Awaited<ReturnType<typeof createClient>>,
   categoryCode: string | null,
   billingMode: string | null,
 ): Promise<string> {
   if (categoryCode) {
-    const { data: cat } = await supabase
-      .from('payment_categories')
-      .select('gl_account_code, revenue_gl_account_code')
+    const { data: acct } = await supabase
+      .from('chart_of_accounts')
+      .select('type')
       .eq('code', categoryCode)
       .maybeSingle()
-    const candidates = [cat?.revenue_gl_account_code, cat?.gl_account_code].filter(
-      (c): c is string => !!c,
-    )
-    for (const code of candidates) {
-      const { data: acct } = await supabase
-        .from('chart_of_accounts')
-        .select('type')
-        .eq('code', code)
-        .maybeSingle()
-      if (acct?.type === 'revenue') return code
-    }
+    if (acct?.type === 'revenue') return categoryCode
   }
   return revenueGlCode(billingMode)
 }

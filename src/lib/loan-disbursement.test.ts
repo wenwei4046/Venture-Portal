@@ -1,59 +1,63 @@
 import { describe, it, expect } from 'vitest'
 import {
-  bsCategoriesForDisbursement,
-  validateDisbursementCategory,
-  type RawCategoryRow,
+  bsAccountsForDisbursement,
+  validateDisbursementAccount,
+  type RawAccountRow,
 } from './loan-disbursement'
 
-const rows: RawCategoryRow[] = [
-  { code: 'amount_due_from_to_2990', label: 'Amount due from / (to) — 2990', account_type: 'asset', is_active: true },
-  { code: 'fund_sources_payable', label: 'Fund sources payable', account_type: 'liability', is_active: true },
-  { code: 'office_rental', label: 'Office Rental', account_type: 'expense', is_active: true },
-  { code: 'service_revenue', label: 'Service revenue', account_type: 'revenue', is_active: true },
-  { code: 'paid_capital', label: 'Paid capital', account_type: 'equity', is_active: true },
-  { code: 'inactive_asset', label: 'Old asset code', account_type: 'asset', is_active: false },
-  { code: 'unclassified', label: 'Legacy unclassified', account_type: null, is_active: true },
+const rows: RawAccountRow[] = [
+  { code: '3030', name: 'Accounts Receivable — Subs', account_type: 'asset', is_active: true },
+  { code: '2000', name: 'Equipment / Computer', account_type: 'fixed_asset', is_active: true },
+  { code: '4000', name: 'Fund Sources Payable', account_type: 'liability', is_active: true },
+  { code: '1010', name: 'HV Operating Fund', account_type: 'equity', is_active: true },
+  { code: '9020', name: 'Office Rental', account_type: 'expense', is_active: true },
+  { code: '5000', name: 'Service revenue', account_type: 'revenue', is_active: true },
+  { code: '6000', name: 'Cost of services', account_type: 'cost', is_active: true },
+  { code: '7000', name: 'Penalty Income', account_type: 'other_income', is_active: true },
+  { code: '3099', name: 'Old asset code', account_type: 'asset', is_active: false },
 ]
 
-describe('bsCategoriesForDisbursement', () => {
-  it('keeps only active asset/liability categories', () => {
-    const out = bsCategoriesForDisbursement(rows)
-    expect(out.map((c) => c.code)).toEqual(['amount_due_from_to_2990', 'fund_sources_payable'])
+describe('bsAccountsForDisbursement', () => {
+  it('keeps only active asset / fixed_asset / liability / equity accounts', () => {
+    const out = bsAccountsForDisbursement(rows)
+    expect(out.map((c) => c.code)).toEqual(['3030', '2000', '4000', '1010'])
   })
 
-  it('drops revenue, expense, equity, inactive, and null-classified rows', () => {
-    const out = bsCategoriesForDisbursement(rows)
+  it('drops revenue, cost, other_income, expense, and inactive rows', () => {
+    const out = bsAccountsForDisbursement(rows)
     const codes = out.map((c) => c.code)
-    expect(codes).not.toContain('office_rental')
-    expect(codes).not.toContain('service_revenue')
-    expect(codes).not.toContain('paid_capital')
-    expect(codes).not.toContain('inactive_asset')
-    expect(codes).not.toContain('unclassified')
+    expect(codes).not.toContain('9020')
+    expect(codes).not.toContain('5000')
+    expect(codes).not.toContain('6000')
+    expect(codes).not.toContain('7000')
+    expect(codes).not.toContain('3099')
   })
 })
 
-describe('validateDisbursementCategory', () => {
-  it('returns null when the code is a valid active BS category', () => {
-    expect(validateDisbursementCategory('amount_due_from_to_2990', rows)).toBeNull()
-    expect(validateDisbursementCategory('fund_sources_payable', rows)).toBeNull()
+describe('validateDisbursementAccount', () => {
+  it('returns null when the code is a valid active BS account', () => {
+    expect(validateDisbursementAccount('3030', rows)).toBeNull()
+    expect(validateDisbursementAccount('2000', rows)).toBeNull()
+    expect(validateDisbursementAccount('4000', rows)).toBeNull()
+    expect(validateDisbursementAccount('1010', rows)).toBeNull()
   })
 
   it('rejects empty code', () => {
-    expect(validateDisbursementCategory('', rows)).toBe('Disbursement category is required')
+    expect(validateDisbursementAccount('', rows)).toBe('Disbursement account is required')
   })
 
   it('rejects unknown code', () => {
-    expect(validateDisbursementCategory('does_not_exist', rows)).toMatch(/not found/)
+    expect(validateDisbursementAccount('does_not_exist', rows)).toMatch(/not found/)
   })
 
   it('rejects inactive code', () => {
-    expect(validateDisbursementCategory('inactive_asset', rows)).toMatch(/inactive/)
+    expect(validateDisbursementAccount('3099', rows)).toMatch(/inactive/)
   })
 
-  it('rejects revenue / expense / equity / null classification', () => {
-    expect(validateDisbursementCategory('office_rental', rows)).toMatch(/asset or liability/)
-    expect(validateDisbursementCategory('service_revenue', rows)).toMatch(/asset or liability/)
-    expect(validateDisbursementCategory('paid_capital', rows)).toMatch(/asset or liability/)
-    expect(validateDisbursementCategory('unclassified', rows)).toMatch(/asset or liability/)
+  it('rejects P&L-classified accounts', () => {
+    expect(validateDisbursementAccount('9020', rows)).toMatch(/balance-sheet/)
+    expect(validateDisbursementAccount('5000', rows)).toMatch(/balance-sheet/)
+    expect(validateDisbursementAccount('6000', rows)).toMatch(/balance-sheet/)
+    expect(validateDisbursementAccount('7000', rows)).toMatch(/balance-sheet/)
   })
 })

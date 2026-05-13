@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { postJournalEntry } from '@/lib/journal'
-import { validateDisbursementCategory } from '@/lib/loan-disbursement'
+import { validateDisbursementAccount } from '@/lib/loan-disbursement'
 import type { PaymentType } from '@/types'
 
 // ─── Create new loan (Finance) ────────────────────────────────────────────────
@@ -27,7 +27,7 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
   const tenureMonths = parseInt((formData.get('tenure_months') as string) ?? '', 10)
   const repaymentTerms = (formData.get('repayment_terms') as string) ?? ''
   const loanStartDate = (formData.get('loan_start_date') as string) ?? ''
-  const disbursementCategoryCode = ((formData.get('disbursement_category_code') as string) ?? '').trim()
+  const disbursementAccountCode = ((formData.get('disbursement_account_code') as string) ?? '').trim()
 
   if (!companyId) return { error: 'Company is required' }
   if (isNaN(principal) || principal <= 0) {
@@ -49,23 +49,24 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
   // the assertPeriodOpen call in recordRepayment.
   await assertPeriodOpen(supabase, loanStartDate)
 
-  // Validate the disbursement category: must exist, be active, and be
-  // BS-classified (asset/liability). This guarantees the loan principal
-  // can never leak into the P&L via the auto-created disbursement PV.
-  const { data: catRows, error: catErr } = await supabase
-    .from('payment_categories')
-    .select('code, label, account_type, is_active')
-  if (catErr) return { error: `Category lookup failed: ${catErr.message}` }
-  const catErrMsg = validateDisbursementCategory(
-    disbursementCategoryCode,
-    (catRows ?? []).map((r) => ({
-      code: r.code as string,
-      label: r.label as string,
-      account_type: (r.account_type as string | null) ?? null,
-      is_active: r.is_active as boolean,
+  // Validate the disbursement account: must exist, be active, and be
+  // BS-classified (asset / fixed_asset / liability / equity in the unified
+  // COA). This guarantees the loan principal can never leak into the P&L via
+  // the auto-created disbursement PV.
+  const { data: acctRows, error: acctErr } = await supabase
+    .from('chart_of_accounts')
+    .select('code, name, type, is_active')
+  if (acctErr) return { error: `Account lookup failed: ${acctErr.message}` }
+  const acctErrMsg = validateDisbursementAccount(
+    disbursementAccountCode,
+    (acctRows ?? []).map((r) => ({
+      code: r.code,
+      name: r.name,
+      account_type: r.type as string,
+      is_active: r.is_active,
     })),
   )
-  if (catErrMsg) return { error: catErrMsg }
+  if (acctErrMsg) return { error: acctErrMsg }
 
   // ─── Look up active base rate ───
   const { data: baseRate, error: brError } = await supabase
@@ -112,11 +113,9 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
   // Principal's approval).
 
   // ─── Atomic loan + approval creation (M1 fix) ───
-  // TEMPORARY: migration 236 (10-arg RPC) isn't applied yet. Call the old
-  // 9-arg RPC and then patch the disbursement PVS row with the BS category.
-  // Revert to the 10-arg call once mig 235 + 236 are applied — diff hints:
-  //   1) re-add `p_disbursement_category_code: disbursementCategoryCode,`
-  //   2) drop the post-RPC UPDATE block below.
+  // Mig 238 renamed payment_voucher_sources.category_code → account_code but
+  // kept the 9-arg create_loan_with_approval RPC signature (the RPC inserts
+  // a placeholder source row; we patch the account_code post-hoc here).
   const { data: loanId, error: rpcError } = await supabase.rpc(
     'create_loan_with_approval',
     {
@@ -136,10 +135,10 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
     return { error: `Failed to create loan: ${rpcError?.message ?? 'unknown'}` }
   }
 
-  // TEMP patch: locate the disbursement PV the RPC just created (reference_type='loan',
-  // reference_id=loanId, voucher_type='other', direction='debit') and set the
-  // BS category on its single source row. Without this the report engine
-  // would later throw on a NULL category_code.
+  // Post-RPC patch: locate the disbursement PV the RPC just created
+  // (reference_type='loan', reference_id=loanId, voucher_type='other',
+  // direction='debit') and set the BS account on its single source row.
+  // Without this the report engine would throw on a NULL account_code.
   const { data: disbursementPv } = await supabase
     .from('payment_vouchers')
     .select('id')
@@ -154,14 +153,14 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
   if (disbursementPv?.id) {
     const { error: updErr } = await supabase
       .from('payment_voucher_sources')
-      .update({ category_code: disbursementCategoryCode })
+      .update({ account_code: disbursementAccountCode })
       .eq('voucher_id', disbursementPv.id)
     if (updErr) {
-      // Loan + PV are created; only the category-code patch failed. Surface
+      // Loan + PV are created; only the account-code patch failed. Surface
       // it to Finance so they know to either retry or fix manually before
       // reports are viewed.
       return {
-        error: `Loan created but failed to set disbursement category (${updErr.message}). ` +
+        error: `Loan created but failed to set disbursement account (${updErr.message}). ` +
                `Open /fund-out/${loanId} and contact engineering.`,
       }
     }

@@ -1,51 +1,65 @@
 // Pure-logic helpers for loan disbursement classification.
 //
-// Loan-disbursement PVs must carry a Balance-Sheet-classified category so the
-// principal can never leak into the P&L. Allowed account types are `asset`
-// (e.g. "Amount due from / (to) — 2990" → 1020 Loans Receivable) and
-// `liability` (rare; only if the borrowing side already had a credit balance
-// on the inter-company account that needs to be cleared). `equity` is not
-// allowed for a disbursement — equity moves go through a different code
-// path.
+// Loan-disbursement PVs must carry a Balance-Sheet-classified account so the
+// principal can never leak into the P&L. The unified COA has 4 BS-side types:
+//   - asset       (e.g. 3030 Accounts Receivable, 3020 Loans Receivable)
+//   - fixed_asset (e.g. 2000 Equipment)
+//   - liability   (e.g. 4050 Accounts Payable — General)
+//   - equity      (e.g. 1010 HV Operating Fund — rare for a disbursement)
+//
+// Note: type list expanded from the pre-unified-COA pair (asset/liability)
+// because the new enum splits assets into asset + fixed_asset and equity is
+// occasionally legitimate for an internal-funds disbursement.
 
-export type LoanDisbursementCategoryAccountType = 'asset' | 'liability'
+export type LoanDisbursementAccountType =
+  | 'asset'
+  | 'fixed_asset'
+  | 'liability'
+  | 'equity'
 
-export interface BsCategoryOption {
+const ALLOWED_TYPES: ReadonlyArray<LoanDisbursementAccountType> = [
+  'asset',
+  'fixed_asset',
+  'liability',
+  'equity',
+]
+
+export interface BsAccountOption {
   code: string
-  label: string
+  name: string
   account_type: string
 }
 
-export interface RawCategoryRow {
+export interface RawAccountRow {
   code: string
-  label: string
-  account_type: string | null
+  name: string
+  account_type: string
   is_active: boolean
 }
 
-// Filter the full payment_categories list down to the categories Finance is
-// allowed to pick on the new-loan form: active rows classified as asset or
-// liability.
-export function bsCategoriesForDisbursement(rows: RawCategoryRow[]): BsCategoryOption[] {
+// Filter the full chart_of_accounts list down to the accounts Finance is
+// allowed to pick on the new-loan form: active rows classified as
+// asset / fixed_asset / liability / equity.
+export function bsAccountsForDisbursement(rows: RawAccountRow[]): BsAccountOption[] {
   return rows
-    .filter((r) => r.is_active && (r.account_type === 'asset' || r.account_type === 'liability'))
-    .map((r) => ({ code: r.code, label: r.label, account_type: r.account_type as string }))
+    .filter((r) => r.is_active && ALLOWED_TYPES.includes(r.account_type as LoanDisbursementAccountType))
+    .map((r) => ({ code: r.code, name: r.name, account_type: r.account_type }))
 }
 
-// Server-side validation: the chosen category must exist in the supplied list
+// Server-side validation: the chosen account must exist in the supplied list
 // and must be BS-classified. Returns null on success, an error message string
 // otherwise. (Keeping the return shape simple so call sites can `if (err)
 // return { error: err }` without further plumbing.)
-export function validateDisbursementCategory(
+export function validateDisbursementAccount(
   code: string,
-  allCategories: RawCategoryRow[],
+  allAccounts: RawAccountRow[],
 ): string | null {
-  if (!code) return 'Disbursement category is required'
-  const found = allCategories.find((r) => r.code === code)
-  if (!found) return `Disbursement category "${code}" not found`
-  if (!found.is_active) return `Disbursement category "${code}" is inactive`
-  if (found.account_type !== 'asset' && found.account_type !== 'liability') {
-    return `Disbursement category "${code}" must be an asset or liability (got "${found.account_type ?? 'null'}")`
+  if (!code) return 'Disbursement account is required'
+  const found = allAccounts.find((r) => r.code === code)
+  if (!found) return `Disbursement account "${code}" not found`
+  if (!found.is_active) return `Disbursement account "${code}" is inactive`
+  if (!ALLOWED_TYPES.includes(found.account_type as LoanDisbursementAccountType)) {
+    return `Disbursement account "${code}" must be a balance-sheet type (asset / fixed_asset / liability / equity) — got "${found.account_type ?? 'null'}"`
   }
   return null
 }
