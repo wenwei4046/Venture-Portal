@@ -238,6 +238,12 @@ export async function createPaymentVoucher(formData: FormData) {
       )
     }
   } else if (direction === 'credit' && targetPool) {
+    // Every PV source row must carry a category — the reports route lines by
+    // payment_categories.account_type. A NULL category would crash the
+    // P&L / Cash Flow render (see src/lib/cfo-reports.ts:gatherPvSources).
+    if (!categoryCode) {
+      throw new Error('Category is required on inbound (credit) vouchers')
+    }
     await supabase.from('payment_voucher_sources').insert({
       voucher_id: data.id,
       pool: targetPool,
@@ -583,6 +589,10 @@ export async function updatePaymentVoucher(formData: FormData) {
       throw new Error(`PVS RLS blocked delete (status=${current.status}) — ${leftover} stale rows remain.`)
     }
 
+    // See comment on create path: credit vouchers must carry a category.
+    if (!categoryCode) {
+      throw new Error('Category is required on inbound (credit) vouchers')
+    }
     const { error: insErr } = await supabase.from('payment_voucher_sources').insert({
       voucher_id: id,
       pool: targetPool,
