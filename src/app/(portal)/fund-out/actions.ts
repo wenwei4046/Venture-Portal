@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { postJournalEntry } from '@/lib/journal'
+import { validateDisbursementCategory } from '@/lib/loan-disbursement'
 import type { PaymentType } from '@/types'
 
 // ─── Create new loan (Finance) ────────────────────────────────────────────────
@@ -26,6 +27,7 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
   const tenureMonths = parseInt((formData.get('tenure_months') as string) ?? '', 10)
   const repaymentTerms = (formData.get('repayment_terms') as string) ?? ''
   const loanStartDate = (formData.get('loan_start_date') as string) ?? ''
+  const disbursementCategoryCode = ((formData.get('disbursement_category_code') as string) ?? '').trim()
 
   if (!companyId) return { error: 'Company is required' }
   if (isNaN(principal) || principal <= 0) {
@@ -40,6 +42,24 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
   if (!loanStartDate || !dayjs(loanStartDate).isValid()) {
     throw new Error('Loan start date is required')
   }
+
+  // Validate the disbursement category: must exist, be active, and be
+  // BS-classified (asset/liability). This guarantees the loan principal
+  // can never leak into the P&L via the auto-created disbursement PV.
+  const { data: catRows, error: catErr } = await supabase
+    .from('payment_categories')
+    .select('code, label, account_type, is_active')
+  if (catErr) return { error: `Category lookup failed: ${catErr.message}` }
+  const catErrMsg = validateDisbursementCategory(
+    disbursementCategoryCode,
+    (catRows ?? []).map((r) => ({
+      code: r.code as string,
+      label: r.label as string,
+      account_type: (r.account_type as string | null) ?? null,
+      is_active: r.is_active as boolean,
+    })),
+  )
+  if (catErrMsg) return { error: catErrMsg }
 
   // ─── Look up active base rate ───
   const { data: baseRate, error: brError } = await supabase
@@ -103,6 +123,38 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
 
   if (rpcError || !loanId) {
     return { error: `Failed to create loan: ${rpcError?.message ?? 'unknown'}` }
+  }
+
+  // The RPC `create_loan_with_approval` (mig 222) inserts a
+  // payment_voucher_sources row WITHOUT a category_code. We can't pass it
+  // in because the RPC signature doesn't accept one (the per-source GL
+  // approval path expects category_code on the source rows). Patch it
+  // here so the disbursement is properly classified on the Balance Sheet.
+  // If this UPDATE fails we surface the error — the loan & PV are already
+  // created so a manual fix is fine, but the user must know.
+  const { data: voucher, error: vErr } = await supabase
+    .from('payment_vouchers')
+    .select('id')
+    .eq('reference_type', 'loan')
+    .eq('reference_id', loanId as string)
+    .eq('voucher_type', 'other')
+    .eq('direction', 'debit')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (vErr || !voucher?.id) {
+    return {
+      error: `Loan created but disbursement voucher not found to assign category: ${vErr?.message ?? 'no PV'}`,
+    }
+  }
+  const { error: pvsErr } = await supabase
+    .from('payment_voucher_sources')
+    .update({ category_code: disbursementCategoryCode })
+    .eq('voucher_id', voucher.id as string)
+  if (pvsErr) {
+    return {
+      error: `Loan created but failed to set disbursement category: ${pvsErr.message}`,
+    }
   }
 
   revalidatePath('/fund-out')

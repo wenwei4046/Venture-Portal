@@ -4,13 +4,15 @@ import { useState, useTransition, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { createLoan } from '../actions'
 import type { Company } from '@/types'
+import type { BsCategoryOption } from '@/lib/loan-disbursement'
 
 interface Props {
   companies: Company[]
   baseRate: { rate: number; quarter: string }
+  bsCategories: BsCategoryOption[]
 }
 
-export default function NewLoanForm({ companies, baseRate }: Props) {
+export default function NewLoanForm({ companies, baseRate, bsCategories }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string>('')
@@ -215,6 +217,36 @@ export default function NewLoanForm({ companies, baseRate }: Props) {
         <p className="font-serif italic text-muted text-xs mt-1.5">
           Contractual start date. Defaults to today; back- or future-date as needed.
           Maturity = start date + tenure.
+        </p>
+      </div>
+
+      {/* ───────── Disbursement category (Balance Sheet) ───────── */}
+      <div className="mb-6">
+        <label
+          htmlFor="disbursement_category_code"
+          className="block text-sm font-sans font-medium text-graphite mb-1.5"
+        >
+          Disbursement category <span className="text-danger">*</span>
+        </label>
+        <select
+          id="disbursement_category_code"
+          name="disbursement_category_code"
+          required
+          defaultValue=""
+          className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+        >
+          <option value="" disabled>
+            Select a balance-sheet category…
+          </option>
+          {bsCategories.map((c) => (
+            <option key={c.code} value={c.code}>
+              {c.label} · {c.account_type === 'asset' ? 'BS · Asset' : 'BS · Liability'}
+            </option>
+          ))}
+        </select>
+        <p className="font-serif italic text-muted text-xs mt-1.5">
+          Used to classify the disbursement on the Balance Sheet — pick the
+          receivable / asset account for the borrowing party.
         </p>
       </div>
 
