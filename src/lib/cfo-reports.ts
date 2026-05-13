@@ -1,212 +1,81 @@
-// CFO-view report helpers (Item 7+8) — label-based aggregation that replaces
-// the GL-account view. Reads from payment_voucher_sources joined to
-// payment_categories (so Finance can rename a category in Settings and the
-// report updates without touching code), and uses journal_entries.segment
-// (mig 215+217) to attribute outflows to the right department / corporate
-// bucket.
+// CFO-view report helpers — classification-driven aggregation.
+//
+// The Income Statement / Cash Flow / Balance Sheet are driven by:
+//   - payment_categories.account_type  (asset | liability | equity | revenue | expense)
+//     → decides WHICH statement a line belongs to and WHICH section (revenue vs expense)
+//   - payment_voucher_sources.pool     → decides WHICH pool the money moved through
+//
+// This replaces the old GlSegment / journal_entries.segment bucketing.
+// Loan/deposit *principal* movements (account_type asset/liability) go to the
+// Balance Sheet & Cash Flow only — never the P&L. Treasury *interest*
+// (GL 4010/4020 income, 5010 expense) is folded into the Venture Pool's P&L.
+//
+// The pure classification logic lives in `classifyRows` (testable without
+// Supabase); the `fetch*` functions are thin wrappers that gather rows and
+// call it.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import dayjs from 'dayjs'
+import { poolLabel, comparePools } from './pools'
 
-export type GlSegment =
-  | 'treasury'
-  | 'marketing'
-  | 'hr'
-  | 'finance'
-  | 'director_office'
-  | 'corporate'
-  | 'unallocated'
+const VENTURE_POOL = 'venture_pool'
 
-export const SEGMENT_LABEL: Record<GlSegment, string> = {
-  treasury: 'Treasury',
-  marketing: 'Marketing',
-  hr: 'HR',
-  finance: 'Finance',
-  director_office: 'Director Office',
-  corporate: 'Corporate (group)',
-  unallocated: 'Unallocated',
+// ────────────────────────────────────────────────────────────────────────────
+// Raw input row shapes (what `classifyRows` consumes)
+// ────────────────────────────────────────────────────────────────────────────
+
+export type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense'
+
+export interface RawPvSourceRow {
+  voucherId: string
+  voucherType: string // 'expense' | 'loan_disbursement' | 'loan_repayment' | 'internal_transfer' | ...
+  direction: 'credit' | 'debit' // credit = money in, debit = money out
+  pool: string // payment_voucher_sources.pool
+  categoryCode: string
+  categoryLabel: string // payment_categories.label
+  accountType: AccountType
+  amount: number
 }
 
-// Departments whose outflows roll up into "Dept outflow" bucket (B). Anything
-// else (treasury / corporate / unallocated) flows into "General expenses" (C).
-export const DEPT_SEGMENTS: GlSegment[] = ['marketing', 'hr', 'finance', 'director_office']
+export interface RawInvoiceRow {
+  invoiceNo: string
+  companyShortCode: string
+  pool: string // derived from billing_mode (see INVOICE_BILLING_MODE_TO_POOL)
+  amount: number // total_amount; counts as revenue inflow
+}
 
-export interface CashflowLine {
+export interface RawTreasury {
+  interestIncome: number // GL 4010 net credit
+  penaltyIncome: number // GL 4020 net credit
+  interestExpense: number // GL 5010 net debit
+}
+
+export interface ClassifyInput {
+  pvSources: RawPvSourceRow[]
+  invoices: RawInvoiceRow[]
+  treasury: RawTreasury
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Output shapes
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface Line {
   label: string
   amount: number
 }
 
-export interface CashflowBuckets {
-  // A — money in
-  sourceOfFund: CashflowLine[]
-  totalIn: number
-  // B — per-dept outflow, ordered, with sub-rows
-  deptOutflow: Array<{ segment: GlSegment; lines: CashflowLine[]; total: number }>
-  totalDeptOut: number
-  // C — group-level expenses
-  generalExpenses: CashflowLine[]
-  totalGeneral: number
-  // Net
-  netChange: number
-}
-
-const FALLBACK_LABEL = 'Uncategorised'
-
-// ────────────────────────────────────────────────────────────────────────────
-// Cashflow: 3-bucket, label-based
-// ────────────────────────────────────────────────────────────────────────────
-export async function fetchCashflowBuckets(
-  supabase: SupabaseClient,
-  args: { from: string; to: string },
-): Promise<CashflowBuckets> {
-  const { from, to } = args
-
-  // 1) Paid vouchers in window (debit = out, credit = in)
-  const { data: vouchers, error: vErr } = await supabase
-    .from('payment_vouchers')
-    .select('id, direction, amount, payment_date, status')
-    .eq('status', 'paid')
-    .gte('payment_date', from)
-    .lte('payment_date', to)
-  if (vErr) throw new Error(`fetchCashflowBuckets vouchers: ${vErr.message}`)
-
-  const voucherIds = (vouchers ?? []).map((v) => v.id as string)
-  if (voucherIds.length === 0) {
-    return {
-      sourceOfFund: [],
-      totalIn: 0,
-      deptOutflow: [],
-      totalDeptOut: 0,
-      generalExpenses: [],
-      totalGeneral: 0,
-      netChange: 0,
-    }
-  }
-
-  // 2) Source rows for those vouchers (category_code + amount per source pool)
-  const { data: sources, error: sErr } = await supabase
-    .from('payment_voucher_sources')
-    .select('voucher_id, category_code, amount')
-    .in('voucher_id', voucherIds)
-  if (sErr) throw new Error(`fetchCashflowBuckets sources: ${sErr.message}`)
-
-  // 3) JE segment per voucher (mig 217 derives this; we just look it up)
-  const { data: jes, error: jErr } = await supabase
-    .from('journal_entries')
-    .select('reference_id, segment')
-    .eq('reference_type', 'payment_voucher')
-    .eq('is_reversed', false)
-    .in('reference_id', voucherIds)
-  if (jErr) throw new Error(`fetchCashflowBuckets JEs: ${jErr.message}`)
-
-  const segmentByVoucher = new Map<string, GlSegment>()
-  for (const je of jes ?? []) {
-    segmentByVoucher.set(je.reference_id as string, (je.segment ?? 'unallocated') as GlSegment)
-  }
-
-  // 4) Category labels — we want human names, not codes. Pull all (active +
-  // inactive) so historical vouchers still resolve a label.
-  const { data: cats, error: cErr } = await supabase
-    .from('payment_categories')
-    .select('code, label')
-  if (cErr) throw new Error(`fetchCashflowBuckets categories: ${cErr.message}`)
-  const labelByCode = new Map<string, string>()
-  for (const c of cats ?? []) {
-    labelByCode.set(c.code as string, (c.label as string) ?? c.code)
-  }
-
-  // Build voucher → direction map (in/out)
-  const directionByVoucher = new Map<string, 'in' | 'out'>()
-  for (const v of vouchers ?? []) {
-    directionByVoucher.set(v.id as string, v.direction === 'credit' ? 'in' : 'out')
-  }
-
-  // Aggregators
-  const inflowsByLabel = new Map<string, number>()
-  const outflowsByDept = new Map<GlSegment, Map<string, number>>()
-  const generalByLabel = new Map<string, number>()
-
-  for (const src of sources ?? []) {
-    const voucherId = src.voucher_id as string
-    const direction = directionByVoucher.get(voucherId)
-    if (!direction) continue
-    const segment = segmentByVoucher.get(voucherId) ?? 'unallocated'
-    const label = labelByCode.get(src.category_code as string) ?? FALLBACK_LABEL
-    const amt = Number(src.amount ?? 0)
-    if (amt === 0) continue
-
-    if (direction === 'in') {
-      inflowsByLabel.set(label, (inflowsByLabel.get(label) ?? 0) + amt)
-      continue
-    }
-
-    // direction === 'out'
-    if (DEPT_SEGMENTS.includes(segment)) {
-      const m = outflowsByDept.get(segment) ?? new Map<string, number>()
-      m.set(label, (m.get(label) ?? 0) + amt)
-      outflowsByDept.set(segment, m)
-    } else {
-      generalByLabel.set(label, (generalByLabel.get(label) ?? 0) + amt)
-    }
-  }
-
-  // Materialise + sort
-  const sourceOfFund: CashflowLine[] = Array.from(inflowsByLabel.entries())
-    .map(([label, amount]) => ({ label, amount }))
-    .sort((a, b) => b.amount - a.amount)
-  const totalIn = sourceOfFund.reduce((s, x) => s + x.amount, 0)
-
-  const deptOutflow = DEPT_SEGMENTS.map((segment) => {
-    const m = outflowsByDept.get(segment)
-    const lines: CashflowLine[] = m
-      ? Array.from(m.entries()).map(([label, amount]) => ({ label, amount })).sort((a, b) => b.amount - a.amount)
-      : []
-    const total = lines.reduce((s, x) => s + x.amount, 0)
-    return { segment, lines, total }
-  }).filter((b) => b.lines.length > 0)
-  const totalDeptOut = deptOutflow.reduce((s, b) => s + b.total, 0)
-
-  const generalExpenses: CashflowLine[] = Array.from(generalByLabel.entries())
-    .map(([label, amount]) => ({ label, amount }))
-    .sort((a, b) => b.amount - a.amount)
-  const totalGeneral = generalExpenses.reduce((s, x) => s + x.amount, 0)
-
-  const netChange = totalIn - totalDeptOut - totalGeneral
-
-  return {
-    sourceOfFund,
-    totalIn,
-    deptOutflow,
-    totalDeptOut,
-    generalExpenses,
-    totalGeneral,
-    netChange,
-  }
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Income Statement: per-dept P&L + group general expenses
-// ────────────────────────────────────────────────────────────────────────────
-
-export interface DeptPnl {
-  segment: GlSegment
-  // Revenue lines: one entry per invoice issued/paid in window. Label is
-  // "<company short_code> — <invoice_no>" so Finance can see who got billed.
-  revenueLines: CashflowLine[]
+export interface PoolPnl {
+  pool: string
+  poolLabel: string
+  revenueLines: Line[]
+  expenseLines: Line[]
   revenue: number
-  // Cost lines: category-label aggregated from paid PV sources (same path as
-  // cashflow report's deptOutflow). Gives buckets like "Logistics",
-  // "Marketing fees" instead of a single dept-level total.
-  costLines: CashflowLine[]
-  cost: number
+  expense: number
   margin: number
 }
 
-// Treasury net = interest income on loans + penalty income on overdue
-// repayments − interest expense paid to fund sources. Pulled from
-// journal_lines in window so it includes both PV-driven and direct
-// recordRepayment posts.
-export interface TreasurySection {
+export interface TreasuryBreakdown {
   interestIncome: number
   penaltyIncome: number
   interestExpense: number
@@ -214,134 +83,391 @@ export interface TreasurySection {
 }
 
 export interface IncomeStatement {
-  perDept: DeptPnl[]
-  treasury: TreasurySection
-  groupGeneral: CashflowLine[]
-  groupGeneralTotal: number
+  pools: PoolPnl[]
+  treasury: TreasuryBreakdown
   groupRevenue: number
-  groupDeptCost: number
+  groupExpense: number
   groupNetProfit: number
 }
 
-const BILLING_MODE_TO_SEGMENT: Record<string, GlSegment> = {
-  marketing_project: 'marketing',
-  hr_attribution: 'hr',
-  finance_attribution: 'finance',
-  director_office_attribution: 'director_office',
-  director_attribution: 'director_office', // director CTC routed through Director Office segment
+export interface PoolCashflow {
+  pool: string
+  poolLabel: string
+  inflow: { fundIn: Line[]; revenue: Line[]; total: number }
+  outflow: { capital: Line[]; expense: Line[]; total: number }
+  net: number
 }
 
-export async function fetchIncomeStatement(
+export interface CashflowStatement {
+  pools: PoolCashflow[]
+  netChange: number
+}
+
+export interface BalanceMovementLine {
+  pool: string
+  poolLabel: string
+  label: string
+  amount: number
+}
+
+export interface ClassifyOutput {
+  income: IncomeStatement
+  cashflow: CashflowStatement
+  balanceMovements: BalanceMovementLine[]
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Invoice billing_mode → pool map. Every billing mode resolves to a pool; an
+// unknown billing mode defaults to the Venture Pool (never dropped).
+//   marketing_project                       → dept_pool_marketing
+//   hr_attribution / hr_pool_split          → dept_pool_hr
+//   finance_attribution                     → dept_pool_finance
+//   director_office_attribution /
+//   director_attribution                    → dept_pool_director_office
+//   fixed_split / non_billable / (other)    → venture_pool
+// ────────────────────────────────────────────────────────────────────────────
+export const INVOICE_BILLING_MODE_TO_POOL: Record<string, string> = {
+  marketing_project: 'dept_pool_marketing',
+  hr_attribution: 'dept_pool_hr',
+  hr_pool_split: 'dept_pool_hr',
+  finance_attribution: 'dept_pool_finance',
+  director_office_attribution: 'dept_pool_director_office',
+  director_attribution: 'dept_pool_director_office',
+  fixed_split: VENTURE_POOL,
+  non_billable: VENTURE_POOL,
+}
+
+export function invoicePoolForBillingMode(billingMode: string | null | undefined): string {
+  if (billingMode && billingMode in INVOICE_BILLING_MODE_TO_POOL) {
+    return INVOICE_BILLING_MODE_TO_POOL[billingMode]
+  }
+  return VENTURE_POOL
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Pure classification
+// ────────────────────────────────────────────────────────────────────────────
+
+function r2(n: number): number {
+  return Math.round(n * 100) / 100
+}
+
+interface PoolAcc {
+  revenue: Map<string, number>
+  expense: Map<string, number>
+  inFundIn: Map<string, number>
+  inRevenue: Map<string, number>
+  outCapital: Map<string, number>
+  outExpense: Map<string, number>
+}
+
+function emptyPoolAcc(): PoolAcc {
+  return {
+    revenue: new Map(),
+    expense: new Map(),
+    inFundIn: new Map(),
+    inRevenue: new Map(),
+    outCapital: new Map(),
+    outExpense: new Map(),
+  }
+}
+
+function bump(m: Map<string, number>, key: string, delta: number): void {
+  m.set(key, (m.get(key) ?? 0) + delta)
+}
+
+function linesFrom(m: Map<string, number>): Line[] {
+  return Array.from(m.entries())
+    .map(([label, amount]) => ({ label, amount: r2(amount) }))
+    .filter((l) => l.amount !== 0)
+    .sort((a, b) => b.amount - a.amount)
+}
+
+export function classifyRows(input: ClassifyInput): ClassifyOutput {
+  const { pvSources, invoices, treasury } = input
+
+  const pools = new Map<string, PoolAcc>()
+  const acc = (pool: string): PoolAcc => {
+    let p = pools.get(pool)
+    if (!p) {
+      p = emptyPoolAcc()
+      pools.set(pool, p)
+    }
+    return p
+  }
+
+  const balanceMovements: Array<{ pool: string; label: string; amount: number }> = []
+  const pushBalanceMovement = (pool: string, label: string, amount: number) => {
+    balanceMovements.push({ pool, label, amount })
+  }
+
+  // ── 1+2: payment_voucher_sources rows ──
+  for (const src of pvSources) {
+    // Rule 1: skip internal_transfer vouchers entirely (bank-to-bank moves).
+    if (src.voucherType === 'internal_transfer') continue
+    const amt = Number(src.amount ?? 0)
+    if (amt === 0) continue
+    const isCredit = src.direction === 'credit'
+    const p = acc(src.pool)
+    const label = src.categoryLabel
+
+    if (src.accountType === 'revenue') {
+      // revenue row → P&L revenue (+amt if credit, -amt if debit) + cash inflow `revenue`
+      const signed = isCredit ? amt : -amt
+      bump(p.revenue, label, signed)
+      bump(p.inRevenue, label, signed)
+    } else if (src.accountType === 'expense') {
+      // expense row → P&L expense (+amt if debit, -amt if credit) + cash outflow `expense`
+      const signed = isCredit ? -amt : amt
+      bump(p.expense, label, signed)
+      bump(p.outExpense, label, signed)
+    } else {
+      // asset / liability / equity row → Balance-Sheet movement + Cash Flow only.
+      //   credit → BS movement +amt, cash inflow `fundIn`
+      //   debit  → BS movement -amt, cash outflow `capital`
+      if (isCredit) {
+        bump(p.inFundIn, label, amt)
+        pushBalanceMovement(src.pool, label, amt)
+      } else {
+        bump(p.outCapital, label, amt)
+        pushBalanceMovement(src.pool, label, -amt)
+      }
+    }
+  }
+
+  // ── 3: invoices — every invoice counts as revenue for its mapped pool ──
+  for (const inv of invoices) {
+    const amt = Number(inv.amount ?? 0)
+    if (amt === 0) continue
+    const p = acc(inv.pool)
+    const label = `${inv.companyShortCode} · ${inv.invoiceNo}`
+    bump(p.revenue, label, amt)
+    bump(p.inRevenue, label, amt)
+  }
+
+  // ── 4: treasury interest folded into the Venture Pool's P&L lines ──
+  // NOTE: the cash effect of interest is already captured via the PV source
+  // rows for interest payments/receipts, so we do NOT also add treasury to the
+  // cash flow — the journal-derived treasury figure is for the P&L only.
+  const interestIncome = r2(Number(treasury.interestIncome ?? 0))
+  const penaltyIncome = r2(Number(treasury.penaltyIncome ?? 0))
+  const interestExpense = r2(Number(treasury.interestExpense ?? 0))
+  if (interestIncome !== 0 || penaltyIncome !== 0 || interestExpense !== 0) {
+    const vp = acc(VENTURE_POOL)
+    if (interestIncome !== 0) bump(vp.revenue, 'Interest income — Loans', interestIncome)
+    if (penaltyIncome !== 0) bump(vp.revenue, 'Penalty income', penaltyIncome)
+    if (interestExpense !== 0) bump(vp.expense, 'Interest expense — Fund sources', interestExpense)
+  }
+  const treasuryNet = r2(interestIncome + penaltyIncome - interestExpense)
+
+  // ── 5: materialise per-pool structures ──
+  const poolKeys = Array.from(pools.keys()).sort(comparePools)
+
+  const pnlPools: PoolPnl[] = []
+  const cfPools: PoolCashflow[] = []
+
+  for (const key of poolKeys) {
+    const p = pools.get(key)!
+    const revenueLines = linesFrom(p.revenue)
+    const expenseLines = linesFrom(p.expense)
+    const revenue = r2(revenueLines.reduce((s, l) => s + l.amount, 0))
+    const expense = r2(expenseLines.reduce((s, l) => s + l.amount, 0))
+    if (revenueLines.length > 0 || expenseLines.length > 0) {
+      pnlPools.push({
+        pool: key,
+        poolLabel: poolLabel(key),
+        revenueLines,
+        expenseLines,
+        revenue,
+        expense,
+        margin: r2(revenue - expense),
+      })
+    }
+
+    const fundIn = linesFrom(p.inFundIn)
+    const inRevenue = linesFrom(p.inRevenue)
+    const capital = linesFrom(p.outCapital)
+    const outExpense = linesFrom(p.outExpense)
+    const inTotal = r2([...fundIn, ...inRevenue].reduce((s, l) => s + l.amount, 0))
+    const outTotal = r2([...capital, ...outExpense].reduce((s, l) => s + l.amount, 0))
+    if (fundIn.length || inRevenue.length || capital.length || outExpense.length) {
+      cfPools.push({
+        pool: key,
+        poolLabel: poolLabel(key),
+        inflow: { fundIn, revenue: inRevenue, total: inTotal },
+        outflow: { capital, expense: outExpense, total: outTotal },
+        net: r2(inTotal - outTotal),
+      })
+    }
+  }
+
+  // ── 6: group totals ──
+  const groupRevenue = r2(pnlPools.reduce((s, p) => s + p.revenue, 0))
+  const groupExpense = r2(pnlPools.reduce((s, p) => s + p.expense, 0))
+  // treasury interest is already inside the Venture Pool's revenue/expense
+  // lines, so groupNetProfit = Σ pool.margin — nothing extra added.
+  const groupNetProfit = r2(pnlPools.reduce((s, p) => s + p.margin, 0))
+
+  const income: IncomeStatement = {
+    pools: pnlPools,
+    treasury: { interestIncome, penaltyIncome, interestExpense, net: treasuryNet },
+    groupRevenue,
+    groupExpense,
+    groupNetProfit,
+  }
+
+  const cashflow: CashflowStatement = {
+    pools: cfPools,
+    netChange: r2(cfPools.reduce((s, p) => s + p.net, 0)),
+  }
+
+  const movements: BalanceMovementLine[] = balanceMovements
+    .map((m) => ({ pool: m.pool, poolLabel: poolLabel(m.pool), label: m.label, amount: r2(m.amount) }))
+    .filter((m) => m.amount !== 0)
+    .sort((a, b) => {
+      const c = comparePools(a.pool, b.pool)
+      if (c !== 0) return c
+      return Math.abs(b.amount) - Math.abs(a.amount)
+    })
+
+  return { income, cashflow, balanceMovements: movements }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Supabase-backed gathering + fetch wrappers
+// ────────────────────────────────────────────────────────────────────────────
+
+const INVOICE_REVENUE_STATUSES = ['issued', 'paid', 'paid_via_netting'] as const
+
+async function gatherPvSources(
   supabase: SupabaseClient,
   args: { from: string; to: string },
-): Promise<IncomeStatement> {
+): Promise<RawPvSourceRow[]> {
   const { from, to } = args
 
-  // ── Revenue: per-invoice lines, segmented by billing_mode ──
-  // invoice_status enum: draft | issued | paid | paid_via_netting (no 'cancelled').
-  // Issued/paid/paid_via_netting all count as recognised revenue; draft means
-  // not yet booked, so we exclude it.
+  // 1) Paid vouchers in window (excluding internal_transfer is handled in
+  //    classifyRows, but we also keep voucher_type around to feed it).
+  const { data: vouchers, error: vErr } = await supabase
+    .from('payment_vouchers')
+    .select('id, voucher_type, direction, amount, payment_date, status')
+    .eq('status', 'paid')
+    .gte('payment_date', from)
+    .lte('payment_date', to)
+  if (vErr) throw new Error(`cfo-reports vouchers: ${vErr.message}`)
+
+  const voucherIds = (vouchers ?? []).map((v) => v.id as string)
+  if (voucherIds.length === 0) return []
+
+  const voucherMeta = new Map<string, { voucherType: string; direction: 'credit' | 'debit' }>()
+  for (const v of vouchers ?? []) {
+    voucherMeta.set(v.id as string, {
+      voucherType: (v.voucher_type as string) ?? 'expense',
+      direction: v.direction === 'credit' ? 'credit' : 'debit',
+    })
+  }
+
+  // 2) Their source rows.
+  const { data: sources, error: sErr } = await supabase
+    .from('payment_voucher_sources')
+    .select('voucher_id, pool, category_code, amount')
+    .in('voucher_id', voucherIds)
+  if (sErr) throw new Error(`cfo-reports pv sources: ${sErr.message}`)
+
+  // 3) Category lookup → label + account_type.
+  const { data: cats, error: cErr } = await supabase
+    .from('payment_categories')
+    .select('code, label, account_type')
+  if (cErr) throw new Error(`cfo-reports categories: ${cErr.message}`)
+  const catByCode = new Map<string, { label: string; accountType: AccountType }>()
+  for (const c of cats ?? []) {
+    catByCode.set(c.code as string, {
+      label: (c.label as string) ?? (c.code as string),
+      accountType: c.account_type as AccountType,
+    })
+  }
+
+  const rows: RawPvSourceRow[] = []
+  for (const src of sources ?? []) {
+    const voucherId = src.voucher_id as string
+    const meta = voucherMeta.get(voucherId)
+    if (!meta) continue
+    const code = src.category_code as string | null
+    const cat = code ? catByCode.get(code) : undefined
+    if (!code || !cat) {
+      // Per the design: no "Uncategorised" fallback — surface the data problem.
+      throw new Error(
+        `cfo-reports: payment_voucher_sources row for voucher ${voucherId} has ` +
+          `${code ? `unknown category_code "${code}"` : 'a null category_code'} ` +
+          `(every source row must reference an existing payment_categories.code)`,
+      )
+    }
+    rows.push({
+      voucherId,
+      voucherType: meta.voucherType,
+      direction: meta.direction,
+      pool: src.pool as string,
+      categoryCode: code,
+      categoryLabel: cat.label,
+      accountType: cat.accountType,
+      amount: Number(src.amount ?? 0),
+    })
+  }
+  return rows
+}
+
+async function gatherInvoices(
+  supabase: SupabaseClient,
+  args: { from: string; to: string },
+): Promise<RawInvoiceRow[]> {
+  const { from, to } = args
   const { data: invoices, error: iErr } = await supabase
     .from('invoices')
-    .select('invoice_no, total_amount, billing_mode, period_month, status, company_id')
+    .select('invoice_no, total_amount, billing_mode, period_month, status, company_id, category_code')
     .gte('period_month', from)
     .lte('period_month', to)
-    .in('status', ['issued', 'paid', 'paid_via_netting'])
-  if (iErr) throw new Error(`fetchIncomeStatement invoices: ${iErr.message}`)
+    .in('status', INVOICE_REVENUE_STATUSES as unknown as string[])
+  if (iErr) throw new Error(`cfo-reports invoices: ${iErr.message}`)
+  if (!invoices || invoices.length === 0) return []
 
-  const companyIds = Array.from(new Set((invoices ?? []).map((i) => i.company_id as string)))
+  const companyIds = Array.from(new Set(invoices.map((i) => i.company_id as string)))
   const { data: companies } = companyIds.length
-    ? await supabase
-        .from('companies')
-        .select('id, short_code')
-        .in('id', companyIds)
+    ? await supabase.from('companies').select('id, short_code').in('id', companyIds)
     : { data: [] as { id: string; short_code: string }[] }
   const shortCodeById = new Map((companies ?? []).map((c) => [c.id as string, c.short_code as string]))
 
-  // Group by segment, with each invoice as one line
-  const revenueLinesBySegment = new Map<GlSegment, CashflowLine[]>()
-  for (const inv of invoices ?? []) {
-    const seg = BILLING_MODE_TO_SEGMENT[inv.billing_mode as string]
-    if (!seg) continue
-    const code = shortCodeById.get(inv.company_id as string) ?? '—'
-    const label = `${code} · ${inv.invoice_no}`
-    const lines = revenueLinesBySegment.get(seg) ?? []
-    lines.push({ label, amount: Number(inv.total_amount ?? 0) })
-    revenueLinesBySegment.set(seg, lines)
-  }
-
-  // ── Cost: per-category lines from paid-PV sources (same path as cashflow) ──
-  // We reuse fetchCashflowBuckets so the dept cost breakdown stays in lock-step
-  // with the cashflow report's deptOutflow section.
-  const buckets = await fetchCashflowBuckets(supabase, { from, to })
-  const costLinesBySegment = new Map<GlSegment, CashflowLine[]>()
-  for (const b of buckets.deptOutflow) {
-    costLinesBySegment.set(b.segment, b.lines)
-  }
-
-  // Build per-dept P&L
-  const perDept: DeptPnl[] = DEPT_SEGMENTS.map((segment) => {
-    const revenueLines = (revenueLinesBySegment.get(segment) ?? [])
-      .sort((a, b) => b.amount - a.amount)
-    const costLines = costLinesBySegment.get(segment) ?? []
-    const revenue = revenueLines.reduce((s, l) => s + l.amount, 0)
-    const cost = costLines.reduce((s, l) => s + l.amount, 0)
-    return { segment, revenueLines, revenue, costLines, cost, margin: revenue - cost }
-  })
-
-  // ── Treasury: 4010 + 4020 income, 5010 expense from journal_lines in window ──
-  const treasury = await fetchTreasurySection(supabase, { from, to })
-
-  // Group general expenses (corporate / unallocated) — already line-itemised
-  // by cashflow.generalExpenses.
-  const groupGeneral = buckets.generalExpenses
-  const groupGeneralTotal = buckets.totalGeneral
-
-  const groupRevenue = perDept.reduce((s, d) => s + d.revenue, 0)
-  const groupDeptCost = perDept.reduce((s, d) => s + d.cost, 0)
-  // Net profit now includes treasury (loan interest in/out) which previously
-  // sat outside the income statement.
-  const groupNetProfit = groupRevenue - groupDeptCost + treasury.net - groupGeneralTotal
-
-  return {
-    perDept,
-    treasury,
-    groupGeneral,
-    groupGeneralTotal,
-    groupRevenue,
-    groupDeptCost,
-    groupNetProfit,
-  }
+  return invoices.map((inv) => ({
+    invoiceNo: (inv.invoice_no as string) ?? '—',
+    companyShortCode: shortCodeById.get(inv.company_id as string) ?? '—',
+    pool: invoicePoolForBillingMode(inv.billing_mode as string | null),
+    amount: Number(inv.total_amount ?? 0),
+  }))
 }
 
 // Treasury revenue/expense from journal_lines (mig 48). 4010 = Interest Income
 // — Loans, 4020 = Penalty Income, 5010 = Interest Expense — Fund Sources.
-async function fetchTreasurySection(
+async function gatherTreasury(
   supabase: SupabaseClient,
   args: { from: string; to: string },
-): Promise<TreasurySection> {
+): Promise<RawTreasury> {
   const { from, to } = args
 
-  // journal_entries in window, not reversed
   const { data: jes, error: jeErr } = await supabase
     .from('journal_entries')
     .select('id, transaction_date, is_reversed')
     .gte('transaction_date', from)
     .lte('transaction_date', to)
     .eq('is_reversed', false)
-  if (jeErr) throw new Error(`fetchTreasurySection JEs: ${jeErr.message}`)
+  if (jeErr) throw new Error(`cfo-reports treasury JEs: ${jeErr.message}`)
 
   const entryIds = (jes ?? []).map((j) => j.id as string)
-  if (entryIds.length === 0) {
-    return { interestIncome: 0, penaltyIncome: 0, interestExpense: 0, net: 0 }
-  }
+  if (entryIds.length === 0) return { interestIncome: 0, penaltyIncome: 0, interestExpense: 0 }
 
   const { data: lines, error: lErr } = await supabase
     .from('journal_lines')
-    .select('account_code, debit, credit')
+    .select('account_code, debit, credit, entry_id')
     .in('entry_id', entryIds)
     .in('account_code', ['4010', '4020', '5010'])
-  if (lErr) throw new Error(`fetchTreasurySection lines: ${lErr.message}`)
+  if (lErr) throw new Error(`cfo-reports treasury lines: ${lErr.message}`)
 
   let interestIncome = 0
   let penaltyIncome = 0
@@ -352,28 +478,43 @@ async function fetchTreasurySection(
     if (l.account_code === '4020') penaltyIncome += Number(l.credit ?? 0) - Number(l.debit ?? 0)
     if (l.account_code === '5010') interestExpense += Number(l.debit ?? 0) - Number(l.credit ?? 0)
   }
-  const net = interestIncome + penaltyIncome - interestExpense
-  return { interestIncome, penaltyIncome, interestExpense, net }
+  return { interestIncome, penaltyIncome, interestExpense }
+}
+
+async function gatherAll(
+  supabase: SupabaseClient,
+  args: { from: string; to: string },
+): Promise<ClassifyInput> {
+  const [pvSources, invoices, treasury] = await Promise.all([
+    gatherPvSources(supabase, args),
+    gatherInvoices(supabase, args),
+    gatherTreasury(supabase, args),
+  ])
+  return { pvSources, invoices, treasury }
+}
+
+export async function fetchIncomeStatement(
+  supabase: SupabaseClient,
+  args: { from: string; to: string },
+): Promise<IncomeStatement> {
+  const input = await gatherAll(supabase, args)
+  return classifyRows(input).income
+}
+
+export async function fetchCashflowStatement(
+  supabase: SupabaseClient,
+  args: { from: string; to: string },
+): Promise<CashflowStatement> {
+  const input = await gatherAll(supabase, args)
+  return classifyRows(input).cashflow
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Balance Sheet: per-segment snapshot
+// Balance Sheet — existing point-in-time snapshot, plus this-period capital
+// movements (asset/liability/equity PV source rows) grouped by pool.
+// The movement window is [startOfMonth(asOf) … asOf] — i.e. the current month
+// up to the as-of date — matching the month picker the report pages use.
 // ────────────────────────────────────────────────────────────────────────────
-
-export interface BalanceLine {
-  label: string
-  amount: number
-}
-
-export interface SegmentSnapshot {
-  segment: GlSegment | 'group'
-  assets: BalanceLine[]
-  liabilities: BalanceLine[]
-  equity: BalanceLine[]
-  totalAssets: number
-  totalLiabilities: number
-  totalEquity: number
-}
 
 export interface BalanceSheet {
   asOf: string
@@ -382,10 +523,10 @@ export interface BalanceSheet {
   loanReceivable: number
   fundSourcesPayable: number
   retainedEarnings: number
-  // Pre-computed group totals for the balance check
   totalAssets: number
   totalLiabilitiesEquity: number
   reconciles: boolean
+  movements: BalanceMovementLine[]
 }
 
 export async function fetchBalanceSheet(
@@ -410,12 +551,10 @@ export async function fetchBalanceSheet(
   const invoiceReceivable = (invoices ?? []).reduce((s, i) => s + Number(i.total_amount ?? 0), 0)
 
   // 3) Loans receivable — sum loan_outstanding view
-  const { data: loanOuts } = await supabase
-    .from('loan_outstanding')
-    .select('outstanding')
+  const { data: loanOuts } = await supabase.from('loan_outstanding').select('outstanding')
   const loanReceivable = (loanOuts ?? []).reduce((s, l) => s + Number(l.outstanding ?? 0), 0)
 
-  // 4) Fund sources payable — outstanding balances we owe to subs/directors/outsource
+  // 4) Fund sources payable — outstanding balances we owe
   const { data: fundSources } = await supabase
     .from('fund_sources')
     .select('amount, status')
@@ -431,6 +570,11 @@ export async function fetchBalanceSheet(
   const totalLiabilitiesEquity = fundSourcesPayable + retainedEarnings
   const reconciles = Math.abs(totalAssets - totalLiabilitiesEquity) < 1 // RM 1 tolerance
 
+  // 6) Capital cash movements this period (current month up to asOf).
+  const movFrom = startOfMonth(asOf)
+  const movInput = await gatherAll(supabase, { from: movFrom, to: asOf })
+  const movements = classifyRows(movInput).balanceMovements
+
   return {
     asOf,
     bank,
@@ -441,6 +585,7 @@ export async function fetchBalanceSheet(
     totalAssets,
     totalLiabilitiesEquity,
     reconciles,
+    movements,
   }
 }
 
