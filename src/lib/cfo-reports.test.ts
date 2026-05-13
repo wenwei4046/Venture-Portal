@@ -4,8 +4,8 @@ import type { RawPvSourceRow, RawInvoiceRow, RawTreasury } from './cfo-reports'
 
 const pv = (o: Partial<RawPvSourceRow>): RawPvSourceRow => ({
   voucherId: 'v1', voucherType: 'expense', direction: 'debit',
-  pool: 'dept_pool_marketing', categoryCode: 'logistics', categoryLabel: 'Logistics',
-  accountType: 'expense', amount: 100, ...o,
+  pool: 'dept_pool_marketing', accountCode: '9100', accountName: 'Logistics',
+  accountType: 'expense', cashFlowCategory: 'operating', amount: 100, ...o,
 })
 const noTreasury: RawTreasury = { interestIncome: 0, penaltyIncome: 0, interestExpense: 0 }
 
@@ -13,8 +13,8 @@ describe('classifyRows', () => {
   it('routes revenue & expense rows into the P&L, by pool', () => {
     const out = classifyRows({
       pvSources: [
-        pv({ accountType: 'expense', direction: 'debit', amount: 300, pool: 'dept_pool_marketing', categoryLabel: 'Logistics' }),
-        pv({ accountType: 'revenue', direction: 'credit', amount: 1000, pool: 'dept_pool_marketing', categoryLabel: 'Service revenue', voucherType: 'other' }),
+        pv({ accountType: 'expense', direction: 'debit', amount: 300, pool: 'dept_pool_marketing', accountName: 'Logistics' }),
+        pv({ accountType: 'revenue', direction: 'credit', amount: 1000, pool: 'dept_pool_marketing', accountName: 'Service revenue', voucherType: 'other' }),
       ],
       invoices: [], treasury: noTreasury,
     })
@@ -28,16 +28,17 @@ describe('classifyRows', () => {
   it('does NOT put asset/liability/equity rows into the P&L (loan disbursement is BS only)', () => {
     const out = classifyRows({
       pvSources: [
-        pv({ accountType: 'asset', direction: 'debit', amount: 50000, voucherType: 'loan_disbursement', categoryLabel: 'Amount due from / (to) - 2990', pool: 'venture_pool' }),
+        pv({ accountType: 'asset', cashFlowCategory: 'investing', direction: 'debit', amount: 50000, voucherType: 'loan_disbursement', accountName: 'Loans Receivable — 2990', pool: 'venture_pool' }),
       ],
       invoices: [], treasury: noTreasury,
     })
     expect(out.income.groupNetProfit).toBe(0)
     expect(out.income.pools.find((p) => p.pool === 'venture_pool')?.expense ?? 0).toBe(0)
-    // it shows up as a capital outflow in cash flow
-    const vp = out.cashflow.pools.find((p) => p.pool === 'venture_pool')!
-    expect(vp.outflow.capital.reduce((s, l) => s + l.amount, 0)).toBe(50000)
-    // and as a balance-sheet movement (negative = asset acquired via cash out... here -amount)
+    // it shows up as an INVESTING cash outflow
+    const inv = out.cashflow.sections.find((s) => s.category === 'investing')!
+    const vpInv = inv.pools.find((p) => p.pool === 'venture_pool')!
+    expect(vpInv.outflowLines.reduce((s, l) => s + l.amount, 0)).toBe(50000)
+    // and as a balance-sheet movement (negative = asset acquired via cash out)
     expect(out.balanceMovements.find((m) => m.label.includes('2990'))?.amount).toBe(-50000)
   })
 
@@ -78,10 +79,15 @@ describe('classifyRows', () => {
 
   it('produces no "Uncategorised" lines — every line carries a real label', () => {
     const out = classifyRows({
-      pvSources: [pv({ categoryLabel: 'Office Rental', accountType: 'expense' })],
+      pvSources: [pv({ accountName: 'Office Rental', accountType: 'expense' })],
       invoices: [], treasury: noTreasury,
     })
-    const allLabels = out.income.pools.flatMap((p) => [...p.revenueLines, ...p.expenseLines].map((l) => l.label))
+    const allLabels = out.income.pools.flatMap((p) => [
+      ...p.revenueLines,
+      ...p.costLines,
+      ...p.otherIncomeLines,
+      ...p.expenseLines,
+    ].map((l) => l.label))
     expect(allLabels).not.toContain('Uncategorised')
     expect(allLabels).toContain('Office Rental')
   })
@@ -92,7 +98,7 @@ describe('classifyRows', () => {
     // P&L revenue (would double-count); it should appear only as cash inflow + BS AR drop.
     const out = classifyRows({
       pvSources: [
-        pv({ voucherType: 'billing_payment', direction: 'credit', accountType: 'revenue', amount: 10000, pool: 'venture_pool', categoryLabel: 'Revenue (paid)' }),
+        pv({ voucherType: 'billing_payment', direction: 'credit', accountType: 'revenue', amount: 10000, pool: 'venture_pool', accountName: 'Revenue (paid)' }),
       ],
       invoices: [
         { invoiceNo: 'INV-1', companyShortCode: 'CAR', pool: 'venture_pool', amount: 10000 },
@@ -103,13 +109,11 @@ describe('classifyRows', () => {
     // Revenue is RM 10,000 (from invoice), NOT RM 20,000.
     expect(vpIncome.revenue).toBeCloseTo(10000, 2)
     expect(out.income.groupNetProfit).toBeCloseTo(10000, 2)
-    // The billing_payment shows as OPERATING cash inflow (revenue, not fundIn)
-    // + BS AR-down (-amount). It does NOT also flow through inRevenue from the
-    // invoice — only the billing_payment puts cash into the Cash Flow.
-    const vpCash = out.cashflow.pools.find((p) => p.pool === 'venture_pool')!
-    expect(vpCash.inflow.revenue.reduce((s, l) => s + l.amount, 0)).toBe(10000)
-    expect(vpCash.inflow.fundIn.reduce((s, l) => s + l.amount, 0)).toBe(0)
-    // Cash flow netChange = +10,000 (matches actual bank delta, not RM 20,000)
+    // The billing_payment shows as OPERATING cash inflow + BS AR-down.
+    const opSection = out.cashflow.sections.find((s) => s.category === 'operating')!
+    const vpCash = opSection.pools.find((p) => p.pool === 'venture_pool')!
+    expect(vpCash.inflowLines.reduce((s, l) => s + l.amount, 0)).toBe(10000)
+    expect(vpCash.outflowLines.reduce((s, l) => s + l.amount, 0)).toBe(0)
     expect(vpCash.net).toBeCloseTo(10000, 2)
     expect(out.cashflow.netChange).toBeCloseTo(10000, 2)
     expect(out.balanceMovements.find((m) => m.label === 'Revenue (paid)')?.amount).toBe(-10000)
@@ -119,8 +123,8 @@ describe('classifyRows', () => {
     const out = classifyRows({
       pvSources: [
         // Hypothetical: a loan_repayment voucher with two source rows — principal (asset, BS) + interest (revenue).
-        pv({ voucherType: 'loan_repayment', direction: 'credit', accountType: 'asset', amount: 10000, pool: 'venture_pool', categoryLabel: 'Loan principal received' }),
-        pv({ voucherType: 'loan_repayment', direction: 'credit', accountType: 'revenue', amount: 200, pool: 'venture_pool', categoryLabel: 'Interest income (PV-side)' }),
+        pv({ voucherType: 'loan_repayment', direction: 'credit', accountType: 'asset', cashFlowCategory: 'investing', amount: 10000, pool: 'venture_pool', accountName: 'Loan principal received' }),
+        pv({ voucherType: 'loan_repayment', direction: 'credit', accountType: 'revenue', cashFlowCategory: 'operating', amount: 200, pool: 'venture_pool', accountName: 'Interest income (PV-side)' }),
       ],
       invoices: [],
       treasury: { interestIncome: 200, penaltyIncome: 0, interestExpense: 0 },
@@ -128,7 +132,7 @@ describe('classifyRows', () => {
     const vp = out.income.pools.find((p) => p.pool === 'venture_pool')!
     // Revenue is 200 (from treasury), NOT 400. The PV revenue source is skipped.
     expect(vp.revenue).toBeCloseTo(200, 2)
-    // The principal row appears as BS movement + cash fundIn
+    // The principal row appears as BS movement + investing cash inflow
     expect(out.balanceMovements.find((m) => m.label === 'Loan principal received')?.amount).toBe(10000)
   })
 
@@ -139,8 +143,9 @@ describe('classifyRows', () => {
       repaymentPrincipalInflows: [],
     })
     expect(out.income.groupNetProfit).toBe(0)
-    const vp = out.cashflow.pools.find((p) => p.pool === 'venture_pool')!
-    expect(vp.inflow.fundIn.reduce((s, l) => s + l.amount, 0)).toBe(100000)
+    const fin = out.cashflow.sections.find((s) => s.category === 'financing')!
+    const vp = fin.pools.find((p) => p.pool === 'venture_pool')!
+    expect(vp.inflowLines.reduce((s, l) => s + l.amount, 0)).toBe(100000)
     expect(out.balanceMovements.find((m) => m.label.includes('CONTS'))?.amount).toBe(100000)
   })
 
@@ -151,8 +156,70 @@ describe('classifyRows', () => {
       repaymentPrincipalInflows: [{ repaymentId: 'r1', pool: 'venture_pool', label: 'Loan principal — HOOKA', amount: 30000 }],
     })
     expect(out.income.groupNetProfit).toBe(0)
-    const vp = out.cashflow.pools.find((p) => p.pool === 'venture_pool')!
-    expect(vp.inflow.fundIn.reduce((s, l) => s + l.amount, 0)).toBe(30000)
+    const inv = out.cashflow.sections.find((s) => s.category === 'investing')!
+    const vp = inv.pools.find((p) => p.pool === 'venture_pool')!
+    expect(vp.inflowLines.reduce((s, l) => s + l.amount, 0)).toBe(30000)
     expect(out.balanceMovements.find((m) => m.label.includes('HOOKA'))?.amount).toBe(-30000)  // reduces Loans Receivable
+  })
+
+  // ── New tests added in Task 7 (unified COA) ──
+
+  it('routes cost rows into the P&L cost section', () => {
+    const out = classifyRows({
+      pvSources: [
+        pv({ accountType: 'cost', direction: 'debit', amount: 3000, pool: 'venture_pool', accountName: 'Cost of services' }),
+      ],
+      invoices: [], treasury: noTreasury,
+    })
+    const vp = out.income.pools.find((p) => p.pool === 'venture_pool')!
+    expect(vp.cost).toBe(3000)
+    expect(vp.grossProfit).toBe(-3000)  // no revenue yet
+  })
+
+  it('routes other_income rows into the P&L other income section', () => {
+    const out = classifyRows({
+      pvSources: [
+        pv({ accountType: 'other_income', direction: 'credit', amount: 200, pool: 'venture_pool', accountName: 'Penalty income', voucherType: 'other' }),
+      ],
+      invoices: [], treasury: noTreasury,
+    })
+    const vp = out.income.pools.find((p) => p.pool === 'venture_pool')!
+    expect(vp.otherIncome).toBe(200)
+    expect(vp.margin).toBe(200)
+  })
+
+  it('groups CFS lines into operating / investing / financing by cashFlowCategory', () => {
+    const out = classifyRows({
+      pvSources: [
+        // Loans Receivable: cash flow category = investing
+        pv({ accountType: 'asset', cashFlowCategory: 'investing', direction: 'debit', amount: 50000, pool: 'venture_pool', accountName: 'Loans Receivable', voucherType: 'other' }),
+        // Operating expense
+        pv({ accountType: 'expense', cashFlowCategory: 'operating', direction: 'debit', amount: 500, pool: 'venture_pool', accountName: 'Postage' }),
+        // Financing: liability inflow (e.g. director loan)
+        pv({ accountType: 'liability', cashFlowCategory: 'financing', direction: 'credit', amount: 100000, pool: 'venture_pool', accountName: 'Director loan', voucherType: 'other' }),
+      ],
+      invoices: [], treasury: noTreasury,
+    })
+    const sections = out.cashflow.sections
+    expect(sections.find((s) => s.category === 'investing')!.net).toBe(-50000)
+    expect(sections.find((s) => s.category === 'operating')!.net).toBe(-500)
+    expect(sections.find((s) => s.category === 'financing')!.net).toBe(100000)
+    expect(out.cashflow.netChange).toBe(100000 - 50000 - 500)
+  })
+
+  it('Gross Profit = revenue - cost for each pool', () => {
+    const out = classifyRows({
+      pvSources: [
+        pv({ accountType: 'cost', direction: 'debit', amount: 3000, pool: 'dept_pool_marketing', accountName: 'Cost' }),
+      ],
+      invoices: [
+        { invoiceNo: 'INV-1', companyShortCode: 'CAR', pool: 'dept_pool_marketing', amount: 10000 },
+      ],
+      treasury: noTreasury,
+    })
+    const mk = out.income.pools.find((p) => p.pool === 'dept_pool_marketing')!
+    expect(mk.revenue).toBe(10000)
+    expect(mk.cost).toBe(3000)
+    expect(mk.grossProfit).toBe(7000)
   })
 })
