@@ -9,15 +9,22 @@ import { assertPeriodOpen } from '@/lib/period-lock'
 import { postJournalEntry } from '@/lib/journal'
 
 // Mig 200/P1-6a: invoice billing_mode → revenue GL code mapping.
-function revenueGlCode(billingMode: string | null): string {
-  return billingMode === 'marketing_project' ? '4040' : '4030'
+// Mig 238 reseed: revenue lives in the 5000-5999 range; 4030 / 4040 are now
+// liability accounts (Statutory Payable / Director Invoice Payable). The
+// b348724 GL-remap pass missed this fallback, so invoices issued without an
+// explicit revenue category_code were silently crediting liabilities and
+// inflating the balance sheet by their amount. Until per-billing-mode
+// revenue sub-accounts exist, every fallback routes to Service Revenue — Subs
+// (5000), the sole revenue account seeded in mig 238.
+function revenueGlCode(_billingMode: string | null): string {
+  return '5000'
 }
 
 // Note: invoices.category_code (added by mig 230) keeps its column name; only
 // payment_voucher_sources.category_code was renamed by mig 238. Values stored
 // here are chart_of_accounts.code post-unified-COA — the COA IS the GL now,
 // so if the invoice declares a revenue account directly we credit that code;
-// otherwise fall back to the billing_mode → 4030 / 4040 mapping.
+// otherwise fall back to revenueGlCode (Service Revenue — Subs 5000).
 async function resolveRevenueGlCode(
   supabase: Awaited<ReturnType<typeof createClient>>,
   categoryCode: string | null,
