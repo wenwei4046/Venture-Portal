@@ -108,14 +108,16 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
           </table>
         </section>
 
-        {/* Equity */}
+        {/* Equity — real share capital + retained earnings only. Internal
+            pool sub-ledgers (mig 248: is_internal_fund=true) get their own
+            section below. */}
         <section>
           <h2 className="font-serif text-xl text-ink mb-4">Equity</h2>
           <table className="ledger-table">
             <tbody>
               {Math.abs(bs.equityBalances) > 0.005 ? (
                 <tr>
-                  <td>Pool / equity balances</td>
+                  <td>Share capital / paid-in equity</td>
                   <td className={`num ${bs.equityBalances >= 0 ? '' : 'text-danger'}`}>
                     {formatMoney(bs.equityBalances)}
                   </td>
@@ -139,6 +141,48 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
           </table>
         </section>
 
+        {/* Internal Funds — operational pool sub-ledgers (HV Operating Fund,
+            Director Saving Fund, the 5 dept pools, Invoice Payout Pool). Live
+            in the equity range of the GL but are management-accounting
+            buckets, not real shareholder capital. Mig 248 flag drives this
+            split. */}
+        {bs.internalFundLines.length > 0 ? (
+          <section>
+            <h2 className="font-serif text-xl text-ink mb-1">Internal Funds</h2>
+            <p className="font-serif italic text-muted text-xs mb-4 max-w-2xl">
+              Operational pool sub-ledgers carried in the equity range of the
+              GL. Not real shareholder capital — these are HV&apos;s internal
+              earmarks of its own retained funds (department allocations,
+              director savings, invoice payout buffer).
+            </p>
+            <table className="ledger-table">
+              <tbody>
+                {bs.internalFundLines.map((l) => (
+                  <tr key={l.code}>
+                    <td>
+                      <span className="font-mono text-[11px] text-graphite mr-2">{l.code}</span>
+                      {l.name}
+                    </td>
+                    <td className={`num ${l.balance >= 0 ? '' : 'text-danger'}`}>
+                      {formatMoney(l.balance)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-hairline">
+                  <td className="font-serif italic text-ink font-medium">Total internal funds</td>
+                  <td
+                    className={`num font-semibold ${bs.internalFundsTotal >= 0 ? '' : 'text-danger'}`}
+                  >
+                    {formatMoney(bs.internalFundsTotal)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </section>
+        ) : null}
+
         {/* Reconciliation */}
         <div className="border border-hairline rounded-md bg-surface p-5">
           <h3 className="font-sans text-xs uppercase tracking-wide text-ledger font-semibold mb-3">
@@ -150,7 +194,7 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
               <span className="num">{formatMoney(bs.totalAssets)}</span>
             </div>
             <div className="flex items-baseline justify-between">
-              <span className="font-serif text-graphite">Total liabilities + equity</span>
+              <span className="font-serif text-graphite">Total liabilities + equity + internal funds</span>
               <span className="num">{formatMoney(bs.totalLiabilitiesEquity)}</span>
             </div>
             <div className="flex items-baseline justify-between pt-2 border-t border-hairline">

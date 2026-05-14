@@ -845,6 +845,12 @@ export async function fetchCashflowStatement(
 // journal_lines aggregation.
 // ────────────────────────────────────────────────────────────────────────────
 
+export interface InternalFundLine {
+  code: string
+  name: string
+  balance: number
+}
+
 export interface BalanceSheet {
   asOf: string
   bank: number
@@ -853,7 +859,13 @@ export interface BalanceSheet {
   fixedAssets: number
   otherAssets: number // residual non-named asset-type accounts
   fundSourcesPayable: number // total liabilities (all liability-type COA)
-  equityBalances: number // permanent equity-type COA (excl. retained earnings)
+  // Mig 248: split equity into "real" (share capital, retained earnings) vs
+  // "internal funds" (pool sub-ledgers living in the equity range). Math
+  // unchanged — internalFundsTotal + equityBalances + retainedEarnings is
+  // the same number as the old equityBalances + retainedEarnings.
+  equityBalances: number // equity-type COA where is_internal_fund=false (excl. retained earnings YTD)
+  internalFundLines: InternalFundLine[] // per-account breakdown of is_internal_fund=true rows
+  internalFundsTotal: number // sum of internalFundLines.balance
   retainedEarnings: number // YTD net income from the income statement
   totalAssets: number
   totalLiabilitiesEquity: number
@@ -901,9 +913,11 @@ export async function fetchBalanceSheet(
 
   // ── 2: Chart of accounts grouped by type. Source of truth for the
   //    Total Assets / Total Liab / Total Equity sums (double-entry).
+  //    Mig 248 added is_internal_fund so equity rows can be split into
+  //    "real equity" vs internal pool sub-ledgers on the BS.
   const { data: coaRows } = await supabase
     .from('chart_of_accounts')
-    .select('code, type')
+    .select('code, name, type, is_internal_fund')
   const codesByType: Record<AccountType, string[]> = {
     equity: [],
     fixed_asset: [],
@@ -914,10 +928,20 @@ export async function fetchBalanceSheet(
     other_income: [],
     expense: [],
   }
+  const internalFundAccounts: Array<{ code: string; name: string }> = []
+  const realEquityCodes: string[] = []
   for (const r of coaRows ?? []) {
     const code = r.code as string
+    const name = (r.name as string) ?? code
     const t = r.type as AccountType
     if (code && t in codesByType) codesByType[t].push(code)
+    if (t === 'equity') {
+      if ((r as { is_internal_fund: boolean }).is_internal_fund) {
+        internalFundAccounts.push({ code, name })
+      } else {
+        realEquityCodes.push(code)
+      }
+    }
   }
 
   // ── 3: Bank cash — sum the GL codes of active bank_accounts.
@@ -967,10 +991,22 @@ export async function fetchBalanceSheet(
   )
 
   // ── 8: Permanent equity balances (excl. retained earnings YTD).
+  // Mig 248 split: equityBalances = real equity only; internal-fund rows are
+  // listed individually so the BS UI can render them in a separate section.
   const equityBalances = await sumGlNetAcrossCodes(
     supabase,
-    { jeIds, codes: codesByType.equity, sign: 'cr-dr' },
+    { jeIds, codes: realEquityCodes, sign: 'cr-dr' },
   )
+  const internalFundLines: InternalFundLine[] = []
+  for (const acc of internalFundAccounts) {
+    const balance = await sumGlNetAcrossCodes(
+      supabase,
+      { jeIds, codes: [acc.code], sign: 'cr-dr' },
+    )
+    internalFundLines.push({ code: acc.code, name: acc.name, balance })
+  }
+  internalFundLines.sort((a, b) => a.code.localeCompare(b.code))
+  const internalFundsTotal = internalFundLines.reduce((s, l) => s + l.balance, 0)
 
   // ── 9: Retained earnings YTD — net profit from start-of-fiscal-year to asOf.
   const fiscalFrom = dayjs(asOf).startOf('year').format('YYYY-MM-DD')
@@ -978,7 +1014,10 @@ export async function fetchBalanceSheet(
   const retainedEarnings = ytd.groupNetProfit
 
   // ── 10: Balance check via the fundamental accounting equation.
-  const totalLiabilitiesEquity = fundSourcesPayable + equityBalances + retainedEarnings
+  // Internal funds are still on the right-hand side (they're equity-typed
+  // accounts in the GL); the split is purely a rendering concern.
+  const totalLiabilitiesEquity =
+    fundSourcesPayable + equityBalances + internalFundsTotal + retainedEarnings
   const reconciles = Math.abs(totalAssets - totalLiabilitiesEquity) < 1 // RM 1 tolerance
 
   // ── 11: Capital cash movements this period (current month up to asOf).
@@ -995,6 +1034,8 @@ export async function fetchBalanceSheet(
     otherAssets,
     fundSourcesPayable,
     equityBalances,
+    internalFundLines,
+    internalFundsTotal,
     retainedEarnings,
     totalAssets,
     totalLiabilitiesEquity,
