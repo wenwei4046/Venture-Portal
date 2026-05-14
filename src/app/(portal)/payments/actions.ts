@@ -68,12 +68,19 @@ export async function createPaymentVoucher(formData: FormData) {
   if (isNaN(amount) || amount <= 0) throw new Error('Amount must be greater than 0')
   if (!payeeName) throw new Error('Payee name is required (select a company or enter manually)')
   if (!description) throw new Error('Description is required')
-  // Mig 242: every debit voucher must declare the bank it draws from, so the
-  // approval RPC's insufficient-funds guard fires and bank_accounts.
-  // current_balance stays in sync with the bank GL. Mirrored by the
-  // debit_voucher_requires_bank CHECK constraint on payment_vouchers.
-  if (direction === 'debit' && !bankAccountId) {
-    throw new Error('Bank account is required for debit (outgoing) vouchers')
+  // Mig 242/251: every voucher that actually moves money must declare the
+  // bank it touches, so the approval RPC's cache-update block fires and
+  // bank_accounts.current_balance stays in sync with the bank GL. Without
+  // this guard, six paid billing_payment credit vouchers slipped through
+  // earlier and built a 33,500 cache-vs-GL drift on Hong Leong before the
+  // audit caught it. Netting transactions are the only legitimate case
+  // where bank stays NULL — no real money moves.
+  if (paymentMethod !== 'netting' && !bankAccountId) {
+    throw new Error(
+      direction === 'debit'
+        ? 'Bank account is required for debit (outgoing) vouchers'
+        : 'Bank account is required (which account is receiving the money?)',
+    )
   }
   if (voucherType === 'billing_payment' && !invoiceId) {
     throw new Error('Billing payment requires a linked invoice')

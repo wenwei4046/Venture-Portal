@@ -97,6 +97,7 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
   const isInvoicePay = !!invoicePreset
   const isNonBillable = !!nonBillablePreset && !isInvoicePay
   const [direction, setDirection] = useState<'debit' | 'credit'>(isInvoicePay ? 'credit' : 'debit')
+  const [paymentMethod, setPaymentMethod] = useState<string>('bank_transfer')
   const [accountCode, setAccountCode] = useState('')
   const [sourceRows, setSourceRows] = useState<SourceRow[]>(
     isNonBillable
@@ -402,10 +403,12 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
         <div>
           <label htmlFor="bank_account_id" className="block text-sm font-sans font-medium text-graphite mb-1.5">
             {direction === 'debit' ? 'Pay from account' : 'Receive into account'}
+            {paymentMethod !== 'netting' ? <span className="text-danger"> *</span> : null}
           </label>
           <select
             id="bank_account_id"
             name="bank_account_id"
+            required={paymentMethod !== 'netting'}
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
           >
             <option value="">Select bank account…</option>
@@ -415,6 +418,11 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
               </option>
             ))}
           </select>
+          {paymentMethod === 'netting' ? (
+            <p className="font-serif italic text-muted text-xs mt-1.5">
+              Netting voucher — no real money moves, so bank is optional.
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -425,6 +433,8 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
         </label>
         <select
           name="payment_method"
+          value={paymentMethod}
+          onChange={(e) => setPaymentMethod(e.target.value)}
           className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border max-w-xs"
         >
           {PAYMENT_METHODS.map((m) => (
