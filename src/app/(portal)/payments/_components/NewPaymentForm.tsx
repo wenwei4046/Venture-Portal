@@ -718,6 +718,30 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
           )}
           <input type="hidden" name="target_pool" value="" />
         </div>
+      ) : isInvoicePay ? (
+        // Settling an invoice: pool is fixed by the invoice's billing_mode
+        // (poolForBillingMode in payments/new/page.tsx). Render as
+        // read-only so Finance can see it but can't accidentally divert
+        // the payment to the wrong pool. The hidden input still submits
+        // the correct value so the server action receives target_pool.
+        <div className="mb-6">
+          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+            Receive into pool
+          </label>
+          <div className="px-3 py-2 bg-surface border border-hairline rounded-md text-sm text-ink font-serif italic flex items-center gap-2">
+            <span>{POOL_OPTIONS.find((p) => p.value === targetPool)?.label ?? targetPool}</span>
+            <span className="font-mono text-[10px] uppercase tracking-wider text-graphite border border-hairline rounded px-1.5 py-0.5 not-italic">
+              from invoice
+            </span>
+          </div>
+          <p className="font-serif italic text-muted text-xs mt-1.5">
+            Auto-set from the invoice&apos;s billing mode. To land the
+            payment in a different pool, void this voucher and re-issue the
+            invoice under the correct billing mode.
+          </p>
+          <input type="hidden" name="target_pool" value={targetPool} />
+          <input type="hidden" name="source_pool" value="" />
+        </div>
       ) : (
         <div className="mb-6">
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
