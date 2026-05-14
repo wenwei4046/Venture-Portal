@@ -28,12 +28,14 @@ export interface BsAccountOption {
   code: string
   name: string
   account_type: string
+  parent_code: string | null
 }
 
 export interface RawAccountRow {
   code: string
   name: string
   account_type: string
+  parent_code: string | null
   is_active: boolean
 }
 
@@ -43,7 +45,7 @@ export interface RawAccountRow {
 export function bsAccountsForDisbursement(rows: RawAccountRow[]): BsAccountOption[] {
   return rows
     .filter((r) => r.is_active && ALLOWED_TYPES.includes(r.account_type as LoanDisbursementAccountType))
-    .map((r) => ({ code: r.code, name: r.name, account_type: r.account_type }))
+    .map((r) => ({ code: r.code, name: r.name, account_type: r.account_type, parent_code: r.parent_code }))
 }
 
 // Server-side validation: the chosen account must exist in the supplied list

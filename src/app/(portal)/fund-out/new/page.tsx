@@ -26,7 +26,7 @@ export default async function NewLoanPage() {
       .maybeSingle(),
     supabase
       .from('chart_of_accounts')
-      .select('code, name, type, is_active')
+      .select('code, name, type, parent_code, is_active')
       .eq('is_active', true)
       .order('type')
       .order('code'),
@@ -38,6 +38,7 @@ export default async function NewLoanPage() {
       code: r.code,
       name: r.name,
       account_type: r.type as string,
+      parent_code: (r as { parent_code: string | null }).parent_code ?? null,
       is_active: r.is_active,
     })),
   )

@@ -4,6 +4,7 @@ import { useState, useTransition, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { createPaymentVoucher } from '../actions'
 import { ACCOUNT_TYPES, typeLabel, type AccountType } from '@/lib/coa'
+import AccountPicker from '@/components/AccountPicker'
 
 interface InvoicePreset {
   id: string
@@ -40,6 +41,7 @@ interface Account {
   code: string
   name: string
   type: AccountType
+  parent_code: string | null
   is_active: boolean
 }
 
@@ -578,31 +580,20 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
                     <option key={p.value} value={p.value}>{p.label}</option>
                   ))}
                 </select>
-                <select
-                  value={row.account_code}
-                  onChange={(e) => {
-                    const next = [...sourceRows]
-                    next[i] = { ...next[i], account_code: e.target.value }
-                    setSourceRows(next)
-                  }}
-                  required
-                  className="flex-1 px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border disabled:opacity-60"
-                >
-                  <option value="">
-                    {accountList.length === 0 ? 'No accounts — create one' : 'Select account…'}
-                  </option>
-                  {ACCOUNT_TYPES.map((t) => {
-                    const group = accountList.filter((a) => a.type === t)
-                    if (group.length === 0) return null
-                    return (
-                      <optgroup key={t} label={typeLabel(t)}>
-                        {group.map((a) => (
-                          <option key={a.code} value={a.code}>{a.code} · {a.name}</option>
-                        ))}
-                      </optgroup>
-                    )
-                  })}
-                </select>
+                <div className="flex-1">
+                  <AccountPicker
+                    accounts={accountList}
+                    value={row.account_code}
+                    onChange={(code) => {
+                      const next = [...sourceRows]
+                      next[i] = { ...next[i], account_code: code }
+                      setSourceRows(next)
+                    }}
+                    name={`source_rows[${i}][account_code_display]`}
+                    placeholder={accountList.length === 0 ? 'No accounts — create one' : 'Select account…'}
+                    required
+                  />
+                </div>
                 <div className="relative w-40">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted font-mono">RM</span>
                   <input
@@ -776,26 +767,14 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
               No accounts yet — create one in Settings to start.
             </p>
           ) : (
-            <select
-              name="account_code"
-              required
+            <AccountPicker
+              accounts={accountList}
               value={accountCode}
-              onChange={(e) => setAccountCode(e.target.value)}
-              className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-            >
-              <option value="">Select account…</option>
-              {ACCOUNT_TYPES.map((t) => {
-                const group = accountList.filter((a) => a.type === t)
-                if (group.length === 0) return null
-                return (
-                  <optgroup key={t} label={typeLabel(t)}>
-                    {group.map((a) => (
-                      <option key={a.code} value={a.code}>{a.code} · {a.name}</option>
-                    ))}
-                  </optgroup>
-                )
-              })}
-            </select>
+              onChange={setAccountCode}
+              name="account_code"
+              placeholder="Select account…"
+              required
+            />
           )
         ) : (
           <p className="font-serif italic text-muted text-xs">

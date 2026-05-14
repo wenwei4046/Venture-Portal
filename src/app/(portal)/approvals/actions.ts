@@ -179,7 +179,7 @@ export async function approveRequest(formData: FormData) {
     // (expense_out) so the dept pool balance reflects the transfer to HV.
     const { data: fundSource, error: fsFetchError } = await supabase
       .from('fund_sources')
-      .select('id, amount, source_type, from_company_id, from_director_id, from_department_id, effective_date')
+      .select('id, amount, source_type, from_company_id, from_director_id, from_department_id, effective_date, account_code')
       .eq('id', approval.reference_id)
       .eq('status', 'pending_approval')
       .single()
@@ -272,10 +272,15 @@ export async function approveRequest(formData: FormData) {
         .eq('id', primaryBank.id)
     }
 
-    // Mig 197/P0-3: post fund source activation JE (dr Bank / cr 2010 Fund Sources Payable).
+    // Mig 197/P0-3: post fund source activation JE (dr Bank / cr Fund Sources Payable).
+    // Mig 247: credit leg uses fundSource.account_code if Finance picked a specific
+    // sub-account (e.g. "4001 — Lim Wei Siang"); falls back to the umbrella 4000
+    // for legacy / unpicked rows. The trigger in mig 246 already enforces that
+    // account_code, if set, is not a header.
     // Skip for department_pool source_type because the dept transfer JE above already
     // covers that flow (dept→HV is an equity reclass, not a new liability).
     if (fundSource.source_type !== 'department_pool') {
+      const liabilityCode = fundSource.account_code ?? '4000'
       await postJournalEntry(supabase, {
         transactionDate: fundSource.effective_date ?? new Date().toISOString().slice(0, 10),
         description: approval.description ?? `Fund source activated — ${fundSource.source_type}`,
@@ -284,7 +289,7 @@ export async function approveRequest(formData: FormData) {
         createdBy: user.id,
         lines: [
           { accountCode: primaryBank?.gl_account_code ?? '3000', debit: Number(fundSource.amount), description: 'Bank — fund source received' },
-          { accountCode: '4000', credit: Number(fundSource.amount), description: `Fund source payable — ${fundSource.source_type}` },
+          { accountCode: liabilityCode, credit: Number(fundSource.amount), description: `Fund source payable — ${fundSource.source_type}` },
         ],
       })
     }

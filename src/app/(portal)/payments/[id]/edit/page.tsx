@@ -52,7 +52,7 @@ export default async function EditPaymentPage({ params }: Props) {
     supabase.from('bank_accounts').select('id, bank_name, account_number, current_balance').eq('status', 'active').order('is_primary', { ascending: false }),
     // Post-mig 238: chart_of_accounts IS the GL. Pull every active account
     // for the source-row picker; downstream the form filters as needed.
-    supabase.from('chart_of_accounts').select('code, name, type').eq('is_active', true).order('code'),
+    supabase.from('chart_of_accounts').select('code, name, type, parent_code').eq('is_active', true).order('code'),
   ])
 
   const sourceRows: SourceRow[] = (sources ?? []).map((s) => ({
@@ -114,6 +114,7 @@ export default async function EditPaymentPage({ params }: Props) {
           code: g.code,
           name: g.name,
           type: g.type as AccountType,
+          parent_code: (g as { parent_code: string | null }).parent_code ?? null,
         }))}
       />
     </div>

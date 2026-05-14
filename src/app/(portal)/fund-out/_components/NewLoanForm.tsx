@@ -5,18 +5,13 @@ import Link from 'next/link'
 import { createLoan } from '../actions'
 import type { Company } from '@/types'
 import type { BsAccountOption } from '@/lib/loan-disbursement'
+import AccountPicker from '@/components/AccountPicker'
+import type { AccountType } from '@/lib/coa'
 
 interface Props {
   companies: Company[]
   baseRate: { rate: number; quarter: string }
   bsAccounts: BsAccountOption[]
-}
-
-const ACCOUNT_TYPE_LABEL: Record<string, string> = {
-  asset:        'BS · Asset',
-  fixed_asset:  'BS · Fixed Asset',
-  liability:    'BS · Liability',
-  equity:       'BS · Equity',
 }
 
 export default function NewLoanForm({ companies, baseRate, bsAccounts }: Props) {
@@ -27,6 +22,7 @@ export default function NewLoanForm({ companies, baseRate, bsAccounts }: Props) 
   const [startDate, setStartDate] = useState<string>(
     () => new Date().toISOString().slice(0, 10)
   )
+  const [disbursementAccountCode, setDisbursementAccountCode] = useState<string>('')
   const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
@@ -235,22 +231,21 @@ export default function NewLoanForm({ companies, baseRate, bsAccounts }: Props) 
         >
           Disbursement account <span className="text-danger">*</span>
         </label>
-        <select
-          id="disbursement_account_code"
+        <AccountPicker
+          accounts={bsAccounts.map((a) => ({
+            code: a.code,
+            name: a.name,
+            type: a.account_type as AccountType,
+            parent_code: a.parent_code,
+            is_active: true,
+          }))}
+          value={disbursementAccountCode}
+          onChange={setDisbursementAccountCode}
           name="disbursement_account_code"
+          typeFilter={['asset', 'fixed_asset', 'liability', 'equity']}
+          placeholder="Select a balance-sheet account…"
           required
-          defaultValue=""
-          className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-        >
-          <option value="" disabled>
-            Select a balance-sheet account…
-          </option>
-          {bsAccounts.map((a) => (
-            <option key={a.code} value={a.code}>
-              {a.code} · {a.name} ({ACCOUNT_TYPE_LABEL[a.account_type] ?? a.account_type})
-            </option>
-          ))}
-        </select>
+        />
         <p className="font-serif italic text-muted text-xs mt-1.5">
           Used to classify the disbursement on the Balance Sheet — pick the
           receivable / asset account for the borrowing party.

@@ -43,7 +43,7 @@ export default async function NewPaymentPage({ searchParams }: Props) {
     supabase.from('bank_accounts').select('id, bank_name, account_number, current_balance').eq('status', 'active').order('is_primary', { ascending: false }),
     supabase
       .from('chart_of_accounts')
-      .select('code, name, type, is_active')
+      .select('code, name, type, parent_code, is_active')
       .eq('is_active', true)
       .order('type')
       .order('sort_order')
@@ -120,6 +120,7 @@ export default async function NewPaymentPage({ searchParams }: Props) {
           code: a.code,
           name: a.name,
           type: a.type as AccountType,
+          parent_code: (a as { parent_code: string | null }).parent_code ?? null,
           is_active: a.is_active,
         }))}
         invoicePreset={invoicePreset}

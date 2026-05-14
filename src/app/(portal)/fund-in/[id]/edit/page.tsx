@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import type { AccountType } from '@/lib/coa'
+import type { AccountOption } from '@/components/AccountPicker'
 import EditFundSourceForm from './_components/EditFundSourceForm'
 
 interface Props {
@@ -13,13 +15,25 @@ export default async function EditFundSourcePage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
 
-  const { data: source, error } = await supabase
-    .from('fund_sources')
-    .select('*')
-    .eq('id', id)
-    .single()
+  const [{ data: source, error }, { data: acctRows }] = await Promise.all([
+    supabase.from('fund_sources').select('*').eq('id', id).single(),
+    supabase
+      .from('chart_of_accounts')
+      .select('code, name, type, parent_code, is_active')
+      .eq('is_active', true)
+      .in('type', ['liability', 'equity'])
+      .order('code'),
+  ])
 
   if (error || !source) notFound()
+
+  const liabilityAccounts: AccountOption[] = (acctRows ?? []).map((a) => ({
+    code: a.code as string,
+    name: a.name as string,
+    type: a.type as AccountType,
+    parent_code: (a as { parent_code: string | null }).parent_code ?? null,
+    is_active: a.is_active as boolean,
+  }))
 
   // Only pending_approval is editable. Anything else → bounce back to the
   // detail view so Finance sees the current frozen state.
@@ -86,7 +100,9 @@ export default async function EditFundSourcePage({ params }: Props) {
           effective_date: source.effective_date as string,
           repayment_date: (source.repayment_date as string | null) ?? source.effective_date as string,
           notes: source.notes ?? '',
+          account_code: (source as { account_code: string | null }).account_code ?? null,
         }}
+        liabilityAccounts={liabilityAccounts}
       />
     </div>
   )

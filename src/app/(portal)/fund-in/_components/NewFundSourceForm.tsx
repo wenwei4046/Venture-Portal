@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createFundSource } from '../actions'
 import type { Company, FundSourceType } from '@/types'
 import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
+import AccountPicker, { type AccountOption } from '@/components/AccountPicker'
 
 interface Department {
   id: string
@@ -15,6 +16,8 @@ interface Department {
 interface Props {
   companies: Company[]
   departments: Department[]
+  /** Liability / equity accounts the fund-in can be tagged with (mig 247). */
+  liabilityAccounts: AccountOption[]
 }
 
 const SOURCE_TYPES: { value: FundSourceType; label: string; hint: string }[] = [
@@ -24,10 +27,11 @@ const SOURCE_TYPES: { value: FundSourceType; label: string; hint: string }[] = [
   { value: 'outsource', label: 'Outsource', hint: 'External party — bank, vendor, individual investor (free text)' },
 ]
 
-export default function NewFundSourceForm({ companies, departments }: Props) {
+export default function NewFundSourceForm({ companies, departments, liabilityAccounts }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [sourceType, setSourceType] = useState<FundSourceType>('subsidiary')
+  const [accountCode, setAccountCode] = useState<string>('')
   const formRef = useRef<HTMLFormElement>(null)
 
   const defaultRepaymentDate = dayjs().add(12, 'month').format('YYYY-MM-DD')
@@ -162,6 +166,30 @@ export default function NewFundSourceForm({ companies, departments }: Props) {
           </p>
         </div>
       ) : null}
+
+      {/* ───────── Liability account (mig 247) ───────── */}
+      <div className="mb-6">
+        <label
+          htmlFor="account_code"
+          className="block text-sm font-sans font-medium text-graphite mb-1.5"
+        >
+          Amount due to (BS account){' '}
+          <span className="text-muted font-normal">(optional)</span>
+        </label>
+        <AccountPicker
+          accounts={liabilityAccounts}
+          value={accountCode}
+          onChange={setAccountCode}
+          name="account_code"
+          typeFilter={['liability', 'equity']}
+          placeholder="Pick the payable sub-account…"
+        />
+        <p className="font-serif italic text-muted text-xs mt-1.5">
+          Tracks who HV owes individually on the Balance Sheet. Leave blank to
+          fall back to the umbrella "4000 Fund Sources Payable". Pick a child
+          sub-account (e.g. "4001 — Lim Wei Siang") for a per-party balance.
+        </p>
+      </div>
 
       {/* ───────── Amount + Rate (row) ───────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">

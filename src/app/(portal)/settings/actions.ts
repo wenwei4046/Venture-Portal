@@ -369,6 +369,10 @@ export async function createAccount(formData: FormData): Promise<AccountActionRe
   const type = ((formData.get('type') as string) ?? '').trim() as AccountType
   const name = ((formData.get('name') as string) ?? '').trim()
   const rawCfc = ((formData.get('cash_flow_category') as string) ?? '').trim()
+  // Mig 246: optional parent. Must exist and have the same type — the
+  // coa_enforce_parent_type trigger will fail the insert otherwise.
+  const rawParent = ((formData.get('parent_code') as string) ?? '').trim()
+  const parentCode = rawParent === '' ? null : rawParent
 
   if (!type || !ACCOUNT_TYPES.includes(type)) {
     return { error: 'Invalid account type' }
@@ -393,6 +397,7 @@ export async function createAccount(formData: FormData): Promise<AccountActionRe
     name,
     type,
     cash_flow_category: cashFlowCategory,
+    parent_code: parentCode,
   })
   if (error) return { error: `Failed to create account: ${error.message}` }
 

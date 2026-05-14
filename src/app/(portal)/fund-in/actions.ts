@@ -38,6 +38,10 @@ export async function createFundSource(formData: FormData) {
     repayment_date: (formData.get('repayment_date') as string) ?? '',
     notes: (formData.get('notes') as string) || undefined,
   }
+  // Mig 247: BS account ("Amount due to <party>") the deposit lands in.
+  // Optional today (falls back to 4000 Fund Sources Payable at approval time)
+  // so legacy data + transitional UI keep working.
+  const accountCode = ((formData.get('account_code') as string) ?? '').trim() || null
 
   if (!VALID_TYPES.includes(raw.source_type)) {
     throw new Error('Invalid source type')
@@ -114,6 +118,7 @@ export async function createFundSource(formData: FormData) {
     lock_in_months: raw.lock_in_months || null,
     effective_date: raw.effective_date,
     repayment_date: raw.repayment_date,
+    account_code: accountCode,
     // Mig 12 trigger auto-fills maturity_date from effective_date + lock_in_months
     // when null. Set it explicitly to the user-entered repayment_date so the
     // detail page's "MATURES …" line matches what Finance promised.
@@ -231,6 +236,10 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
   const effectiveDate = (formData.get('effective_date') as string) ?? ''
   const repaymentDate = (formData.get('repayment_date') as string) ?? ''
   const notes = (formData.get('notes') as string) || null
+  // Mig 247: editable BS account. Empty string from the form means "clear",
+  // which translates to NULL (approval will fall back to 4000).
+  const rawAccountCode = (formData.get('account_code') as string) ?? ''
+  const accountCode = rawAccountCode.trim() === '' ? null : rawAccountCode.trim()
 
   if (isNaN(amount) || amount <= 0) return { error: 'Amount must be greater than 0' }
   if (isNaN(costRatePercent) || costRatePercent < 0 || costRatePercent >= 100) {
@@ -279,6 +288,7 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
       repayment_date: repaymentDate,
       maturity_date: repaymentDate,
       notes,
+      account_code: accountCode,
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)

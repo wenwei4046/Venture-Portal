@@ -17,6 +17,7 @@ interface Account {
   name: string
   type: AccountType
   cash_flow_category: CashFlowCategory
+  parent_code: string | null
   is_active: boolean
   sort_order: number
 }
@@ -52,6 +53,45 @@ export default function AccountsSection({ accounts }: Props) {
     return map
   }, [visible])
 
+  // Per-type, sort so parents land before their own children — the table
+  // body renders top-to-bottom and uses parent_code to indent. Same-tier
+  // rows fall back to code order so the user always sees the COA in
+  // numeric sequence.
+  const childCounts = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const a of accounts) {
+      if (a.parent_code) m.set(a.parent_code, (m.get(a.parent_code) ?? 0) + 1)
+    }
+    return m
+  }, [accounts])
+
+  function sortForRender(rows: Account[]): Account[] {
+    // Build a quick lookup so we can splice children in right after their
+    // parent. Anything orphaned (parent_code points outside the visible set)
+    // gets rendered as a standalone leaf.
+    const byCode = new Map(rows.map((r) => [r.code, r]))
+    const roots = rows
+      .filter((r) => !r.parent_code || !byCode.has(r.parent_code))
+      .sort((a, b) => a.code.localeCompare(b.code))
+    const childrenByParent = new Map<string, Account[]>()
+    for (const r of rows) {
+      if (r.parent_code && byCode.has(r.parent_code)) {
+        const arr = childrenByParent.get(r.parent_code) ?? []
+        arr.push(r)
+        childrenByParent.set(r.parent_code, arr)
+      }
+    }
+    const out: Account[] = []
+    for (const root of roots) {
+      out.push(root)
+      const kids = (childrenByParent.get(root.code) ?? []).sort((a, b) =>
+        a.code.localeCompare(b.code),
+      )
+      out.push(...kids)
+    }
+    return out
+  }
+
   return (
     <section>
       <div className="flex items-baseline justify-between mb-1">
@@ -83,6 +123,7 @@ export default function AccountsSection({ accounts }: Props) {
         <AccountForm
           mode="create"
           isPending={isPending}
+          allAccounts={accounts}
           onSubmit={(fd) =>
             startTransition(async () => {
               try {
@@ -126,6 +167,7 @@ export default function AccountsSection({ accounts }: Props) {
             const rows = grouped.get(t) ?? []
             if (rows.length === 0) return null
             const [start, end] = rangeFor(t)
+            const sortedRows = sortForRender(rows)
             return (
               <div key={t}>
                 <div className="sect-head">
@@ -151,7 +193,7 @@ export default function AccountsSection({ accounts }: Props) {
                       </tr>
                     </thead>
                     <tbody>
-                      {rows.map((acc) => {
+                      {sortedRows.map((acc) => {
                         const isEditing = editing === acc.code
                         return (
                           <tr key={acc.code}>
@@ -162,6 +204,7 @@ export default function AccountsSection({ accounts }: Props) {
                                     mode="edit"
                                     isPending={isPending}
                                     initial={acc}
+                                    allAccounts={accounts}
                                     onSubmit={(fd) =>
                                       startTransition(async () => {
                                         try {
@@ -188,9 +231,19 @@ export default function AccountsSection({ accounts }: Props) {
                             ) : (
                               <>
                                 <td className="font-mono text-xs text-graphite">
+                                  {acc.parent_code ? (
+                                    <span className="text-muted">└ </span>
+                                  ) : null}
                                   {acc.code}
                                 </td>
-                                <td className="text-ink">{acc.name}</td>
+                                <td className={acc.parent_code ? 'text-ink pl-4' : 'text-ink'}>
+                                  {acc.name}
+                                  {childCounts.get(acc.code) ? (
+                                    <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-graphite border border-hairline rounded px-1.5 py-0.5">
+                                      header · {childCounts.get(acc.code)} sub
+                                    </span>
+                                  ) : null}
+                                </td>
                                 <td>
                                   <span className="font-mono text-[10px] uppercase tracking-wider text-info">
                                     {CFC_LABELS[acc.cash_flow_category]}
@@ -238,6 +291,7 @@ interface AccountFormProps {
   initial?: Account
   mode: 'create' | 'edit'
   isPending: boolean
+  allAccounts: Account[]
   onSubmit: (fd: FormData) => void
   onCancel?: () => void
 }
@@ -246,6 +300,7 @@ function AccountForm({
   initial,
   mode,
   isPending,
+  allAccounts,
   onSubmit,
   onCancel,
 }: AccountFormProps) {
@@ -254,6 +309,7 @@ function AccountForm({
   const [cfc, setCfc] = useState<CashFlowCategory>(
     initial?.cash_flow_category ?? defaultCashFlowCategoryFor(initial?.type ?? 'expense'),
   )
+  const [parentCode, setParentCode] = useState<string>(initial?.parent_code ?? '')
   const [isActive, setIsActive] = useState(initial?.is_active ?? true)
 
   function handleTypeChange(next: AccountType) {
@@ -261,7 +317,20 @@ function AccountForm({
     // Auto-suggest the default cash flow category when the type changes.
     // User can still override before submitting.
     setCfc(defaultCashFlowCategoryFor(next))
+    // Parent must share type — clear it on type change so the user re-picks.
+    setParentCode('')
   }
+
+  // Mig 246: a parent must be of the same type and not point at this row
+  // (no self-parent). On create, also exclude the row being created (no code
+  // yet, but exclude anything self-referencing). Inactive rows hidden.
+  const parentOptions = useMemo(
+    () =>
+      allAccounts
+        .filter((a) => a.type === type && a.is_active && a.code !== initial?.code)
+        .sort((a, b) => a.code.localeCompare(b.code)),
+    [allAccounts, type, initial?.code],
+  )
 
   return (
     <form
@@ -277,6 +346,7 @@ function AccountForm({
           fd.set('type', type)
           fd.set('name', name)
           fd.set('cash_flow_category', cfc)
+          if (parentCode) fd.set('parent_code', parentCode)
         }
         onSubmit(fd)
       }}
@@ -362,6 +432,32 @@ function AccountForm({
           for special cases (e.g. loans receivable = investing, not operating).
         </p>
       </div>
+
+      {mode === 'create' ? (
+        <div>
+          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+            Parent account <span className="text-muted font-normal">(optional)</span>
+          </label>
+          <select
+            value={parentCode}
+            onChange={(e) => setParentCode(e.target.value)}
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+          >
+            <option value="">— None (top level) —</option>
+            {parentOptions.map((p) => (
+              <option key={p.code} value={p.code}>
+                {p.code} · {p.name}
+              </option>
+            ))}
+          </select>
+          <p className="font-serif italic text-muted text-xs mt-1.5">
+            Pick a parent to group this account under (e.g. "4000 Amount due
+            to related party" with child "4001 — Lim Wei Siang"). The parent
+            then becomes a header — it can't be picked for posting in PV,
+            fund-in, fund-out, or invoice forms. Must share the same type.
+          </p>
+        </div>
+      ) : null}
 
       {mode === 'edit' ? (
         <label className="flex items-center gap-2 text-sm font-serif text-graphite">

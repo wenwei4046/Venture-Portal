@@ -4,11 +4,13 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { updatePaymentVoucher } from '../../../actions'
 import type { AccountType } from '@/lib/coa'
+import AccountPicker from '@/components/AccountPicker'
 
 interface GlAccount {
   code: string
   name: string
   type: AccountType
+  parent_code: string | null
 }
 
 interface SourceRow {
@@ -316,20 +318,19 @@ export default function EditPaymentForm({
                         <option key={p.value} value={p.value}>{p.label}</option>
                       ))}
                     </select>
-                    <select
-                      value={row.account_code}
-                      onChange={(e) => {
-                        const next = [...sourceRows]
-                        next[i] = { ...next[i], account_code: e.target.value }
-                        setSourceRows(next)
-                      }}
-                      className="flex-1 px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-                    >
-                      <option value="">Select account…</option>
-                      {glAccounts.map((g) => (
-                        <option key={g.code} value={g.code}>{g.code} — {g.name}</option>
-                      ))}
-                    </select>
+                    <div className="flex-1">
+                      <AccountPicker
+                        accounts={glAccounts.map((g) => ({ ...g, is_active: true }))}
+                        value={row.account_code}
+                        onChange={(code) => {
+                          const next = [...sourceRows]
+                          next[i] = { ...next[i], account_code: code }
+                          setSourceRows(next)
+                        }}
+                        name={`source_rows[${i}][account_code_display]`}
+                        placeholder="Select account…"
+                      />
+                    </div>
                     <div className="relative w-40">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted font-mono">RM</span>
                       <input
@@ -468,16 +469,13 @@ export default function EditPaymentForm({
             <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
               Account
             </label>
-            <select
+            <AccountPicker
+              accounts={glAccounts.map((g) => ({ ...g, is_active: true }))}
               value={accountCode}
-              onChange={(e) => setAccountCode(e.target.value)}
-              className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-            >
-              <option value="">—</option>
-              {glAccounts.map((g) => (
-                <option key={g.code} value={g.code}>{g.code} — {g.name}</option>
-              ))}
-            </select>
+              onChange={setAccountCode}
+              name="account_code_display"
+              placeholder="Select account…"
+            />
           </div>
         </>
       )}

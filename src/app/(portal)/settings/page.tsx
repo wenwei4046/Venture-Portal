@@ -74,7 +74,7 @@ export default async function SettingsPage({ searchParams }: Props) {
     supabase.from('period_locks').select('period_month, is_locked, closed_at, notes').order('period_month', { ascending: false }),
     supabase
       .from('chart_of_accounts')
-      .select('code, name, type, cash_flow_category, is_active, sort_order')
+      .select('code, name, type, cash_flow_category, parent_code, is_active, sort_order')
       .order('type')
       .order('sort_order')
       .order('code'),
@@ -196,6 +196,7 @@ export default async function SettingsPage({ searchParams }: Props) {
             name: a.name,
             type: a.type as AccountType,
             cash_flow_category: a.cash_flow_category as CashFlowCategory,
+            parent_code: (a as { parent_code: string | null }).parent_code ?? null,
             is_active: a.is_active,
             sort_order: a.sort_order,
           }))}
