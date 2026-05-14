@@ -38,6 +38,19 @@ export default function AccountsSection({ accounts }: Props) {
   const [editing, setEditing] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showInactive, setShowInactive] = useState(false)
+  // Per-parent collapse state (Set of parent codes currently collapsed). Empty
+  // set = everything expanded, which is the first-load default so newcomers
+  // see the structure.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+
+  function toggleCollapsed(code: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(code)) next.delete(code)
+      else next.add(code)
+      return next
+    })
+  }
 
   const visible = useMemo(
     () => accounts.filter((a) => showInactive || a.is_active),
@@ -153,6 +166,24 @@ export default function AccountsSection({ accounts }: Props) {
         >
           {showInactive ? 'Hide inactive' : 'Show inactive'}
         </button>
+        {childCounts.size > 0 ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setCollapsed(new Set(childCounts.keys()))}
+              className="text-xs text-graphite hover:text-ink font-serif italic"
+            >
+              Collapse all
+            </button>
+            <button
+              type="button"
+              onClick={() => setCollapsed(new Set())}
+              className="text-xs text-graphite hover:text-ink font-serif italic"
+            >
+              Expand all
+            </button>
+          </>
+        ) : null}
       </div>
 
       {visible.length === 0 ? (
@@ -195,6 +226,12 @@ export default function AccountsSection({ accounts }: Props) {
                     <tbody>
                       {sortedRows.map((acc) => {
                         const isEditing = editing === acc.code
+                        const isHeader = (childCounts.get(acc.code) ?? 0) > 0
+                        // Hide rows whose parent is currently collapsed.
+                        if (acc.parent_code && collapsed.has(acc.parent_code)) {
+                          return null
+                        }
+                        const isCollapsed = isHeader && collapsed.has(acc.code)
                         return (
                           <tr key={acc.code}>
                             {isEditing ? (
@@ -231,6 +268,16 @@ export default function AccountsSection({ accounts }: Props) {
                             ) : (
                               <>
                                 <td className="font-mono text-xs text-graphite">
+                                  {isHeader ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleCollapsed(acc.code)}
+                                      aria-label={isCollapsed ? 'Expand children' : 'Collapse children'}
+                                      className="mr-1 inline-block w-3 text-accent hover:text-accent-hover"
+                                    >
+                                      {isCollapsed ? '▶' : '▼'}
+                                    </button>
+                                  ) : null}
                                   {acc.parent_code ? (
                                     <span className="text-muted">└ </span>
                                   ) : null}
@@ -238,7 +285,7 @@ export default function AccountsSection({ accounts }: Props) {
                                 </td>
                                 <td className={acc.parent_code ? 'text-ink pl-4' : 'text-ink'}>
                                   {acc.name}
-                                  {childCounts.get(acc.code) ? (
+                                  {isHeader ? (
                                     <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-graphite border border-hairline rounded px-1.5 py-0.5">
                                       header · {childCounts.get(acc.code)} sub
                                     </span>
