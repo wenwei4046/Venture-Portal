@@ -299,15 +299,35 @@ export function classifyRows(input: ClassifyInput): ClassifyOutput {
     const label = src.accountName
     const cfCat = src.cashFlowCategory
 
-    // Rule 1c: billing_payment vouchers are settling an invoice (AR collection).
-    // The revenue was already accrued when the invoice was issued (booked in
-    // the invoices array below); the cash side here is just AR going down +
-    // bank going up. Treat every source row as AR collection regardless of
-    // the account picked: operating cash inflow + BS asset decrease, NEVER P&L.
+    // Rule 1c: billing_payment vouchers settle an invoice. They carry up to
+    // TWO source rows:
+    //   - Receiving side (always): asset row (3030 AR) tagged with the
+    //     receiver's pool. Revenue was already accrued at invoice issue;
+    //     this row records AR collection only — operating cash inflow + BS
+    //     asset decrease, NEVER P&L.
+    //   - Paying side (inter-billing only, mig 253): expense row (9051-9055)
+    //     tagged with the paying dept's pool. classifyRows treats the credit
+    //     as a debit-in-the-paying-pool's-books — bumps that pool's expense
+    //     and operating cash outflow. Without this branch, only the receiver
+    //     saw revenue and group net profit was over-stated.
+    //   - Any other type (revenue / liability / equity) is treated like AR
+    //     collection — defensive: prevents double-counting if a future code
+    //     path lands an unexpected type here.
     if (src.voucherType === 'billing_payment') {
-      if (isCredit) {
-        // Operating cash inflow (customer paid the invoice). AR (asset) goes
-        // down by the same amount on the balance sheet.
+      if (src.accountType === 'expense') {
+        // Inter-billing paying side. The PV row inherits the voucher's
+        // credit direction but represents a DEBIT in the paying pool's
+        // books (expense incurred). Invert: credit → expense up + cfOut.
+        if (isCredit) {
+          bump(p.expense, label, amt)
+          bump(p.cfOut.operating, label, amt)
+        } else {
+          // Refund (uncommon): expense down + cfIn.
+          bump(p.expense, label, -amt)
+          bump(p.cfIn.operating, label, amt)
+        }
+      } else if (isCredit) {
+        // Receiving side / AR collection — operating cash inflow + BS AR down.
         bump(p.cfIn.operating, label, amt)
         pushBalanceMovement(src.pool, label, -amt)
       } else {

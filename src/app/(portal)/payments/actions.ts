@@ -283,15 +283,26 @@ export async function createPaymentVoucher(formData: FormData) {
   // Two flows:
   //   (a) Real bank settlement (subsidiary / freetext with payment_method
   //       != netting) → Dr Bank / Cr AR, bank cache bumped.
-  //   (b) Inter-billing settlement (invoice issued to a dept_pool, or any
-  //       voucher with payment_method='netting') → Dr <paying party's pool
-  //       equity> / Cr AR, no bank touched. Resolves the dept's equity
-  //       code from chart_of_accounts by name match (Dept Pool — <dept>).
+  //   (b) Inter-billing settlement (invoice issued to a dept_pool, voucher
+  //       with payment_method='netting') → Dr <paying dept inter-billing
+  //       expense> / Cr AR, no bank touched. A 2nd payment_voucher_sources
+  //       row is also inserted tagged with the paying dept's pool so the
+  //       expense lands on the paying side's P&L (mig 253). Without this,
+  //       only the receiving dept saw revenue and group net profit was
+  //       over-stated by the invoiced amount.
   if (isAutoComplete) {
     // Detect inter-billing first so we know which JE path to take below.
-    // We need the invoice's billable_to_type + billable_to_department_id to
-    // resolve the paying party's pool equity account.
-    let interBilling: { equityCode: string; partyLabel: string } | null = null
+    // We resolve THREE things from the invoice's billable_to_department_id:
+    //   - expenseCode: 9051-9055 leaf to debit in the JE + record on the
+    //     paying-side PV source row (drives the paying dept's P&L expense).
+    //   - payingPool: the dept_pool_* key used to tag the PV source so
+    //     the report layer attributes the expense to that pool.
+    //   - partyLabel: dept name for the JE description.
+    let interBilling: {
+      expenseCode: string
+      payingPool: string
+      partyLabel: string
+    } | null = null
     if (paymentMethod === 'netting' && invoiceId) {
       const { data: inv } = await supabase
         .from('invoices')
@@ -305,17 +316,25 @@ export async function createPaymentVoucher(formData: FormData) {
           .eq('id', inv.billable_to_department_id)
           .maybeSingle()
         if (dept?.name) {
-          // Convention from mig 238 seed: '1030 Dept Pool — Marketing',
-          // '1040 Dept Pool — Finance', etc. Match by suffix so a renamed
-          // dept still works as long as the COA row exists.
+          // Convention from mig 253: '9051 Inter-billing — Marketing',
+          // '9052 Inter-billing — Finance', etc. Match by suffix so a
+          // renamed dept still works as long as the COA row exists.
           const { data: acct } = await supabase
             .from('chart_of_accounts')
             .select('code, name')
-            .eq('type', 'equity')
-            .ilike('name', `Dept Pool — ${dept.name}`)
+            .eq('type', 'expense')
+            .ilike('name', `Inter-billing — ${dept.name}`)
             .maybeSingle()
           if (acct?.code) {
-            interBilling = { equityCode: acct.code, partyLabel: dept.name }
+            // Pool key follows the dept_pool_<slug> convention used by
+            // INVOICE_BILLING_MODE_TO_POOL ('dept_pool_marketing',
+            // 'dept_pool_director_office', etc).
+            const payingPool = `dept_pool_${dept.name.toLowerCase().replace(/\s+/g, '_')}`
+            interBilling = {
+              expenseCode: acct.code,
+              payingPool,
+              partyLabel: dept.name,
+            }
           }
         }
       }
@@ -340,9 +359,9 @@ export async function createPaymentVoucher(formData: FormData) {
     try {
       const debitLine = interBilling
         ? {
-            accountCode: interBilling.equityCode,
+            accountCode: interBilling.expenseCode,
             debit: r2(amount),
-            description: `Inter-billing settle — ${interBilling.partyLabel} pool`,
+            description: `Inter-billing — ${interBilling.partyLabel} consumed services`,
           }
         : {
             accountCode: bankAccountId
@@ -364,6 +383,20 @@ export async function createPaymentVoucher(formData: FormData) {
       })
     } catch {
       console.error('GL posting failed for auto-complete credit voucher', data.id)
+    }
+
+    // Inter-billing: insert a SECOND payment_voucher_sources row tagged with
+    // the paying dept's pool + expense account. classifyRows routes this as
+    // the paying dept's P&L expense (mig 253). Without this row, only the
+    // receiving dept (target_pool, written earlier in the credit branch
+    // above) shows the transaction.
+    if (interBilling) {
+      await supabase.from('payment_voucher_sources').insert({
+        voucher_id: data.id,
+        pool: interBilling.payingPool,
+        amount: r2(amount),
+        account_code: interBilling.expenseCode,
+      })
     }
   }
 

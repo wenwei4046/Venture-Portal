@@ -124,6 +124,55 @@ describe('classifyRows', () => {
     expect(out.balanceMovements.find((m) => m.label === 'Revenue (paid)')?.amount).toBe(-10000)
   })
 
+  it('inter-billing: paying dept books expense + cash outflow, receiver books AR collection + cash inflow (mig 253)', () => {
+    // Scenario: Marketing bills HR 1000 (inter-billing). Settlement is a
+    // credit voucher with payment_method='netting'. createPaymentVoucher
+    // inserts TWO payment_voucher_sources rows:
+    //   - pool=dept_pool_marketing, account=3030 (asset) — receiving side
+    //   - pool=dept_pool_hr,        account=9053 (expense) — paying side
+    // Plus an invoice row tagged to dept_pool_marketing (revenue accrued at
+    // issue time).
+    // Expected:
+    //   Marketing P&L: revenue +1000 (from invoice), margin +1000
+    //   HR P&L: expense +1000, margin -1000
+    //   Group: revenue 1000, expense 1000, netProfit 0 (internal nets out)
+    //   Marketing cfIn.operating +1000 (AR collected) — current behavior
+    //     keeps the inter-billing cash as an internal transfer.
+    //   HR cfOut.operating +1000 — mirror.
+    //   BS movement: Marketing AR -1000 (no equity movement; expense closes
+    //   to equity at period end).
+    const out = classifyRows({
+      pvSources: [
+        pv({ voucherType: 'billing_payment', direction: 'credit', accountType: 'asset', cashFlowCategory: 'operating', amount: 1000, pool: 'dept_pool_marketing', accountCode: '3030', accountName: 'AR — Subs' }),
+        pv({ voucherType: 'billing_payment', direction: 'credit', accountType: 'expense', cashFlowCategory: 'operating', amount: 1000, pool: 'dept_pool_hr', accountCode: '9053', accountName: 'Inter-billing — HR' }),
+      ],
+      invoices: [
+        { invoiceNo: 'INV-IB-1', companyShortCode: 'HV', pool: 'dept_pool_marketing', amount: 1000 },
+      ],
+      treasury: noTreasury,
+    })
+    const mk = out.income.pools.find((p) => p.pool === 'dept_pool_marketing')!
+    expect(mk.revenue).toBe(1000)
+    expect(mk.expense).toBe(0)
+    expect(mk.margin).toBe(1000)
+    const hr = out.income.pools.find((p) => p.pool === 'dept_pool_hr')!
+    expect(hr.revenue).toBe(0)
+    expect(hr.expense).toBe(1000)
+    expect(hr.margin).toBe(-1000)
+    expect(out.income.groupNetProfit).toBe(0)
+    const opSection = out.cashflow.sections.find((s) => s.category === 'operating')!
+    const mkOp = opSection.pools.find((p) => p.pool === 'dept_pool_marketing')!
+    expect(mkOp.inflowLines.reduce((s, l) => s + l.amount, 0)).toBe(1000)
+    expect(mkOp.outflowLines.reduce((s, l) => s + l.amount, 0)).toBe(0)
+    const hrOp = opSection.pools.find((p) => p.pool === 'dept_pool_hr')!
+    expect(hrOp.outflowLines.reduce((s, l) => s + l.amount, 0)).toBe(1000)
+    expect(hrOp.inflowLines.reduce((s, l) => s + l.amount, 0)).toBe(0)
+    // BS movements: only the receiver's AR collection. No equity movement
+    // for the paying side — expense closes to equity at period end.
+    expect(out.balanceMovements.find((m) => m.label === 'AR — Subs')?.amount).toBe(-1000)
+    expect(out.balanceMovements.find((m) => m.label === 'Inter-billing — HR')).toBeUndefined()
+  })
+
   it('does NOT double-count loan interest (revenue PV source on loan_repayment is ignored; treasury is sole source)', () => {
     const out = classifyRows({
       pvSources: [
