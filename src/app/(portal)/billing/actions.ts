@@ -453,8 +453,13 @@ export async function approveInvoice(formData: FormData) {
   if (amount > 0) {
     const revenueCode = await resolveRevenueGlCode(supabase, inv.category_code, inv.billing_mode)
     try {
+      // transaction_date = the day this JE is being booked (today), NOT the
+      // end-of-period. period_month already captures which accounting period
+      // the entry belongs to. Using endOf(period_month) creates future-dated
+      // JEs that get excluded from BS snapshots run mid-period, leaving AR
+      // looking "credit-only" when the invoice has already been settled.
       await postJournalEntry(supabase, {
-        transactionDate: dayjs(inv.period_month).endOf('month').format('YYYY-MM-DD'),
+        transactionDate: dayjs().format('YYYY-MM-DD'),
         description: `Invoice ${inv.invoice_no ?? inv.id} issued`,
         referenceType: 'invoice',
         referenceId: inv.id,
@@ -500,7 +505,9 @@ export async function approveInvoicesForPeriod(formData: FormData) {
   if (error) throw new Error(`Failed to bulk issue invoices: ${error.message}`)
 
   // Mig 200/P1-6a: post AR accrual per newly-issued invoice.
-  const txnDate = dayjs(period).endOf('month').format('YYYY-MM-DD')
+  // transaction_date = today (when actually issued). period_month already
+  // tracks accounting period via the journal_entries.period_month column.
+  const txnDate = dayjs().format('YYYY-MM-DD')
   for (const row of draftInvoices ?? []) {
     const amount = Number(row.total_amount ?? 0)
     if (amount <= 0) continue
