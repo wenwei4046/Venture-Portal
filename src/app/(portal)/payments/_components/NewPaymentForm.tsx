@@ -423,9 +423,10 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
             id="bank_account_id"
             name="bank_account_id"
             required={paymentMethod !== 'netting'}
+            defaultValue={bankAccounts[0]?.id ?? ''}
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
           >
-            <option value="">Select bank account…</option>
+            {bankAccounts.length === 0 ? <option value="">No active bank accounts</option> : null}
             {bankAccounts.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.bank_name} — {b.account_number} (bal: RM {Number(b.current_balance).toLocaleString('en-MY', { minimumFractionDigits: 2 })})
