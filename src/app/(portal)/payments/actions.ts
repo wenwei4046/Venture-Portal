@@ -279,13 +279,51 @@ export async function createPaymentVoucher(formData: FormData) {
     })
   }
 
-  // Auto-complete credit payments: adjust bank + pool immediately
+  // Auto-complete credit payments: adjust bank + pool immediately.
+  // Two flows:
+  //   (a) Real bank settlement (subsidiary / freetext with payment_method
+  //       != netting) → Dr Bank / Cr AR, bank cache bumped.
+  //   (b) Inter-billing settlement (invoice issued to a dept_pool, or any
+  //       voucher with payment_method='netting') → Dr <paying party's pool
+  //       equity> / Cr AR, no bank touched. Resolves the dept's equity
+  //       code from chart_of_accounts by name match (Dept Pool — <dept>).
   if (isAutoComplete) {
-    // Bank balance: add via SECURITY DEFINER RPC (bank_accounts RLS only
-    // permits Principal to UPDATE directly; Finance-initiated auto-complete
-    // credit flows through bump_bank_for_paid_credit which verifies the
-    // voucher is already paid + credit before bumping).
-    if (bankAccountId) {
+    // Detect inter-billing first so we know which JE path to take below.
+    // We need the invoice's billable_to_type + billable_to_department_id to
+    // resolve the paying party's pool equity account.
+    let interBilling: { equityCode: string; partyLabel: string } | null = null
+    if (paymentMethod === 'netting' && invoiceId) {
+      const { data: inv } = await supabase
+        .from('invoices')
+        .select('billable_to_type, billable_to_department_id')
+        .eq('id', invoiceId)
+        .maybeSingle()
+      if (inv && inv.billable_to_type === 'dept_pool' && inv.billable_to_department_id) {
+        const { data: dept } = await supabase
+          .from('departments')
+          .select('name')
+          .eq('id', inv.billable_to_department_id)
+          .maybeSingle()
+        if (dept?.name) {
+          // Convention from mig 238 seed: '1030 Dept Pool — Marketing',
+          // '1040 Dept Pool — Finance', etc. Match by suffix so a renamed
+          // dept still works as long as the COA row exists.
+          const { data: acct } = await supabase
+            .from('chart_of_accounts')
+            .select('code, name')
+            .eq('type', 'equity')
+            .ilike('name', `Dept Pool — ${dept.name}`)
+            .maybeSingle()
+          if (acct?.code) {
+            interBilling = { equityCode: acct.code, partyLabel: dept.name }
+          }
+        }
+      }
+    }
+
+    // Bank cache: bump only for real bank settlements. Inter-billing skips
+    // because no money actually entered the bank account.
+    if (bankAccountId && !interBilling) {
       const { error: bumpErr } = await supabase.rpc('bump_bank_for_paid_credit', {
         p_voucher_id: data.id,
       })
@@ -293,22 +331,33 @@ export async function createPaymentVoucher(formData: FormData) {
         console.error('bump_bank_for_paid_credit failed:', bumpErr.message)
       }
     }
-    // Pool balance: add to target pool
+    // Pool balance: add to target pool (the receiving side — e.g. Marketing
+    // pool gets the revenue regardless of how the paying side settled).
     if (targetPool) {
       await adjustPool(supabase, targetPool, 'in', r2(amount), `PV ${voucherNo}: ${description}`, user.id, null, nowIso)
     }
-    // GL journal entry (non-blocking)
+    // GL journal entry (non-blocking).
     try {
-      const bankGlCode = bankAccountId
-        ? ((await supabase.from('bank_accounts').select('gl_account_code').eq('id', bankAccountId).single()).data?.gl_account_code ?? '3000')
-        : '3000'
+      const debitLine = interBilling
+        ? {
+            accountCode: interBilling.equityCode,
+            debit: r2(amount),
+            description: `Inter-billing settle — ${interBilling.partyLabel} pool`,
+          }
+        : {
+            accountCode: bankAccountId
+              ? ((await supabase.from('bank_accounts').select('gl_account_code').eq('id', bankAccountId).single()).data?.gl_account_code ?? '3000')
+              : '3000',
+            debit: r2(amount),
+            description: `Bank deposit — ${voucherNo}`,
+          }
       await postJournalEntry(supabase, {
         transactionDate: todayStr,
         description: `PV ${voucherNo}: ${description}`,
         referenceType: 'payment_voucher',
         referenceId: data.id,
         lines: [
-          { accountCode: bankGlCode, debit: r2(amount), description: `Bank deposit — ${voucherNo}` },
+          debitLine,
           { accountCode: '3030', credit: r2(amount), description: `Payment received — ${payeeName}` },
         ],
         createdBy: user.id,

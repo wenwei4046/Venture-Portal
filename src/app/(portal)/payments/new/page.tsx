@@ -56,12 +56,16 @@ export default async function NewPaymentPage({ searchParams }: Props) {
     period_month: string
     billing_mode: string
     target_pool: string
+    /** Mig 225 polymorphism: tells the form whether this invoice was issued
+     *  to a subsidiary (real bank involved) vs an internal dept pool / director
+     *  (inter-billing, no real money moves — settle via netting). */
+    billable_to_type: 'subsidiary' | 'director' | 'dept_pool' | 'freetext' | null
   } | null = null
 
   if (invoiceId) {
     const { data: inv } = await supabase
       .from('invoices')
-      .select('id, invoice_no, company_id, total_amount, period_month, billing_mode, status, companies(name)')
+      .select('id, invoice_no, company_id, total_amount, period_month, billing_mode, status, billable_to_type, companies(name)')
       .eq('id', invoiceId)
       .single()
 
@@ -76,6 +80,7 @@ export default async function NewPaymentPage({ searchParams }: Props) {
         period_month: inv.period_month,
         billing_mode: inv.billing_mode,
         target_pool: poolForBillingMode(inv.billing_mode),
+        billable_to_type: (inv.billable_to_type as 'subsidiary' | 'director' | 'dept_pool' | 'freetext' | null) ?? null,
       }
     }
   }

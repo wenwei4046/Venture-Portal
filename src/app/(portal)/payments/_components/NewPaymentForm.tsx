@@ -17,6 +17,10 @@ interface InvoicePreset {
   period_month: string
   billing_mode: string
   target_pool: string
+  /** Mig 225 polymorphism: drives whether settlement runs through a bank
+   *  (subsidiary) or through netting against the paying party's internal
+   *  pool ledger (dept_pool / director / freetext). */
+  billable_to_type: 'subsidiary' | 'director' | 'dept_pool' | 'freetext' | null
 }
 
 interface PayableFundSource {
@@ -97,7 +101,17 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
   const isInvoicePay = !!invoicePreset
   const isNonBillable = !!nonBillablePreset && !isInvoicePay
   const [direction, setDirection] = useState<'debit' | 'credit'>(isInvoicePay ? 'credit' : 'debit')
-  const [paymentMethod, setPaymentMethod] = useState<string>('bank_transfer')
+  // Inter-billing: invoice issued to an internal dept pool (or director /
+  // freetext non-cash counterparty) settles without touching a bank — the
+  // money moves between pool ledgers, not banks. Default payment_method to
+  // 'netting' for those so the bank field skips the required guard and the
+  // JE branch below routes the Cr 3030 against the paying dept's pool
+  // equity instead of Dr Bank.
+  const isInterBilling =
+    isInvoicePay && invoicePreset!.billable_to_type !== null && invoicePreset!.billable_to_type !== 'subsidiary'
+  const [paymentMethod, setPaymentMethod] = useState<string>(
+    isInterBilling ? 'netting' : 'bank_transfer',
+  )
   const [accountCode, setAccountCode] = useState('')
   const [sourceRows, setSourceRows] = useState<SourceRow[]>(
     isNonBillable
