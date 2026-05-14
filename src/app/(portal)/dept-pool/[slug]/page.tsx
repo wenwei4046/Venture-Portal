@@ -69,7 +69,11 @@ export default async function DeptPoolDetailPage({ params, searchParams }: Props
       .lt('created_at', nextMonthStart)
     for (const r of monthRows ?? []) {
       if (r.transaction_type === 'np_in') monthIn += Number(r.amount)
-      else if (r.transaction_type === 'expense_out') monthOut += Number(r.amount)
+      else if (r.transaction_type === 'expense_out' || r.transaction_type === 'inter_billing_out') {
+        // 'inter_billing_out' (mig 255) is the paying-side mirror of an
+        // inter-billing settlement — folded into Out alongside expense_out.
+        monthOut += Number(r.amount)
+      }
     }
   }
 

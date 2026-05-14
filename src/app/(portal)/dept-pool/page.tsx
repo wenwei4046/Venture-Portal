@@ -82,7 +82,9 @@ export default async function DeptPoolPage() {
     const cur = inOutByDept.get(key) ?? { in_amt: 0, out_amt: 0 }
     if (t.transaction_type === 'np_in') {
       cur.in_amt += Number(t.amount)
-    } else if (t.transaction_type === 'expense_out') {
+    } else if (t.transaction_type === 'expense_out' || t.transaction_type === 'inter_billing_out') {
+      // 'inter_billing_out' (mig 255) is a forced obligation from another
+      // dept's billing — folded into Out alongside discretionary expense.
       cur.out_amt += Number(t.amount)
     }
     inOutByDept.set(key, cur)

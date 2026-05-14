@@ -271,12 +271,19 @@ export async function createPaymentVoucher(formData: FormData) {
     if (!accountCode) {
       throw new Error('Account is required on inbound (credit) vouchers')
     }
-    await supabase.from('payment_voucher_sources').insert({
-      voucher_id: data.id,
-      pool: targetPool,
-      amount,
-      account_code: accountCode,
-    })
+    // role defaults to 'primary' at the DB level (mig 254); no need to set
+    // it explicitly here.
+    const { error: primaryInsertErr } = await supabase
+      .from('payment_voucher_sources')
+      .insert({
+        voucher_id: data.id,
+        pool: targetPool,
+        amount,
+        account_code: accountCode,
+      })
+    if (primaryInsertErr) {
+      throw new Error(`Failed to insert credit voucher source row: ${primaryInsertErr.message}`)
+    }
   }
 
   // Auto-complete credit payments: adjust bank + pool immediately.
@@ -355,6 +362,45 @@ export async function createPaymentVoucher(formData: FormData) {
     if (targetPool) {
       await adjustPool(supabase, targetPool, 'in', r2(amount), `PV ${voucherNo}: ${description}`, user.id, null, nowIso)
     }
+    // Inter-billing: mirror the dept_pools ledger for the paying side. The
+    // /dept-pool views read In/Out figures from dept_pools.transaction_type,
+    // NOT from payment_voucher_sources, so without this row the paying
+    // dept's Pool view shows 0 movement even though the PV source mirror
+    // row (mig 254) is present.
+    //
+    // Direct insert with transaction_type='inter_billing_out' (mig 255)
+    // instead of adjustPool() — adjustPool writes 'expense_out', which
+    // hits the check_dept_pool_sufficient trigger and rejects when the
+    // pool balance < amount. Inter-billing is a forced obligation
+    // (Marketing billed HR; HR has no veto), so the sufficiency check
+    // shouldn't apply.
+    if (interBilling) {
+      const { data: payingDept } = await supabase
+        .from('departments')
+        .select('id')
+        .eq('name', interBilling.partyLabel)
+        .maybeSingle()
+      if (payingDept?.id) {
+        const interBillingRow = {
+          department_id: payingDept.id,
+          transaction_type: 'inter_billing_out',
+          amount: r2(amount),
+          description: `PV ${voucherNo}: Inter-billing — ${interBilling.partyLabel} (settles ${description})`,
+          created_by: user.id,
+        }
+        // Cast: mig 255 added the new enum value; auto-generated types are
+        // regenerated separately, so TS still only knows 'np_in' | 'expense_out'.
+        const { error: deptPoolErr } = await supabase
+          .from('dept_pools')
+          .insert(interBillingRow as never)
+        if (deptPoolErr) {
+          console.error(
+            `inter-billing dept_pools insert failed (dept=${interBilling.partyLabel}, amount=${amount}):`,
+            deptPoolErr.message,
+          )
+        }
+      }
+    }
     // GL journal entry (non-blocking).
     try {
       const debitLine = interBilling
@@ -390,13 +436,33 @@ export async function createPaymentVoucher(formData: FormData) {
     // the paying dept's P&L expense (mig 253). Without this row, only the
     // receiving dept (target_pool, written earlier in the credit branch
     // above) shows the transaction.
+    //
+    // role='mirror' (mig 254) tells the pvs_enforce_sum_matches_voucher
+    // trigger to exclude this row from the sum-vs-voucher.amount check —
+    // mirror rows represent the OTHER side of the same transaction, not a
+    // split of the voucher amount. Without role='mirror' the trigger would
+    // see sum=2N (primary N + this row N) ≠ voucher.amount N and reject.
     if (interBilling) {
-      await supabase.from('payment_voucher_sources').insert({
+      // role='mirror' (mig 254 column) is not yet in the generated
+      // database.types.ts — cast to bypass the stale type. The DB has the
+      // CHECK constraint, so an invalid value still fails loud at runtime.
+      const mirrorRow = {
         voucher_id: data.id,
         pool: interBilling.payingPool,
         amount: r2(amount),
         account_code: interBilling.expenseCode,
-      })
+        role: 'mirror',
+      }
+      const { error: mirrorInsertErr } = await supabase
+        .from('payment_voucher_sources')
+        .insert(mirrorRow as never)
+      if (mirrorInsertErr) {
+        // Fail loud — silent failure here was the 2026-05-14 bug that left
+        // inter-billing expense invisible in the paying dept's P&L.
+        throw new Error(
+          `Failed to insert inter-billing mirror source row (paying side, pool=${interBilling.payingPool}, account=${interBilling.expenseCode}): ${mirrorInsertErr.message}`,
+        )
+      }
     }
   }
 
