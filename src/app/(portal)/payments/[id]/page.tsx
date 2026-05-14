@@ -133,7 +133,7 @@ export default async function PaymentDetailPage({ params }: Props) {
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> TREASURY · PAYMENT VOUCHER{categoryLabel ? ` · ${categoryLabel.toUpperCase()}` : ''}
+            <em>I.</em> TREASURY · {voucher.direction === 'credit' ? 'OFFICIAL RECEIPT' : 'PAYMENT VOUCHER'}{categoryLabel ? ` · ${categoryLabel.toUpperCase()}` : ''}
           </div>
           <h1 className="page-title">{voucher.voucher_no ?? 'Draft'}</h1>
           <p className="font-serif italic text-graphite text-base mt-3">

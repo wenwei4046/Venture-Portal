@@ -106,13 +106,16 @@ export async function createPaymentVoucher(formData: FormData) {
     }
   }
 
-  // Generate voucher number: HV-PV-YYYYMM-NNNN
+  // Generate voucher number. Debit (outgoing money) → HV-PV-YYYYMM-NNNN
+  // (Payment Voucher). Credit (incoming money) → HV-OR-YYYYMM-NNNN
+  // (Official Receipt). mig 252 renamed historical credit rows to match.
   const period = dayjs().format('YYYYMM')
   const { count } = await supabase
     .from('payment_vouchers')
     .select('*', { count: 'exact', head: true })
   const seq = (count ?? 0) + 1
-  const voucherNo = `HV-PV-${period}-${String(seq).padStart(4, '0')}`
+  const prefix = direction === 'credit' ? 'HV-OR-' : 'HV-PV-'
+  const voucherNo = `${prefix}${period}-${String(seq).padStart(4, '0')}`
 
   // Credit (receive) payments are auto-completed — no approval needed.
   // Money flows in immediately on creation.

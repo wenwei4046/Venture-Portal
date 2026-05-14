@@ -1,12 +1,12 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import PaymentTabs from './_components/PaymentTabs'
 import PaymentFilters from './_components/PaymentFilters'
 import BackToTop from './_components/BackToTop'
+import VouchersTable, { type VoucherRow } from './_components/VouchersTable'
 
 const POOL_LABELS: Record<string, string> = {
   venture_pool: 'Venture Pool',
@@ -145,7 +145,7 @@ export default async function PaymentsPage({ searchParams }: Props) {
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> TREASURY · PAYMENT VOUCHERS
+            <em>I.</em> TREASURY · PAYMENTS & RECEIPTS
           </div>
           <h1 className="page-title">Payments</h1>
         </div>
@@ -237,79 +237,36 @@ export default async function PaymentsPage({ searchParams }: Props) {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="ledger-table">
-                <thead>
-                  <tr>
-                    <th>Voucher #</th>
-                    <th>Category</th>
-                    <th>Pool</th>
-                    <th>Payee</th>
-                    <th className="right">Amount</th>
-                    <th>Status</th>
-                    <th className="right">Date</th>
-                    <th className="right"></th>
-                  </tr>
-                </thead>
-                <tbody className="row-stagger">
-                  {filtered.map((v, i) => {
-                    const cats = categoriesByVoucher.get(v.id) ?? []
-                    const catLabel = cats.length > 0 ? cats.join(' + ') : '—'
-                    let poolLabel = '—'
-                    if (v.direction === 'credit') {
-                      poolLabel = v.target_pool
-                        ? (POOL_LABELS[v.target_pool] ?? v.target_pool.replace(/_/g, ' '))
-                        : '—'
-                    } else {
-                      const pools = sourcesByVoucher.get(v.id) ?? []
-                      if (pools.length > 0) {
-                        poolLabel = pools.map(p => POOL_LABELS[p] ?? p.replace(/_/g, ' ')).join(' + ')
-                      } else if (v.source_pool) {
-                        poolLabel = POOL_LABELS[v.source_pool] ?? v.source_pool.replace(/_/g, ' ')
-                      }
+              <VouchersTable
+                rows={filtered.map<VoucherRow>((v) => {
+                  const cats = categoriesByVoucher.get(v.id) ?? []
+                  const catLabel = cats.length > 0 ? cats.join(' + ') : '—'
+                  let poolLabel = '—'
+                  if (v.direction === 'credit') {
+                    poolLabel = v.target_pool
+                      ? (POOL_LABELS[v.target_pool] ?? v.target_pool.replace(/_/g, ' '))
+                      : '—'
+                  } else {
+                    const pools = sourcesByVoucher.get(v.id) ?? []
+                    if (pools.length > 0) {
+                      poolLabel = pools.map((p) => POOL_LABELS[p] ?? p.replace(/_/g, ' ')).join(' + ')
+                    } else if (v.source_pool) {
+                      poolLabel = POOL_LABELS[v.source_pool] ?? v.source_pool.replace(/_/g, ' ')
                     }
-                    return (
-                      <tr
-                        key={v.id}
-                        style={{ '--i': i } as React.CSSProperties}
-                      >
-                        <td className="font-mono text-[12px] text-ink font-medium">
-                          {v.voucher_no ?? '—'}
-                        </td>
-                        <td className="font-serif italic text-graphite capitalize">
-                          {catLabel}
-                        </td>
-                        <td className="font-mono text-[11px] text-graphite">
-                          {poolLabel}
-                        </td>
-                        <td className="font-serif text-[15px] text-ink truncate max-w-[200px]">
-                          {v.payee_name}
-                        </td>
-                        <td className="num">
-                          <span className={v.direction === 'credit' ? 'text-ledger font-semibold' : 'font-semibold'}>
-                            {v.direction === 'credit' ? '+' : '−'}{formatMoney(Number(v.amount)).replace('RM ', '')}
-                          </span>
-                        </td>
-                        <td>
-                          <em className={`font-serif text-sm ${STATUS_STYLES[v.status] ?? 'text-muted'}`}>
-                            {v.status.replace('_', ' ')}
-                          </em>
-                        </td>
-                        <td className="num text-graphite">
-                          {dayjs(v.payment_date ?? v.created_at).format('D MMM')}
-                        </td>
-                        <td className="right">
-                          <Link
-                            href={`/payments/${v.id}`}
-                            className="text-sm text-accent hover:text-accent-hover font-serif italic"
-                          >
-                            View
-                          </Link>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                  }
+                  return {
+                    id: v.id,
+                    voucher_no: v.voucher_no,
+                    direction: v.direction as 'credit' | 'debit',
+                    amount: Number(v.amount),
+                    payee_name: v.payee_name,
+                    status: v.status,
+                    catLabel,
+                    poolLabel,
+                    paymentOrCreatedDate: (v.payment_date ?? v.created_at) as string,
+                  }
+                })}
+              />
             </div>
           )}
         </section>

@@ -86,11 +86,14 @@ export default async function NewPaymentPage({ searchParams }: Props) {
       ? 'Non-billable expense'
       : 'Create payment'
 
+  // mig 252: settle-invoice is incoming money → Official Receipt (OR);
+  // expense / payment paths stay as Payment Voucher (PV). "NEW" stays
+  // generic because the form lets the user pick debit or credit.
   const headingEyebrow = invoicePreset
-    ? 'PAYMENT VOUCHER · SETTLE INVOICE'
+    ? 'OFFICIAL RECEIPT · SETTLE INVOICE'
     : nonBillablePreset
       ? 'PAYMENT VOUCHER · NON-BILLABLE'
-      : 'PAYMENT VOUCHER · NEW'
+      : 'PAYMENT VOUCHER / OFFICIAL RECEIPT · NEW'
 
   return (
     <div>

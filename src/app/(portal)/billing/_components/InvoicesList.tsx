@@ -1,8 +1,11 @@
+'use client'
+
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
 import { ApproveInvoiceButton, BulkIssueInvoicesButton } from './InvoiceActions'
 import CreateCreditNoteButton from './CreateCreditNoteButton'
+import SortableTable, { type SortableColumn } from '@/components/SortableTable'
 
 interface Invoice {
   id: string
@@ -17,6 +20,31 @@ interface Invoice {
   billable_to_type?: 'subsidiary' | 'director' | 'dept_pool' | 'freetext' | null
   billable_to_department_id?: string | null
   billable_to_freetext_name?: string | null
+}
+
+// Resolve the "who is being billed" label for an invoice row. Mig 225's
+// 4-way polymorphism (subsidiary / director / dept_pool / freetext)
+// means the label source varies per row, so this is centralised so the
+// table cell, the sort key, and the credit-note payee field all stay in
+// sync.
+function resolvePartyLabel(
+  inv: Invoice,
+  companyMap: Map<string, { name: string; code: string }>,
+): { primary: string; sub: string } {
+  const company = inv.company_id ? companyMap.get(inv.company_id) : undefined
+  if (inv.company_id) {
+    return { primary: company?.name ?? '—', sub: company?.code ?? '' }
+  }
+  const primary = inv.billable_to_freetext_name ?? '—'
+  const sub =
+    inv.billable_to_type === 'director'
+      ? 'Director'
+      : inv.billable_to_type === 'dept_pool'
+        ? 'Dept pool'
+        : inv.billable_to_type === 'freetext'
+          ? 'Free text'
+          : '—'
+  return { primary, sub }
 }
 
 // Humanize the billing mode enum values for UI display — raw snake_case
@@ -118,89 +146,89 @@ export default function InvoicesList({ invoices, companyMap, period, categories 
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                  <th className="text-left py-3 pr-4 font-medium">Invoice #</th>
-                  <th className="text-left py-3 pr-4 font-medium">Company</th>
-                  <th className="text-left py-3 pr-4 font-medium">Mode</th>
-                  <th className="text-right py-3 pr-4 font-medium">Amount</th>
-                  <th className="text-left py-3 pr-4 font-medium">Status</th>
-                  <th className="text-right py-3 font-medium">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map((inv) => {
-                  // Item 5: render the actual billable party. For subsidiary
-                  // we look up the company; for the other 3 types we show the
-                  // freetext / department label sitting on the invoice row.
-                  const company = inv.company_id ? companyMap.get(inv.company_id) : undefined
-                  let primaryLabel = company?.name ?? '—'
-                  let subLabel = company?.code ?? ''
-                  if (!inv.company_id) {
-                    primaryLabel = inv.billable_to_freetext_name ?? '—'
-                    subLabel =
-                      inv.billable_to_type === 'director'
-                        ? 'Director'
-                        : inv.billable_to_type === 'dept_pool'
-                          ? 'Dept pool'
-                          : inv.billable_to_type === 'freetext'
-                            ? 'Free text'
-                            : '—'
-                  }
-                  return (
-                    <tr
-                      key={inv.id}
-                      className="border-b border-hairline last:border-0"
-                    >
-                      <td className="py-3 pr-4 font-mono text-xs text-muted">
-                        {inv.invoice_no ?? inv.id.slice(0, 8)}
-                      </td>
-                      <td className="py-3 pr-4">
-                        <div className="font-serif text-md text-ink">
-                          {primaryLabel}
-                        </div>
-                        <div className="font-mono text-xs text-muted">
-                          {subLabel}
-                        </div>
-                      </td>
-                      <td className="py-3 pr-4 font-serif italic text-graphite text-sm">
-                        {formatBillingMode(inv.billing_mode)}
-                      </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">
-                        {formatMoney(Number(inv.total_amount))}
-                      </td>
-                      <td className="py-3 pr-4">
-                        <InvoiceStatus status={inv.status} />
-                      </td>
-                      <td className="py-3 text-right">
-                        <div className="flex items-center justify-end gap-3">
-                          {inv.status === 'draft' ? (
-                            <ApproveInvoiceButton id={inv.id} />
-                          ) : inv.status === 'issued' ? (
-                            <Link
-                              href={`/payments/new?invoice_id=${inv.id}`}
-                              className="text-xs text-accent hover:text-accent-hover font-serif italic"
-                            >
-                              Settle →
-                            </Link>
-                          ) : null}
-                          {inv.status !== 'draft' ? (
-                            <CreateCreditNoteButton
-                              invoiceId={inv.id}
-                              invoiceNo={inv.invoice_no}
-                              invoiceTotal={Number(inv.total_amount)}
-                              payeeLabel={primaryLabel}
-                              categories={categories}
-                            />
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+            <SortableTable<Invoice>
+              rows={invoices}
+              getRowKey={(inv) => inv.id}
+              defaultSort={{ key: 'invoice_no', dir: 'desc' }}
+              searchKeys={['invoice_no', 'company', 'billing_mode']}
+              searchPlaceholder="Search invoice # / company / mode…"
+              columns={[
+                {
+                  key: 'invoice_no',
+                  label: 'Invoice #',
+                  render: (inv) => inv.invoice_no ?? inv.id.slice(0, 8),
+                  sortValue: (inv) => inv.invoice_no ?? inv.id,
+                  cellClassName: 'font-mono text-xs text-muted',
+                },
+                {
+                  key: 'company',
+                  label: 'Company',
+                  render: (inv) => {
+                    const labels = resolvePartyLabel(inv, companyMap)
+                    return (
+                      <>
+                        <div className="font-serif text-md text-ink">{labels.primary}</div>
+                        <div className="font-mono text-xs text-muted">{labels.sub}</div>
+                      </>
+                    )
+                  },
+                  sortValue: (inv) => resolvePartyLabel(inv, companyMap).primary,
+                },
+                {
+                  key: 'billing_mode',
+                  label: 'Mode',
+                  render: (inv) => formatBillingMode(inv.billing_mode),
+                  sortValue: (inv) => formatBillingMode(inv.billing_mode),
+                  cellClassName: 'font-serif italic text-graphite text-sm',
+                },
+                {
+                  key: 'total_amount',
+                  label: 'Amount',
+                  align: 'right',
+                  render: (inv) => formatMoney(Number(inv.total_amount)),
+                  sortValue: (inv) => Number(inv.total_amount),
+                  cellClassName: 'font-mono tabular font-medium text-ink',
+                },
+                {
+                  key: 'status',
+                  label: 'Status',
+                  render: (inv) => <InvoiceStatus status={inv.status} />,
+                  sortValue: (inv) => inv.status,
+                },
+                {
+                  key: 'action',
+                  label: 'Action',
+                  sortable: false,
+                  align: 'right',
+                  render: (inv) => {
+                    const labels = resolvePartyLabel(inv, companyMap)
+                    return (
+                      <div className="flex items-center justify-end gap-3">
+                        {inv.status === 'draft' ? (
+                          <ApproveInvoiceButton id={inv.id} />
+                        ) : inv.status === 'issued' ? (
+                          <Link
+                            href={`/payments/new?invoice_id=${inv.id}`}
+                            className="text-xs text-accent hover:text-accent-hover font-serif italic"
+                          >
+                            Settle →
+                          </Link>
+                        ) : null}
+                        {inv.status !== 'draft' ? (
+                          <CreateCreditNoteButton
+                            invoiceId={inv.id}
+                            invoiceNo={inv.invoice_no}
+                            invoiceTotal={Number(inv.total_amount)}
+                            payeeLabel={labels.primary}
+                            categories={categories}
+                          />
+                        ) : null}
+                      </div>
+                    )
+                  },
+                },
+              ]}
+            />
           </div>
         </>
       )}

@@ -79,7 +79,7 @@ export default async function EditPaymentPage({ params }: Props) {
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> TREASURY · PAYMENT VOUCHER · EDIT
+            <em>I.</em> TREASURY · {voucher.direction === 'credit' ? 'OFFICIAL RECEIPT' : 'PAYMENT VOUCHER'} · EDIT
           </div>
           <h1 className="page-title">Edit {voucher.voucher_no ?? 'draft'}</h1>
           <p className="font-serif italic text-graphite text-sm mt-2">

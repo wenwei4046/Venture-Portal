@@ -1,9 +1,9 @@
 import Link from 'next/link'
-import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import ExportCSVButton from './_components/ExportCSVButton'
+import LoansTable from './_components/LoansTable'
 
 type LoanRow = {
   id: string
@@ -139,78 +139,27 @@ export default async function FundOutPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="ledger-table">
-              <thead>
-                <tr>
-                  <th>Company</th>
-                  <th className="right">Principal</th>
-                  <th className="right">Outstanding</th>
-                  <th className="right">Rate</th>
-                  <th>Status</th>
-                  <th className="right"></th>
-                </tr>
-              </thead>
-              <tbody className="row-stagger">
-                {loanList.map((loan, i) => {
-                  const company = companyMap.get(loan.company_id)
-                  const out = outstandingMap.get(loan.id)
-                  const outstanding = Number(out?.outstanding ?? loan.principal)
-                  return (
-                    <tr
-                      key={loan.id}
-                      style={{ '--i': i } as React.CSSProperties}
-                    >
-                      <td>
-                        <div className="font-serif text-[15px] text-ink">
-                          {company?.name ?? '—'}
-                        </div>
-                        <div className="font-mono text-[11px] text-graphite mt-0.5">
-                          {company?.code ?? ''} · {dayjs(loan.created_at).format('D MMM YYYY')}
-                        </div>
-                      </td>
-                      <td className="num">
-                        {formatMoney(Number(loan.principal))}
-                      </td>
-                      <td className="num">
-                        {loan.status === 'active' ? formatMoney(outstanding) : <span className="text-muted">—</span>}
-                      </td>
-                      <td className="num">
-                        {(Number(loan.effective_rate) * 100).toFixed(3)}%
-                      </td>
-                      <td>
-                        <LoanStatusLabel status={loan.status} />
-                      </td>
-                      <td className="right">
-                        <Link
-                          href={`/fund-out/${loan.id}`}
-                          className="text-sm text-accent hover:text-accent-hover font-serif italic"
-                        >
-                          View
-                        </Link>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+            <LoansTable
+              rows={loanList.map((loan) => {
+                const company = companyMap.get(loan.company_id)
+                const out = outstandingMap.get(loan.id)
+                return {
+                  id: loan.id,
+                  companyName: company?.name ?? '—',
+                  companyCode: company?.code ?? '',
+                  createdAt: loan.created_at as string,
+                  principal: Number(loan.principal),
+                  outstanding: Number(out?.outstanding ?? loan.principal),
+                  effectiveRate: Number(loan.effective_rate),
+                  status: loan.status,
+                }
+              })}
+            />
           </div>
         </section>
       )}
     </div>
   )
-}
-
-function LoanStatusLabel({ status }: { status: LoanRow['status'] }) {
-  if (status === 'active') {
-    return <em className="font-serif text-graphite text-sm">active</em>
-  }
-  if (status === 'pending_approval') {
-    return <em className="font-serif text-alert text-sm">pending approval</em>
-  }
-  if (status === 'fully_repaid') {
-    return <em className="font-serif text-ledger text-sm">fully repaid</em>
-  }
-  return <em className="font-serif text-muted text-sm">cancelled</em>
 }
 
 function EmptyState() {

@@ -1,10 +1,10 @@
-import Link from 'next/link'
 import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import GenerateStatementsButton from './_components/GenerateStatementsButton'
 import StatementsTabHeader from './_components/StatementsTabHeader'
+import StatementsPeriodTable from './_components/StatementsPeriodTable'
 
 export default async function StatementsPage() {
   const user = await requireRole(['principal', 'finance'])
@@ -109,76 +109,26 @@ export default async function StatementsPage() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="ledger-table">
-                <thead>
-                  <tr>
-                    <th>Company</th>
-                    <th className="right">Invoice</th>
-                    <th className="right">Contra</th>
-                    <th className="right">Net</th>
-                    <th>Status</th>
-                    <th className="right"></th>
-                  </tr>
-                </thead>
-                <tbody className="row-stagger">
-                  {periodStatements.map((s, i) => {
-                    const company = companyMap.get(s.company_id)
-                    return (
-                      <tr
-                        key={s.id}
-                        style={{ '--i': i } as React.CSSProperties}
-                      >
-                        <td>
-                          <div className="font-serif text-[15px] text-ink">
-                            {company?.name ?? '—'}
-                          </div>
-                          <div className="font-mono text-[11px] text-graphite mt-0.5">
-                            {company?.code}
-                          </div>
-                        </td>
-                        <td className="num">
-                          {Number(s.total_invoice) > 0
-                            ? formatMoney(Number(s.total_invoice))
-                            : <span className="text-muted">—</span>}
-                        </td>
-                        <td className="num neg">
-                          {Number(s.total_contra) > 0
-                            ? formatMoney(-Number(s.total_contra))
-                            : <span className="text-muted">—</span>}
-                        </td>
-                        <td className="num font-semibold">
-                          {formatMoney(Number(s.net_amount))}
-                        </td>
-                        <td>
-                          <StatementStatus status={s.status} />
-                        </td>
-                        <td className="right">
-                          <Link
-                            href={`/statements/${s.id}`}
-                            className="text-sm text-accent hover:text-accent-hover font-serif italic"
-                          >
-                            View
-                          </Link>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+              <StatementsPeriodTable
+                rows={periodStatements.map((s) => {
+                  const company = companyMap.get(s.company_id)
+                  return {
+                    id: s.id,
+                    companyName: company?.name ?? '—',
+                    companyCode: company?.code ?? '',
+                    totalInvoice: Number(s.total_invoice),
+                    totalContra: Number(s.total_contra),
+                    netAmount: Number(s.net_amount),
+                    status: s.status,
+                  }
+                })}
+              />
             </div>
           </section>
         ))
       )}
     </div>
   )
-}
-
-function StatementStatus({ status }: { status: string }) {
-  if (status === 'draft') return <em className="font-serif text-graphite text-sm">draft</em>
-  if (status === 'issued') return <em className="font-serif text-alert text-sm">issued</em>
-  if (status === 'paid') return <em className="font-serif text-ledger text-sm">paid</em>
-  if (status === 'partial') return <em className="font-serif text-alert text-sm">partial</em>
-  return <em className="font-serif text-muted text-sm">{status}</em>
 }
 
 function EmptyState({ canGenerate }: { canGenerate: boolean }) {
