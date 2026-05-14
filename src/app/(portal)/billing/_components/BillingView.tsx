@@ -161,6 +161,12 @@ export default async function BillingView({ searchParams }: Props) {
   const companyMap = new Map(
     companyList.map((c) => [c.id, { name: c.name as string, code: c.short_code as string }])
   )
+  // Inter-billing: invoices may target a dept_pool (billable_to_type='dept_pool')
+  // instead of a subsidiary, so InvoicesList needs to resolve dept name from
+  // billable_to_department_id rather than falling through to '—'.
+  const departmentMap = new Map<string, string>(
+    (departments ?? []).map((d) => [d.id as string, d.name as string])
+  )
 
   return (
     <div>
@@ -293,7 +299,7 @@ export default async function BillingView({ searchParams }: Props) {
         />
       </div>
 
-      <InvoicesList invoices={invoiceList} companyMap={companyMap} period={period} categories={categoryList} />
+      <InvoicesList invoices={invoiceList} companyMap={companyMap} departmentMap={departmentMap} period={period} categories={categoryList} />
 
       <MarketingProjectList
         contracts={(marketingContracts ?? [])

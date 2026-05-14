@@ -30,10 +30,17 @@ interface Invoice {
 function resolvePartyLabel(
   inv: Invoice,
   companyMap: Map<string, { name: string; code: string }>,
+  departmentMap: Map<string, string>,
 ): { primary: string; sub: string } {
-  const company = inv.company_id ? companyMap.get(inv.company_id) : undefined
   if (inv.company_id) {
+    const company = companyMap.get(inv.company_id)
     return { primary: company?.name ?? '—', sub: company?.code ?? '' }
+  }
+  if (inv.billable_to_type === 'dept_pool' && inv.billable_to_department_id) {
+    return {
+      primary: departmentMap.get(inv.billable_to_department_id) ?? '—',
+      sub: 'Dept pool',
+    }
   }
   const primary = inv.billable_to_freetext_name ?? '—'
   const sub =
@@ -67,6 +74,10 @@ function formatBillingMode(mode: string): string {
 interface Props {
   invoices: Invoice[]
   companyMap: Map<string, { name: string; code: string }>
+  /** Mig 225: dept_pool invoices resolve their party label from this map
+   *  (billable_to_department_id → department name). Subsidiary invoices use
+   *  companyMap; director/freetext invoices use the freetext name on the row. */
+  departmentMap: Map<string, string>
   period: string
   /** Phase 11 / post-unified-COA + mig 246: chart_of_accounts rows for
    *  credit-note multi-pool routing. type + parent_code let AccountPicker
@@ -81,7 +92,7 @@ interface Props {
 
 // Invoices for the selected period. Populated by Step 5's generate_monthly_invoices
 // RPC. Until Step 5 ships, this section shows the empty state with an explanation.
-export default function InvoicesList({ invoices, companyMap, period, categories = [] }: Props) {
+export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [] }: Props) {
   const totalsByMode = new Map<string, number>()
   const totalsByCompany = new Map<string, number>()
   let grandTotal = 0
@@ -164,7 +175,7 @@ export default function InvoicesList({ invoices, companyMap, period, categories 
                   key: 'company',
                   label: 'Company',
                   render: (inv) => {
-                    const labels = resolvePartyLabel(inv, companyMap)
+                    const labels = resolvePartyLabel(inv, companyMap, departmentMap)
                     return (
                       <>
                         <div className="font-serif text-md text-ink">{labels.primary}</div>
@@ -172,7 +183,7 @@ export default function InvoicesList({ invoices, companyMap, period, categories 
                       </>
                     )
                   },
-                  sortValue: (inv) => resolvePartyLabel(inv, companyMap).primary,
+                  sortValue: (inv) => resolvePartyLabel(inv, companyMap, departmentMap).primary,
                 },
                 {
                   key: 'billing_mode',
@@ -201,7 +212,7 @@ export default function InvoicesList({ invoices, companyMap, period, categories 
                   sortable: false,
                   align: 'right',
                   render: (inv) => {
-                    const labels = resolvePartyLabel(inv, companyMap)
+                    const labels = resolvePartyLabel(inv, companyMap, departmentMap)
                     return (
                       <div className="flex items-center justify-end gap-3">
                         {inv.status === 'draft' ? (
