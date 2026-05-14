@@ -9,6 +9,8 @@ import {
   type BillableToKind,
   type CreateInvoiceMode,
 } from '../actions'
+import AccountPicker, { type AccountOption } from '@/components/AccountPicker'
+import type { AccountType } from '@/lib/coa'
 
 interface Company {
   id: string
@@ -24,6 +26,8 @@ interface Department {
 interface Category {
   code: string
   label: string
+  type: AccountType
+  parent_code: string | null
 }
 
 interface Props {
@@ -116,6 +120,21 @@ export default function CreateInvoiceButton({
   const [directorMode, setDirectorMode] = useState<CreateInvoiceMode>(prefillMode)
   const [directorCategory, setDirectorCategory] = useState('')
   const [directorAmount, setDirectorAmount] = useState('')
+
+  // Project categories → AccountPicker option shape (mig 246). The picker
+  // hides headers + supports typeahead; previously this was a native
+  // <select> that listed every category including parent rows.
+  const categoryOptions: AccountOption[] = useMemo(
+    () =>
+      categories.map((c) => ({
+        code: c.code,
+        name: c.label,
+        type: c.type,
+        parent_code: c.parent_code,
+        is_active: true,
+      })),
+    [categories],
+  )
 
   // Multi-pool table — used by subsidiary / dept_pool / freetext
   const [poolRows, setPoolRows] = useState<PoolRow[]>([newPoolRow(prefillMode)])
@@ -553,17 +572,16 @@ export default function CreateInvoiceButton({
                     </select>
                   </Field>
                   <Field label="Category" required>
-                    <select
+                    <AccountPicker
+                      accounts={categoryOptions}
                       value={directorCategory}
-                      onChange={(e) => setDirectorCategory(e.target.value)}
+                      onChange={setDirectorCategory}
+                      name="director_category_display"
+                      placeholder="Select category…"
+                      typeFilter={['revenue', 'cost', 'other_income']}
                       disabled={isPending}
-                      className={inputCls}
-                    >
-                      <option value="">Select category…</option>
-                      {categories.map((c) => (
-                        <option key={c.code} value={c.code}>{c.label}</option>
-                      ))}
-                    </select>
+                      required
+                    />
                   </Field>
                   <Field label="Amount" required>
                     <input
@@ -702,7 +720,7 @@ export default function CreateInvoiceButton({
               {usesMultiPool ? (
                 <PoolTable
                   poolRows={poolRows}
-                  categories={categories}
+                  categoryOptions={categoryOptions}
                   isPending={isPending}
                   isRatioTemplate={billableType === 'subsidiary'}
                   onUpdate={updatePoolRow}
@@ -794,7 +812,7 @@ export default function CreateInvoiceButton({
 
 function PoolTable({
   poolRows,
-  categories,
+  categoryOptions,
   isPending,
   isRatioTemplate,
   onUpdate,
@@ -802,7 +820,7 @@ function PoolTable({
   onRemove,
 }: {
   poolRows: PoolRow[]
-  categories: Category[]
+  categoryOptions: AccountOption[]
   isPending: boolean
   isRatioTemplate: boolean
   onUpdate: (uid: string, patch: Partial<PoolRow>) => void
@@ -850,17 +868,15 @@ function PoolTable({
                   </select>
                 </td>
                 <td className="py-2 px-3">
-                  <select
+                  <AccountPicker
+                    accounts={categoryOptions}
                     value={r.categoryCode}
-                    onChange={(e) => onUpdate(r.uid, { categoryCode: e.target.value })}
+                    onChange={(code) => onUpdate(r.uid, { categoryCode: code })}
+                    name={`pool_row_category_${r.uid}_display`}
+                    placeholder="Select category…"
+                    typeFilter={['revenue', 'cost', 'other_income']}
                     disabled={isPending}
-                    className={inputCls}
-                  >
-                    <option value="">Select category…</option>
-                    {categories.map((c) => (
-                      <option key={c.code} value={c.code}>{c.label}</option>
-                    ))}
-                  </select>
+                  />
                 </td>
                 <td className="py-2 px-3">
                   <input

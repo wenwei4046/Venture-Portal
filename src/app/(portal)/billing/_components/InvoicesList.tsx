@@ -40,9 +40,15 @@ interface Props {
   invoices: Invoice[]
   companyMap: Map<string, { name: string; code: string }>
   period: string
-  /** Phase 11 / post-unified-COA: chart_of_accounts rows projected to
-   *  { code, label } for credit-note multi-pool routing. */
-  categories?: Array<{ code: string; label: string }>
+  /** Phase 11 / post-unified-COA + mig 246: chart_of_accounts rows for
+   *  credit-note multi-pool routing. type + parent_code let AccountPicker
+   *  filter to revenue-side leaves only. */
+  categories?: Array<{
+    code: string
+    label: string
+    type: 'revenue' | 'cost' | 'other_income'
+    parent_code: string | null
+  }>
 }
 
 // Invoices for the selected period. Populated by Step 5's generate_monthly_invoices

@@ -69,19 +69,29 @@ export default async function BillingView({ searchParams }: Props) {
     supabase.from('departments').select('id, name').order('name'),
     // Post-mig 238: payment_categories is gone. Pull P&L revenue / cost /
     // other_income accounts from chart_of_accounts for invoice GL routing.
+    // Mig 246 adds parent_code so downstream pickers can hide headers.
     supabase
       .from('chart_of_accounts')
-      .select('code, name, type')
+      .select('code, name, type, parent_code')
       .in('type', ['revenue', 'cost', 'other_income'])
       .eq('is_active', true)
       .order('sort_order'),
   ])
 
-  // Shape categories as { code, label } so the downstream components
-  // (InvoicesList, CreateInvoiceButton, CreateCreditNoteButton, DeptCostCard)
-  // keep the same prop shape they had under the payment_categories model.
-  const categoryList: Array<{ code: string; label: string }> =
-    (categories ?? []).map((c) => ({ code: c.code, label: c.name }))
+  // Shape categories as { code, label, type, parent_code } so the downstream
+  // CreateInvoiceButton can pass them straight into AccountPicker (mig 246).
+  // Keeps the legacy "label" string the rest of the UI already prints.
+  const categoryList: Array<{
+    code: string
+    label: string
+    type: 'revenue' | 'cost' | 'other_income'
+    parent_code: string | null
+  }> = (categories ?? []).map((c) => ({
+    code: c.code,
+    label: c.name,
+    type: c.type as 'revenue' | 'cost' | 'other_income',
+    parent_code: (c as { parent_code: string | null }).parent_code ?? null,
+  }))
 
   if (hrSummaryError) {
     console.error('get_submitted_hr_summary failed:', hrSummaryError.message)
@@ -348,7 +358,12 @@ function DeptCostCard({
   companies: Array<{ id: string; name: string; short_code: string }>
   currentPeriod: string
   departments?: Array<{ id: string; name: string }>
-  categories?: Array<{ code: string; label: string }>
+  categories?: Array<{
+    code: string
+    label: string
+    type: 'revenue' | 'cost' | 'other_income'
+    parent_code: string | null
+  }>
   marketingNote?: boolean
 }) {
   const hasInvoices = invoiceCount > 0
