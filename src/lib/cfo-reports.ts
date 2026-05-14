@@ -174,7 +174,11 @@ export const INVOICE_BILLING_MODE_TO_POOL: Record<string, string> = {
   hr_pool_split: 'dept_pool_hr',
   finance_attribution: 'dept_pool_finance',
   director_office_attribution: 'dept_pool_director_office',
-  director_attribution: 'dept_pool_director_office',
+  // Bug fix 2026-05-14: was mistakenly mapped to dept_pool_director_office,
+  // so director_attribution invoices landed in the wrong pool both at
+  // settlement time and in P&L reports. Director Pool (1070) and
+  // Director Office Pool (1060) are separate.
+  director_attribution: 'dept_pool_director',
   fixed_split: VENTURE_POOL,
   non_billable: VENTURE_POOL,
 }

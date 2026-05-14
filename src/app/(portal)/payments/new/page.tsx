@@ -4,22 +4,18 @@ import { createClient } from '@/lib/supabase/server'
 import type { AccountType } from '@/lib/coa'
 import NewPaymentForm from '../_components/NewPaymentForm'
 import { listPayableFundSources } from '../../fund-in/actions'
+import { invoicePoolForBillingMode } from '@/lib/cfo-reports'
 
 // Settlement routing: when a sub pays an invoice, the money logically lands
-// in the dept pool that generated the service (marketing contracts → Marketing
-// Pool, director OPEX → Director / Director Office Pool). Unknown modes fall
-// back to Venture Pool.
+// in the dept pool that generated the service. Delegates to the canonical
+// map in cfo-reports.ts so the same lookup drives both the settle-invoice
+// pool prefill AND the income-statement aggregation — single source of
+// truth. Previously this file had its own switch that only handled
+// marketing / director / director_office and silently fell back to
+// venture_pool for hr_attribution + finance_attribution, so HR / Finance
+// invoices were routed to the wrong pool.
 function poolForBillingMode(mode: string): string {
-  switch (mode) {
-    case 'marketing_project':
-      return 'dept_pool_marketing'
-    case 'director_attribution':
-      return 'dept_pool_director'
-    case 'director_office_attribution':
-      return 'dept_pool_director_office'
-    default:
-      return 'venture_pool'
-  }
+  return invoicePoolForBillingMode(mode)
 }
 
 interface Props {
