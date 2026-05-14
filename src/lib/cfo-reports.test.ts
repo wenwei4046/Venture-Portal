@@ -7,7 +7,12 @@ const pv = (o: Partial<RawPvSourceRow>): RawPvSourceRow => ({
   pool: 'dept_pool_marketing', accountCode: '9100', accountName: 'Logistics',
   accountType: 'expense', cashFlowCategory: 'operating', amount: 100, ...o,
 })
-const noTreasury: RawTreasury = { interestIncome: 0, penaltyIncome: 0, interestExpense: 0 }
+const noTreasury: RawTreasury = {
+  interestIncome: 0,
+  penaltyIncome: 0,
+  interestExpense: 0,
+  managedCodes: new Set(),
+}
 
 describe('classifyRows', () => {
   it('routes revenue & expense rows into the P&L, by pool', () => {
@@ -67,7 +72,7 @@ describe('classifyRows', () => {
   it('folds treasury interest into the Venture Pool margin (not double-counted)', () => {
     const out = classifyRows({
       pvSources: [], invoices: [],
-      treasury: { interestIncome: 1268.25, penaltyIncome: 0, interestExpense: 8430 },
+      treasury: { interestIncome: 1268.25, penaltyIncome: 0, interestExpense: 8430, managedCodes: new Set() },
     })
     const vp = out.income.pools.find((p) => p.pool === 'venture_pool')!
     expect(vp.revenue).toBeCloseTo(1268.25, 2)
@@ -127,13 +132,34 @@ describe('classifyRows', () => {
         pv({ voucherType: 'loan_repayment', direction: 'credit', accountType: 'revenue', cashFlowCategory: 'operating', amount: 200, pool: 'venture_pool', accountName: 'Interest income (PV-side)' }),
       ],
       invoices: [],
-      treasury: { interestIncome: 200, penaltyIncome: 0, interestExpense: 0 },
+      treasury: { interestIncome: 200, penaltyIncome: 0, interestExpense: 0, managedCodes: new Set() },
     })
     const vp = out.income.pools.find((p) => p.pool === 'venture_pool')!
     // Revenue is 200 (from treasury), NOT 400. The PV revenue source is skipped.
     expect(vp.revenue).toBeCloseTo(200, 2)
     // The principal row appears as BS movement + investing cash inflow
     expect(out.balanceMovements.find((m) => m.label === 'Loan principal received')?.amount).toBe(10000)
+  })
+
+  it('does NOT double-count interest when posted via a generic expense voucher (account_code 9010 PV source is skipped because treasury claims that code)', () => {
+    // Regression for 2026-05-14: user paid interest via a manually-built
+    // voucher_type='expense' PV with two source rows: principal → liability
+    // 4001, interest → 9010 (Interest Expense). gatherTreasury reads JE
+    // 9010 → interestExpense 2000. Without skipping the 9010 PV row, the
+    // P&L double-counts the same 2000.
+    const out = classifyRows({
+      pvSources: [
+        pv({ voucherType: 'expense', direction: 'debit', accountType: 'liability', cashFlowCategory: 'financing', amount: 8333.33, pool: 'venture_pool', accountCode: '4001', accountName: 'Amount due to — sub' }),
+        pv({ voucherType: 'expense', direction: 'debit', accountType: 'expense', cashFlowCategory: 'operating', amount: 2000, pool: 'venture_pool', accountCode: '9010', accountName: 'Interest Expense — Fund Sources' }),
+      ],
+      invoices: [],
+      treasury: { interestIncome: 0, penaltyIncome: 0, interestExpense: 2000, managedCodes: new Set(['9010']) },
+    })
+    const vp = out.income.pools.find((p) => p.pool === 'venture_pool')!
+    // Expense is 2000 (from treasury), NOT 4000. The PV expense row on
+    // account_code 9010 is skipped.
+    expect(vp.expense).toBeCloseTo(2000, 2)
+    expect(vp.margin).toBeCloseTo(-2000, 2)
   })
 
   it('counts fund_sources (deposits received) as cash inflow + BS liability increase, never P&L', () => {

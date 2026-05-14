@@ -59,6 +59,11 @@ export interface RawTreasury {
   interestIncome: number // GL Interest Income net credit
   penaltyIncome: number // GL Penalty Income net credit
   interestExpense: number // GL Interest Expense net debit
+  // COA codes treasury claims as its own — interest income / penalty income /
+  // interest expense (and any children thereof). classifyRows skips PV
+  // source rows pointing at these codes so the same JE isn't double-counted
+  // both as a PV-derived P&L line AND as treasury.
+  managedCodes: Set<string>
 }
 
 // Fund-IN doesn't create a payment_voucher (the PV system is the single exit
@@ -264,12 +269,20 @@ export function classifyRows(input: ClassifyInput): ClassifyOutput {
   for (const src of pvSources) {
     // Rule 1: skip internal_transfer vouchers entirely (bank-to-bank moves).
     if (src.voucherType === 'internal_transfer') continue
-    // Rule 1b: on loan_repayment / loan_disbursement vouchers, the P&L portion
-    // (interest income, penalty income, interest expense) is already captured
-    // via the journal-derived treasury section. If a categorised PV source row
-    // also tries to land in P&L revenue/cost/other_income/expense, it would
-    // double-count. Only honour BS-classified rows (asset/fixed_asset/
-    // liability/equity = principal movement) on these vouchers.
+    // Rule 1b: treasury accounts (interest income / penalty income /
+    // interest expense + any sub-accounts) are aggregated by gatherTreasury
+    // straight from journal_lines. If a PV source row points at one of
+    // those codes, classifyRows must skip it — otherwise the same 2,000
+    // RM interest charge counts once as a PV-derived expense and once as
+    // treasury, breaking A = L + E by the duplicated amount. Replaces the
+    // older voucher_type-only skip (which only fired on
+    // loan_repayment / loan_disbursement and silently double-counted
+    // interest paid via a generic 'expense' voucher).
+    if (treasury.managedCodes.has(src.accountCode)) continue
+    // Rule 1c: on loan_repayment / loan_disbursement vouchers, also skip
+    // any other P&L-typed source rows (defensive: pre-treasury-skip data
+    // sometimes carried interest as a generic expense category not picked
+    // up by the name match above).
     if (
       (src.voucherType === 'loan_repayment' || src.voucherType === 'loan_disbursement') &&
       (src.accountType === 'revenue' ||
@@ -663,19 +676,37 @@ async function gatherTreasury(
   const { from, to } = args
 
   const accountByCode = await fetchAccountIndex(supabase)
-  let interestIncomeCode: string | null = null
-  let penaltyIncomeCode: string | null = null
-  let interestExpenseCode: string | null = null
+  // Identify the COA codes treasury claims. Multiple matches are allowed so
+  // future sub-accounts ("9011 Interest Expense — Director Loan",
+  // "7002 Penalty Income — Carres", etc.) automatically join the set.
+  // - interest income: revenue OR other_income (mig 238 reseeded 7000 as
+  //   other_income; older deployments may still classify it as revenue)
+  // - penalty income: same dual type
+  // - interest expense: expense
+  const interestIncomeCodes = new Set<string>()
+  const penaltyIncomeCodes = new Set<string>()
+  const interestExpenseCodes = new Set<string>()
   for (const [code, a] of accountByCode.entries()) {
     const n = a.name.toLowerCase()
-    if (a.accountType === 'revenue' && n.includes('interest income')) interestIncomeCode = code
-    else if (
+    if (
+      (a.accountType === 'revenue' || a.accountType === 'other_income') &&
+      n.includes('interest income')
+    ) {
+      interestIncomeCodes.add(code)
+    } else if (
       (a.accountType === 'revenue' || a.accountType === 'other_income') &&
       n.includes('penalty income')
-    )
-      penaltyIncomeCode = code
-    else if (a.accountType === 'expense' && n.includes('interest expense')) interestExpenseCode = code
+    ) {
+      penaltyIncomeCodes.add(code)
+    } else if (a.accountType === 'expense' && n.includes('interest expense')) {
+      interestExpenseCodes.add(code)
+    }
   }
+  const managedCodes = new Set<string>([
+    ...interestIncomeCodes,
+    ...penaltyIncomeCodes,
+    ...interestExpenseCodes,
+  ])
 
   const { data: jes, error: jeErr } = await supabase
     .from('journal_entries')
@@ -686,12 +717,14 @@ async function gatherTreasury(
   if (jeErr) throw new Error(`cfo-reports treasury JEs: ${jeErr.message}`)
 
   const entryIds = (jes ?? []).map((j) => j.id as string)
-  if (entryIds.length === 0) return { interestIncome: 0, penaltyIncome: 0, interestExpense: 0 }
+  if (entryIds.length === 0) {
+    return { interestIncome: 0, penaltyIncome: 0, interestExpense: 0, managedCodes }
+  }
 
-  const watchCodes = [interestIncomeCode, penaltyIncomeCode, interestExpenseCode].filter(
-    (c): c is string => !!c,
-  )
-  if (watchCodes.length === 0) return { interestIncome: 0, penaltyIncome: 0, interestExpense: 0 }
+  const watchCodes = Array.from(managedCodes)
+  if (watchCodes.length === 0) {
+    return { interestIncome: 0, penaltyIncome: 0, interestExpense: 0, managedCodes }
+  }
 
   const { data: lines, error: lErr } = await supabase
     .from('journal_lines')
@@ -705,11 +738,11 @@ async function gatherTreasury(
   let interestExpense = 0
   for (const l of lines ?? []) {
     const code = l.account_code as string
-    if (code === interestIncomeCode) interestIncome += Number(l.credit ?? 0) - Number(l.debit ?? 0)
-    if (code === penaltyIncomeCode) penaltyIncome += Number(l.credit ?? 0) - Number(l.debit ?? 0)
-    if (code === interestExpenseCode) interestExpense += Number(l.debit ?? 0) - Number(l.credit ?? 0)
+    if (interestIncomeCodes.has(code)) interestIncome += Number(l.credit ?? 0) - Number(l.debit ?? 0)
+    if (penaltyIncomeCodes.has(code)) penaltyIncome += Number(l.credit ?? 0) - Number(l.debit ?? 0)
+    if (interestExpenseCodes.has(code)) interestExpense += Number(l.debit ?? 0) - Number(l.credit ?? 0)
   }
-  return { interestIncome, penaltyIncome, interestExpense }
+  return { interestIncome, penaltyIncome, interestExpense, managedCodes }
 }
 
 // Fund-IN inflows: fund_sources rows activated within [from, to].
