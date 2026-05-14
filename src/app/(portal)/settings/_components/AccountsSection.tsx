@@ -322,14 +322,30 @@ function AccountForm({
   }
 
   // Mig 246: a parent must be of the same type and not point at this row
-  // (no self-parent). On create, also exclude the row being created (no code
-  // yet, but exclude anything self-referencing). Inactive rows hidden.
+  // (no self-parent) or at any of its descendants (would create a cycle).
+  // Inactive rows hidden.
+  const descendantCodes = useMemo(() => {
+    if (!initial?.code) return new Set<string>()
+    const out = new Set<string>([initial.code])
+    let added = true
+    while (added) {
+      added = false
+      for (const a of allAccounts) {
+        if (a.parent_code && out.has(a.parent_code) && !out.has(a.code)) {
+          out.add(a.code)
+          added = true
+        }
+      }
+    }
+    return out
+  }, [allAccounts, initial?.code])
+
   const parentOptions = useMemo(
     () =>
       allAccounts
-        .filter((a) => a.type === type && a.is_active && a.code !== initial?.code)
+        .filter((a) => a.type === type && a.is_active && !descendantCodes.has(a.code))
         .sort((a, b) => a.code.localeCompare(b.code)),
-    [allAccounts, type, initial?.code],
+    [allAccounts, type, descendantCodes],
   )
 
   return (
@@ -342,6 +358,8 @@ function AccountForm({
           fd.set('name', name)
           fd.set('cash_flow_category', cfc)
           fd.set('is_active', isActive ? 'true' : 'false')
+          // Empty string = detach (clear parent_code); otherwise = new parent.
+          fd.set('parent_code', parentCode)
         } else {
           fd.set('type', type)
           fd.set('name', name)
@@ -433,31 +451,41 @@ function AccountForm({
         </p>
       </div>
 
-      {mode === 'create' ? (
-        <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Parent account <span className="text-muted font-normal">(optional)</span>
-          </label>
-          <select
-            value={parentCode}
-            onChange={(e) => setParentCode(e.target.value)}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-          >
-            <option value="">— None (top level) —</option>
-            {parentOptions.map((p) => (
-              <option key={p.code} value={p.code}>
-                {p.code} · {p.name}
-              </option>
-            ))}
-          </select>
-          <p className="font-serif italic text-muted text-xs mt-1.5">
-            Pick a parent to group this account under (e.g. "4000 Amount due
-            to related party" with child "4001 — Lim Wei Siang"). The parent
-            then becomes a header — it can't be picked for posting in PV,
-            fund-in, fund-out, or invoice forms. Must share the same type.
-          </p>
-        </div>
-      ) : null}
+      <div>
+        <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+          Parent account <span className="text-muted font-normal">(optional)</span>
+        </label>
+        <select
+          value={parentCode}
+          onChange={(e) => setParentCode(e.target.value)}
+          className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+        >
+          <option value="">— None (top level) —</option>
+          {parentOptions.map((p) => (
+            <option key={p.code} value={p.code}>
+              {p.code} · {p.name}
+            </option>
+          ))}
+        </select>
+        <p className="font-serif italic text-muted text-xs mt-1.5">
+          {mode === 'create' ? (
+            <>
+              Pick a parent to group this account under (e.g. "4000 Amount due
+              to related party" with child "4001 — Lim Wei Siang"). The parent
+              then becomes a header — it can&apos;t be picked for posting in
+              PV, fund-in, fund-out, or invoice forms. Must share the same
+              type.
+            </>
+          ) : (
+            <>
+              Choose a new parent or pick &quot;None&quot; to detach. Only
+              same-type accounts that are not already descendants of this
+              account appear here, so you can&apos;t accidentally create a
+              cycle.
+            </>
+          )}
+        </p>
+      </div>
 
       {mode === 'edit' ? (
         <label className="flex items-center gap-2 text-sm font-serif text-graphite">
