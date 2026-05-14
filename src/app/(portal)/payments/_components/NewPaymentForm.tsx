@@ -841,8 +841,16 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
       {isInvoicePay ? (
         <div className="mb-6 px-3 py-2 bg-surface border border-hairline rounded-md">
           <p className="font-serif italic text-muted text-xs">
-            Journal entry: <span className="font-mono not-italic text-graphite">Dr Bank / Cr 3030 Accounts Receivable</span>.
-            Revenue was already recognised when the invoice was issued — no account to pick.
+            Journal entry:{' '}
+            <span className="font-mono not-italic text-graphite">
+              {isInterBilling
+                ? 'Dr 9050 Inter-billing Expense / Cr 3030 Accounts Receivable'
+                : 'Dr Bank / Cr 3030 Accounts Receivable'}
+            </span>
+            .{' '}
+            {isInterBilling
+              ? 'Inter-billing settle — no bank movement. The paying dept’s P&L books the expense (mig 253); the receiving dept already accrued revenue at invoice issue.'
+              : 'Revenue was already recognised when the invoice was issued — no account to pick.'}
           </p>
         </div>
       ) : null}
