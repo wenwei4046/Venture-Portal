@@ -156,7 +156,7 @@ export async function applyVoucherPaidSideEffects(
   const nowIso = new Date().toISOString()
 
   // ── Bank balance (debit = subtract, credit = add) ──
-  let bankGlCode = '1010'
+  let bankGlCode = '3000'
   if (voucher.bank_account_id) {
     const { data: bank } = await supabase
       .from('bank_accounts')
@@ -165,7 +165,7 @@ export async function applyVoucherPaidSideEffects(
       .single()
 
     if (bank) {
-      bankGlCode = bank.gl_account_code ?? '1010'
+      bankGlCode = bank.gl_account_code ?? '3000'
       const newBalance = isCredit
         ? Number(bank.current_balance) + amount
         : Number(bank.current_balance) - amount
@@ -272,22 +272,25 @@ export async function applyVoucherPaidSideEffects(
   }
 
   // ── GL journal (double-entry, non-blocking) ──
+  // Mig 238 unified COA — accounts remapped to new ranges. See coa.ts for the
+  // full type/range map. This fallback is the catch-all when a PV doesn't
+  // have a more specific account_code on its source row.
   const expenseAccount: Record<string, string> = {
-    loan_repayment: '2010',
-    billing_payment: '2060',
-    claim_payout: '5060',
-    expense: '5050',
-    internal_transfer: '1011',
-    salary_payout: '2030',
-    other: '5050',
+    loan_repayment: '4000',     // Fund Sources Payable (liability ↓)
+    billing_payment: '4050',    // AP — General (liability ↓)
+    claim_payout: '9000',       // G&A Expense (no dedicated claims account in seed)
+    expense: '9000',            // G&A Expense
+    internal_transfer: '3010',  // Alliance Bank (the other bank account)
+    salary_payout: '4020',      // Salary Payable (liability ↓)
+    other: '9000',              // G&A Expense
   }
-  const debitAccount = expenseAccount[voucher.voucher_type] ?? '5050'
+  const debitAccount = expenseAccount[voucher.voucher_type] ?? '9000'
 
   try {
     const lines = isCredit
       ? [
           { accountCode: bankGlCode, debit: amount, description: `Bank deposit — ${voucher.voucher_no}` },
-          { accountCode: '1040', credit: amount, description: `Payment received — ${voucher.payee_name}` },
+          { accountCode: '3030', credit: amount, description: `Payment received — ${voucher.payee_name}` },
         ]
       : [
           { accountCode: debitAccount, debit: amount, description: `${voucher.voucher_type} — ${voucher.payee_name}` },

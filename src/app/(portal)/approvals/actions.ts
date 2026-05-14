@@ -237,7 +237,7 @@ export async function approveRequest(formData: FormData) {
           createdBy: user.id,
           lines: [
             { accountCode: srcGl, debit: Number(fundSource.amount), description: `${srcDept?.name} Pool transferred to HV` },
-            { accountCode: '3010', credit: Number(fundSource.amount), description: 'HV Operating Fund from dept transfer' },
+            { accountCode: '1010', credit: Number(fundSource.amount), description: 'HV Operating Fund from dept transfer' },
           ],
         })
       }
@@ -283,8 +283,8 @@ export async function approveRequest(formData: FormData) {
         referenceId: fundSource.id,
         createdBy: user.id,
         lines: [
-          { accountCode: primaryBank?.gl_account_code ?? '1010', debit: Number(fundSource.amount), description: 'Bank — fund source received' },
-          { accountCode: '2010', credit: Number(fundSource.amount), description: `Fund source payable — ${fundSource.source_type}` },
+          { accountCode: primaryBank?.gl_account_code ?? '3000', debit: Number(fundSource.amount), description: 'Bank — fund source received' },
+          { accountCode: '4000', credit: Number(fundSource.amount), description: `Fund source payable — ${fundSource.source_type}` },
         ],
       })
     }
@@ -633,8 +633,8 @@ export async function approveRequestGroup(formData: FormData) {
       referenceId: loanApproval.reference_id,
       createdBy: user.id,
       lines: [
-        { accountCode: '1020', debit: Number(voucher.amount), description: 'Loans Receivable — disbursement' },
-        { accountCode: primaryBank?.gl_account_code ?? '1010', credit: Number(voucher.amount), description: `Bank — loan disbursement ${voucher.voucher_no ?? ''}`.trim() },
+        { accountCode: '3020', debit: Number(voucher.amount), description: 'Loans Receivable — disbursement' },
+        { accountCode: primaryBank?.gl_account_code ?? '3000', credit: Number(voucher.amount), description: `Bank — loan disbursement ${voucher.voucher_no ?? ''}`.trim() },
       ],
     })
   } catch (jeErr) {

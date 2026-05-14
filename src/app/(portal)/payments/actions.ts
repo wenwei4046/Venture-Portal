@@ -277,8 +277,8 @@ export async function createPaymentVoucher(formData: FormData) {
     // GL journal entry (non-blocking)
     try {
       const bankGlCode = bankAccountId
-        ? ((await supabase.from('bank_accounts').select('gl_account_code').eq('id', bankAccountId).single()).data?.gl_account_code ?? '1010')
-        : '1010'
+        ? ((await supabase.from('bank_accounts').select('gl_account_code').eq('id', bankAccountId).single()).data?.gl_account_code ?? '3000')
+        : '3000'
       await postJournalEntry(supabase, {
         transactionDate: todayStr,
         description: `PV ${voucherNo}: ${description}`,
@@ -286,7 +286,7 @@ export async function createPaymentVoucher(formData: FormData) {
         referenceId: data.id,
         lines: [
           { accountCode: bankGlCode, debit: r2(amount), description: `Bank deposit — ${voucherNo}` },
-          { accountCode: '1040', credit: r2(amount), description: `Payment received — ${payeeName}` },
+          { accountCode: '3030', credit: r2(amount), description: `Payment received — ${payeeName}` },
         ],
         createdBy: user.id,
       })

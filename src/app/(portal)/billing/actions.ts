@@ -460,7 +460,7 @@ export async function approveInvoice(formData: FormData) {
         referenceId: inv.id,
         createdBy: user.id,
         lines: [
-          { accountCode: '1040', debit: amount, description: `AR — invoice ${inv.invoice_no ?? ''}`.trim() },
+          { accountCode: '3030', debit: amount, description: `AR — invoice ${inv.invoice_no ?? ''}`.trim() },
           { accountCode: revenueCode, credit: amount, description: 'Service billing revenue recognised' },
         ],
       })
@@ -513,7 +513,7 @@ export async function approveInvoicesForPeriod(formData: FormData) {
         referenceId: row.id,
         createdBy: user.id,
         lines: [
-          { accountCode: '1040', debit: amount, description: `AR — invoice ${row.invoice_no ?? ''}`.trim() },
+          { accountCode: '3030', debit: amount, description: `AR — invoice ${row.invoice_no ?? ''}`.trim() },
           { accountCode: revenueCode, credit: amount, description: 'Service billing revenue recognised' },
         ],
       })

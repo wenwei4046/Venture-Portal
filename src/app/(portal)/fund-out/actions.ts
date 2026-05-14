@@ -244,11 +244,15 @@ export async function recordRepayment(formData: FormData) {
     .eq('status', 'active')
     .maybeSingle()
 
-  const bankGl = primaryBank?.gl_account_code ?? '1010'
+  const bankGl = primaryBank?.gl_account_code ?? '3000'
+  // Mig 238 unified COA:
+  //   - 3020 Loans Receivable (asset)   ← principal received reduces this
+  //   - 7010 Penalty Income (other_income)
+  //   - 7000 Interest Income — Loans (other_income)  ← interest + netting
   const creditAccount =
-    paymentType === 'principal' ? '1020' :
-    paymentType === 'penalty'   ? '4020' :
-                                  '4010'   // interest + netting
+    paymentType === 'principal' ? '3020' :
+    paymentType === 'penalty'   ? '7010' :
+                                  '7000'   // interest + netting
 
   try {
     await postJournalEntry(supabase, {
