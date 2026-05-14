@@ -752,7 +752,10 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
       )}
 
       {/* ── Account ── (debit: per-source rows own it; credit: single voucher-level) */}
-      {isLoanRepayment ? null : (
+      {/* Settling an invoice is purely Dr Bank / Cr AR — revenue was already
+          recognised at invoice issue. The server auto-fills account_code with
+          3030 (AR — Subs); the user doesn't need to pick. */}
+      {isLoanRepayment || isInvoicePay ? null : (
       <div className="mb-6">
         <div className="flex items-baseline justify-between mb-1.5">
           <label className="block text-sm font-sans font-medium text-graphite">
@@ -806,6 +809,16 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
         ) : null}
       </div>
       )}
+
+      {/* Invoice-pay info banner — replaces the Account picker for billing_payment. */}
+      {isInvoicePay ? (
+        <div className="mb-6 px-3 py-2 bg-surface border border-hairline rounded-md">
+          <p className="font-serif italic text-muted text-xs">
+            Journal entry: <span className="font-mono not-italic text-graphite">Dr Bank / Cr 3030 Accounts Receivable</span>.
+            Revenue was already recognised when the invoice was issued — no account to pick.
+          </p>
+        </div>
+      ) : null}
 
       {/* ── Description ── */}
       <div className="mb-6">

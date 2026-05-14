@@ -26,7 +26,13 @@ export async function createPaymentVoucher(formData: FormData) {
   const description = (formData.get('description') as string)?.trim() ?? ''
   const paymentMethod = (formData.get('payment_method') as string) || 'bank_transfer'
   const direction = (formData.get('direction') as string) || 'debit'
-  const accountCode = (formData.get('account_code') as string) || null
+  // For billing_payment (settling an invoice) the journal is purely
+  //   dr Bank / cr 3030 AR
+  // The user-facing form doesn't need to ask for an account — revenue was
+  // already recognised at invoice issue. Auto-fill with AR — Subs (3030).
+  const rawAccountCode = (formData.get('account_code') as string) || null
+  const accountCode = rawAccountCode
+    ?? (voucherType === 'billing_payment' ? '3030' : null)
   const sourcePool = (formData.get('source_pool') as string) || null
   // Phase 7 Step 10: Credit vouchers default to Venture Pool when unspecified.
   const targetPoolRaw = (formData.get('target_pool') as string) || null
