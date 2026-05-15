@@ -46,14 +46,28 @@ export default async function CashFlowPage({ searchParams }: Props) {
           </div>
           <h1 className="page-title">Cash Flow Statement</h1>
         </div>
-        <form className="shrink-0">
-          <input
-            type="month"
-            name="period"
-            defaultValue={dayjs(from).format('YYYY-MM')}
-            className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
-          />
-        </form>
+        <div className="flex items-center gap-3 shrink-0">
+          <form>
+            <input
+              type="month"
+              name="period"
+              defaultValue={dayjs(from).format('YYYY-MM')}
+              className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+            />
+          </form>
+          <Link
+            href={`/reports/cash-flow/export?format=xlsx&from=${from}&to=${to}`}
+            className="px-3 py-2 bg-accent text-white rounded-md text-sm font-sans hover:bg-accent/90 transition-colors"
+          >
+            Excel
+          </Link>
+          <Link
+            href={`/reports/cash-flow/export?format=pdf&from=${from}&to=${to}`}
+            className="px-3 py-2 bg-accent text-white rounded-md text-sm font-sans hover:bg-accent/90 transition-colors"
+          >
+            PDF
+          </Link>
+        </div>
       </div>
 
       <p className="font-serif italic text-muted text-sm mb-8 max-w-3xl">
