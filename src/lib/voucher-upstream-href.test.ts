@@ -8,8 +8,8 @@ describe('voucherUpstreamHref', () => {
     expect(voucherUpstreamHref('loan', id)).toBe(`/fund-out/${id}`)
   })
 
-  it('returns /statements path for invoice', () => {
-    expect(voucherUpstreamHref('invoice', id)).toBe(`/statements/${id}`)
+  it('returns null for invoice (no per-invoice detail page; lives in /statements?period= list)', () => {
+    expect(voucherUpstreamHref('invoice', id)).toBeNull()
   })
 
   it('returns /fund-in path for fund_source', () => {
