@@ -1225,6 +1225,78 @@ export async function fetchTrialBalance(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// General Ledger — chronological journal_lines for a single account over a
+// period, with running balance.
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface RawLedgerLine {
+  entryDate: string  // YYYY-MM-DD
+  entryNo: string
+  description: string
+  debit: number      // positive amount; 0 when this side wasn't touched
+  credit: number     // positive amount; 0 when this side wasn't touched
+}
+
+export interface LedgerLine {
+  entryDate: string
+  entryNo: string
+  description: string
+  debit: number
+  credit: number
+  runningBalance: number  // signed Dr − Cr (positive = debit balance after this line)
+}
+
+export interface Ledger {
+  code: string
+  accountName: string
+  accountType: AccountType
+  from: string
+  to: string
+  openingBalance: number   // signed Dr − Cr at start of period
+  closingBalance: number   // signed Dr − Cr at end of period
+  periodTotals: { debit: number; credit: number }
+  lines: LedgerLine[]
+}
+
+export function buildLedger(args: {
+  account: CoaLeafAccount
+  openingBalance: number
+  rawLines: RawLedgerLine[]
+  from: string
+  to: string
+}): Ledger {
+  const { account, openingBalance, rawLines, from, to } = args
+  let running = openingBalance
+  let totalDebit = 0
+  let totalCredit = 0
+  const lines: LedgerLine[] = []
+  for (const raw of rawLines) {
+    running += raw.debit - raw.credit
+    totalDebit += raw.debit
+    totalCredit += raw.credit
+    lines.push({
+      entryDate: raw.entryDate,
+      entryNo: raw.entryNo,
+      description: raw.description,
+      debit: r2(raw.debit),
+      credit: r2(raw.credit),
+      runningBalance: r2(running),
+    })
+  }
+  return {
+    code: account.code,
+    accountName: account.name,
+    accountType: account.type,
+    from,
+    to,
+    openingBalance: r2(openingBalance),
+    closingBalance: r2(running),
+    periodTotals: { debit: r2(totalDebit), credit: r2(totalCredit) },
+    lines,
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Date helpers
 // ────────────────────────────────────────────────────────────────────────────
 export function startOfMonth(d?: string): string {

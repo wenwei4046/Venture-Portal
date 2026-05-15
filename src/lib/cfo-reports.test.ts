@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { classifyRows, buildTrialBalance } from './cfo-reports'
-import type { RawPvSourceRow, RawInvoiceRow, RawTreasury, CoaLeafAccount } from './cfo-reports'
+import { classifyRows, buildTrialBalance, buildLedger } from './cfo-reports'
+import type { RawPvSourceRow, RawInvoiceRow, RawTreasury, CoaLeafAccount, RawLedgerLine } from './cfo-reports'
 
 const pv = (o: Partial<RawPvSourceRow>): RawPvSourceRow => ({
   voucherId: 'v1', voucherType: 'expense', direction: 'debit',
@@ -362,5 +362,44 @@ describe('buildTrialBalance', () => {
     })
     expect(shown.rows).toHaveLength(2)
     expect(shown.rows.find((r) => r.code === '3010')).toMatchObject({ debit: 0, credit: 0 })
+  })
+})
+
+describe('buildLedger', () => {
+  it('closing balance = opening + period Dr − period Cr', () => {
+    const account: CoaLeafAccount = {
+      code: '3000', name: 'Cash & Bank — Hong Leong', type: 'asset',
+    }
+    const rawLines: RawLedgerLine[] = [
+      { entryDate: '2026-05-03', entryNo: 'JE-001', description: 'inv 1', debit: 500, credit: 0 },
+      { entryDate: '2026-05-10', entryNo: 'JE-002', description: 'pmt', debit: 0, credit: 200 },
+    ]
+    const led = buildLedger({
+      account, openingBalance: 1000, rawLines,
+      from: '2026-05-01', to: '2026-05-31',
+    })
+    expect(led.openingBalance).toBe(1000)
+    expect(led.periodTotals).toEqual({ debit: 500, credit: 200 })
+    expect(led.closingBalance).toBe(1300)
+    expect(led.lines).toHaveLength(2)
+  })
+
+  it('running balance accumulates Dr − Cr line by line', () => {
+    const account: CoaLeafAccount = {
+      code: '3000', name: 'Cash & Bank — Hong Leong', type: 'asset',
+    }
+    const rawLines: RawLedgerLine[] = [
+      { entryDate: '2026-05-03', entryNo: 'JE-001', description: 'in',  debit: 100, credit: 0 },
+      { entryDate: '2026-05-05', entryNo: 'JE-002', description: 'out', debit: 0,   credit: 30 },
+      { entryDate: '2026-05-08', entryNo: 'JE-003', description: 'in',  debit: 50,  credit: 0 },
+    ]
+    const led = buildLedger({
+      account, openingBalance: 0, rawLines,
+      from: '2026-05-01', to: '2026-05-31',
+    })
+    expect(led.lines[0].runningBalance).toBe(100)
+    expect(led.lines[1].runningBalance).toBe(70)
+    expect(led.lines[2].runningBalance).toBe(120)
+    expect(led.closingBalance).toBe(120)
   })
 })
