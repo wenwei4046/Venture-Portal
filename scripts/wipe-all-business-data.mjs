@@ -165,8 +165,23 @@ async function safeDelete(table) {
     console.log(`  ⚠ ${table}: count error — ${before}`)
     return { table, before: 0, after: 0, error: before }
   }
+  if (before === 0) {
+    console.log(`  ✓ ${table}: 0 → 0 (already empty)`)
+    return { table, before: 0, after: 0 }
+  }
 
-  const { error } = await admin.from(table).delete().not('id', 'is', null)
+  // `.select('id')` is load-bearing: without it, supabase-js sends
+  // `Prefer: return=minimal` and the DELETE silently no-ops on header
+  // tables (payment_vouchers, invoices, journal_entries, fund_sources)
+  // — error is null, 0 rows affected, no signal. Appending `.select(…)`
+  // forces `Prefer: return=representation`, which both makes the DELETE
+  // actually run AND returns the deleted rows so we can count them.
+  // Reproduced 2026-05-14 against test project kylcwsxugfbwcofgzhfm.
+  const { data: deleted, error } = await admin
+    .from(table)
+    .delete()
+    .not('id', 'is', null)
+    .select('id')
   if (error) {
     if (/42P01|Not Found/i.test(error.message)) {
       console.log(`  — ${table}: skipped (table not found)`)
@@ -177,8 +192,20 @@ async function safeDelete(table) {
   }
 
   const after = await rowCount(table)
-  console.log(`  ✓ ${table}: ${before} → ${after ?? 0}`)
-  return { table, before, after: after ?? 0 }
+  const afterCount = typeof after === 'number' ? after : 0
+  const deletedCount = deleted?.length ?? 0
+
+  // Fail loud if rows remain after a no-error DELETE. This catches the
+  // silent-failure mode the .select('id') chain is supposed to fix —
+  // if it ever resurfaces (different table, new trigger, PostgREST
+  // upgrade), the final assertion in main() will exit non-zero.
+  if (afterCount > 0) {
+    console.log(`  ⚠ ${table}: ${before} → ${afterCount}  SILENT FAILURE (deleted ${deletedCount}, ${afterCount} rows still present)`)
+    return { table, before, after: afterCount, error: 'silent-zero' }
+  }
+
+  console.log(`  ✓ ${table}: ${before} → 0 (deleted ${deletedCount})`)
+  return { table, before, after: 0, deletedCount }
 }
 
 async function safeDeleteCreatedAt(table) {
@@ -186,15 +213,33 @@ async function safeDeleteCreatedAt(table) {
   const before = await rowCount(table)
   if (before === null) {
     console.log(`  — ${table}: skipped (table not found)`)
-    return
+    return { table, before: 0, after: 0, skipped: true }
   }
-  const { error } = await admin.from(table).delete().gte('created_at', '1900-01-01')
+  if (typeof before === 'string') {
+    console.log(`  ⚠ ${table}: count error — ${before}`)
+    return { table, before: 0, after: 0, error: before }
+  }
+  if (before === 0) {
+    console.log(`  ✓ ${table}: 0 → 0 (already empty)`)
+    return { table, before: 0, after: 0 }
+  }
+  const { data: deleted, error } = await admin
+    .from(table)
+    .delete()
+    .gte('created_at', '1900-01-01')
+    .select('created_at')
   if (error) {
     console.log(`  ⚠ ${table}: ${error.message}`)
-    return
+    return { table, before, after: before, error: error.message }
   }
   const after = await rowCount(table)
-  console.log(`  ✓ ${table}: ${before} → ${after ?? 0}`)
+  const afterCount = typeof after === 'number' ? after : 0
+  if (afterCount > 0) {
+    console.log(`  ⚠ ${table}: ${before} → ${afterCount}  SILENT FAILURE (deleted ${deleted?.length ?? 0})`)
+    return { table, before, after: afterCount, error: 'silent-zero' }
+  }
+  console.log(`  ✓ ${table}: ${before} → 0 (deleted ${deleted?.length ?? 0})`)
+  return { table, before, after: 0 }
 }
 
 async function safeDeletePeriodLocks() {
@@ -204,15 +249,33 @@ async function safeDeletePeriodLocks() {
   const before = await rowCount(table)
   if (before === null) {
     console.log(`  — ${table}: skipped (table not found)`)
-    return
+    return { table, before: 0, after: 0, skipped: true }
   }
-  const { error } = await admin.from(table).delete().gte('period_month', '1900-01-01')
+  if (typeof before === 'string') {
+    console.log(`  ⚠ ${table}: count error — ${before}`)
+    return { table, before: 0, after: 0, error: before }
+  }
+  if (before === 0) {
+    console.log(`  ✓ ${table}: 0 → 0 (already empty)`)
+    return { table, before: 0, after: 0 }
+  }
+  const { data: deleted, error } = await admin
+    .from(table)
+    .delete()
+    .gte('period_month', '1900-01-01')
+    .select('period_month')
   if (error) {
     console.log(`  ⚠ ${table}: ${error.message}`)
-    return
+    return { table, before, after: before, error: error.message }
   }
   const after = await rowCount(table)
-  console.log(`  ✓ ${table}: ${before} → ${after ?? 0}`)
+  const afterCount = typeof after === 'number' ? after : 0
+  if (afterCount > 0) {
+    console.log(`  ⚠ ${table}: ${before} → ${afterCount}  SILENT FAILURE (deleted ${deleted?.length ?? 0})`)
+    return { table, before, after: afterCount, error: 'silent-zero' }
+  }
+  console.log(`  ✓ ${table}: ${before} → 0 (deleted ${deleted?.length ?? 0})`)
+  return { table, before, after: 0 }
 }
 
 // ── main ─────────────────────────────────────────────────────────────────────
@@ -230,6 +293,7 @@ async function main() {
       ...WIPE_TABLES,
       'payment_vouchers',
       'invoices',
+      'journal_entries',
       'period_locks',
     ]
 
@@ -264,6 +328,7 @@ async function main() {
     ...WIPE_TABLES,
     'payment_vouchers',
     'invoices',
+    'journal_entries',
     'period_locks',
   ]
   for (const t of ALL_TABLES) {
@@ -307,14 +372,21 @@ async function main() {
   // Step 3: Wipe period_locks (uses period_month column, no created_at)
   await safeDeletePeriodLocks()
 
-  // --- AFTER counts ---
+  // --- AFTER counts + assertion ---
+  // Every wipe target must be at 0 rows. If any aren't, the silent-failure
+  // mode resurfaced — exit non-zero so callers (CI, manual cycles, wrapper
+  // scripts) don't proceed to re-enter data on top of orphans.
   console.log()
   console.log('=== AFTER ===')
+  const orphans = []
   for (const t of ALL_TABLES) {
     const c = await rowCount(t)
     if (c === null) console.log(`  — ${t}: (table not found)`)
     else if (typeof c === 'string') console.log(`  ⚠ ${t}: ${c}`)
-    else console.log(`  ${t}: ${c}`)
+    else {
+      console.log(`  ${t}: ${c}`)
+      if (c > 0) orphans.push({ table: t, count: c })
+    }
   }
 
   // Step 4: Zero bank balances
@@ -337,6 +409,15 @@ async function main() {
         console.log(`  ✓ ${b.bank_name}: ${Number(b.current_balance).toLocaleString()} → 0`)
       }
     }
+  }
+
+  if (orphans.length > 0) {
+    console.log()
+    console.log('=== FATAL: wipe completed but rows remain ===')
+    for (const o of orphans) console.log(`  ${o.table}: ${o.count} rows`)
+    console.log('Future re-entry of financial data will collide with these orphans.')
+    console.log('Investigate before re-running. (Exit 2.)')
+    process.exit(2)
   }
 
   console.log()
