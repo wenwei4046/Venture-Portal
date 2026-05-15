@@ -1296,6 +1296,118 @@ export function buildLedger(args: {
   }
 }
 
+export async function fetchLedger(
+  supabase: SupabaseClient,
+  args: { code: string; from: string; to: string },
+): Promise<Ledger> {
+  const { code, from, to } = args
+
+  // ── 1: Resolve account name + type. If unknown or it's a header, bail. ──
+  const { data: acc, error: accErr } = await supabase
+    .from('chart_of_accounts')
+    .select('code, name, type, parent_code')
+    .eq('code', code)
+    .maybeSingle()
+  if (accErr) throw new Error(`fetchLedger account lookup: ${accErr.message}`)
+  if (!acc) throw new Error(`fetchLedger: account ${code} not found`)
+  const { data: childCheck, error: childErr } = await supabase
+    .from('chart_of_accounts')
+    .select('code')
+    .eq('parent_code', code)
+    .limit(1)
+  if (childErr) throw new Error(`fetchLedger header check: ${childErr.message}`)
+  if ((childCheck ?? []).length > 0) {
+    throw new Error(`fetchLedger: account ${code} is a header — pick a leaf account instead`)
+  }
+  const account: CoaLeafAccount = {
+    code: acc.code as string,
+    name: acc.name as string,
+    type: acc.type as AccountType,
+  }
+
+  // ── 2: Opening balance = Σ (Dr − Cr) for all non-reversed JEs strictly
+  //    before `from`. ──
+  const { data: openingJes, error: openJeErr } = await supabase
+    .from('journal_entries')
+    .select('id')
+    .lt('transaction_date', from)
+    .eq('is_reversed', false)
+  if (openJeErr) throw new Error(`fetchLedger opening JEs: ${openJeErr.message}`)
+  const openingJeIds = (openingJes ?? []).map((j) => j.id as string)
+  let openingBalance = 0
+  if (openingJeIds.length > 0) {
+    const { data: openLines, error: openJlErr } = await supabase
+      .from('journal_lines')
+      .select('debit, credit')
+      .eq('account_code', code)
+      .in('entry_id', openingJeIds)
+    if (openJlErr) throw new Error(`fetchLedger opening lines: ${openJlErr.message}`)
+    for (const l of openLines ?? []) {
+      openingBalance += Number(l.debit ?? 0) - Number(l.credit ?? 0)
+    }
+  }
+
+  // ── 3: Period lines, joined to journal_entries for entry_no + date +
+  //    description. Order by date, entry_no, line id. ──
+  const { data: periodJes, error: periodJeErr } = await supabase
+    .from('journal_entries')
+    .select('id, entry_no, transaction_date, description')
+    .gte('transaction_date', from)
+    .lte('transaction_date', to)
+    .eq('is_reversed', false)
+    .order('transaction_date', { ascending: true })
+    .order('entry_no', { ascending: true })
+  if (periodJeErr) throw new Error(`fetchLedger period JEs: ${periodJeErr.message}`)
+  const periodJes2 = periodJes ?? []
+  const jeById = new Map<string, { entryNo: string; transactionDate: string; description: string }>()
+  for (const j of periodJes2) {
+    jeById.set(j.id as string, {
+      entryNo: j.entry_no as string,
+      transactionDate: j.transaction_date as string,
+      description: (j.description as string) ?? '',
+    })
+  }
+  const periodJeIds = periodJes2.map((j) => j.id as string)
+
+  const rawLines: RawLedgerLine[] = []
+  if (periodJeIds.length > 0) {
+    const { data: lines, error: jlErr } = await supabase
+      .from('journal_lines')
+      .select('id, entry_id, debit, credit')
+      .eq('account_code', code)
+      .in('entry_id', periodJeIds)
+    if (jlErr) throw new Error(`fetchLedger period lines: ${jlErr.message}`)
+    const linesWithMeta = (lines ?? []).flatMap((l) => {
+      const je = jeById.get(l.entry_id as string)
+      if (!je) return []
+      return [{
+        id: l.id as string,
+        entryNo: je.entryNo,
+        entryDate: je.transactionDate,
+        description: je.description,
+        debit: Number(l.debit ?? 0),
+        credit: Number(l.credit ?? 0),
+      }]
+    })
+    linesWithMeta.sort((a, b) => {
+      if (a.entryDate !== b.entryDate) return a.entryDate.localeCompare(b.entryDate)
+      if (a.entryNo !== b.entryNo) return a.entryNo.localeCompare(b.entryNo)
+      return a.id.localeCompare(b.id)
+    })
+    for (const l of linesWithMeta) {
+      rawLines.push({
+        entryDate: l.entryDate,
+        entryNo: l.entryNo,
+        description: l.description,
+        debit: l.debit,
+        credit: l.credit,
+      })
+    }
+  }
+
+  return buildLedger({ account, openingBalance, rawLines, from, to })
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Date helpers
 // ────────────────────────────────────────────────────────────────────────────
