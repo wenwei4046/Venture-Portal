@@ -7,6 +7,7 @@ import PaymentTabs from './_components/PaymentTabs'
 import PaymentFilters from './_components/PaymentFilters'
 import BackToTop from './_components/BackToTop'
 import VouchersTable, { type VoucherRow } from './_components/VouchersTable'
+import dayjs from 'dayjs'
 
 const POOL_LABELS: Record<string, string> = {
   venture_pool: 'Venture Pool',
@@ -150,6 +151,30 @@ export default async function PaymentsPage({ searchParams }: Props) {
           <h1 className="page-title">Payments</h1>
         </div>
         <div className="flex items-center gap-3">
+          {/* Export buttons */}
+          {(() => {
+            const exportQs = new URLSearchParams(
+              Object.entries(params)
+                .filter(([, v]) => v !== undefined && v !== null && v !== '')
+                .map(([k, v]) => [k, String(v)])
+            ).toString()
+            return (
+              <>
+                <Link
+                  href={`/payments/export?format=xlsx${exportQs ? '&' + exportQs : ''}`}
+                  className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+                >
+                  Export Excel
+                </Link>
+                <Link
+                  href={`/payments/export?format=pdf${exportQs ? '&' + exportQs : ''}`}
+                  className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+                >
+                  Export PDF
+                </Link>
+              </>
+            )
+          })()}
           <Link
             href="/payments/payroll-requests"
             className={
