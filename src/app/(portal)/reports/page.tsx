@@ -18,6 +18,11 @@ const reports = [
     description: 'Assets, Liabilities, Equity at a point in time. Retained earnings is YTD net profit.',
   },
   {
+    href: '/reports/trial-balance',
+    title: 'Trial Balance',
+    description: 'Snapshot of every GL account at a date. Σ Dr = Σ Cr.',
+  },
+  {
     href: '/reports/fund-summary',
     title: 'Fund Summary',
     description: 'Paid capital, free capital, allocated, free cash.',
