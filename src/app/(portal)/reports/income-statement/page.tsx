@@ -40,14 +40,28 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
           </div>
           <h1 className="page-title">Income Statement</h1>
         </div>
-        <form className="shrink-0">
-          <input
-            type="month"
-            name="period"
-            defaultValue={dayjs(from).format('YYYY-MM')}
-            className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
-          />
-        </form>
+        <div className="shrink-0 flex items-center gap-3">
+          <form>
+            <input
+              type="month"
+              name="period"
+              defaultValue={dayjs(from).format('YYYY-MM')}
+              className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+            />
+          </form>
+          <Link
+            href={`/reports/income-statement/export?format=xlsx&from=${from}&to=${to}`}
+            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+          >
+            Export Excel
+          </Link>
+          <Link
+            href={`/reports/income-statement/export?format=pdf&from=${from}&to=${to}`}
+            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+          >
+            Export PDF
+          </Link>
+        </div>
       </div>
 
       <p className="font-serif italic text-muted text-sm mb-8 max-w-3xl">
