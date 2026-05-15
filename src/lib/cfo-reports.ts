@@ -1168,6 +1168,62 @@ export function buildTrialBalance(args: {
   return { asOf, rows, totals, reconciles, showZeroBalance }
 }
 
+export async function fetchTrialBalance(
+  supabase: SupabaseClient,
+  args: { asOf: string; showZeroBalance: boolean },
+): Promise<TrialBalance> {
+  const { asOf, showZeroBalance } = args
+
+  // ── 1: Resolve the set of leaf accounts. A leaf is an account that is NOT
+  //    a header — its code is not referenced by any other row's parent_code.
+  const { data: coaRows, error: coaErr } = await supabase
+    .from('chart_of_accounts')
+    .select('code, name, type, parent_code')
+    .eq('is_active', true)
+  if (coaErr) throw new Error(`fetchTrialBalance COA: ${coaErr.message}`)
+  const allCoa = coaRows ?? []
+  const headerCodes = new Set(
+    allCoa.map((r) => r.parent_code).filter((p): p is string => !!p),
+  )
+  const leafAccounts: CoaLeafAccount[] = allCoa
+    .filter((r) => !headerCodes.has(r.code as string))
+    .map((r) => ({
+      code: r.code as string,
+      name: r.name as string,
+      type: r.type as AccountType,
+    }))
+
+  // ── 2: Period-bounded JE id set (non-reversed, transaction_date <= asOf).
+  const { data: jes, error: jeErr } = await supabase
+    .from('journal_entries')
+    .select('id')
+    .lte('transaction_date', asOf)
+    .eq('is_reversed', false)
+  if (jeErr) throw new Error(`fetchTrialBalance JEs: ${jeErr.message}`)
+  const jeIds = (jes ?? []).map((j) => j.id as string)
+
+  // ── 3: Per-leaf-account net (Dr − Cr). Single batched journal_lines query
+  //    is far cheaper than one call per account.
+  const netByCode = new Map<string, number>()
+  if (jeIds.length > 0) {
+    const leafCodes = leafAccounts.map((a) => a.code)
+    const { data: lines, error: jlErr } = await supabase
+      .from('journal_lines')
+      .select('account_code, debit, credit')
+      .in('entry_id', jeIds)
+      .in('account_code', leafCodes)
+    if (jlErr) throw new Error(`fetchTrialBalance lines: ${jlErr.message}`)
+    for (const l of lines ?? []) {
+      const code = l.account_code as string
+      const dr = Number(l.debit ?? 0)
+      const cr = Number(l.credit ?? 0)
+      netByCode.set(code, (netByCode.get(code) ?? 0) + dr - cr)
+    }
+  }
+
+  return buildTrialBalance({ accounts: leafAccounts, netByCode, asOf, showZeroBalance })
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Date helpers
 // ────────────────────────────────────────────────────────────────────────────
