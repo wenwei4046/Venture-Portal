@@ -23,6 +23,11 @@ const reports = [
     description: 'Snapshot of every GL account at a date. Σ Dr = Σ Cr.',
   },
   {
+    href: '/reports/ledger',
+    title: 'General Ledger',
+    description: 'Per-account journal lines with running balance over a period.',
+  },
+  {
     href: '/reports/fund-summary',
     title: 'Fund Summary',
     description: 'Paid capital, free capital, allocated, free cash.',
