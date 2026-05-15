@@ -1300,112 +1300,253 @@ export async function fetchLedger(
   supabase: SupabaseClient,
   args: { code: string; from: string; to: string },
 ): Promise<Ledger> {
-  const { code, from, to } = args
-
-  // ── 1: Resolve account name + type. If unknown or it's a header, bail. ──
-  const { data: acc, error: accErr } = await supabase
-    .from('chart_of_accounts')
-    .select('code, name, type, parent_code')
-    .eq('code', code)
-    .maybeSingle()
-  if (accErr) throw new Error(`fetchLedger account lookup: ${accErr.message}`)
-  if (!acc) throw new Error(`fetchLedger: account ${code} not found`)
-  const { data: childCheck, error: childErr } = await supabase
-    .from('chart_of_accounts')
-    .select('code')
-    .eq('parent_code', code)
-    .limit(1)
-  if (childErr) throw new Error(`fetchLedger header check: ${childErr.message}`)
-  if ((childCheck ?? []).length > 0) {
-    throw new Error(`fetchLedger: account ${code} is a header — pick a leaf account instead`)
+  const ledgers = await fetchLedgers(supabase, { codes: [args.code], from: args.from, to: args.to })
+  if (ledgers.length === 0) {
+    throw new Error(`fetchLedger: account ${args.code} not found`)
   }
-  const account: CoaLeafAccount = {
-    code: acc.code as string,
-    name: acc.name as string,
-    type: acc.type as AccountType,
+  return ledgers[0]
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Source-description resolver
+//
+// JE.description is system-generated (`"Invoice X issued"`, `"PV X: <user>"`).
+// The user-typed description lives on the originating row — invoices.description
+// and payment_vouchers.description. Reading those back lets the ledger display
+// what the user actually wrote, not the wrapper string.
+//
+// Returns a map keyed by `${reference_type}:${reference_id}` → user description
+// (only present when the source row has a non-empty description). Reference
+// types not handled here (`fund_source`, `loan`, etc.) fall through to the
+// JE.description, which for those flows already contains the user's text via
+// approval.description.
+// ────────────────────────────────────────────────────────────────────────────
+
+export async function resolveSourceDescriptions(
+  supabase: SupabaseClient,
+  refs: Array<{ referenceType: string; referenceId: string }>,
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  if (refs.length === 0) return out
+
+  const invoiceIds = new Set<string>()
+  const pvIds = new Set<string>()
+  for (const r of refs) {
+    if (r.referenceType === 'invoice') invoiceIds.add(r.referenceId)
+    else if (r.referenceType === 'payment_voucher') pvIds.add(r.referenceId)
   }
 
-  // ── 2: Opening balance = Σ (Dr − Cr) for all non-reversed JEs strictly
-  //    before `from`. ──
+  if (invoiceIds.size > 0) {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('id, description')
+      .in('id', Array.from(invoiceIds))
+    if (error) throw new Error(`resolveSourceDescriptions invoices: ${error.message}`)
+    for (const r of data ?? []) {
+      const desc = (r.description as string | null)?.trim()
+      if (desc) out.set(`invoice:${r.id as string}`, desc)
+    }
+  }
+
+  if (pvIds.size > 0) {
+    const { data, error } = await supabase
+      .from('payment_vouchers')
+      .select('id, description')
+      .in('id', Array.from(pvIds))
+    if (error) throw new Error(`resolveSourceDescriptions payment_vouchers: ${error.message}`)
+    for (const r of data ?? []) {
+      const desc = (r.description as string | null)?.trim()
+      if (desc) out.set(`payment_voucher:${r.id as string}`, desc)
+    }
+  }
+
+  return out
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Multi-account General Ledger — batched fetch for N accounts at once.
+//
+// codes=[] means "every postable leaf account". One round-trip set for opening
+// balances (all accounts), one for period JEs, one for period lines, one
+// source-description lookup. Returns one Ledger per requested account, in the
+// canonical TB type order (asset · fixed_asset · liability · equity · revenue ·
+// cost · other_income · expense), then by code within each type.
+// ────────────────────────────────────────────────────────────────────────────
+
+export async function fetchLedgers(
+  supabase: SupabaseClient,
+  args: { codes: string[]; from: string; to: string },
+): Promise<Ledger[]> {
+  const { codes, from, to } = args
+
+  // ── 1: Resolve the leaf accounts. If codes given, use those (and verify
+  //    none are headers); else pick every leaf. ──
+  const { data: coaRows, error: coaErr } = await supabase
+    .from('chart_of_accounts')
+    .select('code, name, type, parent_code, is_active')
+    .eq('is_active', true)
+  if (coaErr) throw new Error(`fetchLedgers COA: ${coaErr.message}`)
+  const allCoa = coaRows ?? []
+  const headerCodes = new Set(
+    allCoa.map((r) => r.parent_code).filter((p): p is string => !!p),
+  )
+  const codeFilter = codes.length > 0 ? new Set(codes) : null
+  const accounts: CoaLeafAccount[] = allCoa
+    .filter((r) => !headerCodes.has(r.code as string))
+    .filter((r) => (codeFilter ? codeFilter.has(r.code as string) : true))
+    .map((r) => ({
+      code: r.code as string,
+      name: r.name as string,
+      type: r.type as AccountType,
+    }))
+
+  if (codeFilter) {
+    const found = new Set(accounts.map((a) => a.code))
+    for (const c of codeFilter) {
+      if (!found.has(c)) {
+        const row = allCoa.find((r) => r.code === c)
+        if (!row) throw new Error(`fetchLedgers: account ${c} not found`)
+        if (headerCodes.has(c)) {
+          throw new Error(`fetchLedgers: account ${c} is a header — pick a leaf account instead`)
+        }
+        throw new Error(`fetchLedgers: account ${c} is inactive`)
+      }
+    }
+  }
+
+  accounts.sort((a, b) => {
+    const ai = TB_TYPE_ORDER.indexOf(a.type)
+    const bi = TB_TYPE_ORDER.indexOf(b.type)
+    if (ai !== bi) return ai - bi
+    return a.code.localeCompare(b.code)
+  })
+
+  if (accounts.length === 0) return []
+  const leafCodes = accounts.map((a) => a.code)
+
+  // ── 2: Opening balances. Σ (Dr − Cr) for every line on a non-reversed JE
+  //    with transaction_date < from. Single batched query. ──
   const { data: openingJes, error: openJeErr } = await supabase
     .from('journal_entries')
     .select('id')
     .lt('transaction_date', from)
     .eq('is_reversed', false)
-  if (openJeErr) throw new Error(`fetchLedger opening JEs: ${openJeErr.message}`)
+  if (openJeErr) throw new Error(`fetchLedgers opening JEs: ${openJeErr.message}`)
   const openingJeIds = (openingJes ?? []).map((j) => j.id as string)
-  let openingBalance = 0
+  const openingByCode = new Map<string, number>()
   if (openingJeIds.length > 0) {
     const { data: openLines, error: openJlErr } = await supabase
       .from('journal_lines')
-      .select('debit, credit')
-      .eq('account_code', code)
+      .select('account_code, debit, credit')
       .in('entry_id', openingJeIds)
-    if (openJlErr) throw new Error(`fetchLedger opening lines: ${openJlErr.message}`)
+      .in('account_code', leafCodes)
+    if (openJlErr) throw new Error(`fetchLedgers opening lines: ${openJlErr.message}`)
     for (const l of openLines ?? []) {
-      openingBalance += Number(l.debit ?? 0) - Number(l.credit ?? 0)
+      const code = l.account_code as string
+      openingByCode.set(
+        code,
+        (openingByCode.get(code) ?? 0) + Number(l.debit ?? 0) - Number(l.credit ?? 0),
+      )
     }
   }
 
-  // ── 3: Period lines, joined to journal_entries for entry_no + date +
-  //    description. Order by date, entry_no, line id. ──
+  // ── 3: Period JEs with metadata for the description override. ──
   const { data: periodJes, error: periodJeErr } = await supabase
     .from('journal_entries')
-    .select('id, entry_no, transaction_date, description')
+    .select('id, entry_no, transaction_date, description, reference_type, reference_id')
     .gte('transaction_date', from)
     .lte('transaction_date', to)
     .eq('is_reversed', false)
     .order('transaction_date', { ascending: true })
     .order('entry_no', { ascending: true })
-  if (periodJeErr) throw new Error(`fetchLedger period JEs: ${periodJeErr.message}`)
+  if (periodJeErr) throw new Error(`fetchLedgers period JEs: ${periodJeErr.message}`)
   const periodJes2 = periodJes ?? []
+  const periodJeIds = periodJes2.map((j) => j.id as string)
+
+  // ── 4: Source-description override (invoices / payment_vouchers). ──
+  const refs: Array<{ referenceType: string; referenceId: string }> = []
+  for (const j of periodJes2) {
+    const t = j.reference_type as string | null
+    const id = j.reference_id as string | null
+    if (t && id) refs.push({ referenceType: t, referenceId: id })
+  }
+  const descOverrides = await resolveSourceDescriptions(supabase, refs)
+
   const jeById = new Map<string, { entryNo: string; transactionDate: string; description: string }>()
   for (const j of periodJes2) {
+    const fallback = (j.description as string) ?? ''
+    const refKey =
+      j.reference_type && j.reference_id ? `${j.reference_type}:${j.reference_id}` : null
+    const description = refKey ? descOverrides.get(refKey) ?? fallback : fallback
     jeById.set(j.id as string, {
       entryNo: j.entry_no as string,
       transactionDate: j.transaction_date as string,
-      description: (j.description as string) ?? '',
+      description,
     })
   }
-  const periodJeIds = periodJes2.map((j) => j.id as string)
 
-  const rawLines: RawLedgerLine[] = []
+  // ── 5: Period journal_lines for all requested accounts in one query. ──
+  type LineWithMeta = {
+    code: string
+    id: string
+    entryNo: string
+    entryDate: string
+    description: string
+    debit: number
+    credit: number
+  }
+  const linesByCode = new Map<string, LineWithMeta[]>()
+  for (const c of leafCodes) linesByCode.set(c, [])
   if (periodJeIds.length > 0) {
     const { data: lines, error: jlErr } = await supabase
       .from('journal_lines')
-      .select('id, entry_id, debit, credit')
-      .eq('account_code', code)
+      .select('id, entry_id, account_code, debit, credit')
       .in('entry_id', periodJeIds)
-    if (jlErr) throw new Error(`fetchLedger period lines: ${jlErr.message}`)
-    const linesWithMeta = (lines ?? []).flatMap((l) => {
+      .in('account_code', leafCodes)
+    if (jlErr) throw new Error(`fetchLedgers period lines: ${jlErr.message}`)
+    for (const l of lines ?? []) {
       const je = jeById.get(l.entry_id as string)
-      if (!je) return []
-      return [{
+      if (!je) continue
+      const code = l.account_code as string
+      linesByCode.get(code)?.push({
+        code,
         id: l.id as string,
         entryNo: je.entryNo,
         entryDate: je.transactionDate,
         description: je.description,
         debit: Number(l.debit ?? 0),
         credit: Number(l.credit ?? 0),
-      }]
-    })
-    linesWithMeta.sort((a, b) => {
-      if (a.entryDate !== b.entryDate) return a.entryDate.localeCompare(b.entryDate)
-      if (a.entryNo !== b.entryNo) return a.entryNo.localeCompare(b.entryNo)
-      return a.id.localeCompare(b.id)
-    })
-    for (const l of linesWithMeta) {
-      rawLines.push({
-        entryDate: l.entryDate,
-        entryNo: l.entryNo,
-        description: l.description,
-        debit: l.debit,
-        credit: l.credit,
       })
     }
   }
 
-  return buildLedger({ account, openingBalance, rawLines, from, to })
+  // ── 6: Build a Ledger per account. ──
+  const out: Ledger[] = []
+  for (const account of accounts) {
+    const rawByCode = linesByCode.get(account.code) ?? []
+    rawByCode.sort((a, b) => {
+      if (a.entryDate !== b.entryDate) return a.entryDate.localeCompare(b.entryDate)
+      if (a.entryNo !== b.entryNo) return a.entryNo.localeCompare(b.entryNo)
+      return a.id.localeCompare(b.id)
+    })
+    const rawLines: RawLedgerLine[] = rawByCode.map((l) => ({
+      entryDate: l.entryDate,
+      entryNo: l.entryNo,
+      description: l.description,
+      debit: l.debit,
+      credit: l.credit,
+    }))
+    out.push(
+      buildLedger({
+        account,
+        openingBalance: openingByCode.get(account.code) ?? 0,
+        rawLines,
+        from,
+        to,
+      }),
+    )
+  }
+  return out
 }
 
 // ────────────────────────────────────────────────────────────────────────────

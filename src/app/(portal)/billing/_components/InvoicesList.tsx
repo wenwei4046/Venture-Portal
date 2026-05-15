@@ -5,6 +5,7 @@ import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
 import { ApproveInvoiceButton, BulkIssueInvoicesButton } from './InvoiceActions'
 import CreateCreditNoteButton from './CreateCreditNoteButton'
+import InvoiceDetailButton from './InvoiceDetailButton'
 import SortableTable, { type SortableColumn } from '@/components/SortableTable'
 
 interface Invoice {
@@ -20,6 +21,14 @@ interface Invoice {
   billable_to_type?: 'subsidiary' | 'director' | 'dept_pool' | 'freetext' | null
   billable_to_department_id?: string | null
   billable_to_freetext_name?: string | null
+  // Detail-modal fields (read-only). No per-invoice detail page exists, so
+  // these power the click-into-row popup.
+  description?: string | null
+  invoice_date?: string | null
+  due_date?: string | null
+  reference_no?: string | null
+  category_code?: string | null
+  created_at?: string | null
 }
 
 // Resolve the "who is being billed" label for an invoice row. Mig 225's
@@ -167,9 +176,35 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                 {
                   key: 'invoice_no',
                   label: 'Invoice #',
-                  render: (inv) => inv.invoice_no ?? inv.id.slice(0, 8),
+                  render: (inv) => {
+                    const labels = resolvePartyLabel(inv, companyMap, departmentMap)
+                    const categoryLabel = inv.category_code
+                      ? categories.find((c) => c.code === inv.category_code)?.label
+                      : undefined
+                    return (
+                      <InvoiceDetailButton
+                        invoice={{
+                          id: inv.id,
+                          invoice_no: inv.invoice_no,
+                          period_month: inv.period_month,
+                          billing_mode: inv.billing_mode,
+                          total_amount: Number(inv.total_amount),
+                          status: inv.status,
+                          description: inv.description ?? null,
+                          invoice_date: inv.invoice_date ?? null,
+                          due_date: inv.due_date ?? null,
+                          reference_no: inv.reference_no ?? null,
+                          category_code: inv.category_code ?? null,
+                          created_at: inv.created_at ?? null,
+                        }}
+                        partyPrimary={labels.primary}
+                        partySub={labels.sub}
+                        categoryLabel={categoryLabel}
+                        billingModeLabel={formatBillingMode(inv.billing_mode)}
+                      />
+                    )
+                  },
                   sortValue: (inv) => inv.invoice_no ?? inv.id,
-                  cellClassName: 'font-mono text-xs text-muted',
                 },
                 {
                   key: 'company',

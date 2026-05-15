@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { classifyRows, buildTrialBalance, buildLedger } from './cfo-reports'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { classifyRows, buildTrialBalance, buildLedger, resolveSourceDescriptions } from './cfo-reports'
 import type { RawPvSourceRow, RawInvoiceRow, RawTreasury, CoaLeafAccount, RawLedgerLine } from './cfo-reports'
 
 const pv = (o: Partial<RawPvSourceRow>): RawPvSourceRow => ({
@@ -401,5 +402,91 @@ describe('buildLedger', () => {
     expect(led.lines[1].runningBalance).toBe(70)
     expect(led.lines[2].runningBalance).toBe(120)
     expect(led.closingBalance).toBe(120)
+  })
+})
+
+// ────────────────────────────────────────────────────────────────────────────
+// Mock supabase client for resolveSourceDescriptions — `.from(table).select(_).in(_, ids)`
+// is the only chain it uses. We return canned rows per table.
+// ────────────────────────────────────────────────────────────────────────────
+
+function mockSupabaseForDescriptions(
+  data: { invoices?: Array<{ id: string; description: string | null }>; payment_vouchers?: Array<{ id: string; description: string | null }> },
+): SupabaseClient {
+  return {
+    from: (table: string) => ({
+      select: () => ({
+        in: async (_col: string, ids: string[]) => {
+          const rows =
+            table === 'invoices'
+              ? (data.invoices ?? []).filter((r) => ids.includes(r.id))
+              : table === 'payment_vouchers'
+                ? (data.payment_vouchers ?? []).filter((r) => ids.includes(r.id))
+                : []
+          return { data: rows, error: null }
+        },
+      }),
+    }),
+  } as unknown as SupabaseClient
+}
+
+describe('resolveSourceDescriptions', () => {
+  it('returns empty map when no refs given (no DB queries needed)', async () => {
+    const client = mockSupabaseForDescriptions({})
+    const out = await resolveSourceDescriptions(client, [])
+    expect(out.size).toBe(0)
+  })
+
+  it('overrides JE description with invoices.description when present', async () => {
+    const client = mockSupabaseForDescriptions({
+      invoices: [
+        { id: 'inv-1', description: 'Office rent — May 2026' },
+        { id: 'inv-2', description: null }, // null source → skipped
+        { id: 'inv-3', description: '   ' }, // whitespace-only → skipped
+      ],
+    })
+    const out = await resolveSourceDescriptions(client, [
+      { referenceType: 'invoice', referenceId: 'inv-1' },
+      { referenceType: 'invoice', referenceId: 'inv-2' },
+      { referenceType: 'invoice', referenceId: 'inv-3' },
+    ])
+    expect(out.get('invoice:inv-1')).toBe('Office rent — May 2026')
+    expect(out.has('invoice:inv-2')).toBe(false)
+    expect(out.has('invoice:inv-3')).toBe(false)
+  })
+
+  it('overrides JE description with payment_vouchers.description', async () => {
+    const client = mockSupabaseForDescriptions({
+      payment_vouchers: [{ id: 'pv-1', description: 'Petty cash reimbursement' }],
+    })
+    const out = await resolveSourceDescriptions(client, [
+      { referenceType: 'payment_voucher', referenceId: 'pv-1' },
+    ])
+    expect(out.get('payment_voucher:pv-1')).toBe('Petty cash reimbursement')
+  })
+
+  it('ignores reference types it does not handle (loan, fund_source, etc.)', async () => {
+    const client = mockSupabaseForDescriptions({})
+    const out = await resolveSourceDescriptions(client, [
+      { referenceType: 'loan', referenceId: 'loan-1' },
+      { referenceType: 'fund_source', referenceId: 'fs-1' },
+      { referenceType: 'payroll_run', referenceId: 'pr-1' },
+    ])
+    expect(out.size).toBe(0)
+  })
+
+  it('handles a mix of invoice and PV refs in one call', async () => {
+    const client = mockSupabaseForDescriptions({
+      invoices: [{ id: 'inv-1', description: 'Service fee' }],
+      payment_vouchers: [{ id: 'pv-1', description: 'Office supplies' }],
+    })
+    const out = await resolveSourceDescriptions(client, [
+      { referenceType: 'invoice', referenceId: 'inv-1' },
+      { referenceType: 'payment_voucher', referenceId: 'pv-1' },
+      { referenceType: 'loan', referenceId: 'loan-1' },
+    ])
+    expect(out.size).toBe(2)
+    expect(out.get('invoice:inv-1')).toBe('Service fee')
+    expect(out.get('payment_voucher:pv-1')).toBe('Office supplies')
   })
 })
