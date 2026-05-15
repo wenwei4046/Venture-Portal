@@ -1,6 +1,6 @@
-// Phase 7 Step 11: extracted from billing/page.tsx so both the /billing redirect
-// and the /statements/invoices tab can share one implementation. All internal
-// component paths are preserved.
+// Phase 7 Step 11 + 2026-05-15 tab reorder: extracted so both the /billing
+// redirect and the /statements page (Invoices landing after the reorder) can
+// share one implementation. All internal component paths are preserved.
 
 import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'

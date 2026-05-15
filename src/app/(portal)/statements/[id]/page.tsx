@@ -48,7 +48,7 @@ export default async function StatementDetailPage({ params }: Props) {
   return (
     <div>
       <Link
-        href="/statements"
+        href="/statements/monthly"
         className="text-sm text-muted hover:text-accent font-sans transition-colors"
       >
         ← Back to Statements

@@ -202,6 +202,7 @@ export async function generateStatements(formData: FormData) {
   }
 
   revalidatePath('/statements')
+  revalidatePath('/statements/monthly')
   revalidatePath('/dashboard')
   return {
     generated,
@@ -247,6 +248,7 @@ export async function issueStatement(formData: FormData) {
 
   void user
   revalidatePath('/statements')
+  revalidatePath('/statements/monthly')
   revalidatePath(`/statements/${id}`)
 }
 
@@ -275,6 +277,7 @@ export async function markStatementPaid(formData: FormData) {
 
   void user
   revalidatePath('/statements')
+  revalidatePath('/statements/monthly')
   revalidatePath(`/statements/${id}`)
   revalidatePath('/dashboard')
 }

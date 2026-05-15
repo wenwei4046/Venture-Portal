@@ -150,7 +150,7 @@ export async function createManualInvoice(formData: FormData): Promise<void> {
   if (error) throw new Error(`Failed to create invoice: ${error.message}`)
 
   revalidatePath('/billing')
-  revalidatePath('/statements/invoices')
+  revalidatePath('/statements')
 }
 
 // ─── Director CTC per subsidiary (Finance auto-fill helper) ──────────────────
