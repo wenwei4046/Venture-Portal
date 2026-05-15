@@ -1,0 +1,28 @@
+import { createClient } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth'
+import { fetchTrialBalance } from '@/lib/cfo-reports'
+import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
+import { buildTrialBalanceXlsx } from './_format/xlsx'
+import { TrialBalancePdf } from './_format/pdf'
+import dayjs from 'dayjs'
+
+export async function GET(req: Request) {
+  await requireRole(['principal', 'finance'])
+  const url = new URL(req.url)
+  const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
+  const asOf = url.searchParams.get('as_of') ?? dayjs().format('YYYY-MM-DD')
+  const showZero = url.searchParams.get('show_zero') === '1'
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(asOf)) {
+    return Response.json({ error: 'invalid as_of date' }, { status: 400 })
+  }
+
+  const supabase = await createClient()
+  const tb = await fetchTrialBalance(supabase, { asOf, showZeroBalance: showZero })
+
+  const filename = `trial-balance-${asOf.replace(/-/g, '')}`
+  if (format === 'xlsx') {
+    return exportXlsxResponse({ filename, buffer: buildTrialBalanceXlsx(tb) })
+  }
+  return exportPdfResponse({ filename, element: <TrialBalancePdf tb={tb} /> })
+}

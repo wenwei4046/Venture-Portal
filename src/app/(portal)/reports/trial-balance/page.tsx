@@ -43,29 +43,43 @@ export default async function TrialBalancePage({ searchParams }: Props) {
           </div>
           <h1 className="page-title">Trial Balance</h1>
         </div>
-        <form className="shrink-0 flex items-center gap-3">
-          <input
-            type="date"
-            name="as_of"
-            defaultValue={asOf}
-            className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
-          />
-          <label className="flex items-center gap-2 text-sm font-serif italic text-graphite">
+        <div className="shrink-0 flex items-center gap-3">
+          <form className="flex items-center gap-3">
             <input
-              type="checkbox"
-              name="show_zero"
-              value="1"
-              defaultChecked={showZeroBalance}
+              type="date"
+              name="as_of"
+              defaultValue={asOf}
+              className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
             />
-            Show zero-balance
-          </label>
-          <button
-            type="submit"
-            className="px-4 py-2 bg-accent hover:bg-accent-hover text-white font-serif italic text-sm rounded-md transition-colors"
+            <label className="flex items-center gap-2 text-sm font-serif italic text-graphite">
+              <input
+                type="checkbox"
+                name="show_zero"
+                value="1"
+                defaultChecked={showZeroBalance}
+              />
+              Show zero-balance
+            </label>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-accent hover:bg-accent-hover text-white font-serif italic text-sm rounded-md transition-colors"
+            >
+              Apply
+            </button>
+          </form>
+          <Link
+            href={`/reports/trial-balance/export?format=xlsx&as_of=${asOf}${showZeroBalance ? '&show_zero=1' : ''}`}
+            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
           >
-            Apply
-          </button>
-        </form>
+            Export Excel
+          </Link>
+          <Link
+            href={`/reports/trial-balance/export?format=pdf&as_of=${asOf}${showZeroBalance ? '&show_zero=1' : ''}`}
+            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+          >
+            Export PDF
+          </Link>
+        </div>
       </div>
 
       <p className="font-serif italic text-muted text-sm mb-8 max-w-3xl">
