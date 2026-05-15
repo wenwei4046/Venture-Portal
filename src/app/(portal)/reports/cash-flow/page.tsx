@@ -57,15 +57,15 @@ export default async function CashFlowPage({ searchParams }: Props) {
           </form>
           <Link
             href={`/reports/cash-flow/export?format=xlsx&from=${from}&to=${to}`}
-            className="px-3 py-2 bg-accent text-white rounded-md text-sm font-sans hover:bg-accent/90 transition-colors"
+            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
           >
-            Excel
+            Export Excel
           </Link>
           <Link
             href={`/reports/cash-flow/export?format=pdf&from=${from}&to=${to}`}
-            className="px-3 py-2 bg-accent text-white rounded-md text-sm font-sans hover:bg-accent/90 transition-colors"
+            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
           >
-            PDF
+            Export PDF
           </Link>
         </div>
       </div>
