@@ -1,8 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
-import { fetchTrialBalance, type TrialBalanceRow } from '@/lib/cfo-reports'
-import { typeLabel, type AccountType } from '@/lib/coa'
+import { fetchTrialBalance } from '@/lib/cfo-reports'
 import dayjs from 'dayjs'
 import Link from 'next/link'
 
@@ -20,15 +19,6 @@ export default async function TrialBalancePage({ searchParams }: Props) {
 
   const tb = await fetchTrialBalance(supabase, { asOf, showZeroBalance })
   const dateLabel = dayjs(asOf).format('D MMMM YYYY')
-
-  // Group rows by type for the per-section subtotals. Map insertion order
-  // preserves the buildTrialBalance sort (BS types first, then P&L).
-  const byType = new Map<AccountType, TrialBalanceRow[]>()
-  for (const row of tb.rows) {
-    const list = byType.get(row.type) ?? []
-    list.push(row)
-    byType.set(row.type, list)
-  }
 
   return (
     <div>
@@ -102,38 +92,22 @@ export default async function TrialBalancePage({ searchParams }: Props) {
             <th className="num">Credit</th>
           </tr>
         </thead>
-        {Array.from(byType.entries()).map(([type, rows]) => {
-          const sectionDebit = rows.reduce((s, r) => s + r.debit, 0)
-          const sectionCredit = rows.reduce((s, r) => s + r.credit, 0)
-          return (
-            <tbody key={type} className="border-t border-hairline">
-              <tr>
-                <td colSpan={3} className="font-mono text-xs uppercase tracking-wide text-muted pt-4">
-                  {typeLabel(type).toUpperCase()}
-                </td>
-              </tr>
-              {rows.map((r) => (
-                <tr key={r.code}>
-                  <td>
-                    <Link
-                      href={`/reports/ledger?code=${encodeURIComponent(r.code)}`}
-                      className="text-ink hover:text-accent"
-                    >
-                      {r.code} {r.name}
-                    </Link>
-                  </td>
-                  <td className="num">{r.debit > 0 ? formatMoney(r.debit) : '—'}</td>
-                  <td className="num">{r.credit > 0 ? formatMoney(r.credit) : '—'}</td>
-                </tr>
-              ))}
-              <tr>
-                <td className="font-serif italic text-ink">Total {typeLabel(type)}</td>
-                <td className="num font-medium">{sectionDebit > 0 ? formatMoney(sectionDebit) : '—'}</td>
-                <td className="num font-medium">{sectionCredit > 0 ? formatMoney(sectionCredit) : '—'}</td>
-              </tr>
-            </tbody>
-          )
-        })}
+        <tbody>
+          {tb.rows.map((r) => (
+            <tr key={r.code}>
+              <td>
+                <Link
+                  href={`/reports/ledger?code=${encodeURIComponent(r.code)}`}
+                  className="text-ink hover:text-accent"
+                >
+                  {r.code} {r.name}
+                </Link>
+              </td>
+              <td className="num">{r.debit > 0 ? formatMoney(r.debit) : '—'}</td>
+              <td className="num">{r.credit > 0 ? formatMoney(r.credit) : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
         <tfoot className="border-t-2 border-hairline">
           <tr>
             <td className="font-serif italic text-ink font-semibold">TOTAL</td>
