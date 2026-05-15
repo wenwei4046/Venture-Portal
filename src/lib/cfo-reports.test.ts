@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { classifyRows } from './cfo-reports'
-import type { RawPvSourceRow, RawInvoiceRow, RawTreasury } from './cfo-reports'
+import { classifyRows, buildTrialBalance } from './cfo-reports'
+import type { RawPvSourceRow, RawInvoiceRow, RawTreasury, CoaLeafAccount } from './cfo-reports'
 
 const pv = (o: Partial<RawPvSourceRow>): RawPvSourceRow => ({
   voucherId: 'v1', voucherType: 'expense', direction: 'debit',
@@ -296,5 +296,71 @@ describe('classifyRows', () => {
     expect(mk.revenue).toBe(10000)
     expect(mk.cost).toBe(3000)
     expect(mk.grossProfit).toBe(7000)
+  })
+})
+
+describe('buildTrialBalance', () => {
+  it('splits a signed net into Dr/Cr columns, totals reconcile', () => {
+    const accounts: CoaLeafAccount[] = [
+      { code: '3000', name: 'Cash & Bank — Hong Leong', type: 'asset' },
+      { code: '4000', name: 'Fund Sources Payable',     type: 'liability' },
+    ]
+    const netByCode = new Map<string, number>([
+      ['3000', 1000],   // Dr 1000 (asset normal balance)
+      ['4000', -1000],  // Cr 1000 (liability normal balance, signed -)
+    ])
+    const tb = buildTrialBalance({
+      accounts,
+      netByCode,
+      asOf: '2026-05-15',
+      showZeroBalance: false,
+    })
+    expect(tb.rows).toHaveLength(2)
+    expect(tb.rows[0]).toMatchObject({ code: '3000', debit: 1000, credit: 0 })
+    expect(tb.rows[1]).toMatchObject({ code: '4000', debit: 0, credit: 1000 })
+    expect(tb.totals).toEqual({ debit: 1000, credit: 1000 })
+    expect(tb.reconciles).toBe(true)
+  })
+
+  it('drops zero-balance rows when showZeroBalance=false, keeps them when true', () => {
+    const accounts: CoaLeafAccount[] = [
+      { code: '3000', name: 'Cash & Bank — Hong Leong', type: 'asset' },
+      { code: '4000', name: 'Fund Sources Payable',     type: 'liability' },
+      { code: '9000', name: 'General & Admin Expenses', type: 'expense' },
+    ]
+    const netByCode = new Map<string, number>([
+      ['3000', 1000],
+      ['4000', -1000],
+      ['9000', 0],
+    ])
+    const hidden = buildTrialBalance({
+      accounts, netByCode, asOf: '2026-05-15', showZeroBalance: false,
+    })
+    expect(hidden.rows.map((r) => r.code)).toEqual(['3000', '4000'])
+    const shown = buildTrialBalance({
+      accounts, netByCode, asOf: '2026-05-15', showZeroBalance: true,
+    })
+    expect(shown.rows.map((r) => r.code)).toEqual(['3000', '4000', '9000']) // sorted by type (BS then P&L), then code
+    expect(shown.rows.find((r) => r.code === '9000')).toMatchObject({ debit: 0, credit: 0 })
+  })
+
+  it('treats sub-cent balances as zero for the showZeroBalance filter', () => {
+    const accounts: CoaLeafAccount[] = [
+      { code: '3000', name: 'Cash & Bank — Hong Leong', type: 'asset' },
+      { code: '3010', name: 'Cash & Bank — Alliance',   type: 'asset' },
+    ]
+    const netByCode = new Map<string, number>([
+      ['3000', 1000],
+      ['3010', 0.004], // rounds to 0 — should be filtered out
+    ])
+    const hidden = buildTrialBalance({
+      accounts, netByCode, asOf: '2026-05-15', showZeroBalance: false,
+    })
+    expect(hidden.rows.map((r) => r.code)).toEqual(['3000'])
+    const shown = buildTrialBalance({
+      accounts, netByCode, asOf: '2026-05-15', showZeroBalance: true,
+    })
+    expect(shown.rows).toHaveLength(2)
+    expect(shown.rows.find((r) => r.code === '3010')).toMatchObject({ debit: 0, credit: 0 })
   })
 })

@@ -1102,6 +1102,73 @@ export async function fetchBalanceSheet(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Trial Balance — every leaf GL account's net balance at a date, split into
+// Dr / Cr columns. Σ Dr must equal Σ Cr. Sourced from journal_lines via the
+// existing sumGlNetAcrossCodes helper (used by fetchTrialBalance — Task 2).
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface CoaLeafAccount {
+  code: string
+  name: string
+  type: AccountType
+}
+
+export interface TrialBalanceRow {
+  code: string
+  name: string
+  type: AccountType
+  debit: number  // positive when account has a Dr balance; 0 otherwise
+  credit: number // positive when account has a Cr balance; 0 otherwise
+}
+
+export interface TrialBalance {
+  asOf: string
+  rows: TrialBalanceRow[]
+  totals: { debit: number; credit: number }
+  reconciles: boolean // |totals.debit - totals.credit| < 0.01
+  showZeroBalance: boolean
+}
+
+// Display order matches the spec — Asset · Fixed Asset · Liability · Equity ·
+// Revenue · Cost · Other Income · Expense.
+const TB_TYPE_ORDER = [
+  'asset', 'fixed_asset', 'liability', 'equity',
+  'revenue', 'cost', 'other_income', 'expense',
+] as const satisfies readonly AccountType[]
+
+export function buildTrialBalance(args: {
+  accounts: CoaLeafAccount[]
+  netByCode: Map<string, number> // signed: Dr − Cr (positive = debit balance)
+  asOf: string
+  showZeroBalance: boolean
+}): TrialBalance {
+  const { accounts, netByCode, asOf, showZeroBalance } = args
+  const rows: TrialBalanceRow[] = []
+  let totalDebit = 0
+  let totalCredit = 0
+  for (const acc of accounts) {
+    const net = netByCode.get(acc.code) ?? 0
+    const debit = net > 0 ? net : 0
+    const credit = net < 0 ? -net : 0
+    const debitR = r2(debit)
+    const creditR = r2(credit)
+    if (!showZeroBalance && debitR === 0 && creditR === 0) continue
+    rows.push({ code: acc.code, name: acc.name, type: acc.type, debit: debitR, credit: creditR })
+    totalDebit += debit
+    totalCredit += credit
+  }
+  rows.sort((a, b) => {
+    const ai = TB_TYPE_ORDER.indexOf(a.type)
+    const bi = TB_TYPE_ORDER.indexOf(b.type)
+    if (ai !== bi) return ai - bi
+    return a.code.localeCompare(b.code)
+  })
+  const totals = { debit: r2(totalDebit), credit: r2(totalCredit) }
+  const reconciles = Math.abs(totals.debit - totals.credit) < 0.01
+  return { asOf, rows, totals, reconciles, showZeroBalance }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Date helpers
 // ────────────────────────────────────────────────────────────────────────────
 export function startOfMonth(d?: string): string {
