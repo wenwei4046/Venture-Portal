@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
@@ -49,7 +50,21 @@ export default async function MonthlyStatementsPage() {
           </div>
           <h1 className="page-title">Statements</h1>
         </div>
-        {canGenerate ? <GenerateStatementsButton /> : null}
+        <div className="flex gap-2">
+          {canGenerate ? <GenerateStatementsButton /> : null}
+          <Link
+            href="/statements/monthly/export?format=xlsx"
+            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+          >
+            Export Excel
+          </Link>
+          <Link
+            href="/statements/monthly/export?format=pdf"
+            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+          >
+            Export PDF
+          </Link>
+        </div>
       </div>
 
       {/* ───────── Summary ───────── */}
