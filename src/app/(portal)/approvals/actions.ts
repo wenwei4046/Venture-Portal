@@ -8,6 +8,7 @@ import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { notifyApprovalDecision } from '@/lib/slack'
 import { postJournalEntry } from '@/lib/journal'
+import { resolveLoansReceivableLeaf } from '@/lib/loans-coa'
 
 // Mig 197: dept name → equity GL code mirror (must match dept_pool_gl_code SQL helper).
 const DEPT_POOL_GL: Record<string, string> = {
@@ -626,10 +627,17 @@ export async function approveRequestGroup(formData: FormData) {
   // ─── 6) GL journal: loan disbursement (P0-2 drift fix, mig 199) ─────────
   // approveRequestGroup bypasses approve_single_voucher because the paired
   // approvals live under group_id (approve_single_voucher rejects grouped
-  // rows). Post the loan-side JE directly: dr 1020 Loans Receivable /
-  // cr 1010 Bank. The voucher-side JE (which approve_single_voucher would
+  // rows). Post the loan-side JE directly: dr <borrower's leaf under 3020>
+  // / cr Bank. The voucher-side JE (which approve_single_voucher would
   // have written) is skipped here to avoid double-counting — same net
   // balance effect, one JE labelled as the loan event.
+  //
+  // 2026-05-15 fix: was hardcoded to `3020`, but the user split the COA
+  // into a header + per-borrower leaves (`3051 Amount Due From - Carres`,
+  // ...). Posting to the header silently disappeared from Trial Balance
+  // (which filters to leaves only). Mig 256 added a DB trigger that
+  // rejects header posts; this code now resolves the leaf per borrower.
+  const loansReceivableLeaf = await resolveLoansReceivableLeaf(supabase, loanApproval.reference_id)
   try {
     await postJournalEntry(supabase, {
       transactionDate: todayStr,
@@ -638,7 +646,7 @@ export async function approveRequestGroup(formData: FormData) {
       referenceId: loanApproval.reference_id,
       createdBy: user.id,
       lines: [
-        { accountCode: '3020', debit: Number(voucher.amount), description: 'Loans Receivable — disbursement' },
+        { accountCode: loansReceivableLeaf, debit: Number(voucher.amount), description: 'Loans Receivable — disbursement' },
         { accountCode: primaryBank?.gl_account_code ?? '3000', credit: Number(voucher.amount), description: `Bank — loan disbursement ${voucher.voucher_no ?? ''}`.trim() },
       ],
     })

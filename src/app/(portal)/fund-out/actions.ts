@@ -8,6 +8,7 @@ import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { postJournalEntry } from '@/lib/journal'
 import { validateDisbursementAccount } from '@/lib/loan-disbursement'
+import { resolveLoansReceivableLeaf } from '@/lib/loans-coa'
 import type { PaymentType } from '@/types'
 
 // ─── Create new loan (Finance) ────────────────────────────────────────────────
@@ -245,12 +246,16 @@ export async function recordRepayment(formData: FormData) {
     .maybeSingle()
 
   const bankGl = primaryBank?.gl_account_code ?? '3000'
-  // Mig 238 unified COA:
-  //   - 3020 Loans Receivable (asset)   ← principal received reduces this
+  // Mig 238 unified COA + 2026-05-15 fix:
+  //   - principal → <borrower's leaf under 3020 Loans Receivable>. The user
+  //     split 3020 into a header + per-borrower leaves (`3051 Amount Due
+  //     From - <code>`); posting directly to 3020 silently dropped from
+  //     Trial Balance and tripped mig 256's header-rejection trigger.
+  //     resolveLoansReceivableLeaf() does the per-borrower lookup.
   //   - 7010 Penalty Income (other_income)
   //   - 7000 Interest Income — Loans (other_income)  ← interest + netting
   const creditAccount =
-    paymentType === 'principal' ? '3020' :
+    paymentType === 'principal' ? await resolveLoansReceivableLeaf(supabase, loanId) :
     paymentType === 'penalty'   ? '7010' :
                                   '7000'   // interest + netting
 
