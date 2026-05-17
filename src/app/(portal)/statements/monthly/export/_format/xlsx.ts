@@ -8,7 +8,6 @@ interface StatementRow {
   netAmount: number
   status: string
   issuedAt: string
-  paidAt: string
 }
 
 export function buildStatementsXlsx(rows: StatementRow[]): Buffer {
@@ -20,13 +19,12 @@ export function buildStatementsXlsx(rows: StatementRow[]): Buffer {
     row.netAmount,
     row.status,
     row.issuedAt,
-    row.paidAt,
   ])
 
   return buildXlsxBuffer({
     sheetName: 'Statements',
-    headerRow: ['Period', 'Subsidiary', 'Total Invoice', 'Total Contra', 'Net Amount', 'Status', 'Issued At', 'Paid At'],
+    headerRow: ['Period', 'Subsidiary', 'Total Invoice', 'Total Contra', 'Net Amount', 'Status', 'Issued At'],
     rows: xlsxRows,
-    columnWidths: [14, 20, 16, 16, 16, 12, 14, 14],
+    columnWidths: [14, 20, 16, 16, 16, 12, 14],
   })
 }

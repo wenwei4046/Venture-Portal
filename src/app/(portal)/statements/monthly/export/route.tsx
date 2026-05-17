@@ -13,7 +13,6 @@ interface StatementRow {
   netAmount: number
   status: string
   issuedAt: string
-  paidAt: string
 }
 
 export async function GET(req: Request) {
@@ -54,8 +53,6 @@ export async function GET(req: Request) {
     const company = companyMap.get(s.company_id)
     const periodLabel = dayjs(s.period_month).format('MMM YYYY')
     const issuedAtStr = s.issued_at ? dayjs(s.issued_at).format('DD/MM/YYYY') : '—'
-    const paidAtStr = s.paid_at ? dayjs(s.paid_at).format('DD/MM/YYYY') : '—'
-
     return {
       period: periodLabel,
       companyName: company?.name ?? '—',
@@ -64,7 +61,6 @@ export async function GET(req: Request) {
       netAmount: Number(s.net_amount),
       status: s.status ?? 'draft',
       issuedAt: issuedAtStr,
-      paidAt: paidAtStr,
     }
   })
 

@@ -9,7 +9,6 @@ const COLUMNS = [
   { label: 'Net Amount', width: 100, align: 'right' as const },
   { label: 'Status', width: 80 },
   { label: 'Issued At', width: 90 },
-  { label: 'Paid At', width: 90 },
 ]
 
 interface StatementRow {
@@ -20,7 +19,6 @@ interface StatementRow {
   netAmount: number
   status: string
   issuedAt: string
-  paidAt: string
 }
 
 export function StatementsPdf({ rows, periodLabel }: { rows: StatementRow[]; periodLabel: string }) {
@@ -41,7 +39,6 @@ export function StatementsPdf({ rows, periodLabel }: { rows: StatementRow[]; per
           row.netAmount,
           row.status,
           row.issuedAt,
-          row.paidAt,
         ])}
       />
     </PdfDocument>
