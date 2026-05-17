@@ -56,7 +56,7 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
   // the auto-created disbursement PV.
   const { data: acctRows, error: acctErr } = await supabase
     .from('chart_of_accounts')
-    .select('code, name, type, is_active')
+    .select('code, name, type, is_active, parent_code')
   if (acctErr) return { error: `Account lookup failed: ${acctErr.message}` }
   const acctErrMsg = validateDisbursementAccount(
     disbursementAccountCode,
@@ -65,6 +65,7 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
       name: r.name,
       account_type: r.type as string,
       is_active: r.is_active,
+      parent_code: r.parent_code ?? null,
     })),
   )
   if (acctErrMsg) return { error: acctErrMsg }
