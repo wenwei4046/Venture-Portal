@@ -1,7 +1,6 @@
 import React from 'react'
 import {
   Document, Page, Text, View, StyleSheet, pdf,
-  type DocumentProps,
 } from '@react-pdf/renderer'
 import dayjs from 'dayjs'
 
@@ -182,8 +181,8 @@ export function PdfTable({
   )
 }
 
-export async function renderPdfBuffer(element: React.ReactElement<DocumentProps>): Promise<Buffer> {
-  const instance = pdf(element)
+export async function renderPdfBuffer(element: React.ReactElement): Promise<Buffer> {
+  const instance = pdf(element as Parameters<typeof pdf>[0])
   const blob = await instance.toBuffer()
   // toBuffer in Node returns a NodeJS.ReadableStream in @react-pdf/renderer 4.x.
   // Some patch versions may return a Buffer directly — handle both.
