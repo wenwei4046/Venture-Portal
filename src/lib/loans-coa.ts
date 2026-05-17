@@ -35,24 +35,26 @@ export async function resolveLoansReceivableLeaf(
 
   const { data: borrower, error: bErr } = await supabase
     .from('companies')
-    .select('short_code')
+    .select('name, short_code')
     .eq('id', loan.company_id)
     .maybeSingle()
   if (bErr) throw new Error(`resolveLoansReceivableLeaf: borrower lookup failed — ${bErr.message}`)
   if (!borrower) throw new Error(`resolveLoansReceivableLeaf: borrower company ${loan.company_id} not found`)
 
-  const expectedName = `Amount Due From - ${borrower.short_code}`
+  // Match any child of 3020 whose name contains the company name or short_code —
+  // tolerates both naming conventions ("Amount due from - Carres" or "Amount Due From - CAR").
   const { data: coa, error: cErr } = await supabase
     .from('chart_of_accounts')
     .select('code')
     .eq('type', 'asset')
-    .ilike('name', expectedName)
+    .eq('parent_code', '3020')
+    .or(`name.ilike.%${borrower.name}%,name.ilike.%${borrower.short_code}%`)
     .maybeSingle()
   if (cErr) throw new Error(`resolveLoansReceivableLeaf: COA lookup failed — ${cErr.message}`)
   if (!coa?.code) {
     throw new Error(
-      `No COA leaf for borrower ${borrower.short_code} under 3020 Loans Receivable. ` +
-      `Create it in Settings → Accounts (name: "${expectedName}", type: asset, parent: 3020), ` +
+      `No COA leaf for borrower "${borrower.name}" under 3020 Loans Receivable. ` +
+      `Create it in Settings → Accounts (name: "Amount due from - ${borrower.name}", type: asset, parent: 3020), ` +
       `then retry.`,
     )
   }
