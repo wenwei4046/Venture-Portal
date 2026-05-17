@@ -330,7 +330,7 @@ export async function createPaymentVoucher(formData: FormData) {
             .from('chart_of_accounts')
             .select('code, name')
             .eq('type', 'expense')
-            .ilike('name', `Inter-billing — ${dept.name}`)
+            .ilike('name', `Inter-billing - ${dept.name}`)
             .maybeSingle()
           if (acct?.code) {
             // Pool key follows the dept_pool_<slug> convention used by
