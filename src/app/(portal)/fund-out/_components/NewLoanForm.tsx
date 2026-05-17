@@ -4,13 +4,17 @@ import { useState, useTransition, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { createLoan } from '../actions'
 import type { Company } from '@/types'
+import type { BsAccountOption } from '@/lib/loan-disbursement'
+import AccountPicker from '@/components/AccountPicker'
+import type { AccountType } from '@/lib/coa'
 
 interface Props {
   companies: Company[]
   baseRate: { rate: number; quarter: string }
+  bsAccounts: BsAccountOption[]
 }
 
-export default function NewLoanForm({ companies, baseRate }: Props) {
+export default function NewLoanForm({ companies, baseRate, bsAccounts }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string>('')
@@ -18,6 +22,7 @@ export default function NewLoanForm({ companies, baseRate }: Props) {
   const [startDate, setStartDate] = useState<string>(
     () => new Date().toISOString().slice(0, 10)
   )
+  const [disbursementAccountCode, setDisbursementAccountCode] = useState<string>('')
   const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
@@ -215,6 +220,35 @@ export default function NewLoanForm({ companies, baseRate }: Props) {
         <p className="font-serif italic text-muted text-xs mt-1.5">
           Contractual start date. Defaults to today; back- or future-date as needed.
           Maturity = start date + tenure.
+        </p>
+      </div>
+
+      {/* ───────── Disbursement account (Balance Sheet) ───────── */}
+      <div className="mb-6">
+        <label
+          htmlFor="disbursement_account_code"
+          className="block text-sm font-sans font-medium text-graphite mb-1.5"
+        >
+          Disbursement account <span className="text-danger">*</span>
+        </label>
+        <AccountPicker
+          accounts={bsAccounts.map((a) => ({
+            code: a.code,
+            name: a.name,
+            type: a.account_type as AccountType,
+            parent_code: a.parent_code,
+            is_active: true,
+          }))}
+          value={disbursementAccountCode}
+          onChange={setDisbursementAccountCode}
+          name="disbursement_account_code"
+          typeFilter={['asset', 'fixed_asset', 'liability', 'equity']}
+          placeholder="Select a balance-sheet account…"
+          required
+        />
+        <p className="font-serif italic text-muted text-xs mt-1.5">
+          Used to classify the disbursement on the Balance Sheet — pick the
+          receivable / asset account for the borrowing party.
         </p>
       </div>
 

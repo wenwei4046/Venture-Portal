@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -273,9 +273,11 @@ export type Database = {
       }
       chart_of_accounts: {
         Row: {
+          cash_flow_category: Database["public"]["Enums"]["cash_flow_category"]
           code: string
           created_at: string
           is_active: boolean
+          is_internal_fund: boolean
           name: string
           parent_code: string | null
           sort_order: number
@@ -283,9 +285,11 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cash_flow_category: Database["public"]["Enums"]["cash_flow_category"]
           code: string
           created_at?: string
           is_active?: boolean
+          is_internal_fund?: boolean
           name: string
           parent_code?: string | null
           sort_order?: number
@@ -293,9 +297,11 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cash_flow_category?: Database["public"]["Enums"]["cash_flow_category"]
           code?: string
           created_at?: string
           is_active?: boolean
+          is_internal_fund?: boolean
           name?: string
           parent_code?: string | null
           sort_order?: number
@@ -305,6 +311,13 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "chart_of_accounts_parent_code_fkey"
+            columns: ["parent_code"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "coa_parent_code_fk"
             columns: ["parent_code"]
             isOneToOne: false
             referencedRelation: "chart_of_accounts"
@@ -665,6 +678,13 @@ export type Database = {
             columns: ["approved_by"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_notes_billable_to_department_id_fkey"
+            columns: ["billable_to_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
             referencedColumns: ["id"]
           },
           {
@@ -1109,6 +1129,13 @@ export type Database = {
             referencedRelation: "directors"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "director_payouts_statutory_overridden_by_fkey"
+            columns: ["statutory_overridden_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
         ]
       }
       directors: {
@@ -1292,6 +1319,7 @@ export type Database = {
       }
       fund_sources: {
         Row: {
+          account_code: string | null
           amount: number
           capital_type: string
           cost_rate: number
@@ -1317,6 +1345,7 @@ export type Database = {
           version: number
         }
         Insert: {
+          account_code?: string | null
           amount: number
           capital_type?: string
           cost_rate: number
@@ -1342,6 +1371,7 @@ export type Database = {
           version?: number
         }
         Update: {
+          account_code?: string | null
           amount?: number
           capital_type?: string
           cost_rate?: number
@@ -1373,6 +1403,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "directors"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fund_sources_account_code_fk"
+            columns: ["account_code"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["code"]
           },
           {
             foreignKeyName: "fund_sources_created_by_fkey"
@@ -1593,6 +1630,13 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "hr_staff_costs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_monthly_payroll_statutory_overridden_by_fkey"
+            columns: ["statutory_overridden_by"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -2086,6 +2130,13 @@ export type Database = {
           version?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "invoices_billable_to_department_id_fkey"
+            columns: ["billable_to_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "invoices_company_id_fkey"
             columns: ["company_id"]
@@ -2595,64 +2646,10 @@ export type Database = {
           },
         ]
       }
-      payment_categories: {
-        Row: {
-          account_type: Database["public"]["Enums"]["account_type"] | null
-          code: string
-          created_at: string
-          created_by: string | null
-          description: string | null
-          gl_account_code: string | null
-          is_active: boolean
-          label: string
-          revenue_gl_account_code: string | null
-          sort_order: number
-        }
-        Insert: {
-          account_type?: Database["public"]["Enums"]["account_type"] | null
-          code: string
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          gl_account_code?: string | null
-          is_active?: boolean
-          label: string
-          revenue_gl_account_code?: string | null
-          sort_order?: number
-        }
-        Update: {
-          account_type?: Database["public"]["Enums"]["account_type"] | null
-          code?: string
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          gl_account_code?: string | null
-          is_active?: boolean
-          label?: string
-          revenue_gl_account_code?: string | null
-          sort_order?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payment_categories_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payment_categories_gl_account_code_fkey"
-            columns: ["gl_account_code"]
-            isOneToOne: false
-            referencedRelation: "chart_of_accounts"
-            referencedColumns: ["code"]
-          },
-        ]
-      }
       payment_voucher_sources: {
         Row: {
+          account_code: string
           amount: number
-          category_code: string | null
           created_at: string
           id: string
           override_account_type:
@@ -2661,11 +2658,12 @@ export type Database = {
           override_gl_account_code: string | null
           override_reason: string | null
           pool: string
+          role: string
           voucher_id: string
         }
         Insert: {
+          account_code: string
           amount: number
-          category_code?: string | null
           created_at?: string
           id?: string
           override_account_type?:
@@ -2674,11 +2672,12 @@ export type Database = {
           override_gl_account_code?: string | null
           override_reason?: string | null
           pool: string
+          role?: string
           voucher_id: string
         }
         Update: {
+          account_code?: string
           amount?: number
-          category_code?: string | null
           created_at?: string
           id?: string
           override_account_type?:
@@ -2687,16 +2686,10 @@ export type Database = {
           override_gl_account_code?: string | null
           override_reason?: string | null
           pool?: string
+          role?: string
           voucher_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "payment_voucher_sources_category_code_fkey"
-            columns: ["category_code"]
-            isOneToOne: false
-            referencedRelation: "payment_categories"
-            referencedColumns: ["code"]
-          },
           {
             foreignKeyName: "payment_voucher_sources_override_gl_account_code_fkey"
             columns: ["override_gl_account_code"]
@@ -2710,6 +2703,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "payment_vouchers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pvs_account_code_fk"
+            columns: ["account_code"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["code"]
           },
         ]
       }
@@ -3892,6 +3892,7 @@ export type Database = {
             Args: { p_cancel_reason?: string; p_loan_id: string }
             Returns: undefined
           }
+      coa_is_header: { Args: { p_code: string }; Returns: boolean }
       compute_commission: {
         Args: { p_period: string; p_staff_id: string }
         Returns: number
@@ -3901,6 +3902,7 @@ export type Database = {
           p_base_rate: number
           p_company_id: string
           p_company_name?: string
+          p_disbursement_account_code?: string
           p_disbursement_date?: string
           p_effective_rate: number
           p_principal: number
@@ -3929,6 +3931,7 @@ export type Database = {
         Args: { p_reference_id: string; p_reference_type: string }
         Returns: Database["public"]["Enums"]["gl_segment"]
       }
+      execute_loan_cancel: { Args: { p_loan_id: string }; Returns: string }
       format_invoice_no: { Args: { p_period: string }; Returns: string }
       generate_invoices_from_request: {
         Args: { p_request_id: string }
@@ -4110,7 +4113,12 @@ export type Database = {
         }[]
       }
       mark_matured_fund_sources: { Args: never; Returns: number }
+      mint_credit_note_no: { Args: { p_period?: string }; Returns: string }
       mint_invoice_no: { Args: { p_period: string }; Returns: string }
+      next_account_code: {
+        Args: { p_type: Database["public"]["Enums"]["account_type"] }
+        Returns: string
+      }
       post_journal_entry: {
         Args: {
           p_created_by: string
@@ -4123,22 +4131,7 @@ export type Database = {
         }
         Returns: string
       }
-      refresh_base_rate: {
-        Args: { p_op_margin: number }
-        Returns: string
-      }
-      mint_credit_note_no: {
-        Args: { p_period?: string }
-        Returns: string
-      }
-      request_loan_cancel: {
-        Args: { p_loan_id: string; p_reason?: string }
-        Returns: string
-      }
-      execute_loan_cancel: {
-        Args: { p_loan_id: string }
-        Returns: string
-      }
+      refresh_base_rate: { Args: { p_op_margin: number }; Returns: string }
       reject_dept_payment_request: {
         Args: { p_approval_id: string }
         Returns: undefined
@@ -4150,6 +4143,10 @@ export type Database = {
       reject_payroll_run: {
         Args: { p_approver: string; p_reason: string; p_run_id: string }
         Returns: undefined
+      }
+      request_loan_cancel: {
+        Args: { p_loan_id: string; p_reason?: string }
+        Returns: string
       }
       save_director_salary_results: { Args: { p_data: Json }; Returns: Json }
       submit_dept_payment_request: {
@@ -4179,7 +4176,15 @@ export type Database = {
       }
     }
     Enums: {
-      account_type: "asset" | "liability" | "equity" | "revenue" | "expense"
+      account_type:
+        | "asset"
+        | "liability"
+        | "equity"
+        | "revenue"
+        | "expense"
+        | "fixed_asset"
+        | "cost"
+        | "other_income"
       approval_request_type:
         | "new_loan"
         | "base_rate"
@@ -4206,11 +4211,7 @@ export type Database = {
         | "approved"
         | "rejected"
         | "expired"
-      billable_to_kind:
-        | "subsidiary"
-        | "director"
-        | "dept_pool"
-        | "freetext"
+      billable_to_kind: "subsidiary" | "director" | "dept_pool" | "freetext"
       billing_mode:
         | "marketing_project"
         | "non_billable"
@@ -4218,6 +4219,7 @@ export type Database = {
         | "director_attribution"
         | "hr_attribution"
         | "finance_attribution"
+      cash_flow_category: "operating" | "investing" | "financing"
       claim_status: "pending" | "approved" | "rejected" | "paid"
       claim_type: "project" | "benefit"
       commission_base_source:
@@ -4235,7 +4237,7 @@ export type Database = {
         | "pending_principal_pv"
         | "completed"
         | "cancelled"
-      dept_pool_txn_type: "np_in" | "expense_out"
+      dept_pool_txn_type: "np_in" | "expense_out" | "inter_billing_out"
       director_status: "active" | "inactive"
       epf_part: "A" | "C" | "E" | "F"
       fund_source_status:
@@ -4441,7 +4443,16 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      account_type: ["asset", "liability", "equity", "revenue", "expense"],
+      account_type: [
+        "asset",
+        "liability",
+        "equity",
+        "revenue",
+        "expense",
+        "fixed_asset",
+        "cost",
+        "other_income",
+      ],
       approval_request_type: [
         "new_loan",
         "base_rate",
@@ -4470,12 +4481,7 @@ export const Constants = {
         "rejected",
         "expired",
       ],
-      billable_to_kind: [
-        "subsidiary",
-        "director",
-        "dept_pool",
-        "freetext",
-      ],
+      billable_to_kind: ["subsidiary", "director", "dept_pool", "freetext"],
       billing_mode: [
         "marketing_project",
         "non_billable",
@@ -4484,6 +4490,7 @@ export const Constants = {
         "hr_attribution",
         "finance_attribution",
       ],
+      cash_flow_category: ["operating", "investing", "financing"],
       claim_status: ["pending", "approved", "rejected", "paid"],
       claim_type: ["project", "benefit"],
       commission_base_source: [
@@ -4503,7 +4510,7 @@ export const Constants = {
         "completed",
         "cancelled",
       ],
-      dept_pool_txn_type: ["np_in", "expense_out"],
+      dept_pool_txn_type: ["np_in", "expense_out", "inter_billing_out"],
       director_status: ["active", "inactive"],
       epf_part: ["A", "C", "E", "F"],
       fund_source_status: [

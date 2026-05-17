@@ -3,6 +3,8 @@
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createCreditNote, type CreateInvoiceMode } from '../actions'
+import AccountPicker, { type AccountOption } from '@/components/AccountPicker'
+import type { AccountType } from '@/lib/coa'
 
 interface Props {
   invoiceId: string
@@ -11,8 +13,14 @@ interface Props {
   /** Label shown for the party being credited. Already resolved by the parent
    *  list (subsidiary name OR free-text/dept name from Item 5 polymorphism). */
   payeeLabel: string
-  /** Phase 11: payment_categories for GL routing per CN row. */
-  categories?: Array<{ code: string; label: string }>
+  /** Phase 11 / post-unified-COA: chart_of_accounts rows for GL routing per
+   *  CN row. parent_code + type let AccountPicker hide headers. */
+  categories?: Array<{
+    code: string
+    label: string
+    type: AccountType
+    parent_code: string | null
+  }>
 }
 
 const POOL_OPTIONS: Array<{ value: CreateInvoiceMode; label: string }> = [
@@ -57,6 +65,19 @@ export default function CreateCreditNoteButton({
   const validRows = useMemo(
     () => rows.filter((r) => r.mode && r.categoryCode && Number(r.amount) > 0),
     [rows],
+  )
+
+  // mig 246: categories → AccountPicker shape; picker auto-hides headers.
+  const categoryOptions: AccountOption[] = useMemo(
+    () =>
+      categories.map((c) => ({
+        code: c.code,
+        name: c.label,
+        type: c.type,
+        parent_code: c.parent_code,
+        is_active: true,
+      })),
+    [categories],
   )
   const allocated = useMemo(
     () => rows.reduce((s, r) => s + (Number(r.amount) || 0), 0),
@@ -247,17 +268,15 @@ export default function CreateCreditNoteButton({
                             </select>
                           </td>
                           <td className="py-2 px-3">
-                            <select
+                            <AccountPicker
+                              accounts={categoryOptions}
                               value={r.categoryCode}
-                              onChange={(e) => updateRow(r.uid, { categoryCode: e.target.value })}
+                              onChange={(code) => updateRow(r.uid, { categoryCode: code })}
+                              name={`cn_row_category_${r.uid}_display`}
+                              placeholder="Select category…"
+                              typeFilter={['revenue', 'cost', 'other_income']}
                               disabled={isPending}
-                              className={inputCls}
-                            >
-                              <option value="">Select category…</option>
-                              {categories.map((c) => (
-                                <option key={c.code} value={c.code}>{c.label}</option>
-                              ))}
-                            </select>
+                            />
                           </td>
                           <td className="py-2 px-3">
                             <input

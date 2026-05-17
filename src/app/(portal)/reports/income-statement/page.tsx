@@ -5,8 +5,9 @@ import {
   fetchIncomeStatement,
   startOfMonth,
   endOfMonth,
-  SEGMENT_LABEL,
-  type DeptPnl,
+  type PoolPnl,
+  type Line,
+  type IncomeStatement,
 } from '@/lib/cfo-reports'
 import dayjs from 'dayjs'
 import Link from 'next/link'
@@ -25,8 +26,6 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
   const periodLabel = formatPeriodLabel(from, to)
 
   const stmt = await fetchIncomeStatement(supabase, { from, to })
-  const treasury = stmt.treasury
-  const deptMargin = stmt.groupRevenue - stmt.groupDeptCost
 
   return (
     <div>
@@ -41,189 +40,253 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
           </div>
           <h1 className="page-title">Income Statement</h1>
         </div>
-        <form className="shrink-0">
-          <input
-            type="month"
-            name="period"
-            defaultValue={dayjs(from).format('YYYY-MM')}
-            className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
-          />
-        </form>
+        <div className="shrink-0 flex items-center gap-3">
+          <form>
+            <input
+              type="month"
+              name="period"
+              defaultValue={dayjs(from).format('YYYY-MM')}
+              className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+            />
+          </form>
+          <Link
+            href={`/reports/income-statement/export?format=xlsx&from=${from}&to=${to}`}
+            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+          >
+            Export Excel
+          </Link>
+          <Link
+            href={`/reports/income-statement/export?format=pdf&from=${from}&to=${to}`}
+            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+          >
+            Export PDF
+          </Link>
+        </div>
       </div>
 
       <p className="font-serif italic text-muted text-sm mb-8 max-w-3xl">
-        Per-department P&amp;L with line items: revenue per invoice, cost per
-        category. Treasury (loan interest) sits at group level alongside general
-        corporate expenses.
+        One block per pool. Gross profit = revenue − cost. Pool margin = gross
+        profit + other income − operating expense. The Venture Pool folds
+        treasury interest (loan interest in / fund-source interest out) into its
+        revenue and expense lines. Loan and deposit <em>principal</em> never
+        appear here — they sit on the Balance Sheet.
       </p>
 
       <div className="max-w-3xl space-y-12">
-        {/* ─── Per-dept P&L (one block per dept with line items) ─── */}
-        {stmt.perDept.map((d) => (
-          <DeptBlock key={d.segment} dept={d} />
-        ))}
+        {stmt.pools.length === 0 ? (
+          <div className="border border-hairline rounded-md bg-surface p-6 text-center">
+            <p className="font-serif italic text-muted text-sm">
+              No revenue or expense activity in this period. Issue invoices or
+              pay expense vouchers to populate the income statement.
+            </p>
+          </div>
+        ) : (
+          stmt.pools.map((p) => (
+            <PoolBlock
+              key={p.pool}
+              pool={p}
+              showTreasuryNote={p.pool === 'venture_pool' && stmt.treasury.net !== 0}
+            />
+          ))
+        )}
 
-        {/* ─── Dept margin subtotal ─── */}
-        <div className="border-t border-hairline pt-4">
-          <div className="flex items-baseline justify-between">
-            <span className="font-serif italic text-graphite">Dept margin (sum)</span>
-            <span className={`font-mono tabular text-lg ${deptMargin >= 0 ? 'text-ledger' : 'text-danger'}`}>
-              {formatMoney(deptMargin)}
-            </span>
-          </div>
-          <div className="font-mono text-[11.5px] text-muted mt-1">
-            Σ revenue {formatMoney(stmt.groupRevenue)} − Σ cost {formatMoney(stmt.groupDeptCost)}
-          </div>
-        </div>
-
-        {/* ─── Treasury section ─── */}
-        <section>
-          <div className="sect-head">
-            <h2>Treasury</h2>
-            <span className="rule" aria-hidden />
-            <span className="count">LOAN INTEREST · PENALTY · FUND SOURCE INTEREST</span>
-          </div>
-          <table className="ledger-table">
-            <tbody>
-              <tr>
-                <td>Interest income — Loans <span className="font-mono text-muted text-xs ml-1">(4010)</span></td>
-                <td className="num text-ledger">{formatMoney(treasury.interestIncome)}</td>
-              </tr>
-              {treasury.penaltyIncome !== 0 ? (
-                <tr>
-                  <td>Penalty income <span className="font-mono text-muted text-xs ml-1">(4020)</span></td>
-                  <td className="num text-ledger">{formatMoney(treasury.penaltyIncome)}</td>
-                </tr>
-              ) : null}
-              <tr>
-                <td>Interest expense — Fund sources <span className="font-mono text-muted text-xs ml-1">(5010)</span></td>
-                <td className="num"><span className="neg">{formatMoney(-treasury.interestExpense)}</span></td>
-              </tr>
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 border-hairline">
-                <td className="font-serif italic text-ink font-medium">Treasury net</td>
-                <td className={`num font-semibold ${treasury.net >= 0 ? 'text-ledger' : 'text-danger'}`}>
-                  {formatMoney(treasury.net)}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </section>
-
-        {/* ─── Group general expenses ─── */}
-        <section>
-          <div className="sect-head">
-            <h2>General expenses</h2>
-            <span className="rule" aria-hidden />
-            <span className="count">GROUP-LEVEL · CORPORATE · UNALLOCATED</span>
-          </div>
-          {stmt.groupGeneral.length === 0 ? (
-            <p className="font-serif italic text-muted text-sm">No general expenses booked this period.</p>
-          ) : (
-            <table className="ledger-table">
-              <tbody>
-                {stmt.groupGeneral.map((l) => (
-                  <tr key={l.label}>
-                    <td>{l.label}</td>
-                    <td className="num"><span className="neg">{formatMoney(-l.amount)}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-hairline">
-                  <td className="font-serif italic text-ink font-medium">Total general</td>
-                  <td className="num font-semibold"><span className="neg">{formatMoney(-stmt.groupGeneralTotal)}</span></td>
-                </tr>
-              </tfoot>
-            </table>
-          )}
-        </section>
-
-        {/* ─── Group net profit ─── */}
-        <div className="border-t-2 border-hairline pt-6">
-          <div className="flex items-baseline justify-between">
-            <span className="font-serif text-lg text-ink">Group net profit</span>
-            <span className={`font-serif text-2xl font-semibold tabular ${stmt.groupNetProfit >= 0 ? 'text-ledger' : 'text-danger'}`}>
-              {formatMoney(stmt.groupNetProfit)}
-            </span>
-          </div>
-          <p className="font-serif italic text-muted text-xs mt-2">
-            Dept margin {formatMoney(deptMargin)} + Treasury net {formatMoney(treasury.net)} − General {formatMoney(stmt.groupGeneralTotal)}
-          </p>
-        </div>
+        {/* ─── Summary ─── */}
+        {stmt.pools.length > 0 ? <SummaryBlock stmt={stmt} /> : null}
       </div>
     </div>
   )
 }
 
-function DeptBlock({ dept }: { dept: DeptPnl }) {
-  const hasAny = dept.revenueLines.length > 0 || dept.costLines.length > 0
+// One block per pool — four inner ledger-tables (Revenue / Cost / Other Income
+// / Expense) with a Gross Profit line between Cost and Other Income, and the
+// pool margin at the bottom.
+function PoolBlock({ pool, showTreasuryNote }: { pool: PoolPnl; showTreasuryNote: boolean }) {
+  const empty =
+    pool.revenueLines.length === 0 &&
+    pool.costLines.length === 0 &&
+    pool.otherIncomeLines.length === 0 &&
+    pool.expenseLines.length === 0
+
   return (
     <section>
       <div className="sect-head">
-        <h2>{SEGMENT_LABEL[dept.segment]}</h2>
+        <h2>{pool.poolLabel}</h2>
         <span className="rule" aria-hidden />
-        <span className={`count ${dept.margin >= 0 ? 'text-ledger' : 'text-danger'}`}>
-          MARGIN {formatMoney(dept.margin)}
+        <span className={`count ${pool.margin >= 0 ? 'text-ledger' : 'text-danger'}`}>
+          MARGIN {formatMoney(pool.margin)}
         </span>
       </div>
 
-      {!hasAny ? (
-        <p className="font-serif italic text-muted text-sm">No activity this period.</p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6">
-          {/* Revenue */}
-          <div>
-            <h3 className="font-serif italic text-accent text-sm mb-2">Revenue</h3>
-            {dept.revenueLines.length === 0 ? (
-              <p className="font-serif italic text-muted text-xs">No invoices.</p>
-            ) : (
-              <table className="ledger-table">
-                <tbody>
-                  {dept.revenueLines.map((l) => (
-                    <tr key={l.label}>
-                      <td className="text-sm">{l.label}</td>
-                      <td className="num text-ledger">{formatMoney(l.amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t border-hairline">
-                    <td className="font-serif italic text-graphite text-sm">Subtotal</td>
-                    <td className="num text-ledger font-semibold">{formatMoney(dept.revenue)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            )}
-          </div>
+      {showTreasuryNote ? (
+        <p className="font-serif italic text-muted text-xs mb-3">incl. loan interest</p>
+      ) : null}
 
-          {/* Cost */}
-          <div>
-            <h3 className="font-serif italic text-accent text-sm mb-2">Cost</h3>
-            {dept.costLines.length === 0 ? (
-              <p className="font-serif italic text-muted text-xs">No expenses.</p>
-            ) : (
-              <table className="ledger-table">
-                <tbody>
-                  {dept.costLines.map((l) => (
-                    <tr key={l.label}>
-                      <td className="text-sm">{l.label}</td>
-                      <td className="num"><span className="neg">{formatMoney(-l.amount)}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t border-hairline">
-                    <td className="font-serif italic text-graphite text-sm">Subtotal</td>
-                    <td className="num font-semibold"><span className="neg">{formatMoney(-dept.cost)}</span></td>
-                  </tr>
-                </tfoot>
-              </table>
-            )}
-          </div>
+      {empty ? (
+        <p className="font-serif italic text-muted text-sm">No P&amp;L activity in this period.</p>
+      ) : (
+        <div className="space-y-6">
+          <LineTable
+            title="Revenue"
+            lines={pool.revenueLines}
+            subtotal={pool.revenue}
+            tone="credit"
+          />
+          <LineTable
+            title="Cost"
+            lines={pool.costLines}
+            subtotal={pool.cost}
+            tone="debit"
+          />
+
+          {/* Gross Profit divider — between Cost and Other Income */}
+          <table className="ledger-table">
+            <tbody>
+              <tr className="border-t-2 border-hairline">
+                <td className="font-serif italic text-ink font-medium">Gross profit</td>
+                <td className={`num tabular ${pool.grossProfit >= 0 ? 'text-num-ink' : 'text-danger'}`}>
+                  <span className="font-serif text-lg font-semibold tabular tracking-[-0.01em]">
+                    {pool.grossProfit < 0
+                      ? <span className="neg">{formatMoney(pool.grossProfit)}</span>
+                      : formatMoney(pool.grossProfit)}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <LineTable
+            title="Other income"
+            lines={pool.otherIncomeLines}
+            subtotal={pool.otherIncome}
+            tone="credit"
+          />
+          <LineTable
+            title="Expense"
+            lines={pool.expenseLines}
+            subtotal={pool.expense}
+            tone="debit"
+          />
+
+          {/* Pool margin footer */}
+          <table className="ledger-table">
+            <tfoot>
+              <tr className="border-t-2 border-hairline">
+                <td className="font-serif italic text-ink font-medium">Pool margin</td>
+                <td className={`num ${pool.margin >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                  <span className={`font-serif text-xl font-semibold tabular tracking-[-0.01em] ${pool.margin >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                    {formatMoney(pool.margin)}
+                  </span>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       )}
+    </section>
+  )
+}
+
+function LineTable({
+  title,
+  lines,
+  subtotal,
+  tone,
+}: {
+  title: string
+  lines: Line[]
+  subtotal: number
+  tone: 'credit' | 'debit'
+}) {
+  const isCredit = tone === 'credit'
+  return (
+    <div>
+      <h3 className="font-serif italic text-accent text-sm mb-2">{title}</h3>
+      {lines.length === 0 ? (
+        <p className="font-serif italic text-muted text-xs">No {title.toLowerCase()}.</p>
+      ) : (
+        <table className="ledger-table">
+          <tbody>
+            {lines.map((l) => (
+              <tr key={l.label}>
+                <td className="text-sm">{l.label}</td>
+                <td className={`num ${isCredit ? 'text-ledger' : ''}`}>
+                  {isCredit
+                    ? (l.amount < 0
+                        ? <span className="neg">{formatMoney(l.amount)}</span>
+                        : formatMoney(l.amount))
+                    : <span className="neg">{formatMoney(-l.amount)}</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t border-hairline">
+              <td className="font-serif italic text-graphite text-sm">Subtotal</td>
+              <td className={`num font-semibold ${isCredit ? 'text-ledger' : ''}`}>
+                {isCredit
+                  ? formatMoney(subtotal)
+                  : <span className="neg">{formatMoney(-subtotal)}</span>}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      )}
+    </div>
+  )
+}
+
+function SummaryBlock({ stmt }: { stmt: IncomeStatement }) {
+  const showCost = Math.abs(stmt.groupCost) > 0.005
+  const showOtherIncome = Math.abs(stmt.groupOtherIncome) > 0.005
+  return (
+    <section className="border-t-2 border-hairline pt-6">
+      <div className="sect-head">
+        <h2>Summary</h2>
+        <span className="rule" aria-hidden />
+        <span className="count">ALL POOLS</span>
+      </div>
+      <table className="ledger-table">
+        <tbody>
+          <tr>
+            <td className="text-graphite">Group revenue</td>
+            <td className="num text-ledger">{formatMoney(stmt.groupRevenue)}</td>
+          </tr>
+          {showCost ? (
+            <tr>
+              <td className="text-graphite">− Group cost</td>
+              <td className="num"><span className="neg">{formatMoney(-stmt.groupCost)}</span></td>
+            </tr>
+          ) : null}
+          <tr className="border-t border-hairline">
+            <td className="font-serif italic text-ink font-medium">Gross profit</td>
+            <td className={`num ${stmt.groupGrossProfit >= 0 ? 'text-ledger' : 'text-danger'}`}>
+              <span className={`font-serif text-xl font-semibold tabular tracking-[-0.01em] ${stmt.groupGrossProfit >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                {formatMoney(stmt.groupGrossProfit)}
+              </span>
+            </td>
+          </tr>
+          {showOtherIncome ? (
+            <tr>
+              <td className="text-graphite">+ Group other income</td>
+              <td className="num text-ledger">{formatMoney(stmt.groupOtherIncome)}</td>
+            </tr>
+          ) : null}
+          <tr>
+            <td className="text-graphite">− Group expense</td>
+            <td className="num"><span className="neg">{formatMoney(-stmt.groupExpense)}</span></td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr className="border-t-2 border-hairline">
+            <td className="font-serif italic text-ink font-medium">Group net profit</td>
+            <td className={`num ${stmt.groupNetProfit >= 0 ? 'text-ledger' : 'text-danger'}`}>
+              <span className={`font-serif text-2xl font-semibold tabular tracking-[-0.01em] ${stmt.groupNetProfit >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                {formatMoney(stmt.groupNetProfit)}
+              </span>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
     </section>
   )
 }

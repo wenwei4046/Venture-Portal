@@ -9,5 +9,5 @@ interface Props {
 export default async function BillingRedirect({ searchParams }: Props) {
   const { period } = await searchParams
   const qs = period ? `?period=${encodeURIComponent(period)}` : ''
-  redirect(`/statements/invoices${qs}`)
+  redirect(`/statements${qs}`)
 }

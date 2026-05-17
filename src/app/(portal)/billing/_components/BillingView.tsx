@@ -1,6 +1,6 @@
-// Phase 7 Step 11: extracted from billing/page.tsx so both the /billing redirect
-// and the /statements/invoices tab can share one implementation. All internal
-// component paths are preserved.
+// Phase 7 Step 11 + 2026-05-15 tab reorder: extracted so both the /billing
+// redirect and the /statements page (Invoices landing after the reorder) can
+// share one implementation. All internal component paths are preserved.
 
 import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
@@ -56,7 +56,7 @@ export default async function BillingView({ searchParams }: Props) {
       .order('created_at', { ascending: false }),
     supabase
       .from('invoices')
-      .select('id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name')
+      .select('id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, description, invoice_date, due_date, reference_no, category_code, created_at')
       .eq('period_month', period)
       .order('billing_mode', { ascending: true }),
     supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('short_code'),
@@ -67,12 +67,31 @@ export default async function BillingView({ searchParams }: Props) {
       .lte('created_at', periodEnd)
       .order('created_at', { ascending: false }),
     supabase.from('departments').select('id, name').order('name'),
+    // Post-mig 238: payment_categories is gone. Pull P&L revenue / cost /
+    // other_income accounts from chart_of_accounts for invoice GL routing.
+    // Mig 246 adds parent_code so downstream pickers can hide headers.
     supabase
-      .from('payment_categories')
-      .select('code, label')
+      .from('chart_of_accounts')
+      .select('code, name, type, parent_code')
+      .in('type', ['revenue', 'cost', 'other_income'])
       .eq('is_active', true)
       .order('sort_order'),
   ])
+
+  // Shape categories as { code, label, type, parent_code } so the downstream
+  // CreateInvoiceButton can pass them straight into AccountPicker (mig 246).
+  // Keeps the legacy "label" string the rest of the UI already prints.
+  const categoryList: Array<{
+    code: string
+    label: string
+    type: 'revenue' | 'cost' | 'other_income'
+    parent_code: string | null
+  }> = (categories ?? []).map((c) => ({
+    code: c.code,
+    label: c.name,
+    type: c.type as 'revenue' | 'cost' | 'other_income',
+    parent_code: (c as { parent_code: string | null }).parent_code ?? null,
+  }))
 
   if (hrSummaryError) {
     console.error('get_submitted_hr_summary failed:', hrSummaryError.message)
@@ -142,6 +161,12 @@ export default async function BillingView({ searchParams }: Props) {
   const companyMap = new Map(
     companyList.map((c) => [c.id, { name: c.name as string, code: c.short_code as string }])
   )
+  // Inter-billing: invoices may target a dept_pool (billable_to_type='dept_pool')
+  // instead of a subsidiary, so InvoicesList needs to resolve dept name from
+  // billable_to_department_id rather than falling through to '—'.
+  const departmentMap = new Map<string, string>(
+    (departments ?? []).map((d) => [d.id as string, d.name as string])
+  )
 
   return (
     <div>
@@ -159,7 +184,7 @@ export default async function BillingView({ searchParams }: Props) {
               companies={companyList}
               currentPeriod={period}
               departments={departments ?? []}
-              categories={categories ?? []}
+              categories={categoryList}
             />
           )}
         </div>
@@ -221,7 +246,7 @@ export default async function BillingView({ searchParams }: Props) {
           canCreate={user.role === 'finance'}
           companies={companyList}
           currentPeriod={period}
-          categories={categories ?? []}
+          categories={categoryList}
         />
         <DeptCostCard
           label="Finance OPEX"
@@ -233,7 +258,7 @@ export default async function BillingView({ searchParams }: Props) {
           canCreate={user.role === 'finance'}
           companies={companyList}
           currentPeriod={period}
-          categories={categories ?? []}
+          categories={categoryList}
         />
         <DeptCostCard
           label="Director Office OPEX"
@@ -245,7 +270,7 @@ export default async function BillingView({ searchParams }: Props) {
           canCreate={user.role === 'finance'}
           companies={companyList}
           currentPeriod={period}
-          categories={categories ?? []}
+          categories={categoryList}
         />
         <DeptCostCard
           label="Director OPEX"
@@ -257,7 +282,7 @@ export default async function BillingView({ searchParams }: Props) {
           canCreate={user.role === 'finance'}
           companies={companyList}
           currentPeriod={period}
-          categories={categories ?? []}
+          categories={categoryList}
         />
         <DeptCostCard
           label="Marketing OPEX"
@@ -269,12 +294,12 @@ export default async function BillingView({ searchParams }: Props) {
           canCreate={user.role === 'finance'}
           companies={companyList}
           currentPeriod={period}
-          categories={categories ?? []}
+          categories={categoryList}
           marketingNote
         />
       </div>
 
-      <InvoicesList invoices={invoiceList} companyMap={companyMap} period={period} categories={categories ?? []} />
+      <InvoicesList invoices={invoiceList} companyMap={companyMap} departmentMap={departmentMap} period={period} categories={categoryList} />
 
       <MarketingProjectList
         contracts={(marketingContracts ?? [])
@@ -339,7 +364,12 @@ function DeptCostCard({
   companies: Array<{ id: string; name: string; short_code: string }>
   currentPeriod: string
   departments?: Array<{ id: string; name: string }>
-  categories?: Array<{ code: string; label: string }>
+  categories?: Array<{
+    code: string
+    label: string
+    type: 'revenue' | 'cost' | 'other_income'
+    parent_code: string | null
+  }>
   marketingNote?: boolean
 }) {
   const hasInvoices = invoiceCount > 0

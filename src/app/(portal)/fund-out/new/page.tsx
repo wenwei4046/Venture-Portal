@@ -3,6 +3,7 @@ import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import type { Company } from '@/types'
+import { bsAccountsForDisbursement } from '@/lib/loan-disbursement'
 import NewLoanForm from '../_components/NewLoanForm'
 
 export default async function NewLoanPage() {
@@ -12,6 +13,7 @@ export default async function NewLoanPage() {
   const [
     { data: companyRows },
     { data: baseRateRow },
+    { data: acctRows },
   ] = await Promise.all([
     supabase.from('companies').select('*').eq('is_active', true).order('short_code'),
     supabase
@@ -22,9 +24,24 @@ export default async function NewLoanPage() {
       .order('effective_from', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from('chart_of_accounts')
+      .select('code, name, type, parent_code, is_active')
+      .eq('is_active', true)
+      .order('type')
+      .order('code'),
   ])
 
   const companies = (companyRows ?? []) as Company[]
+  const bsAccounts = bsAccountsForDisbursement(
+    (acctRows ?? []).map((r) => ({
+      code: r.code,
+      name: r.name,
+      account_type: r.type as string,
+      parent_code: (r as { parent_code: string | null }).parent_code ?? null,
+      is_active: r.is_active,
+    })),
+  )
 
   const baseRate = baseRateRow
     ? {
@@ -51,7 +68,7 @@ export default async function NewLoanPage() {
       </div>
 
       {baseRate ? (
-        <NewLoanForm companies={companies} baseRate={baseRate} />
+        <NewLoanForm companies={companies} baseRate={baseRate} bsAccounts={bsAccounts} />
       ) : (
         <div className="bg-alert-bg border border-alert rounded-md p-6 max-w-3xl">
           <p className="font-serif text-lg text-alert mb-1">

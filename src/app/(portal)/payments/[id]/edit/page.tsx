@@ -8,12 +8,12 @@ interface Props {
   params: Promise<{ id: string }>
 }
 
-type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense'
+import type { AccountType } from '@/lib/coa'
 
 interface SourceRow {
   pool: string
   amount: string
-  category_code: string
+  account_code: string
   override_account_type?: AccountType | ''
   override_gl_account_code?: string
   override_reason?: string
@@ -41,33 +41,33 @@ export default async function EditPaymentPage({ params }: Props) {
     { data: sources },
     { data: companies },
     { data: bankAccounts },
-    { data: categories },
     { data: glAccounts },
   ] = await Promise.all([
     supabase
       .from('payment_voucher_sources')
-      .select('pool, amount, category_code, override_account_type, override_gl_account_code, override_reason')
+      .select('pool, amount, account_code, override_account_type, override_gl_account_code, override_reason')
       .eq('voucher_id', id)
       .order('amount', { ascending: false }),
     supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('name'),
     supabase.from('bank_accounts').select('id, bank_name, account_number, current_balance').eq('status', 'active').order('is_primary', { ascending: false }),
-    supabase.from('payment_categories').select('code, label, account_type, gl_account_code').eq('is_active', true).order('sort_order'),
-    supabase.from('chart_of_accounts').select('code, name, type').eq('is_active', true).order('code'),
+    // Post-mig 238: chart_of_accounts IS the GL. Pull every active account
+    // for the source-row picker; downstream the form filters as needed.
+    supabase.from('chart_of_accounts').select('code, name, type, parent_code').eq('is_active', true).order('code'),
   ])
 
   const sourceRows: SourceRow[] = (sources ?? []).map((s) => ({
     pool: s.pool,
     amount: Number(s.amount).toFixed(2),
-    category_code: s.category_code ?? '',
+    account_code: s.account_code ?? '',
     override_account_type: (s.override_account_type as AccountType | null) ?? '',
     override_gl_account_code: s.override_gl_account_code ?? '',
     override_reason: s.override_reason ?? '',
   }))
 
-  // For credit vouchers, pull the single source row's category as the
-  // initial category_code (mig 205 backfilled one row per credit voucher).
-  const initialCreditCategoryCode = voucher.direction === 'credit' && sources && sources.length > 0
-    ? sources[0].category_code ?? null
+  // For credit vouchers, pull the single source row's account as the
+  // initial account_code (mig 205 backfilled one row per credit voucher).
+  const initialCreditAccountCode = voucher.direction === 'credit' && sources && sources.length > 0
+    ? sources[0].account_code ?? null
     : null
 
   return (
@@ -79,7 +79,7 @@ export default async function EditPaymentPage({ params }: Props) {
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> TREASURY · PAYMENT VOUCHER · EDIT
+            <em>I.</em> TREASURY · {voucher.direction === 'credit' ? 'OFFICIAL RECEIPT' : 'PAYMENT VOUCHER'} · EDIT
           </div>
           <h1 className="page-title">Edit {voucher.voucher_no ?? 'draft'}</h1>
           <p className="font-serif italic text-graphite text-sm mt-2">
@@ -107,19 +107,14 @@ export default async function EditPaymentPage({ params }: Props) {
           repayment_breakdown: voucher.repayment_breakdown as { principal: number; interest: number; penalty: number } | null,
         }}
         initialSources={sourceRows}
-        initialCreditCategoryCode={initialCreditCategoryCode}
+        initialCreditAccountCode={initialCreditAccountCode}
         companies={companies ?? []}
         bankAccounts={bankAccounts ?? []}
-        categories={(categories ?? []).map((c) => ({
-          code: c.code,
-          label: c.label,
-          account_type: c.account_type as AccountType | null,
-          gl_account_code: c.gl_account_code,
-        }))}
         glAccounts={(glAccounts ?? []).map((g) => ({
           code: g.code,
           name: g.name,
           type: g.type as AccountType,
+          parent_code: (g as { parent_code: string | null }).parent_code ?? null,
         }))}
       />
     </div>

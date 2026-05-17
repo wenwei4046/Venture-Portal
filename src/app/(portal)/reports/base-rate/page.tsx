@@ -27,6 +27,14 @@ export default async function BaseRateHistoryPage() {
           </div>
           <h1 className="page-title">Base Rate History</h1>
         </div>
+        <div className="flex gap-2">
+          <Link href="/reports/base-rate/export?format=xlsx" className="btn-secondary btn-sm">
+            Export Excel
+          </Link>
+          <Link href="/reports/base-rate/export?format=pdf" className="btn-secondary btn-sm">
+            Export PDF
+          </Link>
+        </div>
       </div>
 
       {/* Trend chart */}

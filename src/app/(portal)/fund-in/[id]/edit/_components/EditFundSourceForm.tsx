@@ -3,6 +3,8 @@
 import { useState, useTransition, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { updateFundSource } from '../../../actions'
+import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
+import AccountPicker, { type AccountOption } from '@/components/AccountPicker'
 
 interface Props {
   id: string
@@ -15,12 +17,17 @@ interface Props {
     effective_date: string
     repayment_date: string
     notes: string
+    account_code: string | null
   }
+  liabilityAccounts: AccountOption[]
 }
 
-export default function EditFundSourceForm({ id, typeLabel, fromLabel, initial }: Props) {
+export default function EditFundSourceForm({ id, typeLabel, fromLabel, initial, liabilityAccounts }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [repaymentDate, setRepaymentDate] = useState<string>(initial.repayment_date)
+  const [lockInMonths, setLockInMonths] = useState<number>(initial.lock_in_months)
+  const [accountCode, setAccountCode] = useState<string>(initial.account_code ?? '')
   const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
@@ -71,6 +78,25 @@ export default function EditFundSourceForm({ id, typeLabel, fromLabel, initial }
         <div className="sm:col-span-2 text-xs text-muted italic font-serif">
           Source type and counterparty are locked once submitted. To change them, cancel and create a new fund source.
         </div>
+      </div>
+
+      {/* ───────── Liability account (mig 247) ───────── */}
+      <div className="mb-6">
+        <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+          Amount due to (BS account){' '}
+          <span className="text-muted font-normal">(optional)</span>
+        </label>
+        <AccountPicker
+          accounts={liabilityAccounts}
+          value={accountCode}
+          onChange={setAccountCode}
+          name="account_code"
+          typeFilter={['liability', 'equity']}
+          placeholder="Pick the payable sub-account…"
+        />
+        <p className="font-serif italic text-muted text-xs mt-1.5">
+          Leave blank to fall back to the umbrella &quot;4000 Fund Sources Payable&quot;.
+        </p>
       </div>
 
       {/* ───────── Amount + Rate (row) ───────── */}
@@ -141,6 +167,10 @@ export default function EditFundSourceForm({ id, typeLabel, fromLabel, initial }
               max="120"
               required
               defaultValue={initial.lock_in_months}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10)
+                if (!isNaN(v) && v >= 1) setLockInMonths(v)
+              }}
               className="w-full px-3 py-2 pr-16 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted font-mono">
@@ -181,11 +211,17 @@ export default function EditFundSourceForm({ id, typeLabel, fromLabel, initial }
           type="date"
           required
           defaultValue={initial.repayment_date}
+          onChange={(e) => setRepaymentDate(e.target.value)}
           className="w-full max-w-sm px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
         />
         <p className="font-serif italic text-muted text-xs mt-1.5">
-          Target date HV repays the full principal. Drives the maturity date shown on the detail view.
+          Date the first installment is due. Must be on or after the effective date.
         </p>
+        {repaymentDate && lockInMonths >= 1 ? (
+          <p className="font-serif italic text-muted text-xs mt-1.5">
+            Fully repaid by ~{expectedFullRepaymentDate(repaymentDate, lockInMonths)} ({lockInMonths} installment{lockInMonths === 1 ? '' : 's'})
+          </p>
+        ) : null}
       </div>
 
       {/* ───────── Notes ───────── */}

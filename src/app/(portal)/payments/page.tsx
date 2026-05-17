@@ -1,12 +1,13 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import PaymentTabs from './_components/PaymentTabs'
 import PaymentFilters from './_components/PaymentFilters'
 import BackToTop from './_components/BackToTop'
+import VouchersTable, { type VoucherRow } from './_components/VouchersTable'
+import dayjs from 'dayjs'
 
 const POOL_LABELS: Record<string, string> = {
   venture_pool: 'Venture Pool',
@@ -64,28 +65,29 @@ export default async function PaymentsPage({ searchParams }: Props) {
     .select('*', { count: 'exact', head: true })
     .eq('status', 'submitted')
 
-  // Mig 205: sources also carry category_code. Load once, index by voucher_id,
-  // then derive pool list + category list for the table cells.
+  // Post-mig 238: PVS rows reference chart_of_accounts via account_code
+  // (the COA `code` IS the GL). Load once, index by voucher_id, then derive
+  // pool list + account name list for the table cells.
   const sourcesByVoucher = new Map<string, string[]>()
   const categoriesByVoucher = new Map<string, string[]>()
   {
     const { data: srcs } = await supabase
       .from('payment_voucher_sources')
-      .select('voucher_id, pool, amount, category_code, payment_categories(label)')
+      .select('voucher_id, pool, amount, account_code, chart_of_accounts!pvs_account_code_fk(name)')
       .order('amount', { ascending: false })
     for (const s of (srcs ?? []) as Array<{
       voucher_id: string
       pool: string
-      category_code: string | null
-      payment_categories: { label: string } | null
+      account_code: string | null
+      chart_of_accounts: { name: string } | null
     }>) {
       const pools = sourcesByVoucher.get(s.voucher_id) ?? []
       pools.push(s.pool)
       sourcesByVoucher.set(s.voucher_id, pools)
 
       const label =
-        s.payment_categories?.label ??
-        (s.category_code ? s.category_code.replace(/_/g, ' ') : null)
+        s.chart_of_accounts?.name ??
+        (s.account_code ? s.account_code.replace(/_/g, ' ') : null)
       if (label) {
         const cats = categoriesByVoucher.get(s.voucher_id) ?? []
         if (!cats.includes(label)) cats.push(label)
@@ -144,11 +146,35 @@ export default async function PaymentsPage({ searchParams }: Props) {
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> TREASURY · PAYMENT VOUCHERS
+            <em>I.</em> TREASURY · PAYMENTS & RECEIPTS
           </div>
           <h1 className="page-title">Payments</h1>
         </div>
         <div className="flex items-center gap-3">
+          {/* Export buttons */}
+          {(() => {
+            const exportQs = new URLSearchParams(
+              Object.entries(params)
+                .filter(([, v]) => v !== undefined && v !== null && v !== '')
+                .map(([k, v]) => [k, String(v)])
+            ).toString()
+            return (
+              <>
+                <Link
+                  href={`/payments/export?format=xlsx${exportQs ? '&' + exportQs : ''}`}
+                  className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+                >
+                  Export Excel
+                </Link>
+                <Link
+                  href={`/payments/export?format=pdf${exportQs ? '&' + exportQs : ''}`}
+                  className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+                >
+                  Export PDF
+                </Link>
+              </>
+            )
+          })()}
           <Link
             href="/payments/payroll-requests"
             className={
@@ -236,79 +262,36 @@ export default async function PaymentsPage({ searchParams }: Props) {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="ledger-table">
-                <thead>
-                  <tr>
-                    <th>Voucher #</th>
-                    <th>Category</th>
-                    <th>Pool</th>
-                    <th>Payee</th>
-                    <th className="right">Amount</th>
-                    <th>Status</th>
-                    <th className="right">Date</th>
-                    <th className="right"></th>
-                  </tr>
-                </thead>
-                <tbody className="row-stagger">
-                  {filtered.map((v, i) => {
-                    const cats = categoriesByVoucher.get(v.id) ?? []
-                    const catLabel = cats.length > 0 ? cats.join(' + ') : '—'
-                    let poolLabel = '—'
-                    if (v.direction === 'credit') {
-                      poolLabel = v.target_pool
-                        ? (POOL_LABELS[v.target_pool] ?? v.target_pool.replace(/_/g, ' '))
-                        : '—'
-                    } else {
-                      const pools = sourcesByVoucher.get(v.id) ?? []
-                      if (pools.length > 0) {
-                        poolLabel = pools.map(p => POOL_LABELS[p] ?? p.replace(/_/g, ' ')).join(' + ')
-                      } else if (v.source_pool) {
-                        poolLabel = POOL_LABELS[v.source_pool] ?? v.source_pool.replace(/_/g, ' ')
-                      }
+              <VouchersTable
+                rows={filtered.map<VoucherRow>((v) => {
+                  const cats = categoriesByVoucher.get(v.id) ?? []
+                  const catLabel = cats.length > 0 ? cats.join(' + ') : '—'
+                  let poolLabel = '—'
+                  if (v.direction === 'credit') {
+                    poolLabel = v.target_pool
+                      ? (POOL_LABELS[v.target_pool] ?? v.target_pool.replace(/_/g, ' '))
+                      : '—'
+                  } else {
+                    const pools = sourcesByVoucher.get(v.id) ?? []
+                    if (pools.length > 0) {
+                      poolLabel = pools.map((p) => POOL_LABELS[p] ?? p.replace(/_/g, ' ')).join(' + ')
+                    } else if (v.source_pool) {
+                      poolLabel = POOL_LABELS[v.source_pool] ?? v.source_pool.replace(/_/g, ' ')
                     }
-                    return (
-                      <tr
-                        key={v.id}
-                        style={{ '--i': i } as React.CSSProperties}
-                      >
-                        <td className="font-mono text-[12px] text-ink font-medium">
-                          {v.voucher_no ?? '—'}
-                        </td>
-                        <td className="font-serif italic text-graphite capitalize">
-                          {catLabel}
-                        </td>
-                        <td className="font-mono text-[11px] text-graphite">
-                          {poolLabel}
-                        </td>
-                        <td className="font-serif text-[15px] text-ink truncate max-w-[200px]">
-                          {v.payee_name}
-                        </td>
-                        <td className="num">
-                          <span className={v.direction === 'credit' ? 'text-ledger font-semibold' : 'font-semibold'}>
-                            {v.direction === 'credit' ? '+' : '−'}{formatMoney(Number(v.amount)).replace('RM ', '')}
-                          </span>
-                        </td>
-                        <td>
-                          <em className={`font-serif text-sm ${STATUS_STYLES[v.status] ?? 'text-muted'}`}>
-                            {v.status.replace('_', ' ')}
-                          </em>
-                        </td>
-                        <td className="num text-graphite">
-                          {dayjs(v.payment_date ?? v.created_at).format('D MMM')}
-                        </td>
-                        <td className="right">
-                          <Link
-                            href={`/payments/${v.id}`}
-                            className="text-sm text-accent hover:text-accent-hover font-serif italic"
-                          >
-                            View
-                          </Link>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                  }
+                  return {
+                    id: v.id,
+                    voucher_no: v.voucher_no,
+                    direction: v.direction as 'credit' | 'debit',
+                    amount: Number(v.amount),
+                    payee_name: v.payee_name,
+                    status: v.status,
+                    catLabel,
+                    poolLabel,
+                    paymentOrCreatedDate: (v.payment_date ?? v.created_at) as string,
+                  }
+                })}
+              />
             </div>
           )}
         </section>

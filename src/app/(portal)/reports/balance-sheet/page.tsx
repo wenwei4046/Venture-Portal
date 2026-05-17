@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
-import { fetchBalanceSheet } from '@/lib/cfo-reports'
+import { fetchBalanceSheet, type BalanceMovementLine } from '@/lib/cfo-reports'
 import dayjs from 'dayjs'
 import Link from 'next/link'
 
@@ -32,18 +32,34 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
           </div>
           <h1 className="page-title">Balance Sheet</h1>
         </div>
-        <form className="shrink-0">
-          <input
-            type="date"
-            name="as_of"
-            defaultValue={asOf}
-            className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
-          />
-        </form>
+        <div className="shrink-0 flex items-center gap-2">
+          <form className="shrink-0">
+            <input
+              type="date"
+              name="as_of"
+              defaultValue={asOf}
+              className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+            />
+          </form>
+          <Link
+            href={`/reports/balance-sheet/export?format=xlsx&as_of=${asOf}`}
+            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+          >
+            Export Excel
+          </Link>
+          <Link
+            href={`/reports/balance-sheet/export?format=pdf&as_of=${asOf}`}
+            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+          >
+            Export PDF
+          </Link>
+        </div>
       </div>
 
       <p className="font-serif italic text-muted text-sm mb-8 max-w-3xl">
-        Snapshot at end of <strong>{dateLabel}</strong>. Group-level. Retained
+        Snapshot at end of <strong>{dateLabel}</strong>. Group-level. Driven by
+        the unified chart of accounts — assets, fixed assets, liabilities, and
+        permanent equity accounts each roll up to their own row. Retained
         earnings is YTD net profit (Jan 1 → as-of date).
       </p>
 
@@ -65,6 +81,18 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
                 <td>Loan receivable</td>
                 <td className="num">{formatMoney(bs.loanReceivable)}</td>
               </tr>
+              {Math.abs(bs.fixedAssets) > 0.005 ? (
+                <tr>
+                  <td>Fixed assets</td>
+                  <td className="num">{formatMoney(bs.fixedAssets)}</td>
+                </tr>
+              ) : null}
+              {Math.abs(bs.otherAssets) > 0.005 ? (
+                <tr>
+                  <td>Other assets</td>
+                  <td className="num">{formatMoney(bs.otherAssets)}</td>
+                </tr>
+              ) : null}
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-hairline">
@@ -94,11 +122,21 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
           </table>
         </section>
 
-        {/* Equity */}
+        {/* Equity — real share capital + retained earnings only. Internal
+            pool sub-ledgers (mig 248: is_internal_fund=true) get their own
+            section below. */}
         <section>
           <h2 className="font-serif text-xl text-ink mb-4">Equity</h2>
           <table className="ledger-table">
             <tbody>
+              {Math.abs(bs.equityBalances) > 0.005 ? (
+                <tr>
+                  <td>Share capital / paid-in equity</td>
+                  <td className={`num ${bs.equityBalances >= 0 ? '' : 'text-danger'}`}>
+                    {formatMoney(bs.equityBalances)}
+                  </td>
+                </tr>
+              ) : null}
               <tr>
                 <td>Retained earnings (YTD)</td>
                 <td className={`num ${bs.retainedEarnings >= 0 ? 'text-ledger' : 'text-danger'}`}>
@@ -109,13 +147,55 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
             <tfoot>
               <tr className="border-t-2 border-hairline">
                 <td className="font-serif italic text-ink font-medium">Total equity</td>
-                <td className={`num font-semibold ${bs.retainedEarnings >= 0 ? 'text-ledger' : 'text-danger'}`}>
-                  {formatMoney(bs.retainedEarnings)}
+                <td className={`num font-semibold ${(bs.equityBalances + bs.retainedEarnings) >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                  {formatMoney(bs.equityBalances + bs.retainedEarnings)}
                 </td>
               </tr>
             </tfoot>
           </table>
         </section>
+
+        {/* Internal Funds — operational pool sub-ledgers (HV Operating Fund,
+            Director Saving Fund, the 5 dept pools, Invoice Payout Pool). Live
+            in the equity range of the GL but are management-accounting
+            buckets, not real shareholder capital. Mig 248 flag drives this
+            split. */}
+        {bs.internalFundLines.length > 0 ? (
+          <section>
+            <h2 className="font-serif text-xl text-ink mb-1">Internal Funds</h2>
+            <p className="font-serif italic text-muted text-xs mb-4 max-w-2xl">
+              Operational pool sub-ledgers carried in the equity range of the
+              GL. Not real shareholder capital — these are HV&apos;s internal
+              earmarks of its own retained funds (department allocations,
+              director savings, invoice payout buffer).
+            </p>
+            <table className="ledger-table">
+              <tbody>
+                {bs.internalFundLines.map((l) => (
+                  <tr key={l.code}>
+                    <td>
+                      <span className="font-mono text-[11px] text-graphite mr-2">{l.code}</span>
+                      {l.name}
+                    </td>
+                    <td className={`num ${l.balance >= 0 ? '' : 'text-danger'}`}>
+                      {formatMoney(l.balance)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-hairline">
+                  <td className="font-serif italic text-ink font-medium">Total internal funds</td>
+                  <td
+                    className={`num font-semibold ${bs.internalFundsTotal >= 0 ? '' : 'text-danger'}`}
+                  >
+                    {formatMoney(bs.internalFundsTotal)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </section>
+        ) : null}
 
         {/* Reconciliation */}
         <div className="border border-hairline rounded-md bg-surface p-5">
@@ -128,7 +208,7 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
               <span className="num">{formatMoney(bs.totalAssets)}</span>
             </div>
             <div className="flex items-baseline justify-between">
-              <span className="font-serif text-graphite">Total liabilities + equity</span>
+              <span className="font-serif text-graphite">Total liabilities + equity + internal funds</span>
               <span className="num">{formatMoney(bs.totalLiabilitiesEquity)}</span>
             </div>
             <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
@@ -149,7 +229,84 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
             </p>
           )}
         </div>
+
+        {/* Capital cash movements this period */}
+        <CapitalMovementsSection movements={bs.movements} asOf={asOf} />
       </div>
     </div>
+  )
+}
+
+function CapitalMovementsSection({ movements, asOf }: { movements: BalanceMovementLine[]; asOf: string }) {
+  const monthLabel = dayjs(asOf).format('MMMM YYYY')
+  const grandTotal = movements.reduce((s, m) => s + m.amount, 0)
+
+  // Group by pool, preserving the (already-sorted) order of first appearance.
+  const groups: Array<{ pool: string; poolLabel: string; lines: BalanceMovementLine[]; subtotal: number }> = []
+  for (const m of movements) {
+    let g = groups.find((x) => x.pool === m.pool)
+    if (!g) {
+      g = { pool: m.pool, poolLabel: m.poolLabel, lines: [], subtotal: 0 }
+      groups.push(g)
+    }
+    g.lines.push(m)
+    g.subtotal += m.amount
+  }
+
+  return (
+    <section>
+      <div className="sect-head">
+        <h2>Capital cash movements</h2>
+        <span className="rule" aria-hidden />
+        <span className="count">{monthLabel.toUpperCase()}</span>
+      </div>
+      <p className="font-serif italic text-muted text-xs mb-4">
+        Asset / liability / equity movements (loans disbursed, principal received,
+        fund-in, deposits) this month — grouped by pool. Excludes P&amp;L items.
+      </p>
+      {movements.length === 0 ? (
+        <p className="font-serif italic text-muted text-sm">No capital movements this period.</p>
+      ) : (
+        <table className="ledger-table">
+          <tbody>
+            {groups.map((g) => (
+              <PoolGroupRows key={g.pool} group={g} />
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t-2 border-hairline">
+              <td className="font-serif italic text-ink font-medium">Net capital movement</td>
+              <td className={`num font-semibold ${grandTotal >= 0 ? 'text-num-ink' : 'text-danger'}`}>
+                {grandTotal < 0 ? <span className="neg">{formatMoney(grandTotal)}</span> : formatMoney(grandTotal)}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      )}
+    </section>
+  )
+}
+
+function PoolGroupRows({ group }: { group: { pool: string; poolLabel: string; lines: BalanceMovementLine[]; subtotal: number } }) {
+  return (
+    <>
+      <tr>
+        <td colSpan={2} className="font-mono text-[11px] uppercase tracking-wide text-muted pt-3">{group.poolLabel}</td>
+      </tr>
+      {group.lines.map((l, i) => (
+        <tr key={`${group.pool}-${i}`}>
+          <td className="text-sm pl-4">{l.label}</td>
+          <td className="num">
+            {l.amount < 0 ? <span className="neg">{formatMoney(l.amount)}</span> : formatMoney(l.amount)}
+          </td>
+        </tr>
+      ))}
+      <tr>
+        <td className="font-serif italic text-graphite text-sm pl-4">{group.poolLabel} subtotal</td>
+        <td className="num font-semibold">
+          {group.subtotal < 0 ? <span className="neg">{formatMoney(group.subtotal)}</span> : formatMoney(group.subtotal)}
+        </td>
+      </tr>
+    </>
   )
 }

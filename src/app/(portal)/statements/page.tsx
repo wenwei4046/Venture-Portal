@@ -1,203 +1,40 @@
+// /statements is now the Invoices landing (mig 2026-05-15 tab reorder).
+// The Monthly Statements list moved to /statements/monthly.
+
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import { requireRole } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
-import { formatMoney } from '@/lib/utils'
-import GenerateStatementsButton from './_components/GenerateStatementsButton'
+import BillingView from '../billing/_components/BillingView'
 import StatementsTabHeader from './_components/StatementsTabHeader'
+import { getPeriodMonth } from '@/lib/utils'
 
-export default async function StatementsPage() {
-  const user = await requireRole(['principal', 'finance'])
-  const supabase = await createClient()
+interface Props {
+  searchParams: Promise<{ period?: string }>
+}
 
-  const [{ data: statements }, { data: companies }] = await Promise.all([
-    supabase
-      .from('monthly_statements')
-      .select('*')
-      .order('period_month', { ascending: false })
-      .order('created_at', { ascending: false }),
-    supabase.from('companies').select('id, name, short_code'),
-  ])
-
-  const statementList = statements ?? []
-  const companyMap = new Map(
-    (companies ?? []).map((c) => [c.id, { name: c.name, code: c.short_code }])
-  )
-
-  // Group by period for the summary view
-  const byPeriod = new Map<string, typeof statementList>()
-  for (const s of statementList) {
-    const period = s.period_month
-    const list = byPeriod.get(period) ?? []
-    list.push(s)
-    byPeriod.set(period, list)
-  }
-
-  const latestPeriod = Array.from(byPeriod.keys()).sort().reverse()[0]
-  const draftCount = statementList.filter((s) => s.status === 'draft').length
-  const issuedCount = statementList.filter((s) => s.status === 'issued').length
-  const paidCount = statementList.filter((s) => s.status === 'paid').length
-
-  const canGenerate = user.role === 'finance'
+export default async function StatementsPage(props: Props) {
+  const params = await props.searchParams
+  const period = params.period ?? getPeriodMonth()
+  const periodFormatted = dayjs(period).format('YYYY-MM')
+  const exportQs = `&period=${periodFormatted}`
 
   return (
     <div>
-      <StatementsTabHeader active="statements" />
-      <div className="page-head">
-        <div>
-          <div className="page-eyebrow">
-            <em>I.</em> TREASURY · MONTHLY STATEMENTS
-          </div>
-          <h1 className="page-title">Statements</h1>
-        </div>
-        {canGenerate ? <GenerateStatementsButton /> : null}
+      <StatementsTabHeader active="invoices" />
+      <div className="flex justify-end gap-2 mb-4">
+        <Link
+          href={`/statements/export?format=xlsx${exportQs}`}
+          className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+        >
+          Export Excel
+        </Link>
+        <Link
+          href={`/statements/export?format=pdf${exportQs}`}
+          className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+        >
+          Export PDF
+        </Link>
       </div>
-
-      {/* ───────── Summary ───────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
-        <div className="lg:col-span-7">
-          <div className="font-serif italic text-accent text-base mb-1">
-            {latestPeriod ? `Latest period` : 'No statements yet'}
-          </div>
-          <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tracking-[-0.01em]">
-            {latestPeriod ? (
-              dayjs(latestPeriod).format('MMMM YYYY')
-            ) : (
-              <span className="text-muted">—</span>
-            )}
-          </div>
-          <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
-            {statementList.length} TOTAL{' '}
-            {statementList.length === 1 ? 'STATEMENT' : 'STATEMENTS'}
-          </div>
-        </div>
-
-        {statementList.length > 0 ? (
-          <div className="lg:col-span-5 space-y-2">
-            {draftCount > 0 ? (
-              <div className="flex items-baseline justify-between font-mono text-sm">
-                <em className="font-serif text-md text-graphite">draft</em>
-                <span className="text-ink tabular">{draftCount}</span>
-              </div>
-            ) : null}
-            {issuedCount > 0 ? (
-              <div className="flex items-baseline justify-between font-mono text-sm">
-                <em className="font-serif text-md text-alert">issued</em>
-                <span className="text-ink tabular">{issuedCount}</span>
-              </div>
-            ) : null}
-            {paidCount > 0 ? (
-              <div className="flex items-baseline justify-between font-mono text-sm">
-                <em className="font-serif text-md text-ledger">paid</em>
-                <span className="text-ink tabular">{paidCount}</span>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-
-      {/* ───────── Statements by period ───────── */}
-      {statementList.length === 0 ? (
-        <EmptyState canGenerate={canGenerate} />
-      ) : (
-        Array.from(byPeriod.entries()).map(([period, periodStatements]) => (
-          <section key={period} className="mb-12">
-            <div className="sect-head">
-              <h2>{dayjs(period).format('MMMM YYYY')}</h2>
-              <span className="rule" aria-hidden />
-              <span className="count">{periodStatements.length} {periodStatements.length === 1 ? 'STATEMENT' : 'STATEMENTS'}</span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="ledger-table">
-                <thead>
-                  <tr>
-                    <th>Company</th>
-                    <th className="right">Invoice</th>
-                    <th className="right">Contra</th>
-                    <th className="right">Net</th>
-                    <th>Status</th>
-                    <th className="right"></th>
-                  </tr>
-                </thead>
-                <tbody className="row-stagger">
-                  {periodStatements.map((s, i) => {
-                    const company = companyMap.get(s.company_id)
-                    return (
-                      <tr
-                        key={s.id}
-                        style={{ '--i': i } as React.CSSProperties}
-                      >
-                        <td>
-                          <div className="font-serif text-[15px] text-ink">
-                            {company?.name ?? '—'}
-                          </div>
-                          <div className="font-mono text-[11px] text-graphite mt-0.5">
-                            {company?.code}
-                          </div>
-                        </td>
-                        <td className="num">
-                          {Number(s.total_invoice) > 0
-                            ? formatMoney(Number(s.total_invoice))
-                            : <span className="text-muted">—</span>}
-                        </td>
-                        <td className="num neg">
-                          {Number(s.total_contra) > 0
-                            ? formatMoney(-Number(s.total_contra))
-                            : <span className="text-muted">—</span>}
-                        </td>
-                        <td className="num font-semibold">
-                          {formatMoney(Number(s.net_amount))}
-                        </td>
-                        <td>
-                          <StatementStatus status={s.status} />
-                        </td>
-                        <td className="right">
-                          <Link
-                            href={`/statements/${s.id}`}
-                            className="text-sm text-accent hover:text-accent-hover font-serif italic"
-                          >
-                            View
-                          </Link>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        ))
-      )}
-    </div>
-  )
-}
-
-function StatementStatus({ status }: { status: string }) {
-  if (status === 'draft') return <em className="font-serif text-graphite text-sm">draft</em>
-  if (status === 'issued') return <em className="font-serif text-alert text-sm">issued</em>
-  if (status === 'paid') return <em className="font-serif text-ledger text-sm">paid</em>
-  if (status === 'partial') return <em className="font-serif text-alert text-sm">partial</em>
-  return <em className="font-serif text-muted text-sm">{status}</em>
-}
-
-function EmptyState({ canGenerate }: { canGenerate: boolean }) {
-  return (
-    <div className="py-16 text-center border border-hairline rounded-md bg-surface">
-      <p className="font-serif italic text-graphite text-lg mb-2">
-        No statements yet.
-      </p>
-      <p className="font-serif italic text-muted text-sm">
-        {canGenerate ? (
-          <>
-            Finance generates monthly statements for all active subsidiaries.
-            <br />
-            Click <em>Generate statements</em> above to start.
-          </>
-        ) : (
-          <>Finance hasn&apos;t generated any statements yet.</>
-        )}
-      </p>
+      <BillingView searchParams={Promise.resolve(params)} />
     </div>
   )
 }

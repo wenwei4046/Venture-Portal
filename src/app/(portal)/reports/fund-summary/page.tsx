@@ -61,6 +61,20 @@ export default async function FundSummaryPage() {
           </div>
           <h1 className="page-title">Fund Summary</h1>
         </div>
+        <div className="flex gap-2">
+          <Link
+            href="/reports/fund-summary/export?format=xlsx"
+            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+          >
+            Export Excel
+          </Link>
+          <Link
+            href="/reports/fund-summary/export?format=pdf"
+            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+          >
+            Export PDF
+          </Link>
+        </div>
       </div>
 
       <div className="max-w-3xl space-y-8">

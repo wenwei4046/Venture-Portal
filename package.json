@@ -17,6 +17,7 @@
     "seed:hr-staff": "node --env-file=.env.local scripts/seed-hr-staff.mjs"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.5.1",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.0",
     "@types/bcryptjs": "^2.4.6",

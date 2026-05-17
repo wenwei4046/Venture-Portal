@@ -41,6 +41,20 @@ export default async function ClaimsSummaryPage() {
           </div>
           <h1 className="page-title">Claims Summary</h1>
         </div>
+        <div className="flex gap-2">
+          <Link
+            href="/reports/claims/export?format=xlsx"
+            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+          >
+            Export Excel
+          </Link>
+          <Link
+            href="/reports/claims/export?format=pdf"
+            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+          >
+            Export PDF
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-3xl">

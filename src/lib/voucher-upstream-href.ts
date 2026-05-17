@@ -7,12 +7,13 @@ export function voucherUpstreamHref(
   switch (referenceType) {
     case 'loan':
       return `/fund-out/${referenceId}`
-    case 'invoice':
-      return `/statements/${referenceId}`
     case 'fund_source':
       return `/fund-in/${referenceId}`
     case 'payroll_run':
       return `/approvals/payroll-run/${referenceId}`
+    // 'invoice' falls through to null: invoices have no per-id detail page —
+    // they live in the period-filtered list at /statements?period=<month>, and
+    // this function lacks the period_month needed to build that link.
     default:
       return null
   }

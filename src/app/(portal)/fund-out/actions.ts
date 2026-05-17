@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { postJournalEntry } from '@/lib/journal'
+import { validateDisbursementAccount } from '@/lib/loan-disbursement'
+import { resolveLoansReceivableLeaf } from '@/lib/loans-coa'
 import type { PaymentType } from '@/types'
 
 // ─── Create new loan (Finance) ────────────────────────────────────────────────
@@ -26,6 +28,7 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
   const tenureMonths = parseInt((formData.get('tenure_months') as string) ?? '', 10)
   const repaymentTerms = (formData.get('repayment_terms') as string) ?? ''
   const loanStartDate = (formData.get('loan_start_date') as string) ?? ''
+  const disbursementAccountCode = ((formData.get('disbursement_account_code') as string) ?? '').trim()
 
   if (!companyId) return { error: 'Company is required' }
   if (isNaN(principal) || principal <= 0) {
@@ -40,6 +43,32 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
   if (!loanStartDate || !dayjs(loanStartDate).isValid()) {
     throw new Error('Loan start date is required')
   }
+
+  // Surface period-lock conflicts at creation time rather than at approval
+  // time — the auto-generated disbursement PV will be dated loanStartDate
+  // and would otherwise fail on approval if its period is locked. Mirrors
+  // the assertPeriodOpen call in recordRepayment.
+  await assertPeriodOpen(supabase, loanStartDate)
+
+  // Validate the disbursement account: must exist, be active, and be
+  // BS-classified (asset / fixed_asset / liability / equity in the unified
+  // COA). This guarantees the loan principal can never leak into the P&L via
+  // the auto-created disbursement PV.
+  const { data: acctRows, error: acctErr } = await supabase
+    .from('chart_of_accounts')
+    .select('code, name, type, is_active, parent_code')
+  if (acctErr) return { error: `Account lookup failed: ${acctErr.message}` }
+  const acctErrMsg = validateDisbursementAccount(
+    disbursementAccountCode,
+    (acctRows ?? []).map((r) => ({
+      code: r.code,
+      name: r.name,
+      account_type: r.type as string,
+      is_active: r.is_active,
+      parent_code: r.parent_code ?? null,
+    })),
+  )
+  if (acctErrMsg) return { error: acctErrMsg }
 
   // ─── Look up active base rate ───
   const { data: baseRate, error: brError } = await supabase
@@ -86,6 +115,9 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
   // Principal's approval).
 
   // ─── Atomic loan + approval creation (M1 fix) ───
+  // Mig 239: the 10-arg create_loan_with_approval RPC accepts the BS account
+  // code and writes it on the disbursement PV source row in a single
+  // transaction. No post-RPC patch needed.
   const { data: loanId, error: rpcError } = await supabase.rpc(
     'create_loan_with_approval',
     {
@@ -98,6 +130,7 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
       p_repayment_terms: repaymentTerms || undefined,
       p_company_name: company.name,
       p_disbursement_date: loanStartDate,
+      p_disbursement_account_code: disbursementAccountCode,
     }
   )
 
@@ -213,11 +246,19 @@ export async function recordRepayment(formData: FormData) {
     .eq('status', 'active')
     .maybeSingle()
 
-  const bankGl = primaryBank?.gl_account_code ?? '1010'
+  const bankGl = primaryBank?.gl_account_code ?? '3000'
+  // Mig 238 unified COA + 2026-05-15 fix:
+  //   - principal → <borrower's leaf under 3020 Loans Receivable>. The user
+  //     split 3020 into a header + per-borrower leaves (`3051 Amount Due
+  //     From - <code>`); posting directly to 3020 silently dropped from
+  //     Trial Balance and tripped mig 256's header-rejection trigger.
+  //     resolveLoansReceivableLeaf() does the per-borrower lookup.
+  //   - 7010 Penalty Income (other_income)
+  //   - 7000 Interest Income — Loans (other_income)  ← interest + netting
   const creditAccount =
-    paymentType === 'principal' ? '1020' :
-    paymentType === 'penalty'   ? '4020' :
-                                  '4010'   // interest + netting
+    paymentType === 'principal' ? await resolveLoansReceivableLeaf(supabase, loanId) :
+    paymentType === 'penalty'   ? '7010' :
+                                  '7000'   // interest + netting
 
   try {
     await postJournalEntry(supabase, {

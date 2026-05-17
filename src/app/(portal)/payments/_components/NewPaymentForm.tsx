@@ -3,6 +3,8 @@
 import { useState, useTransition, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { createPaymentVoucher } from '../actions'
+import { ACCOUNT_TYPES, typeLabel, type AccountType } from '@/lib/coa'
+import AccountPicker from '@/components/AccountPicker'
 
 interface InvoicePreset {
   id: string
@@ -15,6 +17,10 @@ interface InvoicePreset {
   period_month: string
   billing_mode: string
   target_pool: string
+  /** Mig 225 polymorphism: drives whether settlement runs through a bank
+   *  (subsidiary) or through netting against the paying party's internal
+   *  pool ledger (dept_pool / director / freetext). */
+  billable_to_type: 'subsidiary' | 'director' | 'dept_pool' | 'freetext' | null
 }
 
 interface PayableFundSource {
@@ -35,37 +41,32 @@ interface PayableFundSource {
   remaining_periods: number
 }
 
-type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense'
-
-interface Category {
-  code: string
-  label: string
-  account_type: AccountType | null
-  gl_account_code: string | null
-}
-
-interface GlAccount {
+interface Account {
   code: string
   name: string
   type: AccountType
+  parent_code: string | null
+  is_active: boolean
 }
 
 interface Props {
   companies: { id: string; name: string; short_code: string }[]
   bankAccounts: { id: string; bank_name: string; account_number: string; current_balance: number }[]
-  categories: Category[]
-  glAccounts: GlAccount[]
+  accounts: Account[]
   invoicePreset?: InvoicePreset | null
   nonBillablePreset?: boolean
   payableFundSources?: PayableFundSource[]
 }
 
 const TYPE_BADGE: Record<AccountType, { label: string; className: string }> = {
-  asset:     { label: 'BS · Asset',     className: 'text-info' },
-  liability: { label: 'BS · Liability', className: 'text-info' },
-  equity:    { label: 'BS · Equity',    className: 'text-info' },
-  revenue:   { label: 'P&L · Revenue',  className: 'text-ledger' },
-  expense:   { label: 'P&L · Expense',  className: 'text-danger' },
+  equity:       { label: 'BS · Equity',       className: 'text-info' },
+  fixed_asset:  { label: 'BS · Fixed Asset',  className: 'text-info' },
+  asset:        { label: 'BS · Asset',        className: 'text-info' },
+  liability:    { label: 'BS · Liability',    className: 'text-info' },
+  revenue:      { label: 'P&L · Revenue',     className: 'text-ledger' },
+  cost:         { label: 'P&L · Cost',        className: 'text-danger' },
+  other_income: { label: 'P&L · Other Inc.',  className: 'text-ledger' },
+  expense:      { label: 'P&L · Expense',     className: 'text-danger' },
 }
 
 const POOL_OPTIONS = [
@@ -88,23 +89,34 @@ const PAYMENT_METHODS = [
 interface SourceRow {
   pool: string
   amount: string
-  category_code: string
+  account_code: string
   override_account_type?: AccountType | ''
   override_gl_account_code?: string
   override_reason?: string
 }
 
-export default function NewPaymentForm({ companies, bankAccounts, categories, glAccounts, invoicePreset, nonBillablePreset, payableFundSources = [] }: Props) {
+export default function NewPaymentForm({ companies, bankAccounts, accounts, invoicePreset, nonBillablePreset, payableFundSources = [] }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const isInvoicePay = !!invoicePreset
   const isNonBillable = !!nonBillablePreset && !isInvoicePay
   const [direction, setDirection] = useState<'debit' | 'credit'>(isInvoicePay ? 'credit' : 'debit')
-  const [categoryCode, setCategoryCode] = useState(isInvoicePay ? 'billing_payment' : '')
+  // Inter-billing: invoice issued to an internal dept pool (or director /
+  // freetext non-cash counterparty) settles without touching a bank — the
+  // money moves between pool ledgers, not banks. Default payment_method to
+  // 'netting' for those so the bank field skips the required guard and the
+  // JE branch below routes the Cr 3030 against the paying dept's pool
+  // equity instead of Dr Bank.
+  const isInterBilling =
+    isInvoicePay && invoicePreset!.billable_to_type !== null && invoicePreset!.billable_to_type !== 'subsidiary'
+  const [paymentMethod, setPaymentMethod] = useState<string>(
+    isInterBilling ? 'netting' : 'bank_transfer',
+  )
+  const [accountCode, setAccountCode] = useState('')
   const [sourceRows, setSourceRows] = useState<SourceRow[]>(
     isNonBillable
-      ? [{ pool: 'venture_pool', amount: '', category_code: '' }]
-      : [{ pool: '', amount: '', category_code: isInvoicePay ? 'billing_payment' : '' }]
+      ? [{ pool: 'venture_pool', amount: '', account_code: '' }]
+      : [{ pool: '', amount: '', account_code: '' }]
   )
   const [amount, setAmount] = useState(isInvoicePay ? invoicePreset!.total_amount.toFixed(2) : '')
   // Controlled payee fields so loan-repayment mode can auto-fill them
@@ -127,7 +139,8 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, gl
     isInvoicePay ? invoicePreset!.target_pool : direction === 'credit' ? 'venture_pool' : ''
   )
   const [files, setFiles] = useState<File[]>([])
-  const [catList] = useState(categories)
+  const accountList = accounts.filter((a) => a.is_active)
+  const accountByCode = new Map(accountList.map((a) => [a.code, a]))
   const formRef = useRef<HTMLFormElement>(null)
 
   const totalAmount = parseFloat(amount) || 0
@@ -142,7 +155,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, gl
     if (sourceRows.length !== 1) return
     if (sourceRows[0].amount !== '') return
     if (!totalAmount) return
-    setSourceRows([{ pool: sourceRows[0].pool, amount: totalAmount.toFixed(2), category_code: sourceRows[0].category_code }])
+    setSourceRows([{ pool: sourceRows[0].pool, amount: totalAmount.toFixed(2), account_code: sourceRows[0].account_code }])
   }, [totalAmount, direction, sourceRows])
 
   // When a fund source is picked, auto-fill payee + monthly principal/interest
@@ -162,18 +175,14 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, gl
     setRepayInterest((prev) => (prev === '0.00' || prev === '' ? selectedFundSource.monthly_interest.toFixed(2) : prev))
   }, [isLoanRepayment, selectedFundSource, companies])
 
-  // Loan repayment mode: amount = sum of split; category auto-chosen by what's being paid.
+  // Loan repayment mode: amount = sum of split. Account is picked manually
+  // per row (post-unified-COA the principal/interest legacy categories no
+  // longer exist — Finance picks 3020 Loans Receivable / 7000 Interest Income
+  // / etc. from the account dropdown).
   useEffect(() => {
     if (!isLoanRepayment) return
     setAmount(repaymentSum.toFixed(2))
-    // If paying principal → classify as loan_principal, else loan_interest.
-    const wantCat = (parseFloat(repayPrincipal) || 0) > 0 ? 'loan_principal' : 'loan_interest'
-    if (catList.some((c) => c.code === wantCat)) {
-      setCategoryCode(wantCat)
-      // Mig 205: each source row owns its category. Apply auto-category to every row.
-      setSourceRows(prev => prev.map(r => ({ ...r, category_code: wantCat })))
-    }
-  }, [isLoanRepayment, repaymentSum, repayPrincipal, catList])
+  }, [isLoanRepayment, repaymentSum])
 
   useEffect(() => {
     if (error && formRef.current) {
@@ -230,7 +239,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, gl
         const r = sourceRows[i]
         formData.set(`source_rows[${i}][pool]`, r.pool)
         formData.set(`source_rows[${i}][amount]`, r.amount)
-        formData.set(`source_rows[${i}][category_code]`, r.category_code)
+        formData.set(`source_rows[${i}][account_code]`, r.account_code)
         // Per-row BS/PL + GL override (mig 218). All-or-none guard at DB level.
         if (r.override_account_type && r.override_gl_account_code && r.override_reason?.trim()) {
           formData.set(`source_rows[${i}][override_account_type]`, r.override_account_type)
@@ -408,19 +417,27 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, gl
         <div>
           <label htmlFor="bank_account_id" className="block text-sm font-sans font-medium text-graphite mb-1.5">
             {direction === 'debit' ? 'Pay from account' : 'Receive into account'}
+            {paymentMethod !== 'netting' ? <span className="text-danger"> *</span> : null}
           </label>
           <select
             id="bank_account_id"
             name="bank_account_id"
+            required={paymentMethod !== 'netting'}
+            defaultValue={bankAccounts[0]?.id ?? ''}
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
           >
-            <option value="">Select bank account…</option>
+            {bankAccounts.length === 0 ? <option value="">No active bank accounts</option> : null}
             {bankAccounts.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.bank_name} — {b.account_number} (bal: RM {Number(b.current_balance).toLocaleString('en-MY', { minimumFractionDigits: 2 })})
               </option>
             ))}
           </select>
+          {paymentMethod === 'netting' ? (
+            <p className="font-serif italic text-muted text-xs mt-1.5">
+              Netting voucher — no real money moves, so bank is optional.
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -431,6 +448,8 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, gl
         </label>
         <select
           name="payment_method"
+          value={paymentMethod}
+          onChange={(e) => setPaymentMethod(e.target.value)}
           className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border max-w-xs"
         >
           {PAYMENT_METHODS.map((m) => (
@@ -541,7 +560,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, gl
             </label>
             <button
               type="button"
-              onClick={() => setSourceRows([...sourceRows, { pool: '', amount: '', category_code: '' }])}
+              onClick={() => setSourceRows([...sourceRows, { pool: '', amount: '', account_code: '' }])}
               className="text-xs text-accent hover:text-accent-hover font-serif italic"
             >
               + Add source
@@ -551,22 +570,22 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, gl
           {sourceRows.length > 1 ? (
             <div className="flex gap-2 items-center text-xs uppercase tracking-wide text-muted font-sans mb-1.5 px-0.5">
               <div className="flex-1">Pool</div>
-              <div className="flex-1">Category</div>
+              <div className="flex-1">Account</div>
               <div className="w-40">Amount</div>
               <div className="w-6"></div>
             </div>
           ) : null}
           <div className="space-y-3">
             {sourceRows.map((row, i) => {
-              const cat = catList.find((c) => c.code === row.category_code)
-              const derivedType = cat?.account_type ?? null
-              const derivedGl = cat?.gl_account_code ?? null
+              const acct = accountByCode.get(row.account_code)
+              const derivedType = acct?.type ?? null
+              const derivedGl = acct?.code ?? null
               const hasOverride = !!row.override_account_type
               const effType = (row.override_account_type || derivedType) as AccountType | null
               const effGl = row.override_gl_account_code || derivedGl
-              const effGlName = glAccounts.find((g) => g.code === effGl)?.name
+              const effGlName = effGl ? accountByCode.get(effGl)?.name : null
               const overrideGlOptions = row.override_account_type
-                ? glAccounts.filter((g) => g.type === row.override_account_type)
+                ? accountList.filter((g) => g.type === row.override_account_type)
                 : []
               return (
               <div key={i} className="border border-hairline rounded-md p-3 bg-surface">
@@ -586,23 +605,20 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, gl
                     <option key={p.value} value={p.value}>{p.label}</option>
                   ))}
                 </select>
-                <select
-                  value={row.category_code}
-                  onChange={(e) => {
-                    const next = [...sourceRows]
-                    next[i] = { ...next[i], category_code: e.target.value }
-                    setSourceRows(next)
-                  }}
-                  disabled={isLoanRepayment}
-                  className="flex-1 px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border disabled:opacity-60"
-                >
-                  <option value="">
-                    {catList.length === 0 ? 'No categories — create one' : 'Select category…'}
-                  </option>
-                  {catList.map((c) => (
-                    <option key={c.code} value={c.code}>{c.label}</option>
-                  ))}
-                </select>
+                <div className="flex-1">
+                  <AccountPicker
+                    accounts={accountList}
+                    value={row.account_code}
+                    onChange={(code) => {
+                      const next = [...sourceRows]
+                      next[i] = { ...next[i], account_code: code }
+                      setSourceRows(next)
+                    }}
+                    name={`source_rows[${i}][account_code_display]`}
+                    placeholder={accountList.length === 0 ? 'No accounts — create one' : 'Select account…'}
+                    required
+                  />
+                </div>
                 <div className="relative w-40">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted font-mono">RM</span>
                   <input
@@ -634,7 +650,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, gl
                 )}
                 </div>
                 {/* BS/PL preview + override (mig 218 / Option B) */}
-                {row.category_code && !isLoanRepayment ? (
+                {row.account_code ? (
                   <div className="mt-2 flex items-baseline justify-between gap-3">
                     <div className="text-xs font-mono">
                       {effType ? (
@@ -647,7 +663,7 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, gl
                         </span>
                       ) : (
                         <span className="text-danger italic font-serif">
-                          Category has no BS/PL classification — fix in Settings
+                          Account not found — pick again
                         </span>
                       )}
                     </div>
@@ -679,11 +695,9 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, gl
                       }}
                       className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
                     >
-                      <option value="asset">BS · Asset</option>
-                      <option value="liability">BS · Liability</option>
-                      <option value="equity">BS · Equity</option>
-                      <option value="revenue">P&L · Revenue</option>
-                      <option value="expense">P&L · Expense</option>
+                      {ACCOUNT_TYPES.map((t) => (
+                        <option key={t} value={t}>{TYPE_BADGE[t].label}</option>
+                      ))}
                     </select>
                     <select
                       value={row.override_gl_account_code ?? ''}
@@ -729,6 +743,30 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, gl
           )}
           <input type="hidden" name="target_pool" value="" />
         </div>
+      ) : isInvoicePay ? (
+        // Settling an invoice: pool is fixed by the invoice's billing_mode
+        // (poolForBillingMode in payments/new/page.tsx). Render as
+        // read-only so Finance can see it but can't accidentally divert
+        // the payment to the wrong pool. The hidden input still submits
+        // the correct value so the server action receives target_pool.
+        <div className="mb-6">
+          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+            Receive into pool
+          </label>
+          <div className="px-3 py-2 bg-surface border border-hairline rounded-md text-sm text-ink font-serif italic flex items-center gap-2">
+            <span>{POOL_OPTIONS.find((p) => p.value === targetPool)?.label ?? targetPool}</span>
+            <span className="font-mono text-[10px] uppercase tracking-wider text-graphite border border-hairline rounded px-1.5 py-0.5 not-italic">
+              from invoice
+            </span>
+          </div>
+          <p className="font-serif italic text-muted text-xs mt-1.5">
+            Auto-set from the invoice&apos;s billing mode. To land the
+            payment in a different pool, void this voucher and re-issue the
+            invoice under the correct billing mode.
+          </p>
+          <input type="hidden" name="target_pool" value={targetPool} />
+          <input type="hidden" name="source_pool" value="" />
+        </div>
       ) : (
         <div className="mb-6">
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
@@ -753,19 +791,18 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, gl
         </div>
       )}
 
-      {/* ── Category ── (debit: per-source rows own it; credit: single voucher-level) */}
-      {isLoanRepayment ? (
-        // Loan repayment: auto-category (loan_principal/loan_interest) is applied
-        // to each source row by the useEffect above. No explicit UI needed here.
-        null
-      ) : (
+      {/* ── Account ── (debit: per-source rows own it; credit: single voucher-level) */}
+      {/* Settling an invoice is purely Dr Bank / Cr AR — revenue was already
+          recognised at invoice issue. The server auto-fills account_code with
+          3030 (AR — Subs); the user doesn't need to pick. */}
+      {isLoanRepayment || isInvoicePay ? null : (
       <div className="mb-6">
         <div className="flex items-baseline justify-between mb-1.5">
           <label className="block text-sm font-sans font-medium text-graphite">
-            {direction === 'credit' ? 'Category' : 'Manage categories'}
+            {direction === 'credit' ? 'Account' : 'Manage accounts'}
           </label>
           <Link
-            href="/settings?tab=categories"
+            href="/settings?tab=accounts"
             target="_blank"
             className="text-xs text-accent hover:text-accent-hover font-serif italic"
           >
@@ -774,35 +811,50 @@ export default function NewPaymentForm({ companies, bankAccounts, categories, gl
         </div>
 
         {direction === 'credit' ? (
-          catList.length === 0 ? (
+          accountList.length === 0 ? (
             <p className="font-serif italic text-muted text-sm py-2 px-3 bg-surface border border-hairline rounded-md">
-              No categories yet — create one above to start.
+              No accounts yet — create one in Settings to start.
             </p>
           ) : (
-            <select
-              name="category_code"
-              value={categoryCode}
-              onChange={(e) => setCategoryCode(e.target.value)}
-              className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-            >
-              <option value="">Select category…</option>
-              {catList.map((c) => (
-                <option key={c.code} value={c.code}>{c.label}</option>
-              ))}
-            </select>
+            <AccountPicker
+              accounts={accountList}
+              value={accountCode}
+              onChange={setAccountCode}
+              name="account_code"
+              placeholder="Select account…"
+              required
+            />
           )
         ) : (
           <p className="font-serif italic text-muted text-xs">
-            Pick category per-row in the pool split above. New categories added here appear in every row&apos;s dropdown.
+            Pick the chart-of-accounts code per-row in the pool split above. New accounts appear in every row&apos;s dropdown.
           </p>
         )}
         {direction === 'credit' ? (
           <p className="font-serif italic text-muted text-xs mt-1.5">
-            For P&L classification. Create new categories as needed.
+            Drives P&L vs Balance Sheet classification. Pick the account this incoming payment lands on.
           </p>
         ) : null}
       </div>
       )}
+
+      {/* Invoice-pay info banner — replaces the Account picker for billing_payment. */}
+      {isInvoicePay ? (
+        <div className="mb-6 px-3 py-2 bg-surface border border-hairline rounded-md">
+          <p className="font-serif italic text-muted text-xs">
+            Journal entry:{' '}
+            <span className="font-mono not-italic text-graphite">
+              {isInterBilling
+                ? 'Dr 9050 Inter-billing Expense / Cr 3030 Accounts Receivable'
+                : 'Dr Bank / Cr 3030 Accounts Receivable'}
+            </span>
+            .{' '}
+            {isInterBilling
+              ? 'Inter-billing settle — no bank movement. The paying dept’s P&L books the expense (mig 253); the receiving dept already accrued revenue at invoice issue.'
+              : 'Revenue was already recognised when the invoice was issued — no account to pick.'}
+          </p>
+        </div>
+      ) : null}
 
       {/* ── Description ── */}
       <div className="mb-6">

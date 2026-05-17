@@ -1,0 +1,22 @@
+import { createClient } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth'
+import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
+import { buildClaimsXlsx } from './_format/xlsx'
+import { ClaimsPdf } from './_format/pdf'
+import dayjs from 'dayjs'
+
+export async function GET(req: Request) {
+  await requireRole(['principal', 'finance'])
+  const url = new URL(req.url)
+  const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
+
+  const supabase = await createClient()
+
+  const { data: claims } = await supabase.from('claims').select('*').order('created_at', { ascending: false })
+
+  const filename = `claims-${dayjs().format('YYYYMMDD')}`
+  if (format === 'xlsx') {
+    return exportXlsxResponse({ filename, buffer: buildClaimsXlsx(claims ?? []) })
+  }
+  return exportPdfResponse({ filename, element: <ClaimsPdf rows={claims ?? []} /> })
+}

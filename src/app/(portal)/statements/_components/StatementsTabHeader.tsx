@@ -1,14 +1,14 @@
 import Link from 'next/link'
 
-// Phase 7 Step 11: Statements + Invoices share one sidebar entry, split by tab.
-// "Statements" (default) = monthly consolidated statements.
-// "Invoices" = billing overview + invoice generation (formerly /billing).
+// 2026-05-15 reorder: Invoices is the default Statements landing
+// (/statements). Monthly Statements moved to /statements/monthly. The
+// sidebar entry still says "Statements" — only the landing content swapped.
 export default function StatementsTabHeader({ active }: { active: 'statements' | 'invoices' }) {
   return (
     <div className="border-b border-hairline mb-8 -mt-2">
       <nav className="flex gap-6" aria-label="Statements tabs">
-        <TabLink href="/statements" label="Statements" isActive={active === 'statements'} />
-        <TabLink href="/statements/invoices" label="Invoices" isActive={active === 'invoices'} />
+        <TabLink href="/statements" label="Invoices" isActive={active === 'invoices'} />
+        <TabLink href="/statements/monthly" label="Statements" isActive={active === 'statements'} />
       </nav>
     </div>
   )

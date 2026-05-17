@@ -9,42 +9,34 @@ import { assertPeriodOpen } from '@/lib/period-lock'
 import { postJournalEntry } from '@/lib/journal'
 
 // Mig 200/P1-6a: invoice billing_mode → revenue GL code mapping.
-function revenueGlCode(billingMode: string | null): string {
-  return billingMode === 'marketing_project' ? '4040' : '4030'
+// Mig 238 reseed: revenue lives in the 5000-5999 range; 4030 / 4040 are now
+// liability accounts (Statutory Payable / Director Invoice Payable). The
+// b348724 GL-remap pass missed this fallback, so invoices issued without an
+// explicit revenue category_code were silently crediting liabilities and
+// inflating the balance sheet by their amount. Until per-billing-mode
+// revenue sub-accounts exist, every fallback routes to Service Revenue — Subs
+// (5000), the sole revenue account seeded in mig 238.
+function revenueGlCode(_billingMode: string | null): string {
+  return '5000'
 }
 
-// Phase 11.1: invoice GL routing precedence (high → low):
-//   1. payment_categories.revenue_gl_account_code (Phase 11.1, opt-in per-category
-//      via Settings → Categories). Only honoured if it points at a revenue-type
-//      account.
-//   2. payment_categories.gl_account_code (legacy/PV side) — only honoured if it
-//      happens to be revenue-typed (rare, since seeded categories are expense-side).
-//   3. billing_mode → 4030 / 4040 fallback.
-//
-// Step 1 is the path Loo configures explicitly. Steps 2 & 3 are safety nets so
-// invoice JEs never accidentally credit an expense or asset account.
+// Note: invoices.category_code (added by mig 230) keeps its column name; only
+// payment_voucher_sources.category_code was renamed by mig 238. Values stored
+// here are chart_of_accounts.code post-unified-COA — the COA IS the GL now,
+// so if the invoice declares a revenue account directly we credit that code;
+// otherwise fall back to revenueGlCode (Service Revenue — Subs 5000).
 async function resolveRevenueGlCode(
   supabase: Awaited<ReturnType<typeof createClient>>,
   categoryCode: string | null,
   billingMode: string | null,
 ): Promise<string> {
   if (categoryCode) {
-    const { data: cat } = await supabase
-      .from('payment_categories')
-      .select('gl_account_code, revenue_gl_account_code')
+    const { data: acct } = await supabase
+      .from('chart_of_accounts')
+      .select('type')
       .eq('code', categoryCode)
       .maybeSingle()
-    const candidates = [cat?.revenue_gl_account_code, cat?.gl_account_code].filter(
-      (c): c is string => !!c,
-    )
-    for (const code of candidates) {
-      const { data: acct } = await supabase
-        .from('chart_of_accounts')
-        .select('type')
-        .eq('code', code)
-        .maybeSingle()
-      if (acct?.type === 'revenue') return code
-    }
+    if (acct?.type === 'revenue') return categoryCode
   }
   return revenueGlCode(billingMode)
 }
@@ -158,7 +150,7 @@ export async function createManualInvoice(formData: FormData): Promise<void> {
   if (error) throw new Error(`Failed to create invoice: ${error.message}`)
 
   revalidatePath('/billing')
-  revalidatePath('/statements/invoices')
+  revalidatePath('/statements')
 }
 
 // ─── Director CTC per subsidiary (Finance auto-fill helper) ──────────────────
@@ -468,14 +460,19 @@ export async function approveInvoice(formData: FormData) {
   if (amount > 0) {
     const revenueCode = await resolveRevenueGlCode(supabase, inv.category_code, inv.billing_mode)
     try {
+      // transaction_date = the day this JE is being booked (today), NOT the
+      // end-of-period. period_month already captures which accounting period
+      // the entry belongs to. Using endOf(period_month) creates future-dated
+      // JEs that get excluded from BS snapshots run mid-period, leaving AR
+      // looking "credit-only" when the invoice has already been settled.
       await postJournalEntry(supabase, {
-        transactionDate: dayjs(inv.period_month).endOf('month').format('YYYY-MM-DD'),
+        transactionDate: dayjs().format('YYYY-MM-DD'),
         description: `Invoice ${inv.invoice_no ?? inv.id} issued`,
         referenceType: 'invoice',
         referenceId: inv.id,
         createdBy: user.id,
         lines: [
-          { accountCode: '1040', debit: amount, description: `AR — invoice ${inv.invoice_no ?? ''}`.trim() },
+          { accountCode: '3030', debit: amount, description: `AR — invoice ${inv.invoice_no ?? ''}`.trim() },
           { accountCode: revenueCode, credit: amount, description: 'Service billing revenue recognised' },
         ],
       })
@@ -515,7 +512,9 @@ export async function approveInvoicesForPeriod(formData: FormData) {
   if (error) throw new Error(`Failed to bulk issue invoices: ${error.message}`)
 
   // Mig 200/P1-6a: post AR accrual per newly-issued invoice.
-  const txnDate = dayjs(period).endOf('month').format('YYYY-MM-DD')
+  // transaction_date = today (when actually issued). period_month already
+  // tracks accounting period via the journal_entries.period_month column.
+  const txnDate = dayjs().format('YYYY-MM-DD')
   for (const row of draftInvoices ?? []) {
     const amount = Number(row.total_amount ?? 0)
     if (amount <= 0) continue
@@ -528,7 +527,7 @@ export async function approveInvoicesForPeriod(formData: FormData) {
         referenceId: row.id,
         createdBy: user.id,
         lines: [
-          { accountCode: '1040', debit: amount, description: `AR — invoice ${row.invoice_no ?? ''}`.trim() },
+          { accountCode: '3030', debit: amount, description: `AR — invoice ${row.invoice_no ?? ''}`.trim() },
           { accountCode: revenueCode, credit: amount, description: 'Service billing revenue recognised' },
         ],
       })

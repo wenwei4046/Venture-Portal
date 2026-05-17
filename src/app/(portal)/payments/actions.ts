@@ -7,9 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { postJournalEntry, r2 } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
-
-const VALID_ACCOUNT_TYPES = ['asset', 'liability', 'equity', 'revenue', 'expense'] as const
-type AccountType = (typeof VALID_ACCOUNT_TYPES)[number]
+import { ACCOUNT_TYPES, type AccountType } from '@/lib/coa'
 
 // ─── Create payment voucher (Finance) ────────────────────────────────────────
 
@@ -28,7 +26,13 @@ export async function createPaymentVoucher(formData: FormData) {
   const description = (formData.get('description') as string)?.trim() ?? ''
   const paymentMethod = (formData.get('payment_method') as string) || 'bank_transfer'
   const direction = (formData.get('direction') as string) || 'debit'
-  const categoryCode = (formData.get('category_code') as string) || null
+  // For billing_payment (settling an invoice) the journal is purely
+  //   dr Bank / cr 3030 AR
+  // The user-facing form doesn't need to ask for an account — revenue was
+  // already recognised at invoice issue. Auto-fill with AR — Subs (3030).
+  const rawAccountCode = (formData.get('account_code') as string) || null
+  const accountCode = rawAccountCode
+    ?? (voucherType === 'billing_payment' ? '3030' : null)
   const sourcePool = (formData.get('source_pool') as string) || null
   // Phase 7 Step 10: Credit vouchers default to Venture Pool when unspecified.
   const targetPoolRaw = (formData.get('target_pool') as string) || null
@@ -64,6 +68,20 @@ export async function createPaymentVoucher(formData: FormData) {
   if (isNaN(amount) || amount <= 0) throw new Error('Amount must be greater than 0')
   if (!payeeName) throw new Error('Payee name is required (select a company or enter manually)')
   if (!description) throw new Error('Description is required')
+  // Mig 242/251: every voucher that actually moves money must declare the
+  // bank it touches, so the approval RPC's cache-update block fires and
+  // bank_accounts.current_balance stays in sync with the bank GL. Without
+  // this guard, six paid billing_payment credit vouchers slipped through
+  // earlier and built a 33,500 cache-vs-GL drift on Hong Leong before the
+  // audit caught it. Netting transactions are the only legitimate case
+  // where bank stays NULL — no real money moves.
+  if (paymentMethod !== 'netting' && !bankAccountId) {
+    throw new Error(
+      direction === 'debit'
+        ? 'Bank account is required for debit (outgoing) vouchers'
+        : 'Bank account is required (which account is receiving the money?)',
+    )
+  }
   if (voucherType === 'billing_payment' && !invoiceId) {
     throw new Error('Billing payment requires a linked invoice')
   }
@@ -88,13 +106,16 @@ export async function createPaymentVoucher(formData: FormData) {
     }
   }
 
-  // Generate voucher number: HV-PV-YYYYMM-NNNN
+  // Generate voucher number. Debit (outgoing money) → HV-PV-YYYYMM-NNNN
+  // (Payment Voucher). Credit (incoming money) → HV-OR-YYYYMM-NNNN
+  // (Official Receipt). mig 252 renamed historical credit rows to match.
   const period = dayjs().format('YYYYMM')
   const { count } = await supabase
     .from('payment_vouchers')
     .select('*', { count: 'exact', head: true })
   const seq = (count ?? 0) + 1
-  const voucherNo = `HV-PV-${period}-${String(seq).padStart(4, '0')}`
+  const prefix = direction === 'credit' ? 'HV-OR-' : 'HV-PV-'
+  const voucherNo = `${prefix}${period}-${String(seq).padStart(4, '0')}`
 
   // Credit (receive) payments are auto-completed — no approval needed.
   // Money flows in immediately on creation.
@@ -183,7 +204,7 @@ export async function createPaymentVoucher(formData: FormData) {
     const rows: {
       pool: string
       amount: number
-      category_code: string | null
+      account_code: string
       override_account_type: AccountType | null
       override_gl_account_code: string | null
       override_reason: string | null
@@ -192,7 +213,7 @@ export async function createPaymentVoucher(formData: FormData) {
       for (let i = 0; i < rowCount; i++) {
         const pool = (formData.get(`source_rows[${i}][pool]`) as string)?.trim() ?? ''
         const amt = parseFloat((formData.get(`source_rows[${i}][amount]`) as string) ?? '0')
-        const cat = (formData.get(`source_rows[${i}][category_code]`) as string)?.trim() || null
+        const acct = (formData.get(`source_rows[${i}][account_code]`) as string)?.trim() || ''
         const ovType = (formData.get(`source_rows[${i}][override_account_type]`) as string)?.trim() ?? ''
         const ovGl   = (formData.get(`source_rows[${i}][override_gl_account_code]`) as string)?.trim() ?? ''
         const ovRsn  = (formData.get(`source_rows[${i}][override_reason]`) as string)?.trim() ?? ''
@@ -200,12 +221,15 @@ export async function createPaymentVoucher(formData: FormData) {
         if (!isOverride && (ovType || ovGl || ovRsn)) {
           throw new Error(`source row ${i + 1}: override requires account type, GL, AND reason — fill all three or clear all`)
         }
-        if (isOverride && !VALID_ACCOUNT_TYPES.includes(ovType as AccountType)) {
+        if (isOverride && !ACCOUNT_TYPES.includes(ovType as AccountType)) {
           throw new Error(`source row ${i + 1}: invalid override account type "${ovType}"`)
         }
         if (pool && amt > 0) {
+          if (!acct) {
+            throw new Error(`source row ${i + 1}: account is required (every PV source row must reference a chart_of_accounts code)`)
+          }
           rows.push({
-            pool, amount: amt, category_code: cat,
+            pool, amount: amt, account_code: acct,
             override_account_type: isOverride ? (ovType as AccountType) : null,
             override_gl_account_code: isOverride ? ovGl : null,
             override_reason: isOverride ? ovRsn : null,
@@ -213,10 +237,13 @@ export async function createPaymentVoucher(formData: FormData) {
         }
       }
     } else if (sourcePool) {
-      // Legacy single-source form path — category falls back to the voucher-level
+      // Legacy single-source form path — account falls back to the voucher-level
       // field name still sent by older UIs.
+      if (!accountCode) {
+        throw new Error('Account is required on debit voucher source rows')
+      }
       rows.push({
-        pool: sourcePool, amount, category_code: categoryCode,
+        pool: sourcePool, amount, account_code: accountCode,
         override_account_type: null, override_gl_account_code: null, override_reason: null,
       })
     }
@@ -230,7 +257,7 @@ export async function createPaymentVoucher(formData: FormData) {
           voucher_id: data.id,
           pool: r.pool,
           amount: r.amount,
-          category_code: r.category_code,
+          account_code: r.account_code,
           override_account_type: r.override_account_type,
           override_gl_account_code: r.override_gl_account_code,
           override_reason: r.override_reason,
@@ -238,21 +265,91 @@ export async function createPaymentVoucher(formData: FormData) {
       )
     }
   } else if (direction === 'credit' && targetPool) {
-    await supabase.from('payment_voucher_sources').insert({
-      voucher_id: data.id,
-      pool: targetPool,
-      amount,
-      category_code: categoryCode,
-    })
+    // Every PV source row must carry an account — reports route lines by the
+    // referenced chart_of_accounts.type. A NULL account_code would crash the
+    // P&L / Cash Flow render (see src/lib/cfo-reports.ts:gatherPvSources).
+    if (!accountCode) {
+      throw new Error('Account is required on inbound (credit) vouchers')
+    }
+    // role defaults to 'primary' at the DB level (mig 254); no need to set
+    // it explicitly here.
+    const { error: primaryInsertErr } = await supabase
+      .from('payment_voucher_sources')
+      .insert({
+        voucher_id: data.id,
+        pool: targetPool,
+        amount,
+        account_code: accountCode,
+      })
+    if (primaryInsertErr) {
+      throw new Error(`Failed to insert credit voucher source row: ${primaryInsertErr.message}`)
+    }
   }
 
-  // Auto-complete credit payments: adjust bank + pool immediately
+  // Auto-complete credit payments: adjust bank + pool immediately.
+  // Two flows:
+  //   (a) Real bank settlement (subsidiary / freetext with payment_method
+  //       != netting) → Dr Bank / Cr AR, bank cache bumped.
+  //   (b) Inter-billing settlement (invoice issued to a dept_pool, voucher
+  //       with payment_method='netting') → Dr <paying dept inter-billing
+  //       expense> / Cr AR, no bank touched. A 2nd payment_voucher_sources
+  //       row is also inserted tagged with the paying dept's pool so the
+  //       expense lands on the paying side's P&L (mig 253). Without this,
+  //       only the receiving dept saw revenue and group net profit was
+  //       over-stated by the invoiced amount.
   if (isAutoComplete) {
-    // Bank balance: add via SECURITY DEFINER RPC (bank_accounts RLS only
-    // permits Principal to UPDATE directly; Finance-initiated auto-complete
-    // credit flows through bump_bank_for_paid_credit which verifies the
-    // voucher is already paid + credit before bumping).
-    if (bankAccountId) {
+    // Detect inter-billing first so we know which JE path to take below.
+    // We resolve THREE things from the invoice's billable_to_department_id:
+    //   - expenseCode: 9051-9055 leaf to debit in the JE + record on the
+    //     paying-side PV source row (drives the paying dept's P&L expense).
+    //   - payingPool: the dept_pool_* key used to tag the PV source so
+    //     the report layer attributes the expense to that pool.
+    //   - partyLabel: dept name for the JE description.
+    let interBilling: {
+      expenseCode: string
+      payingPool: string
+      partyLabel: string
+    } | null = null
+    if (paymentMethod === 'netting' && invoiceId) {
+      const { data: inv } = await supabase
+        .from('invoices')
+        .select('billable_to_type, billable_to_department_id')
+        .eq('id', invoiceId)
+        .maybeSingle()
+      if (inv && inv.billable_to_type === 'dept_pool' && inv.billable_to_department_id) {
+        const { data: dept } = await supabase
+          .from('departments')
+          .select('name')
+          .eq('id', inv.billable_to_department_id)
+          .maybeSingle()
+        if (dept?.name) {
+          // Convention from mig 253: '9051 Inter-billing — Marketing',
+          // '9052 Inter-billing — Finance', etc. Match by suffix so a
+          // renamed dept still works as long as the COA row exists.
+          const { data: acct } = await supabase
+            .from('chart_of_accounts')
+            .select('code, name')
+            .eq('type', 'expense')
+            .ilike('name', `Inter-billing — ${dept.name}`)
+            .maybeSingle()
+          if (acct?.code) {
+            // Pool key follows the dept_pool_<slug> convention used by
+            // INVOICE_BILLING_MODE_TO_POOL ('dept_pool_marketing',
+            // 'dept_pool_director_office', etc).
+            const payingPool = `dept_pool_${dept.name.toLowerCase().replace(/\s+/g, '_')}`
+            interBilling = {
+              expenseCode: acct.code,
+              payingPool,
+              partyLabel: dept.name,
+            }
+          }
+        }
+      }
+    }
+
+    // Bank cache: bump only for real bank settlements. Inter-billing skips
+    // because no money actually entered the bank account.
+    if (bankAccountId && !interBilling) {
       const { error: bumpErr } = await supabase.rpc('bump_bank_for_paid_credit', {
         p_voucher_id: data.id,
       })
@@ -260,28 +357,112 @@ export async function createPaymentVoucher(formData: FormData) {
         console.error('bump_bank_for_paid_credit failed:', bumpErr.message)
       }
     }
-    // Pool balance: add to target pool
+    // Pool balance: add to target pool (the receiving side — e.g. Marketing
+    // pool gets the revenue regardless of how the paying side settled).
     if (targetPool) {
       await adjustPool(supabase, targetPool, 'in', r2(amount), `PV ${voucherNo}: ${description}`, user.id, null, nowIso)
     }
-    // GL journal entry (non-blocking)
+    // Inter-billing: mirror the dept_pools ledger for the paying side. The
+    // /dept-pool views read In/Out figures from dept_pools.transaction_type,
+    // NOT from payment_voucher_sources, so without this row the paying
+    // dept's Pool view shows 0 movement even though the PV source mirror
+    // row (mig 254) is present.
+    //
+    // Direct insert with transaction_type='inter_billing_out' (mig 255)
+    // instead of adjustPool() — adjustPool writes 'expense_out', which
+    // hits the check_dept_pool_sufficient trigger and rejects when the
+    // pool balance < amount. Inter-billing is a forced obligation
+    // (Marketing billed HR; HR has no veto), so the sufficiency check
+    // shouldn't apply.
+    if (interBilling) {
+      const { data: payingDept } = await supabase
+        .from('departments')
+        .select('id')
+        .eq('name', interBilling.partyLabel)
+        .maybeSingle()
+      if (payingDept?.id) {
+        const interBillingRow = {
+          department_id: payingDept.id,
+          transaction_type: 'inter_billing_out',
+          amount: r2(amount),
+          description: `PV ${voucherNo}: Inter-billing — ${interBilling.partyLabel} (settles ${description})`,
+          created_by: user.id,
+        }
+        // Cast: mig 255 added the new enum value; auto-generated types are
+        // regenerated separately, so TS still only knows 'np_in' | 'expense_out'.
+        const { error: deptPoolErr } = await supabase
+          .from('dept_pools')
+          .insert(interBillingRow as never)
+        if (deptPoolErr) {
+          console.error(
+            `inter-billing dept_pools insert failed (dept=${interBilling.partyLabel}, amount=${amount}):`,
+            deptPoolErr.message,
+          )
+        }
+      }
+    }
+    // GL journal entry (non-blocking).
     try {
-      const bankGlCode = bankAccountId
-        ? ((await supabase.from('bank_accounts').select('gl_account_code').eq('id', bankAccountId).single()).data?.gl_account_code ?? '1010')
-        : '1010'
+      const debitLine = interBilling
+        ? {
+            accountCode: interBilling.expenseCode,
+            debit: r2(amount),
+            description: `Inter-billing — ${interBilling.partyLabel} consumed services`,
+          }
+        : {
+            accountCode: bankAccountId
+              ? ((await supabase.from('bank_accounts').select('gl_account_code').eq('id', bankAccountId).single()).data?.gl_account_code ?? '3000')
+              : '3000',
+            debit: r2(amount),
+            description: `Bank deposit — ${voucherNo}`,
+          }
       await postJournalEntry(supabase, {
         transactionDate: todayStr,
         description: `PV ${voucherNo}: ${description}`,
         referenceType: 'payment_voucher',
         referenceId: data.id,
         lines: [
-          { accountCode: bankGlCode, debit: r2(amount), description: `Bank deposit — ${voucherNo}` },
-          { accountCode: '1040', credit: r2(amount), description: `Payment received — ${payeeName}` },
+          debitLine,
+          { accountCode: '3030', credit: r2(amount), description: `Payment received — ${payeeName}` },
         ],
         createdBy: user.id,
       })
     } catch {
       console.error('GL posting failed for auto-complete credit voucher', data.id)
+    }
+
+    // Inter-billing: insert a SECOND payment_voucher_sources row tagged with
+    // the paying dept's pool + expense account. classifyRows routes this as
+    // the paying dept's P&L expense (mig 253). Without this row, only the
+    // receiving dept (target_pool, written earlier in the credit branch
+    // above) shows the transaction.
+    //
+    // role='mirror' (mig 254) tells the pvs_enforce_sum_matches_voucher
+    // trigger to exclude this row from the sum-vs-voucher.amount check —
+    // mirror rows represent the OTHER side of the same transaction, not a
+    // split of the voucher amount. Without role='mirror' the trigger would
+    // see sum=2N (primary N + this row N) ≠ voucher.amount N and reject.
+    if (interBilling) {
+      // role='mirror' (mig 254 column) is not yet in the generated
+      // database.types.ts — cast to bypass the stale type. The DB has the
+      // CHECK constraint, so an invalid value still fails loud at runtime.
+      const mirrorRow = {
+        voucher_id: data.id,
+        pool: interBilling.payingPool,
+        amount: r2(amount),
+        account_code: interBilling.expenseCode,
+        role: 'mirror',
+      }
+      const { error: mirrorInsertErr } = await supabase
+        .from('payment_voucher_sources')
+        .insert(mirrorRow as never)
+      if (mirrorInsertErr) {
+        // Fail loud — silent failure here was the 2026-05-14 bug that left
+        // inter-billing expense invisible in the paying dept's P&L.
+        throw new Error(
+          `Failed to insert inter-billing mirror source row (paying side, pool=${interBilling.payingPool}, account=${interBilling.expenseCode}): ${mirrorInsertErr.message}`,
+        )
+      }
     }
   }
 
@@ -448,6 +629,10 @@ export async function updatePaymentVoucher(formData: FormData) {
 
   if (isNaN(amount) || amount <= 0) throw new Error('Amount must be greater than 0')
   if (!description) throw new Error('Description is required')
+  // Mig 242: debit vouchers must declare a bank — same rule as createPaymentVoucher.
+  if (current.direction === 'debit' && !bankAccountId) {
+    throw new Error('Bank account is required for debit (outgoing) vouchers')
+  }
 
   if (!payeeName && payeeCompanyId) {
     const { data: co } = await supabase.from('companies').select('name').eq('id', payeeCompanyId).single()
@@ -501,7 +686,7 @@ export async function updatePaymentVoucher(formData: FormData) {
     const rows: {
       pool: string
       amount: number
-      category_code: string | null
+      account_code: string
       override_account_type: AccountType | null
       override_gl_account_code: string | null
       override_reason: string | null
@@ -509,7 +694,7 @@ export async function updatePaymentVoucher(formData: FormData) {
     for (let i = 0; i < rowCount; i++) {
       const pool = (formData.get(`source_rows[${i}][pool]`) as string)?.trim() ?? ''
       const amt = parseFloat((formData.get(`source_rows[${i}][amount]`) as string) ?? '0')
-      const cat = (formData.get(`source_rows[${i}][category_code]`) as string)?.trim() || null
+      const acct = (formData.get(`source_rows[${i}][account_code]`) as string)?.trim() || ''
       const ovType = (formData.get(`source_rows[${i}][override_account_type]`) as string)?.trim() ?? ''
       const ovGl = (formData.get(`source_rows[${i}][override_gl_account_code]`) as string)?.trim() ?? ''
       const ovRsn = (formData.get(`source_rows[${i}][override_reason]`) as string)?.trim() ?? ''
@@ -517,12 +702,15 @@ export async function updatePaymentVoucher(formData: FormData) {
       if (!isOverride && (ovType || ovGl || ovRsn)) {
         throw new Error(`source row ${i + 1}: override requires account type, GL, AND reason`)
       }
-      if (isOverride && !VALID_ACCOUNT_TYPES.includes(ovType as AccountType)) {
+      if (isOverride && !ACCOUNT_TYPES.includes(ovType as AccountType)) {
         throw new Error(`source row ${i + 1}: invalid override account type "${ovType}"`)
       }
       if (pool && amt > 0) {
+        if (!acct) {
+          throw new Error(`source row ${i + 1}: account is required (every PV source row must reference a chart_of_accounts code)`)
+        }
         rows.push({
-          pool, amount: amt, category_code: cat,
+          pool, amount: amt, account_code: acct,
           override_account_type: isOverride ? (ovType as AccountType) : null,
           override_gl_account_code: isOverride ? ovGl : null,
           override_reason: isOverride ? ovRsn : null,
@@ -558,7 +746,7 @@ export async function updatePaymentVoucher(formData: FormData) {
         voucher_id: id,
         pool: r.pool,
         amount: r.amount,
-        category_code: r.category_code,
+        account_code: r.account_code,
         override_account_type: r.override_account_type,
         override_gl_account_code: r.override_gl_account_code,
         override_reason: r.override_reason,
@@ -567,7 +755,7 @@ export async function updatePaymentVoucher(formData: FormData) {
     if (insErr) throw new Error(`Failed to write new source rows: ${insErr.message}`)
   } else if (current.direction === 'credit') {
     if (!targetPool) throw new Error('Target pool is required for credit voucher')
-    const categoryCode = (formData.get('category_code') as string)?.trim() || null
+    const accountCode = (formData.get('account_code') as string)?.trim() || null
 
     const { error: delErr } = await supabase
       .from('payment_voucher_sources')
@@ -583,11 +771,15 @@ export async function updatePaymentVoucher(formData: FormData) {
       throw new Error(`PVS RLS blocked delete (status=${current.status}) — ${leftover} stale rows remain.`)
     }
 
+    // See comment on create path: credit vouchers must carry an account.
+    if (!accountCode) {
+      throw new Error('Account is required on inbound (credit) vouchers')
+    }
     const { error: insErr } = await supabase.from('payment_voucher_sources').insert({
       voucher_id: id,
       pool: targetPool,
       amount,
-      category_code: categoryCode,
+      account_code: accountCode,
     })
     if (insErr) throw new Error(`Failed to write new source rows: ${insErr.message}`)
   }
@@ -656,139 +848,9 @@ export async function voidVoucher(formData: FormData) {
   redirect('/payments')
 }
 
-// ─── Create payment category (Finance) ──────────────────────────────────────
-// Mig 214 enforces an account_type (BS vs P&L) and a GL account on every
-// category so journal_entries route correctly. Both are required — no more
-// silently-NULL categories that fall back to coarse voucher_type GL routing.
-//
-// Returns `{ error }` for validation/DB failures so the message survives
-// Next.js 15's production error redaction.
-
-export type CategoryActionResult = { error: string } | undefined
-
-export async function createPaymentCategory(formData: FormData): Promise<CategoryActionResult> {
-  await requireRole(['finance', 'principal'])
-  const supabase = await createClient()
-
-  const code = (formData.get('code') as string)?.trim() ?? ''
-  const label = (formData.get('label') as string)?.trim() ?? ''
-  const accountType = (formData.get('account_type') as string)?.trim() as AccountType
-  const glAccountCode = (formData.get('gl_account_code') as string)?.trim() ?? ''
-  // Phase 11.1: optional revenue GL for invoices using this category. NULL =
-  // fallback to billing_mode→4030/4040 mapping at invoice JE post time.
-  const revenueGlRaw = (formData.get('revenue_gl_account_code') as string)?.trim() ?? ''
-  const revenueGl = revenueGlRaw || null
-
-  if (!code || !label) return { error: 'Code and label are required' }
-  if (!accountType || !VALID_ACCOUNT_TYPES.includes(accountType)) {
-    return { error: 'Account type is required (asset / liability / equity / revenue / expense)' }
-  }
-  if (!glAccountCode) return { error: 'GL account code is required' }
-
-  // Defence-in-depth: verify GL exists and its type matches account_type
-  const { data: gl } = await supabase
-    .from('chart_of_accounts')
-    .select('code, type')
-    .eq('code', glAccountCode)
-    .maybeSingle()
-  if (!gl) return { error: `GL account ${glAccountCode} does not exist` }
-  if (gl.type !== accountType) {
-    return {
-      error: `GL account ${glAccountCode} is type "${gl.type}" but category was tagged "${accountType}". They must match.`,
-    }
-  }
-
-  if (revenueGl) {
-    const { data: rgl } = await supabase
-      .from('chart_of_accounts')
-      .select('code, type')
-      .eq('code', revenueGl)
-      .maybeSingle()
-    if (!rgl) throw new Error(`Revenue GL ${revenueGl} does not exist`)
-    if (rgl.type !== 'revenue') {
-      throw new Error(`Revenue GL ${revenueGl} is type "${rgl.type}" — must be revenue`)
-    }
-  }
-
-  const { error } = await supabase
-    .from('payment_categories')
-    .upsert(
-      {
-        code,
-        label,
-        account_type: accountType,
-        gl_account_code: glAccountCode,
-        revenue_gl_account_code: revenueGl,
-        is_active: true,
-      },
-      { onConflict: 'code' },
-    )
-
-  if (error) return { error: `Failed to create category: ${error.message}` }
-
-  revalidatePath('/payments/new')
-  revalidatePath('/settings?tab=categories')
-}
-
-export async function updatePaymentCategory(formData: FormData): Promise<CategoryActionResult> {
-  await requireRole(['finance', 'principal'])
-  const supabase = await createClient()
-
-  const code = (formData.get('code') as string)?.trim() ?? ''
-  const label = (formData.get('label') as string)?.trim() ?? ''
-  const accountType = (formData.get('account_type') as string)?.trim() as AccountType
-  const glAccountCode = (formData.get('gl_account_code') as string)?.trim() ?? ''
-  const isActiveRaw = (formData.get('is_active') as string) ?? 'true'
-  const revenueGlRaw = (formData.get('revenue_gl_account_code') as string)?.trim() ?? ''
-  const revenueGl = revenueGlRaw || null
-
-  if (!code) return { error: 'Code is required' }
-  if (!label) return { error: 'Label is required' }
-  if (!accountType || !VALID_ACCOUNT_TYPES.includes(accountType)) {
-    return { error: 'Account type is required' }
-  }
-  if (!glAccountCode) return { error: 'GL account code is required' }
-
-  const { data: gl } = await supabase
-    .from('chart_of_accounts')
-    .select('code, type')
-    .eq('code', glAccountCode)
-    .maybeSingle()
-  if (!gl) return { error: `GL account ${glAccountCode} does not exist` }
-  if (gl.type !== accountType) {
-    return {
-      error: `GL account ${glAccountCode} type "${gl.type}" mismatches category "${accountType}"`,
-    }
-  }
-
-  if (revenueGl) {
-    const { data: rgl } = await supabase
-      .from('chart_of_accounts')
-      .select('code, type')
-      .eq('code', revenueGl)
-      .maybeSingle()
-    if (!rgl) throw new Error(`Revenue GL ${revenueGl} does not exist`)
-    if (rgl.type !== 'revenue') {
-      throw new Error(`Revenue GL ${revenueGl} is type "${rgl.type}" — must be revenue`)
-    }
-  }
-
-  const { error } = await supabase
-    .from('payment_categories')
-    .update({
-      label,
-      account_type: accountType,
-      gl_account_code: glAccountCode,
-      revenue_gl_account_code: revenueGl,
-      is_active: isActiveRaw === 'true',
-    })
-    .eq('code', code)
-
-  if (error) return { error: `Failed to update category: ${error.message}` }
-
-  revalidatePath('/settings?tab=categories')
-  revalidatePath('/payments/new')
-}
+// NOTE: createPaymentCategory / updatePaymentCategory were removed by the
+// unified-COA migration (237/238). The Chart of Accounts IS the GL now —
+// create/edit accounts via createAccount / updateAccount in settings/actions.ts.
 
 // ─── Attachment signed URL (Principal + Finance) ────────────────────────────
 // Defense-in-depth: the storage bucket policy allows any authenticated user to

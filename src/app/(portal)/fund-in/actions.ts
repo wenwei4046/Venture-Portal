@@ -38,6 +38,10 @@ export async function createFundSource(formData: FormData) {
     repayment_date: (formData.get('repayment_date') as string) ?? '',
     notes: (formData.get('notes') as string) || undefined,
   }
+  // Mig 247: BS account ("Amount due to <party>") the deposit lands in.
+  // Optional today (falls back to 4000 Fund Sources Payable at approval time)
+  // so legacy data + transitional UI keep working.
+  const accountCode = ((formData.get('account_code') as string) ?? '').trim() || null
 
   if (!VALID_TYPES.includes(raw.source_type)) {
     throw new Error('Invalid source type')
@@ -114,6 +118,7 @@ export async function createFundSource(formData: FormData) {
     lock_in_months: raw.lock_in_months || null,
     effective_date: raw.effective_date,
     repayment_date: raw.repayment_date,
+    account_code: accountCode,
     // Mig 12 trigger auto-fills maturity_date from effective_date + lock_in_months
     // when null. Set it explicitly to the user-entered repayment_date so the
     // detail page's "MATURES …" line matches what Finance promised.
@@ -231,6 +236,10 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
   const effectiveDate = (formData.get('effective_date') as string) ?? ''
   const repaymentDate = (formData.get('repayment_date') as string) ?? ''
   const notes = (formData.get('notes') as string) || null
+  // Mig 247: editable BS account. Empty string from the form means "clear",
+  // which translates to NULL (approval will fall back to 4000).
+  const rawAccountCode = (formData.get('account_code') as string) ?? ''
+  const accountCode = rawAccountCode.trim() === '' ? null : rawAccountCode.trim()
 
   if (isNaN(amount) || amount <= 0) return { error: 'Amount must be greater than 0' }
   if (isNaN(costRatePercent) || costRatePercent < 0 || costRatePercent >= 100) {
@@ -279,6 +288,7 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
       repayment_date: repaymentDate,
       maturity_date: repaymentDate,
       notes,
+      account_code: accountCode,
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)
@@ -293,13 +303,16 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
   }
 
   // If amount changed, refresh the approval_request so Principal sees the
-  // updated number in the queue + email/digest descriptions.
+  // updated number in the queue + email/digest descriptions. Mig 243 added
+  // an RLS policy so the submitter can UPDATE their own pending approval;
+  // before that, this UPDATE silently affected zero rows under finance and
+  // the Principal queue kept showing the original (wrong) figure.
   if (Number(current.amount) !== amount) {
     const typeLabel =
       current.source_type === 'subsidiary' ? 'subsidiary deposit'
       : current.source_type === 'director_loan' ? 'director loan'
       : 'dept pool transfer'
-    await supabase
+    const { data: updatedApprovals, error: apprErr } = await supabase
       .from('approval_requests')
       .update({
         description: `New fund source: ${typeLabel} — RM ${amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${costRatePercent}%/mo`,
@@ -308,6 +321,17 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
       .eq('reference_id', id)
       .eq('reference_table', 'fund_sources')
       .eq('status', 'pending')
+      .select('id')
+    if (apprErr) {
+      return { error: `Failed to refresh approval queue: ${apprErr.message}` }
+    }
+    if (!updatedApprovals || updatedApprovals.length === 0) {
+      return {
+        error:
+          'Failed to refresh approval queue (no pending approval matched). ' +
+          'The approval may have been actioned mid-edit — refresh the page and try again.',
+      }
+    }
   }
 
   revalidatePath(`/fund-in/${id}`)

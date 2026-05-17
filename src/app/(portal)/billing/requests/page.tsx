@@ -33,7 +33,7 @@ export default async function InvoiceRequestsPage() {
   return (
     <div>
       <Link href="/statements" className="text-sm text-muted hover:text-accent font-sans transition-colors">
-        ← Back to Statements
+        ← Back to Invoices
       </Link>
       <div className="page-head">
         <div>

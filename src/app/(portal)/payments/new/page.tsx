@@ -1,24 +1,21 @@
 import Link from 'next/link'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import type { AccountType } from '@/lib/coa'
 import NewPaymentForm from '../_components/NewPaymentForm'
 import { listPayableFundSources } from '../../fund-in/actions'
+import { invoicePoolForBillingMode } from '@/lib/cfo-reports'
 
 // Settlement routing: when a sub pays an invoice, the money logically lands
-// in the dept pool that generated the service (marketing contracts → Marketing
-// Pool, director OPEX → Director / Director Office Pool). Unknown modes fall
-// back to Venture Pool.
+// in the dept pool that generated the service. Delegates to the canonical
+// map in cfo-reports.ts so the same lookup drives both the settle-invoice
+// pool prefill AND the income-statement aggregation — single source of
+// truth. Previously this file had its own switch that only handled
+// marketing / director / director_office and silently fell back to
+// venture_pool for hr_attribution + finance_attribution, so HR / Finance
+// invoices were routed to the wrong pool.
 function poolForBillingMode(mode: string): string {
-  switch (mode) {
-    case 'marketing_project':
-      return 'dept_pool_marketing'
-    case 'director_attribution':
-      return 'dept_pool_director'
-    case 'director_office_attribution':
-      return 'dept_pool_director_office'
-    default:
-      return 'venture_pool'
-  }
+  return invoicePoolForBillingMode(mode)
 }
 
 interface Props {
@@ -35,14 +32,18 @@ export default async function NewPaymentPage({ searchParams }: Props) {
   const [
     { data: companies },
     { data: bankAccounts },
-    { data: categories },
-    { data: glAccounts },
+    { data: accountRows },
     payableFundSources,
   ] = await Promise.all([
     supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('name'),
     supabase.from('bank_accounts').select('id, bank_name, account_number, current_balance').eq('status', 'active').order('is_primary', { ascending: false }),
-    supabase.from('payment_categories').select('code, label, account_type, gl_account_code').eq('is_active', true).order('sort_order'),
-    supabase.from('chart_of_accounts').select('code, name, type').eq('is_active', true).order('code'),
+    supabase
+      .from('chart_of_accounts')
+      .select('code, name, type, parent_code, is_active')
+      .eq('is_active', true)
+      .order('type')
+      .order('sort_order')
+      .order('code'),
     listPayableFundSources().catch(() => []),
   ])
 
@@ -55,12 +56,16 @@ export default async function NewPaymentPage({ searchParams }: Props) {
     period_month: string
     billing_mode: string
     target_pool: string
+    /** Mig 225 polymorphism: tells the form whether this invoice was issued
+     *  to a subsidiary (real bank involved) vs an internal dept pool / director
+     *  (inter-billing, no real money moves — settle via netting). */
+    billable_to_type: 'subsidiary' | 'director' | 'dept_pool' | 'freetext' | null
   } | null = null
 
   if (invoiceId) {
     const { data: inv } = await supabase
       .from('invoices')
-      .select('id, invoice_no, company_id, total_amount, period_month, billing_mode, status, companies(name)')
+      .select('id, invoice_no, company_id, total_amount, period_month, billing_mode, status, billable_to_type, companies(name)')
       .eq('id', invoiceId)
       .single()
 
@@ -75,6 +80,7 @@ export default async function NewPaymentPage({ searchParams }: Props) {
         period_month: inv.period_month,
         billing_mode: inv.billing_mode,
         target_pool: poolForBillingMode(inv.billing_mode),
+        billable_to_type: (inv.billable_to_type as 'subsidiary' | 'director' | 'dept_pool' | 'freetext' | null) ?? null,
       }
     }
   }
@@ -85,11 +91,14 @@ export default async function NewPaymentPage({ searchParams }: Props) {
       ? 'Non-billable expense'
       : 'Create payment'
 
+  // mig 252: settle-invoice is incoming money → Official Receipt (OR);
+  // expense / payment paths stay as Payment Voucher (PV). "NEW" stays
+  // generic because the form lets the user pick debit or credit.
   const headingEyebrow = invoicePreset
-    ? 'PAYMENT VOUCHER · SETTLE INVOICE'
+    ? 'OFFICIAL RECEIPT · SETTLE INVOICE'
     : nonBillablePreset
       ? 'PAYMENT VOUCHER · NON-BILLABLE'
-      : 'PAYMENT VOUCHER · NEW'
+      : 'PAYMENT VOUCHER / OFFICIAL RECEIPT · NEW'
 
   return (
     <div>
@@ -111,16 +120,12 @@ export default async function NewPaymentPage({ searchParams }: Props) {
       <NewPaymentForm
         companies={companies ?? []}
         bankAccounts={bankAccounts ?? []}
-        categories={(categories ?? []).map((c) => ({
-          code: c.code,
-          label: c.label,
-          account_type: c.account_type as 'asset' | 'liability' | 'equity' | 'revenue' | 'expense' | null,
-          gl_account_code: c.gl_account_code,
-        }))}
-        glAccounts={(glAccounts ?? []).map((g) => ({
-          code: g.code,
-          name: g.name,
-          type: g.type as 'asset' | 'liability' | 'equity' | 'revenue' | 'expense',
+        accounts={(accountRows ?? []).map((a) => ({
+          code: a.code,
+          name: a.name,
+          type: a.type as AccountType,
+          parent_code: (a as { parent_code: string | null }).parent_code ?? null,
+          is_active: a.is_active,
         }))}
         invoicePreset={invoicePreset}
         nonBillablePreset={nonBillablePreset}

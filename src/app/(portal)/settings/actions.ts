@@ -3,6 +3,13 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import {
+  ACCOUNT_TYPES,
+  CASH_FLOW_CATEGORIES,
+  defaultCashFlowCategoryFor,
+  type AccountType,
+  type CashFlowCategory,
+} from '@/lib/coa'
 import type { OverdueConfigStage } from '@/types'
 
 // ─── Treasury Config (op_margin, saving_rate) ────────────────────────────────
@@ -345,4 +352,104 @@ export async function toggleCompanyActive(formData: FormData) {
   if (error) throw new Error(`Failed to update company: ${error.message}`)
 
   revalidatePath('/settings')
+}
+
+// ─── Chart of Accounts (unified COA, mig 237/238) ────────────────────────────
+// Replaces the old createPaymentCategory / updatePaymentCategory pair. The COA
+// IS the GL now, so creating an "account" inserts directly into
+// chart_of_accounts. The code is auto-allocated by the next_account_code RPC
+// so users can't pick a colliding number.
+
+export type AccountActionResult = { error: string } | undefined
+
+export async function createAccount(formData: FormData): Promise<AccountActionResult> {
+  await requireRole(['principal', 'finance'])
+  const supabase = await createClient()
+
+  const type = ((formData.get('type') as string) ?? '').trim() as AccountType
+  const name = ((formData.get('name') as string) ?? '').trim()
+  const rawCfc = ((formData.get('cash_flow_category') as string) ?? '').trim()
+  // Mig 246: optional parent. Must exist and have the same type — the
+  // coa_enforce_parent_type trigger will fail the insert otherwise.
+  const rawParent = ((formData.get('parent_code') as string) ?? '').trim()
+  const parentCode = rawParent === '' ? null : rawParent
+
+  if (!type || !ACCOUNT_TYPES.includes(type)) {
+    return { error: 'Invalid account type' }
+  }
+  if (!name) return { error: 'Account name is required' }
+
+  const cashFlowCategory: CashFlowCategory =
+    rawCfc && CASH_FLOW_CATEGORIES.includes(rawCfc as CashFlowCategory)
+      ? (rawCfc as CashFlowCategory)
+      : defaultCashFlowCategoryFor(type)
+
+  // Atomic code allocation via SECURITY DEFINER RPC.
+  const { data: code, error: rpcErr } = await supabase.rpc('next_account_code', {
+    p_type: type,
+  })
+  if (rpcErr || !code) {
+    return { error: `Failed to generate code: ${rpcErr?.message ?? 'unknown'}` }
+  }
+
+  const { error } = await supabase.from('chart_of_accounts').insert({
+    code,
+    name,
+    type,
+    cash_flow_category: cashFlowCategory,
+    parent_code: parentCode,
+  })
+  if (error) return { error: `Failed to create account: ${error.message}` }
+
+  revalidatePath('/settings')
+  revalidatePath('/payments/new')
+}
+
+export async function updateAccount(formData: FormData): Promise<AccountActionResult> {
+  await requireRole(['principal', 'finance'])
+  const supabase = await createClient()
+
+  const code = ((formData.get('code') as string) ?? '').trim()
+  const name = ((formData.get('name') as string) ?? '').trim()
+  const rawCfc = ((formData.get('cash_flow_category') as string) ?? '').trim()
+  const isActive =
+    formData.get('is_active') === 'on' || formData.get('is_active') === 'true'
+  // Mig 246: editable parent. Form always sends the field (empty string = detach).
+  // Whether the form sent it is detectable via .has(); guard so legacy
+  // callers that omit it don't unintentionally null out parent_code.
+  const sentParent = formData.has('parent_code')
+  const rawParent = ((formData.get('parent_code') as string) ?? '').trim()
+  const parentCode = rawParent === '' ? null : rawParent
+
+  if (!code) return { error: 'Account code is required' }
+  if (!name) return { error: 'Account name is required' }
+
+  // type + code are immutable post-create. name / cash_flow_category /
+  // is_active / parent_code are editable. parent_code rejection (same-type,
+  // no cycles) is enforced by the coa_enforce_parent_type trigger from
+  // mig 246 — we just pass the value through.
+  const updates: {
+    name: string
+    is_active: boolean
+    cash_flow_category?: CashFlowCategory
+    parent_code?: string | null
+  } = { name, is_active: isActive }
+  if (rawCfc) {
+    if (!CASH_FLOW_CATEGORIES.includes(rawCfc as CashFlowCategory)) {
+      return { error: 'Invalid cash flow category' }
+    }
+    updates.cash_flow_category = rawCfc as CashFlowCategory
+  }
+  if (sentParent) {
+    updates.parent_code = parentCode
+  }
+
+  const { error } = await supabase
+    .from('chart_of_accounts')
+    .update(updates)
+    .eq('code', code)
+  if (error) return { error: `Failed to update account: ${error.message}` }
+
+  revalidatePath('/settings')
+  revalidatePath('/payments/new')
 }

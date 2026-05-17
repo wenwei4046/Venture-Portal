@@ -34,8 +34,8 @@ export interface VoucherDetailContext {
   sources: Array<{
     pool: string
     amount: string | number
-    category_code: string | null
-    category_label: string | null
+    account_code: string | null
+    account_label: string | null
   }>
   attachments: Array<{
     id: string
@@ -70,7 +70,7 @@ export async function getVoucherDetailContext(
     await Promise.all([
       supabase
         .from('payment_voucher_sources')
-        .select('pool, amount, category_code, payment_categories(label)')
+        .select('pool, amount, account_code, chart_of_accounts!pvs_account_code_fk(name)')
         .eq('voucher_id', voucherId)
         .order('amount', { ascending: false }),
       supabase
@@ -105,27 +105,30 @@ export async function getVoucherDetailContext(
     ? { ...bankRaw, current_balance: Number(bankRaw.current_balance) }
     : null
 
-  // Shape sources + fold in category label from the join
+  // Shape sources + fold in account name from the chart_of_accounts join.
+  // Post-mig 238: PVS rows reference chart_of_accounts directly via account_code
+  // (the COA `code` IS the GL account; there's no separate payment_categories
+  // table anymore).
   const sources: VoucherDetailContext['sources'] = (sourcesRes.data ?? []).map((s) => {
     const raw = s as {
       pool: string
       amount: string | number
-      category_code: string | null
-      payment_categories: { label: string } | null
+      account_code: string | null
+      chart_of_accounts: { name: string } | null
     }
     return {
       pool: raw.pool,
       amount: raw.amount,
-      category_code: raw.category_code,
-      category_label:
-        raw.payment_categories?.label ??
-        (raw.category_code ? raw.category_code.replace(/_/g, ' ') : null),
+      account_code: raw.account_code,
+      account_label:
+        raw.chart_of_accounts?.name ??
+        (raw.account_code ? raw.account_code.replace(/_/g, ' ') : null),
     }
   })
 
-  // Voucher-level categoryLabel: distinct categories across all source rows
+  // Voucher-level categoryLabel: distinct account names across all source rows
   const categoryLabel = sources.length > 0
-    ? Array.from(new Set(sources.map((s) => s.category_label).filter((l): l is string => !!l))).join(' + ') || null
+    ? Array.from(new Set(sources.map((s) => s.account_label).filter((l): l is string => !!l))).join(' + ') || null
     : null
 
   return {

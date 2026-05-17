@@ -89,7 +89,7 @@ export async function submitHRCostSummary(formData: FormData) {
   }
 
   revalidatePath('/hr-costing')
-  revalidatePath('/statements/invoices')
+  revalidatePath('/statements')
   revalidatePath('/approvals')
   revalidatePath('/dashboard')
 

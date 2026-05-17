@@ -8,6 +8,7 @@ import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { notifyApprovalDecision } from '@/lib/slack'
 import { postJournalEntry } from '@/lib/journal'
+import { resolveLoansReceivableLeaf } from '@/lib/loans-coa'
 
 // Mig 197: dept name → equity GL code mirror (must match dept_pool_gl_code SQL helper).
 const DEPT_POOL_GL: Record<string, string> = {
@@ -179,7 +180,7 @@ export async function approveRequest(formData: FormData) {
     // (expense_out) so the dept pool balance reflects the transfer to HV.
     const { data: fundSource, error: fsFetchError } = await supabase
       .from('fund_sources')
-      .select('id, amount, source_type, from_company_id, from_director_id, from_department_id, effective_date')
+      .select('id, amount, source_type, from_company_id, from_director_id, from_department_id, effective_date, account_code')
       .eq('id', approval.reference_id)
       .eq('status', 'pending_approval')
       .single()
@@ -237,7 +238,7 @@ export async function approveRequest(formData: FormData) {
           createdBy: user.id,
           lines: [
             { accountCode: srcGl, debit: Number(fundSource.amount), description: `${srcDept?.name} Pool transferred to HV` },
-            { accountCode: '3010', credit: Number(fundSource.amount), description: 'HV Operating Fund from dept transfer' },
+            { accountCode: '1010', credit: Number(fundSource.amount), description: 'HV Operating Fund from dept transfer' },
           ],
         })
       }
@@ -272,10 +273,15 @@ export async function approveRequest(formData: FormData) {
         .eq('id', primaryBank.id)
     }
 
-    // Mig 197/P0-3: post fund source activation JE (dr Bank / cr 2010 Fund Sources Payable).
+    // Mig 197/P0-3: post fund source activation JE (dr Bank / cr Fund Sources Payable).
+    // Mig 247: credit leg uses fundSource.account_code if Finance picked a specific
+    // sub-account (e.g. "4001 — Lim Wei Siang"); falls back to the umbrella 4000
+    // for legacy / unpicked rows. The trigger in mig 246 already enforces that
+    // account_code, if set, is not a header.
     // Skip for department_pool source_type because the dept transfer JE above already
     // covers that flow (dept→HV is an equity reclass, not a new liability).
     if (fundSource.source_type !== 'department_pool') {
+      const liabilityCode = fundSource.account_code ?? '4000'
       await postJournalEntry(supabase, {
         transactionDate: fundSource.effective_date ?? new Date().toISOString().slice(0, 10),
         description: approval.description ?? `Fund source activated — ${fundSource.source_type}`,
@@ -283,8 +289,8 @@ export async function approveRequest(formData: FormData) {
         referenceId: fundSource.id,
         createdBy: user.id,
         lines: [
-          { accountCode: primaryBank?.gl_account_code ?? '1010', debit: Number(fundSource.amount), description: 'Bank — fund source received' },
-          { accountCode: '2010', credit: Number(fundSource.amount), description: `Fund source payable — ${fundSource.source_type}` },
+          { accountCode: primaryBank?.gl_account_code ?? '3000', debit: Number(fundSource.amount), description: 'Bank — fund source received' },
+          { accountCode: liabilityCode, credit: Number(fundSource.amount), description: `Fund source payable — ${fundSource.source_type}` },
         ],
       })
     }
@@ -621,10 +627,17 @@ export async function approveRequestGroup(formData: FormData) {
   // ─── 6) GL journal: loan disbursement (P0-2 drift fix, mig 199) ─────────
   // approveRequestGroup bypasses approve_single_voucher because the paired
   // approvals live under group_id (approve_single_voucher rejects grouped
-  // rows). Post the loan-side JE directly: dr 1020 Loans Receivable /
-  // cr 1010 Bank. The voucher-side JE (which approve_single_voucher would
+  // rows). Post the loan-side JE directly: dr <borrower's leaf under 3020>
+  // / cr Bank. The voucher-side JE (which approve_single_voucher would
   // have written) is skipped here to avoid double-counting — same net
   // balance effect, one JE labelled as the loan event.
+  //
+  // 2026-05-15 fix: was hardcoded to `3020`, but the user split the COA
+  // into a header + per-borrower leaves (`3051 Amount Due From - Carres`,
+  // ...). Posting to the header silently disappeared from Trial Balance
+  // (which filters to leaves only). Mig 256 added a DB trigger that
+  // rejects header posts; this code now resolves the leaf per borrower.
+  const loansReceivableLeaf = await resolveLoansReceivableLeaf(supabase, loanApproval.reference_id)
   try {
     await postJournalEntry(supabase, {
       transactionDate: todayStr,
@@ -633,8 +646,8 @@ export async function approveRequestGroup(formData: FormData) {
       referenceId: loanApproval.reference_id,
       createdBy: user.id,
       lines: [
-        { accountCode: '1020', debit: Number(voucher.amount), description: 'Loans Receivable — disbursement' },
-        { accountCode: primaryBank?.gl_account_code ?? '1010', credit: Number(voucher.amount), description: `Bank — loan disbursement ${voucher.voucher_no ?? ''}`.trim() },
+        { accountCode: loansReceivableLeaf, debit: Number(voucher.amount), description: 'Loans Receivable — disbursement' },
+        { accountCode: primaryBank?.gl_account_code ?? '3000', credit: Number(voucher.amount), description: `Bank — loan disbursement ${voucher.voucher_no ?? ''}`.trim() },
       ],
     })
   } catch (jeErr) {

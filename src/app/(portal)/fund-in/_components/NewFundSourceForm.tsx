@@ -5,6 +5,8 @@ import dayjs from 'dayjs'
 import Link from 'next/link'
 import { createFundSource } from '../actions'
 import type { Company, FundSourceType } from '@/types'
+import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
+import AccountPicker, { type AccountOption } from '@/components/AccountPicker'
 
 interface Department {
   id: string
@@ -14,6 +16,8 @@ interface Department {
 interface Props {
   companies: Company[]
   departments: Department[]
+  /** Liability / equity accounts the fund-in can be tagged with (mig 247). */
+  liabilityAccounts: AccountOption[]
 }
 
 const SOURCE_TYPES: { value: FundSourceType; label: string; hint: string }[] = [
@@ -23,11 +27,16 @@ const SOURCE_TYPES: { value: FundSourceType; label: string; hint: string }[] = [
   { value: 'outsource', label: 'Outsource', hint: 'External party — bank, vendor, individual investor (free text)' },
 ]
 
-export default function NewFundSourceForm({ companies, departments }: Props) {
+export default function NewFundSourceForm({ companies, departments, liabilityAccounts }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [sourceType, setSourceType] = useState<FundSourceType>('subsidiary')
+  const [accountCode, setAccountCode] = useState<string>('')
   const formRef = useRef<HTMLFormElement>(null)
+
+  const defaultRepaymentDate = dayjs().add(12, 'month').format('YYYY-MM-DD')
+  const [repaymentDate, setRepaymentDate] = useState<string>(defaultRepaymentDate)
+  const [lockInMonths, setLockInMonths] = useState<number>(12)
 
   useEffect(() => {
     if (error && formRef.current) {
@@ -158,6 +167,30 @@ export default function NewFundSourceForm({ companies, departments }: Props) {
         </div>
       ) : null}
 
+      {/* ───────── Liability account (mig 247) ───────── */}
+      <div className="mb-6">
+        <label
+          htmlFor="account_code"
+          className="block text-sm font-sans font-medium text-graphite mb-1.5"
+        >
+          Amount due to (BS account){' '}
+          <span className="text-muted font-normal">(optional)</span>
+        </label>
+        <AccountPicker
+          accounts={liabilityAccounts}
+          value={accountCode}
+          onChange={setAccountCode}
+          name="account_code"
+          typeFilter={['liability', 'equity']}
+          placeholder="Pick the payable sub-account…"
+        />
+        <p className="font-serif italic text-muted text-xs mt-1.5">
+          Tracks who HV owes individually on the Balance Sheet. Leave blank to
+          fall back to the umbrella &quot;4000 Fund Sources Payable&quot;. Pick a child
+          sub-account (e.g. &quot;4001 — Lim Wei Siang&quot;) for a per-party balance.
+        </p>
+      </div>
+
       {/* ───────── Amount + Rate (row) ───────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
         <div>
@@ -226,6 +259,10 @@ export default function NewFundSourceForm({ companies, departments }: Props) {
               max="120"
               defaultValue="12"
               required
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10)
+                if (!isNaN(v) && v >= 1) setLockInMonths(v)
+              }}
               className="w-full px-3 py-2 pr-16 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted font-mono">
@@ -266,12 +303,18 @@ export default function NewFundSourceForm({ companies, departments }: Props) {
           name="repayment_date"
           type="date"
           required
-          defaultValue={dayjs().add(12, 'month').format('YYYY-MM-DD')}
+          defaultValue={defaultRepaymentDate}
+          onChange={(e) => setRepaymentDate(e.target.value)}
           className="w-full max-w-sm px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
         />
         <p className="font-serif italic text-muted text-xs mt-1.5">
-          Target date HV repays the full principal. Must be on or after the effective date.
+          Date the first installment is due. Must be on or after the effective date.
         </p>
+        {repaymentDate && lockInMonths >= 1 ? (
+          <p className="font-serif italic text-muted text-xs mt-1.5">
+            Fully repaid by ~{expectedFullRepaymentDate(repaymentDate, lockInMonths)} ({lockInMonths} installment{lockInMonths === 1 ? '' : 's'})
+          </p>
+        ) : null}
       </div>
 
       {/* ───────── Notes ───────── */}
