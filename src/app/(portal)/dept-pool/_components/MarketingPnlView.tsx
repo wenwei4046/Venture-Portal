@@ -29,7 +29,7 @@ export default async function MarketingPnlView({ deptId, period }: Props) {
       .from('dept_pools')
       .select('amount')
       .eq('department_id', deptId)
-      .eq('transaction_type', 'expense_out')
+      .in('transaction_type', ['expense_out', 'inter_billing_out'])
       .gte('created_at', monthStart)
       .lt('created_at', nextMonth),
   ])
@@ -80,7 +80,7 @@ export default async function MarketingPnlView({ deptId, period }: Props) {
       .from('dept_pools')
       .select('amount, created_at')
       .eq('department_id', deptId)
-      .eq('transaction_type', 'expense_out')
+      .in('transaction_type', ['expense_out', 'inter_billing_out'])
       .gte('created_at', trendStart),
   ])
 

@@ -26,7 +26,7 @@ export default async function HistoryTable({ deptId, filter = 'all' }: Props) {
     .limit(200)
 
   if (filter === 'in') query = query.eq('transaction_type', 'np_in')
-  if (filter === 'out') query = query.eq('transaction_type', 'expense_out')
+  if (filter === 'out') query = query.in('transaction_type', ['expense_out', 'inter_billing_out'])
 
   const { data: rows } = await query
 
