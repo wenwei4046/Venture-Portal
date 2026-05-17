@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
   },
 })
 
-interface DocumentProps {
+interface PdfDocumentProps {
   title: string
   subtitle?: string
   periodLabel: string
@@ -109,7 +109,7 @@ interface DocumentProps {
 
 export function PdfDocument({
   title, subtitle, periodLabel, orientation = 'portrait', children,
-}: DocumentProps): React.ReactElement {
+}: PdfDocumentProps): React.ReactElement {
   const generatedAt = dayjs().format('YYYY-MM-DD HH:mm')
   return (
     <Document>
