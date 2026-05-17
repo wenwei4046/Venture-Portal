@@ -95,7 +95,7 @@ export default function EditFundSourceForm({ id, typeLabel, fromLabel, initial, 
           placeholder="Pick the payable sub-account…"
         />
         <p className="font-serif italic text-muted text-xs mt-1.5">
-          Leave blank to fall back to the umbrella "4000 Fund Sources Payable".
+          Leave blank to fall back to the umbrella &quot;4000 Fund Sources Payable&quot;.
         </p>
       </div>
 

@@ -517,8 +517,8 @@ function AccountForm({
         <p className="font-serif italic text-muted text-xs mt-1.5">
           {mode === 'create' ? (
             <>
-              Pick a parent to group this account under (e.g. "4000 Amount due
-              to related party" with child "4001 — Lim Wei Siang"). The parent
+              Pick a parent to group this account under (e.g. &quot;4000 Amount due
+              to related party&quot; with child &quot;4001 — Lim Wei Siang&quot;). The parent
               then becomes a header — it can&apos;t be picked for posting in
               PV, fund-in, fund-out, or invoice forms. Must share the same
               type.

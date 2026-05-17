@@ -186,8 +186,8 @@ export default function NewFundSourceForm({ companies, departments, liabilityAcc
         />
         <p className="font-serif italic text-muted text-xs mt-1.5">
           Tracks who HV owes individually on the Balance Sheet. Leave blank to
-          fall back to the umbrella "4000 Fund Sources Payable". Pick a child
-          sub-account (e.g. "4001 — Lim Wei Siang") for a per-party balance.
+          fall back to the umbrella &quot;4000 Fund Sources Payable&quot;. Pick a child
+          sub-account (e.g. &quot;4001 — Lim Wei Siang&quot;) for a per-party balance.
         </p>
       </div>
 

@@ -181,7 +181,7 @@ export function PdfTable({
   )
 }
 
-export async function renderPdfBuffer(element: React.ReactElement<any>): Promise<Buffer> {
+export async function renderPdfBuffer(element: React.ReactElement): Promise<Buffer> {
   const instance = pdf(element)
   const blob = await instance.toBuffer()
   // toBuffer in Node returns a NodeJS.ReadableStream in @react-pdf/renderer 4.x.

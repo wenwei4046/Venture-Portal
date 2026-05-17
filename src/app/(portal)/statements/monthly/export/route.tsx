@@ -46,11 +46,11 @@ export async function GET(req: Request) {
   ])
 
   const companyMap = new Map(
-    (companies ?? []).map((c: any) => [c.id, { name: c.name as string, code: c.short_code as string }])
+    (companies ?? []).map((c) => [c.id, { name: c.name as string, code: c.short_code as string }])
   )
 
   // Transform statements to row format
-  const rows: StatementRow[] = (statements ?? []).map((s: any) => {
+  const rows: StatementRow[] = (statements ?? []).map((s) => {
     const company = companyMap.get(s.company_id)
     const periodLabel = dayjs(s.period_month).format('MMM YYYY')
     const issuedAtStr = s.issued_at ? dayjs(s.issued_at).format('DD/MM/YYYY') : '—'
