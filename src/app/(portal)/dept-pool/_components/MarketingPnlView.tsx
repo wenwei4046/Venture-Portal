@@ -21,10 +21,9 @@ export default async function MarketingPnlView({ deptId, period }: Props) {
   const [{ data: invoiceRows }, { data: expenseRows }] = await Promise.all([
     supabase
       .from('invoices')
-      .select('total_amount, service_contracts!inner(department_id)')
+      .select('total_amount')
       .eq('period_month', period)
-      .eq('billing_mode', 'marketing_project')
-      .eq('service_contracts.department_id', deptId),
+      .eq('billing_mode', 'marketing_project'),
     supabase
       .from('dept_pools')
       .select('amount')
@@ -72,7 +71,7 @@ export default async function MarketingPnlView({ deptId, period }: Props) {
   const [{ data: trendInvoices }, { data: trendExpenses }] = await Promise.all([
     supabase
       .from('invoices')
-      .select('total_amount, period_month, billing_mode, service_contracts(department_id)')
+      .select('total_amount, period_month')
       .gte('period_month', trendStart)
       .lte('period_month', period)
       .eq('billing_mode', 'marketing_project'),
@@ -91,9 +90,6 @@ export default async function MarketingPnlView({ deptId, period }: Props) {
     trendMap.set(m, { revenue: 0, cost: 0 })
   }
   for (const inv of trendInvoices ?? []) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sc = (inv as any).service_contracts
-    if (sc?.department_id !== deptId) continue
     const k = inv.period_month as string
     const row = trendMap.get(k)
     if (row) row.revenue += Number(inv.total_amount)
