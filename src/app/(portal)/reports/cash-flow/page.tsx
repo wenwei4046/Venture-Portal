@@ -176,6 +176,20 @@ function PoolCashflowPanel({ block }: { block: CashflowByPoolBlock }) {
           </div>
         ))}
       </div>
+      <table className="ledger-table mt-6">
+        <tbody>
+          <tr className="border-t-2 border-hairline">
+            <td className="font-serif italic text-ink font-medium">
+              Net cash surplus / (deficiency)
+            </td>
+            <td className={`num font-semibold ${block.net >= 0 ? 'text-ledger' : 'text-danger'}`}>
+              <span className={`font-serif text-2xl font-semibold tabular tracking-[-0.01em] ${block.net >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                {formatMoney(block.net)}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </section>
   )
 }
