@@ -7,7 +7,12 @@ export function buildIncomeStatementXlsx(stmt: IncomeStatement, opts: { pool: Po
 
   function appendPool(p: PoolPnl) {
     breaks.push({ afterRow: rows.length, title: `${p.poolLabel.toUpperCase()} POOL` })
-    for (const l of p.revenueLines)      rows.push([l.label, l.amount, null, null, null])
+    for (const g of p.revenueGroups) {
+      rows.push([g.accountName, g.subtotal, null, null, null])
+      for (const it of g.items) {
+        rows.push([`  ${it.label}`, it.amount, null, null, null])
+      }
+    }
     if (p.revenue !== 0)                  rows.push(['Total revenue', p.revenue, null, null, null])
     for (const l of p.costLines)          rows.push([l.label, null, l.amount, null, null])
     if (p.cost !== 0)                     rows.push(['Total cost',    null, p.cost, null, null])
