@@ -161,62 +161,67 @@ async function LedgerBody({
 
 function LedgerSection({ led }: { led: Ledger }) {
   return (
-    <section>
-      <div className="sect-head mb-3">
-        <h2 className="font-serif italic text-ink text-base">
-          {led.code} {led.accountName}
-        </h2>
-        <div className="font-mono text-[11px] uppercase tracking-wide text-graphite">
-          {led.accountType.replace('_', ' ')}
-        </div>
-      </div>
-      <div className="mb-3 font-mono text-sm text-graphite">
-        Opening balance ({dayjs(led.from).subtract(1, 'day').format('D MMM YYYY')}):{' '}
-        <span className="text-num-ink tabular">{formatSignedBalance(led.openingBalance)}</span>
-      </div>
+    <section className="mb-10">
       <table className="ledger-table">
         <thead>
           <tr>
             <th>Date</th>
-            <th>Entry</th>
-            <th>Description</th>
-            <th className="num">Debit</th>
-            <th className="num">Credit</th>
-            <th className="num">Balance</th>
+            <th>Acc. Desc.</th>
+            <th>Journal Type</th>
+            <th>Ref. 1</th>
+            <th>Desc.</th>
+            <th className="num">Home DR</th>
+            <th className="num">Home CR</th>
+            <th className="num">Home Balance</th>
           </tr>
         </thead>
         <tbody>
-          {led.lines.length === 0 ? (
-            <tr>
-              <td colSpan={6} className="font-serif italic text-muted text-center py-6">
-                No activity in this period.
-              </td>
-            </tr>
-          ) : (
-            led.lines.map((l, i) => (
-              <tr key={i}>
-                <td className="font-mono text-xs">{dayjs(l.entryDate).format('D MMM YYYY')}</td>
-                <td className="font-mono text-xs text-graphite">{l.entryNo}</td>
-                <td>{l.description}</td>
+          <tr className="bg-surface border-t-2 border-hairline">
+            <td colSpan={5} className="font-serif italic text-ink font-semibold">
+              Acc. No.: {led.code} · {led.accountName}
+            </td>
+            <td className="num font-semibold">
+              {led.periodTotals.debit > 0 ? formatMoney(led.periodTotals.debit) : '—'}
+            </td>
+            <td className="num font-semibold">
+              {led.periodTotals.credit > 0 ? formatMoney(led.periodTotals.credit) : '—'}
+            </td>
+            <td className="num font-semibold">{formatSignedBalance(led.closingBalance)}</td>
+          </tr>
+          {led.lines.map((l, i) => {
+            const isBf = l.description === 'BALANCE B/F' && l.entryDate === ''
+            return (
+              <tr key={i} className={isBf ? 'text-graphite italic' : ''}>
+                <td className="font-mono text-xs">
+                  {l.entryDate ? dayjs(l.entryDate).format('D MMM YYYY') : '—'}
+                </td>
+                <td className="text-sm">{l.accountDesc}</td>
+                <td className="font-mono text-xs uppercase tracking-wide text-accent">
+                  {l.journalType}
+                </td>
+                <td className="font-mono text-sm text-ink">{l.ref}</td>
+                <td className="text-sm">{l.description}</td>
                 <td className="num">{l.debit > 0 ? formatMoney(l.debit) : '—'}</td>
                 <td className="num">{l.credit > 0 ? formatMoney(l.credit) : '—'}</td>
                 <td className="num">{formatSignedBalance(l.runningBalance)}</td>
               </tr>
-            ))
-          )}
+            )
+          })}
         </tbody>
-        <tfoot className="border-t-2 border-hairline">
-          <tr>
-            <td colSpan={3} className="font-serif italic text-ink">Period totals</td>
-            <td className="num font-medium">{led.periodTotals.debit > 0 ? formatMoney(led.periodTotals.debit) : '—'}</td>
-            <td className="num font-medium">{led.periodTotals.credit > 0 ? formatMoney(led.periodTotals.credit) : '—'}</td>
-            <td></td>
-          </tr>
-          <tr>
+        <tfoot>
+          <tr className="border-t border-hairline">
             <td colSpan={5} className="font-serif italic text-ink font-semibold">
-              Closing balance ({dayjs(led.to).format('D MMM YYYY')})
+              {led.code} {led.accountName} — total
             </td>
-            <td className="num font-semibold text-num-ink">{formatSignedBalance(led.closingBalance)}</td>
+            <td className="num font-semibold">
+              {led.periodTotals.debit > 0 ? formatMoney(led.periodTotals.debit) : '—'}
+            </td>
+            <td className="num font-semibold">
+              {led.periodTotals.credit > 0 ? formatMoney(led.periodTotals.credit) : '—'}
+            </td>
+            <td className="num font-semibold text-num-ink">
+              {formatSignedBalance(led.closingBalance)}
+            </td>
           </tr>
         </tfoot>
       </table>
