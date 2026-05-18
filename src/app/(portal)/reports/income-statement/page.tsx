@@ -13,6 +13,7 @@ import dayjs from 'dayjs'
 import Link from 'next/link'
 import { SegmentedReport, type ReportSegment } from '@/app/(portal)/reports/_components/SegmentedReport'
 import { SegmentExportButtons } from '@/app/(portal)/reports/_components/SegmentExportButtons'
+import { RevenueGroups } from './_components/RevenueGroups'
 
 interface Props {
   searchParams: Promise<{ from?: string; to?: string; period?: string }>
@@ -103,7 +104,7 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
 // pool margin at the bottom.
 function PoolBlock({ pool, showTreasuryNote }: { pool: PoolPnl; showTreasuryNote: boolean }) {
   const empty =
-    pool.revenueLines.length === 0 &&
+    pool.revenueGroups.length === 0 &&
     pool.costLines.length === 0 &&
     pool.otherIncomeLines.length === 0 &&
     pool.expenseLines.length === 0
@@ -126,12 +127,7 @@ function PoolBlock({ pool, showTreasuryNote }: { pool: PoolPnl; showTreasuryNote
         <p className="font-serif italic text-muted text-sm">No P&amp;L activity in this period.</p>
       ) : (
         <div className="space-y-6">
-          <LineTable
-            title="Revenue"
-            lines={pool.revenueLines}
-            subtotal={pool.revenue}
-            tone="credit"
-          />
+          <RevenueGroups groups={pool.revenueGroups} subtotal={pool.revenue} />
           <LineTable
             title="Cost"
             lines={pool.costLines}
