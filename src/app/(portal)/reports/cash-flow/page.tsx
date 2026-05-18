@@ -5,9 +5,11 @@ import {
   fetchCashflowStatement,
   startOfMonth,
   endOfMonth,
-  type CashflowSection,
-  type CashflowPoolBlock,
+  pivotCashflowByPool,
+  type CashflowByPoolBlock,
 } from '@/lib/cfo-reports'
+import { SegmentedReport, type ReportSegment } from '@/app/(portal)/reports/_components/SegmentedReport'
+import { SegmentExportButtons } from '@/app/(portal)/reports/_components/SegmentExportButtons'
 import type { CashFlowCategory } from '@/lib/coa'
 import dayjs from 'dayjs'
 import Link from 'next/link'
@@ -55,18 +57,7 @@ export default async function CashFlowPage({ searchParams }: Props) {
               className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
             />
           </form>
-          <Link
-            href={`/reports/cash-flow/export?format=xlsx&from=${from}&to=${to}`}
-            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-          >
-            Export Excel
-          </Link>
-          <Link
-            href={`/reports/cash-flow/export?format=pdf&from=${from}&to=${to}`}
-            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-          >
-            Export PDF
-          </Link>
+          <SegmentExportButtons basePath="/reports/cash-flow/export" from={from} to={to} />
         </div>
       </div>
 
@@ -77,128 +68,115 @@ export default async function CashFlowPage({ searchParams }: Props) {
         bank-to-bank transfers are excluded.
       </p>
 
-      <div className="max-w-3xl space-y-12">
-        {stmt.sections.map((section) => (
-          <CashflowSectionBlock key={section.category} section={section} />
-        ))}
-
-        {/* Net cash change */}
-        <section className="border-t-2 border-hairline pt-6">
-          <div className="sect-head">
-            <h2>Net cash change</h2>
-            <span className="rule" aria-hidden />
-            <span className="count">ALL SECTIONS</span>
-          </div>
-          <table className="ledger-table">
-            <tbody>
-              {stmt.sections.map((s) => (
-                <tr key={s.category}>
-                  <td>{SECTION_INTRO[s.category]}</td>
-                  <td className="num">
-                    {s.net < 0
-                      ? <span className="neg">{formatMoney(s.net)}</span>
-                      : formatMoney(s.net)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 border-hairline">
-                <td className="font-serif italic text-ink font-medium">Net change this period</td>
-                <td className={`num font-semibold ${stmt.netChange >= 0 ? 'text-ledger' : 'text-danger'}`}>
-                  <span className={`font-serif text-2xl font-semibold tabular tracking-[-0.01em] ${stmt.netChange >= 0 ? 'text-ledger' : 'text-danger'}`}>
-                    {formatMoney(stmt.netChange)}
-                  </span>
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </section>
+      <div className="max-w-3xl">
+        {(() => {
+          const pivot = pivotCashflowByPool(stmt)
+          if (pivot.pools.length === 0) {
+            return (
+              <div className="border border-hairline rounded-md bg-surface p-6 text-center">
+                <p className="font-serif italic text-muted text-sm">No cash activity in this period.</p>
+              </div>
+            )
+          }
+          return (
+            <SegmentedReport
+              defaultKey="summary"
+              segments={[
+                { key: 'summary', label: 'Summary', panel: <SummaryPanel stmt={stmt} /> },
+                ...pivot.pools.map<ReportSegment>((b) => ({
+                  key: b.pool,
+                  label: b.poolLabel,
+                  panel: <PoolCashflowPanel block={b} />,
+                })),
+              ]}
+            />
+          )
+        })()}
       </div>
     </div>
   )
 }
 
-function CashflowSectionBlock({ section }: { section: CashflowSection }) {
-  const heading = SECTION_INTRO[section.category]
-  const empty = section.pools.length === 0
+function SummaryPanel({ stmt }: { stmt: import('@/lib/cfo-reports').CashflowStatement }) {
   return (
-    <section>
+    <section className="border-t-2 border-hairline pt-6">
       <div className="sect-head">
-        <h2>{heading}</h2>
+        <h2>Net cash change</h2>
         <span className="rule" aria-hidden />
-        <span className={`count ${section.net >= 0 ? 'text-ledger' : 'text-danger'}`}>
-          NET {formatMoney(section.net)}
-        </span>
-      </div>
-
-      {empty ? (
-        <p className="font-serif italic text-muted text-sm">No activity in this period.</p>
-      ) : (
-        <div className="space-y-6">
-          {section.pools.map((pool) => (
-            <PoolCashBlock key={pool.pool} pool={pool} />
-          ))}
-          <table className="ledger-table">
-            <tfoot>
-              <tr className="border-t-2 border-hairline">
-                <td className="font-serif italic text-ink font-medium">{heading} subtotal</td>
-                <td className={`num font-semibold ${section.net >= 0 ? 'text-ledger' : 'text-danger'}`}>
-                  <span className={`font-serif text-lg font-semibold tabular tracking-[-0.01em] ${section.net >= 0 ? 'text-ledger' : 'text-danger'}`}>
-                    {formatMoney(section.net)}
-                  </span>
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      )}
-    </section>
-  )
-}
-
-function PoolCashBlock({ pool }: { pool: CashflowPoolBlock }) {
-  const noFlow = pool.inflowLines.length === 0 && pool.outflowLines.length === 0
-  if (noFlow) return null
-  return (
-    <div>
-      <div className="flex items-baseline justify-between mb-2">
-        <h3 className="font-serif italic text-accent text-sm">{pool.poolLabel}</h3>
-        <span className={`font-mono text-xs ${pool.net >= 0 ? 'text-ledger' : 'text-danger'}`}>
-          NET {formatMoney(pool.net)}
-        </span>
+        <span className="count">ALL SECTIONS</span>
       </div>
       <table className="ledger-table">
         <tbody>
-          {pool.inflowLines.map((l) => (
-            <tr key={`in-${l.label}`}>
-              <td className="text-sm">{l.label}</td>
-              <td className="num text-ledger">
-                {l.amount < 0
-                  ? <span className="neg">{formatMoney(l.amount)}</span>
-                  : formatMoney(l.amount)}
+          {stmt.sections.map((s) => (
+            <tr key={s.category}>
+              <td>{SECTION_INTRO[s.category]}</td>
+              <td className="num">
+                {s.net < 0 ? <span className="neg">{formatMoney(s.net)}</span> : formatMoney(s.net)}
               </td>
-            </tr>
-          ))}
-          {pool.outflowLines.map((l) => (
-            <tr key={`out-${l.label}`}>
-              <td className="text-sm">{l.label}</td>
-              <td className="num"><span className="neg">{formatMoney(-l.amount)}</span></td>
             </tr>
           ))}
         </tbody>
         <tfoot>
-          <tr className="border-t border-hairline">
-            <td className="font-serif italic text-graphite text-sm">{pool.poolLabel} net</td>
-            <td className={`num font-semibold ${pool.net >= 0 ? 'text-ledger' : 'text-danger'}`}>
-              {pool.net < 0
-                ? <span className="neg">{formatMoney(pool.net)}</span>
-                : formatMoney(pool.net)}
+          <tr className="border-t-2 border-hairline">
+            <td className="font-serif italic text-ink font-medium">Net change this period</td>
+            <td className={`num font-semibold ${stmt.netChange >= 0 ? 'text-ledger' : 'text-danger'}`}>
+              <span className={`font-serif text-2xl font-semibold tabular tracking-[-0.01em] ${stmt.netChange >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                {formatMoney(stmt.netChange)}
+              </span>
             </td>
           </tr>
         </tfoot>
       </table>
-    </div>
+    </section>
+  )
+}
+
+function PoolCashflowPanel({ block }: { block: CashflowByPoolBlock }) {
+  return (
+    <section>
+      <div className="sect-head">
+        <h2>{block.poolLabel}</h2>
+        <span className="rule" aria-hidden />
+        <span className={`count ${block.net >= 0 ? 'text-ledger' : 'text-danger'}`}>
+          NET {formatMoney(block.net)}
+        </span>
+      </div>
+      <div className="space-y-6">
+        {block.sections.map((sec) => (
+          <div key={sec.category}>
+            <h3 className="font-serif italic text-accent text-sm mb-2">
+              {SECTION_INTRO[sec.category]}
+            </h3>
+            <table className="ledger-table">
+              <tbody>
+                {sec.inflowLines.map((l) => (
+                  <tr key={`in-${l.label}`}>
+                    <td className="text-sm">{l.label}</td>
+                    <td className="num text-ledger">
+                      {l.amount < 0 ? <span className="neg">{formatMoney(l.amount)}</span> : formatMoney(l.amount)}
+                    </td>
+                  </tr>
+                ))}
+                {sec.outflowLines.map((l) => (
+                  <tr key={`out-${l.label}`}>
+                    <td className="text-sm">{l.label}</td>
+                    <td className="num"><span className="neg">{formatMoney(-l.amount)}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-hairline">
+                  <td className="font-serif italic text-graphite text-sm">{SECTION_INTRO[sec.category]} net</td>
+                  <td className={`num font-semibold ${sec.net >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                    {sec.net < 0 ? <span className="neg">{formatMoney(sec.net)}</span> : formatMoney(sec.net)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 
