@@ -89,13 +89,20 @@ describe('classifyRows', () => {
       invoices: [], treasury: noTreasury,
     })
     const allLabels = out.income.pools.flatMap((p) => [
-      ...p.revenueLines,
-      ...p.costLines,
-      ...p.otherIncomeLines,
-      ...p.expenseLines,
-    ].map((l) => l.label))
+      ...p.revenueGroups.flatMap((g) => [g.accountName, ...g.items.map((it) => it.label)]),
+      ...p.costLines.map((l) => l.label),
+      ...p.otherIncomeLines.map((l) => l.label),
+      ...p.expenseLines.map((l) => l.label),
+    ])
     expect(allLabels).not.toContain('Uncategorised')
     expect(allLabels).toContain('Office Rental')
+    // every revenue group + item must carry a real (non-empty) label
+    for (const p of out.income.pools) {
+      for (const g of p.revenueGroups) {
+        expect(g.accountName).not.toBe('')
+        for (const it of g.items) expect(it.label).not.toBe('')
+      }
+    }
   })
 
   it('does NOT double-count invoice revenue on billing_payment (invoice already accrued revenue at issue)', () => {
