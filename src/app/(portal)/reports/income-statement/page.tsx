@@ -11,6 +11,8 @@ import {
 } from '@/lib/cfo-reports'
 import dayjs from 'dayjs'
 import Link from 'next/link'
+import { SegmentedReport, type ReportSegment } from '@/app/(portal)/reports/_components/SegmentedReport'
+import { SegmentExportButtons } from '@/app/(portal)/reports/_components/SegmentExportButtons'
 
 interface Props {
   searchParams: Promise<{ from?: string; to?: string; period?: string }>
@@ -49,18 +51,7 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
               className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
             />
           </form>
-          <Link
-            href={`/reports/income-statement/export?format=xlsx&from=${from}&to=${to}`}
-            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-          >
-            Export Excel
-          </Link>
-          <Link
-            href={`/reports/income-statement/export?format=pdf&from=${from}&to=${to}`}
-            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-          >
-            Export PDF
-          </Link>
+          <SegmentExportButtons basePath="/reports/income-statement/export" from={from} to={to} />
         </div>
       </div>
 
@@ -72,7 +63,7 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
         appear here — they sit on the Balance Sheet.
       </p>
 
-      <div className="max-w-3xl space-y-12">
+      <div className="max-w-3xl">
         {stmt.pools.length === 0 ? (
           <div className="border border-hairline rounded-md bg-surface p-6 text-center">
             <p className="font-serif italic text-muted text-sm">
@@ -81,17 +72,27 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
             </p>
           </div>
         ) : (
-          stmt.pools.map((p) => (
-            <PoolBlock
-              key={p.pool}
-              pool={p}
-              showTreasuryNote={p.pool === 'venture_pool' && stmt.treasury.net !== 0}
-            />
-          ))
+          <SegmentedReport
+            defaultKey="summary"
+            segments={[
+              {
+                key: 'summary',
+                label: 'Summary',
+                panel: <SummaryBlock stmt={stmt} />,
+              },
+              ...stmt.pools.map<ReportSegment>((p) => ({
+                key: p.pool,
+                label: p.poolLabel,
+                panel: (
+                  <PoolBlock
+                    pool={p}
+                    showTreasuryNote={p.pool === 'venture_pool' && stmt.treasury.net !== 0}
+                  />
+                ),
+              })),
+            ]}
+          />
         )}
-
-        {/* ─── Summary ─── */}
-        {stmt.pools.length > 0 ? <SummaryBlock stmt={stmt} /> : null}
       </div>
     </div>
   )
