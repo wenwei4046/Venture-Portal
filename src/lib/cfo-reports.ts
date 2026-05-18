@@ -116,7 +116,7 @@ export interface Line {
 export interface PoolPnl {
   pool: string
   poolLabel: string
-  revenueLines: Line[]
+  revenueGroups: RevenueGroup[]
   costLines: Line[]
   otherIncomeLines: Line[]
   expenseLines: Line[]
@@ -224,6 +224,7 @@ function r2(n: number): number {
 // CFS slots: per-cash-flow-category inflow/outflow maps.
 interface PoolAcc {
   revenue: Map<string, number>
+  revenueInvoiceItems: Array<{ accountCode: string; accountName: string; label: string; amount: number }>
   cost: Map<string, number>
   otherIncome: Map<string, number>
   expense: Map<string, number>
@@ -235,6 +236,7 @@ interface PoolAcc {
 function emptyPoolAcc(): PoolAcc {
   return {
     revenue: new Map(),
+    revenueInvoiceItems: [],
     cost: new Map(),
     otherIncome: new Map(),
     expense: new Map(),
@@ -455,8 +457,12 @@ export function classifyRows(input: ClassifyInput): ClassifyOutput {
     const amt = Number(inv.amount ?? 0)
     if (amt === 0) continue
     const p = acc(inv.pool)
-    const label = `${inv.companyShortCode} · ${inv.invoiceNo}`
-    bump(p.revenue, label, amt)
+    p.revenueInvoiceItems.push({
+      accountCode: inv.categoryCode,
+      accountName: inv.categoryName,
+      label: `${inv.companyShortCode} · ${inv.invoiceNo}`,
+      amount: amt,
+    })
   }
 
   // ── 3a: inter-billing expenses — recognised at invoice date (symmetric with revenue) ──
@@ -522,18 +528,21 @@ export function classifyRows(input: ClassifyInput): ClassifyOutput {
 
   for (const key of poolKeys) {
     const p = pools.get(key)!
-    const revenueLines = linesFrom(p.revenue)
+    const revenueGroups = groupRevenueByAccount({
+      invoiceItems: p.revenueInvoiceItems,
+      flatLines: linesFrom(p.revenue),
+    })
     const costLines = linesFrom(p.cost)
     const otherIncomeLines = linesFrom(p.otherIncome)
     const expenseLines = linesFrom(p.expense)
-    const revenue = r2(revenueLines.reduce((s, l) => s + l.amount, 0))
+    const revenue = r2(revenueGroups.reduce((s, g) => s + g.subtotal, 0))
     const cost = r2(costLines.reduce((s, l) => s + l.amount, 0))
     const otherIncome = r2(otherIncomeLines.reduce((s, l) => s + l.amount, 0))
     const expense = r2(expenseLines.reduce((s, l) => s + l.amount, 0))
     const grossProfit = r2(revenue - cost)
     const margin = r2(grossProfit + otherIncome - expense)
     if (
-      revenueLines.length > 0 ||
+      revenueGroups.length > 0 ||
       costLines.length > 0 ||
       otherIncomeLines.length > 0 ||
       expenseLines.length > 0
@@ -541,7 +550,7 @@ export function classifyRows(input: ClassifyInput): ClassifyOutput {
       pnlPools.push({
         pool: key,
         poolLabel: poolLabel(key),
-        revenueLines,
+        revenueGroups,
         costLines,
         otherIncomeLines,
         expenseLines,
