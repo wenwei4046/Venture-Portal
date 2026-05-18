@@ -1456,6 +1456,64 @@ export async function resolveSourceDescriptions(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Source-meta resolver — Journal Type + Ref per originating row.
+//
+// invoice            → journalType 'SALES',   ref = invoices.invoice_no
+// payment_voucher    → journalType 'RECEIPT' (direction 'credit') /
+//                       'PAYMENT' (otherwise), ref = payment_vouchers.voucher_no
+//
+// Returns a map keyed by `${reference_type}:${reference_id}`. Reference types
+// not handled here fall through to the manual-JE defaults in fetchLedgers
+// (journalType 'JOURNAL', ref = JE.entry_no).
+// ────────────────────────────────────────────────────────────────────────────
+
+export async function resolveLedgerSourceMeta(
+  supabase: SupabaseClient,
+  refs: Array<{ referenceType: string; referenceId: string }>,
+): Promise<Map<string, { journalType: string; ref: string }>> {
+  const out = new Map<string, { journalType: string; ref: string }>()
+  if (refs.length === 0) return out
+
+  const invoiceIds = new Set<string>()
+  const pvIds = new Set<string>()
+  for (const r of refs) {
+    if (r.referenceType === 'invoice') invoiceIds.add(r.referenceId)
+    else if (r.referenceType === 'payment_voucher') pvIds.add(r.referenceId)
+  }
+
+  if (invoiceIds.size > 0) {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('id, invoice_no')
+      .in('id', Array.from(invoiceIds))
+    if (error) throw new Error(`resolveLedgerSourceMeta invoices: ${error.message}`)
+    for (const r of data ?? []) {
+      out.set(`invoice:${r.id as string}`, {
+        journalType: 'SALES',
+        ref: (r.invoice_no as string | null) ?? '',
+      })
+    }
+  }
+
+  if (pvIds.size > 0) {
+    const { data, error } = await supabase
+      .from('payment_vouchers')
+      .select('id, voucher_no, direction')
+      .in('id', Array.from(pvIds))
+    if (error) throw new Error(`resolveLedgerSourceMeta payment_vouchers: ${error.message}`)
+    for (const r of data ?? []) {
+      const dir = r.direction as string | null
+      out.set(`payment_voucher:${r.id as string}`, {
+        journalType: dir === 'credit' ? 'RECEIPT' : 'PAYMENT',
+        ref: (r.voucher_no as string | null) ?? '',
+      })
+    }
+  }
+
+  return out
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Multi-account General Ledger — batched fetch for N accounts at once.
 //
 // codes=[] means "every postable leaf account". One round-trip set for opening
@@ -1563,17 +1621,24 @@ export async function fetchLedgers(
     if (t && id) refs.push({ referenceType: t, referenceId: id })
   }
   const descOverrides = await resolveSourceDescriptions(supabase, refs)
+  const srcMeta = await resolveLedgerSourceMeta(supabase, refs)
 
-  const jeById = new Map<string, { entryNo: string; transactionDate: string; description: string }>()
+  const jeById = new Map<
+    string,
+    { entryNo: string; transactionDate: string; description: string; journalType: string; ref: string }
+  >()
   for (const j of periodJes2) {
     const fallback = (j.description as string) ?? ''
     const refKey =
       j.reference_type && j.reference_id ? `${j.reference_type}:${j.reference_id}` : null
     const description = refKey ? descOverrides.get(refKey) ?? fallback : fallback
+    const meta = refKey ? srcMeta.get(refKey) : undefined
     jeById.set(j.id as string, {
       entryNo: j.entry_no as string,
       transactionDate: j.transaction_date as string,
       description,
+      journalType: meta?.journalType ?? 'JOURNAL',
+      ref: meta?.ref ?? (j.entry_no as string),
     })
   }
 
@@ -1584,6 +1649,8 @@ export async function fetchLedgers(
     entryNo: string
     entryDate: string
     description: string
+    journalType: string
+    ref: string
     debit: number
     credit: number
   }
@@ -1606,6 +1673,8 @@ export async function fetchLedgers(
         entryNo: je.entryNo,
         entryDate: je.transactionDate,
         description: je.description,
+        journalType: je.journalType,
+        ref: je.ref,
         debit: Number(l.debit ?? 0),
         credit: Number(l.credit ?? 0),
       })
@@ -1625,11 +1694,9 @@ export async function fetchLedgers(
       entryDate: l.entryDate,
       entryNo: l.entryNo,
       description: l.description,
-      // accountDesc/journalType/ref are wired from the DB in Task A2;
-      // empty-string placeholders keep the type contract until then.
-      accountDesc: '',
-      journalType: '',
-      ref: '',
+      accountDesc: account.name,
+      journalType: l.journalType,
+      ref: l.ref,
       debit: l.debit,
       credit: l.credit,
     }))
