@@ -11,30 +11,41 @@ function fmtBalance(signed: number): string {
 
 export function LedgerPdf({ led }: { led: Ledger }) {
   const periodLabel = `${dayjs(led.from).format('D MMM YYYY')} – ${dayjs(led.to).format('D MMM YYYY')}`
-  const subtitle = `${led.code} ${led.accountName} · Opening ${fmtBalance(led.openingBalance)} · Closing ${fmtBalance(led.closingBalance)}`
+  const subtitle = `${led.code} ${led.accountName}`
 
   return (
     <PdfDocument title="General Ledger" periodLabel={periodLabel} subtitle={subtitle} orientation="landscape">
       <PdfTable
         columns={[
-          { label: 'Date',        width: 70 },
-          { label: 'Entry',       width: 80 },
-          { label: 'Description', width: 300 },
-          { label: 'Debit',       width: 80, align: 'right' },
-          { label: 'Credit',      width: 80, align: 'right' },
-          { label: 'Balance',     width: 100, align: 'right' },
+          { label: 'Date',         width: 60 },
+          { label: 'Acc. Desc.',   width: 110 },
+          { label: 'Journal Type', width: 70 },
+          { label: 'Ref. 1',       width: 90 },
+          { label: 'Desc.',        width: 200 },
+          { label: 'Home DR',      width: 70, align: 'right' },
+          { label: 'Home CR',      width: 70, align: 'right' },
+          { label: 'Home Balance', width: 90, align: 'right' },
         ]}
         numberFormat="money"
         rows={[
+          [`Acc. No.: ${led.code} · ${led.accountName}`, '', '', '', '',
+            led.periodTotals.debit > 0 ? led.periodTotals.debit : null,
+            led.periodTotals.credit > 0 ? led.periodTotals.credit : null,
+            fmtBalance(led.closingBalance)],
           ...led.lines.map((l) => [
-            dayjs(l.entryDate).format('D MMM YYYY'),
-            l.entryNo,
+            l.entryDate ? dayjs(l.entryDate).format('D MMM YYYY') : '—',
+            l.accountDesc,
+            l.journalType,
+            l.ref,
             l.description,
             l.debit > 0 ? l.debit : null,
             l.credit > 0 ? l.credit : null,
             fmtBalance(l.runningBalance),
           ] as (string | number | null)[]),
-          ['Period totals', '', '', led.periodTotals.debit, led.periodTotals.credit, ''],
+          [`${led.code} ${led.accountName} — total`, '', '', '', '',
+            led.periodTotals.debit > 0 ? led.periodTotals.debit : null,
+            led.periodTotals.credit > 0 ? led.periodTotals.credit : null,
+            fmtBalance(led.closingBalance)],
         ]}
       />
     </PdfDocument>
