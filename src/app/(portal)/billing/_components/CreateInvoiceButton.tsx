@@ -855,9 +855,8 @@ function PoolTable({
                 ×
               </button>
             </div>
-            <div className="grid grid-cols-1 gap-3">
-              <label className="block">
-                <span className="block text-xs font-sans text-graphite mb-1">Pool</span>
+            <div className="space-y-3">
+              <Field label="Pool">
                 <select
                   value={r.mode}
                   onChange={(e) => onUpdate(r.uid, { mode: e.target.value as CreateInvoiceMode })}
@@ -869,9 +868,8 @@ function PoolTable({
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
-              </label>
-              <label className="block">
-                <span className="block text-xs font-sans text-graphite mb-1">Category</span>
+              </Field>
+              <Field label="Category">
                 <AccountPicker
                   accounts={categoryOptions}
                   value={r.categoryCode}
@@ -881,11 +879,8 @@ function PoolTable({
                   typeFilter={['revenue', 'cost', 'other_income']}
                   disabled={isPending}
                 />
-              </label>
-              <label className="block">
-                <span className="block text-xs font-sans text-graphite mb-1">
-                  {isRatioTemplate ? 'Ratio (RM)' : 'Amount (RM)'}
-                </span>
+              </Field>
+              <Field label={isRatioTemplate ? 'Ratio (RM)' : 'Amount (RM)'}>
                 <input
                   type="text"
                   inputMode="decimal"
@@ -895,7 +890,7 @@ function PoolTable({
                   disabled={isPending}
                   className={inputCls + ' font-mono tabular text-right'}
                 />
-              </label>
+              </Field>
             </div>
           </div>
         ))}
