@@ -177,7 +177,7 @@ function LedgerSection({ led }: { led: Ledger }) {
         </thead>
         <tbody>
           <tr className="bg-surface border-t-2 border-hairline">
-            <td colSpan={5} className="font-serif italic text-ink font-semibold">
+            <td colSpan={5} className="font-mono text-xs text-ink font-semibold">
               Acc. No.: {led.code} · {led.accountName}
             </td>
             <td className="num font-semibold">
@@ -195,7 +195,7 @@ function LedgerSection({ led }: { led: Ledger }) {
                 <td className="font-mono text-xs">
                   {l.entryDate ? dayjs(l.entryDate).format('D MMM YYYY') : '—'}
                 </td>
-                <td className="text-sm">{l.accountDesc}</td>
+                <td className="font-mono text-xs">{l.accountDesc}</td>
                 <td className="font-mono text-xs uppercase tracking-wide text-accent">
                   {l.journalType}
                 </td>
@@ -210,7 +210,7 @@ function LedgerSection({ led }: { led: Ledger }) {
         </tbody>
         <tfoot>
           <tr className="border-t border-hairline">
-            <td colSpan={5} className="font-serif italic text-ink font-semibold">
+            <td colSpan={5} className="font-mono text-xs text-ink font-semibold">
               {led.code} {led.accountName} — total
             </td>
             <td className="num font-semibold">
