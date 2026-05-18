@@ -50,6 +50,7 @@ export interface RawPvSourceRow {
 
 export interface RawInvoiceRow {
   invoiceNo: string
+  description: string // invoices.description, trimmed; '' when null/blank
   companyShortCode: string
   pool: string // derived from billing_mode (see INVOICE_BILLING_MODE_TO_POOL)
   amount: number // total_amount; counts as revenue inflow
@@ -467,7 +468,9 @@ export function classifyRows(input: ClassifyInput): ClassifyOutput {
     p.revenueInvoiceItems.push({
       accountCode: inv.categoryCode,
       accountName: inv.categoryName,
-      label: `${inv.companyShortCode} · ${inv.invoiceNo}`,
+      label: inv.description
+        ? `${inv.description} · ${inv.invoiceNo}`
+        : `${inv.companyShortCode} · ${inv.invoiceNo}`,
       amount: amt,
     })
   }
@@ -751,7 +754,7 @@ async function gatherInvoices(
   const { from, to } = args
   const { data: invoices, error: iErr } = await supabase
     .from('invoices')
-    .select('invoice_no, total_amount, billing_mode, period_month, status, company_id, category_code')
+    .select('invoice_no, description, total_amount, billing_mode, period_month, status, company_id, category_code')
     .gte('period_month', from)
     .lte('period_month', to)
     .in('status', INVOICE_REVENUE_STATUSES as unknown as string[])
@@ -774,6 +777,7 @@ async function gatherInvoices(
 
   return invoices.map((inv) => ({
     invoiceNo: (inv.invoice_no as string) ?? '—',
+    description: ((inv.description as string | null) ?? '').trim(),
     companyShortCode: shortCodeById.get(inv.company_id as string) ?? '—',
     pool: invoicePoolForBillingMode(inv.billing_mode as string | null),
     amount: Number(inv.total_amount ?? 0),
