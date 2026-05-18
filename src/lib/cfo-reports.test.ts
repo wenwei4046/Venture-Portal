@@ -306,6 +306,25 @@ describe('classifyRows', () => {
     expect(mk.cost).toBe(3000)
     expect(mk.grossProfit).toBe(7000)
   })
+
+  it('revenue detail label: description present → "desc · invNo", empty → "shortCode · invNo" fallback (ed27e3d)', () => {
+    const out = classifyRows({
+      pvSources: [],
+      invoices: [
+        { invoiceNo: 'I-1', description: 'Office rent Feb', companyShortCode: 'DC', pool: 'dept_pool_marketing', amount: 1000, categoryCode: '5000', categoryName: 'Service Revenue - Subs' },
+        { invoiceNo: 'I-2', description: '', companyShortCode: 'KG', pool: 'dept_pool_marketing', amount: 2000, categoryCode: '5000', categoryName: 'Service Revenue - Subs' },
+      ],
+      treasury: noTreasury,
+    })
+    const mk = out.income.pools.find((p) => p.pool === 'dept_pool_marketing')!
+    const grp = mk.revenueGroups.find((g) => g.accountName === 'Service Revenue - Subs')!
+    expect(grp.items).toEqual(
+      expect.arrayContaining([
+        { label: 'Office rent Feb · I-1', amount: 1000 },
+        { label: 'KG · I-2', amount: 2000 },
+      ]),
+    )
+  })
 })
 
 describe('buildTrialBalance', () => {
