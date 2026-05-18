@@ -31,6 +31,19 @@ export function RevenueGroups({ groups, subtotal }: { groups: RevenueGroup[]; su
                   <tr
                     className={expandable ? 'cursor-pointer' : ''}
                     onClick={expandable ? () => toggle(key) : undefined}
+                    role={expandable ? 'button' : undefined}
+                    tabIndex={expandable ? 0 : undefined}
+                    aria-expanded={expandable ? isOpen : undefined}
+                    onKeyDown={
+                      expandable
+                        ? (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              toggle(key)
+                            }
+                          }
+                        : undefined
+                    }
                   >
                     <td className="text-sm">
                       {expandable ? (
