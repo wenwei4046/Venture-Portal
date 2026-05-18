@@ -60,8 +60,8 @@ export function RevenueGroups({ groups, subtotal }: { groups: RevenueGroup[]; su
                     </td>
                   </tr>
                   {isOpen
-                    ? g.items.map((it) => (
-                        <tr key={`${key}::${it.label}`} className="text-graphite">
+                    ? g.items.map((it, i) => (
+                        <tr key={`${key}::${i}::${it.label}`} className="text-graphite">
                           <td className="text-sm pl-6">{it.label}</td>
                           <td className="num text-ledger">
                             {it.amount < 0

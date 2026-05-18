@@ -9,8 +9,11 @@ export function buildIncomeStatementXlsx(stmt: IncomeStatement, opts: { pool: Po
     breaks.push({ afterRow: rows.length, title: `${p.poolLabel.toUpperCase()} POOL` })
     for (const g of p.revenueGroups) {
       rows.push([g.accountName, g.subtotal, null, null, null])
-      for (const it of g.items) {
-        rows.push([`  ${it.label}`, it.amount, null, null, null])
+      const selfLabelled = g.items.length === 1 && g.items[0].label === g.accountName
+      if (!selfLabelled) {
+        for (const it of g.items) {
+          rows.push([`  ${it.label}`, it.amount, null, null, null])
+        }
       }
     }
     if (p.revenue !== 0)                  rows.push(['Total revenue', p.revenue, null, null, null])

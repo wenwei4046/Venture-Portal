@@ -114,7 +114,7 @@ async function LedgerBody({
       ? ledgers
       : ledgers.filter(
           (l) =>
-            l.lines.length > 0 ||
+            l.lines.length > 1 ||
             Math.abs(l.openingBalance) >= 0.005 ||
             Math.abs(l.closingBalance) >= 0.005,
         )

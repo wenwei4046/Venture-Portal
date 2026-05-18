@@ -15,8 +15,11 @@ export function IncomeStatementPdf({ stmt, periodLabel, pool }: { stmt: IncomeSt
     const out: (string | number | null)[][] = []
     for (const g of p.revenueGroups) {
       out.push([g.accountName, g.subtotal, null, null, null])
-      for (const it of g.items) {
-        out.push([`  ${it.label}`, it.amount, null, null, null])
+      const selfLabelled = g.items.length === 1 && g.items[0].label === g.accountName
+      if (!selfLabelled) {
+        for (const it of g.items) {
+          out.push([`  ${it.label}`, it.amount, null, null, null])
+        }
       }
     }
     if (p.revenue !== 0)                 out.push(['Total revenue', p.revenue, null, null, null])
