@@ -130,18 +130,16 @@ describe('classifyRows', () => {
     // credit voucher with payment_method='netting'. createPaymentVoucher
     // inserts TWO payment_voucher_sources rows:
     //   - pool=dept_pool_marketing, account=3030 (asset) — receiving side
-    //   - pool=dept_pool_hr,        account=9053 (expense) — paying side
+    //   - pool=dept_pool_hr,        account=9053 (expense) — paying side (CF only)
     // Plus an invoice row tagged to dept_pool_marketing (revenue accrued at
-    // issue time).
+    // issue time) and an interBillingExpenses row for HR (expense at invoice date).
     // Expected:
     //   Marketing P&L: revenue +1000 (from invoice), margin +1000
-    //   HR P&L: expense +1000, margin -1000
+    //   HR P&L: expense +1000 (from interBillingExpenses), margin -1000
     //   Group: revenue 1000, expense 1000, netProfit 0 (internal nets out)
-    //   Marketing cfIn.operating +1000 (AR collected) — current behavior
-    //     keeps the inter-billing cash as an internal transfer.
-    //   HR cfOut.operating +1000 — mirror.
-    //   BS movement: Marketing AR -1000 (no equity movement; expense closes
-    //   to equity at period end).
+    //   Marketing cfIn.operating +1000 (AR collected at settlement).
+    //   HR cfOut.operating +1000 (at settlement, from billing_payment mirror, CF-only).
+    //   BS movement: Marketing AR -1000.
     const out = classifyRows({
       pvSources: [
         pv({ voucherType: 'billing_payment', direction: 'credit', accountType: 'asset', cashFlowCategory: 'operating', amount: 1000, pool: 'dept_pool_marketing', accountCode: '3030', accountName: 'AR — Subs' }),
@@ -149,6 +147,9 @@ describe('classifyRows', () => {
       ],
       invoices: [
         { invoiceNo: 'INV-IB-1', companyShortCode: 'HV', pool: 'dept_pool_marketing', amount: 1000 },
+      ],
+      interBillingExpenses: [
+        { invoiceNo: 'INV-IB-1', payingPool: 'dept_pool_hr', amount: 1000 },
       ],
       treasury: noTreasury,
     })

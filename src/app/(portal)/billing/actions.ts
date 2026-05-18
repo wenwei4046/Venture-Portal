@@ -436,7 +436,7 @@ export async function approveInvoice(formData: FormData) {
 
   const { data: inv } = await supabase
     .from('invoices')
-    .select('id, invoice_no, period_month, status, total_amount, billing_mode, company_id, category_code')
+    .select('id, invoice_no, period_month, status, total_amount, billing_mode, company_id, category_code, billable_to_type, billable_to_department_id')
     .eq('id', id)
     .single()
   if (!inv) throw new Error('Invoice not found')
@@ -480,6 +480,48 @@ export async function approveInvoice(formData: FormData) {
       const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
       throw new Error(`Invoice issued but AR accrual JE failed: ${msg}`)
     }
+
+    // Inter-billing: post expense JE at invoice issue so that the paying
+    // dept's P&L expense is recognised in the same period as the receiver's
+    // revenue (symmetric PNL). GL: Dr 9051-9055 / Cr 3030 — net with JE1
+    // above = Dr expense / Cr revenue, AR nets to zero immediately.
+    // Cash-flow effect is tracked at settlement via the billing_payment PV
+    // mirror row (payments/actions.ts), keeping PNL and CF on independent dates.
+    const billableType = (inv as { billable_to_type?: string | null }).billable_to_type
+    const billableDeptId = (inv as { billable_to_department_id?: string | null }).billable_to_department_id
+    if (billableType === 'dept_pool' && billableDeptId) {
+      const { data: payingDept } = await supabase
+        .from('departments')
+        .select('name')
+        .eq('id', billableDeptId)
+        .maybeSingle()
+      if (payingDept?.name) {
+        const { data: expenseAcct } = await supabase
+          .from('chart_of_accounts')
+          .select('code')
+          .eq('type', 'expense')
+          .ilike('name', `Inter-billing % ${payingDept.name}`)
+          .maybeSingle()
+        if (expenseAcct?.code) {
+          try {
+            await postJournalEntry(supabase, {
+              transactionDate: dayjs().format('YYYY-MM-DD'),
+              description: `Invoice ${inv.invoice_no ?? inv.id} issued — inter-billing expense (${payingDept.name})`,
+              referenceType: 'invoice',
+              referenceId: inv.id,
+              createdBy: user.id,
+              lines: [
+                { accountCode: expenseAcct.code, debit: amount, description: `Inter-billing expense — ${payingDept.name}` },
+                { accountCode: '3030', credit: amount, description: `AR cleared — inter-billing ${inv.invoice_no ?? ''}`.trim() },
+              ],
+            })
+          } catch (jeErr) {
+            const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
+            throw new Error(`Invoice issued but inter-billing expense JE failed: ${msg}`)
+          }
+        }
+      }
+    }
   }
 
   revalidatePath('/billing')
@@ -499,7 +541,7 @@ export async function approveInvoicesForPeriod(formData: FormData) {
   // Pull draft rows up-front so we can post AR accrual JEs after the bulk update.
   const { data: draftInvoices } = await supabase
     .from('invoices')
-    .select('id, invoice_no, total_amount, billing_mode, category_code')
+    .select('id, invoice_no, total_amount, billing_mode, category_code, billable_to_type, billable_to_department_id')
     .eq('period_month', period)
     .eq('status', 'draft')
 
@@ -534,6 +576,43 @@ export async function approveInvoicesForPeriod(formData: FormData) {
     } catch (jeErr) {
       const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
       throw new Error(`Bulk issue: JE post failed for invoice ${row.invoice_no ?? row.id}: ${msg}`)
+    }
+
+    // Inter-billing: expense JE at invoice issue — see approveInvoice for details.
+    const rowBillableType = (row as { billable_to_type?: string | null }).billable_to_type
+    const rowBillableDeptId = (row as { billable_to_department_id?: string | null }).billable_to_department_id
+    if (rowBillableType === 'dept_pool' && rowBillableDeptId) {
+      const { data: payingDept } = await supabase
+        .from('departments')
+        .select('name')
+        .eq('id', rowBillableDeptId)
+        .maybeSingle()
+      if (payingDept?.name) {
+        const { data: expenseAcct } = await supabase
+          .from('chart_of_accounts')
+          .select('code')
+          .eq('type', 'expense')
+          .ilike('name', `Inter-billing % ${payingDept.name}`)
+          .maybeSingle()
+        if (expenseAcct?.code) {
+          try {
+            await postJournalEntry(supabase, {
+              transactionDate: txnDate,
+              description: `Invoice ${row.invoice_no ?? row.id} issued (bulk) — inter-billing expense (${payingDept.name})`,
+              referenceType: 'invoice',
+              referenceId: row.id,
+              createdBy: user.id,
+              lines: [
+                { accountCode: expenseAcct.code, debit: amount, description: `Inter-billing expense — ${payingDept.name}` },
+                { accountCode: '3030', credit: amount, description: `AR cleared — inter-billing ${row.invoice_no ?? ''}`.trim() },
+              ],
+            })
+          } catch (jeErr) {
+            const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
+            throw new Error(`Bulk issue: inter-billing expense JE failed for invoice ${row.invoice_no ?? row.id}: ${msg}`)
+          }
+        }
+      }
     }
   }
 

@@ -87,12 +87,19 @@ export interface RawRepaymentPrincipalInflow {
   amount: number // positive principal portion received
 }
 
+export interface RawInterBillingExpenseRow {
+  invoiceNo: string
+  payingPool: string // dept_pool_hr, dept_pool_finance, etc.
+  amount: number
+}
+
 export interface ClassifyInput {
   pvSources: RawPvSourceRow[]
   invoices: RawInvoiceRow[]
   treasury: RawTreasury
   fundSourceInflows?: RawFundSourceInflow[]
   repaymentPrincipalInflows?: RawRepaymentPrincipalInflow[]
+  interBillingExpenses?: RawInterBillingExpenseRow[]
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -249,6 +256,7 @@ export function classifyRows(input: ClassifyInput): ClassifyOutput {
   const { pvSources, invoices, treasury } = input
   const fundSourceInflows = input.fundSourceInflows ?? []
   const repaymentPrincipalInflows = input.repaymentPrincipalInflows ?? []
+  const interBillingExpenses = input.interBillingExpenses ?? []
 
   const pools = new Map<string, PoolAcc>()
   const acc = (pool: string): PoolAcc => {
@@ -315,15 +323,15 @@ export function classifyRows(input: ClassifyInput): ClassifyOutput {
     //     path lands an unexpected type here.
     if (src.voucherType === 'billing_payment') {
       if (src.accountType === 'expense') {
-        // Inter-billing paying side. The PV row inherits the voucher's
-        // credit direction but represents a DEBIT in the paying pool's
-        // books (expense incurred). Invert: credit → expense up + cfOut.
+        // Inter-billing paying side — CF only. P&L expense is recognised at
+        // invoice issue date via the interBillingExpenses loop below (driven
+        // by gatherInterBillingExpenses reading invoices.period_month). The
+        // mirror PV source row exists solely to track the cash-flow timing
+        // of settlement, keeping PNL (invoice date) and CF (settlement date)
+        // on separate time axes as intended.
         if (isCredit) {
-          bump(p.expense, label, amt)
           bump(p.cfOut.operating, label, amt)
         } else {
-          // Refund (uncommon): expense down + cfIn.
-          bump(p.expense, label, -amt)
           bump(p.cfIn.operating, label, amt)
         }
       } else if (isCredit) {
@@ -397,6 +405,18 @@ export function classifyRows(input: ClassifyInput): ClassifyOutput {
     const p = acc(inv.pool)
     const label = `${inv.companyShortCode} · ${inv.invoiceNo}`
     bump(p.revenue, label, amt)
+  }
+
+  // ── 3a: inter-billing expenses — recognised at invoice date (symmetric with revenue) ──
+  // The paying dept's expense is posted when the invoice is issued, matching
+  // the receiving dept's revenue recognised in the invoices loop above. The
+  // cash-flow effect (settlement date) is tracked separately via the mirror
+  // billing_payment PV source row, keeping PNL and CF on independent time axes.
+  for (const exp of interBillingExpenses) {
+    const amt = Number(exp.amount ?? 0)
+    if (amt === 0) continue
+    const p = acc(exp.payingPool)
+    bump(p.expense, `Inter-billing — ${exp.invoiceNo}`, amt)
   }
 
   // ── 3b: fund_sources deposits received — cash inflow + BS liability increase ──
@@ -866,19 +886,62 @@ async function gatherRepaymentPrincipalInflows(
   })
 }
 
+// Inter-billing expenses: invoices billed from one internal dept to another
+// (billable_to_type='dept_pool'). The expense is recognised at the invoice's
+// period_month (same date as the receiver's revenue) so PNL is symmetric.
+// Cash flow is captured separately via the billing_payment PV source row at
+// settlement time.
+async function gatherInterBillingExpenses(
+  supabase: SupabaseClient,
+  args: { from: string; to: string },
+): Promise<RawInterBillingExpenseRow[]> {
+  const { from, to } = args
+  const { data: invoices, error } = await supabase
+    .from('invoices')
+    .select('invoice_no, total_amount, billable_to_department_id')
+    .gte('period_month', from)
+    .lte('period_month', to)
+    .in('status', INVOICE_REVENUE_STATUSES as unknown as string[])
+    .eq('billable_to_type', 'dept_pool')
+    .not('billable_to_department_id', 'is', null)
+  if (error) throw new Error(`cfo-reports inter-billing expenses: ${error.message}`)
+  if (!invoices || invoices.length === 0) return []
+
+  const deptIds = Array.from(
+    new Set(invoices.map((i) => i.billable_to_department_id as string).filter(Boolean)),
+  )
+  const { data: departments } = deptIds.length
+    ? await supabase.from('departments').select('id, name').in('id', deptIds)
+    : { data: [] as { id: string; name: string }[] }
+  const deptNameById = new Map(
+    (departments ?? []).map((d) => [d.id as string, d.name as string]),
+  )
+
+  return invoices.map((inv) => {
+    const deptId = inv.billable_to_department_id as string
+    const deptName = deptNameById.get(deptId) ?? 'Unknown'
+    return {
+      invoiceNo: (inv.invoice_no as string) ?? '—',
+      payingPool: `dept_pool_${deptName.toLowerCase().replace(/\s+/g, '_')}`,
+      amount: Number(inv.total_amount ?? 0),
+    }
+  })
+}
+
 async function gatherAll(
   supabase: SupabaseClient,
   args: { from: string; to: string },
 ): Promise<ClassifyInput> {
-  const [pvSources, invoices, treasury, fundSourceInflows, repaymentPrincipalInflows] =
+  const [pvSources, invoices, treasury, fundSourceInflows, repaymentPrincipalInflows, interBillingExpenses] =
     await Promise.all([
       gatherPvSources(supabase, args),
       gatherInvoices(supabase, args),
       gatherTreasury(supabase, args),
       gatherFundSourceInflows(supabase, args),
       gatherRepaymentPrincipalInflows(supabase, args),
+      gatherInterBillingExpenses(supabase, args),
     ])
-  return { pvSources, invoices, treasury, fundSourceInflows, repaymentPrincipalInflows }
+  return { pvSources, invoices, treasury, fundSourceInflows, repaymentPrincipalInflows, interBillingExpenses }
 }
 
 export async function fetchIncomeStatement(

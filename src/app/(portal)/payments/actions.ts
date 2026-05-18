@@ -330,7 +330,7 @@ export async function createPaymentVoucher(formData: FormData) {
             .from('chart_of_accounts')
             .select('code, name')
             .eq('type', 'expense')
-            .ilike('name', `Inter-billing - ${dept.name}`)
+            .ilike('name', `Inter-billing % ${dept.name}`)
             .maybeSingle()
           if (acct?.code) {
             // Pool key follows the dept_pool_<slug> convention used by
@@ -401,34 +401,29 @@ export async function createPaymentVoucher(formData: FormData) {
         }
       }
     }
-    // GL journal entry (non-blocking).
-    try {
-      const debitLine = interBilling
-        ? {
-            accountCode: interBilling.expenseCode,
-            debit: r2(amount),
-            description: `Inter-billing — ${interBilling.partyLabel} consumed services`,
-          }
-        : {
-            accountCode: bankAccountId
-              ? ((await supabase.from('bank_accounts').select('gl_account_code').eq('id', bankAccountId).single()).data?.gl_account_code ?? '3000')
-              : '3000',
-            debit: r2(amount),
-            description: `Bank deposit — ${voucherNo}`,
-          }
-      await postJournalEntry(supabase, {
-        transactionDate: todayStr,
-        description: `PV ${voucherNo}: ${description}`,
-        referenceType: 'payment_voucher',
-        referenceId: data.id,
-        lines: [
-          debitLine,
-          { accountCode: '3030', credit: r2(amount), description: `Payment received — ${payeeName}` },
-        ],
-        createdBy: user.id,
-      })
-    } catch {
-      console.error('GL posting failed for auto-complete credit voucher', data.id)
+    // GL journal entry (non-blocking). Inter-billing skips because the
+    // expense JE (Dr 9051-9055 / Cr 3030) was already posted at invoice
+    // issue in billing/actions.ts — posting again here would double-count
+    // the expense and leave AR negative.
+    if (!interBilling) {
+      try {
+        const glAccountCode = bankAccountId
+          ? ((await supabase.from('bank_accounts').select('gl_account_code').eq('id', bankAccountId).single()).data?.gl_account_code ?? '3000')
+          : '3000'
+        await postJournalEntry(supabase, {
+          transactionDate: todayStr,
+          description: `PV ${voucherNo}: ${description}`,
+          referenceType: 'payment_voucher',
+          referenceId: data.id,
+          lines: [
+            { accountCode: glAccountCode, debit: r2(amount), description: `Bank deposit — ${voucherNo}` },
+            { accountCode: '3030', credit: r2(amount), description: `Payment received — ${payeeName}` },
+          ],
+          createdBy: user.id,
+        })
+      } catch {
+        console.error('GL posting failed for auto-complete credit voucher', data.id)
+      }
     }
 
     // Inter-billing: insert a SECOND payment_voucher_sources row tagged with
@@ -463,6 +458,17 @@ export async function createPaymentVoucher(formData: FormData) {
           `Failed to insert inter-billing mirror source row (paying side, pool=${interBilling.payingPool}, account=${interBilling.expenseCode}): ${mirrorInsertErr.message}`,
         )
       }
+    }
+
+    // Mark the invoice as settled so the Billing list stops showing "Settle →"
+    // and guards against duplicate settlement attempts.
+    if (invoiceId) {
+      const newInvStatus = paymentMethod === 'netting' ? 'paid_via_netting' : 'paid'
+      await supabase
+        .from('invoices')
+        .update({ status: newInvStatus })
+        .eq('id', invoiceId)
+        .in('status', ['issued', 'draft'])
     }
   }
 
