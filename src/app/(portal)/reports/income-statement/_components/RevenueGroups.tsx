@@ -23,7 +23,7 @@ export function RevenueGroups({ groups, subtotal }: { groups: RevenueGroup[]; su
         <table className="ledger-table">
           <tbody>
             {groups.map((g) => {
-              const key = g.accountName
+              const key = g.accountCode || g.accountName
               const expandable = g.items.length > 1 || g.items[0]?.label !== g.accountName
               const isOpen = open.has(key)
               return (

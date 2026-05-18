@@ -114,6 +114,7 @@ async function LedgerBody({
       ? ledgers
       : ledgers.filter(
           (l) =>
+            // > 1: every ledger carries a synthetic BALANCE B/F line (see buildLedger), so >1 = real period movement
             l.lines.length > 1 ||
             Math.abs(l.openingBalance) >= 0.005 ||
             Math.abs(l.closingBalance) >= 0.005,
