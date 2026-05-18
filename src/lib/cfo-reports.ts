@@ -224,7 +224,7 @@ function r2(n: number): number {
 // CFS slots: per-cash-flow-category inflow/outflow maps.
 interface PoolAcc {
   revenue: Map<string, number>
-  revenueInvoiceItems: Array<{ accountCode: string; accountName: string; label: string; amount: number }>
+  revenueInvoiceItems: RevenueInvoiceItem[]
   cost: Map<string, number>
   otherIncome: Map<string, number>
   expense: Map<string, number>
@@ -271,8 +271,15 @@ export interface RevenueGroup {
   items: Line[]
 }
 
+export interface RevenueInvoiceItem {
+  accountCode: string
+  accountName: string
+  label: string
+  amount: number
+}
+
 export function groupRevenueByAccount(input: {
-  invoiceItems: Array<{ accountCode: string; accountName: string; label: string; amount: number }>
+  invoiceItems: RevenueInvoiceItem[]
   flatLines: Line[]
 }): RevenueGroup[] {
   // Grouped by accountName (the user-facing key per spec); accountCode is taken from the first-seen item. Safe because revenue COA names are unique per code; null/unmapped codes all carry categoryCode '' so the merged code stays consistent.
