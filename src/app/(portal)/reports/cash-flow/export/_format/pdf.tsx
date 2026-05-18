@@ -1,6 +1,6 @@
 import React from 'react'
 import { PdfDocument, PdfTable, PdfSectionHead } from '@/lib/export/pdf'
-import type { CashflowStatement, CashflowPoolBlock } from '@/lib/cfo-reports'
+import type { CashflowStatement, CashflowByPoolBlock } from '@/lib/cfo-reports'
 
 const COLUMNS = [
   { label: 'Line',    width: 360 },
@@ -15,36 +15,53 @@ const CAT_TITLE: Record<string, string> = {
   financing: 'Financing activities',
 }
 
-export function CashflowPdf({ stmt, periodLabel }: { stmt: CashflowStatement; periodLabel: string }) {
-  function poolRows(p: CashflowPoolBlock): (string | number | null)[][] {
-    const out: (string | number | null)[][] = []
-    out.push([`${p.poolLabel} — Inflows`, null, null, null])
-    for (const l of p.inflowLines)  out.push([`  ${l.label}`, l.amount, null, null])
-    out.push([`${p.poolLabel} — Outflows`, null, null, null])
-    for (const l of p.outflowLines) out.push([`  ${l.label}`, null, l.amount, null])
-    out.push([`${p.poolLabel} — Net`, null, null, p.net])
-    return out
-  }
-
+export function CashflowPdf({
+  stmt,
+  periodLabel,
+  block,
+}: {
+  stmt: CashflowStatement
+  periodLabel: string
+  block: CashflowByPoolBlock | null
+}) {
   return (
     <PdfDocument title="Cash Flow" periodLabel={periodLabel} orientation="landscape">
-      {stmt.sections.map((section) => (
-        <React.Fragment key={section.category}>
-          <PdfSectionHead label={CAT_TITLE[section.category] ?? section.category} />
+      {block ? (
+        <>
+          {block.sections.map((sec) => (
+            <React.Fragment key={sec.category}>
+              <PdfSectionHead label={CAT_TITLE[sec.category] ?? sec.category} />
+              <PdfTable
+                columns={COLUMNS}
+                numberFormat="money"
+                rows={[
+                  ['Inflows', null, null, null],
+                  ...sec.inflowLines.map((l) => [`  ${l.label}`, l.amount, null, null] as (string | number | null)[]),
+                  ['Outflows', null, null, null],
+                  ...sec.outflowLines.map((l) => [`  ${l.label}`, null, l.amount, null] as (string | number | null)[]),
+                  [`${CAT_TITLE[sec.category] ?? sec.category} net`, null, null, sec.net],
+                ]}
+              />
+            </React.Fragment>
+          ))}
+          <PdfSectionHead label={`${block.poolLabel} total`} />
+          <PdfTable columns={COLUMNS} numberFormat="money" rows={[
+            [`${block.poolLabel} net`, null, null, block.net],
+          ]} />
+        </>
+      ) : (
+        <>
+          <PdfSectionHead label="Net cash change" />
           <PdfTable
             columns={COLUMNS}
             numberFormat="money"
             rows={[
-              ...section.pools.flatMap(poolRows),
-              [`Section net (${section.category})`, null, null, section.net],
+              ...stmt.sections.map((s) => [`Section net (${s.category})`, null, null, s.net] as (string | number | null)[]),
+              ['Total net change', null, null, stmt.netChange],
             ]}
           />
-        </React.Fragment>
-      ))}
-      <PdfSectionHead label="Total" />
-      <PdfTable columns={COLUMNS} numberFormat="money" rows={[
-        ['Total net change', null, null, stmt.netChange],
-      ]} />
+        </>
+      )}
     </PdfDocument>
   )
 }

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { fetchCashflowStatement } from '@/lib/cfo-reports'
+import { fetchCashflowStatement, pivotCashflowByPool } from '@/lib/cfo-reports'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildCashflowXlsx } from './_format/xlsx'
 import { CashflowPdf } from './_format/pdf'
@@ -18,9 +18,15 @@ export async function GET(req: Request) {
   const supabase = await createClient()
   const stmt = await fetchCashflowStatement(supabase, { from, to })
   const periodLabel = `${dayjs(from).format('D MMM YYYY')} – ${dayjs(to).format('D MMM YYYY')}`
-  const filename = `cash-flow-${from}-${to}`
-  if (format === 'xlsx') {
-    return exportXlsxResponse({ filename, buffer: buildCashflowXlsx(stmt) })
+  const seg = url.searchParams.get('seg') ?? 'summary'
+  const isSummary = seg === 'summary'
+  const block = isSummary ? null : pivotCashflowByPool(stmt).pools.find((p) => p.pool === seg) ?? null
+  if (!isSummary && !block) {
+    return Response.json({ error: 'unknown seg' }, { status: 400 })
   }
-  return exportPdfResponse({ filename, element: <CashflowPdf stmt={stmt} periodLabel={periodLabel} /> })
+  const filename = `cash-flow-${isSummary ? 'summary' : seg}-${from}-${to}`
+  if (format === 'xlsx') {
+    return exportXlsxResponse({ filename, buffer: buildCashflowXlsx(stmt, { block }) })
+  }
+  return exportPdfResponse({ filename, element: <CashflowPdf stmt={stmt} periodLabel={periodLabel} block={block} /> })
 }
