@@ -273,6 +273,7 @@ export function groupRevenueByAccount(input: {
   invoiceItems: Array<{ accountCode: string; accountName: string; label: string; amount: number }>
   flatLines: Line[]
 }): RevenueGroup[] {
+  // Grouped by accountName (the user-facing key per spec); accountCode is taken from the first-seen item. Safe because revenue COA names are unique per code; null/unmapped codes all carry categoryCode '' so the merged code stays consistent.
   const byAccount = new Map<string, { accountCode: string; accountName: string; items: Line[] }>()
   for (const it of input.invoiceItems) {
     if (it.amount === 0) continue
