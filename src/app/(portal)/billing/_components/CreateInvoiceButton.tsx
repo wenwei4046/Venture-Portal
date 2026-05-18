@@ -839,76 +839,72 @@ function PoolTable({
             : 'Each row creates one invoice with this pool / category / amount'}
         </span>
       </div>
-      <div className="border border-hairline rounded-md overflow-hidden bg-surface">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans bg-paper">
-              <th className="text-left py-2 px-3 font-medium">Pool</th>
-              <th className="text-left py-2 px-3 font-medium">Category</th>
-              <th className="text-right py-2 px-3 font-medium w-40">
-                {isRatioTemplate ? 'Ratio (RM)' : 'Amount (RM)'}
-              </th>
-              <th className="w-10 py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {poolRows.map((r) => (
-              <tr key={r.uid} className="border-b border-hairline last:border-0">
-                <td className="py-2 px-3">
-                  <select
-                    value={r.mode}
-                    onChange={(e) => onUpdate(r.uid, { mode: e.target.value as CreateInvoiceMode })}
-                    disabled={isPending}
-                    className={inputCls}
-                  >
-                    <option value="">Select pool…</option>
-                    {POOL_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                </td>
-                <td className="py-2 px-3">
-                  <AccountPicker
-                    accounts={categoryOptions}
-                    value={r.categoryCode}
-                    onChange={(code) => onUpdate(r.uid, { categoryCode: code })}
-                    name={`pool_row_category_${r.uid}_display`}
-                    placeholder="Select category…"
-                    typeFilter={['revenue', 'cost', 'other_income']}
-                    disabled={isPending}
-                  />
-                </td>
-                <td className="py-2 px-3">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={r.amount}
-                    onChange={(e) => onUpdate(r.uid, { amount: e.target.value.replace(/[^\d.]/g, '') })}
-                    placeholder="0.00"
-                    disabled={isPending}
-                    className={inputCls + ' font-mono tabular text-right'}
-                  />
-                </td>
-                <td className="py-2 px-3 text-right">
-                  <button
-                    onClick={() => onRemove(r.uid)}
-                    disabled={isPending || poolRows.length === 1}
-                    className="text-muted hover:text-danger disabled:opacity-30 disabled:cursor-not-allowed text-lg leading-none"
-                    aria-label="Remove row"
-                    type="button"
-                  >
-                    ×
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+      <div className="space-y-3">
+        {poolRows.map((r) => (
+          <div key={r.uid} className="border border-hairline rounded-md bg-surface p-4">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="text-xs font-mono uppercase tracking-wide text-muted">Pool entry</div>
+              <button
+                onClick={() => onRemove(r.uid)}
+                disabled={isPending || poolRows.length === 1}
+                className="text-muted hover:text-danger disabled:opacity-30 disabled:cursor-not-allowed text-lg leading-none"
+                aria-label="Remove row"
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-3">
+              <label className="block">
+                <span className="block text-xs font-sans text-graphite mb-1">Pool</span>
+                <select
+                  value={r.mode}
+                  onChange={(e) => onUpdate(r.uid, { mode: e.target.value as CreateInvoiceMode })}
+                  disabled={isPending}
+                  className={inputCls}
+                >
+                  <option value="">Select pool…</option>
+                  {POOL_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="block text-xs font-sans text-graphite mb-1">Category</span>
+                <AccountPicker
+                  accounts={categoryOptions}
+                  value={r.categoryCode}
+                  onChange={(code) => onUpdate(r.uid, { categoryCode: code })}
+                  name={`pool_row_category_${r.uid}_display`}
+                  placeholder="Select category…"
+                  typeFilter={['revenue', 'cost', 'other_income']}
+                  disabled={isPending}
+                />
+              </label>
+              <label className="block">
+                <span className="block text-xs font-sans text-graphite mb-1">
+                  {isRatioTemplate ? 'Ratio (RM)' : 'Amount (RM)'}
+                </span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={r.amount}
+                  onChange={(e) => onUpdate(r.uid, { amount: e.target.value.replace(/[^\d.]/g, '') })}
+                  placeholder="0.00"
+                  disabled={isPending}
+                  className={inputCls + ' font-mono tabular text-right'}
+                />
+              </label>
+            </div>
+          </div>
+        ))}
       </div>
+
       <button
         onClick={onAdd}
         disabled={isPending}
-        className="mt-2 text-xs font-sans text-accent hover:text-accent-hover underline-offset-2 hover:underline"
+        className="mt-3 text-xs font-sans text-accent hover:text-accent-hover underline-offset-2 hover:underline"
         type="button"
       >
         + Add pool entry
