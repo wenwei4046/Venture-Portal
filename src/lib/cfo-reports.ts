@@ -176,6 +176,14 @@ export interface ClassifyOutput {
   balanceMovements: BalanceMovementLine[]
 }
 
+// Pool-first pivot of the Cash Flow statement (department-segmented nav).
+export {
+  pivotCashflowByPool,
+  type CashflowByPool,
+  type CashflowByPoolBlock,
+  type CashflowPoolSection,
+} from './cfo-reports-pivot'
+
 // ────────────────────────────────────────────────────────────────────────────
 // Invoice billing_mode → pool map. Every billing mode resolves to a pool; an
 // unknown billing mode defaults to the Venture Pool (never dropped).
