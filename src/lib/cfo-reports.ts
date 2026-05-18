@@ -53,6 +53,8 @@ export interface RawInvoiceRow {
   companyShortCode: string
   pool: string // derived from billing_mode (see INVOICE_BILLING_MODE_TO_POOL)
   amount: number // total_amount; counts as revenue inflow
+  categoryCode: string // chart_of_accounts code (revenue account)
+  categoryName: string // chart_of_accounts name; 'Uncategorised revenue' fallback
 }
 
 export interface RawTreasury {
@@ -258,6 +260,47 @@ function linesFrom(m: Map<string, number>): Line[] {
     .map(([label, amount]) => ({ label, amount: r2(amount) }))
     .filter((l) => l.amount !== 0)
     .sort((a, b) => b.amount - a.amount)
+}
+
+export interface RevenueGroup {
+  accountCode: string
+  accountName: string
+  subtotal: number
+  items: Line[]
+}
+
+export function groupRevenueByAccount(input: {
+  invoiceItems: Array<{ accountCode: string; accountName: string; label: string; amount: number }>
+  flatLines: Line[]
+}): RevenueGroup[] {
+  const byAccount = new Map<string, { accountCode: string; accountName: string; items: Line[] }>()
+  for (const it of input.invoiceItems) {
+    if (it.amount === 0) continue
+    let g = byAccount.get(it.accountName)
+    if (!g) {
+      g = { accountCode: it.accountCode, accountName: it.accountName, items: [] }
+      byAccount.set(it.accountName, g)
+    }
+    g.items.push({ label: it.label, amount: r2(it.amount) })
+  }
+  const groups: RevenueGroup[] = [...byAccount.values()].map((g) => ({
+    accountCode: g.accountCode,
+    accountName: g.accountName,
+    items: g.items.slice().sort((a, b) => b.amount - a.amount),
+    subtotal: r2(g.items.reduce((s, i) => s + i.amount, 0)),
+  }))
+  for (const fl of input.flatLines) {
+    if (fl.amount === 0) continue
+    groups.push({
+      accountCode: '',
+      accountName: fl.label,
+      subtotal: r2(fl.amount),
+      items: [{ label: fl.label, amount: r2(fl.amount) }],
+    })
+  }
+  return groups
+    .filter((g) => g.subtotal !== 0)
+    .sort((a, b) => b.subtotal - a.subtotal)
 }
 
 export function classifyRows(input: ClassifyInput): ClassifyOutput {
@@ -704,11 +747,21 @@ async function gatherInvoices(
     : { data: [] as { id: string; short_code: string }[] }
   const shortCodeById = new Map((companies ?? []).map((c) => [c.id as string, c.short_code as string]))
 
+  const catCodes = Array.from(
+    new Set(invoices.map((i) => i.category_code as string | null).filter((c): c is string => !!c)),
+  )
+  const { data: coa } = catCodes.length
+    ? await supabase.from('chart_of_accounts').select('code, name').in('code', catCodes)
+    : { data: [] as { code: string; name: string }[] }
+  const coaNameByCode = new Map((coa ?? []).map((c) => [c.code as string, c.name as string]))
+
   return invoices.map((inv) => ({
     invoiceNo: (inv.invoice_no as string) ?? '—',
     companyShortCode: shortCodeById.get(inv.company_id as string) ?? '—',
     pool: invoicePoolForBillingMode(inv.billing_mode as string | null),
     amount: Number(inv.total_amount ?? 0),
+    categoryCode: (inv.category_code as string | null) ?? '',
+    categoryName: coaNameByCode.get((inv.category_code as string | null) ?? '') ?? 'Uncategorised revenue',
   }))
 }
 

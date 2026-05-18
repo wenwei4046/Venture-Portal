@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { classifyRows, buildTrialBalance, buildLedger, resolveSourceDescriptions } from './cfo-reports'
+import { classifyRows, buildTrialBalance, buildLedger, resolveSourceDescriptions, groupRevenueByAccount } from './cfo-reports'
 import type { RawPvSourceRow, RawInvoiceRow, RawTreasury, CoaLeafAccount, RawLedgerLine } from './cfo-reports'
 
 const pv = (o: Partial<RawPvSourceRow>): RawPvSourceRow => ({
@@ -61,8 +61,8 @@ describe('classifyRows', () => {
 
   it('counts every invoice as revenue, mapped to its pool, regardless of billing mode', () => {
     const invoices: RawInvoiceRow[] = [
-      { invoiceNo: 'INV-1', companyShortCode: 'CONTS', pool: 'dept_pool_hr', amount: 4000 },
-      { invoiceNo: 'INV-2', companyShortCode: 'OHANA', pool: 'venture_pool', amount: 1500 },
+      { invoiceNo: 'INV-1', companyShortCode: 'CONTS', pool: 'dept_pool_hr', amount: 4000, categoryCode: '5000', categoryName: 'Service Revenue - Subs' },
+      { invoiceNo: 'INV-2', companyShortCode: 'OHANA', pool: 'venture_pool', amount: 1500, categoryCode: '5000', categoryName: 'Service Revenue - Subs' },
     ]
     const out = classifyRows({ pvSources: [], invoices, treasury: noTreasury })
     expect(out.income.pools.find((p) => p.pool === 'dept_pool_hr')!.revenue).toBe(4000)
@@ -107,7 +107,7 @@ describe('classifyRows', () => {
         pv({ voucherType: 'billing_payment', direction: 'credit', accountType: 'revenue', amount: 10000, pool: 'venture_pool', accountName: 'Revenue (paid)' }),
       ],
       invoices: [
-        { invoiceNo: 'INV-1', companyShortCode: 'CAR', pool: 'venture_pool', amount: 10000 },
+        { invoiceNo: 'INV-1', companyShortCode: 'CAR', pool: 'venture_pool', amount: 10000, categoryCode: '5000', categoryName: 'Service Revenue - Subs' },
       ],
       treasury: noTreasury,
     })
@@ -146,7 +146,7 @@ describe('classifyRows', () => {
         pv({ voucherType: 'billing_payment', direction: 'credit', accountType: 'expense', cashFlowCategory: 'operating', amount: 1000, pool: 'dept_pool_hr', accountCode: '9053', accountName: 'Inter-billing — HR' }),
       ],
       invoices: [
-        { invoiceNo: 'INV-IB-1', companyShortCode: 'HV', pool: 'dept_pool_marketing', amount: 1000 },
+        { invoiceNo: 'INV-IB-1', companyShortCode: 'HV', pool: 'dept_pool_marketing', amount: 1000, categoryCode: '5000', categoryName: 'Service Revenue - Subs' },
       ],
       interBillingExpenses: [
         { invoiceNo: 'INV-IB-1', payingPool: 'dept_pool_hr', amount: 1000 },
@@ -290,7 +290,7 @@ describe('classifyRows', () => {
         pv({ accountType: 'cost', direction: 'debit', amount: 3000, pool: 'dept_pool_marketing', accountName: 'Cost' }),
       ],
       invoices: [
-        { invoiceNo: 'INV-1', companyShortCode: 'CAR', pool: 'dept_pool_marketing', amount: 10000 },
+        { invoiceNo: 'INV-1', companyShortCode: 'CAR', pool: 'dept_pool_marketing', amount: 10000, categoryCode: '5000', categoryName: 'Service Revenue - Subs' },
       ],
       treasury: noTreasury,
     })
@@ -529,5 +529,38 @@ describe('resolveSourceDescriptions', () => {
     expect(out.size).toBe(2)
     expect(out.get('invoice:inv-1')).toBe('Service fee')
     expect(out.get('payment_voucher:pv-1')).toBe('Office supplies')
+  })
+})
+
+describe('groupRevenueByAccount', () => {
+  it('groups invoice items by account, sums subtotals, sorts groups + items desc, drops zero', () => {
+    const groups = groupRevenueByAccount({
+      invoiceItems: [
+        { accountCode: '5000', accountName: 'Service Revenue - Subs', label: 'DC · I-1', amount: 1000 },
+        { accountCode: '5000', accountName: 'Service Revenue - Subs', label: 'DC · I-2', amount: 3000 },
+        { accountCode: '5100', accountName: 'Rental Income', label: 'KG · I-3', amount: 500 },
+        { accountCode: '5100', accountName: 'Rental Income', label: 'KG · I-4', amount: 0 },
+      ],
+      flatLines: [{ label: 'Interest income — Loans', amount: 250 }],
+    })
+    expect(groups.map((g) => [g.accountName, g.subtotal])).toEqual([
+      ['Service Revenue - Subs', 4000],
+      ['Rental Income', 500],
+      ['Interest income — Loans', 250],
+    ])
+    const subs = groups.find((g) => g.accountName === 'Service Revenue - Subs')!
+    expect(subs.items).toEqual([
+      { label: 'DC · I-2', amount: 3000 },
+      { label: 'DC · I-1', amount: 1000 },
+    ])
+    const interest = groups.find((g) => g.accountName === 'Interest income — Loans')!
+    expect(interest.items).toEqual([{ label: 'Interest income — Loans', amount: 250 }])
+    expect(groups.find((g) => g.accountName === 'Rental Income')!.items).toEqual([
+      { label: 'KG · I-3', amount: 500 },
+    ])
+  })
+
+  it('returns [] when no revenue', () => {
+    expect(groupRevenueByAccount({ invoiceItems: [], flatLines: [] })).toEqual([])
   })
 })
