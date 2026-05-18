@@ -283,14 +283,15 @@ export function groupRevenueByAccount(input: {
   invoiceItems: RevenueInvoiceItem[]
   flatLines: Line[]
 }): RevenueGroup[] {
-  // Grouped by accountName (the user-facing key per spec); accountCode is taken from the first-seen item. Safe because revenue COA names are unique per code; null/unmapped codes all carry categoryCode '' so the merged code stays consistent.
+  // Grouped by accountCode (falling back to accountName when the code is empty/unmapped — that bucket is the consistent 'Uncategorised revenue' / code ''). Code-first keying means distinct codes never merge even if they share a name, and the carried accountCode/accountName (taken from the first item of the key) is deterministic because the invoice query is ordered and every item under a non-empty-code key shares the same code.
   const byAccount = new Map<string, { accountCode: string; accountName: string; items: Line[] }>()
   for (const it of input.invoiceItems) {
     if (it.amount === 0) continue
-    let g = byAccount.get(it.accountName)
+    const key = it.accountCode || it.accountName
+    let g = byAccount.get(key)
     if (!g) {
       g = { accountCode: it.accountCode, accountName: it.accountName, items: [] }
-      byAccount.set(it.accountName, g)
+      byAccount.set(key, g)
     }
     g.items.push({ label: it.label, amount: r2(it.amount) })
   }
@@ -758,6 +759,7 @@ async function gatherInvoices(
     .gte('period_month', from)
     .lte('period_month', to)
     .in('status', INVOICE_REVENUE_STATUSES as unknown as string[])
+    .order('id', { ascending: true })
   if (iErr) throw new Error(`cfo-reports invoices: ${iErr.message}`)
   if (!invoices || invoices.length === 0) return []
 
@@ -1538,8 +1540,15 @@ export async function resolveSourceDescriptions(
 //
 // Returns a map keyed by `${reference_type}:${reference_id}`. Reference types
 // not handled here fall through to the manual-JE defaults in fetchLedgers
-// (journalType 'JOURNAL', ref = JE.entry_no).
+// (journalType 'JOURNAL', ref = JE.entry_no), except fund_source / loan which
+// get a meaningful Journal Type via REF_TYPE_JOURNAL below (ref still falls
+// back to JE.entry_no — those rows have no separate doc number).
 // ────────────────────────────────────────────────────────────────────────────
+
+// Reference types with no dedicated source-meta resolver but a meaningful
+// Journal Type: fund_source (subsidiary deposit) → DEPOSIT, loan → LOAN.
+// Everything else (manual / null) falls through to 'JOURNAL'.
+const REF_TYPE_JOURNAL: Record<string, string> = { fund_source: 'DEPOSIT', loan: 'LOAN' }
 
 export async function resolveLedgerSourceMeta(
   supabase: SupabaseClient,
@@ -1708,10 +1717,13 @@ export async function fetchLedgers(
     const description = refKey ? descOverrides.get(refKey) ?? fallback : fallback
     const meta = refKey ? srcMeta.get(refKey) : undefined
     jeById.set(j.id as string, {
-      entryNo: j.entry_no as string,
+      entryNo: (j.entry_no as string | null) ?? '',
       transactionDate: j.transaction_date as string,
       description,
-      journalType: meta?.journalType ?? 'JOURNAL',
+      journalType:
+        meta?.journalType ??
+        (j.reference_type ? REF_TYPE_JOURNAL[j.reference_type as string] : undefined) ??
+        'JOURNAL',
       ref: meta?.ref || (j.entry_no as string),
     })
   }
@@ -1761,7 +1773,7 @@ export async function fetchLedgers(
     const rawByCode = linesByCode.get(account.code) ?? []
     rawByCode.sort((a, b) => {
       if (a.entryDate !== b.entryDate) return a.entryDate.localeCompare(b.entryDate)
-      if (a.entryNo !== b.entryNo) return a.entryNo.localeCompare(b.entryNo)
+      if (a.entryNo !== b.entryNo) return (a.entryNo ?? '').localeCompare(b.entryNo ?? '')
       return a.id.localeCompare(b.id)
     })
     const rawLines: RawLedgerLine[] = rawByCode.map((l) => ({
