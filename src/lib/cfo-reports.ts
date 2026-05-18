@@ -1638,7 +1638,7 @@ export async function fetchLedgers(
       transactionDate: j.transaction_date as string,
       description,
       journalType: meta?.journalType ?? 'JOURNAL',
-      ref: meta?.ref ?? (j.entry_no as string),
+      ref: meta?.ref || (j.entry_no as string),
     })
   }
 
