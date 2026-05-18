@@ -373,8 +373,8 @@ describe('buildLedger', () => {
       code: '3000', name: 'Cash & Bank — Hong Leong', type: 'asset',
     }
     const rawLines: RawLedgerLine[] = [
-      { entryDate: '2026-05-03', entryNo: 'JE-001', description: 'inv 1', debit: 500, credit: 0 },
-      { entryDate: '2026-05-10', entryNo: 'JE-002', description: 'pmt', debit: 0, credit: 200 },
+      { entryDate: '2026-05-03', entryNo: 'JE-001', description: 'inv 1', accountDesc: '', journalType: '', ref: '', debit: 500, credit: 0 },
+      { entryDate: '2026-05-10', entryNo: 'JE-002', description: 'pmt', accountDesc: '', journalType: '', ref: '', debit: 0, credit: 200 },
     ]
     const led = buildLedger({
       account, openingBalance: 1000, rawLines,
@@ -383,7 +383,8 @@ describe('buildLedger', () => {
     expect(led.openingBalance).toBe(1000)
     expect(led.periodTotals).toEqual({ debit: 500, credit: 200 })
     expect(led.closingBalance).toBe(1300)
-    expect(led.lines).toHaveLength(2)
+    // lines[0] is the injected BALANCE B/F line; 2 real lines follow
+    expect(led.lines).toHaveLength(3)
   })
 
   it('running balance accumulates Dr − Cr line by line', () => {
@@ -391,18 +392,57 @@ describe('buildLedger', () => {
       code: '3000', name: 'Cash & Bank — Hong Leong', type: 'asset',
     }
     const rawLines: RawLedgerLine[] = [
-      { entryDate: '2026-05-03', entryNo: 'JE-001', description: 'in',  debit: 100, credit: 0 },
-      { entryDate: '2026-05-05', entryNo: 'JE-002', description: 'out', debit: 0,   credit: 30 },
-      { entryDate: '2026-05-08', entryNo: 'JE-003', description: 'in',  debit: 50,  credit: 0 },
+      { entryDate: '2026-05-03', entryNo: 'JE-001', description: 'in',  accountDesc: '', journalType: '', ref: '', debit: 100, credit: 0 },
+      { entryDate: '2026-05-05', entryNo: 'JE-002', description: 'out', accountDesc: '', journalType: '', ref: '', debit: 0,   credit: 30 },
+      { entryDate: '2026-05-08', entryNo: 'JE-003', description: 'in',  accountDesc: '', journalType: '', ref: '', debit: 50,  credit: 0 },
     ]
     const led = buildLedger({
       account, openingBalance: 0, rawLines,
       from: '2026-05-01', to: '2026-05-31',
     })
-    expect(led.lines[0].runningBalance).toBe(100)
-    expect(led.lines[1].runningBalance).toBe(70)
-    expect(led.lines[2].runningBalance).toBe(120)
+    // lines[0] is the injected BALANCE B/F line; real lines shifted by 1
+    expect(led.lines[1].runningBalance).toBe(100)
+    expect(led.lines[2].runningBalance).toBe(70)
+    expect(led.lines[3].runningBalance).toBe(120)
     expect(led.closingBalance).toBe(120)
+  })
+})
+
+describe('buildLedger GL fields', () => {
+  const account = { code: '5700', name: 'Rental Income', type: 'revenue' as const }
+
+  it('injects a BALANCE B/F line as lines[0] carrying the opening balance', () => {
+    const led = buildLedger({
+      account, openingBalance: -112894.42, from: '2026-02-01', to: '2026-02-28',
+      rawLines: [
+        { entryDate: '2026-02-09', entryNo: 'JE-1', description: 'KL Gateway',
+          debit: 0, credit: 7159.12, accountDesc: 'Rental Income',
+          journalType: 'SALES', ref: 'I-2602-0043' },
+      ],
+    })
+    expect(led.lines[0]).toEqual({
+      entryDate: '', entryNo: '', description: 'BALANCE B/F',
+      accountDesc: 'Rental Income', journalType: '', ref: '',
+      debit: 0, credit: 0, runningBalance: -112894.42,
+    })
+  })
+
+  it('passes accountDesc/journalType/ref through and keeps running balance algorithm', () => {
+    const led = buildLedger({
+      account, openingBalance: 0, from: '2026-02-01', to: '2026-02-28',
+      rawLines: [
+        { entryDate: '2026-02-09', entryNo: 'JE-1', description: 'x',
+          debit: 0, credit: 1000, accountDesc: 'Rental Income',
+          journalType: 'SALES', ref: 'I-1' },
+        { entryDate: '2026-02-10', entryNo: 'JE-2', description: 'y',
+          debit: 200, credit: 0, accountDesc: 'Rental Income',
+          journalType: 'PAYMENT', ref: 'HV-PV-1' },
+      ],
+    })
+    expect(led.lines[1]).toMatchObject({ journalType: 'SALES', ref: 'I-1', accountDesc: 'Rental Income', runningBalance: -1000 })
+    expect(led.lines[2]).toMatchObject({ journalType: 'PAYMENT', ref: 'HV-PV-1', runningBalance: -800 })
+    expect(led.periodTotals).toEqual({ debit: 200, credit: 1000 })
+    expect(led.closingBalance).toBe(-800)
   })
 })
 

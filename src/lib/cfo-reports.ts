@@ -1304,6 +1304,9 @@ export interface RawLedgerLine {
   entryDate: string  // YYYY-MM-DD
   entryNo: string
   description: string
+  accountDesc: string
+  journalType: string
+  ref: string
   debit: number      // positive amount; 0 when this side wasn't touched
   credit: number     // positive amount; 0 when this side wasn't touched
 }
@@ -1312,6 +1315,9 @@ export interface LedgerLine {
   entryDate: string
   entryNo: string
   description: string
+  accountDesc: string
+  journalType: string
+  ref: string
   debit: number
   credit: number
   runningBalance: number  // signed Dr − Cr (positive = debit balance after this line)
@@ -1340,7 +1346,19 @@ export function buildLedger(args: {
   let running = openingBalance
   let totalDebit = 0
   let totalCredit = 0
-  const lines: LedgerLine[] = []
+  const lines: LedgerLine[] = [
+    {
+      entryDate: '',
+      entryNo: '',
+      description: 'BALANCE B/F',
+      accountDesc: account.name,
+      journalType: '',
+      ref: '',
+      debit: 0,
+      credit: 0,
+      runningBalance: r2(openingBalance),
+    },
+  ]
   for (const raw of rawLines) {
     running += raw.debit - raw.credit
     totalDebit += raw.debit
@@ -1349,6 +1367,9 @@ export function buildLedger(args: {
       entryDate: raw.entryDate,
       entryNo: raw.entryNo,
       description: raw.description,
+      accountDesc: raw.accountDesc,
+      journalType: raw.journalType,
+      ref: raw.ref,
       debit: r2(raw.debit),
       credit: r2(raw.credit),
       runningBalance: r2(running),
@@ -1604,6 +1625,11 @@ export async function fetchLedgers(
       entryDate: l.entryDate,
       entryNo: l.entryNo,
       description: l.description,
+      // accountDesc/journalType/ref are wired from the DB in Task A2;
+      // empty-string placeholders keep the type contract until then.
+      accountDesc: '',
+      journalType: '',
+      ref: '',
       debit: l.debit,
       credit: l.credit,
     }))
