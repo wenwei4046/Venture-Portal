@@ -51,8 +51,11 @@ export function SegmentedReport({
           return (
             <button
               key={s.key}
+              type="button"
               role="tab"
+              id={`seg-tab-${s.key}`}
               aria-selected={on}
+              aria-controls="seg-panel"
               onClick={() => select(s.key)}
               className={`px-3 py-2 font-mono text-[11px] uppercase tracking-[0.08em] border-b-2 transition-colors ${
                 on
@@ -65,7 +68,9 @@ export function SegmentedReport({
           )
         })}
       </div>
-      <div role="tabpanel">{activePanel}</div>
+      <div role="tabpanel" id="seg-panel" aria-labelledby={`seg-tab-${effective}`}>
+        {activePanel}
+      </div>
     </div>
   )
 }
