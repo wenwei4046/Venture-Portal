@@ -1,7 +1,7 @@
 import { buildXlsxBuffer } from '@/lib/export/excel'
 import type { IncomeStatement, PoolPnl } from '@/lib/cfo-reports'
 
-export function buildIncomeStatementXlsx(stmt: IncomeStatement): Buffer {
+export function buildIncomeStatementXlsx(stmt: IncomeStatement, opts: { pool: PoolPnl | null }): Buffer {
   const rows: (string | number | null)[][] = []
   const breaks: { afterRow: number; title: string }[] = []
 
@@ -18,14 +18,17 @@ export function buildIncomeStatementXlsx(stmt: IncomeStatement): Buffer {
     rows.push([`Margin`, null, null, null, p.margin])
   }
 
-  for (const pool of stmt.pools) appendPool(pool)
-  breaks.push({ afterRow: rows.length, title: 'GROUP TOTALS' })
-  rows.push(['Group revenue',      stmt.groupRevenue,     null, null, null])
-  rows.push(['Group cost',         null, stmt.groupCost,  null, null])
-  rows.push(['Group gross profit', null, null, stmt.groupGrossProfit, null])
-  rows.push(['Group other income', null, null, stmt.groupOtherIncome, null])
-  rows.push(['Group expense',      null, null, null, stmt.groupExpense])
-  rows.push(['Group net profit',   null, null, null, stmt.groupNetProfit])
+  if (opts.pool) {
+    appendPool(opts.pool)
+  } else {
+    breaks.push({ afterRow: rows.length, title: 'GROUP TOTALS' })
+    rows.push(['Group revenue',      stmt.groupRevenue,     null, null, null])
+    rows.push(['Group cost',         null, stmt.groupCost,  null, null])
+    rows.push(['Group gross profit', null, null, stmt.groupGrossProfit, null])
+    rows.push(['Group other income', null, null, stmt.groupOtherIncome, null])
+    rows.push(['Group expense',      null, null, null, stmt.groupExpense])
+    rows.push(['Group net profit',   null, null, null, stmt.groupNetProfit])
+  }
 
   return buildXlsxBuffer({
     sheetName: 'Income Statement',

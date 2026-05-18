@@ -21,9 +21,17 @@ export async function GET(req: Request) {
   const stmt = await fetchIncomeStatement(supabase, { from, to })
   const periodLabel = `${dayjs(from).format('D MMM YYYY')} – ${dayjs(to).format('D MMM YYYY')}`
 
-  const filename = `income-statement-${from}-${to}`
-  if (format === 'xlsx') {
-    return exportXlsxResponse({ filename, buffer: buildIncomeStatementXlsx(stmt) })
+  const seg = url.searchParams.get('seg') ?? 'summary'
+  const isSummary = seg === 'summary'
+  const pool = isSummary ? null : stmt.pools.find((p) => p.pool === seg) ?? null
+  if (!isSummary && !pool) {
+    return Response.json({ error: 'unknown seg' }, { status: 400 })
   }
-  return exportPdfResponse({ filename, element: <IncomeStatementPdf stmt={stmt} periodLabel={periodLabel} /> })
+  const segLabel = isSummary ? 'summary' : seg
+  const filename = `income-statement-${segLabel}-${from}-${to}`
+
+  if (format === 'xlsx') {
+    return exportXlsxResponse({ filename, buffer: buildIncomeStatementXlsx(stmt, { pool }) })
+  }
+  return exportPdfResponse({ filename, element: <IncomeStatementPdf stmt={stmt} periodLabel={periodLabel} pool={pool} /> })
 }

@@ -10,7 +10,7 @@ const COLUMNS = [
   { label: 'Expense',      width: 70, align: 'right' as const },
 ]
 
-export function IncomeStatementPdf({ stmt, periodLabel }: { stmt: IncomeStatement; periodLabel: string }) {
+export function IncomeStatementPdf({ stmt, periodLabel, pool }: { stmt: IncomeStatement; periodLabel: string; pool: PoolPnl | null }) {
   function poolRows(p: PoolPnl): (string | number | null)[][] {
     const out: (string | number | null)[][] = []
     for (const l of p.revenueLines)     out.push([l.label, l.amount, null, null, null])
@@ -27,25 +27,28 @@ export function IncomeStatementPdf({ stmt, periodLabel }: { stmt: IncomeStatemen
 
   return (
     <PdfDocument title="Income Statement" periodLabel={periodLabel}>
-      {stmt.pools.map((p) => (
-        <React.Fragment key={p.pool}>
-          <PdfSectionHead label={`${p.poolLabel} Pool`} />
-          <PdfTable columns={COLUMNS} rows={poolRows(p)} numberFormat="money" />
-        </React.Fragment>
-      ))}
-      <PdfSectionHead label="Group Totals" />
-      <PdfTable
-        columns={COLUMNS}
-        rows={[
-          ['Group revenue',      stmt.groupRevenue, null, null, null],
-          ['Group cost',         null, stmt.groupCost, null, null],
-          ['Group gross profit', null, null, stmt.groupGrossProfit, null],
-          ['Group other income', null, null, stmt.groupOtherIncome, null],
-          ['Group expense',      null, null, null, stmt.groupExpense],
-          ['Group net profit',   null, null, null, stmt.groupNetProfit],
-        ]}
-        numberFormat="money"
-      />
+      {pool ? (
+        <>
+          <PdfSectionHead label={`${pool.poolLabel} Pool`} />
+          <PdfTable columns={COLUMNS} rows={poolRows(pool)} numberFormat="money" />
+        </>
+      ) : (
+        <>
+          <PdfSectionHead label="Group Totals" />
+          <PdfTable
+            columns={COLUMNS}
+            rows={[
+              ['Group revenue',      stmt.groupRevenue, null, null, null],
+              ['Group cost',         null, stmt.groupCost, null, null],
+              ['Group gross profit', null, null, stmt.groupGrossProfit, null],
+              ['Group other income', null, null, stmt.groupOtherIncome, null],
+              ['Group expense',      null, null, null, stmt.groupExpense],
+              ['Group net profit',   null, null, null, stmt.groupNetProfit],
+            ]}
+            numberFormat="money"
+          />
+        </>
+      )}
     </PdfDocument>
   )
 }
