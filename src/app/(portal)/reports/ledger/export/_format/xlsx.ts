@@ -19,6 +19,7 @@ export function buildLedgerXlsx(led: Ledger): Buffer {
     led.periodTotals.credit > 0 ? led.periodTotals.credit : null,
     fmtBalance(led.closingBalance),
   ])
+  // Empty Dr/Cr cells are null (blank, keeps column numeric/sortable) — deliberately differs from the web layout's '—'.
   for (const l of led.lines) {
     rows.push([
       l.entryDate ? dayjs(l.entryDate).format('D MMM YYYY') : '—',
@@ -33,7 +34,9 @@ export function buildLedgerXlsx(led: Ledger): Buffer {
   }
   rows.push([
     `${led.code} ${led.accountName} — total`, null, null, null, null,
-    led.periodTotals.debit, led.periodTotals.credit, fmtBalance(led.closingBalance),
+    led.periodTotals.debit > 0 ? led.periodTotals.debit : null,
+    led.periodTotals.credit > 0 ? led.periodTotals.credit : null,
+    fmtBalance(led.closingBalance),
   ])
 
   return buildXlsxBuffer({
