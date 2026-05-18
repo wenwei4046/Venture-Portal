@@ -13,27 +13,33 @@ function fmtBalance(signed: number): string {
 
 export function buildLedgerXlsx(led: Ledger): Buffer {
   const rows: (string | number | null)[][] = []
-  rows.push([`Account: ${led.code} ${led.accountName}`, null, null, null, null, null])
-  rows.push([`Period: ${dayjs(led.from).format('D MMM YYYY')} – ${dayjs(led.to).format('D MMM YYYY')}`, null, null, null, null, null])
-  rows.push([])
-  rows.push([`Opening balance (${dayjs(led.from).subtract(1, 'day').format('D MMM YYYY')})`, null, null, null, null, fmtBalance(led.openingBalance)])
+  rows.push([
+    `Acc. No.: ${led.code} · ${led.accountName}`, null, null, null, null,
+    led.periodTotals.debit > 0 ? led.periodTotals.debit : null,
+    led.periodTotals.credit > 0 ? led.periodTotals.credit : null,
+    fmtBalance(led.closingBalance),
+  ])
   for (const l of led.lines) {
     rows.push([
-      dayjs(l.entryDate).format('D MMM YYYY'),
-      l.entryNo,
+      l.entryDate ? dayjs(l.entryDate).format('D MMM YYYY') : '—',
+      l.accountDesc,
+      l.journalType,
+      l.ref,
       l.description,
       l.debit > 0 ? l.debit : null,
       l.credit > 0 ? l.credit : null,
       fmtBalance(l.runningBalance),
     ])
   }
-  rows.push([`Period totals`, null, null, led.periodTotals.debit, led.periodTotals.credit, null])
-  rows.push([`Closing balance (${dayjs(led.to).format('D MMM YYYY')})`, null, null, null, null, fmtBalance(led.closingBalance)])
+  rows.push([
+    `${led.code} ${led.accountName} — total`, null, null, null, null,
+    led.periodTotals.debit, led.periodTotals.credit, fmtBalance(led.closingBalance),
+  ])
 
   return buildXlsxBuffer({
     sheetName: 'Ledger',
-    headerRow: ['Date', 'Entry', 'Description', 'Debit', 'Credit', 'Balance'],
+    headerRow: ['Date', 'Acc. Desc.', 'Journal Type', 'Ref. 1', 'Desc.', 'Home DR', 'Home CR', 'Home Balance'],
     rows,
-    columnWidths: [14, 16, 50, 14, 14, 18],
+    columnWidths: [14, 26, 14, 18, 40, 14, 14, 18],
   })
 }
