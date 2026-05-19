@@ -380,25 +380,34 @@ export async function createPaymentVoucher(formData: FormData) {
         .select('id')
         .eq('name', interBilling.partyLabel)
         .maybeSingle()
-      if (payingDept?.id) {
-        const interBillingRow = {
-          department_id: payingDept.id,
-          transaction_type: 'inter_billing_out',
-          amount: r2(amount),
-          description: `PV ${voucherNo}: Inter-billing — ${interBilling.partyLabel} (settles ${description})`,
-          created_by: user.id,
-        }
-        // Cast: mig 255 added the new enum value; auto-generated types are
-        // regenerated separately, so TS still only knows 'np_in' | 'expense_out'.
-        const { error: deptPoolErr } = await supabase
-          .from('dept_pools')
-          .insert(interBillingRow as never)
-        if (deptPoolErr) {
-          console.error(
-            `inter-billing dept_pools insert failed (dept=${interBilling.partyLabel}, amount=${amount}):`,
-            deptPoolErr.message,
-          )
-        }
+      // Fail loud — when interBilling is truthy the paying dept MUST be
+      // resolvable. Silently skipping the deduction (the old implicit else)
+      // is the bug that left HR/Director Office un-debited with zero error
+      // trace; the inter_billing_out row must be inserted OR this throws.
+      if (!payingDept?.id) {
+        throw new Error(
+          `Inter-billing paying dept "${interBilling.partyLabel}" not found (PV ${voucherNo}) — cannot post inter_billing_out`,
+        )
+      }
+      const interBillingRow = {
+        department_id: payingDept.id,
+        transaction_type: 'inter_billing_out',
+        amount: r2(amount),
+        description: `PV ${voucherNo}: Inter-billing — ${interBilling.partyLabel} (settles ${description})`,
+        created_by: user.id,
+      }
+      // Cast: mig 255 added the new enum value; auto-generated types are
+      // regenerated separately, so TS still only knows 'np_in' | 'expense_out'.
+      const { error: deptPoolErr } = await supabase
+        .from('dept_pools')
+        .insert(interBillingRow as never)
+      if (deptPoolErr) {
+        // Fail loud — silent skip here was the bug that landed receiving-side
+        // np_in + the role='mirror' row but never debited the paying dept,
+        // an invisible financially-wrong partial settlement.
+        throw new Error(
+          `Inter-billing paying-side dept_pool insert failed for ${interBilling.partyLabel} (PV ${voucherNo}): ${deptPoolErr.message}`,
+        )
       }
     }
     // GL journal entry (non-blocking). Inter-billing skips because the
