@@ -178,3 +178,27 @@ See `~/.gstack/projects/wenwei4046-Venture-Portal/main-autoplan-phase1-*-2026040
     `pool.basicRatio`.
   - **Context:** vp-e2e-role-auditor 🟢 GREEN verdict on 2026-04-25, finding #3.
   - **Depends on:** nothing.
+
+- **Inter-billing settlement is not transactionally atomic** (`src/app/(portal)/payments/actions.ts`, `createPaymentVoucher`)
+  - **What:** An inter-billing settlement performs sequential non-transactional Supabase
+    inserts: voucher → receiving `np_in` (adjustPool) → paying `inter_billing_out`
+    dept_pool → `role='mirror'` payment_voucher_sources → invoice status. As of
+    `9f2c1a6` the paying-side `inter_billing_out` insert (and its paying-dept
+    resolution) now FAIL LOUD (throw) instead of silently swallowing — so a
+    failure is detectable, the invoice stays `issued`/retryable, and no mirror
+    row is written. But the receiving-side `np_in` (committed earlier in the
+    sequence) is left orphaned without its paired `inter_billing_out` until the
+    settlement is retried/reconciled.
+  - **Fix:** Wrap the whole inter-billing credit branch (np_in + inter_billing_out
+    + mirror + invoice-status) in a single Postgres transaction — realistically a
+    `SECURITY DEFINER` RPC, since the Supabase JS client has no client-side tx.
+  - **Why deferred:** Fail-loud (9f2c1a6) already stops the silent-wrong-books
+    failure mode (the production bug: HV-INV-202605-0004/0005 settled, receiving
+    np_in + mirror committed, paying HR/Director Office never debited, zero error
+    — backfilled manually 2026-05-18). Full atomicity touches the whole write
+    path + RLS/trigger surface (`check_dept_pool_sufficient`,
+    `pvs_enforce_sum_matches_voucher`); bolting it onto the targeted fix would be
+    scope creep on a hot financial path.
+  - **Context:** Found via systematic-debugging audit 2026-05-18 (user reported
+    inter-bill settled but paying dept showed no /dept-pool deduction).
+  - **Depends on:** nothing.
