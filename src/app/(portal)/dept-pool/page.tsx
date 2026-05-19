@@ -71,13 +71,7 @@ export default async function DeptPoolPage({
     const rows = visible.map((dept) => {
       const key = deptNameToPoolKey(dept.name)
       const a = splitPoolAccrual(key ? poolByKey.get(key) ?? null : null)
-      const slugByName: Record<string, string> = {
-        Marketing: 'marketing',
-        HR: 'hr',
-        Finance: 'finance',
-        'Director Office': 'director-office',
-      }
-      const slug = slugByName[dept.name]
+      const slug = DEPT_NAME_TO_SLUG[dept.name]
       return { dept, a, href: slug ? `/dept-pool/${slug}` : null }
     })
     const totalNetMargin = rows.reduce((s, r) => s + r.a.netMargin, 0)
@@ -91,7 +85,9 @@ export default async function DeptPoolPage({
             </div>
             <h1 className="page-title">Department Pools</h1>
           </div>
+          {/* Accrual view is read-only — intentionally omits the dept_manager "New project contract" action. */}
           <div className="flex items-center gap-3 shrink-0">
+            {/* Pill active-state is hardcoded per render branch (basis is TS-narrowed after the accrual early-return). Keep the two pills in sync. */}
             <div className="inline-flex border border-hairline rounded-md overflow-hidden font-mono text-xs">
               <Link href="/dept-pool?basis=cash" className="px-4 py-2 transition-colors text-graphite hover:text-ink">
                 Cash
@@ -264,6 +260,7 @@ export default async function DeptPoolPage({
           <h1 className="page-title">Department Pools</h1>
         </div>
         <div className="flex items-center gap-3 shrink-0">
+          {/* Pill active-state is hardcoded per render branch (basis is TS-narrowed after the accrual early-return). Keep the two pills in sync. */}
           <div className="inline-flex border border-hairline rounded-md overflow-hidden font-mono text-xs">
             <Link
               href="/dept-pool?basis=cash"
