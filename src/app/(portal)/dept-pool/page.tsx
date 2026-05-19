@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
+import { fetchIncomeStatement } from '@/lib/cfo-reports'
+import { deptNameToPoolKey, splitPoolAccrual } from '@/lib/dept-pool-accrual'
 
 // dept_manager only owns their own dept pool. Skip the multi-dept list and
 // land them straight on their own detail page — same content as clicking View.
@@ -23,9 +25,16 @@ interface HRCostSubmissionRow {
   dept_summaries: Record<string, { total_ctc?: number; department_id?: string }> | null
 }
 
-export default async function DeptPoolPage() {
+export default async function DeptPoolPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ basis?: string }>
+}) {
   const user = await requireRole(['principal', 'finance', 'dept_manager'])
   const supabase = await createClient()
+
+  const { basis: basisParam } = await searchParams
+  const basis = basisParam === 'accrual' ? 'accrual' : 'cash'
 
   // Fast-path: dept_manager → their own dept detail page. No reason to show
   // a 1-row list and make them click View.
@@ -51,6 +60,139 @@ export default async function DeptPoolPage() {
   let visible = departments ?? []
   if (user.role === 'dept_manager') {
     visible = visible.filter((d) => d.id === user.department_id)
+  }
+
+  if (basis === 'accrual') {
+    const from = dayjs(period).startOf('month').format('YYYY-MM-DD')
+    const to = dayjs(period).endOf('month').format('YYYY-MM-DD')
+    const income = await fetchIncomeStatement(supabase, { from, to })
+    const poolByKey = new Map(income.pools.map((p) => [p.pool, p]))
+
+    const rows = visible.map((dept) => {
+      const key = deptNameToPoolKey(dept.name)
+      const a = splitPoolAccrual(key ? poolByKey.get(key) ?? null : null)
+      const slugByName: Record<string, string> = {
+        Marketing: 'marketing',
+        HR: 'hr',
+        Finance: 'finance',
+        'Director Office': 'director-office',
+      }
+      const slug = slugByName[dept.name]
+      return { dept, a, href: slug ? `/dept-pool/${slug}` : null }
+    })
+    const totalNetMargin = rows.reduce((s, r) => s + r.a.netMargin, 0)
+
+    return (
+      <div>
+        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10">
+          <div>
+            <div className="page-eyebrow">
+              <em>I.</em> DEPARTMENTS · POOL OVERVIEW
+            </div>
+            <h1 className="page-title">Department Pools</h1>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="inline-flex border border-hairline rounded-md overflow-hidden font-mono text-xs">
+              <Link href="/dept-pool?basis=cash" className="px-4 py-2 transition-colors text-graphite hover:text-ink">
+                Cash
+              </Link>
+              <Link href="/dept-pool?basis=accrual" className="px-4 py-2 transition-colors bg-ink text-paper">
+                Accrual · P&amp;L
+              </Link>
+            </div>
+            <Link
+              href="/dept-pool/submissions"
+              className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            >
+              Past Month Submission
+            </Link>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
+          <div className="lg:col-span-7">
+            <div className="font-serif italic text-accent text-base mb-1">
+              Total net margin · P&amp;L ({dayjs(period).format('MMMM YYYY')})
+            </div>
+            <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
+              {formatMoney(totalNetMargin)}
+            </div>
+            <div className="font-mono text-xs text-muted mt-2">
+              {visible.length} department{visible.length === 1 ? '' : 's'} visible · Period{' '}
+              {dayjs(period).format('MMMM YYYY')}
+            </div>
+          </div>
+        </div>
+
+        <section className="mb-12">
+          <h2 className="font-serif text-xl text-ink mb-1">By department</h2>
+          {visible.length === 0 ? (
+            <div className="border border-hairline rounded-md bg-surface p-6 text-center">
+              <p className="font-serif italic text-muted text-sm">
+                No departments visible to your role.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
+                    <th className="text-left py-3 pr-4 font-medium">Department</th>
+                    <th className="text-right py-3 pr-4 font-medium">Revenue (bill)</th>
+                    <th className="text-right py-3 pr-4 font-medium">− Cost</th>
+                    <th className="text-right py-3 pr-4 font-medium">− Expense</th>
+                    <th className="text-right py-3 pr-4 font-medium">− Inter-billing</th>
+                    <th className="text-right py-3 pr-4 font-medium">= Net margin</th>
+                    <th className="py-3 text-right font-medium"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(({ dept, a, href }) => (
+                    <tr key={dept.id} className="border-b border-hairline last:border-0">
+                      <td className="py-3 pr-4 font-serif text-md text-ink">{dept.name}</td>
+                      <td className="py-3 pr-4 text-right font-mono tabular text-ledger">
+                        {formatMoney(a.revenue)}
+                      </td>
+                      <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                        {a.cost === 0 ? formatMoney(0) : <span className="neg">{formatMoney(-a.cost)}</span>}
+                      </td>
+                      <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                        {a.expense === 0 ? formatMoney(0) : <span className="neg">{formatMoney(-a.expense)}</span>}
+                      </td>
+                      <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                        {a.interBilling === 0 ? formatMoney(0) : <span className="neg">{formatMoney(-a.interBilling)}</span>}
+                      </td>
+                      <td className="py-3 pr-4 text-right font-mono tabular font-semibold">
+                        <span className={a.netMargin >= 0 ? 'text-ink' : 'text-danger'}>
+                          {formatMoney(a.netMargin)}
+                        </span>
+                      </td>
+                      <td className="py-3 text-right space-x-4">
+                        {href ? (
+                          <Link href={href} className="text-sm text-accent hover:text-accent-hover font-serif italic">
+                            View
+                          </Link>
+                        ) : null}
+                        {dept.name === 'Marketing' && href ? (
+                          <Link href={`${href}?tab=pnl`} className="text-sm text-accent hover:text-accent-hover font-serif italic">
+                            P&amp;L
+                          </Link>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <p className="font-serif italic text-muted text-xs">
+          Accrual basis — billed revenue − cost − expense − inter-billing, from the
+          P&amp;L engine (ties to /reports/income-statement). Switch to Cash for actual pool movement.
+        </p>
+      </div>
+    )
   }
 
   // Load balances — all 5 Dept Pools live in dept_pool_balances after the
@@ -122,6 +264,20 @@ export default async function DeptPoolPage() {
           <h1 className="page-title">Department Pools</h1>
         </div>
         <div className="flex items-center gap-3 shrink-0">
+          <div className="inline-flex border border-hairline rounded-md overflow-hidden font-mono text-xs">
+            <Link
+              href="/dept-pool?basis=cash"
+              className="px-4 py-2 transition-colors bg-ink text-paper"
+            >
+              Cash
+            </Link>
+            <Link
+              href="/dept-pool?basis=accrual"
+              className="px-4 py-2 transition-colors text-graphite hover:text-ink"
+            >
+              Accrual · P&amp;L
+            </Link>
+          </div>
           <Link
             href="/dept-pool/submissions"
             className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
