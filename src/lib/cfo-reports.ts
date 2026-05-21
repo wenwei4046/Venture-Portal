@@ -104,14 +104,14 @@ export interface RawInterBillingExpenseRow {
 // operational subledgers (PV sources / invoices / inter-billing) the rest of
 // the report derives P&L from, so without this they'd be invisible to the
 // Income Statement and the Balance Sheet's retained earnings would be short.
-// One row per (segment, account type) bucket — already net of treasury-managed
-// codes (those are aggregated by gatherTreasury to avoid double-counting).
+// One row per (segment, account) so the income statement lists each GL account
+// as its own line (not a single "Manual JV" lump). Already net of treasury-
+// managed codes (those are aggregated by gatherTreasury to avoid double-count).
 export interface RawManualJvPnlRow {
   segment: GlSegment
-  revenue: number // credit − debit on revenue accounts
-  otherIncome: number // credit − debit on other_income accounts
-  expense: number // debit − credit on expense accounts
-  cost: number // debit − credit on cost accounts
+  label: string // account name (the income-statement line label)
+  kind: 'revenue' | 'other_income' | 'expense' | 'cost'
+  amount: number // signed: revenue/other_income = cr−dr; expense/cost = dr−cr
 }
 
 export interface ClassifyInput {
@@ -574,18 +574,15 @@ export function classifyRows(input: ClassifyInput): ClassifyOutput {
   // P&L only — no cash-flow effect (opening balances move no cash).
   const manualJvPnl = input.manualJvPnl ?? []
   for (const m of manualJvPnl) {
-    const pool = manualJvPoolForSegment(m.segment)
-    const revenue = r2(Number(m.revenue ?? 0))
-    const otherIncome = r2(Number(m.otherIncome ?? 0))
-    const expense = r2(Number(m.expense ?? 0))
-    const cost = r2(Number(m.cost ?? 0))
-    if (revenue === 0 && otherIncome === 0 && expense === 0 && cost === 0) continue
-    const p = acc(pool)
-    const label = `Manual JV — ${m.segment}`
-    if (revenue !== 0) bump(p.revenue, label, revenue)
-    if (otherIncome !== 0) bump(p.otherIncome, label, otherIncome)
-    if (expense !== 0) bump(p.expense, label, expense)
-    if (cost !== 0) bump(p.cost, label, cost)
+    const amount = r2(Number(m.amount ?? 0))
+    if (amount === 0) continue
+    const p = acc(manualJvPoolForSegment(m.segment))
+    const target =
+      m.kind === 'revenue' ? p.revenue
+      : m.kind === 'other_income' ? p.otherIncome
+      : m.kind === 'expense' ? p.expense
+      : p.cost
+    bump(target, m.label, amount)
   }
 
   // ── 5: materialise per-pool structures ──
@@ -971,21 +968,9 @@ async function gatherManualJvPnl(
 
   const accountByCode = await fetchAccountIndex(supabase)
 
-  interface SegAcc {
-    revenue: number
-    otherIncome: number
-    expense: number
-    cost: number
-  }
-  const bySegment = new Map<GlSegment, SegAcc>()
-  const segAcc = (seg: GlSegment): SegAcc => {
-    let s = bySegment.get(seg)
-    if (!s) {
-      s = { revenue: 0, otherIncome: 0, expense: 0, cost: 0 }
-      bySegment.set(seg, s)
-    }
-    return s
-  }
+  // Aggregate per (segment, account) so each GL account becomes its own line.
+  type Kind = 'revenue' | 'other_income' | 'expense' | 'cost'
+  const acc = new Map<string, { segment: GlSegment; label: string; kind: Kind; amount: number }>()
 
   for (const l of lines ?? []) {
     const code = l.account_code as string | null
@@ -996,36 +981,21 @@ async function gatherManualJvPnl(
     if (!account) continue
     const seg = segmentByEntryId.get(l.entry_id as string)
     if (!seg) continue
+    const t = account.accountType
+    if (t !== 'revenue' && t !== 'other_income' && t !== 'expense' && t !== 'cost') continue
     const dr = Number(l.debit ?? 0)
     const cr = Number(l.credit ?? 0)
-    const s = segAcc(seg)
-    switch (account.accountType) {
-      case 'revenue':
-        s.revenue += cr - dr
-        break
-      case 'other_income':
-        s.otherIncome += cr - dr
-        break
-      case 'expense':
-        s.expense += dr - cr
-        break
-      case 'cost':
-        s.cost += dr - cr
-        break
-      default:
-        // asset / fixed_asset / liability / equity lines carry no P&L — the
-        // BS reads those straight from journal_lines elsewhere.
-        break
+    const signed = (t === 'revenue' || t === 'other_income') ? cr - dr : dr - cr
+    const key = `${seg}|${code}`
+    const existing = acc.get(key)
+    if (existing) {
+      existing.amount += signed
+    } else {
+      acc.set(key, { segment: seg, label: account.name, kind: t as Kind, amount: signed })
     }
   }
 
-  return Array.from(bySegment.entries()).map(([segment, s]) => ({
-    segment,
-    revenue: s.revenue,
-    otherIncome: s.otherIncome,
-    expense: s.expense,
-    cost: s.cost,
-  }))
+  return Array.from(acc.values()).map((r) => ({ ...r, amount: r2(r.amount) }))
 }
 
 // Fund-IN inflows: fund_sources rows activated within [from, to].
