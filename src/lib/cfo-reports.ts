@@ -24,6 +24,9 @@ import dayjs from 'dayjs'
 import { poolLabel, comparePools } from './pools'
 import type { AccountType, CashFlowCategory } from './coa'
 import { CASH_FLOW_CATEGORIES } from './coa'
+import type { Database } from './supabase/database.types'
+
+type GlSegment = Database['public']['Enums']['gl_segment']
 
 const VENTURE_POOL = 'venture_pool'
 
@@ -96,6 +99,21 @@ export interface RawInterBillingExpenseRow {
   amount: number
 }
 
+// Opening-balance / adjustment P&L posted as MANUAL journal vouchers
+// (journal_entries.reference_type = 'manual_jv'). These do NOT flow through the
+// operational subledgers (PV sources / invoices / inter-billing) the rest of
+// the report derives P&L from, so without this they'd be invisible to the
+// Income Statement and the Balance Sheet's retained earnings would be short.
+// One row per (segment, account type) bucket — already net of treasury-managed
+// codes (those are aggregated by gatherTreasury to avoid double-counting).
+export interface RawManualJvPnlRow {
+  segment: GlSegment
+  revenue: number // credit − debit on revenue accounts
+  otherIncome: number // credit − debit on other_income accounts
+  expense: number // debit − credit on expense accounts
+  cost: number // debit − credit on cost accounts
+}
+
 export interface ClassifyInput {
   pvSources: RawPvSourceRow[]
   invoices: RawInvoiceRow[]
@@ -103,6 +121,7 @@ export interface ClassifyInput {
   fundSourceInflows?: RawFundSourceInflow[]
   repaymentPrincipalInflows?: RawRepaymentPrincipalInflow[]
   interBillingExpenses?: RawInterBillingExpenseRow[]
+  manualJvPnl?: RawManualJvPnlRow[]
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -211,6 +230,26 @@ export function invoicePoolForBillingMode(billingMode: string | null | undefined
     return INVOICE_BILLING_MODE_TO_POOL[billingMode]
   }
   return VENTURE_POOL
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// gl_segment → P&L pool map (manual-JV P&L only). Departmental segments map to
+// their dept pools; treasury / corporate / unallocated have no dedicated dept
+// pool, so they fall into the Venture Pool — the same place treasury interest
+// and unmapped invoices already land.
+// ────────────────────────────────────────────────────────────────────────────
+export const MANUAL_JV_SEGMENT_TO_POOL: Record<GlSegment, string> = {
+  marketing: 'dept_pool_marketing',
+  hr: 'dept_pool_hr',
+  finance: 'dept_pool_finance',
+  director_office: 'dept_pool_director_office',
+  treasury: VENTURE_POOL,
+  corporate: VENTURE_POOL,
+  unallocated: VENTURE_POOL,
+}
+
+export function manualJvPoolForSegment(segment: GlSegment): string {
+  return MANUAL_JV_SEGMENT_TO_POOL[segment] ?? VENTURE_POOL
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -525,6 +564,27 @@ export function classifyRows(input: ClassifyInput): ClassifyOutput {
     if (interestExpense !== 0) bump(vp.expense, 'Interest expense — Fund sources', interestExpense)
   }
   const treasuryNet = r2(interestIncome + penaltyIncome - interestExpense)
+
+  // ── 4a: manual-JV P&L (opening balances / adjustments) folded into pools ──
+  // These are journal_entries with reference_type='manual_jv'; they bypass the
+  // operational subledgers above. Treasury-managed codes are already excluded
+  // upstream (gatherManualJvPnl), so there's no double-count with section 4.
+  // P&L only — no cash-flow effect (opening balances move no cash).
+  const manualJvPnl = input.manualJvPnl ?? []
+  for (const m of manualJvPnl) {
+    const pool = manualJvPoolForSegment(m.segment)
+    const revenue = r2(Number(m.revenue ?? 0))
+    const otherIncome = r2(Number(m.otherIncome ?? 0))
+    const expense = r2(Number(m.expense ?? 0))
+    const cost = r2(Number(m.cost ?? 0))
+    if (revenue === 0 && otherIncome === 0 && expense === 0 && cost === 0) continue
+    const p = acc(pool)
+    const label = `Manual JV — ${m.segment}`
+    if (revenue !== 0) bump(p.revenue, label, revenue)
+    if (otherIncome !== 0) bump(p.otherIncome, label, otherIncome)
+    if (expense !== 0) bump(p.expense, label, expense)
+    if (cost !== 0) bump(p.cost, label, cost)
+  }
 
   // ── 5: materialise per-pool structures ──
   const poolKeys = Array.from(pools.keys()).sort(comparePools)
@@ -869,6 +929,99 @@ async function gatherTreasury(
   return { interestIncome, penaltyIncome, interestExpense, managedCodes }
 }
 
+// Manual-JV P&L: opening-balance / adjustment journal entries posted with
+// reference_type='manual_jv'. Grouped by journal_entries.segment × account
+// type. Treasury-managed account codes (interest income / penalty income /
+// interest expense, per gatherTreasury) are EXCLUDED so the same line isn't
+// counted both here and in the treasury aggregation. Mirrors gatherTreasury's
+// two-query style (JE id set, then journal_lines), reusing the COA index.
+async function gatherManualJvPnl(
+  supabase: SupabaseClient,
+  args: { from: string; to: string; managedCodes: Set<string> },
+): Promise<RawManualJvPnlRow[]> {
+  const { from, to, managedCodes } = args
+
+  const { data: jes, error: jeErr } = await supabase
+    .from('journal_entries')
+    .select('id, segment')
+    .eq('reference_type', 'manual_jv')
+    .eq('is_reversed', false)
+    .gte('transaction_date', from)
+    .lte('transaction_date', to)
+  if (jeErr) throw new Error(`cfo-reports manual-JV JEs: ${jeErr.message}`)
+  if (!jes || jes.length === 0) return []
+
+  const segmentByEntryId = new Map<string, GlSegment>()
+  for (const j of jes) {
+    segmentByEntryId.set(j.id as string, j.segment as GlSegment)
+  }
+  const entryIds = Array.from(segmentByEntryId.keys())
+
+  const { data: lines, error: lErr } = await supabase
+    .from('journal_lines')
+    .select('entry_id, account_code, debit, credit')
+    .in('entry_id', entryIds)
+  if (lErr) throw new Error(`cfo-reports manual-JV lines: ${lErr.message}`)
+
+  const accountByCode = await fetchAccountIndex(supabase)
+
+  interface SegAcc {
+    revenue: number
+    otherIncome: number
+    expense: number
+    cost: number
+  }
+  const bySegment = new Map<GlSegment, SegAcc>()
+  const segAcc = (seg: GlSegment): SegAcc => {
+    let s = bySegment.get(seg)
+    if (!s) {
+      s = { revenue: 0, otherIncome: 0, expense: 0, cost: 0 }
+      bySegment.set(seg, s)
+    }
+    return s
+  }
+
+  for (const l of lines ?? []) {
+    const code = l.account_code as string | null
+    if (!code) continue
+    // Skip treasury-managed codes — already aggregated by gatherTreasury.
+    if (managedCodes.has(code)) continue
+    const account = accountByCode.get(code)
+    if (!account) continue
+    const seg = segmentByEntryId.get(l.entry_id as string)
+    if (!seg) continue
+    const dr = Number(l.debit ?? 0)
+    const cr = Number(l.credit ?? 0)
+    const s = segAcc(seg)
+    switch (account.accountType) {
+      case 'revenue':
+        s.revenue += cr - dr
+        break
+      case 'other_income':
+        s.otherIncome += cr - dr
+        break
+      case 'expense':
+        s.expense += dr - cr
+        break
+      case 'cost':
+        s.cost += dr - cr
+        break
+      default:
+        // asset / fixed_asset / liability / equity lines carry no P&L — the
+        // BS reads those straight from journal_lines elsewhere.
+        break
+    }
+  }
+
+  return Array.from(bySegment.entries()).map(([segment, s]) => ({
+    segment,
+    revenue: s.revenue,
+    otherIncome: s.otherIncome,
+    expense: s.expense,
+    cost: s.cost,
+  }))
+}
+
 // Fund-IN inflows: fund_sources rows activated within [from, to].
 async function gatherFundSourceInflows(
   supabase: SupabaseClient,
@@ -1025,7 +1178,23 @@ async function gatherAll(
       gatherRepaymentPrincipalInflows(supabase, args),
       gatherInterBillingExpenses(supabase, args),
     ])
-  return { pvSources, invoices, treasury, fundSourceInflows, repaymentPrincipalInflows, interBillingExpenses }
+  // Manual-JV P&L runs after treasury so it can reuse treasury.managedCodes to
+  // exclude interest income / penalty income / interest expense (avoids
+  // double-counting with the treasury aggregation).
+  const manualJvPnl = await gatherManualJvPnl(supabase, {
+    from: args.from,
+    to: args.to,
+    managedCodes: treasury.managedCodes,
+  })
+  return {
+    pvSources,
+    invoices,
+    treasury,
+    fundSourceInflows,
+    repaymentPrincipalInflows,
+    interBillingExpenses,
+    manualJvPnl,
+  }
 }
 
 export async function fetchIncomeStatement(
