@@ -64,6 +64,7 @@ const navEntries: NavEntry[] = [
   },
   { href: '/statements', label: 'Statements', section: 'Daily Operations', visible: canAccessTreasury },
   { href: '/reconciliation', label: 'Reconciliation', section: 'Daily Operations', visible: canAccessTreasury },
+  { href: '/reconciliation/journal-entries', label: 'Journal Entries', section: 'Daily Operations', visible: canAccessTreasury },
   // HR sees HR Costing as an expandable group covering all monthly sub-pages.
   // Principal sees a flat /hr-costing link in the Departments section below.
   {
