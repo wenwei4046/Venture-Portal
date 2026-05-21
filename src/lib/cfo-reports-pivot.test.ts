@@ -4,6 +4,8 @@ import type { CashflowStatement } from './cfo-reports'
 
 const stmt: CashflowStatement = {
   netChange: 300,
+  openingCash: 0,
+  closingCash: 300,
   sections: [
     {
       category: 'operating',

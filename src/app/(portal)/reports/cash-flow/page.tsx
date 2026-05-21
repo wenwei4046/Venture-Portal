@@ -98,15 +98,24 @@ export default async function CashFlowPage({ searchParams }: Props) {
 }
 
 function SummaryPanel({ stmt }: { stmt: import('@/lib/cfo-reports').CashflowStatement }) {
+  const reconciled = Math.abs(stmt.openingCash + stmt.netChange - stmt.closingCash) < 0.01
   return (
     <section className="border-t-2 border-hairline pt-6">
       <div className="sect-head">
-        <h2>Net cash change</h2>
+        <h2>Cash reconciliation</h2>
         <span className="rule" aria-hidden />
-        <span className="count">ALL SECTIONS</span>
+        <span className={`count ${reconciled ? 'text-ledger' : 'text-danger'}`}>
+          {reconciled ? 'TIES TO BALANCE SHEET' : 'OUT OF BALANCE'}
+        </span>
       </div>
       <table className="ledger-table">
         <tbody>
+          <tr>
+            <td className="font-serif italic text-ink">Opening cash</td>
+            <td className="num">
+              {stmt.openingCash < 0 ? <span className="neg">{formatMoney(stmt.openingCash)}</span> : formatMoney(stmt.openingCash)}
+            </td>
+          </tr>
           {stmt.sections.map((s) => (
             <tr key={s.category}>
               <td>{SECTION_INTRO[s.category]}</td>
@@ -115,18 +124,29 @@ function SummaryPanel({ stmt }: { stmt: import('@/lib/cfo-reports').CashflowStat
               </td>
             </tr>
           ))}
+          <tr className="border-t border-hairline">
+            <td className="font-serif italic text-graphite text-sm">Net change in cash</td>
+            <td className={`num font-semibold ${stmt.netChange >= 0 ? 'text-ledger' : 'text-danger'}`}>
+              {stmt.netChange < 0 ? <span className="neg">{formatMoney(stmt.netChange)}</span> : formatMoney(stmt.netChange)}
+            </td>
+          </tr>
         </tbody>
         <tfoot>
           <tr className="border-t-2 border-hairline">
-            <td className="font-serif italic text-ink font-medium">Net change this period</td>
-            <td className={`num font-semibold ${stmt.netChange >= 0 ? 'text-ledger' : 'text-danger'}`}>
-              <span className={`font-serif text-2xl font-semibold tabular tracking-[-0.01em] ${stmt.netChange >= 0 ? 'text-ledger' : 'text-danger'}`}>
-                {formatMoney(stmt.netChange)}
+            <td className="font-serif italic text-ink font-medium">Closing cash</td>
+            <td className={`num font-semibold ${stmt.closingCash >= 0 ? 'text-ledger' : 'text-danger'}`}>
+              <span className={`font-serif text-2xl font-semibold tabular tracking-[-0.01em] ${stmt.closingCash >= 0 ? 'text-ledger' : 'text-danger'}`}>
+                {formatMoney(stmt.closingCash)}
               </span>
             </td>
           </tr>
         </tfoot>
       </table>
+      <p className="font-serif italic text-muted text-xs mt-3">
+        {reconciled
+          ? 'Opening cash + net change = closing cash, which equals the Balance Sheet bank balance as at period end.'
+          : `Opening (${formatMoney(stmt.openingCash)}) + net change (${formatMoney(stmt.netChange)}) does not equal closing (${formatMoney(stmt.closingCash)}).`}
+      </p>
     </section>
   )
 }

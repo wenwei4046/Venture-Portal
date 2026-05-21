@@ -51,13 +51,15 @@ export function CashflowPdf({
         </>
       ) : (
         <>
-          <PdfSectionHead label="Net cash change" />
+          <PdfSectionHead label="Cash reconciliation" />
           <PdfTable
             columns={COLUMNS}
             numberFormat="money"
             rows={[
+              ['Opening cash', null, null, stmt.openingCash],
               ...stmt.sections.map((s) => [`Section net (${s.category})`, null, null, s.net] as (string | number | null)[]),
-              ['Total net change', null, null, stmt.netChange],
+              ['Net change in cash', null, null, stmt.netChange],
+              ['Closing cash', null, null, stmt.closingCash],
             ]}
           />
         </>

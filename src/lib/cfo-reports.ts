@@ -183,6 +183,8 @@ export interface CashflowSection {
 export interface CashflowStatement {
   sections: CashflowSection[] // length 3, always [operating, investing, financing]
   netChange: number
+  openingCash: number // GL bank balance at start of period (transaction_date < from)
+  closingCash: number // GL bank balance at end of period (transaction_date <= to); ties to BS bank
 }
 
 export interface BalanceMovementLine {
@@ -683,6 +685,10 @@ export function classifyRows(input: ClassifyInput): ClassifyOutput {
   const cashflow: CashflowStatement = {
     sections,
     netChange: r2(sections.reduce((s, sec) => s + sec.net, 0)),
+    // openingCash/closingCash are GL-derived (need DB access) and are filled in
+    // by fetchCashflowStatement; classifyRows is pure so it leaves them at 0.
+    openingCash: 0,
+    closingCash: 0,
   }
 
   const movements: BalanceMovementLine[] = balanceMovements
@@ -1209,8 +1215,90 @@ export async function fetchCashflowStatement(
   supabase: SupabaseClient,
   args: { from: string; to: string },
 ): Promise<CashflowStatement> {
+  const { from, to } = args
   const input = await gatherAll(supabase, args)
-  return classifyRows(input).cashflow
+  const base = classifyRows(input).cashflow
+
+  // ── Opening / closing cash — mirror fetchBalanceSheet's `bank` derivation so
+  //    closingCash (asOf=to) equals the Balance Sheet bank figure. The CFS
+  //    sections are operational-only (payment_voucher_sources) and never see
+  //    the manual-JV opening balances, so we must derive cash from the GL.
+  const bankCodes = await fetchActiveBankCodes(supabase)
+
+  const openingJeIds = await fetchJeIdsBefore(supabase, from) // transaction_date < from
+  const closingJeIds = await fetchJeIdsOnOrBefore(supabase, to) // transaction_date <= to
+
+  const openingCash = r2(
+    await sumGlNetAcrossCodes(supabase, { jeIds: openingJeIds, codes: bankCodes, sign: 'dr-cr' }),
+  )
+  const closingCash = r2(
+    await sumGlNetAcrossCodes(supabase, { jeIds: closingJeIds, codes: bankCodes, sign: 'dr-cr' }),
+  )
+
+  // ── Reconciliation: openingCash + netChange MUST equal closingCash.
+  //    The operational netChange omits manual-JV bank movements (e.g. the loaded
+  //    opening balances). The true GL movement this period = closingCash -
+  //    openingCash; the residual it doesn't explain goes into financing as an
+  //    explicit "Opening balances / adjustments" line so the sections re-sum.
+  const glMovement = r2(closingCash - openingCash)
+  const residual = r2(glMovement - base.netChange)
+
+  let sections = base.sections
+  if (Math.abs(residual) >= 0.005) {
+    sections = base.sections.map((sec) => {
+      if (sec.category !== 'financing') return sec
+      const adjBlock: CashflowPoolBlock = {
+        pool: '_adjustments',
+        poolLabel: 'Opening balances / adjustments',
+        inflowLines: residual >= 0 ? [{ label: 'Opening balances / adjustments', amount: residual }] : [],
+        outflowLines: residual < 0 ? [{ label: 'Opening balances / adjustments', amount: -residual }] : [],
+        net: residual,
+      }
+      return {
+        ...sec,
+        pools: [...sec.pools, adjBlock],
+        net: r2(sec.net + residual),
+      }
+    })
+  }
+
+  const netChange = r2(sections.reduce((s, sec) => s + sec.net, 0))
+
+  return { sections, netChange, openingCash, closingCash }
+}
+
+// Distinct GL codes of active bank_accounts — same source the Balance Sheet
+// uses for its `bank` line (see fetchBalanceSheet step 3).
+async function fetchActiveBankCodes(supabase: SupabaseClient): Promise<string[]> {
+  const { data: bankRows } = await supabase
+    .from('bank_accounts')
+    .select('gl_account_code')
+    .eq('status', 'active')
+  return Array.from(
+    new Set(
+      (bankRows ?? [])
+        .map((b) => (b.gl_account_code as string | null) ?? '')
+        .filter((c): c is string => !!c),
+    ),
+  )
+}
+
+async function fetchJeIdsBefore(supabase: SupabaseClient, date: string): Promise<string[]> {
+  const { data } = await supabase
+    .from('journal_entries')
+    .select('id')
+    .lt('transaction_date', date)
+    .eq('is_reversed', false)
+  return (data ?? []).map((j) => j.id as string)
+}
+
+async function fetchJeIdsOnOrBefore(supabase: SupabaseClient, date: string): Promise<string[]> {
+  const { data } = await supabase
+    .from('journal_entries')
+    .select('id')
+    .lte('transaction_date', date)
+    .eq('is_reversed', false)
+  return (data ?? []).map((j) => j.id as string)
 }
 
 // ────────────────────────────────────────────────────────────────────────────
