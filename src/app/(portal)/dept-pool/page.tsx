@@ -277,33 +277,16 @@ export default async function DeptPoolPage({
     }
   }
 
-  // Venture (= Office / corporate) cash = the venture_pool ledger. Shown as its
-  // own row for principal/finance (not a department, so handled separately).
-  let ventureCash: { balance: number; in_amt: number; out_amt: number } | null = null
-  if (user.role !== 'dept_manager') {
-    const { data: vpRows } = await supabase
-      .from('venture_pool')
-      .select('transaction_type, amount')
-    let balance = 0
-    let inAmt = 0
-    let outAmt = 0
-    for (const t of vpRows ?? []) {
-      const amt = Number(t.amount)
-      const isIn = ['fund_in', 'loan_repayment_in', 'profit_in'].includes(
-        t.transaction_type as string,
-      )
-      balance += isIn ? amt : -amt
-      if (isIn) inAmt += amt
-      else outAmt += amt
-    }
-    ventureCash = { balance, in_amt: inAmt, out_amt: outAmt }
-  }
+  // Venture (= Office / corporate) has NO separate cash here: per the Bank
+  // Reconciliation, the "Director & Office" cash is assigned to Director, so
+  // Office's cash is already inside Director. (The old venture_pool ledger is a
+  // distinct central record, not part of the bank-recon cash basis.) Shown as 0.
+  const ventureCash: { balance: number; in_amt: number; out_amt: number } | null =
+    user.role !== 'dept_manager' ? { balance: 0, in_amt: 0, out_amt: 0 } : null
 
-  // Total cash = all dept balances (incl overdrafts) + the Venture central pool,
-  // so it foots to the rows shown in the table.
-  const totalDeployed =
-    Array.from(balanceMap.values()).reduce((acc, b) => acc + b, 0) +
-    (ventureCash?.balance ?? 0)
+  // Total cash = all dept balances (incl overdrafts); foots to the Bank
+  // Reconciliation. Venture contributes 0 (its cash sits in Director).
+  const totalDeployed = Array.from(balanceMap.values()).reduce((acc, b) => acc + b, 0)
 
   return (
     <div>
@@ -351,7 +334,7 @@ export default async function DeptPoolPage({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
         <div className="lg:col-span-7">
           <div className="font-serif italic text-accent text-base mb-1">
-            Total cash · dept pools + Venture
+            Total cash available · all departments
           </div>
           <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
             {formatMoney(totalDeployed)}
