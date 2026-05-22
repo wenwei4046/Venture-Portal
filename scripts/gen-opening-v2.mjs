@@ -72,8 +72,8 @@ for (const sys of Object.keys(TB_PNL)) {
   })
 }
 
-// segment maps: corporate = office + director (merge); director extracted for reclass
-const SEG_BUCKETS = { marketing: ['marketing'], finance: ['finance'], hr: ['hr'], director_office: ['director_office'], corporate: ['office', 'director'] }
+// segment maps: Director is its own segment (like other departments); corporate = office only.
+const SEG_BUCKETS = { marketing: ['marketing'], finance: ['finance'], hr: ['hr'], director_office: ['director_office'], director: ['director'], corporate: ['office'] }
 const bySeg = {}
 for (const s of Object.keys(SEG_BUCKETS)) {
   bySeg[s] = {}
@@ -134,7 +134,7 @@ sql += '-- Step 2a: BS opening\n' + bsR.sql + '\n\n'
 console.log(`BS         Dr ${bsR.sumDr.toFixed(2).padStart(13)}  Cr ${bsR.sumCr.toFixed(2).padStart(13)}  clearing ${(bsR.clr).toFixed(2).padStart(11)} (net profit roll)`)
 
 // P&L segments
-const SEG_ORDER = ['marketing', 'finance', 'hr', 'director_office', 'corporate']
+const SEG_ORDER = ['marketing', 'finance', 'hr', 'director_office', 'director', 'corporate']
 let totNet = 0, clearingSum = bsR.clr > 0 ? bsR.clr : -(-bsR.clr)
 let clearingTotal = bsR.clr // signed: + means Dr clearing posted... track net
 sql += '-- Step 2b: P&L segment entries\n'
@@ -157,26 +157,16 @@ console.log(`P&L total net profit: ${totNet.toFixed(2)}  (BS clearing offsets th
 console.log(`SUM of all clearing legs (must be ~0): ${r2(clearingTotal).toFixed(2)}`)
 
 // ---- Step 3 already folded into BS (suspense split). ----
-// ---- Step 4: Director -> Director Pool reclass ----
+// ---- Director Pool = director segment NP (like other dept pools); no reclass, no 4080. ----
 const dirInc = r2(Object.values(director).filter(v => v.inc).reduce((a, v) => a + v.amt, 0))
 const dirExp = r2(Object.values(director).filter(v => !v.inc).reduce((a, v) => a + v.amt, 0))
 const dirNet = r2(dirInc - dirExp)
-const rlines = []
-for (const code of Object.keys(director).sort()) {
-  const { inc, amt } = director[code]
-  if (Math.abs(amt) < 0.004) continue
-  if (inc) rlines.push([code, r2(amt), 0])   // Dr to reverse income
-  else rlines.push([code, 0, r2(amt)])       // Cr to reverse expense
-}
-rlines.push(['4080', 0, dirNet])              // net -> Director Pool Payable (Cr, profit)
-const recR = entrySQL('corporate', 'Reclass: DIRECTOR opening P&L -> Director Pool Payable', rlines)
-sql += '-- Step 4: Director -> Director Pool reclass\n' + recR.sql + '\n\n'
-sql += `-- Step 4b: mirror into operational Director Pool ledger
+sql += `-- Director Pool: mirror director-segment NP into the operational dept pool
 INSERT INTO dept_pools(department_id,transaction_type,amount,period_month,description,created_by)
 SELECT id,'np_in'::dept_pool_txn_type,${dirNet.toFixed(2)},DATE '2026-05-01','Opening Director Pool balance (ledger DIRECTOR dept net P&L)',${U}
 FROM departments WHERE name='Director';
 `
-console.log(`\nDirector reclass: Inc ${dirInc.toFixed(2)}  Exp ${dirExp.toFixed(2)}  Net(->4080 & Director Pool) ${dirNet.toFixed(2)}  reclassBalanced=${Math.abs(recR.clr) < 0.004}`)
+console.log(`\nDirector segment: Inc ${dirInc.toFixed(2)}  Exp ${dirExp.toFixed(2)}  NP(->Director Pool) ${dirNet.toFixed(2)}`)
 
 fs.writeFileSync('C:/Users/User/OneDrive/Desktop/Claude/Venture/Venture-Portal/scripts/opening-v2.sql', sql)
 console.log('\nWROTE opening-v2.sql (' + sql.length + ' chars)')

@@ -245,6 +245,7 @@ export const MANUAL_JV_SEGMENT_TO_POOL: Record<GlSegment, string> = {
   hr: 'dept_pool_hr',
   finance: 'dept_pool_finance',
   director_office: 'dept_pool_director_office',
+  director: 'dept_pool_director',
   treasury: VENTURE_POOL,
   corporate: VENTURE_POOL,
   unallocated: VENTURE_POOL,

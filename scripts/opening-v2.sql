@@ -109,43 +109,36 @@ SELECT e.id,x.code,x.dr,x.cr FROM e,(VALUES
 
 WITH s AS (SELECT nextval('journal_entry_no_seq') AS seq),
 e AS (INSERT INTO journal_entries (entry_no,transaction_date,period_month,description,reference_type,segment,total_amount,created_by)
- SELECT format('JE-%s-%s',to_char(DATE '2026-05-20','YYYYMM'),lpad(s.seq::text,4,'0')),DATE '2026-05-20',DATE '2026-05-01','期初 P&L corporate @20/05/2026 (TB 22.05)','manual_jv','corporate'::gl_segment,349485.26,'cbc6a18a-3f38-4567-b8c3-385d00b9e6b3' FROM s RETURNING id)
+ SELECT format('JE-%s-%s',to_char(DATE '2026-05-20','YYYYMM'),lpad(s.seq::text,4,'0')),DATE '2026-05-20',DATE '2026-05-01','期初 P&L director @20/05/2026 (TB 22.05)','manual_jv','director'::gl_segment,333865.26,'cbc6a18a-3f38-4567-b8c3-385d00b9e6b3' FROM s RETURNING id)
 INSERT INTO journal_lines (entry_id,account_code,debit,credit)
 SELECT e.id,x.code,x.dr,x.cr FROM e,(VALUES
   ('5020',NULL::numeric,333865.26::numeric),
-  ('7000',NULL::numeric,15620.00::numeric),
-  ('9010',9630.00::numeric,NULL::numeric),
+  ('9010',300.00::numeric,NULL::numeric),
   ('9030',256005.04::numeric,NULL::numeric),
   ('9081',28080.00::numeric,NULL::numeric),
   ('9082',1666.40::numeric,NULL::numeric),
   ('9083',190.40::numeric,NULL::numeric),
+  ('9093',22360.38::numeric,NULL::numeric),
+  ('1900',25263.04::numeric,NULL::numeric)
+) AS x(code,dr,cr);
+
+WITH s AS (SELECT nextval('journal_entry_no_seq') AS seq),
+e AS (INSERT INTO journal_entries (entry_no,transaction_date,period_month,description,reference_type,segment,total_amount,created_by)
+ SELECT format('JE-%s-%s',to_char(DATE '2026-05-20','YYYYMM'),lpad(s.seq::text,4,'0')),DATE '2026-05-20',DATE '2026-05-01','期初 P&L corporate @20/05/2026 (TB 22.05)','manual_jv','corporate'::gl_segment,25132.17,'cbc6a18a-3f38-4567-b8c3-385d00b9e6b3' FROM s RETURNING id)
+INSERT INTO journal_lines (entry_id,account_code,debit,credit)
+SELECT e.id,x.code,x.dr,x.cr FROM e,(VALUES
+  ('7000',NULL::numeric,15620.00::numeric),
+  ('9010',9330.00::numeric,NULL::numeric),
   ('9085',1201.00::numeric,NULL::numeric),
   ('9087',2793.38::numeric,NULL::numeric),
   ('9088',2807.34::numeric,NULL::numeric),
   ('9089',0.40::numeric,NULL::numeric),
   ('9091',0.05::numeric,NULL::numeric),
-  ('9093',22360.38::numeric,NULL::numeric),
   ('9094',9000.00::numeric,NULL::numeric),
-  ('1900',15750.87::numeric,NULL::numeric)
+  ('1900',NULL::numeric,9512.17::numeric)
 ) AS x(code,dr,cr);
 
--- Step 4: Director -> Director Pool reclass
-WITH s AS (SELECT nextval('journal_entry_no_seq') AS seq),
-e AS (INSERT INTO journal_entries (entry_no,transaction_date,period_month,description,reference_type,segment,total_amount,created_by)
- SELECT format('JE-%s-%s',to_char(DATE '2026-05-20','YYYYMM'),lpad(s.seq::text,4,'0')),DATE '2026-05-20',DATE '2026-05-01','Reclass: DIRECTOR opening P&L -> Director Pool Payable','manual_jv','corporate'::gl_segment,333865.26,'cbc6a18a-3f38-4567-b8c3-385d00b9e6b3' FROM s RETURNING id)
-INSERT INTO journal_lines (entry_id,account_code,debit,credit)
-SELECT e.id,x.code,x.dr,x.cr FROM e,(VALUES
-  ('5020',333865.26::numeric,NULL::numeric),
-  ('9010',NULL::numeric,300.00::numeric),
-  ('9030',NULL::numeric,256005.04::numeric),
-  ('9081',NULL::numeric,28080.00::numeric),
-  ('9082',NULL::numeric,1666.40::numeric),
-  ('9083',NULL::numeric,190.40::numeric),
-  ('9093',NULL::numeric,22360.38::numeric),
-  ('4080',NULL::numeric,25263.04::numeric)
-) AS x(code,dr,cr);
-
--- Step 4b: mirror into operational Director Pool ledger
+-- Director Pool: mirror director-segment NP into the operational dept pool
 INSERT INTO dept_pools(department_id,transaction_type,amount,period_month,description,created_by)
 SELECT id,'np_in'::dept_pool_txn_type,25263.04,DATE '2026-05-01','Opening Director Pool balance (ledger DIRECTOR dept net P&L)','cbc6a18a-3f38-4567-b8c3-385d00b9e6b3'
 FROM departments WHERE name='Director';

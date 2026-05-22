@@ -4258,6 +4258,7 @@ export type Database = {
         | "hr"
         | "finance"
         | "director_office"
+        | "director"
         | "corporate"
         | "unallocated"
       hr_employment_type: "salaried" | "commission_eligible"
@@ -4533,6 +4534,7 @@ export const Constants = {
         "hr",
         "finance",
         "director_office",
+        "director",
         "corporate",
         "unallocated",
       ],
