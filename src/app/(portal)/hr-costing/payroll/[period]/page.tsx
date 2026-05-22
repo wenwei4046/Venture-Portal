@@ -7,12 +7,28 @@ import PayrollGrid, { type PayrollRowData } from '../_components/PayrollGrid'
 import CopyFromLastMonthButton from '../_components/CopyFromLastMonthButton'
 import SubmitToPrincipalButton from '../_components/SubmitToPrincipalButton'
 import MoreActionsDropdown from '../_components/MoreActionsDropdown'
+import PeriodPicker from '../_components/PeriodPicker'
 import RequestPayrollPaymentButton, {
   type RequestState,
 } from '../_components/RequestPayrollPaymentButton'
 
 interface PageProps {
   params: Promise<{ period: string }>
+}
+
+interface DirectorPayoutRow {
+  id: string
+  director_id: string
+  status: string
+  director_code: string
+  director_name: string
+  gross_amount: number
+  payroll_gross: number
+  payroll_net: number
+  payroll_epf_er: number
+  payroll_socso_er: number
+  payroll_eis_er: number
+  payroll_pcb: number
 }
 
 function formatPeriodLabel(period: string): string {
@@ -29,7 +45,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
 
   const supabase = await createClient()
 
-  const [{ data: rows }, { data: run }] = await Promise.all([
+  const [{ data: rows }, { data: run }, { data: directorRows }] = await Promise.all([
     supabase
       .from('hr_monthly_payroll')
       .select(`
@@ -48,6 +64,17 @@ export default async function PayrollGridPage({ params }: PageProps) {
       .select('id, status, total_amount, submitted_at, approved_at, paid_at, rejection_reason, rejected_at')
       .eq('period_month', period)
       .maybeSingle(),
+    supabase
+      .from('director_payouts')
+      .select(`
+        id, director_id, status,
+        gross_amount, payroll_gross, payroll_net,
+        payroll_epf_er, payroll_socso_er, payroll_eis_er,
+        payroll_pcb,
+        directors (code, name)
+      `)
+      .eq('period_month', period)
+      .order('director_id'),
   ])
 
   // Latest payment request for this run (if run exists). Order by created_at
@@ -62,6 +89,26 @@ export default async function PayrollGridPage({ params }: PageProps) {
         .limit(5)
     : { data: null }
 
+  const directorPayouts: DirectorPayoutRow[] = (directorRows ?? []).map(d => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const director = (d as any).directors
+    return {
+      id: d.id,
+      director_id: d.director_id,
+      status: String(d.status),
+      director_code: director?.code ?? '?',
+      director_name: director?.name ?? '?',
+      gross_amount: Number(d.gross_amount ?? 0),
+      payroll_gross: Number(d.payroll_gross ?? 0),
+      payroll_net: Number(d.payroll_net ?? 0),
+      payroll_epf_er: Number(d.payroll_epf_er ?? 0),
+      payroll_socso_er: Number(d.payroll_socso_er ?? 0),
+      payroll_eis_er: Number(d.payroll_eis_er ?? 0),
+      payroll_pcb: Number(d.payroll_pcb ?? 0),
+    }
+  })
+  const hasDirectorPayouts = directorPayouts.length > 0
+
   if (!rows || rows.length === 0) {
     return (
       <div>
@@ -72,13 +119,19 @@ export default async function PayrollGridPage({ params }: PageProps) {
             </div>
             <h1 className="page-title">{formatPeriodLabel(period)}</h1>
             <p className="font-serif italic text-graphite text-base mt-3">
-              <em>No rows for this period yet.</em>
+              <em>No staff rows for this period yet.</em>
             </p>
           </div>
+          <div className="flex flex-col items-end gap-3">
+            <PeriodPicker period={period} />
+          </div>
         </div>
-        <p className="font-sans text-sm text-muted">
-          Open <Link href="/hr-costing/payroll" className="text-accent hover:underline">Payroll</Link> to create the current period.
+        <p className="font-sans text-sm text-muted mb-12">
+          Open <Link href="/hr-costing/payroll" className="text-accent hover:underline">Payroll</Link> to create the current period, or pick a different month above.
         </p>
+        {hasDirectorPayouts && (
+          <DirectorSalarySection rows={directorPayouts} period={period} />
+        )}
       </div>
     )
   }
@@ -114,14 +167,32 @@ export default async function PayrollGridPage({ params }: PageProps) {
     }
   })
 
+  // Combined totals: staff paycheck figures + director 75% payroll portion.
+  // The director's 25% invoice + 5% saving do NOT flow through this page —
+  // they're handled by the Director Salary engine + Invoice Pool. The
+  // approval amount (Principal-side) includes the full director gross_amount
+  // via the RPC, which is intentionally broader than this paycheck summary.
+  const directorTotals = directorPayouts.reduce(
+    (acc, d) => ({
+      gross: acc.gross + d.payroll_gross,
+      net: acc.net + d.payroll_net,
+      epf_er: acc.epf_er + d.payroll_epf_er,
+      socso_er: acc.socso_er + d.payroll_socso_er,
+      eis_er: acc.eis_er + d.payroll_eis_er,
+      pcb: acc.pcb + d.payroll_pcb,
+    }),
+    { gross: 0, net: 0, epf_er: 0, socso_er: 0, eis_er: 0, pcb: 0 },
+  )
+
   const totals = {
     staff: gridRows.length,
-    gross: gridRows.reduce((s, r) => s + r.gross, 0),
-    net: gridRows.reduce((s, r) => s + r.net, 0),
-    epf_er: gridRows.reduce((s, r) => s + r.epf_er, 0),
-    socso_er: gridRows.reduce((s, r) => s + r.socso_er, 0),
-    eis_er: gridRows.reduce((s, r) => s + r.eis_er, 0),
-    pcb: gridRows.reduce((s, r) => s + r.pcb, 0),
+    directors: directorPayouts.length,
+    gross: gridRows.reduce((s, r) => s + r.gross, 0) + directorTotals.gross,
+    net: gridRows.reduce((s, r) => s + r.net, 0) + directorTotals.net,
+    epf_er: gridRows.reduce((s, r) => s + r.epf_er, 0) + directorTotals.epf_er,
+    socso_er: gridRows.reduce((s, r) => s + r.socso_er, 0) + directorTotals.socso_er,
+    eis_er: gridRows.reduce((s, r) => s + r.eis_er, 0) + directorTotals.eis_er,
+    pcb: gridRows.reduce((s, r) => s + r.pcb, 0) + directorTotals.pcb,
   }
 
   // ─── Derive the period's phase from run + latest request ─────────────────
@@ -230,7 +301,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
         </div>
       ) : null}
 
-      {/* Row 1 — title + primary CTA varies by phase */}
+      {/* Row 1 — title + period picker + primary CTA varies by phase */}
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
@@ -238,18 +309,24 @@ export default async function PayrollGridPage({ params }: PageProps) {
           </div>
           <h1 className="page-title">{formatPeriodLabel(period)}</h1>
           <p className="font-serif italic text-graphite text-base mt-3">
-            {totals.staff} staff ·{' '}
+            {totals.staff} staff
+            {totals.directors > 0 ? ` · ${totals.directors} director${totals.directors > 1 ? 's' : ''}` : ''}
+            {' · '}
             <PhaseLabel phase={phase} rejectionReason={run?.rejection_reason} />
           </p>
         </div>
-        <PhaseCta
-          phase={phase}
-          period={period}
-          runId={run?.id}
-          totalGross={totals.gross}
-          totalAmount={Number(run?.total_amount ?? totals.gross)}
-          requestState={requestState}
-        />
+        <div className="flex flex-col items-end gap-3">
+          <PeriodPicker period={period} />
+          <PhaseCta
+            phase={phase}
+            period={period}
+            runId={run?.id}
+            totalGross={totals.gross}
+            totalAmount={Number(run?.total_amount ?? totals.gross)}
+            requestState={requestState}
+            hasDirectorPayouts={hasDirectorPayouts}
+          />
+        </div>
       </div>
 
       {/* Row 2 — secondary actions. Import is always available; Copy-from-last
@@ -293,7 +370,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
         />
       </div>
 
-      {/* Summary band */}
+      {/* Summary band — staff paycheck figures + director 75% payroll portion */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mb-10 border-y border-hairline py-6">
         <div>
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total Gross</div>
@@ -320,7 +397,92 @@ export default async function PayrollGridPage({ params }: PageProps) {
       </div>
 
       <PayrollGrid rows={gridRows} period={period} />
+
+      {hasDirectorPayouts && (
+        <DirectorSalarySection rows={directorPayouts} period={period} />
+      )}
     </div>
+  )
+}
+
+function DirectorSalarySection({
+  rows,
+  period,
+}: {
+  rows: DirectorPayoutRow[]
+  period: string
+}) {
+  return (
+    <section className="mt-16">
+      <div className="flex items-baseline justify-between mb-4">
+        <div>
+          <h2 className="font-serif text-2xl text-ink">Director Salary</h2>
+          <p className="font-serif italic text-graphite text-sm mt-1">
+            75% payroll portion · read-only here · edited via{' '}
+            <Link
+              href={`/director-salary?period=${period}`}
+              className="text-accent hover:text-accent-hover not-italic"
+            >
+              Director Salary →
+            </Link>
+          </p>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="ledger-table">
+          <thead>
+            <tr>
+              <th>Director</th>
+              <th className="right">Pool Slice</th>
+              <th className="right">Gross (75%)</th>
+              <th className="right">EPF ER</th>
+              <th className="right">SOCSO+EIS ER</th>
+              <th className="right">PCB</th>
+              <th className="right">Net</th>
+              <th>Status</th>
+              <th className="right"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(d => (
+              <tr key={d.id}>
+                <td>
+                  <div className="font-serif text-[15px] text-ink">{d.director_code}</div>
+                  <div className="font-mono text-[11px] text-graphite mt-0.5">{d.director_name}</div>
+                </td>
+                <td className="num">{formatMoney(d.gross_amount)}</td>
+                <td className="num">{formatMoney(d.payroll_gross)}</td>
+                <td className="num">{formatMoney(d.payroll_epf_er)}</td>
+                <td className="num">{formatMoney(d.payroll_socso_er + d.payroll_eis_er)}</td>
+                <td className="num">{formatMoney(d.payroll_pcb)}</td>
+                <td className="num font-semibold">{formatMoney(d.payroll_net)}</td>
+                <td>
+                  <em
+                    className={`font-serif italic text-sm not-italic ${
+                      d.status === 'draft'
+                        ? 'text-alert'
+                        : d.status === 'confirmed'
+                        ? 'text-ledger'
+                        : 'text-graphite'
+                    }`}
+                  >
+                    {d.status}
+                  </em>
+                </td>
+                <td className="right">
+                  <Link
+                    href={`/director-salary/${d.director_id}?period=${period}`}
+                    className="text-sm text-accent hover:text-accent-hover font-serif italic"
+                  >
+                    Detail
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   )
 }
 
@@ -370,6 +532,7 @@ function PhaseCta({
   totalGross,
   totalAmount,
   requestState,
+  hasDirectorPayouts,
 }: {
   phase:
     | 'drafting'
@@ -385,9 +548,16 @@ function PhaseCta({
   totalGross: number
   totalAmount: number
   requestState: RequestState
+  hasDirectorPayouts: boolean
 }) {
   if (phase === 'drafting' || phase === 'rejected') {
-    return <SubmitToPrincipalButton period={period} totalAmount={totalGross} />
+    return (
+      <SubmitToPrincipalButton
+        period={period}
+        totalAmount={totalGross}
+        hasDirectorPayouts={hasDirectorPayouts}
+      />
+    )
   }
   if (phase === 'awaiting-approval') {
     return (
