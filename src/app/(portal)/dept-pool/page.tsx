@@ -238,13 +238,11 @@ export default async function DeptPoolPage({
   // (revenue - staff cost - expenses); the other 4 pools are pure ledger
   // movement so we show credits in / debits out directly from dept_pools.
   // Marketing's P&L breakdown still lives on /dept-pool/marketing.
-  const periodStart = dayjs(period).startOf('month').format('YYYY-MM-DD')
-  const nextMonthStart = dayjs(period).add(1, 'month').startOf('month').format('YYYY-MM-DD')
+  // Accumulated (all-time) In/Out per dept, so In − Out foots exactly to the
+  // accumulated Balance. (Previously this-month only.)
   const { data: poolTxns } = await supabase
     .from('dept_pools')
     .select('department_id, transaction_type, amount')
-    .gte('created_at', periodStart)
-    .lt('created_at', nextMonthStart)
 
   const inOutByDept = new Map<string, { in_amt: number; out_amt: number }>()
   for (const t of poolTxns ?? []) {
@@ -288,7 +286,7 @@ export default async function DeptPoolPage({
   if (user.role !== 'dept_manager') {
     const { data: vpRows } = await supabase
       .from('venture_pool')
-      .select('transaction_type, amount, created_at')
+      .select('transaction_type, amount')
     let balance = 0
     let inAmt = 0
     let outAmt = 0
@@ -298,11 +296,8 @@ export default async function DeptPoolPage({
         t.transaction_type as string,
       )
       balance += isIn ? amt : -amt
-      const created = String(t.created_at)
-      if (created >= periodStart && created < nextMonthStart) {
-        if (isIn) inAmt += amt
-        else outAmt += amt
-      }
+      if (isIn) inAmt += amt
+      else outAmt += amt
     }
     ventureCash = { balance, in_amt: inAmt, out_amt: outAmt }
   }
@@ -382,9 +377,9 @@ export default async function DeptPoolPage({
                 <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
                   <th className="text-left py-3 pr-4 font-medium">Department</th>
                   <th className="text-right py-3 pr-4 font-medium">Balance</th>
-                  <th className="text-right py-3 pr-4 font-medium">In (this month)</th>
-                  <th className="text-right py-3 pr-4 font-medium">Out (this month)</th>
-                  <th className="text-right py-3 pr-4 font-medium">Net (this month)</th>
+                  <th className="text-right py-3 pr-4 font-medium">In (to date)</th>
+                  <th className="text-right py-3 pr-4 font-medium">Out (to date)</th>
+                  <th className="text-right py-3 pr-4 font-medium">Net (to date)</th>
                   <th className="text-right py-3 pr-4 font-medium">Costing Submission</th>
                   <th className="py-3 text-right font-medium"></th>
                 </tr>
