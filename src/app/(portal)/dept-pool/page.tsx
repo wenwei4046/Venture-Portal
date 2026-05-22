@@ -76,6 +76,13 @@ export default async function DeptPoolPage({
     })
     const totalNetMargin = rows.reduce((s, r) => s + r.a.netMargin, 0)
 
+    // Venture (= Office / corporate) shown as its own row for principal/finance.
+    // Its P&L lives in the income statement's venture_pool bucket.
+    const ventureAccrual =
+      user.role !== 'dept_manager'
+        ? splitPoolAccrual(poolByKey.get('venture_pool') ?? null)
+        : null
+
     return (
       <div>
         <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10">
@@ -177,6 +184,31 @@ export default async function DeptPoolPage({
                       </td>
                     </tr>
                   ))}
+                  {ventureAccrual ? (
+                    <tr className="border-t-2 border-hairline">
+                      <td className="py-3 pr-4 font-serif text-md text-ink">
+                        Venture <span className="font-mono text-xs text-muted">(Office)</span>
+                      </td>
+                      <td className="py-3 pr-4 text-right font-mono tabular text-ledger">
+                        {formatMoney(ventureAccrual.revenue)}
+                      </td>
+                      <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                        {ventureAccrual.cost === 0 ? formatMoney(0) : <span className="neg">{formatMoney(-ventureAccrual.cost)}</span>}
+                      </td>
+                      <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                        {ventureAccrual.expense === 0 ? formatMoney(0) : <span className="neg">{formatMoney(-ventureAccrual.expense)}</span>}
+                      </td>
+                      <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                        {ventureAccrual.interBilling === 0 ? formatMoney(0) : <span className="neg">{formatMoney(-ventureAccrual.interBilling)}</span>}
+                      </td>
+                      <td className="py-3 pr-4 text-right font-mono tabular font-semibold">
+                        <span className={ventureAccrual.netMargin >= 0 ? 'text-ink' : 'text-danger'}>
+                          {formatMoney(ventureAccrual.netMargin)}
+                        </span>
+                      </td>
+                      <td className="py-3"></td>
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
             </div>
@@ -249,6 +281,31 @@ export default async function DeptPoolPage({
     (acc, b) => acc + (b > 0 ? b : 0),
     0
   )
+
+  // Venture (= Office / corporate) cash = the venture_pool ledger. Shown as its
+  // own row for principal/finance (not a department, so handled separately).
+  let ventureCash: { balance: number; in_amt: number; out_amt: number } | null = null
+  if (user.role !== 'dept_manager') {
+    const { data: vpRows } = await supabase
+      .from('venture_pool')
+      .select('transaction_type, amount, created_at')
+    let balance = 0
+    let inAmt = 0
+    let outAmt = 0
+    for (const t of vpRows ?? []) {
+      const amt = Number(t.amount)
+      const isIn = ['fund_in', 'loan_repayment_in', 'profit_in'].includes(
+        t.transaction_type as string,
+      )
+      balance += isIn ? amt : -amt
+      const created = String(t.created_at)
+      if (created >= periodStart && created < nextMonthStart) {
+        if (isIn) inAmt += amt
+        else outAmt += amt
+      }
+    }
+    ventureCash = { balance, in_amt: inAmt, out_amt: outAmt }
+  }
 
   return (
     <div>
@@ -393,6 +450,31 @@ export default async function DeptPoolPage({
                     </tr>
                   )
                 })}
+                {ventureCash ? (
+                  <tr className="border-t-2 border-hairline">
+                    <td className="py-3 pr-4 font-serif text-md text-ink">
+                      Venture <span className="font-mono text-xs text-muted">(Office)</span>
+                    </td>
+                    <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">
+                      {formatMoney(ventureCash.balance)}
+                    </td>
+                    <td className="py-3 pr-4 text-right font-mono tabular text-ledger">
+                      {formatMoney(ventureCash.in_amt)}
+                    </td>
+                    <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                      {formatMoney(ventureCash.out_amt)}
+                    </td>
+                    <td className="py-3 pr-4 text-right font-mono tabular font-semibold">
+                      <span className={ventureCash.in_amt - ventureCash.out_amt >= 0 ? 'text-ink' : 'text-danger'}>
+                        {formatMoney(ventureCash.in_amt - ventureCash.out_amt)}
+                      </span>
+                    </td>
+                    <td className="py-3 pr-4 text-right font-mono tabular text-graphite">
+                      {formatMoney(0)}
+                    </td>
+                    <td className="py-3"></td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
@@ -400,7 +482,8 @@ export default async function DeptPoolPage({
       </section>
 
       <p className="font-serif italic text-muted text-xs">
-        All 5 Dept Pools share the same model: invoices settled + P&amp;L in, payroll consolidation + expenses out.
+        Dept Pools: invoices settled + P&amp;L in, payroll consolidation + expenses out.
+        Venture (Office) = HV central pool (venture_pool ledger).
       </p>
     </div>
   )
