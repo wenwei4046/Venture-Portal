@@ -74,14 +74,16 @@ export default async function DeptPoolPage({
       const slug = DEPT_NAME_TO_SLUG[dept.name]
       return { dept, a, href: slug ? `/dept-pool/${slug}` : null }
     })
-    const totalNetMargin = rows.reduce((s, r) => s + r.a.netMargin, 0)
-
     // Venture (= Office / corporate) shown as its own row for principal/finance.
     // Its P&L lives in the income statement's venture_pool bucket.
     const ventureAccrual =
       user.role !== 'dept_manager'
         ? splitPoolAccrual(poolByKey.get('venture_pool') ?? null)
         : null
+
+    // Total = the visible departments + Venture (whole-company net margin).
+    const totalNetMargin =
+      rows.reduce((s, r) => s + r.a.netMargin, 0) + (ventureAccrual?.netMargin ?? 0)
 
     return (
       <div>
@@ -121,7 +123,7 @@ export default async function DeptPoolPage({
               {formatMoney(totalNetMargin)}
             </div>
             <div className="font-mono text-xs text-muted mt-2">
-              {visible.length} department{visible.length === 1 ? '' : 's'} visible · Period{' '}
+              {visible.length} department{visible.length === 1 ? '' : 's'}{ventureAccrual ? ' + Venture' : ''} visible · Period{' '}
               {dayjs(period).format('MMMM YYYY')}
             </div>
           </div>
