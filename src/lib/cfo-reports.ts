@@ -564,7 +564,8 @@ export function classifyRows(input: ClassifyInput): ClassifyOutput {
     const vp = acc(VENTURE_POOL)
     if (interestIncome !== 0) bump(vp.revenue, 'Interest income — Loans', interestIncome)
     if (penaltyIncome !== 0) bump(vp.revenue, 'Penalty income', penaltyIncome)
-    if (interestExpense !== 0) bump(vp.expense, 'Interest expense — Fund sources', interestExpense)
+    // Treated as Cost (sits above gross profit) per user request, not Expense.
+    if (interestExpense !== 0) bump(vp.cost, 'Interest expense — Fund sources', interestExpense)
   }
   const treasuryNet = r2(interestIncome + penaltyIncome - interestExpense)
 

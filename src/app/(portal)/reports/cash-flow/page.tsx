@@ -8,11 +8,26 @@ import {
   pivotCashflowByPool,
   type CashflowByPoolBlock,
 } from '@/lib/cfo-reports'
+import { poolLabel, comparePools } from '@/lib/pools'
 import { SegmentedReport, type ReportSegment } from '@/app/(portal)/reports/_components/SegmentedReport'
 import { SegmentExportButtons } from '@/app/(portal)/reports/_components/SegmentExportButtons'
 import type { CashFlowCategory } from '@/lib/coa'
 import dayjs from 'dayjs'
 import Link from 'next/link'
+
+// Always show one cash-flow tab per pool, even when the pool had no activity
+// in the period. Mirrors the Income Statement's per-pool layout.
+const STANDARD_POOLS: readonly string[] = [
+  'venture_pool',
+  'dept_pool_marketing',
+  'dept_pool_hr',
+  'dept_pool_finance',
+  'dept_pool_director_office',
+  'dept_pool_director',
+]
+const EMPTY_SECTIONS: CashflowByPoolBlock['sections'] = (
+  ['operating', 'investing', 'financing'] as const
+).map((cat) => ({ category: cat, inflowLines: [], outflowLines: [], net: 0 }))
 
 interface Props {
   searchParams: Promise<{ from?: string; to?: string; period?: string }>
@@ -71,19 +86,24 @@ export default async function CashFlowPage({ searchParams }: Props) {
       <div className="max-w-3xl">
         {(() => {
           const pivot = pivotCashflowByPool(stmt)
-          if (pivot.pools.length === 0) {
-            return (
-              <div className="border border-hairline rounded-md bg-surface p-6 text-center">
-                <p className="font-serif italic text-muted text-sm">No cash activity in this period.</p>
-              </div>
-            )
-          }
+          // Inject empty blocks for any standard pool not in the pivot, so every
+          // pool gets its own tab even if it had no cash activity this period.
+          const present = new Set(pivot.pools.map((p) => p.pool))
+          const padded: CashflowByPoolBlock[] = [
+            ...pivot.pools,
+            ...STANDARD_POOLS.filter((p) => !present.has(p)).map<CashflowByPoolBlock>((p) => ({
+              pool: p,
+              poolLabel: poolLabel(p),
+              sections: EMPTY_SECTIONS,
+              net: 0,
+            })),
+          ].sort((a, b) => comparePools(a.pool, b.pool))
           return (
             <SegmentedReport
               defaultKey="summary"
               segments={[
                 { key: 'summary', label: 'Summary', panel: <SummaryPanel stmt={stmt} /> },
-                ...pivot.pools.map<ReportSegment>((b) => ({
+                ...padded.map<ReportSegment>((b) => ({
                   key: b.pool,
                   label: b.poolLabel,
                   panel: <PoolCashflowPanel block={b} />,
