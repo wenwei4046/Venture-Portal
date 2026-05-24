@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { User } from '@/types'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
+import BackToTop from '@/components/BackToTop'
 
 // Portal shell — hosts the mobile nav state that both Sidebar and TopBar
 // need to coordinate on. On mobile (<md), Sidebar hides off-canvas and
@@ -50,6 +51,7 @@ export default function PortalFrame({
           </div>
         </main>
       </div>
+      <BackToTop />
     </div>
   )
 }

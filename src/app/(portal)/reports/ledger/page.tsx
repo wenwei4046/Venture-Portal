@@ -1,9 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { formatMoney } from '@/lib/utils'
-import { fetchLedgers, type Ledger } from '@/lib/cfo-reports'
+import { fetchLedgers } from '@/lib/cfo-reports'
 import { type AccountType } from '@/lib/coa'
 import LedgerPicker from './_components/LedgerPicker'
+import LedgerSections from './_components/LedgerSections'
 import dayjs from 'dayjs'
 import Link from 'next/link'
 
@@ -15,28 +15,6 @@ interface Props {
     to?: string
     showZero?: string
   }>
-}
-
-function formatSignedBalance(signed: number): string {
-  const abs = Math.abs(signed)
-  if (abs < 0.005) return '—'
-  return `${formatMoney(abs)} ${signed >= 0 ? 'Dr' : 'Cr'}`
-}
-
-// Short-form labels for the Dept column (sourced from journal_entries.segment).
-const SEGMENT_SHORT: Record<string, string> = {
-  marketing: 'Mkt',
-  finance: 'Fin',
-  hr: 'HR',
-  director_office: 'DO',
-  director: 'Dir',
-  corporate: 'Vent', // Venture (= Office)
-  treasury: 'Trs',
-  unallocated: '—',
-}
-function segmentShort(seg: string): string {
-  if (!seg) return ''
-  return SEGMENT_SHORT[seg] ?? seg
 }
 
 function parseCodes(codes: string | undefined, code: string | undefined): string[] {
@@ -152,18 +130,14 @@ async function LedgerBody({
 
     return (
       <div className="mt-2">
-        <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
+        <p className="font-serif italic text-muted text-sm mb-2 max-w-3xl">
           {visible.length} {visible.length === 1 ? 'account' : 'accounts'} &middot; {periodLabel}
           {codes.length === 0 ? ' · all postable leaf accounts' : null}
           {!showZero && ledgers.length > visible.length
             ? ` · hiding ${ledgers.length - visible.length} with no activity`
             : null}
         </p>
-        <div className="space-y-8">
-          {visible.map((led) => (
-            <LedgerSection key={led.code} led={led} />
-          ))}
-        </div>
+        <LedgerSections ledgers={visible} />
       </div>
     )
   } catch (err) {
@@ -174,76 +148,4 @@ async function LedgerBody({
       </div>
     )
   }
-}
-
-function LedgerSection({ led }: { led: Ledger }) {
-  return (
-    <section className="mb-10">
-      <table className="ledger-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Acc. Desc.</th>
-            <th>Journal Type</th>
-            <th>Ref. 1</th>
-            <th>Dept</th>
-            <th>Desc.</th>
-            <th className="num">Home DR</th>
-            <th className="num">Home CR</th>
-            <th className="num">Home Balance</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr className="bg-surface border-t-2 border-hairline">
-            <td colSpan={6} className="font-mono text-xs text-ink font-semibold">
-              Acc. No.: {led.code} · {led.accountName}
-            </td>
-            <td className="num font-semibold">
-              {led.periodTotals.debit > 0 ? formatMoney(led.periodTotals.debit) : '—'}
-            </td>
-            <td className="num font-semibold">
-              {led.periodTotals.credit > 0 ? formatMoney(led.periodTotals.credit) : '—'}
-            </td>
-            <td className="num font-semibold">{formatSignedBalance(led.closingBalance)}</td>
-          </tr>
-          {led.lines.map((l, i) => {
-            const isBf = l.description === 'BALANCE B/F' && l.entryDate === ''
-            return (
-              <tr key={i} className={isBf ? 'text-graphite italic' : ''}>
-                <td className="font-mono text-xs">
-                  {l.entryDate ? dayjs(l.entryDate).format('D MMM YYYY') : '—'}
-                </td>
-                <td className="font-mono text-xs">{l.accountDesc}</td>
-                <td className="font-mono text-xs uppercase tracking-wide text-accent">
-                  {l.journalType}
-                </td>
-                <td className="font-mono text-sm text-ink">{l.ref}</td>
-                <td className="font-mono text-xs text-graphite">{segmentShort(l.segment)}</td>
-                <td className="text-sm">{l.description}</td>
-                <td className="num">{l.debit > 0 ? formatMoney(l.debit) : '—'}</td>
-                <td className="num">{l.credit > 0 ? formatMoney(l.credit) : '—'}</td>
-                <td className="num">{formatSignedBalance(l.runningBalance)}</td>
-              </tr>
-            )
-          })}
-        </tbody>
-        <tfoot>
-          <tr className="border-t border-hairline">
-            <td colSpan={6} className="font-mono text-xs text-ink font-semibold">
-              {led.code} {led.accountName} — total
-            </td>
-            <td className="num font-semibold">
-              {led.periodTotals.debit > 0 ? formatMoney(led.periodTotals.debit) : '—'}
-            </td>
-            <td className="num font-semibold">
-              {led.periodTotals.credit > 0 ? formatMoney(led.periodTotals.credit) : '—'}
-            </td>
-            <td className="num font-semibold text-num-ink">
-              {formatSignedBalance(led.closingBalance)}
-            </td>
-          </tr>
-        </tfoot>
-      </table>
-    </section>
-  )
 }
