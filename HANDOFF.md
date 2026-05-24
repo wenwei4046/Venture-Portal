@@ -1,4 +1,4 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-05-23)
+# HOUZS Venture Portal — Session Handoff (checkpoint 2026-05-25)
 
 > Context-window handoff. Read this first to continue. User communicates in 华语 (Mandarin).
 
