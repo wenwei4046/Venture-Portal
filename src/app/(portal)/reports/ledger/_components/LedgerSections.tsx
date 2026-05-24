@@ -136,7 +136,7 @@ export default function LedgerSections({ ledgers }: { ledgers: Ledger[] }) {
 
       {prepared.length === 0 ? (
         <p className="font-serif italic text-muted text-sm">
-          No lines match <strong>"{query}"</strong>. Try a different keyword or clear the search.
+          No lines match <strong>&ldquo;{query}&rdquo;</strong>. Try a different keyword or clear the search.
         </p>
       ) : (
         <div className="space-y-8">
