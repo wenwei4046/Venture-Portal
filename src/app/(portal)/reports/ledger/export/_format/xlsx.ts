@@ -11,21 +11,27 @@ function fmtBalance(signed: number): string {
   return `${abs} ${signed >= 0 ? 'Dr' : 'Cr'}`
 }
 
+const SEGMENT_SHORT: Record<string, string> = {
+  marketing: 'Mkt', finance: 'Fin', hr: 'HR', director_office: 'DO',
+  director: 'Dir', corporate: 'Vent', treasury: 'Trs', unallocated: '',
+}
+const segShort = (s: string) => (s ? SEGMENT_SHORT[s] ?? s : '')
+
 export function buildLedgerXlsx(led: Ledger): Buffer {
   const rows: (string | number | null)[][] = []
   rows.push([
-    `Acc. No.: ${led.code} · ${led.accountName}`, null, null, null, null,
+    `Acc. No.: ${led.code} · ${led.accountName}`, null, null, null, null, null,
     led.periodTotals.debit > 0 ? led.periodTotals.debit : null,
     led.periodTotals.credit > 0 ? led.periodTotals.credit : null,
     fmtBalance(led.closingBalance),
   ])
-  // Empty Dr/Cr cells are null (blank, keeps column numeric/sortable) — deliberately differs from the web layout's '—'.
   for (const l of led.lines) {
     rows.push([
       l.entryDate ? dayjs(l.entryDate).format('D MMM YYYY') : '—',
       l.accountDesc,
       l.journalType,
       l.ref,
+      segShort(l.segment),
       l.description,
       l.debit > 0 ? l.debit : null,
       l.credit > 0 ? l.credit : null,
@@ -33,7 +39,7 @@ export function buildLedgerXlsx(led: Ledger): Buffer {
     ])
   }
   rows.push([
-    `${led.code} ${led.accountName} — total`, null, null, null, null,
+    `${led.code} ${led.accountName} — total`, null, null, null, null, null,
     led.periodTotals.debit > 0 ? led.periodTotals.debit : null,
     led.periodTotals.credit > 0 ? led.periodTotals.credit : null,
     fmtBalance(led.closingBalance),
@@ -41,8 +47,8 @@ export function buildLedgerXlsx(led: Ledger): Buffer {
 
   return buildXlsxBuffer({
     sheetName: 'Ledger',
-    headerRow: ['Date', 'Acc. Desc.', 'Journal Type', 'Ref. 1', 'Desc.', 'Home DR', 'Home CR', 'Home Balance'],
+    headerRow: ['Date', 'Acc. Desc.', 'Journal Type', 'Ref. 1', 'Dept', 'Desc.', 'Home DR', 'Home CR', 'Home Balance'],
     rows,
-    columnWidths: [14, 26, 14, 18, 40, 14, 14, 18],
+    columnWidths: [14, 26, 14, 18, 8, 40, 14, 14, 18],
   })
 }

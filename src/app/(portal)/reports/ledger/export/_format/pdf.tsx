@@ -9,6 +9,12 @@ function fmtBalance(signed: number): string {
   return `${abs} ${signed >= 0 ? 'Dr' : 'Cr'}`
 }
 
+const SEGMENT_SHORT: Record<string, string> = {
+  marketing: 'Mkt', finance: 'Fin', hr: 'HR', director_office: 'DO',
+  director: 'Dir', corporate: 'Vent', treasury: 'Trs', unallocated: '',
+}
+const segShort = (s: string) => (s ? SEGMENT_SHORT[s] ?? s : '')
+
 export function LedgerPdf({ led }: { led: Ledger }) {
   const periodLabel = `${dayjs(led.from).format('D MMM YYYY')} – ${dayjs(led.to).format('D MMM YYYY')}`
   const subtitle = `${led.code} ${led.accountName}`
@@ -18,17 +24,18 @@ export function LedgerPdf({ led }: { led: Ledger }) {
       <PdfTable
         columns={[
           { label: 'Date',         width: 60 },
-          { label: 'Acc. Desc.',   width: 110 },
-          { label: 'Journal Type', width: 70 },
-          { label: 'Ref. 1',       width: 90 },
-          { label: 'Desc.',        width: 200 },
+          { label: 'Acc. Desc.',   width: 100 },
+          { label: 'Journal Type', width: 65 },
+          { label: 'Ref. 1',       width: 80 },
+          { label: 'Dept',         width: 36 },
+          { label: 'Desc.',        width: 180 },
           { label: 'Home DR',      width: 70, align: 'right' },
           { label: 'Home CR',      width: 70, align: 'right' },
           { label: 'Home Balance', width: 90, align: 'right' },
         ]}
         numberFormat="money"
         rows={[
-          [`Acc. No.: ${led.code} · ${led.accountName}`, '', '', '', '',
+          [`Acc. No.: ${led.code} · ${led.accountName}`, '', '', '', '', '',
             led.periodTotals.debit > 0 ? led.periodTotals.debit : null,
             led.periodTotals.credit > 0 ? led.periodTotals.credit : null,
             fmtBalance(led.closingBalance)],
@@ -37,12 +44,13 @@ export function LedgerPdf({ led }: { led: Ledger }) {
             l.accountDesc,
             l.journalType,
             l.ref,
+            segShort(l.segment),
             l.description,
             l.debit > 0 ? l.debit : null,
             l.credit > 0 ? l.credit : null,
             fmtBalance(l.runningBalance),
           ] as (string | number | null)[]),
-          [`${led.code} ${led.accountName} — total`, '', '', '', '',
+          [`${led.code} ${led.accountName} — total`, '', '', '', '', '',
             led.periodTotals.debit > 0 ? led.periodTotals.debit : null,
             led.periodTotals.credit > 0 ? led.periodTotals.credit : null,
             fmtBalance(led.closingBalance)],
