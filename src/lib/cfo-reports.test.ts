@@ -399,8 +399,8 @@ describe('buildLedger', () => {
       code: '3000', name: 'Cash & Bank — Hong Leong', type: 'asset',
     }
     const rawLines: RawLedgerLine[] = [
-      { entryDate: '2026-05-03', entryNo: 'JE-001', description: 'inv 1', accountDesc: '', journalType: '', ref: '', debit: 500, credit: 0 },
-      { entryDate: '2026-05-10', entryNo: 'JE-002', description: 'pmt', accountDesc: '', journalType: '', ref: '', debit: 0, credit: 200 },
+      { entryDate: '2026-05-03', entryNo: 'JE-001', description: 'inv 1', accountDesc: '', journalType: '', ref: '', segment: '', debit: 500, credit: 0 },
+      { entryDate: '2026-05-10', entryNo: 'JE-002', description: 'pmt', accountDesc: '', journalType: '', ref: '', segment: '', debit: 0, credit: 200 },
     ]
     const led = buildLedger({
       account, openingBalance: 1000, rawLines,
@@ -418,9 +418,9 @@ describe('buildLedger', () => {
       code: '3000', name: 'Cash & Bank — Hong Leong', type: 'asset',
     }
     const rawLines: RawLedgerLine[] = [
-      { entryDate: '2026-05-03', entryNo: 'JE-001', description: 'in',  accountDesc: '', journalType: '', ref: '', debit: 100, credit: 0 },
-      { entryDate: '2026-05-05', entryNo: 'JE-002', description: 'out', accountDesc: '', journalType: '', ref: '', debit: 0,   credit: 30 },
-      { entryDate: '2026-05-08', entryNo: 'JE-003', description: 'in',  accountDesc: '', journalType: '', ref: '', debit: 50,  credit: 0 },
+      { entryDate: '2026-05-03', entryNo: 'JE-001', description: 'in',  accountDesc: '', journalType: '', ref: '', segment: '', debit: 100, credit: 0 },
+      { entryDate: '2026-05-05', entryNo: 'JE-002', description: 'out', accountDesc: '', journalType: '', ref: '', segment: '', debit: 0,   credit: 30 },
+      { entryDate: '2026-05-08', entryNo: 'JE-003', description: 'in',  accountDesc: '', journalType: '', ref: '', segment: '', debit: 50,  credit: 0 },
     ]
     const led = buildLedger({
       account, openingBalance: 0, rawLines,
@@ -443,12 +443,12 @@ describe('buildLedger GL fields', () => {
       rawLines: [
         { entryDate: '2026-02-09', entryNo: 'JE-1', description: 'KL Gateway',
           debit: 0, credit: 7159.12, accountDesc: 'Rental Income',
-          journalType: 'SALES', ref: 'I-2602-0043' },
+          journalType: 'SALES', ref: 'I-2602-0043', segment: '' },
       ],
     })
     expect(led.lines[0]).toEqual({
       entryDate: '', entryNo: '', description: 'BALANCE B/F',
-      accountDesc: 'Rental Income', journalType: '', ref: '',
+      accountDesc: 'Rental Income', journalType: '', ref: '', segment: '',
       debit: 0, credit: 0, runningBalance: -112894.42,
     })
   })
@@ -459,10 +459,10 @@ describe('buildLedger GL fields', () => {
       rawLines: [
         { entryDate: '2026-02-09', entryNo: 'JE-1', description: 'x',
           debit: 0, credit: 1000, accountDesc: 'Rental Income',
-          journalType: 'SALES', ref: 'I-1' },
+          journalType: 'SALES', ref: 'I-1', segment: '' },
         { entryDate: '2026-02-10', entryNo: 'JE-2', description: 'y',
           debit: 200, credit: 0, accountDesc: 'Rental Income',
-          journalType: 'PAYMENT', ref: 'HV-PV-1' },
+          journalType: 'PAYMENT', ref: 'HV-PV-1', segment: '' },
       ],
     })
     expect(led.lines[1]).toMatchObject({ journalType: 'SALES', ref: 'I-1', accountDesc: 'Rental Income', runningBalance: -1000 })

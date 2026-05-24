@@ -23,6 +23,22 @@ function formatSignedBalance(signed: number): string {
   return `${formatMoney(abs)} ${signed >= 0 ? 'Dr' : 'Cr'}`
 }
 
+// Short-form labels for the Dept column (sourced from journal_entries.segment).
+const SEGMENT_SHORT: Record<string, string> = {
+  marketing: 'Mkt',
+  finance: 'Fin',
+  hr: 'HR',
+  director_office: 'DO',
+  director: 'Dir',
+  corporate: 'Vent', // Venture (= Office)
+  treasury: 'Trs',
+  unallocated: '—',
+}
+function segmentShort(seg: string): string {
+  if (!seg) return ''
+  return SEGMENT_SHORT[seg] ?? seg
+}
+
 function parseCodes(codes: string | undefined, code: string | undefined): string[] {
   if (codes) {
     return codes
@@ -170,6 +186,7 @@ function LedgerSection({ led }: { led: Ledger }) {
             <th>Acc. Desc.</th>
             <th>Journal Type</th>
             <th>Ref. 1</th>
+            <th>Dept</th>
             <th>Desc.</th>
             <th className="num">Home DR</th>
             <th className="num">Home CR</th>
@@ -178,7 +195,7 @@ function LedgerSection({ led }: { led: Ledger }) {
         </thead>
         <tbody>
           <tr className="bg-surface border-t-2 border-hairline">
-            <td colSpan={5} className="font-mono text-xs text-ink font-semibold">
+            <td colSpan={6} className="font-mono text-xs text-ink font-semibold">
               Acc. No.: {led.code} · {led.accountName}
             </td>
             <td className="num font-semibold">
@@ -201,6 +218,7 @@ function LedgerSection({ led }: { led: Ledger }) {
                   {l.journalType}
                 </td>
                 <td className="font-mono text-sm text-ink">{l.ref}</td>
+                <td className="font-mono text-xs text-graphite">{segmentShort(l.segment)}</td>
                 <td className="text-sm">{l.description}</td>
                 <td className="num">{l.debit > 0 ? formatMoney(l.debit) : '—'}</td>
                 <td className="num">{l.credit > 0 ? formatMoney(l.credit) : '—'}</td>
@@ -211,7 +229,7 @@ function LedgerSection({ led }: { led: Ledger }) {
         </tbody>
         <tfoot>
           <tr className="border-t border-hairline">
-            <td colSpan={5} className="font-mono text-xs text-ink font-semibold">
+            <td colSpan={6} className="font-mono text-xs text-ink font-semibold">
               {led.code} {led.accountName} — total
             </td>
             <td className="num font-semibold">

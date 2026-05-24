@@ -1612,6 +1612,7 @@ export interface RawLedgerLine {
   accountDesc: string
   journalType: string
   ref: string
+  segment: string    // journal_entries.segment (department / pool tag)
   debit: number      // positive amount; 0 when this side wasn't touched
   credit: number     // positive amount; 0 when this side wasn't touched
 }
@@ -1623,6 +1624,7 @@ export interface LedgerLine {
   accountDesc: string
   journalType: string
   ref: string
+  segment: string
   debit: number
   credit: number
   runningBalance: number  // signed Dr − Cr (positive = debit balance after this line)
@@ -1659,6 +1661,7 @@ export function buildLedger(args: {
       accountDesc: account.name,
       journalType: '',
       ref: '',
+      segment: '',
       debit: 0,
       credit: 0,
       runningBalance: r2(openingBalance),
@@ -1675,6 +1678,7 @@ export function buildLedger(args: {
       accountDesc: raw.accountDesc,
       journalType: raw.journalType,
       ref: raw.ref,
+      segment: raw.segment,
       debit: r2(raw.debit),
       credit: r2(raw.credit),
       runningBalance: r2(running),
@@ -1915,7 +1919,7 @@ export async function fetchLedgers(
   // ── 3: Period JEs with metadata for the description override. ──
   const { data: periodJes, error: periodJeErr } = await supabase
     .from('journal_entries')
-    .select('id, entry_no, transaction_date, description, reference_type, reference_id')
+    .select('id, entry_no, transaction_date, description, reference_type, reference_id, segment')
     .gte('transaction_date', from)
     .lte('transaction_date', to)
     .eq('is_reversed', false)
@@ -1937,7 +1941,7 @@ export async function fetchLedgers(
 
   const jeById = new Map<
     string,
-    { entryNo: string; transactionDate: string; description: string; journalType: string; ref: string }
+    { entryNo: string; transactionDate: string; description: string; journalType: string; ref: string; segment: string }
   >()
   for (const j of periodJes2) {
     const fallback = (j.description as string) ?? ''
@@ -1954,6 +1958,7 @@ export async function fetchLedgers(
         (j.reference_type ? REF_TYPE_JOURNAL[j.reference_type as string] : undefined) ??
         'JOURNAL',
       ref: meta?.ref || (j.entry_no as string),
+      segment: (j.segment as string | null) ?? '',
     })
   }
 
@@ -1966,6 +1971,7 @@ export async function fetchLedgers(
     description: string
     journalType: string
     ref: string
+    segment: string
     debit: number
     credit: number
   }
@@ -1990,6 +1996,7 @@ export async function fetchLedgers(
         description: je.description,
         journalType: je.journalType,
         ref: je.ref,
+        segment: je.segment,
         debit: Number(l.debit ?? 0),
         credit: Number(l.credit ?? 0),
       })
@@ -2012,6 +2019,7 @@ export async function fetchLedgers(
       accountDesc: account.name,
       journalType: l.journalType,
       ref: l.ref,
+      segment: l.segment,
       debit: l.debit,
       credit: l.credit,
     }))
