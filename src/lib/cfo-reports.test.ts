@@ -71,13 +71,16 @@ describe('classifyRows', () => {
   })
 
   it('folds treasury interest into the Venture Pool margin (not double-counted)', () => {
+    // Post b4a108d: treasury interest EXPENSE now bumps into vp.cost (above
+    // gross profit), NOT vp.expense. Interest income still lands in vp.revenue.
     const out = classifyRows({
       pvSources: [], invoices: [],
       treasury: { interestIncome: 1268.25, penaltyIncome: 0, interestExpense: 8430, managedCodes: new Set() },
     })
     const vp = out.income.pools.find((p) => p.pool === 'venture_pool')!
     expect(vp.revenue).toBeCloseTo(1268.25, 2)
-    expect(vp.expense).toBeCloseTo(8430, 2)
+    expect(vp.cost).toBeCloseTo(8430, 2)
+    expect(vp.expense).toBeCloseTo(0, 2)
     expect(vp.margin).toBeCloseTo(-7161.75, 2)
     expect(out.income.treasury.net).toBeCloseTo(-7161.75, 2)
     expect(out.income.groupNetProfit).toBeCloseTo(-7161.75, 2)  // only counted once
@@ -214,9 +217,10 @@ describe('classifyRows', () => {
       treasury: { interestIncome: 0, penaltyIncome: 0, interestExpense: 2000, managedCodes: new Set(['9010']) },
     })
     const vp = out.income.pools.find((p) => p.pool === 'venture_pool')!
-    // Expense is 2000 (from treasury), NOT 4000. The PV expense row on
-    // account_code 9010 is skipped.
-    expect(vp.expense).toBeCloseTo(2000, 2)
+    // Cost is 2000 (from treasury, post-b4a108d routes interest expense to
+    // vp.cost), NOT 4000. The PV expense row on account_code 9010 is skipped.
+    expect(vp.cost).toBeCloseTo(2000, 2)
+    expect(vp.expense).toBeCloseTo(0, 2)
     expect(vp.margin).toBeCloseTo(-2000, 2)
   })
 
