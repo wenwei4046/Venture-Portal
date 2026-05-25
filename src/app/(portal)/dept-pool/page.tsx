@@ -277,37 +277,48 @@ export default async function DeptPoolPage({
     }
   }
 
-  // Venture (= Office / corporate) cash = the central venture_pool ledger.
-  // Bank-recon opening lives in dept_pools(Director) (per the "Director & Office"
-  // line on the recon — see mig 262), so Venture's BS-cash opening is 0; the
-  // venture_pool ledger then accumulates HV central movements going forward:
-  //   IN  = fund_in (subsidiary deposits) + loan_repayment_in + profit_in
-  //   OUT = fund_out (loans disbursed)    + expense_out
-  // Matches the IN/OUT mapping used on /venture-pool.
-  const VP_IN_TYPES = new Set(['fund_in', 'loan_repayment_in', 'profit_in'])
-  const VP_OUT_TYPES = new Set(['fund_out', 'expense_out'])
-
+  // Venture (= Office / corporate) cash movements = real cash impact of
+  // every journal entry tagged segment='corporate' on a HV bank account.
+  // Source: journal_lines (same data that drives Trial Balance / BS / IS),
+  // NOT the venture_pool table — venture_pool is a future-going PV ledger
+  // and would miss the 334 manual_jv entries imported from the historical
+  // GL. apply_pool_adjustment writes venture_pool only; the matching
+  // journal_lines posts happen separately, so reading journal_lines also
+  // captures all future PV-driven movements (no double count).
+  //   IN  = Σ debit  on cash accounts (3000 / 3010 / ...) where seg='corporate'
+  //   OUT = Σ credit on cash accounts where seg='corporate'
   let ventureCash: { balance: number; in_amt: number; out_amt: number } | null = null
   if (user.role !== 'dept_manager') {
-    const { data: vpTxns } = await supabase
-      .from('venture_pool')
-      .select('transaction_type, amount')
-    let vpIn = 0
-    let vpOut = 0
-    for (const t of vpTxns ?? []) {
-      const amt = Number(t.amount)
-      if (VP_IN_TYPES.has(t.transaction_type as string)) vpIn += amt
-      else if (VP_OUT_TYPES.has(t.transaction_type as string)) vpOut += amt
+    const { data: bankCodes } = await supabase
+      .from('bank_accounts')
+      .select('gl_account_code')
+      .eq('status', 'active')
+    const cashCodes = (bankCodes ?? [])
+      .map((b) => b.gl_account_code as string)
+      .filter(Boolean)
+
+    let vIn = 0
+    let vOut = 0
+    if (cashCodes.length > 0) {
+      const { data: corpCashRows } = await supabase
+        .from('journal_lines')
+        .select('debit, credit, journal_entries!inner(segment)')
+        .in('account_code', cashCodes)
+        .eq('journal_entries.segment', 'corporate')
+      for (const r of corpCashRows ?? []) {
+        vIn += Number(r.debit ?? 0)
+        vOut += Number(r.credit ?? 0)
+      }
     }
-    ventureCash = { balance: vpIn - vpOut, in_amt: vpIn, out_amt: vpOut }
+    ventureCash = { balance: vIn - vOut, in_amt: vIn, out_amt: vOut }
   }
 
-  // Total cash = all dept balances (incl overdrafts) + Venture central pool;
-  // dept balances foot to the Bank Reconciliation, Venture adds its central
-  // movement on top.
-  const totalDeployed =
-    Array.from(balanceMap.values()).reduce((acc, b) => acc + b, 0) +
-    (ventureCash?.balance ?? 0)
+  // Total cash = sum of dept balances only; foots to the Bank Reconciliation.
+  // Venture is shown for transparency but NOT added to total — the bank-recon
+  // assigns "Director & Office" cash to Director, so the corporate-segment
+  // movements that Venture shows are already reflected inside Director's
+  // bank slice. Adding Venture here would double-count.
+  const totalDeployed = Array.from(balanceMap.values()).reduce((acc, b) => acc + b, 0)
 
   return (
     <div>
@@ -485,7 +496,9 @@ export default async function DeptPoolPage({
 
       <p className="font-serif italic text-muted text-xs">
         Dept Pools: invoices settled + P&amp;L in, payroll consolidation + expenses out.
-        Venture (Office) = HV central pool (venture_pool ledger).
+        Venture (Office) = every JE tagged segment=corporate hitting a HV bank
+        account; shown for transparency but NOT added to the Total above —
+        per the Bank Reconciliation, Office cash sits inside Director&apos;s slice.
       </p>
     </div>
   )
