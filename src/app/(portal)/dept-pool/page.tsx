@@ -277,16 +277,37 @@ export default async function DeptPoolPage({
     }
   }
 
-  // Venture (= Office / corporate) has NO separate cash here: per the Bank
-  // Reconciliation, the "Director & Office" cash is assigned to Director, so
-  // Office's cash is already inside Director. (The old venture_pool ledger is a
-  // distinct central record, not part of the bank-recon cash basis.) Shown as 0.
-  const ventureCash: { balance: number; in_amt: number; out_amt: number } | null =
-    user.role !== 'dept_manager' ? { balance: 0, in_amt: 0, out_amt: 0 } : null
+  // Venture (= Office / corporate) cash = the central venture_pool ledger.
+  // Bank-recon opening lives in dept_pools(Director) (per the "Director & Office"
+  // line on the recon — see mig 262), so Venture's BS-cash opening is 0; the
+  // venture_pool ledger then accumulates HV central movements going forward:
+  //   IN  = fund_in (subsidiary deposits) + loan_repayment_in + profit_in
+  //   OUT = fund_out (loans disbursed)    + expense_out
+  // Matches the IN/OUT mapping used on /venture-pool.
+  const VP_IN_TYPES = new Set(['fund_in', 'loan_repayment_in', 'profit_in'])
+  const VP_OUT_TYPES = new Set(['fund_out', 'expense_out'])
 
-  // Total cash = all dept balances (incl overdrafts); foots to the Bank
-  // Reconciliation. Venture contributes 0 (its cash sits in Director).
-  const totalDeployed = Array.from(balanceMap.values()).reduce((acc, b) => acc + b, 0)
+  let ventureCash: { balance: number; in_amt: number; out_amt: number } | null = null
+  if (user.role !== 'dept_manager') {
+    const { data: vpTxns } = await supabase
+      .from('venture_pool')
+      .select('transaction_type, amount')
+    let vpIn = 0
+    let vpOut = 0
+    for (const t of vpTxns ?? []) {
+      const amt = Number(t.amount)
+      if (VP_IN_TYPES.has(t.transaction_type as string)) vpIn += amt
+      else if (VP_OUT_TYPES.has(t.transaction_type as string)) vpOut += amt
+    }
+    ventureCash = { balance: vpIn - vpOut, in_amt: vpIn, out_amt: vpOut }
+  }
+
+  // Total cash = all dept balances (incl overdrafts) + Venture central pool;
+  // dept balances foot to the Bank Reconciliation, Venture adds its central
+  // movement on top.
+  const totalDeployed =
+    Array.from(balanceMap.values()).reduce((acc, b) => acc + b, 0) +
+    (ventureCash?.balance ?? 0)
 
   return (
     <div>
