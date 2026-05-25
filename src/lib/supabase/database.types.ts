@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -3912,6 +3912,14 @@ export type Database = {
         }
         Returns: string
       }
+      create_manual_journal_voucher: {
+        Args: {
+          p_description: string
+          p_lines: Json
+          p_transaction_date: string
+        }
+        Returns: string
+      }
       create_payroll_disbursement_vouchers: {
         Args: { p_period: string }
         Returns: Json
@@ -3922,6 +3930,10 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       dashboard_summary: { Args: never; Returns: Json }
+      delete_manual_journal_voucher: {
+        Args: { p_entry_id: string }
+        Returns: undefined
+      }
       dept_pool_gl_code: { Args: { p_dept_name: string }; Returns: string }
       dept_to_segment: {
         Args: { p_dept_name: string }
@@ -4174,6 +4186,15 @@ export type Database = {
         Args: { p_period: string; p_user_id: string }
         Returns: string
       }
+      update_manual_journal_voucher: {
+        Args: {
+          p_description: string
+          p_entry_id: string
+          p_lines: Json
+          p_transaction_date: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       account_type:
@@ -4219,6 +4240,7 @@ export type Database = {
         | "director_attribution"
         | "hr_attribution"
         | "finance_attribution"
+        | "venture_attribution"
       cash_flow_category: "operating" | "investing" | "financing"
       claim_status: "pending" | "approved" | "rejected" | "paid"
       claim_type: "project" | "benefit"
@@ -4258,9 +4280,9 @@ export type Database = {
         | "hr"
         | "finance"
         | "director_office"
-        | "director"
         | "corporate"
         | "unallocated"
+        | "director"
       hr_employment_type: "salaried" | "commission_eligible"
       hr_monthly_payroll_source: "imported" | "manual" | "carried_forward"
       hr_monthly_payroll_status: "draft" | "submitted" | "paid"
@@ -4490,6 +4512,7 @@ export const Constants = {
         "director_attribution",
         "hr_attribution",
         "finance_attribution",
+        "venture_attribution",
       ],
       cash_flow_category: ["operating", "investing", "financing"],
       claim_status: ["pending", "approved", "rejected", "paid"],
@@ -4534,9 +4557,9 @@ export const Constants = {
         "hr",
         "finance",
         "director_office",
-        "director",
         "corporate",
         "unallocated",
+        "director",
       ],
       hr_employment_type: ["salaried", "commission_eligible"],
       hr_monthly_payroll_source: ["imported", "manual", "carried_forward"],
