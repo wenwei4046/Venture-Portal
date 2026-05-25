@@ -24,11 +24,12 @@ interface Props {
 }
 
 const POOL_OPTIONS: Array<{ value: CreateInvoiceMode; label: string }> = [
+  { value: 'venture_attribution',         label: 'Venture Pool' },
+  { value: 'marketing_project',           label: 'Marketing Department Pool' },
   { value: 'hr_attribution',              label: 'HR Department Pool' },
   { value: 'finance_attribution',         label: 'Finance Department Pool' },
   { value: 'director_office_attribution', label: 'Director Office Department Pool' },
   { value: 'director_attribution',        label: 'Director Department Pool' },
-  { value: 'marketing_project',           label: 'Marketing Department Pool' },
 ]
 
 interface CnRow {
@@ -274,7 +275,6 @@ export default function CreateCreditNoteButton({
                               onChange={(code) => updateRow(r.uid, { categoryCode: code })}
                               name={`cn_row_category_${r.uid}_display`}
                               placeholder="Select category…"
-                              typeFilter={['revenue', 'cost', 'other_income']}
                               disabled={isPending}
                             />
                           </td>

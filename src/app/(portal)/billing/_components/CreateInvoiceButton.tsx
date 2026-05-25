@@ -57,11 +57,12 @@ const BILLABLE_OPTIONS: Array<{ value: BillableToKind; label: string; hint: stri
 ]
 
 const POOL_OPTIONS: Array<{ value: CreateInvoiceMode; label: string }> = [
+  { value: 'venture_attribution',         label: 'Venture Pool' },
+  { value: 'marketing_project',           label: 'Marketing Department Pool' },
   { value: 'hr_attribution',              label: 'HR Department Pool' },
   { value: 'finance_attribution',         label: 'Finance Department Pool' },
   { value: 'director_office_attribution', label: 'Director Office Department Pool' },
   { value: 'director_attribution',        label: 'Director Department Pool' },
-  { value: 'marketing_project',           label: 'Marketing Department Pool' },
 ]
 
 interface SubRow {
@@ -578,7 +579,6 @@ export default function CreateInvoiceButton({
                       onChange={setDirectorCategory}
                       name="director_category_display"
                       placeholder="Select category…"
-                      typeFilter={['revenue', 'cost', 'other_income']}
                       disabled={isPending}
                       required
                     />
@@ -876,7 +876,6 @@ function PoolTable({
                   onChange={(code) => onUpdate(r.uid, { categoryCode: code })}
                   name={`pool_row_category_${r.uid}_display`}
                   placeholder="Select category…"
-                  typeFilter={['revenue', 'cost', 'other_income']}
                   disabled={isPending}
                 />
               </Field>

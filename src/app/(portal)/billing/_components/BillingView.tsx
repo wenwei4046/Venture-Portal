@@ -7,6 +7,7 @@ import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import type { CreateInvoiceMode } from '../actions'
+import type { AccountType } from '@/lib/coa'
 import PeriodSelector from './PeriodSelector'
 import GenerateInvoicesButton from './GenerateInvoicesButton'
 import MarketingProjectList from './MarketingProjectList'
@@ -67,13 +68,15 @@ export default async function BillingView({ searchParams }: Props) {
       .lte('created_at', periodEnd)
       .order('created_at', { ascending: false }),
     supabase.from('departments').select('id, name').order('name'),
-    // Post-mig 238: payment_categories is gone. Pull P&L revenue / cost /
-    // other_income accounts from chart_of_accounts for invoice GL routing.
+    // Post-mig 238: payment_categories is gone. Pull every active leaf
+    // account from chart_of_accounts so the invoice "category" picker can
+    // route the credit side anywhere — revenue (5000s), other_income (9000)
+    // for recoveries, or balance-sheet codes (e.g. clearing a receivable
+    // originally booked when HV paid on someone's behalf).
     // Mig 246 adds parent_code so downstream pickers can hide headers.
     supabase
       .from('chart_of_accounts')
       .select('code, name, type, parent_code')
-      .in('type', ['revenue', 'cost', 'other_income'])
       .eq('is_active', true)
       .order('sort_order'),
   ])
@@ -84,12 +87,12 @@ export default async function BillingView({ searchParams }: Props) {
   const categoryList: Array<{
     code: string
     label: string
-    type: 'revenue' | 'cost' | 'other_income'
+    type: AccountType
     parent_code: string | null
   }> = (categories ?? []).map((c) => ({
     code: c.code,
     label: c.name,
-    type: c.type as 'revenue' | 'cost' | 'other_income',
+    type: c.type as AccountType,
     parent_code: (c as { parent_code: string | null }).parent_code ?? null,
   }))
 
@@ -367,7 +370,7 @@ function DeptCostCard({
   categories?: Array<{
     code: string
     label: string
-    type: 'revenue' | 'cost' | 'other_income'
+    type: AccountType
     parent_code: string | null
   }>
   marketingNote?: boolean

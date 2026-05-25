@@ -23,8 +23,15 @@ function revenueGlCode(_billingMode: string | null): string {
 // Note: invoices.category_code (added by mig 230) keeps its column name; only
 // payment_voucher_sources.category_code was renamed by mig 238. Values stored
 // here are chart_of_accounts.code post-unified-COA — the COA IS the GL now,
-// so if the invoice declares a revenue account directly we credit that code;
-// otherwise fall back to revenueGlCode (Service Revenue — Subs 5000).
+// so we trust whatever account the user picked as the credit side. Typical
+// uses:
+//   - revenue (5000-series)  → ordinary service billing
+//   - other_income (9000)    → expense-recovery invoices
+//   - receivable (3050-3071) → "bill-back / pay-on-behalf" — clearing the
+//                              receivable originally booked when HV paid on
+//                              someone's behalf
+// Previously this function would silently force a non-revenue pick back to
+// 5000, which mis-credited the GL on bill-back invoices.
 async function resolveRevenueGlCode(
   supabase: Awaited<ReturnType<typeof createClient>>,
   categoryCode: string | null,
@@ -33,10 +40,11 @@ async function resolveRevenueGlCode(
   if (categoryCode) {
     const { data: acct } = await supabase
       .from('chart_of_accounts')
-      .select('type')
+      .select('code')
       .eq('code', categoryCode)
+      .eq('is_active', true)
       .maybeSingle()
-    if (acct?.type === 'revenue') return categoryCode
+    if (acct?.code) return acct.code
   }
   return revenueGlCode(billingMode)
 }
@@ -62,6 +70,7 @@ const CREATE_INVOICE_MODES = [
   'director_office_attribution',
   'director_attribution',
   'marketing_project',
+  'venture_attribution',
 ] as const
 
 export type CreateInvoiceMode = (typeof CREATE_INVOICE_MODES)[number]

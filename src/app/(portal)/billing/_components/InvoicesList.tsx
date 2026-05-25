@@ -7,6 +7,7 @@ import { ApproveInvoiceButton, BulkIssueInvoicesButton } from './InvoiceActions'
 import CreateCreditNoteButton from './CreateCreditNoteButton'
 import InvoiceDetailButton from './InvoiceDetailButton'
 import SortableTable, { type SortableColumn } from '@/components/SortableTable'
+import type { AccountType } from '@/lib/coa'
 
 interface Invoice {
   id: string
@@ -94,7 +95,7 @@ interface Props {
   categories?: Array<{
     code: string
     label: string
-    type: 'revenue' | 'cost' | 'other_income'
+    type: AccountType
     parent_code: string | null
   }>
 }
