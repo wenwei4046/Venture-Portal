@@ -313,6 +313,73 @@ export default async function DeptPoolPage({
     ventureCash = { balance: vIn - vOut, in_amt: vIn, out_amt: vOut }
   }
 
+  // Per-bank × per-segment breakdown (cash basis only). Pulls the full
+  // journal_lines net per (bank account, segment) so the user can see the
+  // "Alliance = Director's slice; HL = everyone else's slice" convention
+  // landing as intended. Drives a separate section below the main table.
+  type BankInfo = { code: string; name: string; balance: number }
+  type PerBankRow = { segment: string; label: string; perBank: Record<string, number>; total: number }
+  let perBankBreakdown: { banks: BankInfo[]; rows: PerBankRow[]; totals: { perBank: Record<string, number>; grand: number } } | null = null
+  if (user.role !== 'dept_manager') {
+    const { data: bankRows } = await supabase
+      .from('bank_accounts')
+      .select('gl_account_code, bank_name, current_balance, is_primary')
+      .eq('status', 'active')
+      .order('is_primary', { ascending: false })
+    const banks: BankInfo[] = (bankRows ?? [])
+      .filter((b) => b.gl_account_code)
+      .map((b) => ({
+        code: b.gl_account_code as string,
+        name: b.bank_name as string,
+        balance: Number(b.current_balance ?? 0),
+      }))
+
+    if (banks.length > 0) {
+      const codes = banks.map((b) => b.code)
+      const { data: bankLines } = await supabase
+        .from('journal_lines')
+        .select('account_code, debit, credit, journal_entries!inner(segment)')
+        .in('account_code', codes)
+      const agg = new Map<string, Map<string, number>>() // segment -> bankCode -> net
+      for (const r of bankLines ?? []) {
+        const seg = (r as { journal_entries: { segment: string } }).journal_entries.segment ?? 'unallocated'
+        const code = r.account_code as string
+        if (!agg.has(seg)) agg.set(seg, new Map())
+        const map = agg.get(seg)!
+        map.set(code, (map.get(code) ?? 0) + Number(r.debit ?? 0) - Number(r.credit ?? 0))
+      }
+
+      // Build display rows. Use the dept name (matching the main table) for
+      // 5 dept segments, and "Venture (Office)" for corporate. Skip
+      // 'unallocated' since it has no business-meaningful presence.
+      const segLabels: Array<{ seg: string; label: string }> = [
+        { seg: 'director',        label: 'Director' },
+        { seg: 'director_office', label: 'Director Office' },
+        { seg: 'finance',         label: 'Finance' },
+        { seg: 'hr',              label: 'HR' },
+        { seg: 'marketing',       label: 'Marketing' },
+        { seg: 'corporate',       label: 'Venture (Office)' },
+      ]
+      const rows: PerBankRow[] = segLabels.map(({ seg, label }) => {
+        const perBank: Record<string, number> = {}
+        let total = 0
+        for (const b of banks) {
+          const v = agg.get(seg)?.get(b.code) ?? 0
+          perBank[b.code] = v
+          total += v
+        }
+        return { segment: seg, label, perBank, total }
+      })
+      const totals = { perBank: {} as Record<string, number>, grand: 0 }
+      for (const b of banks) {
+        const sum = rows.reduce((s, r) => s + (r.perBank[b.code] ?? 0), 0)
+        totals.perBank[b.code] = sum
+        totals.grand += sum
+      }
+      perBankBreakdown = { banks, rows, totals }
+    }
+  }
+
   // Total cash = sum of dept balances only; foots to the Bank Reconciliation.
   // Venture is shown for transparency but NOT added to total — the bank-recon
   // assigns "Director & Office" cash to Director, so the corporate-segment
@@ -493,6 +560,68 @@ export default async function DeptPoolPage({
           </div>
         )}
       </section>
+
+      {perBankBreakdown ? (
+        <section className="mb-12">
+          <div className="flex items-baseline justify-between mb-1">
+            <h2 className="font-serif text-xl text-ink">Per-bank breakdown</h2>
+            <span className="font-serif italic text-muted text-xs">
+              Derived from journal_lines · cash basis
+            </span>
+          </div>
+          <p className="font-serif italic text-muted text-xs mb-4 max-w-2xl">
+            Per-segment cash slice on each HV bank account. Sums down each
+            column = bank balance; sums across each row = department total.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
+                  <th className="text-left py-3 pr-4 font-medium">Department</th>
+                  {perBankBreakdown.banks.map((b) => (
+                    <th key={b.code} className="text-right py-3 pr-4 font-medium">
+                      {b.name} <span className="font-mono text-muted">({b.code})</span>
+                    </th>
+                  ))}
+                  <th className="text-right py-3 pr-4 font-medium">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {perBankBreakdown.rows.map((r) => (
+                  <tr key={r.segment} className="border-b border-hairline last:border-0">
+                    <td className="py-3 pr-4 font-serif text-md text-ink">{r.label}</td>
+                    {perBankBreakdown!.banks.map((b) => {
+                      const v = r.perBank[b.code] ?? 0
+                      return (
+                        <td
+                          key={b.code}
+                          className={`py-3 pr-4 text-right font-mono tabular ${v < 0 ? 'text-danger' : 'text-ink'}`}
+                        >
+                          {v === 0 ? '—' : formatMoney(v)}
+                        </td>
+                      )
+                    })}
+                    <td className={`py-3 pr-4 text-right font-mono tabular font-semibold ${r.total < 0 ? 'text-danger' : 'text-ink'}`}>
+                      {formatMoney(r.total)}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="border-t-2 border-hairline">
+                  <td className="py-3 pr-4 font-serif text-md text-ink font-semibold">Bank balance</td>
+                  {perBankBreakdown.banks.map((b) => (
+                    <td key={b.code} className="py-3 pr-4 text-right font-mono tabular font-semibold text-ink">
+                      {formatMoney(perBankBreakdown!.totals.perBank[b.code] ?? 0)}
+                    </td>
+                  ))}
+                  <td className="py-3 pr-4 text-right font-mono tabular font-semibold text-num-ink">
+                    {formatMoney(perBankBreakdown.totals.grand)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
       <p className="font-serif italic text-muted text-xs">
         Dept Pools: invoices settled + P&amp;L in, payroll consolidation + expenses out.
