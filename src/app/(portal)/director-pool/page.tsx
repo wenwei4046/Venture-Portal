@@ -33,6 +33,7 @@ export default async function DirectorPoolPage() {
     { data: payouts },
     { data: advancePayouts },
     { data: directors },
+    { data: deptBalances },
   ] = await Promise.all([
     directorDept
       ? supabase
@@ -54,6 +55,9 @@ export default async function DirectorPoolPage() {
       .in('status', ['confirmed', 'paid'])
       .order('period_month', { ascending: false }),
     supabase.from('directors').select('id, code, name').order('code'),
+    // For per-director Billed/Used/Remaining: other depts' negative balances
+    // = amount "borrowed" from Director's invoice pool, pro-rated by ratio.
+    supabase.from('dept_pool_balances').select('department_id, balance'),
   ])
 
   // Director Pool balance — SUM(np_in) - SUM(expense_out) for Director dept
@@ -117,6 +121,46 @@ export default async function DirectorPoolPage() {
   )
   const totalAccumulated = directorRows.reduce((s, r) => s + r.accumulated, 0)
   const totalReleased = directorRows.reduce((s, r) => s + r.released, 0)
+
+  // Per-director Billed / Used / Remaining.
+  // "Used" model: when other dept pools (non-Director, non-Office) go
+  // negative, those deficits are effectively financed by Director's invoice
+  // accumulator. Aggregate the negative dept balances and pro-rate across
+  // directors by their share of the total billed pool.
+  const otherDeptsNetNegative = (deptBalances ?? [])
+    .filter((b) => b.department_id !== directorDept?.id)
+    .map((b) => Number(b.balance))
+    .filter((v) => v < 0)
+    .reduce((s, v) => s + v, 0) // negative number
+  const totalUsed = Math.abs(otherDeptsNetNegative) // positive
+  const r2 = (n: number) => Math.round(n * 100) / 100
+  type UsageRow = { id: string | null; code: string | null; name: string; billed: number; used: number; remaining: number }
+  let runningUsedSum = 0
+  const usageRows: UsageRow[] = directorRows.map((r, idx) => {
+    let used: number
+    if (totalAccumulated <= 0) {
+      used = 0
+    } else if (idx === directorRows.length - 1) {
+      // Last row absorbs rounding so column sum = totalUsed exactly.
+      used = r2(totalUsed - runningUsedSum)
+    } else {
+      used = r2((r.accumulated / totalAccumulated) * totalUsed)
+      runningUsedSum += used
+    }
+    return {
+      id: r.id,
+      code: r.code,
+      name: r.name,
+      billed: r.accumulated,
+      used,
+      remaining: r2(r.accumulated - used),
+    }
+  })
+  const usageTotals = {
+    billed: r2(usageRows.reduce((s, r) => s + r.billed, 0)),
+    used: r2(usageRows.reduce((s, r) => s + r.used, 0)),
+    remaining: r2(usageRows.reduce((s, r) => s + r.remaining, 0)),
+  }
 
   // Reconciliation: Saving + Invoice should equal Director Pool once all period payroll is PV'd out
   const bucketsTotal = savingBucket + invoiceBucket
@@ -328,6 +372,64 @@ export default async function DirectorPoolPage() {
         )}
       </section>
       )}
+
+      {/* Per-director Billed / Used / Remaining — Principal only.
+          Models the user's accounting view: other depts going negative
+          have "borrowed" from Director's invoice accumulator, allocated
+          pro-rata across directors by their share of total billed. */}
+      {isPrincipal && usageRows.length > 0 && totalAccumulated > 0 ? (
+        <section className="mb-12">
+          <h2 className="font-serif text-2xl text-ink mb-1">Per-director usage</h2>
+          <p className="font-serif italic text-muted text-xs mb-4 max-w-2xl">
+            Other departments&apos; negative dept-pool balances are funded by
+            Director&apos;s invoice accumulator. The {formatMoney(totalUsed)} total
+            shortfall is pro-rated across each director by their share of the
+            billed pool ({formatMoney(totalAccumulated)}).
+          </p>
+          <div className="overflow-x-auto">
+            <table className="ledger-table">
+              <thead>
+                <tr>
+                  <th>Director</th>
+                  <th className="right">Total billed</th>
+                  <th className="right">Used</th>
+                  <th className="right">Remaining</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usageRows.map((r) => (
+                  <tr key={r.id ?? 'unassigned'}>
+                    <td>
+                      <span className="font-mono text-sm text-ink">{r.code ?? r.name}</span>
+                    </td>
+                    <td className="num">{r.billed > 0 ? formatMoneyBare(r.billed) : '—'}</td>
+                    <td className="num">
+                      {r.used > 0 ? <span className="neg">({formatMoneyBare(r.used)})</span> : '—'}
+                    </td>
+                    <td className={`num font-medium ${r.remaining < 0 ? 'neg' : ''}`}>
+                      {r.remaining < 0
+                        ? <span className="neg">({formatMoneyBare(Math.abs(r.remaining))})</span>
+                        : formatMoneyBare(r.remaining)}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="border-t border-hairline">
+                  <td className="font-serif italic text-ink">Total</td>
+                  <td className="num font-medium">{formatMoneyBare(usageTotals.billed)}</td>
+                  <td className="num font-medium">
+                    {usageTotals.used > 0
+                      ? <span className="neg">({formatMoneyBare(usageTotals.used)})</span>
+                      : '—'}
+                  </td>
+                  <td className="num font-medium text-num-ink">
+                    {formatMoneyBare(usageTotals.remaining)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
     </div>
   )
 }
