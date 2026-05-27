@@ -277,16 +277,11 @@ export default async function DeptPoolPage({
     }
   }
 
-  // Venture (= Office / corporate) cash movements = real cash impact of
-  // every journal entry tagged segment='corporate' on a HV bank account.
-  // Source: journal_lines (same data that drives Trial Balance / BS / IS),
-  // NOT the venture_pool table — venture_pool is a future-going PV ledger
-  // and would miss the 334 manual_jv entries imported from the historical
-  // GL. apply_pool_adjustment writes venture_pool only; the matching
-  // journal_lines posts happen separately, so reading journal_lines also
-  // captures all future PV-driven movements (no double count).
-  //   IN  = Σ debit  on cash accounts (3000 / 3010 / ...) where seg='corporate'
-  //   OUT = Σ credit on cash accounts where seg='corporate'
+  // Venture (= Office / corporate + treasury) cash movements = real cash
+  // impact of every journal entry tagged segment IN ('corporate','treasury')
+  // on a HV bank account. corporate covers generic HV expenses + historical
+  // OFFICE manual_jv; treasury covers fund_source / loan / repayment activity
+  // (auto-tagged by derive_journal_segment, mig 217).
   let ventureCash: { balance: number; in_amt: number; out_amt: number } | null = null
   if (user.role !== 'dept_manager') {
     const { data: bankCodes } = await supabase
@@ -304,7 +299,7 @@ export default async function DeptPoolPage({
         .from('journal_lines')
         .select('debit, credit, journal_entries!inner(segment)')
         .in('account_code', cashCodes)
-        .eq('journal_entries.segment', 'corporate')
+        .in('journal_entries.segment', ['corporate', 'treasury'])
       for (const r of corpCashRows ?? []) {
         vIn += Number(r.debit ?? 0)
         vOut += Number(r.credit ?? 0)
@@ -349,26 +344,27 @@ export default async function DeptPoolPage({
         map.set(code, (map.get(code) ?? 0) + Number(r.debit ?? 0) - Number(r.credit ?? 0))
       }
 
-      // Build display rows. Use the dept name (matching the main table) for
-      // 5 dept segments, and "Venture (Office)" for corporate. Skip
-      // 'unallocated' since it has no business-meaningful presence.
-      const segLabels: Array<{ seg: string; label: string }> = [
-        { seg: 'director',        label: 'Director' },
-        { seg: 'director_office', label: 'Director Office' },
-        { seg: 'finance',         label: 'Finance' },
-        { seg: 'hr',              label: 'HR' },
-        { seg: 'marketing',       label: 'Marketing' },
-        { seg: 'corporate',       label: 'Venture (Office)' },
+      // Build display rows. 5 dept segments individually, and Venture (Office)
+      // aggregates corporate + treasury (matches /venture-pool's filter and
+      // dashboard hv_fund_balance per mig 273). Skip 'unallocated'.
+      const segLabels: Array<{ seg: string | string[]; label: string }> = [
+        { seg: 'director',                       label: 'Director' },
+        { seg: 'director_office',                label: 'Director Office' },
+        { seg: 'finance',                        label: 'Finance' },
+        { seg: 'hr',                             label: 'HR' },
+        { seg: 'marketing',                      label: 'Marketing' },
+        { seg: ['corporate', 'treasury'],        label: 'Venture (Office)' },
       ]
       const rows: PerBankRow[] = segLabels.map(({ seg, label }) => {
         const perBank: Record<string, number> = {}
         let total = 0
+        const segs = Array.isArray(seg) ? seg : [seg]
         for (const b of banks) {
-          const v = agg.get(seg)?.get(b.code) ?? 0
+          const v = segs.reduce((s, sg) => s + (agg.get(sg)?.get(b.code) ?? 0), 0)
           perBank[b.code] = v
           total += v
         }
-        return { segment: seg, label, perBank, total }
+        return { segment: Array.isArray(seg) ? seg.join('+') : seg, label, perBank, total }
       })
       const totals = { perBank: {} as Record<string, number>, grand: 0 }
       for (const b of banks) {

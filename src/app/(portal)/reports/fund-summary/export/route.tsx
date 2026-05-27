@@ -38,7 +38,7 @@ export async function GET(req: Request) {
           .from('journal_lines')
           .select('debit, credit, journal_entries!inner(segment)')
           .in('account_code', cashCodes)
-          .eq('journal_entries.segment', 'corporate')
+          .in('journal_entries.segment', ['corporate', 'treasury'])
       : Promise.resolve({ data: [] }),
     supabase.from('invoice_payout_pool').select('transaction_type, amount'),
     supabase.from('dept_pools').select('transaction_type, amount'),

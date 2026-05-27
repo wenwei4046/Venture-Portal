@@ -5,9 +5,11 @@ import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import PnlCharts from '../dept-pool/_components/PnlCharts'
 
 // Post 2026-05-26 re-import: Venture Pool data is derived from journal_lines
-// (segment='corporate' on HV bank accounts), NOT the legacy venture_pool table
-// (which is empty per the bank-recon decision). Matches /dept-pool's Venture
-// row + dashboard hv_fund_balance (mig 272).
+// where segment IN ('corporate', 'treasury') on HV bank accounts, NOT the
+// legacy venture_pool table. Matches /dept-pool's Venture row + dashboard
+// hv_fund_balance (mig 273). Treasury inclusion captures fund_source /
+// loan / repayment activity (HV central treasury operations); corporate
+// captures generic HV expenses + historical OFFICE-tagged manual_jv.
 
 export default async function VenturePoolPage() {
   await requireRole(['principal', 'finance'])
@@ -41,7 +43,7 @@ export default async function VenturePoolPage() {
       .from('journal_lines')
       .select('id, debit, credit, description, journal_entries!inner(transaction_date, description, reference_type, segment)')
       .in('account_code', cashCodes)
-      .eq('journal_entries.segment', 'corporate')
+      .in('journal_entries.segment', ['corporate', 'treasury'])
     if (opts.since) q = q.gte('journal_entries.transaction_date', opts.since)
     if (opts.until) q = q.lt('journal_entries.transaction_date', opts.until)
     q = q.order('transaction_date', { foreignTable: 'journal_entries', ascending: false })
