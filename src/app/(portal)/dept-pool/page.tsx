@@ -380,12 +380,14 @@ export default async function DeptPoolPage({
     }
   }
 
-  // Total cash = sum of dept balances only; foots to the Bank Reconciliation.
-  // Venture is shown for transparency but NOT added to total — the bank-recon
-  // assigns "Director & Office" cash to Director, so the corporate-segment
-  // movements that Venture shows are already reflected inside Director's
-  // bank slice. Adding Venture here would double-count.
-  const totalDeployed = Array.from(balanceMap.values()).reduce((acc, b) => acc + b, 0)
+  // Total cash = sum of dept balances + Venture (corporate segment from GL).
+  // Director and Office are independent segments post the 2026-05-26 re-import
+  // (Director got a top-up FROM Office via cross-segment cleanup JE, so Office
+  // can be negative while Director > natural GL). Total ties bank-recon when
+  // all 6 segments' allocations sum to the physical bank balance.
+  const totalDeployed =
+    Array.from(balanceMap.values()).reduce((acc, b) => acc + b, 0) +
+    (ventureCash?.balance ?? 0)
 
   return (
     <div>
@@ -626,8 +628,8 @@ export default async function DeptPoolPage({
       <p className="font-serif italic text-muted text-xs">
         Dept Pools: invoices settled + P&amp;L in, payroll consolidation + expenses out.
         Venture (Office) = every JE tagged segment=corporate hitting a HV bank
-        account; shown for transparency but NOT added to the Total above —
-        per the Bank Reconciliation, Office cash sits inside Director&apos;s slice.
+        account. Total above = all 6 segments&apos; allocations summed = physical
+        bank balance.
       </p>
     </div>
   )
