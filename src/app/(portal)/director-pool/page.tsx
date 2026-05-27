@@ -123,16 +123,33 @@ export default async function DirectorPoolPage() {
   const totalReleased = directorRows.reduce((s, r) => s + r.released, 0)
 
   // Per-director Billed / Used / Remaining.
-  // "Used" model: when other dept pools (non-Director, non-Office) go
-  // negative, those deficits are effectively financed by Director's invoice
-  // accumulator. Aggregate the negative dept balances and pro-rate across
-  // directors by their share of the total billed pool.
+  // "Used" model: when any non-Director pool goes negative, that deficit is
+  // effectively financed by Director's invoice accumulator. Includes:
+  //   - other dept pools (Marketing / HR / Finance / Director Office) from
+  //     dept_pool_balances
+  //   - Office (corporate segment) cash from journal_lines (segment='corporate'
+  //     on HV bank accounts), since corporate has no dept_pools row
+  // Pro-rate across directors by their share of the total billed pool. The
+  // resulting "Remaining" then equals total billed minus all deficits =
+  // physical bank balance (the real money still available for payout).
   const otherDeptsNetNegative = (deptBalances ?? [])
     .filter((b) => b.department_id !== directorDept?.id)
     .map((b) => Number(b.balance))
     .filter((v) => v < 0)
     .reduce((s, v) => s + v, 0) // negative number
-  const totalUsed = Math.abs(otherDeptsNetNegative) // positive
+
+  // Office (corporate) cash from GL — include if negative.
+  const { data: officeBankRows } = await supabase
+    .from('journal_lines')
+    .select('debit, credit, journal_entries!inner(segment)')
+    .in('account_code', ['3000', '3010'])
+    .eq('journal_entries.segment', 'corporate')
+  let officeCash = 0
+  for (const r of officeBankRows ?? []) {
+    officeCash += Number(r.debit ?? 0) - Number(r.credit ?? 0)
+  }
+  const officeNegative = officeCash < 0 ? officeCash : 0
+  const totalUsed = Math.abs(otherDeptsNetNegative + officeNegative) // positive
   const r2 = (n: number) => Math.round(n * 100) / 100
   type UsageRow = { id: string | null; code: string | null; name: string; billed: number; used: number; remaining: number }
   let runningUsedSum = 0

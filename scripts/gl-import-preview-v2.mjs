@@ -215,33 +215,35 @@ if (INCLUDE_PER_BANK_CLEANUP) {
       total: amount,
     })
   }
-  // Within-segment for Corporate: Alliance → 0, HL absorbs the 79,000.
-  // (No transfer to Director — Director invoice pool lives separately in
-  // invoice_payout_pool; Director's bank cash stays at natural GL 17,566.94.)
+  // Cross-segment: Corporate Alliance → 0 AND transfer 19,651.43 to Director
+  // (via 1900 clearing). Director's dept_pools opening = 37,218.37 covers
+  // both the natural GL slice (17,566.94) and the transferred portion
+  // (19,651.43 borrowed from Office). Office consequently goes to -8,565.84.
   entries.push({
     date: '2026-05-20',
     segment: 'corporate',
-    ref: 'BANK-CLEANUP-CORPORATE',
-    desc: 'Per-bank cleanup: corporate Alliance balance moved to HL',
+    ref: 'BANK-CLEANUP-CORP-XFER',
+    desc: 'Per-bank cleanup: corporate Alliance → 0, transfer 19,651.43 to Director (via 1900)',
     lines: [
-      { code: '3000', dr: 79000.00, cr: 0,        memo: 'Corporate HL absorbs Alliance' },
+      { code: '3000', dr: 59348.57, cr: 0,        memo: 'Corporate HL absorbs Alliance' },
       { code: '3010', dr: 0,        cr: 79000.00, memo: 'Corporate Alliance → 0' },
+      { code: '1900', dr: 19651.43, cr: 0,        memo: 'Transfer to Director Pool (via clearing)' },
     ],
     total: 79000.00,
   })
-  // Within-segment for Director: bring Alliance from -3,671.33 to +922.47
-  // (delta +4,593.80), offset by HL reduction. Director total stays at
-  // natural GL value 17,566.94.
+  // Director receives 19,651.43 from Corporate, distributed as HL +15,057.63
+  // and Alliance +4,593.80 (final state: HL 36,295.90 / Alliance 922.47).
   entries.push({
     date: '2026-05-20',
     segment: 'director',
-    ref: 'BANK-CLEANUP-DIRECTOR',
-    desc: 'Per-bank cleanup: Director Alliance reset to 922.47 (Alliance = Director-only convention)',
+    ref: 'BANK-CLEANUP-DIR-XFER',
+    desc: 'Per-bank cleanup: Director receives 19,651.43 from Corporate (HL +15,057.63 / Alliance +4,593.80)',
     lines: [
-      { code: '3010', dr: 4593.80, cr: 0,       memo: 'Director Alliance → 922.47' },
-      { code: '3000', dr: 0,       cr: 4593.80, memo: 'Director HL absorbs Alliance shift' },
+      { code: '3000', dr: 15057.63, cr: 0,        memo: 'Director HL top-up (to reach 36,295.90)' },
+      { code: '3010', dr: 4593.80,  cr: 0,        memo: 'Director Alliance top-up (to reach 922.47)' },
+      { code: '1900', dr: 0,        cr: 19651.43, memo: 'Receive from Corporate (via clearing)' },
     ],
-    total: 4593.80,
+    total: 19651.43,
   })
 }
 console.log('Total entries to post     :', entries.length, `(YE: ${INCLUDE_YE_CLOSING}, suspense: ${INCLUDE_SUSPENSE_SPLIT}, bank-cleanup: ${INCLUDE_PER_BANK_CLEANUP})`)
