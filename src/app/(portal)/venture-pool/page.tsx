@@ -4,23 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import PnlCharts from '../dept-pool/_components/PnlCharts'
 
-type HvFundTxn =
-  | 'profit_in'
-  | 'fund_in'
-  | 'fund_out'
-  | 'loan_repayment_in'
-  | 'expense_out'
-
-const IN_TYPES: HvFundTxn[] = ['fund_in', 'loan_repayment_in', 'profit_in']
-const OUT_TYPES: HvFundTxn[] = ['fund_out', 'expense_out']
-
-const TXN_LABEL: Record<HvFundTxn, string> = {
-  fund_in: 'Fund in',
-  loan_repayment_in: 'Loan repayment',
-  profit_in: 'Profit in',
-  fund_out: 'Loan disbursed',
-  expense_out: 'Expense out',
-}
+// Post 2026-05-26 re-import: Venture Pool data is derived from journal_lines
+// (segment='corporate' on HV bank accounts), NOT the legacy venture_pool table
+// (which is empty per the bank-recon decision). Matches /dept-pool's Venture
+// row + dashboard hv_fund_balance (mig 272).
 
 export default async function VenturePoolPage() {
   await requireRole(['principal', 'finance'])
@@ -31,46 +18,70 @@ export default async function VenturePoolPage() {
   const nextMonth = dayjs(period).add(1, 'month').startOf('month').format('YYYY-MM-DD')
   const trendStart = dayjs(period).subtract(11, 'month').startOf('month').format('YYYY-MM-DD')
 
-  const [{ data: monthRows }, { data: balanceRow }, { data: trendRows }, { data: ledgerRows }] =
-    await Promise.all([
-      supabase
-        .from('venture_pool')
-        .select('transaction_type, amount')
-        .gte('created_at', monthStart)
-        .lt('created_at', nextMonth),
-      supabase.from('venture_pool_balance').select('balance').maybeSingle(),
-      supabase
-        .from('venture_pool')
-        .select('transaction_type, amount, created_at')
-        .gte('created_at', trendStart),
-      supabase
-        .from('venture_pool')
-        .select('id, transaction_type, amount, description, created_at')
-        .order('created_at', { ascending: false })
-        .limit(50),
-    ])
+  // Resolve bank account codes once.
+  const { data: bankCodesData } = await supabase
+    .from('bank_accounts')
+    .select('gl_account_code')
+    .eq('status', 'active')
+  const cashCodes = (bankCodesData ?? [])
+    .map((b) => b.gl_account_code as string)
+    .filter(Boolean)
 
+  // Helper: fetch journal_lines on corporate-segment bank touches in a window.
+  type RawLine = {
+    id: string
+    debit: number | null
+    credit: number | null
+    description: string | null
+    journal_entries: { transaction_date: string; description: string | null; reference_type: string | null }
+  }
+  async function fetchCorpBankLines(opts: { since?: string; until?: string; limit?: number }) {
+    if (cashCodes.length === 0) return [] as RawLine[]
+    let q = supabase
+      .from('journal_lines')
+      .select('id, debit, credit, description, journal_entries!inner(transaction_date, description, reference_type, segment)')
+      .in('account_code', cashCodes)
+      .eq('journal_entries.segment', 'corporate')
+    if (opts.since) q = q.gte('journal_entries.transaction_date', opts.since)
+    if (opts.until) q = q.lt('journal_entries.transaction_date', opts.until)
+    q = q.order('transaction_date', { foreignTable: 'journal_entries', ascending: false })
+    if (opts.limit) q = q.limit(opts.limit)
+    const { data } = await q
+    return (data ?? []) as unknown as RawLine[]
+  }
+
+  const [allTimeLines, monthLines, trendLines, ledgerLines] = await Promise.all([
+    fetchCorpBankLines({}),
+    fetchCorpBankLines({ since: monthStart, until: nextMonth }),
+    fetchCorpBankLines({ since: trendStart }),
+    fetchCorpBankLines({ limit: 50 }),
+  ])
+
+  // All-time balance.
+  let balance = 0
+  for (const l of allTimeLines) balance += Number(l.debit ?? 0) - Number(l.credit ?? 0)
+
+  // This-month In/Out.
   let monthIn = 0
   let monthOut = 0
-  for (const r of monthRows ?? []) {
-    if (IN_TYPES.includes(r.transaction_type as HvFundTxn)) monthIn += Number(r.amount)
-    else if (OUT_TYPES.includes(r.transaction_type as HvFundTxn)) monthOut += Number(r.amount)
+  for (const l of monthLines) {
+    monthIn += Number(l.debit ?? 0)
+    monthOut += Number(l.credit ?? 0)
   }
-  const balance = Number(balanceRow?.balance ?? 0)
   const netChange = monthIn - monthOut
 
-  // 12-month trend bucketed by created_at month.
+  // 12-month trend bucketed by transaction_date month.
   const trendMap = new Map<string, { in: number; out: number }>()
   for (let i = 0; i < 12; i++) {
     const m = dayjs(period).subtract(11 - i, 'month').format('YYYY-MM-01')
     trendMap.set(m, { in: 0, out: 0 })
   }
-  for (const r of trendRows ?? []) {
-    const k = dayjs(r.created_at).format('YYYY-MM-01')
+  for (const l of trendLines) {
+    const k = dayjs(l.journal_entries.transaction_date).format('YYYY-MM-01')
     const row = trendMap.get(k)
     if (!row) continue
-    if (IN_TYPES.includes(r.transaction_type as HvFundTxn)) row.in += Number(r.amount)
-    else if (OUT_TYPES.includes(r.transaction_type as HvFundTxn)) row.out += Number(r.amount)
+    row.in += Number(l.debit ?? 0)
+    row.out += Number(l.credit ?? 0)
   }
   const trend = Array.from(trendMap.entries()).map(([m, v]) => ({
     month: dayjs(m).format('MMM'),
@@ -82,6 +93,23 @@ export default async function VenturePoolPage() {
     { name: 'In', value: Math.max(monthIn, 0) },
     { name: 'Out', value: Math.max(monthOut, 0) },
   ].filter((d) => d.value > 0)
+
+  // Friendly type label from journal_entries.reference_type.
+  function refLabel(refType: string | null): string {
+    if (!refType) return 'Journal'
+    switch (refType) {
+      case 'manual_jv': return 'Manual JV'
+      case 'invoice': return 'Invoice settled'
+      case 'voucher':
+      case 'payment_voucher': return 'Payment voucher'
+      case 'fund_source': return 'Fund source'
+      case 'fund_source_repayment': return 'Fund source repayment'
+      case 'loan': return 'Loan'
+      case 'repayment': return 'Loan repayment'
+      case 'invoice_paid_credit': return 'Invoice paid credit'
+      default: return refType.replace(/_/g, ' ')
+    }
+  }
 
   return (
     <div>
@@ -106,7 +134,7 @@ export default async function VenturePoolPage() {
             {formatMoney(balance)}
           </div>
           <div className="font-mono text-xs text-muted mt-2">
-            HV holding-company cash ledger · all-time
+            Corporate-segment cash on HV bank accounts · all-time
           </div>
         </div>
 
@@ -134,9 +162,9 @@ export default async function VenturePoolPage() {
         <Kpi
           label="In this month"
           amount={monthIn}
-          subtitle="Fund in + loan repayment + profit"
+          subtitle="Cash in: debits on HL/Alliance (segment=corporate)"
         />
-        <Kpi label="Out this month" amount={-monthOut} subtitle="Loans disbursed + HV expense" />
+        <Kpi label="Out this month" amount={-monthOut} subtitle="Cash out: credits on HL/Alliance" />
         <Kpi label="Net change" amount={netChange} accent />
         <Kpi label="Running balance" amount={balance} subtitle="All-time, see ledger below" />
       </div>
@@ -157,9 +185,9 @@ export default async function VenturePoolPage() {
       <section className="mb-12">
         <h2 className="font-serif text-xl text-ink mb-1">Pool ledger</h2>
         <p className="font-serif italic text-graphite text-xs mb-4">
-          Latest 50 entries · all-time
+          Latest 50 entries · derived from journal_lines (segment=corporate on HV banks)
         </p>
-        {(ledgerRows ?? []).length === 0 ? (
+        {ledgerLines.length === 0 ? (
           <div className="border border-hairline rounded-md bg-surface p-6 text-center">
             <p className="font-serif italic text-muted text-sm">No movements yet.</p>
           </div>
@@ -176,16 +204,20 @@ export default async function VenturePoolPage() {
                 </tr>
               </thead>
               <tbody>
-                {(ledgerRows ?? []).map((r) => {
-                  const isIn = IN_TYPES.includes(r.transaction_type as HvFundTxn)
-                  const signed = isIn ? Number(r.amount) : -Number(r.amount)
-                  const label = TXN_LABEL[r.transaction_type as HvFundTxn] ?? r.transaction_type
+                {ledgerLines.map((l) => {
+                  const dr = Number(l.debit ?? 0)
+                  const cr = Number(l.credit ?? 0)
+                  const isIn = dr > 0
+                  const signed = isIn ? dr : -cr
+                  const desc = l.description ?? l.journal_entries.description ?? '—'
                   return (
-                    <tr key={r.id}>
+                    <tr key={l.id}>
                       <td className="font-mono text-xs text-muted">
-                        {dayjs(r.created_at).format('D MMM YYYY')}
+                        {dayjs(l.journal_entries.transaction_date).format('D MMM YYYY')}
                       </td>
-                      <td className="font-serif italic text-graphite text-sm">{label}</td>
+                      <td className="font-serif italic text-graphite text-sm">
+                        {refLabel(l.journal_entries.reference_type)}
+                      </td>
                       <td>
                         <span
                           className={
@@ -197,9 +229,7 @@ export default async function VenturePoolPage() {
                           {isIn ? 'In' : 'Out'}
                         </span>
                       </td>
-                      <td className="font-serif italic text-graphite">
-                        {r.description ?? '—'}
-                      </td>
+                      <td className="font-serif italic text-graphite">{desc}</td>
                       <td className={`num ${isIn ? 'text-ledger' : ''}`}>
                         {isIn ? formatMoney(signed) : <span className="neg">{formatMoney(signed)}</span>}
                       </td>

@@ -9,16 +9,34 @@ export default async function FundSummaryPage() {
   await requireRole(['principal', 'finance'])
   const supabase = await createClient()
 
+  // Resolve cash account codes for the Venture Pool computation.
+  const { data: bankCodesData } = await supabase
+    .from('bank_accounts')
+    .select('gl_account_code')
+    .eq('status', 'active')
+  const cashCodes = (bankCodesData ?? [])
+    .map((b) => b.gl_account_code as string)
+    .filter(Boolean)
+
   const [
     { data: fundSources },
     { data: loans },
-    { data: hvFundTxns },
+    { data: corpBankLines },
     { data: invoicePoolTxns },
     { data: deptPoolTxns },
   ] = await Promise.all([
     supabase.from('fund_sources').select('*').eq('status', 'active').order('effective_date'),
     supabase.from('loans').select('principal, status').eq('status', 'active'),
-    supabase.from('venture_pool').select('transaction_type, amount'),
+    // Venture Pool: corporate-segment journal_lines on HV bank accounts
+    // (matches /dept-pool Venture row + dashboard hv_fund_balance per mig 272).
+    // Legacy venture_pool table is empty per 2026-05-26 bank-recon decision.
+    cashCodes.length > 0
+      ? supabase
+          .from('journal_lines')
+          .select('debit, credit, journal_entries!inner(segment)')
+          .in('account_code', cashCodes)
+          .eq('journal_entries.segment', 'corporate')
+      : Promise.resolve({ data: [] }),
     supabase.from('invoice_payout_pool').select('transaction_type, amount'),
     supabase.from('dept_pools').select('transaction_type, amount'),
   ])
@@ -29,11 +47,10 @@ export default async function FundSummaryPage() {
     ? (fundSources ?? []).reduce((s, f) => s + Number(f.amount) * Number(f.cost_rate), 0) / totalPaid
     : 0
 
-  // Venture Pool balance (Phase 10 / mig 192 formula)
+  // Venture Pool balance = Σ (debit − credit) on bank accounts tagged corporate.
   let hvFundBalance = 0
-  for (const t of hvFundTxns ?? []) {
-    const isIn = ['fund_in', 'loan_repayment_in', 'profit_in'].includes(t.transaction_type)
-    hvFundBalance += isIn ? Number(t.amount) : -Number(t.amount)
+  for (const l of corpBankLines ?? []) {
+    hvFundBalance += Number(l.debit ?? 0) - Number(l.credit ?? 0)
   }
 
   let deptPoolBalance = 0
