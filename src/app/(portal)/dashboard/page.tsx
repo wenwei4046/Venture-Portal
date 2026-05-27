@@ -922,20 +922,35 @@ export default async function DashboardPage() {
                       </div>
                     ) : null}
 
-                    {/* Dept pool by department */}
-                    {summary.dept_pool_breakdown?.length > 0 ? (
-                      <div className="border-t border-hairline pt-3">
-                        <div className="font-mono text-xs text-muted uppercase tracking-wide mb-2">Dept pool by department</div>
-                        {summary.dept_pool_breakdown.map((dp) => (
-                          <div key={dp.department_id} className="flex justify-between text-sm py-0.5">
-                            <span className="font-serif italic text-graphite">{dp.department_name}</span>
-                            <span className="font-mono tabular font-medium text-ink">
-                              {formatMoney(Number(dp.balance))}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
+                    {/* Dept pool by department (+ Venture from corporate+treasury GL) */}
+                    {(() => {
+                      const rows: Array<{ key: string; name: string; balance: number }> = [
+                        ...(summary.dept_pool_breakdown ?? []).map((dp) => ({
+                          key: dp.department_id,
+                          name: dp.department_name,
+                          balance: Number(dp.balance),
+                        })),
+                      ]
+                      const venture = Number(summary.hv_fund_balance ?? 0)
+                      if (Math.abs(venture) >= 0.005) {
+                        rows.push({ key: 'venture', name: 'Venture (Office)', balance: venture })
+                      }
+                      rows.sort((a, b) => b.balance - a.balance)
+                      if (rows.length === 0) return null
+                      return (
+                        <div className="border-t border-hairline pt-3">
+                          <div className="font-mono text-xs text-muted uppercase tracking-wide mb-2">Dept pool by department</div>
+                          {rows.map((r) => (
+                            <div key={r.key} className="flex justify-between text-sm py-0.5">
+                              <span className="font-serif italic text-graphite">{r.name}</span>
+                              <span className="font-mono tabular font-medium text-ink">
+                                {formatMoney(r.balance)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })()}
                   </div>
                 </details>
               ) : null}
