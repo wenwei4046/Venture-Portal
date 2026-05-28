@@ -174,7 +174,7 @@ export default async function BillingView({ searchParams }: Props) {
 
   return (
     <div>
-      <div className="page-head">
+      <div className="page-head sticky top-0 z-20 bg-paper pt-2">
         <div>
           <div className="page-eyebrow">
             <em>I.</em> BILLING · SERVICE INVOICES

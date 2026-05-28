@@ -107,7 +107,7 @@ export default function AccountsSection({ accounts }: Props) {
 
   return (
     <section>
-      <div className="flex items-baseline justify-between mb-1">
+      <div className="sticky top-0 z-20 bg-paper pt-2 pb-3 flex items-baseline justify-between mb-1 border-b border-hairline">
         <h2 className="font-serif text-2xl text-ink">Chart of Accounts</h2>
         <button
           type="button"
