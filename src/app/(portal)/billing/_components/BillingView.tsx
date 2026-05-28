@@ -386,8 +386,14 @@ function DeptCostCard({
 }) {
   const hasInvoices = invoiceCount > 0
   const hasRequired = required > 0.005
-  const amount = hasInvoices ? invoiced : required
-  const muted = !hasInvoices && !hasRequired
+  // Main number = actual invoiced total (0 when nothing's been billed yet).
+  // Target from payroll engine is moved to the subtitle so it doesn't read
+  // like an invoice amount when none exist.
+  const amount = invoiced
+  const muted = !hasInvoices
+
+  const fmtAmt = (n: number) =>
+    n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   let note: string
   if (!payrollApproved) {
@@ -397,14 +403,16 @@ function DeptCostCard({
     if (Math.abs(gap) < 0.01) {
       note = `${invoiceCount} invoice${invoiceCount === 1 ? '' : 's'}`
     } else if (gap > 0) {
-      note = `${invoiceCount} invoice${invoiceCount === 1 ? '' : 's'} · short RM ${gap.toLocaleString('en-MY', { minimumFractionDigits: 2 })}`
+      note = `${invoiceCount} invoice${invoiceCount === 1 ? '' : 's'} · short RM ${fmtAmt(gap)}`
     } else {
-      note = `${invoiceCount} invoice${invoiceCount === 1 ? '' : 's'} · over RM ${(-gap).toLocaleString('en-MY', { minimumFractionDigits: 2 })}`
+      note = `${invoiceCount} invoice${invoiceCount === 1 ? '' : 's'} · over RM ${fmtAmt(-gap)}`
     }
+  } else if (hasRequired) {
+    note = `target from payroll: RM ${fmtAmt(required)} · no invoice yet`
   } else if (marketingNote) {
-    note = 'from payroll — no invoice'
+    note = 'no invoice yet'
   } else {
-    note = 'from payroll — no invoice yet'
+    note = 'no invoice yet'
   }
 
   return (
