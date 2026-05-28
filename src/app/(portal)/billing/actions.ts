@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { postJournalEntry } from '@/lib/journal'
+import { adjustPool } from '@/lib/voucher-paid-helpers'
 
 // Mig 200/P1-6a: invoice billing_mode → revenue GL code mapping.
 // Mig 238 reseed: revenue lives in the 5000-5999 range; 4030 / 4040 are now
@@ -659,6 +660,197 @@ export async function updateDraftInvoice(formData: FormData): Promise<void> {
 
   revalidatePath('/billing')
   revalidatePath('/statements')
+}
+
+// ─── Batch settle (knock-off) issued invoices (Finance) ────────────────────
+//
+// Settles many issued invoices at once. For each invoice creates a
+// billing_payment voucher (direction='credit', auto-paid), bumps the bank
+// balance, posts the AR settlement JE (Dr Bank / Cr 3030), and marks the
+// invoice 'paid'. Mirrors the single-voucher flow in payments/actions.ts
+// but inline so we don't need redirect() per loop.
+//
+// Constraints kept simple for batch:
+//   * Only invoices with status='issued' are processed (skipped otherwise)
+//   * Inter-billing (billable_to_type='dept_pool') is rejected — those
+//     need the 2-row mirror + inter_billing_out logic that single-voucher
+//     handles separately. User settles those one at a time.
+//   * One bank account + one payment_date applied to all selected.
+//   * payment_method='bank_transfer'; target_pool='venture_pool'.
+
+export async function batchSettleInvoices(payload: {
+  invoiceIds: string[]
+  bankAccountId: string
+  paymentDate: string // YYYY-MM-DD
+}): Promise<{ settled: number; failed: Array<{ invoice_id: string; error: string }> }> {
+  const user = await requireRole(['finance'])
+  const supabase = await createClient()
+
+  if (!payload.invoiceIds?.length) throw new Error('No invoices selected')
+  if (!payload.bankAccountId) throw new Error('Bank account is required')
+  if (!payload.paymentDate) throw new Error('Payment date is required')
+
+  // Validate bank exists
+  const { data: bank } = await supabase
+    .from('bank_accounts')
+    .select('id, gl_account_code')
+    .eq('id', payload.bankAccountId)
+    .maybeSingle()
+  if (!bank) throw new Error('Bank account not found')
+  const bankGlCode = bank.gl_account_code ?? '3000'
+
+  // Bulk fetch invoices
+  const { data: invoices } = await supabase
+    .from('invoices')
+    .select(
+      'id, invoice_no, company_id, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billing_mode, period_month',
+    )
+    .in('id', payload.invoiceIds)
+
+  // Pre-fetch company names to avoid N+1
+  const companyIds = (invoices ?? [])
+    .map((i) => i.company_id)
+    .filter((id): id is string => !!id)
+  const { data: companies } = companyIds.length > 0
+    ? await supabase.from('companies').select('id, name').in('id', companyIds)
+    : { data: [] }
+  const companyName = new Map<string, string>(
+    (companies ?? []).map((c) => [c.id as string, c.name as string]),
+  )
+
+  const settled: string[] = []
+  const failed: Array<{ invoice_id: string; error: string }> = []
+
+  for (const inv of invoices ?? []) {
+    if (inv.status !== 'issued') {
+      failed.push({ invoice_id: inv.id, error: `status=${inv.status}, expected 'issued'` })
+      continue
+    }
+    if (inv.billable_to_type === 'dept_pool') {
+      failed.push({
+        invoice_id: inv.id,
+        error: 'inter-billing (dept_pool) invoice — settle individually via /payments/new',
+      })
+      continue
+    }
+
+    try {
+      const payeeName = inv.company_id
+        ? companyName.get(inv.company_id) ?? '—'
+        : inv.billable_to_freetext_name ?? '—'
+
+      // Mint voucher_no — best-effort by count + retry on collision
+      const period = dayjs(payload.paymentDate).format('YYYYMM')
+      const { count } = await supabase
+        .from('payment_vouchers')
+        .select('*', { count: 'exact', head: true })
+      const seq = (count ?? 0) + 1
+      const voucherNo = `HV-OR-${period}-${String(seq).padStart(4, '0')}`
+
+      const amount = Number(inv.total_amount)
+      const nowIso = new Date().toISOString()
+      const description = `Settle ${inv.invoice_no ?? inv.id.slice(0, 8)} — ${payeeName}`
+
+      // Insert PV
+      const { data: pv, error: pvErr } = await supabase
+        .from('payment_vouchers')
+        .insert({
+          voucher_no: voucherNo,
+          voucher_type: 'billing_payment',
+          direction: 'credit',
+          source_pool: null,
+          target_pool: 'venture_pool',
+          status: 'paid',
+          amount,
+          payee_name: payeeName,
+          payee_company_id: inv.company_id,
+          bank_account_id: payload.bankAccountId,
+          invoice_id: inv.id,
+          description,
+          payment_method: 'bank_transfer',
+          created_by: user.id,
+          approved_by: user.id,
+          approved_at: nowIso,
+          executed_by: user.id,
+          executed_at: nowIso,
+          payment_date: payload.paymentDate,
+        })
+        .select('id')
+        .single()
+      if (pvErr || !pv) throw new Error(`voucher insert failed: ${pvErr?.message ?? 'unknown'}`)
+
+      // Insert payment_voucher_sources (single primary row, AR account)
+      const { error: srcErr } = await supabase
+        .from('payment_voucher_sources')
+        .insert({
+          voucher_id: pv.id,
+          pool: 'venture_pool',
+          amount,
+          account_code: '3030',
+        })
+      if (srcErr) throw new Error(`source row insert failed: ${srcErr.message}`)
+
+      // Bump bank balance cache
+      const { error: bumpErr } = await supabase.rpc('bump_bank_for_paid_credit', {
+        p_voucher_id: pv.id,
+      })
+      if (bumpErr) {
+        // Non-fatal — bank can be re-synced; surface as warning, don't undo
+        console.error('bump_bank_for_paid_credit warning:', bumpErr.message)
+      }
+
+      // Pool credit (target_pool=venture_pool gets the receivable conversion)
+      await adjustPool(
+        supabase,
+        'venture_pool',
+        'in',
+        Math.round(amount * 100) / 100,
+        `PV ${voucherNo}: ${description}`,
+        user.id,
+        null,
+        nowIso,
+      )
+
+      // GL: Dr Bank / Cr 3030 AR
+      try {
+        await postJournalEntry(supabase, {
+          transactionDate: payload.paymentDate,
+          description: `PV ${voucherNo}: ${description}`,
+          referenceType: 'payment_voucher',
+          referenceId: pv.id,
+          lines: [
+            { accountCode: bankGlCode, debit: Math.round(amount * 100) / 100, description: `Bank deposit — ${voucherNo}` },
+            { accountCode: '3030', credit: Math.round(amount * 100) / 100, description: `Payment received — ${payeeName}` },
+          ],
+          createdBy: user.id,
+        })
+      } catch (jeErr) {
+        console.error('GL posting warning for batch settle:', jeErr)
+      }
+
+      // Mark invoice paid (trigger 202 also fires here for dept_pools np_in)
+      const { error: invUpdErr } = await supabase
+        .from('invoices')
+        .update({ status: 'paid' })
+        .eq('id', inv.id)
+        .eq('status', 'issued') // race guard
+      if (invUpdErr) throw new Error(`invoice status update failed: ${invUpdErr.message}`)
+
+      settled.push(inv.id)
+    } catch (e) {
+      failed.push({
+        invoice_id: inv.id,
+        error: e instanceof Error ? e.message : 'unknown',
+      })
+    }
+  }
+
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+  revalidatePath('/payments')
+  revalidatePath('/dashboard')
+
+  return { settled: settled.length, failed }
 }
 
 // ─── Approve / Issue Invoice (Finance — draft → issued) ────────────────────

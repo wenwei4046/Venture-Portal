@@ -47,6 +47,7 @@ export default async function BillingView({ searchParams }: Props) {
     { data: nonBillableTxns },
     { data: departments },
     { data: categories },
+    { data: banks },
   ] = await Promise.all([
     supabase.rpc('get_submitted_hr_summary', { p_period: period }).maybeSingle(),
     supabase
@@ -80,7 +81,19 @@ export default async function BillingView({ searchParams }: Props) {
       .select('code, name, type, parent_code')
       .eq('is_active', true)
       .order('sort_order'),
+    // For the batch-settle modal in InvoicesList.
+    supabase
+      .from('bank_accounts')
+      .select('id, bank_name, account_number, gl_account_code, is_primary')
+      .eq('status', 'active')
+      .order('is_primary', { ascending: false }),
   ])
+
+  const bankList = (banks ?? []).map((b) => ({
+    id: b.id as string,
+    bank_name: b.bank_name as string,
+    account_number: (b.account_number as string | null) ?? null,
+  }))
 
   // Shape categories as { code, label, type, parent_code } so the downstream
   // CreateInvoiceButton can pass them straight into AccountPicker (mig 246).
@@ -324,7 +337,7 @@ export default async function BillingView({ searchParams }: Props) {
         />
       </div>
 
-      <InvoicesList invoices={invoiceList} companyMap={companyMap} departmentMap={departmentMap} period={period} categories={categoryList} />
+      <InvoicesList invoices={invoiceList} companyMap={companyMap} departmentMap={departmentMap} period={period} categories={categoryList} bankAccounts={bankList} />
 
       <MarketingProjectList
         contracts={(marketingContracts ?? [])

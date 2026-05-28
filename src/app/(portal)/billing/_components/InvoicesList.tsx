@@ -1,13 +1,16 @@
 'use client'
 
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
 import { ApproveInvoiceButton, BulkIssueInvoicesButton, DeleteInvoiceButton, EditInvoiceButton } from './InvoiceActions'
 import CreateCreditNoteButton from './CreateCreditNoteButton'
 import InvoiceDetailButton from './InvoiceDetailButton'
-import SortableTable, { type SortableColumn } from '@/components/SortableTable'
+import SortableTable from '@/components/SortableTable'
 import type { AccountType } from '@/lib/coa'
+import { batchSettleInvoices } from '../actions'
 
 interface Invoice {
   id: string
@@ -98,11 +101,86 @@ interface Props {
     type: AccountType
     parent_code: string | null
   }>
+  /** Banks shown in the batch-settle modal. Drives which bank account
+   *  receives the inflow when knocking off multiple issued invoices. */
+  bankAccounts?: Array<{ id: string; bank_name: string; account_number: string | null }>
 }
 
 // Invoices for the selected period. Populated by Step 5's generate_monthly_invoices
 // RPC. Until Step 5 ships, this section shows the empty state with an explanation.
-export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [] }: Props) {
+export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [], bankAccounts = [] }: Props) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showSettleModal, setShowSettleModal] = useState(false)
+  const [settleBank, setSettleBank] = useState<string>('')
+  const [settleDate, setSettleDate] = useState<string>(dayjs().format('YYYY-MM-DD'))
+  const [settleError, setSettleError] = useState<string | null>(null)
+  const [settleResult, setSettleResult] = useState<string | null>(null)
+
+  // Only 'issued' subsidiary/freetext invoices are batch-settleable.
+  // (Drafts need approval first; paid is done; dept_pool/inter-billing
+  // needs the more involved single-voucher path.)
+  function isBatchSettleable(inv: Invoice): boolean {
+    return inv.status === 'issued' && inv.billable_to_type !== 'dept_pool'
+  }
+
+  const selectedInvoices = invoices.filter((i) => selectedIds.has(i.id) && isBatchSettleable(i))
+  const selectedTotal = selectedInvoices.reduce((s, i) => s + Number(i.total_amount), 0)
+
+  function toggle(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+  function selectAllIssued() {
+    setSelectedIds(new Set(invoices.filter(isBatchSettleable).map((i) => i.id)))
+  }
+  function clearSelection() {
+    setSelectedIds(new Set())
+  }
+
+  function openSettleModal() {
+    setSettleError(null)
+    setSettleResult(null)
+    // Default bank to the first one (usually primary) if none chosen
+    if (!settleBank && bankAccounts.length > 0) setSettleBank(bankAccounts[0].id)
+    setShowSettleModal(true)
+  }
+
+  function handleBatchSettle() {
+    setSettleError(null)
+    setSettleResult(null)
+    if (!settleBank) return setSettleError('Pick a bank account')
+    if (!settleDate) return setSettleError('Pick a payment date')
+    const ids = selectedInvoices.map((i) => i.id)
+    if (ids.length === 0) return setSettleError('No settleable invoices selected')
+    startTransition(async () => {
+      try {
+        const res = await batchSettleInvoices({
+          invoiceIds: ids,
+          bankAccountId: settleBank,
+          paymentDate: settleDate,
+        })
+        if (res.failed.length === 0) {
+          setSettleResult(`Settled ${res.settled} invoice(s).`)
+          setSelectedIds(new Set())
+          setShowSettleModal(false)
+          router.refresh()
+        } else {
+          setSettleResult(
+            `Settled ${res.settled}, ${res.failed.length} failed. First error: ${res.failed[0].error}`,
+          )
+          router.refresh()
+        }
+      } catch (err) {
+        setSettleError(err instanceof Error ? err.message : 'Batch settle failed')
+      }
+    })
+  }
   const totalsByMode = new Map<string, number>()
   const totalsByCompany = new Map<string, number>()
   let grandTotal = 0
@@ -166,6 +244,33 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
             </div>
           </div>
 
+          {/* Batch-settle helper bar: select-all-issued shortcut + count */}
+          {invoices.some(isBatchSettleable) ? (
+            <div className="flex items-center gap-3 mb-3 text-xs font-mono">
+              <span className="text-muted">
+                {selectedIds.size > 0
+                  ? `${selectedIds.size} selected · RM ${selectedTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}`
+                  : 'Select issued invoices below to batch-settle'}
+              </span>
+              <button
+                type="button"
+                onClick={selectAllIssued}
+                className="text-graphite hover:text-ink font-serif italic"
+              >
+                Select all issued
+              </button>
+              {selectedIds.size > 0 ? (
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  className="text-graphite hover:text-ink font-serif italic"
+                >
+                  Clear
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="overflow-x-auto">
             <SortableTable<Invoice>
               rows={invoices}
@@ -174,6 +279,24 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
               searchKeys={['invoice_no', 'company', 'billing_mode']}
               searchPlaceholder="Search invoice # / company / mode…"
               columns={[
+                {
+                  key: '_select',
+                  label: '',
+                  sortable: false,
+                  render: (inv) => {
+                    const settleable = isBatchSettleable(inv)
+                    return (
+                      <input
+                        type="checkbox"
+                        disabled={!settleable || isPending}
+                        checked={selectedIds.has(inv.id)}
+                        onChange={() => toggle(inv.id)}
+                        className="accent-accent cursor-pointer disabled:cursor-not-allowed disabled:opacity-30"
+                        aria-label={settleable ? `Select ${inv.invoice_no ?? 'invoice'}` : 'Not settleable in batch'}
+                      />
+                    )
+                  },
+                },
                 {
                   key: 'invoice_no',
                   label: 'Invoice #',
@@ -304,6 +427,131 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
           </div>
         </>
       )}
+
+      {/* Floating batch-settle action bar (bottom right). Appears when any
+          issued + settleable invoice is selected. */}
+      {selectedIds.size > 0 && !showSettleModal ? (
+        <div className="fixed bottom-6 right-6 z-30 bg-paper border border-hairline rounded-md shadow-lg px-4 py-3 flex items-center gap-3">
+          <div className="font-mono text-sm text-ink">
+            {selectedIds.size} selected · <span className="font-semibold">RM {selectedTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="text-xs font-sans text-muted hover:text-ink"
+          >
+            Clear
+          </button>
+          <button
+            type="button"
+            onClick={openSettleModal}
+            disabled={selectedInvoices.length === 0}
+            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50"
+          >
+            Batch settle
+          </button>
+        </div>
+      ) : null}
+
+      {/* Batch-settle modal */}
+      {showSettleModal ? (
+        <div
+          className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
+          onClick={() => !isPending && setShowSettleModal(false)}
+        >
+          <div
+            className="bg-paper border border-hairline rounded-md shadow-xl w-full max-w-lg my-12"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-baseline justify-between px-6 py-4 border-b border-hairline">
+              <div>
+                <h2 className="font-serif text-2xl text-ink">Batch settle</h2>
+                <p className="font-serif italic text-graphite text-xs mt-1">
+                  {selectedInvoices.length} invoice(s) · RM {selectedTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}.
+                  One billing_payment voucher per invoice, all marked paid.
+                </p>
+              </div>
+              <button
+                onClick={() => !isPending && setShowSettleModal(false)}
+                disabled={isPending}
+                className="text-muted hover:text-ink text-2xl leading-none pt-1 disabled:opacity-50"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <label className="block">
+                <div className="text-xs font-sans font-medium text-graphite mb-1">
+                  Bank account <span className="text-danger">*</span>
+                </div>
+                <select
+                  value={settleBank}
+                  onChange={(e) => setSettleBank(e.target.value)}
+                  disabled={isPending}
+                  className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+                >
+                  <option value="">Select bank…</option>
+                  {bankAccounts.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.bank_name}{b.account_number ? ` · ${b.account_number}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <div className="text-xs font-sans font-medium text-graphite mb-1">
+                  Payment date <span className="text-danger">*</span>
+                </div>
+                <input
+                  type="date"
+                  value={settleDate}
+                  onChange={(e) => setSettleDate(e.target.value)}
+                  disabled={isPending}
+                  className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink font-mono focus:outline-none focus:border-accent-border"
+                />
+              </label>
+              <div className="text-xs font-mono text-muted">
+                Invoices to settle:
+              </div>
+              <ul className="max-h-48 overflow-y-auto text-xs font-mono space-y-1 border border-hairline rounded-md p-2 bg-surface">
+                {selectedInvoices.map((inv) => (
+                  <li key={inv.id} className="flex justify-between">
+                    <span>{inv.invoice_no ?? inv.id.slice(0, 8)}</span>
+                    <span className="tabular">RM {Number(inv.total_amount).toLocaleString('en-MY', { minimumFractionDigits: 2 })}</span>
+                  </li>
+                ))}
+              </ul>
+              {settleError ? (
+                <div className="bg-danger/10 border border-danger/30 text-danger rounded-md px-3 py-2 text-sm font-sans">
+                  {settleError}
+                </div>
+              ) : null}
+              {settleResult ? (
+                <div className="bg-surface border border-hairline rounded-md px-3 py-2 text-sm font-sans">
+                  {settleResult}
+                </div>
+              ) : null}
+            </div>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-hairline bg-surface">
+              <button
+                onClick={() => !isPending && setShowSettleModal(false)}
+                disabled={isPending}
+                className="text-sm font-sans text-muted hover:text-ink disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBatchSettle}
+                disabled={isPending || selectedInvoices.length === 0}
+                className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50"
+              >
+                {isPending ? 'Settling…' : `Settle ${selectedInvoices.length}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   )
 }
