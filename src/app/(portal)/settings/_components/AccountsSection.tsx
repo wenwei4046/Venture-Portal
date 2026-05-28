@@ -112,12 +112,12 @@ export default function AccountsSection({ accounts }: Props) {
         <button
           type="button"
           onClick={() => {
-            setShowCreate((v) => !v)
+            setShowCreate(true)
             setError(null)
           }}
-          className="text-sm text-accent hover:text-accent-hover font-serif italic"
+          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
         >
-          {showCreate ? 'Cancel' : '+ New account'}
+          + New account
         </button>
       </div>
       <p className="font-serif italic text-muted text-sm mb-6">
@@ -133,26 +133,54 @@ export default function AccountsSection({ accounts }: Props) {
       ) : null}
 
       {showCreate ? (
-        <AccountForm
-          mode="create"
-          isPending={isPending}
-          allAccounts={accounts}
-          onSubmit={(fd) =>
-            startTransition(async () => {
-              try {
-                const result = await createAccount(fd)
-                if (result?.error) {
-                  setError(result.error)
-                  return
+        <div
+          className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
+          onClick={() => !isPending && setShowCreate(false)}
+        >
+          <div
+            className="bg-paper border border-hairline rounded-md shadow-xl w-full max-w-2xl my-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-baseline justify-between px-6 py-4 border-b border-hairline">
+              <div>
+                <h2 className="font-serif text-2xl text-ink">New account</h2>
+                <p className="font-serif italic text-graphite text-xs mt-1">
+                  Code is auto-allocated within the type&apos;s range.
+                </p>
+              </div>
+              <button
+                onClick={() => !isPending && setShowCreate(false)}
+                disabled={isPending}
+                className="text-muted hover:text-ink text-2xl leading-none pt-1 disabled:opacity-50"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-6">
+              <AccountForm
+                mode="create"
+                isPending={isPending}
+                allAccounts={accounts}
+                onSubmit={(fd) =>
+                  startTransition(async () => {
+                    try {
+                      const result = await createAccount(fd)
+                      if (result?.error) {
+                        setError(result.error)
+                        return
+                      }
+                      setShowCreate(false)
+                      setError(null)
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : 'Failed to create')
+                    }
+                  })
                 }
-                setShowCreate(false)
-                setError(null)
-              } catch (e) {
-                setError(e instanceof Error ? e.message : 'Failed to create')
-              }
-            })
-          }
-        />
+              />
+            </div>
+          </div>
+        </div>
       ) : null}
 
       <div className="flex items-baseline gap-3 mb-3 mt-6">
