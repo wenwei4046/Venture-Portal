@@ -114,9 +114,29 @@ export async function GET(req: Request) {
     (coaRows ?? []).map((c) => [c.code as string, c.name as string]),
   )
 
+  // Mig 275: fetch line items for these invoices if any.
+  const invoiceIds = invoices.map((inv) => inv.id as string)
+  const { data: allLines } = await supabase
+    .from('invoice_lines')
+    .select('invoice_id, line_no, description, amount, category_code')
+    .in('invoice_id', invoiceIds)
+    .order('line_no')
+  const linesByInvoice = new Map<string, Array<{ line_no: number; description: string | null; amount: number; category_code: string | null }>>()
+  for (const ln of allLines ?? []) {
+    const arr = linesByInvoice.get(ln.invoice_id as string) ?? []
+    arr.push({
+      line_no: ln.line_no as number,
+      description: (ln.description as string | null) ?? null,
+      amount: Number(ln.amount),
+      category_code: (ln.category_code as string | null) ?? null,
+    })
+    linesByInvoice.set(ln.invoice_id as string, arr)
+  }
+
   const docs: InvoiceDocData[] = invoices.map((raw) => {
     const inv = raw as InvoiceRow
     const billTo = resolveBillTo(inv, companyMap, departmentMap)
+    const lines = linesByInvoice.get(inv.id)
     return {
       id: inv.id,
       invoice_no: inv.invoice_no,
@@ -131,6 +151,16 @@ export async function GET(req: Request) {
       category_label: inv.category_code ? `${inv.category_code} · ${coaMap.get(inv.category_code) ?? ''}`.trim() : null,
       bill_to_primary: billTo.primary,
       bill_to_sub: billTo.sub,
+      lines: lines && lines.length > 0
+        ? lines.map((ln) => ({
+            line_no: ln.line_no,
+            description: ln.description,
+            amount: ln.amount,
+            category_label: ln.category_code
+              ? `${ln.category_code} · ${coaMap.get(ln.category_code) ?? ''}`.trim()
+              : null,
+          }))
+        : undefined,
     }
   })
 

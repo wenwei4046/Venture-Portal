@@ -58,6 +58,13 @@ const styles = StyleSheet.create({
   },
 })
 
+export interface InvoiceLineData {
+  line_no: number
+  description: string | null
+  amount: number
+  category_label: string | null
+}
+
 export interface InvoiceDocData {
   id: string
   invoice_no: string | null
@@ -73,6 +80,9 @@ export interface InvoiceDocData {
   // Bill-to resolved upstream
   bill_to_primary: string
   bill_to_sub: string
+  // Multi-line (mig 275). When present, render as a line-items table instead
+  // of the flat description block.
+  lines?: InvoiceLineData[]
 }
 
 function fmtMoney(v: number): string {
@@ -147,21 +157,54 @@ function InvoicePage({ inv }: { inv: InvoiceDocData }) {
         </Text>
       </View>
 
-      <View style={styles.descBlock}>
-        <Text style={styles.sectionLabel}>Description</Text>
-        <Text style={styles.descText}>{inv.description ?? '—'}</Text>
-      </View>
-
-      <View style={styles.amountTable}>
-        <View style={styles.amountRow}>
-          <Text style={styles.amountLabel}>Subtotal (RM)</Text>
-          <Text style={styles.amountValue}>{fmtMoney(inv.total_amount)}</Text>
-        </View>
-        <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>TOTAL (RM)</Text>
-          <Text style={styles.totalValue}>{fmtMoney(inv.total_amount)}</Text>
-        </View>
-      </View>
+      {inv.lines && inv.lines.length > 0 ? (
+        <>
+          {inv.description ? (
+            <View style={styles.descBlock}>
+              <Text style={styles.sectionLabel}>Summary</Text>
+              <Text style={styles.descText}>{inv.description}</Text>
+            </View>
+          ) : null}
+          <View style={[styles.amountTable, { marginTop: 8 }]}>
+            <View style={[styles.amountRow, { backgroundColor: '#eee', borderBottom: '0.5pt solid #aaa' }]}>
+              <Text style={[styles.amountLabel, { fontFamily: 'Helvetica-Bold', fontSize: 8.5 }]}>DESCRIPTION</Text>
+              <Text style={[styles.amountValue, { fontFamily: 'Helvetica-Bold', fontSize: 8.5, textAlign: 'right' }]}>AMOUNT (RM)</Text>
+            </View>
+            {inv.lines.map((ln) => (
+              <View key={ln.line_no} style={[styles.amountRow, { borderBottom: '0.5pt solid #ddd' }]}>
+                <View style={{ flex: 1, paddingLeft: 4 }}>
+                  <Text style={{ fontSize: 10 }}>{ln.description ?? '—'}</Text>
+                  {ln.category_label ? (
+                    <Text style={{ fontSize: 8, color: '#777', marginTop: 1 }}>{ln.category_label}</Text>
+                  ) : null}
+                </View>
+                <Text style={styles.amountValue}>{fmtMoney(ln.amount)}</Text>
+              </View>
+            ))}
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>TOTAL (RM)</Text>
+              <Text style={styles.totalValue}>{fmtMoney(inv.total_amount)}</Text>
+            </View>
+          </View>
+        </>
+      ) : (
+        <>
+          <View style={styles.descBlock}>
+            <Text style={styles.sectionLabel}>Description</Text>
+            <Text style={styles.descText}>{inv.description ?? '—'}</Text>
+          </View>
+          <View style={styles.amountTable}>
+            <View style={styles.amountRow}>
+              <Text style={styles.amountLabel}>Subtotal (RM)</Text>
+              <Text style={styles.amountValue}>{fmtMoney(inv.total_amount)}</Text>
+            </View>
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>TOTAL (RM)</Text>
+              <Text style={styles.totalValue}>{fmtMoney(inv.total_amount)}</Text>
+            </View>
+          </View>
+        </>
+      )}
 
       {inv.reference_no ? (
         <View style={styles.footerNote}>

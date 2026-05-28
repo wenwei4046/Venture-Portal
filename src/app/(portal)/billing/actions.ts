@@ -162,6 +162,145 @@ export async function createManualInvoice(formData: FormData): Promise<void> {
   revalidatePath('/statements')
 }
 
+// ─── Create multi-line invoice (Finance) ────────────────────────────────────
+//
+// One invoice with N line items: same bill-to + billing_mode for all lines,
+// but each line has its own description, amount, and category_code.
+// invoices.total_amount = SUM(lines.amount). Per-line categories feed the
+// approve/issue JE (per-line Cr) so P&L attribution stays correct even when
+// items hit different account codes.
+
+export interface InvoiceLineInput {
+  description: string
+  amount: number
+  categoryCode: string
+}
+
+export async function createMultiLineInvoice(
+  payload: {
+    billableType: BillableToKind
+    billingMode: CreateInvoiceMode
+    period: string // YYYY-MM
+    invoiceDate: string // YYYY-MM-DD
+    dueDate: string
+    referenceNo: string
+    headerDescription: string
+    companyId?: string
+    departmentId?: string
+    freetextName?: string
+    lines: InvoiceLineInput[]
+  },
+): Promise<{ id: string; invoice_no: string | null }> {
+  const user = await requireRole(['finance'])
+  const supabase = await createClient()
+
+  if (!['subsidiary', 'director', 'dept_pool', 'freetext'].includes(payload.billableType)) {
+    throw new Error(`Unsupported billable_to_type: ${payload.billableType}`)
+  }
+  if (!CREATE_INVOICE_MODES.includes(payload.billingMode)) {
+    throw new Error(`Unsupported billing mode: ${payload.billingMode}`)
+  }
+  if (payload.billableType === 'subsidiary' && !payload.companyId) {
+    throw new Error('Subsidiary is required')
+  }
+  if (payload.billableType === 'director' && !payload.freetextName?.trim()) {
+    throw new Error('Director name is required')
+  }
+  if (payload.billableType === 'dept_pool' && !payload.departmentId) {
+    throw new Error('Department is required')
+  }
+  if (payload.billableType === 'freetext' && !payload.freetextName?.trim()) {
+    throw new Error('Billable party name is required')
+  }
+  if (!payload.period) throw new Error('Period is required')
+  if (!payload.lines || payload.lines.length === 0) {
+    throw new Error('At least one line item is required')
+  }
+
+  // Validate every line.
+  for (let i = 0; i < payload.lines.length; i++) {
+    const ln = payload.lines[i]
+    if (!Number.isFinite(ln.amount) || ln.amount <= 0) {
+      throw new Error(`Line ${i + 1}: amount must be a positive number`)
+    }
+    if (!ln.description.trim()) {
+      throw new Error(`Line ${i + 1}: description is required`)
+    }
+    // category_code is optional but recommended; allow empty (will fall back
+    // to revenueGlCode 5000 at issue time, same as single-line invoices).
+  }
+
+  const total = payload.lines.reduce((s, l) => s + Number(l.amount), 0)
+  if (!(total > 0)) throw new Error('Total amount must be positive')
+  const totalRounded = Math.round(total * 100) / 100
+
+  const period = dayjs(payload.period).startOf('month').format('YYYY-MM-DD')
+  await assertPeriodOpen(supabase, period)
+
+  const { data: invoiceNo, error: mintErr } = await supabase.rpc('mint_invoice_no', {
+    p_period: period,
+  })
+  if (mintErr || !invoiceNo) {
+    throw new Error(`Failed to mint invoice number: ${mintErr?.message ?? 'unknown'}`)
+  }
+
+  const { data: created, error: invErr } = await supabase
+    .from('invoices')
+    .insert({
+      invoice_no: invoiceNo as string,
+      period_month: period,
+      billing_mode: payload.billingMode,
+      // Header description is just a summary; per-line descriptions are the
+      // source of truth. Leave category_code NULL so issue flow knows to
+      // fan out by line (Cr per line) rather than crediting one account.
+      category_code: null,
+      base_amount: totalRounded,
+      total_amount: totalRounded,
+      status: 'draft',
+      invoice_date: payload.invoiceDate || null,
+      due_date: payload.dueDate || null,
+      description: payload.headerDescription.trim() || null,
+      reference_no: payload.referenceNo.trim() || null,
+      created_by: user.id,
+      billable_to_type: payload.billableType,
+      company_id: payload.billableType === 'subsidiary' ? payload.companyId : null,
+      billable_to_department_id: payload.billableType === 'dept_pool' ? payload.departmentId : null,
+      billable_to_freetext_name:
+        payload.billableType === 'director' || payload.billableType === 'freetext'
+          ? payload.freetextName?.trim() ?? null
+          : null,
+    })
+    .select('id, invoice_no')
+    .single()
+
+  if (invErr || !created) {
+    throw new Error(`Failed to create invoice: ${invErr?.message ?? 'unknown'}`)
+  }
+
+  // Insert lines. If this fails we should roll back the invoice — but
+  // there's no atomic SQL transaction available via PostgREST, so on
+  // failure we attempt to clean up.
+  const lineRows = payload.lines.map((l, idx) => ({
+    invoice_id: created.id,
+    line_no: idx + 1,
+    description: l.description.trim(),
+    amount: Math.round(Number(l.amount) * 100) / 100,
+    category_code: l.categoryCode.trim() || null,
+  }))
+
+  const { error: linesErr } = await supabase.from('invoice_lines').insert(lineRows)
+  if (linesErr) {
+    // Best-effort cleanup; the invoice is still draft so it's safe to delete.
+    await supabase.from('invoices').delete().eq('id', created.id).eq('status', 'draft')
+    throw new Error(`Failed to create invoice lines (invoice rolled back): ${linesErr.message}`)
+  }
+
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+
+  return { id: created.id, invoice_no: created.invoice_no }
+}
+
 // ─── Director CTC per subsidiary (Finance auto-fill helper) ──────────────────
 //
 // Mig 206: when Finance opens Create Invoice with mode=director_attribution,
@@ -555,23 +694,51 @@ export async function approveInvoice(formData: FormData) {
   //   dr Bank / cr 1040 AR (approve_single_voucher billing_payment branch)
   const amount = Number(inv.total_amount ?? 0)
   if (amount > 0) {
-    const revenueCode = await resolveRevenueGlCode(supabase, inv.category_code, inv.billing_mode)
+    // Mig 275: multi-line invoices have rows in invoice_lines, each with its
+    // own category_code. Fan out the Cr side per line so P&L attribution
+    // stays correct when items span different accounts. Falls back to the
+    // legacy single-line path when no lines exist.
+    const { data: invoiceLines } = await supabase
+      .from('invoice_lines')
+      .select('line_no, description, amount, category_code')
+      .eq('invoice_id', inv.id)
+      .order('line_no')
     try {
       // transaction_date = the day this JE is being booked (today), NOT the
       // end-of-period. period_month already captures which accounting period
       // the entry belongs to. Using endOf(period_month) creates future-dated
       // JEs that get excluded from BS snapshots run mid-period, leaving AR
       // looking "credit-only" when the invoice has already been settled.
+      const jeLines: Array<{ accountCode: string; debit?: number; credit?: number; description: string }> = [
+        { accountCode: '3030', debit: amount, description: `AR — invoice ${inv.invoice_no ?? ''}`.trim() },
+      ]
+      if (invoiceLines && invoiceLines.length > 0) {
+        // Per-line Cr. Each line's category_code resolves through the same
+        // fallback logic as the single-line path.
+        for (const ln of invoiceLines) {
+          const code = await resolveRevenueGlCode(supabase, ln.category_code, inv.billing_mode)
+          jeLines.push({
+            accountCode: code,
+            credit: Number(ln.amount),
+            description: ln.description ?? 'Line item',
+          })
+        }
+      } else {
+        // Single-line / legacy invoice: one Cr for the full amount.
+        const revenueCode = await resolveRevenueGlCode(supabase, inv.category_code, inv.billing_mode)
+        jeLines.push({
+          accountCode: revenueCode,
+          credit: amount,
+          description: 'Service billing revenue recognised',
+        })
+      }
       await postJournalEntry(supabase, {
         transactionDate: dayjs().format('YYYY-MM-DD'),
         description: `Invoice ${inv.invoice_no ?? inv.id} issued`,
         referenceType: 'invoice',
         referenceId: inv.id,
         createdBy: user.id,
-        lines: [
-          { accountCode: '3030', debit: amount, description: `AR — invoice ${inv.invoice_no ?? ''}`.trim() },
-          { accountCode: revenueCode, credit: amount, description: 'Service billing revenue recognised' },
-        ],
+        lines: jeLines,
       })
     } catch (jeErr) {
       const msg = jeErr instanceof Error ? jeErr.message : 'unknown'

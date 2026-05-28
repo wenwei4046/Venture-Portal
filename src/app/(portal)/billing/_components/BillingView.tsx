@@ -14,6 +14,7 @@ import MarketingProjectList from './MarketingProjectList'
 import NonBillableList from './NonBillableList'
 import InvoicesList from './InvoicesList'
 import CreateInvoiceButton from './CreateInvoiceButton'
+import CreateMultiLineInvoiceButton from './CreateMultiLineInvoiceButton'
 
 interface Props {
   searchParams: Promise<{ period?: string }>
@@ -183,12 +184,20 @@ export default async function BillingView({ searchParams }: Props) {
         <div className="flex items-center gap-3 shrink-0">
           <PeriodSelector currentPeriod={period} />
           {user.role === 'finance' && (
-            <CreateInvoiceButton
-              companies={companyList}
-              currentPeriod={period}
-              departments={departments ?? []}
-              categories={categoryList}
-            />
+            <>
+              <CreateMultiLineInvoiceButton
+                companies={companyList}
+                currentPeriod={period}
+                departments={departments ?? []}
+                categories={categoryList}
+              />
+              <CreateInvoiceButton
+                companies={companyList}
+                currentPeriod={period}
+                departments={departments ?? []}
+                categories={categoryList}
+              />
+            </>
           )}
         </div>
       </div>

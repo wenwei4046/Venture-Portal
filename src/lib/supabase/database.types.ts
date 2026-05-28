@@ -1913,6 +1913,51 @@ export type Database = {
           },
         ]
       }
+      invoice_lines: {
+        Row: {
+          amount: number
+          category_code: string | null
+          created_at: string
+          description: string | null
+          id: string
+          invoice_id: string
+          line_no: number
+        }
+        Insert: {
+          amount: number
+          category_code?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          invoice_id: string
+          line_no: number
+        }
+        Update: {
+          amount?: number
+          category_code?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          invoice_id?: string
+          line_no?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_lines_category_code_fkey"
+            columns: ["category_code"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "invoice_lines_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_payout_pool: {
         Row: {
           amount: number
