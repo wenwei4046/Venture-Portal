@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import {
@@ -139,6 +139,17 @@ export default function CreateInvoiceButton({
 
   // Multi-pool table — used by subsidiary / dept_pool / freetext
   const [poolRows, setPoolRows] = useState<PoolRow[]>([newPoolRow(prefillMode)])
+
+  const modalContentRef = useRef<HTMLDivElement>(null)
+  // When the modal opens, scroll the backdrop to the top so the modal header
+  // is visible (was opening with the user's previous page scroll position
+  // still in effect; with overflow on the backdrop the modal could land off
+  // screen and require an upward scroll).
+  useLayoutEffect(() => {
+    if (!open) return
+    const el = modalContentRef.current?.parentElement
+    if (el && 'scrollTop' in el) el.scrollTop = 0
+  }, [open])
 
   const [period, setPeriod] = useState(dayjs(currentPeriod).format('YYYY-MM'))
   const [invoiceDate, setInvoiceDate] = useState(dayjs().format('YYYY-MM-DD'))
@@ -457,11 +468,12 @@ export default function CreateInvoiceButton({
 
       {open && (
         <div
-          className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
           onClick={() => !isPending && setOpen(false)}
         >
           <div
-            className="bg-paper border border-hairline rounded-md shadow-xl w-full max-w-3xl max-h-[92vh] overflow-y-auto"
+            ref={modalContentRef}
+            className="bg-paper border border-hairline rounded-md shadow-xl w-full max-w-3xl my-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-baseline justify-between px-6 py-4 border-b border-hairline">

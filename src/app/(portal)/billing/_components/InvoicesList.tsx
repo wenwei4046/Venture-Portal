@@ -251,6 +251,15 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                     const labels = resolvePartyLabel(inv, companyMap, departmentMap)
                     return (
                       <div className="flex items-center justify-end gap-3">
+                        <Link
+                          href={`/billing/invoice-doc?id=${inv.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-graphite hover:text-accent font-serif italic"
+                          title="Download single-invoice PDF"
+                        >
+                          PDF
+                        </Link>
                         {inv.status === 'draft' ? (
                           <>
                             <EditInvoiceButton
