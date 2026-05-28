@@ -434,6 +434,94 @@ export async function createCreditNote(formData: FormData) {
   return data.id
 }
 
+// ─── Delete draft invoice (Finance — soft to recover from mistakes) ───────
+
+export async function deleteDraftInvoice(formData: FormData): Promise<void> {
+  await requireRole(['finance'])
+  const supabase = await createClient()
+
+  const id = String(formData.get('id') ?? '').trim()
+  if (!id) throw new Error('Invoice id is required')
+
+  const { data: inv } = await supabase
+    .from('invoices')
+    .select('id, status, period_month, invoice_no')
+    .eq('id', id)
+    .single()
+  if (!inv) throw new Error('Invoice not found')
+  if (inv.status !== 'draft') {
+    throw new Error(`Cannot delete: invoice ${inv.invoice_no ?? inv.id} is ${inv.status}`)
+  }
+  await assertPeriodOpen(supabase, inv.period_month)
+
+  const { error } = await supabase
+    .from('invoices')
+    .delete()
+    .eq('id', id)
+    .eq('status', 'draft') // guard against races
+
+  if (error) throw new Error(`Failed to delete invoice: ${error.message}`)
+
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+}
+
+// ─── Update draft invoice (Finance — fix typos before approving) ──────────
+//
+// Only edits the "soft" fields: amount, category, description, dates,
+// reference. Hard structural fields (billing_mode, billable_to_*, company)
+// stay locked — those are essentially "which pool / who to bill", changing
+// them = delete + recreate. Per user request 2026-05-27.
+
+export async function updateDraftInvoice(formData: FormData): Promise<void> {
+  await requireRole(['finance'])
+  const supabase = await createClient()
+
+  const id = String(formData.get('id') ?? '').trim()
+  if (!id) throw new Error('Invoice id is required')
+
+  const { data: inv } = await supabase
+    .from('invoices')
+    .select('id, status, period_month, invoice_no')
+    .eq('id', id)
+    .single()
+  if (!inv) throw new Error('Invoice not found')
+  if (inv.status !== 'draft') {
+    throw new Error(`Cannot edit: invoice ${inv.invoice_no ?? inv.id} is ${inv.status}`)
+  }
+  await assertPeriodOpen(supabase, inv.period_month)
+
+  const rawAmount = String(formData.get('amount') ?? '')
+  const amount = Number(rawAmount)
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error('Amount must be a positive number')
+  }
+
+  const categoryCode = String(formData.get('category_code') ?? '').trim() || null
+  const description = String(formData.get('description') ?? '').trim() || null
+  const invoiceDate = String(formData.get('invoice_date') ?? '').trim() || null
+  const dueDate = String(formData.get('due_date') ?? '').trim() || null
+  const referenceNo = String(formData.get('reference_no') ?? '').trim() || null
+
+  const { error } = await supabase
+    .from('invoices')
+    .update({
+      total_amount: amount,
+      category_code: categoryCode,
+      description,
+      invoice_date: invoiceDate,
+      due_date: dueDate,
+      reference_no: referenceNo,
+    })
+    .eq('id', id)
+    .eq('status', 'draft')
+
+  if (error) throw new Error(`Failed to update invoice: ${error.message}`)
+
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+}
+
 // ─── Approve / Issue Invoice (Finance — draft → issued) ────────────────────
 
 export async function approveInvoice(formData: FormData) {

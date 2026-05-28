@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
-import { ApproveInvoiceButton, BulkIssueInvoicesButton } from './InvoiceActions'
+import { ApproveInvoiceButton, BulkIssueInvoicesButton, DeleteInvoiceButton, EditInvoiceButton } from './InvoiceActions'
 import CreateCreditNoteButton from './CreateCreditNoteButton'
 import InvoiceDetailButton from './InvoiceDetailButton'
 import SortableTable, { type SortableColumn } from '@/components/SortableTable'
@@ -252,7 +252,23 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                     return (
                       <div className="flex items-center justify-end gap-3">
                         {inv.status === 'draft' ? (
-                          <ApproveInvoiceButton id={inv.id} />
+                          <>
+                            <EditInvoiceButton
+                              id={inv.id}
+                              invoiceNo={inv.invoice_no}
+                              initial={{
+                                total_amount: Number(inv.total_amount),
+                                category_code: inv.category_code ?? null,
+                                description: inv.description ?? null,
+                                invoice_date: inv.invoice_date ?? null,
+                                due_date: inv.due_date ?? null,
+                                reference_no: inv.reference_no ?? null,
+                              }}
+                              categories={categories ?? []}
+                            />
+                            <DeleteInvoiceButton id={inv.id} invoiceNo={inv.invoice_no} />
+                            <ApproveInvoiceButton id={inv.id} />
+                          </>
                         ) : inv.status === 'issued' ? (
                           <Link
                             href={`/payments/new?invoice_id=${inv.id}`}
