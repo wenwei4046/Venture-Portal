@@ -143,23 +143,24 @@ export default async function BillingView({ searchParams }: Props) {
   const directorAttributionInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'director_attribution').length
   const marketingInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'marketing_project').length
 
-  // Pull the 5 per-dept OPEX totals the approved payroll_run captured at
-  // Stage A (Principal approved HR costing). Finance uses these as the
-  // REQUIRED amount per dept — once they've created + issued invoices for
-  // the dept, the card flips to showing the invoice total instead.
+  // Pull the 5 per-dept OPEX totals from the payroll_run, but ONLY if
+  // Principal has approved it (approved_at IS NOT NULL). HR-submitted-only
+  // (still pending) shouldn't propagate into the billing view — Finance
+  // should not see the figures or be able to invoice until Principal signs
+  // off on HR's submission.
   const { data: payrollRun } = await supabase
     .from('payroll_runs')
     .select(
-      'marketing_opex_total, hr_opex_total, finance_opex_total, director_office_total, director_salary_total'
+      'marketing_opex_total, hr_opex_total, finance_opex_total, director_office_total, director_salary_total, approved_at'
     )
     .eq('period_month', period)
     .maybeSingle()
-  const payrollApproved = !!payrollRun
-  const marketingFromPayroll = Number(payrollRun?.marketing_opex_total ?? 0)
-  const hrFromPayroll = Number(payrollRun?.hr_opex_total ?? 0)
-  const financeFromPayroll = Number(payrollRun?.finance_opex_total ?? 0)
-  const directorOfficeFromPayroll = Number(payrollRun?.director_office_total ?? 0)
-  const directorFromPayroll = Number(payrollRun?.director_salary_total ?? 0)
+  const payrollApproved = !!payrollRun?.approved_at
+  const marketingFromPayroll = payrollApproved ? Number(payrollRun?.marketing_opex_total ?? 0) : 0
+  const hrFromPayroll = payrollApproved ? Number(payrollRun?.hr_opex_total ?? 0) : 0
+  const financeFromPayroll = payrollApproved ? Number(payrollRun?.finance_opex_total ?? 0) : 0
+  const directorOfficeFromPayroll = payrollApproved ? Number(payrollRun?.director_office_total ?? 0) : 0
+  const directorFromPayroll = payrollApproved ? Number(payrollRun?.director_salary_total ?? 0) : 0
 
   const companyList = companies ?? []
   const companyMap = new Map(
@@ -208,7 +209,17 @@ export default async function BillingView({ searchParams }: Props) {
             {dayjs(period).format('MMMM YYYY')}
           </div>
           <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
-            {invoiceList.length > 0 ? formatMoney(invoiceTotal) : formatMoney(hrTotalCtc)}
+            {invoiceList.length > 0
+              ? formatMoney(invoiceTotal)
+              : payrollApproved
+                ? formatMoney(
+                    marketingFromPayroll +
+                      hrFromPayroll +
+                      financeFromPayroll +
+                      directorOfficeFromPayroll +
+                      directorFromPayroll,
+                  )
+                : formatMoney(0)}
           </div>
           <div className="font-mono text-xs text-muted mt-2">
             {invoiceList.length > 0 ? (
@@ -217,11 +228,13 @@ export default async function BillingView({ searchParams }: Props) {
                 {' · '}
                 <em className="font-serif italic">generated</em>
               </>
-            ) : submitted ? (
+            ) : payrollApproved ? (
               <>
-                HR submitted · {formatMoney(hrTotalCtc)} total CTC ·{' '}
+                Principal approved · {formatMoney(hrTotalCtc)} HR CTC ·{' '}
                 <em className="font-serif italic">ready for invoice generation</em>
               </>
+            ) : submitted ? (
+              <em className="font-serif italic">HR submitted — awaiting Principal approval</em>
             ) : (
               <em className="font-serif italic">HR has not submitted this period yet</em>
             )}
@@ -386,33 +399,29 @@ function DeptCostCard({
 }) {
   const hasInvoices = invoiceCount > 0
   const hasRequired = required > 0.005
-  // Main number = actual invoiced total (0 when nothing's been billed yet).
-  // Target from payroll engine is moved to the subtitle so it doesn't read
-  // like an invoice amount when none exist.
-  const amount = invoiced
-  const muted = !hasInvoices
-
-  const fmtAmt = (n: number) =>
-    n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  // Main number: invoiced total once invoices exist; otherwise the
+  // approved-payroll target (Finance uses this to know what to bill).
+  // payrollApproved gating happens upstream (required is forced to 0 when
+  // Principal hasn't approved), so reaching this branch implies approval.
+  const amount = hasInvoices ? invoiced : required
+  const muted = !hasInvoices && !hasRequired
 
   let note: string
   if (!payrollApproved) {
-    note = 'awaiting HR costing'
+    note = 'awaiting Principal approval'
   } else if (hasInvoices) {
     const gap = Math.round((required - invoiced) * 100) / 100
     if (Math.abs(gap) < 0.01) {
       note = `${invoiceCount} invoice${invoiceCount === 1 ? '' : 's'}`
     } else if (gap > 0) {
-      note = `${invoiceCount} invoice${invoiceCount === 1 ? '' : 's'} · short RM ${fmtAmt(gap)}`
+      note = `${invoiceCount} invoice${invoiceCount === 1 ? '' : 's'} · short RM ${gap.toLocaleString('en-MY', { minimumFractionDigits: 2 })}`
     } else {
-      note = `${invoiceCount} invoice${invoiceCount === 1 ? '' : 's'} · over RM ${fmtAmt(-gap)}`
+      note = `${invoiceCount} invoice${invoiceCount === 1 ? '' : 's'} · over RM ${(-gap).toLocaleString('en-MY', { minimumFractionDigits: 2 })}`
     }
-  } else if (hasRequired) {
-    note = `target from payroll: RM ${fmtAmt(required)} · no invoice yet`
   } else if (marketingNote) {
-    note = 'no invoice yet'
+    note = 'from payroll — no invoice'
   } else {
-    note = 'no invoice yet'
+    note = 'from payroll — no invoice yet'
   }
 
   return (
