@@ -16,6 +16,9 @@ export interface PostJournalEntryInput {
   description: string
   referenceType?: string
   referenceId?: string
+  /** Optional GL segment. When omitted, the DB derives it from reference_type
+   *  (journal_entries_set_segment trigger). Pass to force a specific segment. */
+  segment?: string
   lines: JournalLine[]
   createdBy: string
 }
@@ -29,7 +32,7 @@ export async function postJournalEntry(
   supabase: SupabaseClient,
   input: PostJournalEntryInput,
 ): Promise<string> {
-  const { transactionDate, description, referenceType, referenceId, lines, createdBy } = input
+  const { transactionDate, description, referenceType, referenceId, lines, createdBy, segment } = input
 
   if (lines.length < 2) {
     throw new Error('Journal entry must have at least 2 lines')
@@ -54,7 +57,7 @@ export async function postJournalEntry(
     }
   }
 
-  const { data, error } = await supabase.rpc('post_journal_entry', {
+  const rpcArgs: Record<string, unknown> = {
     p_transaction_date: transactionDate,
     p_description: description,
     p_reference_type: referenceType ?? null,
@@ -66,7 +69,9 @@ export async function postJournalEntry(
       credit: l.credit ?? null,
       description: l.description ?? null,
     })),
-  })
+  }
+  if (segment) rpcArgs.p_segment = segment
+  const { data, error } = await supabase.rpc('post_journal_entry', rpcArgs as never)
 
   if (error) {
     throw new Error(`Failed to post journal entry: ${error.message}`)
