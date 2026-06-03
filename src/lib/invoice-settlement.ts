@@ -82,3 +82,19 @@ export function poolAttributions(
     invoiceNo: i.invoice_no ?? i.id.slice(0, 8),
   }))
 }
+
+// Mirrors the SQL billing_mode_to_segment (IMMUTABLE) so the TS settlement
+// path tags the bank-in JE with the same segment the revenue used at issue.
+// NOTE: director_attribution → 'director_office' segment (matches SQL), even
+// though its POOL is dept_pool_director.
+const BILLING_MODE_TO_SEGMENT: Record<string, string> = {
+  marketing_project: 'marketing',
+  hr_attribution: 'hr',
+  finance_attribution: 'finance',
+  director_office_attribution: 'director_office',
+  director_attribution: 'director_office',
+}
+
+export function segmentForBillingMode(mode: string): string {
+  return BILLING_MODE_TO_SEGMENT[mode] ?? 'corporate'
+}

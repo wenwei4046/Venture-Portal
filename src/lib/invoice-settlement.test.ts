@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { payeeKey, validateConsolidation, poolAttributions, type SettleableInvoice } from './invoice-settlement'
+import { payeeKey, validateConsolidation, poolAttributions, segmentForBillingMode, type SettleableInvoice } from './invoice-settlement'
 
 function inv(over: Partial<SettleableInvoice>): SettleableInvoice {
   return {
@@ -108,5 +108,19 @@ describe('poolAttributions', () => {
     const r = poolAttributions([{ id: 'x', invoice_no: null, billing_mode: 'weird', total_amount: 9 }], map)
     expect(r[0].pool).toBe('venture_pool')
     expect(r[0].invoiceNo).toBe('x')
+  })
+})
+
+describe('segmentForBillingMode', () => {
+  it('maps each billing mode to its GL segment (mirrors SQL billing_mode_to_segment)', () => {
+    expect(segmentForBillingMode('marketing_project')).toBe('marketing')
+    expect(segmentForBillingMode('hr_attribution')).toBe('hr')
+    expect(segmentForBillingMode('finance_attribution')).toBe('finance')
+    expect(segmentForBillingMode('director_office_attribution')).toBe('director_office')
+    expect(segmentForBillingMode('director_attribution')).toBe('director_office')
+  })
+  it('falls back to corporate for venture_attribution and unknown modes', () => {
+    expect(segmentForBillingMode('venture_attribution')).toBe('corporate')
+    expect(segmentForBillingMode('weird')).toBe('corporate')
   })
 })
