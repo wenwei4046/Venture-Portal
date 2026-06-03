@@ -8,6 +8,7 @@ import { requireRole } from '@/lib/auth'
 import { postJournalEntry, r2 } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
 import { ACCOUNT_TYPES, type AccountType } from '@/lib/coa'
+import { segmentForBillingMode } from '@/lib/invoice-settlement'
 
 // ─── Create payment voucher (Finance) ────────────────────────────────────────
 
@@ -85,16 +86,18 @@ export async function createPaymentVoucher(formData: FormData) {
   if (voucherType === 'billing_payment' && !invoiceId) {
     throw new Error('Billing payment requires a linked invoice')
   }
+  let settleBillingMode: string | null = null
   if (voucherType === 'billing_payment' && invoiceId) {
     const { data: openInv } = await supabase
       .from('invoices')
-      .select('id, status')
+      .select('id, status, billing_mode')
       .eq('id', invoiceId)
       .in('status', ['issued', 'draft'])
       .maybeSingle()
     if (!openInv) {
       throw new Error('Invoice is not open for payment (already paid, via netting, or does not exist)')
     }
+    settleBillingMode = (openInv as { billing_mode: string | null }).billing_mode ?? null
     const { data: existingVoucher } = await supabase
       .from('payment_vouchers')
       .select('id, voucher_no')
@@ -430,6 +433,9 @@ export async function createPaymentVoucher(formData: FormData) {
           description: `PV ${voucherNo}: ${description}`,
           referenceType: 'payment_voucher',
           referenceId: data.id,
+          ...(invoiceId && settleBillingMode
+            ? { segment: segmentForBillingMode(settleBillingMode) }
+            : {}),
           lines: [
             { accountCode: glAccountCode, debit: r2(amount), description: `Bank deposit — ${voucherNo}` },
             { accountCode: '3030', credit: r2(amount), description: `Payment received — ${payeeName}` },
