@@ -1,6 +1,8 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-05-25)
+# HOUZS Venture Portal — Session Handoff (checkpoint 2026-05-28)
 
 > Context-window handoff. Read this first to continue. User communicates in 华语 (Mandarin).
+> Supersedes the 2026-05-23 / 2026-05-25 checkpoints after a heavy session of
+> GL re-import + dept-pool restructure + billing UX work.
 
 ## Project
 - HV internal banking portal. Next.js 15 (App Router) + Supabase + Vercel + TypeScript + Tailwind.
@@ -11,72 +13,161 @@
 
 ## ⚠️ Vercel deployment
 - Live site: **venture-portal-chi.vercel.app** under `wenwei4046s-projects`. Auto-deploys on `git push origin main`. Do NOT use `vercel --prod` (chi rejects with permission denied).
-- Last pushed commit: `56f0f6c` (ledger Excel/PDF Dept column).
+- Last pushed commit at checkpoint: `7d28828` (batch settle invoices).
+- ⚠️ OneDrive sync locks `.next/` on Windows occasionally — if dev server EBUSY-loops, stop + `rm -rf .next` + restart.
 
-## ⚠️ DB write methods (current)
+## ⚠️ DB write methods
 - `supabase` MCP tools are connected; use `mcp__supabase__execute_sql` for DML and `apply_migration` for DDL/RPC changes.
-- For DML where MCP isn't available, run a node script that loads `.env.local` → `@supabase/supabase-js` with `SUPABASE_SERVICE_ROLE_KEY`. Pattern: `scripts/apply-corrections-2026-05-23.mjs`, `scripts/gl-import-apply.mjs`.
-- Stale: `scripts/apply-mig-*.mjs` use the management API + a different `PROJECT_REF` (kylcwsxugfbwcofgzhfm) — that's an old test project, NOT the current `gixpptmfuryskbwkmiwz`.
+- For DML where MCP isn't available, run a node script that loads `.env.local` → `@supabase/supabase-js` with `SUPABASE_SERVICE_ROLE_KEY`. Pattern: `scripts/gl-import-apply-v2.mjs`.
+- TypeScript types: regen via `mcp__supabase__generate_typescript_types`, unwrap JSON (`JSON.parse(text).types`), write to `src/lib/supabase/database.types.ts`.
 
-## Current data state (key facts)
+## Major changes this session (2026-05-26 → 28)
 
-### Journals / opening
-- **`reference_type='manual_jv'` now holds 334 entries** representing the full GL history (Jan 2025 → May 2026), grouped by Ref.1, multi-dept journals split per segment with 1900 clearing. Built by `scripts/gl-import-preview.mjs` (generator) and applied by `scripts/gl-import-apply.mjs` (insert via service-role key). Includes:
-  - PV-000077 HOUZS Century interest **4,130 → 3,540** (rate 3.5%→3%), bank Cr matched (590 less).
-  - Year-end closing 2025-12-31: `Dr 1510 RE 2,024 / Cr 9000 2,024` tagged **`corporate`** segment (so Office cumulative ties to TB).
-  - Interest-in-suspense adjusting JE 2026-05-20: 3053→3063 38,333.33 (The Cont), 4052→4062 38,333.33 (HOUZS Century).
-  - 305-D001 → 3030 (Dream Crafter Trade Debtors, 91.26); other 305-xxxx → 3071; 405-xxxx → 4050; 900-I001 → 9000.
-- Reconciled: every TB account matches `HV - Trial Balance 22.05.pdf` (source TB total 1,676,933.38). Journal-lines sum-of-Dr = sum-of-Cr = **4,974,391.22** (the gross is much higher than source TB because each Ref's lines are posted intact rather than netted into one bulk opening; per-account NET is what reconciles).
-- Per-segment cumulative P&L: **Marketing −8,238.07, Finance 0, HR 0, Director Office 0, Director +25,263.04, Corporate (Office) −8,922.07, Total +8,102.90.**
+### A. GL re-import (new source: 26-May-2026 XLSX)
+- Source: `C:\Users\User\OneDrive\Desktop\Houzs Venture - General Ledger 26.05.2026.xlsx` (53 source accounts, 1,613 raw lines).
+- TB: `C:\Users\User\OneDrive\Desktop\Trial Balance.pdf` (Dr=Cr=**1,676,933.38**).
+- 334 manual_jv entries / 1,580 journal_lines now in DB (wipe + re-insert via `scripts/gl-import-apply-v2.mjs`).
+- Adjusting JEs baked in by `scripts/gl-import-preview-v2.mjs`:
+  1. **Year-end closing 2025-12-31**: Dr 1510 RE 2,024 / Cr 9000 GE 2,024 (segment='corporate')
+  2. **Suspense-split 2026-05-20**: 3053 ↔ 3063 + 4052 ↔ 4062 each 38,333.33 (segment='unallocated')
+  3. **Per-bank cleanup (2 JEs)**: Alliance reserved for Director-only convention. Cross-segment transfer 19,651.43 from corporate→director via 1900 clearing.
+- PV-000077 correction (4,130→3,540) is **already baked into the new source** — preview script's old correction toggle was removed.
+- TB reconciliation: every account matches (verified post-import).
 
-### Dept pools (cash)
-- Set from **Bank Reconciliation 20/05/2026** (mig 262, then revised). Bank-recon total = 9,928.14.
-- Director **18,673.62** (the "Director & Office" bank slice) + later corrected +590 (PV-000077 interest adj) = **19,263.62**.
-- Director Office (2,255.49), Finance (361.80), HR 0, Marketing (6,718.19). Sum = 9,928.14 ✓.
-- HR has no dept_pools row (balance 0).
+### B. Dept Pool re-opening (mig 269 → 270 → 271)
+- 5 dept_pool opening rows after 3 iterations (Director value flip-flopped during user clarification):
+  - Director: **np_in 37,218.37** (final, mig 271) — includes 19,651.43 top-up from Venture Pool via the cross-segment GL transfer JEs
+  - Director Office: expense_out 2,255.49
+  - Finance: expense_out 361.80
+  - Marketing: expense_out 16,107.10
+  - HR: no row (balance 0)
+- Per-bank × per-segment landed as intended: **Alliance = Director only (922.47)**, HL absorbs everyone else.
+- `/dept-pool` Total cash = 9,928.14 = HL 9,005.67 + Alliance 922.47 ✓ (bank-recon).
 
-### Venture pool ledger (`venture_pool` table)
-- **EMPTY** (user explicitly wanted Venture Pool = 0 because all cash is in dept pools per bank recon; the prior 38,902.71 was a stale duplicate of the old "Director & Office" opening).
-- Will accumulate automatically going forward:
-  - **`new_fund_source` approval** → `fund_in` (approvals/actions.ts line 247-259).
-  - **`new_loan` approval** → `fund_out` (approvals/actions.ts line 129-139).
-  - **PV approval** (source_pool='venture_pool', via `apply_pool_adjustment`): direction out + loan_id → `fund_out`; out no loan → `expense_out`; in + loan_id → `loan_repayment_in`; in no loan → `profit_in`.
-  - Statement contra-only items (no PV) do NOT touch venture_pool — they're paper net-off.
+### C. Director Pool reset
+- `director_payouts` drafts **DELETED** (Saving 9,040.69 → 0).
+- `invoice_payout_pool` **wiped + 4 new rows** per user-provided breakdown:
+  - WL (`a5f55a13`): 7,910.04
+  - MK (`18b3aa79`): 8,790.51
+  - WS (`5f9bec22`): 9,770.81
+  - WW (`b5add299`): 10,747.01
+  - Total: **37,218.37**
+- `/director-pool` Total Pool = 37,218.37 (saving 0 + invoice 37,218.37).
 
-### Director Pool
-- **Director is now its own `gl_segment = 'director'`** (mig 260). Director's income/expense sit in their own pool, like marketing/finance/hr. Drops the previous Director→4080 reclass model.
-- `4080 Director Pool Payable` is **deactivated** (`is_active = false`) — kept for history.
-- `dept_pools(Director)` reflects bank-recon cash (19,263.62), not the P&L net.
-- /director-pool page hero (Total Pool = Saving + Invoice − Advance) is the salary-engine view; an opening np_in to dept_pools shows on the dashboard "Director Pool" card and the page reconciliation line but NOT in the Saving+Invoice hero.
+### D. Save & Calculate behaviour fix (mig 268)
+- `save_director_salary_results` RPC no longer writes `dept_pools` rows. Director Pool cash now lives via the same `credit_dept_pool_on_invoice_paid` trigger (mig 202) as the other 4 depts → driven by billing_payment PV settlement.
+- Previously the RPC's `DELETE FROM dept_pools WHERE period_month=... AND transaction_type='np_in'` collaterally wiped bank-recon opening rows.
 
-### Banks (`bank_accounts` table)
-- Hong Leong **9,005.67**, Alliance **922.47** (set by script). Dashboard "Bank Accounts" widget reads this table.
+### E. Venture Pool semantic (corporate + treasury)
+- Single segment filter `journal_entries.segment IN ('corporate', 'treasury')` applied in 5 read paths:
+  - `/venture-pool` (hero, this-month, 12-month, ledger)
+  - `/dept-pool` Venture row + per-bank breakdown
+  - `dashboard_summary` RPC (mig 273)
+  - `/reports/fund-summary` + xlsx/pdf export
+- `treasury` includes future fund_in / fund_out / loan_repayment via `derive_journal_segment` (mig 217). Currently 0 in historical GL but auto-flows future activity.
+- The legacy `venture_pool` TABLE is **kept** with existing writers untouched (approval/fund-out/voucher-paid), but **no reads anymore**. User decision: leave alone.
 
-### `dashboard_summary` RPC (mig 264)
-- Total pool ("Pool" subline) = ALL dept pools (incl Director, incl negatives, no clamp) + Venture pool. So Pool foots to dept-pool Cash page = 9,928.14.
-- `pool_breakdown.dept_pool / venture_pool / total` mirror that.
-- `dept_pool_breakdown` lists EVERY pool with non-zero balance (incl Director and negatives), not just positives.
-- Subsidiaries / "lent" hero = LIVE outstanding (net of principal repayments, +netting for fund-in). Interest income/expense still on gross principal (Margin panel unchanged).
+### F. Per-bank × per-segment view
+- `/dept-pool` Cash tab has a **"Per-bank breakdown"** section under the main table.
+- Rows: 5 depts + Venture (corporate+treasury merged). Cols: HL · Alliance · Total + bottom "Bank balance" row.
+- Driven by `journal_lines + journal_entries.segment + account_code ∈ bank_accounts.gl_account_code`.
 
-### `cfo-reports.ts` (Income Statement / Cash Flow)
-- Treasury interest **EXPENSE** now bumps into Venture Pool's **`vp.cost`** (NOT `vp.expense`) — appears under Cost (above gross profit). Interest income stays in `vp.revenue`.
-- Income Statement folds `manual_jv` P&L by segment per account (label = account name).
-- Cash Flow page (`/reports/cash-flow`) injects all 6 standard pool tabs (Venture + 5 dept pools) even when a pool had no activity in the period.
-- Ledger (`/reports/ledger`) shows a **Dept** short-form column per line (Mkt / Fin / HR / DO / Dir / Vent / Trs). Excel + PDF exports include the column too.
+### G. Per-director Billed / Used / Remaining on `/director-pool`
+- New table below Director Invoice section (Principal only).
+- "Used" = sum of negative balances on the other 4 dept pools + Office (corporate cash if negative) — pro-rated across directors by their share of total billed.
+- Last row absorbs rounding so column sums foot exactly.
+- Current: Used 27,290.23, Remaining 9,928.14 (= bank cash).
 
-### dept-pool page (`/dept-pool`)
-- Cash tab: total = sum of all dept balances = 9,928.14 = bank-recon. Venture (Office) row is shown but cash = 0 (Office's cash is folded into Director per "Director & Office → Director"). In/Out columns are accumulated to-date (not this-month), so In − Out foots to Balance.
-- Accrual·P&L tab: Total net margin = sum of all dept segments INCL Venture row (= 8,102.90 total). Each dept + Venture (Office) shown.
+### H. Billing UX overhaul
+- **Multi-line invoice** (new flow, mig 275 + `CreateMultiLineInvoiceButton`): one bill, one bill-to, N line items each with own description / amount / category. Approve & Issue fans out per-line Cr JE. Single-line "+ Create Invoice" path still exists alongside.
+- **Edit / Delete draft invoices** (mig 274 — `invoices_finance_delete_draft` policy; soft-field editor modal): finance can fix typos or delete pre-approval. Issued/paid stay locked.
+- **Per-invoice PDF + batch PDF** at `/billing/invoice-doc`:
+  - `?id=<uuid>` single page
+  - `?ids=a,b,c` multi-page
+  - `?period=YYYY-MM` whole period
+  - PDF template = HV letterhead + bill-to + line items table (or flat desc) + total + reference
+  - Per-row PDF link + period-batch button in /statements
+- **Batch settle (knock-off)**: checkbox column on InvoicesList. Select any subset of `issued` (non-dept_pool) invoices, floating bar → modal (bank + date) → server creates billing_payment PV per invoice, all auto-paid. `batchSettleInvoices` server action.
+- **OPEX cards gating fix**: cards + hero only show payroll figures after `payroll_runs.approved_at IS NOT NULL` (was firing on row exists). Subtitle differentiates: HR not submitted / HR submitted — awaiting Principal approval / Principal approved.
+- **Modal scroll fix**: Create Invoice / Multi-line / New account modals use `items-start + backdrop overflow-y-auto + my-4` so they open at top, page scrolls naturally.
+- **Sticky headers**: `/statements?tab=invoices` BillingView page-head + `/settings` Chart of Accounts header are `sticky top-0` — Create buttons always reachable.
+- **New account button**: was tiny text link, now accent button + modal popup.
+
+### I. Dashboard / reports
+- `dashboard_summary` RPC: mig 272 → 273 (Venture Pool from journal_lines, includes corporate + treasury). Pool breakdown shows Venture row alongside dept pools (frontend appends).
+- `/reports/ledger` enhancements (2026-05-25 sub-session, already shipped): search, reverse-order toggle, global back-to-top button.
+
+### J. Cleanup
+- 17 stale one-off scripts deleted (apply-mig-*, verify-mig-*, diagnose-*, etc.).
+- /operating-fund orphan route deleted (duplicate of /venture-pool).
+- `.env.local.shared` kept untouched (per user, secrets visible in OneDrive but accepted).
+
+## Current data state (post-session, key facts)
+
+### `/dashboard`
+- Pool = **9,928.14** (= 18,493.98 dept_pools + (-8,565.84) Venture)
+- Pool breakdown shows 5 dept pool rows + Venture (Office)
+
+### `/dept-pool` Cash tab
+- Director **37,218.37** / Director Office **(2,255.49)** / Finance **(361.80)** / HR 0.00 / Marketing **(16,107.10)** / Venture (Office) **(8,565.84)** → Total **9,928.14**
+- Per-bank breakdown: Alliance = Director 922.47 only; HL takes the rest.
+
+### `/director-pool`
+- Total Pool 37,218.37 (saving 0 + invoice 37,218.37)
+- Director Pool balance 37,218.37 → reconciliation "Buckets balance ✓"
+- Per-director usage table: Billed 37,218.37 / Used 27,290.23 / Remaining 9,928.14
+
+### `/reports/trial-balance`
+- Dr = Cr = **1,676,933.38** (ties TB PDF)
+
+### Bank
+- HL (3000): 9,005.67 · Alliance (3010): 922.47 · Total 9,928.14
+- `bank_accounts.current_balance` ties GL.
+
+### May 2026 payroll_run
+- Exists with HR 18,877.26 / Finance 23,170.12 / Marketing 47,166.26 / etc.
+- `approved_at = NULL` (Principal hasn't approved yet) → all OPEX cards and hero show RM 0.00 with "awaiting Principal approval" subtitle. Once Principal approves on `/approvals/payroll-run/<id>`, figures surface.
+
+## Migrations added this session
+- `267_add_venture_attribution_billing_mode` — Postgres ENUM gains 'venture_attribution' so the new pool option works.
+- `268_save_director_salary_drop_dept_pool_np_in` — Save & Calculate no longer writes dept_pools.
+- `269_dept_pools_opening_2026_05_26` — first opening write (Director 37,218.37 in the originally interpreted role).
+- `270_dept_pools_director_opening_to_natural_gl` — interim revert (Director 17,566.94) — superseded.
+- `271_dept_pools_director_opening_to_37218_37` — final Director 37,218.37 again (current).
+- `272_dashboard_venture_pool_from_journal_lines` — RPC reads journal_lines for hv_fund_balance.
+- `273_dashboard_venture_pool_include_treasury` — RPC also includes treasury segment.
+- `274_invoices_allow_finance_delete_draft` — RLS policy unlocks finance DELETE on draft.
+- `275_invoice_lines_table` — new table for multi-line invoices + RLS.
+
+> Note: mig 269 / 270 / 271 are sequential reverts during user clarification. Current state = mig 271. Don't try to "clean up" by removing the interim ones — each runs in order; later overrides earlier.
+
+## Scripts (in `scripts/`)
+- `gl-import-preview-v2.mjs` — parses 26-May-2026 XLSX, applies YE closing + suspense split + per-bank cleanup, emits `gl-import-entries-v2.json`. Read-only.
+- `gl-import-apply-v2.mjs` — wipes manual_jv + bulk-inserts the 334 entries / 1,580 lines, verifies TB + per-bank × per-segment.
+- `gl-import-entries-v2.json` — the actual entries that landed in production (committed for traceability).
+- (v1 versions `gl-import-preview.mjs` / `gl-import-apply.mjs` / `gl-import-entries.json` are legacy, kept for history but not used.)
+
+## Open / pending decisions
+
+### 1. venture_pool TABLE retirement
+- Currently: 4 codepaths still INSERT into venture_pool (approvals/actions.ts L129/249/614, fund-out/actions.ts L220, lib/voucher-paid-helpers.ts L32, billing/BillingView.tsx L65 read).
+- All READS have been moved off the table; writes are harmless but pollute on each PV/loan approval.
+- User said "leave alone" — revisit only if it causes drift or noise later.
+
+### 2. Multi-line invoice — edit / inter-billing edge cases
+- `updateDraftInvoice` only edits flat soft fields. Multi-line edit not yet supported (must delete + recreate).
+- Inter-billing (dept_pool target) on multi-line invoices works in create flow but the approve/issue JE path treats it like single-line (per-line Cr to category, no per-line inter-billing mirror). Likely fine for the cases user has but verify before scaling.
+
+### 3. Batch settle — inter-billing excluded
+- Batch action rejects `billable_to_type='dept_pool'` invoices. User must settle those individually via `/payments/new?invoice_id=`.
+- Could be expanded later by inlining the inter_billing_out + mirror logic; punted for now.
+
+### 4. User mentioned "I have a little bit to change" on session end
+- New session will likely bring small tweaks. Listen first, then act — don't pre-emptively start.
 
 ## COA additions / mapping
-- Receivable `3051-3059`; payable `4051-4058`; parents `4100` Company / `4200` Director. `4052`=HOUZS Century, `4058`=Tan Guan Yu.
-- Interest in Suspense: `3060`/`3061-3065` (recv); `4060`/`4061-4064` (pay).
-- Year-end RE: `1510`. Opening clearing: `1900`. `4080 Director Pool Payable` (mig 258, now deactivated).
-- Source GL → system COA map (used by `gl-import-preview.mjs`):
-  - BS: `100-0000→1500`, `150-0000→1510`, `200-3000→2000`, `300-0000→3030`, `305-D001→3030` (Dream Crafter trade), other `305-*→3071`, `310-0010→3000`, `310-0030→3010`, `350-0010→3051`, `350-0020→3053`, `350-0050→4052`, `350-0060→3055`, `350-0070→3058`, `350-0080→4051`, `350-0090→3052`, `350-0120→3059`, `360-0020→4058`, `370-0010..40→4057/4054/4056/4055`, `405-0000/H001/Y001→4050`, `410-0010..50→4070..4074`, `420-1000→7000`.
-  - P&L: `500-0000→5010`, `700-0010→5020`, `700-0020→5000`, `700-0030→7000`, `900-E001→9081`, `900-E002→9083`, `900-I001→9000`, `900-M001→9020`, `900-S001→9082`, `900-S002→9084`, `900-S003→9085`, `900-U001→9086`, `900-W001→9087`, `901→9088`, `902→9089`, `904→9030`, `905→9090`, `907→9091`, `911→9010`, `912→9092`, `913→9093`, `914→9094`, `915→9000`.
-  - The standalone `HV_期初TB映射.xlsx` codes are a stale draft — use the codes above.
-- Dept (GL) → gl_segment: `MAR→marketing`, `FIN→finance`, `HR→hr`, `DO→director_office`, `DIRECTOR→director`, `OFFICE→corporate`. Empty dept → `corporate`.
+Same as previous handoff (the COA itself is unchanged this session). For new invoices using `billing_mode='venture_attribution'`:
+- Falls back to `5000` Cr account if no category_code given; per-line categories now override correctly (mig 275 + `resolveRevenueGlCode` honors any active COA code).
 
 ## Key IDs
 - Principal user: `cbc6a18a-3f38-4567-b8c3-385d00b9e6b3`; Finance: `6c0c28a2-c936-4c83-9bf8-b8c54bda51c5`
@@ -84,39 +175,27 @@
 - Companies: 2990 `8a7c5a36`, CAR `daeeb093`, CMI `538a18d5`, CONTS `89c32d76`, HC `5eab1801`, HK `24204cca`, OHN `346274df`
 - Directors: MK `18b3aa79`, WL `a5f55a13`, WS `5f9bec22`, WW `b5add299`
 
-## Migrations added (cumulative across both sessions)
-- `257_dashboard_net_of_repayments` — dashboard lent = net of repayments.
-- `258_director_pnl_to_director_pool` — first Director→4080 reclass (superseded).
-- `259_opening_v2_full_replace_tb2205` — bulk opening rebuild (superseded by the per-date GL re-import).
-- `260_add_director_gl_segment` — adds `gl_segment='director'`.
-- `261_opening_v3_director_own_segment` — opening v3 with Director as own segment (superseded).
-- `262_dept_pool_cash_opening_bank_recon` — dept_pool cash from bank recon.
-- `263_post_opening_data_corrections` — HOUZS interest +590 adj + venture_pool clear (file-archive of work also embedded in the GL re-import).
-- `264_dashboard_pool_total_and_breakdown` — Pool = all dept pools incl Director, breakdown shows all non-zero pools.
-
-NOTE: migrations 258, 259, 261 are HISTORICAL — the current state is from the GL re-import via `gl-import-apply.mjs`, NOT from the bulk openings in those migrations.
-
-## Scripts (in `scripts/`)
-- `gl-import-preview.mjs` — parses `HV - General Legder 22.05.xlsx`, applies all corrections, groups by Ref.1, splits multi-dept, emits `gl-import-entries.json` + verifies TB locally. **Read-only.**
-- `gl-import-apply.mjs` — reads the JSON, wipes existing manual_jv via service-role, batch-inserts 334 entries + 1,568 lines, then verifies.
-- `gl-import-entries.json` — the actual 334 entries that landed in production.
-- `apply-corrections-2026-05-23.mjs` — earlier corrections script (banks + initial backdate). Backdate was later reverted by another node one-liner; do not re-run.
-- `gen-opening-v2.mjs` + `opening-v2.sql` — bulk-opening generator (historical, superseded by GL re-import).
-
-## Open / pending decisions
-1. **Suspense split for other loans** — only LO#19/BI#19 split is applied. Other loans' interest-in-suspense NOT separated (pending user).
-2. **5% saving** — does NOT auto-flow to Venture pool (stays in Director Pool's saving bucket via `director_payouts.saving_amount`). User said "再考虑" — open question whether they want to change this.
-3. **/director-pool "Total Pool" hero** — Saving+Invoice−Advance basis (salary engine), so the opening np_in does NOT appear in that hero (only on the dashboard Director Pool card + page reconciliation line as "Pending payroll to PV"). User may want hero formula changed.
-4. **Statement vs venture_pool** — confirmed with user: statements are paper net-off; only actual PVs touch venture_pool. No change needed.
-
 ## Source files on Desktop (current truth)
-- `HV - Trial Balance 22.05.pdf` (final TB, 22 May 2026)
-- `HV - General Legder 22.05.xlsx` (final GL Jan 2025 → 20 May 2026)
-- `HV - Bank Reconciliation - Format 1.pdf` (bank recon 20.05.2026 18:00)
-- `HV_期初TB映射.xlsx` — stale draft; ignore the codes column, use the map in this handoff.
-- `venture - GL.xlsx` — original old GL (pre-correction); superseded by `HV - General Legder 22.05.xlsx`.
+- `Houzs Venture - General Ledger 26.05.2026.xlsx` — latest GL (now imported)
+- `Trial Balance.pdf` — final TB at 26 May 2026 (Dr=Cr 1,676,933.38)
+- `HV - General Legder 22.05.xlsx` / `HV - Trial Balance 22.05.pdf` — superseded
+- `HV - Bank Reconciliation - Format 1.pdf` — informational; bank-recon decision already baked into mig 269/271 + cleanup JEs.
 
-## Reports architecture
-- Income Statement / Balance Sheet / Cash Flow built from OPERATIONAL subledgers (payment_vouchers, invoices, treasury) PLUS the `manual_jv` GL entries folded via `gatherManualJvPnl` in `cfo-reports.ts`. Trial Balance reads `journal_lines` directly.
-- Treasury-managed account codes (interest income / penalty income / interest expense by NAME, type=revenue/other_income/expense respectively) are EXCLUDED from the manual_jv fold and instead summed by `gatherTreasury` → routed to Venture Pool. **Interest expense now lands in `vp.cost`** (not `vp.expense`).
-- Per-pool layout (Income Statement, Cash Flow, dept-pool page) all share the same 6-pool view: Venture, Marketing, HR, Finance, Director Office, Director Pool. Empty pools are shown.
+## Reports architecture (unchanged from prior handoff)
+- Income Statement / Balance Sheet / Cash Flow built from OPERATIONAL subledgers (payment_vouchers, invoices, treasury) PLUS the `manual_jv` GL entries folded via `gatherManualJvPnl` in `cfo-reports.ts`.
+- Trial Balance reads `journal_lines` directly.
+- Treasury-managed account codes (interest income / penalty income / interest expense by NAME, type=revenue/other_income/expense respectively) are EXCLUDED from the manual_jv fold and instead summed by `gatherTreasury` → routed to Venture Pool. **Interest expense lands in `vp.cost`** (not `vp.expense`).
+- Per-pool layout (Income Statement, Cash Flow, /dept-pool page) share 6-pool view: Venture · Marketing · HR · Finance · Director Office · Director Pool. Empty pools shown.
+
+## Untracked files
+- `.env.local.shared` — copy of .env.local with secrets exposed in plain text. User decided to leave it (option C). DO NOT commit.
+
+## Quick gotchas / future-Claude reminders
+- When the user gives flip-flopping clarifications about a number, write a layered plan + numbered options BEFORE touching DB — they appreciate "let me confirm interpretation". Three migrations 269→270→271 for Director opening = the cost of skipping that step.
+- TS type generation via Supabase MCP returns JSON-wrapped — needs `JSON.parse(text).types` extraction before writing to `database.types.ts`.
+- `redirect()` inside server actions breaks if called in loops — extract logic into helpers when batching (see `batchSettleInvoices`).
+- Bash CWD resets between calls — `cd /c/Users/User/OneDrive/Desktop/Claude/Venture/Venture-Portal && <cmd>` for git, node, npx.
+- If new helper scripts appear during work (apply-mig-* etc.), decide upfront whether they're disposable (delete on session end) or worth checking in. This session's policy: delete one-offs once the work has been applied.
+- Modals: use `items-start` + backdrop `overflow-y-auto` + `my-4` so they open at top — `items-center` + inner `overflow-y-auto` can land mid-content.
+- Sticky headers + paper backdrop work fine inside `<main className="overflow-y-auto">` (the PortalFrame scroll container). Use `sticky top-0 z-20 bg-paper`.
+- Vercel build is faster than typecheck locally (~60s) — push and watch instead of waiting for local `next build`. Errors surface quickly in the build log.
