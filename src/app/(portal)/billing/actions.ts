@@ -8,7 +8,7 @@ import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { postJournalEntry } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
-import { validateConsolidation, poolAttributions } from '@/lib/invoice-settlement'
+import { validateConsolidation, poolAttributions, segmentForBillingMode } from '@/lib/invoice-settlement'
 import { INVOICE_BILLING_MODE_TO_POOL } from '@/lib/cfo-reports'
 
 // Mig 200/P1-6a: invoice billing_mode → revenue GL code mapping.
@@ -804,21 +804,32 @@ export async function settleInvoicesConsolidated(payload: {
     )
   }
 
-  // GL: Dr Bank (total) / Cr 3030 AR (total), dated to the payment date
-  try {
-    await postJournalEntry(supabase, {
-      transactionDate: payload.paymentDate,
-      description: `PV ${voucherNo}: ${description}`,
-      referenceType: 'payment_voucher',
-      referenceId: pv.id,
-      lines: [
-        { accountCode: bankGlCode, debit: total, description: `Bank deposit — ${voucherNo}` },
-        { accountCode: '3030', credit: total, description: `Payment received — ${payeeName}` },
-      ],
-      createdBy: user.id,
-    })
-  } catch (jeErr) {
-    console.error('GL posting warning for consolidated settle:', jeErr)
+  // GL: Dr Bank / Cr 3030, SPLIT per department segment so the GL-derived
+  // Venture figure (corporate+treasury bank) doesn't absorb dept settlements.
+  // Group invoice amounts by segmentForBillingMode(billing_mode); one JE/segment.
+  const bySegment = new Map<string, number>()
+  for (const inv of invoices) {
+    const seg = segmentForBillingMode(inv.billing_mode)
+    bySegment.set(seg, Math.round(((bySegment.get(seg) ?? 0) + Number(inv.total_amount)) * 100) / 100)
+  }
+  for (const [seg, segAmount] of bySegment) {
+    if (segAmount <= 0) continue
+    try {
+      await postJournalEntry(supabase, {
+        transactionDate: payload.paymentDate,
+        description: `PV ${voucherNo}: ${description} [${seg}]`,
+        referenceType: 'payment_voucher',
+        referenceId: pv.id,
+        segment: seg,
+        lines: [
+          { accountCode: bankGlCode, debit: segAmount, description: `Bank deposit — ${voucherNo}` },
+          { accountCode: '3030', credit: segAmount, description: `Payment received — ${payeeName}` },
+        ],
+        createdBy: user.id,
+      })
+    } catch (jeErr) {
+      console.error('GL posting warning for consolidated settle:', seg, jeErr)
+    }
   }
 
   // Mark every invoice paid + link to this voucher (race-guarded on issued).
