@@ -480,10 +480,10 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
           >
             <div className="flex items-baseline justify-between px-6 py-4 border-b border-hairline">
               <div>
-                <h2 className="font-serif text-2xl text-ink">Batch settle</h2>
+                <h2 className="font-serif text-2xl text-ink">合并结算 · 生成收据</h2>
                 <p className="font-serif italic text-graphite text-xs mt-1">
-                  {selectedInvoices.length} invoice(s) · RM {selectedTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}.
-                  One billing_payment voucher per invoice, all marked paid.
+                  {selectedInvoices.length} 张发票 · RM {selectedTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}。
+                  合并为一张收款凭证（Official Receipt），所选发票全部标记为已付。
                 </p>
               </div>
               <button
