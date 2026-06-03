@@ -32,12 +32,22 @@ export function validateConsolidation(invoices: SettleableInvoice[]): Consolidat
     if (i.billable_to_type === 'dept_pool') {
       return { ok: false, error: 'Inter-billing (dept_pool) invoices must be settled individually' }
     }
+    if (!i.company_id && !i.billable_to_freetext_name) {
+      return { ok: false, error: `Invoice ${i.id} has no identifiable payee` }
+    }
   }
   const keys = new Set(invoices.map(payeeKey))
   if (keys.size > 1) {
     return { ok: false, error: '一张收据只能结同一家公司的单，请只勾选同一家公司的发票' }
   }
   // Sum in integer cents to avoid floating-point drift, then convert back.
-  const totalCents = invoices.reduce((s, i) => s + Math.round(Number(i.total_amount) * 100), 0)
+  let totalCents = 0
+  for (const i of invoices) {
+    const cents = Math.round(Number(i.total_amount) * 100)
+    if (Number.isNaN(cents)) {
+      return { ok: false, error: `Invoice ${i.id} has an invalid total_amount` }
+    }
+    totalCents += cents
+  }
   return { ok: true, payeeKey: [...keys][0], total: totalCents / 100 }
 }

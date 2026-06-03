@@ -50,4 +50,21 @@ describe('validateConsolidation', () => {
     ])
     expect(r).toEqual({ ok: true, payeeKey: 'company:c1', total: 150.11 })
   })
+
+  it('rejects an invoice with no company and no freetext name', () => {
+    const r = validateConsolidation([inv({ company_id: null, billable_to_freetext_name: null })])
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error).toContain('no identifiable payee')
+  })
+
+  it('rejects an invalid total_amount', () => {
+    const r = validateConsolidation([inv({ company_id: 'c1', total_amount: 'abc' as unknown as number })])
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error).toContain('invalid total_amount')
+  })
+
+  it('accepts a single same-company invoice', () => {
+    const r = validateConsolidation([inv({ company_id: 'c1', total_amount: 42.5 })])
+    expect(r).toEqual({ ok: true, payeeKey: 'company:c1', total: 42.5 })
+  })
 })
