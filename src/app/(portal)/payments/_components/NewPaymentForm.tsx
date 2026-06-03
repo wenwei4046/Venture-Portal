@@ -119,6 +119,10 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
       : [{ pool: '', amount: '', account_code: '' }]
   )
   const [amount, setAmount] = useState(isInvoicePay ? invoicePreset!.total_amount.toFixed(2) : '')
+  // Payment date — defaults to today, user can backdate to the real pay date.
+  // dayjs isn't imported here; build today's YYYY-MM-DD from the Date locale.
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const [paymentDate, setPaymentDate] = useState(todayIso)
   // Controlled payee fields so loan-repayment mode can auto-fill them
   const [payeeName, setPayeeName] = useState(isInvoicePay ? invoicePreset!.company_name : '')
   const [payeeCompanyId, setPayeeCompanyId] = useState(isInvoicePay ? (invoicePreset!.company_id ?? '') : '')
@@ -439,6 +443,24 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
             </p>
           ) : null}
         </div>
+      </div>
+
+      {/* ── Payment date ── (backdate to the real settlement date) */}
+      <div className="mb-6">
+        <label htmlFor="payment_date" className="block text-sm font-sans font-medium text-graphite mb-1.5">
+          Payment date
+        </label>
+        <input
+          id="payment_date"
+          name="payment_date"
+          type="date"
+          value={paymentDate}
+          onChange={(e) => setPaymentDate(e.target.value)}
+          className="w-full max-w-xs px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink font-mono focus:outline-none focus:border-accent-border"
+        />
+        <p className="font-serif italic text-muted text-xs mt-1.5">
+          Defaults to today. Set the actual date the money moved if backdating.
+        </p>
       </div>
 
       {/* ── Payment method ── */}

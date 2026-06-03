@@ -122,6 +122,12 @@ export async function createPaymentVoucher(formData: FormData) {
   const isAutoComplete = direction === 'credit'
   const nowIso = new Date().toISOString()
   const todayStr = dayjs().format('YYYY-MM-DD')
+  // mig 276 / single-settle date: honor a user-chosen payment date when valid,
+  // else fall back to today. Drives both payment_date and the settlement JE date.
+  const rawPaymentDate = (formData.get('payment_date') as string)?.trim()
+  const paymentDateStr = rawPaymentDate && /^\d{4}-\d{2}-\d{2}$/.test(rawPaymentDate)
+    ? rawPaymentDate
+    : todayStr
 
   // Validate loan repayment breakdown if provided (fund_source or legacy loan)
   if (fundSourceId || loanId) {
@@ -188,7 +194,7 @@ export async function createPaymentVoucher(formData: FormData) {
         approved_at: nowIso,
         executed_by: user.id,
         executed_at: nowIso,
-        payment_date: todayStr,
+        payment_date: paymentDateStr,
       } : {}),
     })
     .select('id')
@@ -420,7 +426,7 @@ export async function createPaymentVoucher(formData: FormData) {
           ? ((await supabase.from('bank_accounts').select('gl_account_code').eq('id', bankAccountId).single()).data?.gl_account_code ?? '3000')
           : '3000'
         await postJournalEntry(supabase, {
-          transactionDate: todayStr,
+          transactionDate: paymentDateStr,
           description: `PV ${voucherNo}: ${description}`,
           referenceType: 'payment_voucher',
           referenceId: data.id,
