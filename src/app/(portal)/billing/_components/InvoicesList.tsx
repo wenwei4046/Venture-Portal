@@ -10,7 +10,8 @@ import CreateCreditNoteButton from './CreateCreditNoteButton'
 import InvoiceDetailButton from './InvoiceDetailButton'
 import SortableTable from '@/components/SortableTable'
 import type { AccountType } from '@/lib/coa'
-import { batchSettleInvoices } from '../actions'
+import { settleInvoicesConsolidated } from '../actions'
+import { payeeKey } from '@/lib/invoice-settlement'
 
 interface Invoice {
   id: string
@@ -127,6 +128,21 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
 
   const selectedInvoices = invoices.filter((i) => selectedIds.has(i.id) && isBatchSettleable(i))
   const selectedTotal = selectedInvoices.reduce((s, i) => s + Number(i.total_amount), 0)
+  // A consolidated receipt covers one payer only. Detect mixed selections so
+  // the UI can warn + block before the server rejects.
+  const selectedPayeeKeys = new Set(
+    selectedInvoices.map((i) =>
+      payeeKey({
+        id: i.id,
+        status: i.status,
+        billable_to_type: i.billable_to_type ?? null,
+        company_id: i.company_id ?? null,
+        billable_to_freetext_name: i.billable_to_freetext_name ?? null,
+        total_amount: i.total_amount,
+      }),
+    ),
+  )
+  const crossCompany = selectedPayeeKeys.size > 1
 
   function toggle(id: string) {
     setSelectedIds((prev) => {
@@ -156,28 +172,22 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
     setSettleResult(null)
     if (!settleBank) return setSettleError('Pick a bank account')
     if (!settleDate) return setSettleError('Pick a payment date')
+    if (crossCompany) return setSettleError('一张收据只能结同一家公司的单，请只勾选同一家公司的发票')
     const ids = selectedInvoices.map((i) => i.id)
     if (ids.length === 0) return setSettleError('No settleable invoices selected')
     startTransition(async () => {
       try {
-        const res = await batchSettleInvoices({
+        const res = await settleInvoicesConsolidated({
           invoiceIds: ids,
           bankAccountId: settleBank,
           paymentDate: settleDate,
         })
-        if (res.failed.length === 0) {
-          setSettleResult(`Settled ${res.settled} invoice(s).`)
-          setSelectedIds(new Set())
-          setShowSettleModal(false)
-          router.refresh()
-        } else {
-          setSettleResult(
-            `Settled ${res.settled}, ${res.failed.length} failed. First error: ${res.failed[0].error}`,
-          )
-          router.refresh()
-        }
+        setSettleResult(`Receipt ${res.voucherNo} — settled ${res.settledCount} invoice(s).`)
+        setSelectedIds(new Set())
+        setShowSettleModal(false)
+        router.refresh()
       } catch (err) {
-        setSettleError(err instanceof Error ? err.message : 'Batch settle failed')
+        setSettleError(err instanceof Error ? err.message : 'Consolidated settle failed')
       }
     })
   }
@@ -244,29 +254,34 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
             </div>
           </div>
 
-          {/* Batch-settle helper bar: select-all-issued shortcut + count */}
+          {/* Consolidated-settle helper bar: prominent select-all button + count */}
           {invoices.some(isBatchSettleable) ? (
-            <div className="flex items-center gap-3 mb-3 text-xs font-mono">
-              <span className="text-muted">
-                {selectedIds.size > 0
-                  ? `${selectedIds.size} selected · RM ${selectedTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}`
-                  : 'Select issued invoices below to batch-settle'}
-              </span>
+            <div className="flex items-center gap-3 mb-4 flex-wrap">
               <button
                 type="button"
                 onClick={selectAllIssued}
-                className="text-graphite hover:text-ink font-serif italic"
+                className="bg-surface hover:bg-surface-2 border border-hairline rounded-md px-3 py-1.5 text-xs font-sans text-ink transition-colors"
               >
-                Select all issued
+                全选可结算发票
               </button>
               {selectedIds.size > 0 ? (
                 <button
                   type="button"
                   onClick={clearSelection}
-                  className="text-graphite hover:text-ink font-serif italic"
+                  className="text-xs font-sans text-muted hover:text-ink"
                 >
-                  Clear
+                  清除选择
                 </button>
+              ) : null}
+              <span className="text-xs font-mono text-muted">
+                {selectedIds.size > 0
+                  ? `已选 ${selectedIds.size} 张 · RM ${selectedTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}`
+                  : '勾选同一公司的 issued 发票，合并结算成一张收据'}
+              </span>
+              {crossCompany ? (
+                <span className="text-xs font-serif italic text-danger">
+                  选中了不同公司的单 — 一张收据只能结同一家公司
+                </span>
               ) : null}
             </div>
           ) : null}
@@ -428,27 +443,27 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
         </>
       )}
 
-      {/* Floating batch-settle action bar (bottom right). Appears when any
-          issued + settleable invoice is selected. */}
+      {/* Floating consolidated-settle action bar (bottom right). */}
       {selectedIds.size > 0 && !showSettleModal ? (
         <div className="fixed bottom-6 right-6 z-30 bg-paper border border-hairline rounded-md shadow-lg px-4 py-3 flex items-center gap-3">
           <div className="font-mono text-sm text-ink">
-            {selectedIds.size} selected · <span className="font-semibold">RM {selectedTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}</span>
+            {selectedIds.size} 张 · <span className="font-semibold">RM {selectedTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}</span>
           </div>
           <button
             type="button"
             onClick={clearSelection}
             className="text-xs font-sans text-muted hover:text-ink"
           >
-            Clear
+            清除
           </button>
           <button
             type="button"
             onClick={openSettleModal}
-            disabled={selectedInvoices.length === 0}
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50"
+            disabled={selectedInvoices.length === 0 || crossCompany}
+            title={crossCompany ? '一张收据只能结同一家公司的单' : undefined}
+            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Batch settle
+            {crossCompany ? '不同公司不能合并' : `合并结算 ${selectedInvoices.length} 张 → 生成收据`}
           </button>
         </div>
       ) : null}
@@ -543,10 +558,10 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
               </button>
               <button
                 onClick={handleBatchSettle}
-                disabled={isPending || selectedInvoices.length === 0}
-                className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50"
+                disabled={isPending || selectedInvoices.length === 0 || crossCompany}
+                className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isPending ? 'Settling…' : `Settle ${selectedInvoices.length}`}
+                {isPending ? '结算中…' : `生成收据 · 结 ${selectedInvoices.length} 张`}
               </button>
             </div>
           </div>
