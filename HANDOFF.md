@@ -1,8 +1,47 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-05-28)
+# HOUZS Venture Portal — Session Handoff (checkpoint 2026-06-03)
 
 > Context-window handoff. Read this first to continue. User communicates in 华语 (Mandarin).
-> Supersedes the 2026-05-23 / 2026-05-25 checkpoints after a heavy session of
-> GL re-import + dept-pool restructure + billing UX work.
+> Supersedes the 2026-05-28 checkpoint. Latest session shipped consolidated invoice
+> settlement + single-settle payment date + batch-entry discoverability (see next section).
+> Earlier 2026-05-28 work (GL re-import + dept-pool restructure + billing UX) is still current below.
+
+## Latest session (2026-06-03): Consolidated invoice settlement
+
+Followed the superpowers brainstorm → spec → plan → subagent-driven build flow.
+- Spec: `docs/superpowers/specs/2026-06-03-consolidated-invoice-settlement-design.md`
+- Plan: `docs/superpowers/plans/2026-06-03-consolidated-invoice-settlement.md`
+- Deployed to main (commits `0301b3f`..`a6db977`); live + tests (234) + build green.
+
+Three user-facing changes:
+1. **Consolidated settle (true one-voucher).** Selecting issued invoices of the SAME
+   company → ONE Official Receipt voucher (amount = sum), all invoices marked paid.
+   New action `settleInvoicesConsolidated` in `billing/actions.ts` **replaced** the old
+   `batchSettleInvoices` (which minted N vouchers). Cross-company selections are
+   **blocked** (one receipt = one payer) at both client + server. dept_pool
+   (inter-billing) invoices still excluded — settle individually.
+2. **Single-settle payment date.** `NewPaymentForm` now has a `payment_date` field
+   (default = browser-local today, backdate-able). `createPaymentVoucher` threads it
+   into the voucher `payment_date` AND the settlement JE `transactionDate` (was
+   hardcoded `todayStr`). Only persists on the credit/auto-complete (settle) path.
+3. **Discoverable entry.** `/statements` Invoices tab (`InvoicesList`) now has a
+   prominent 「全选可结算发票」button + floating 「合并结算 N 张 → 生成收据」 bar.
+
+Data model: **mig 276** adds `invoices.settlement_voucher_id` (nullable FK →
+payment_vouchers, ON DELETE SET NULL). Reverse pointer = the 1:N link (one voucher
+settles many invoices). Consolidated voucher has `invoice_id = NULL`; invoices point
+back via `settlement_voucher_id`. Legacy `payment_vouchers.invoice_id` (single) is
+untouched — single-settle still writes it. `settlement_voucher_id` is currently
+**write-only** (no reader yet — verified no read path breaks on invoice_id=NULL:
+payments detail/list + cfo-reports all read via voucher_id / PVS / payee_name).
+
+New pure helper `src/lib/invoice-settlement.ts` (`payeeKey`, `validateConsolidation`)
+shared by client + server so the same-payer check can't drift. Tested (10 tests).
+
+⚠️ Known follow-up (spawned as a task, not yet done): `settleInvoicesConsolidated`
+is non-transactional (Supabase JS limit). If the final invoice-status update fails
+after the money-side writes, you get an orphaned voucher and a re-run mints a 2nd
+voucher (invoices still 'issued'). Same convention as `createPaymentVoucher`. Add an
+idempotency / orphan guard when convenient.
 
 ## Project
 - HV internal banking portal. Next.js 15 (App Router) + Supabase + Vercel + TypeScript + Tailwind.
@@ -138,6 +177,7 @@
 - `273_dashboard_venture_pool_include_treasury` — RPC also includes treasury segment.
 - `274_invoices_allow_finance_delete_draft` — RLS policy unlocks finance DELETE on draft.
 - `275_invoice_lines_table` — new table for multi-line invoices + RLS.
+- `276_invoices_settlement_voucher_id` — (2026-06-03 session) nullable FK on invoices → payment_vouchers for consolidated-receipt linkage.
 
 > Note: mig 269 / 270 / 271 are sequential reverts during user clarification. Current state = mig 271. Don't try to "clean up" by removing the interim ones — each runs in order; later overrides earlier.
 
