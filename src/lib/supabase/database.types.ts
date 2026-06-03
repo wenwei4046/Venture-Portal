@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -922,6 +922,68 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      director_advance_offsets: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string
+          director_id: string
+          id: string
+          invoice_release_id: string | null
+          journal_entry_id: string | null
+          note: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by: string
+          director_id: string
+          id?: string
+          invoice_release_id?: string | null
+          journal_entry_id?: string | null
+          note?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string
+          director_id?: string
+          id?: string
+          invoice_release_id?: string | null
+          journal_entry_id?: string | null
+          note?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "director_advance_offsets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "director_advance_offsets_director_id_fkey"
+            columns: ["director_id"]
+            isOneToOne: false
+            referencedRelation: "directors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "director_advance_offsets_invoice_release_id_fkey"
+            columns: ["invoice_release_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_payout_pool"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "director_advance_offsets_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
             referencedColumns: ["id"]
           },
         ]
@@ -2120,6 +2182,7 @@ export type Database = {
           invoice_no: string | null
           period_month: string
           reference_no: string | null
+          settlement_voucher_id: string | null
           sst_amount: number | null
           sst_rate: number | null
           status: Database["public"]["Enums"]["invoice_status"]
@@ -2144,6 +2207,7 @@ export type Database = {
           invoice_no?: string | null
           period_month: string
           reference_no?: string | null
+          settlement_voucher_id?: string | null
           sst_amount?: number | null
           sst_rate?: number | null
           status?: Database["public"]["Enums"]["invoice_status"]
@@ -2168,6 +2232,7 @@ export type Database = {
           invoice_no?: string | null
           period_month?: string
           reference_no?: string | null
+          settlement_voucher_id?: string | null
           sst_amount?: number | null
           sst_rate?: number | null
           status?: Database["public"]["Enums"]["invoice_status"]
@@ -2201,6 +2266,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_settlement_voucher_id_fkey"
+            columns: ["settlement_voucher_id"]
+            isOneToOne: false
+            referencedRelation: "payment_vouchers"
             referencedColumns: ["id"]
           },
         ]
