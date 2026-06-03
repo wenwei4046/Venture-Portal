@@ -8,7 +8,8 @@ import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { postJournalEntry } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
-import { validateConsolidation } from '@/lib/invoice-settlement'
+import { validateConsolidation, poolAttributions } from '@/lib/invoice-settlement'
+import { INVOICE_BILLING_MODE_TO_POOL } from '@/lib/cfo-reports'
 
 // Mig 200/P1-6a: invoice billing_mode → revenue GL code mapping.
 // Mig 238 reseed: revenue lives in the 5000-5999 range; 4030 / 4040 are now
@@ -692,7 +693,7 @@ export async function settleInvoicesConsolidated(payload: {
   const { data: invoices } = await supabase
     .from('invoices')
     .select(
-      'id, invoice_no, company_id, total_amount, status, billable_to_type, billable_to_freetext_name',
+      'id, invoice_no, company_id, total_amount, status, billable_to_type, billable_to_freetext_name, billing_mode',
     )
     .in('id', payload.invoiceIds)
   if (!invoices || invoices.length === 0) throw new Error('No invoices found')
@@ -776,17 +777,32 @@ export async function settleInvoicesConsolidated(payload: {
   })
   if (bumpErr) console.error('bump_bank_for_paid_credit warning:', bumpErr.message)
 
-  // Pool credit (receiving side)
-  await adjustPool(
-    supabase,
-    'venture_pool',
-    'in',
-    total,
-    `PV ${voucherNo}: ${description}`,
-    user.id,
-    null,
-    nowIso,
+  // Pool credit — attribute EACH invoice to its OWN dept pool by billing_mode.
+  // A consolidated receipt can span departments (same company can have e.g. a
+  // marketing_project invoice + a venture_attribution invoice), so the cash
+  // must be split per invoice — NOT lumped under one pool. (Earlier bug:
+  // everything went to venture_pool / "Office".)
+  const attributions = poolAttributions(
+    invoices.map((i) => ({
+      id: i.id,
+      invoice_no: i.invoice_no,
+      billing_mode: i.billing_mode,
+      total_amount: i.total_amount,
+    })),
+    INVOICE_BILLING_MODE_TO_POOL,
   )
+  for (const a of attributions) {
+    await adjustPool(
+      supabase,
+      a.pool,
+      'in',
+      a.amount,
+      `PV ${voucherNo}: settle ${a.invoiceNo}`,
+      user.id,
+      null,
+      nowIso,
+    )
+  }
 
   // GL: Dr Bank (total) / Cr 3030 AR (total), dated to the payment date
   try {
@@ -806,7 +822,11 @@ export async function settleInvoicesConsolidated(payload: {
   }
 
   // Mark every invoice paid + link to this voucher (race-guarded on issued).
-  // Trigger 202 fires per row on status→paid for dept-pool crediting.
+  // NOTE: the credit_dept_pool_on_invoice_paid trigger does NOT fire here — it
+  // keys off payment_vouchers.reference_type='invoice' + reference_id, which a
+  // consolidated voucher (invoice_id NULL, many invoices) deliberately leaves
+  // unset. Dept-pool attribution is handled by the per-invoice adjustPool loop
+  // above instead.
   const { error: updErr } = await supabase
     .from('invoices')
     .update({ status: 'paid', settlement_voucher_id: pv.id } as never)

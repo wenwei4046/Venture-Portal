@@ -51,3 +51,34 @@ export function validateConsolidation(invoices: SettleableInvoice[]): Consolidat
   }
   return { ok: true, payeeKey: [...keys][0], total: totalCents / 100 }
 }
+
+export interface AttributableInvoice {
+  id: string
+  invoice_no: string | null
+  billing_mode: string
+  total_amount: number | string
+}
+
+export interface PoolAttribution {
+  pool: string
+  amount: number
+  invoiceNo: string
+}
+
+/** Split a consolidated settlement back to each invoice's dept pool.
+ *  A consolidated receipt can span departments (e.g. a marketing_project
+ *  invoice + a venture_attribution invoice on the same company), so the cash
+ *  must be attributed PER INVOICE via its billing_mode — never lumped under a
+ *  single pool. `modeToPool` is INVOICE_BILLING_MODE_TO_POOL; unmapped modes
+ *  fall back to the venture pool. */
+export function poolAttributions(
+  invoices: AttributableInvoice[],
+  modeToPool: Record<string, string>,
+  fallbackPool = 'venture_pool',
+): PoolAttribution[] {
+  return invoices.map((i) => ({
+    pool: modeToPool[i.billing_mode] ?? fallbackPool,
+    amount: Math.round(Number(i.total_amount) * 100) / 100,
+    invoiceNo: i.invoice_no ?? i.id.slice(0, 8),
+  }))
+}

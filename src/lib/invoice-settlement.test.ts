@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { payeeKey, validateConsolidation, type SettleableInvoice } from './invoice-settlement'
+import { payeeKey, validateConsolidation, poolAttributions, type SettleableInvoice } from './invoice-settlement'
 
 function inv(over: Partial<SettleableInvoice>): SettleableInvoice {
   return {
@@ -66,5 +66,47 @@ describe('validateConsolidation', () => {
   it('accepts a single same-company invoice', () => {
     const r = validateConsolidation([inv({ company_id: 'c1', total_amount: 42.5 })])
     expect(r).toEqual({ ok: true, payeeKey: 'company:c1', total: 42.5 })
+  })
+})
+
+describe('poolAttributions', () => {
+  const map: Record<string, string> = {
+    marketing_project: 'dept_pool_marketing',
+    hr_attribution: 'dept_pool_hr',
+    venture_attribution: 'venture_pool',
+  }
+
+  it('attributes each invoice to its own pool by billing_mode', () => {
+    const r = poolAttributions(
+      [
+        { id: 'a', invoice_no: 'INV-1', billing_mode: 'marketing_project', total_amount: 100 },
+        { id: 'b', invoice_no: 'INV-2', billing_mode: 'venture_attribution', total_amount: 50 },
+        { id: 'c', invoice_no: 'INV-3', billing_mode: 'hr_attribution', total_amount: 25.5 },
+      ],
+      map,
+    )
+    expect(r).toEqual([
+      { pool: 'dept_pool_marketing', amount: 100, invoiceNo: 'INV-1' },
+      { pool: 'venture_pool', amount: 50, invoiceNo: 'INV-2' },
+      { pool: 'dept_pool_hr', amount: 25.5, invoiceNo: 'INV-3' },
+    ])
+  })
+
+  it('does NOT lump a mixed-department selection into one pool (regression for OR-0001..0004)', () => {
+    const r = poolAttributions(
+      [
+        { id: 'a', invoice_no: 'M', billing_mode: 'marketing_project', total_amount: 2183.04 },
+        { id: 'b', invoice_no: 'V', billing_mode: 'venture_attribution', total_amount: 391.95 },
+      ],
+      map,
+    )
+    const pools = new Set(r.map((x) => x.pool))
+    expect(pools).toEqual(new Set(['dept_pool_marketing', 'venture_pool']))
+  })
+
+  it('falls back to venture pool for an unmapped billing_mode', () => {
+    const r = poolAttributions([{ id: 'x', invoice_no: null, billing_mode: 'weird', total_amount: 9 }], map)
+    expect(r[0].pool).toBe('venture_pool')
+    expect(r[0].invoiceNo).toBe('x')
   })
 })
