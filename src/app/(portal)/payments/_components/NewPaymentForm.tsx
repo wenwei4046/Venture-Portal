@@ -119,9 +119,10 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
       : [{ pool: '', amount: '', account_code: '' }]
   )
   const [amount, setAmount] = useState(isInvoicePay ? invoicePreset!.total_amount.toFixed(2) : '')
-  // Payment date — defaults to today, user can backdate to the real pay date.
-  // dayjs isn't imported here; build today's YYYY-MM-DD from the Date locale.
-  const todayIso = new Date().toISOString().slice(0, 10)
+  // Payment date — defaults to today (browser-LOCAL date so a UTC+8 user
+  // doesn't get "yesterday" in the early morning), user can backdate.
+  const now = new Date()
+  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const [paymentDate, setPaymentDate] = useState(todayIso)
   // Controlled payee fields so loan-repayment mode can auto-fill them
   const [payeeName, setPayeeName] = useState(isInvoicePay ? invoicePreset!.company_name : '')
