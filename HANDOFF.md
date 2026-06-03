@@ -178,6 +178,7 @@ idempotency / orphan guard when convenient.
 - `274_invoices_allow_finance_delete_draft` — RLS policy unlocks finance DELETE on draft.
 - `275_invoice_lines_table` — new table for multi-line invoices + RLS.
 - `276_invoices_settlement_voucher_id` — (2026-06-03 session) nullable FK on invoices → payment_vouchers for consolidated-receipt linkage.
+- `277_drop_billing_payment_has_invoice` — (2026-06-03 session) dropped the obsolete CHECK that forced every billing_payment voucher to have a non-null invoice_id. It rejected consolidated OR vouchers (invoice_id=NULL). Root-caused via postgres ERROR log. Single-settle still sets invoice_id at app layer.
 
 > Note: mig 269 / 270 / 271 are sequential reverts during user clarification. Current state = mig 271. Don't try to "clean up" by removing the interim ones — each runs in order; later overrides earlier.
 
