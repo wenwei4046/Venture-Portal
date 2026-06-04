@@ -4,8 +4,10 @@ import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import dayjs from 'dayjs'
 import Link from 'next/link'
 import CTCInputGrid from './_components/CTCInputGrid'
+import PayoutModeSwitch from './_components/PayoutModeSwitch'
 import SubmitDirectorSalaryButton from './_components/SubmitDirectorSalaryButton'
 import ReopenDirectorSalaryButton from './_components/ReopenDirectorSalaryButton'
+import type { PayoutMode } from '@/lib/salary'
 
 interface Props {
   searchParams: Promise<{ period?: string; tab?: string }>
@@ -53,6 +55,12 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const summary = (payoutSummary as any)?.[0] ?? null
   const hasSummaryData = summary && summary.out_payout_count > 0
+
+  // All payouts of a period share one mode (one calculation run).
+  const payoutMode: PayoutMode =
+    (payouts?.[0]?.payout_mode as PayoutMode | undefined) ?? 'split'
+  const fullyPaid = payoutMode === 'fully_paid'
+  const allDraft = (payouts ?? []).every(p => p.status === 'draft')
 
   const tabHref = (t: 'calculation' | 'submission') =>
     `/director-salary?period=${dayjs(period).format('YYYY-MM')}${t === 'submission' ? '&tab=submission' : ''}`
@@ -119,11 +127,11 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
 
               <div className="lg:col-span-5 space-y-3">
                 <div className="flex items-baseline justify-between">
-                  <span className="font-serif italic text-sm text-graphite">Total Payroll (75%)</span>
+                  <span className="font-serif italic text-sm text-graphite">Total Payroll {fullyPaid ? '(95% · Fully Paid)' : '(75%)'}</span>
                   <span className="font-mono tabular text-sm font-medium text-num-ink">{formatMoney(Number(summary.out_total_payroll_gross))}</span>
                 </div>
                 <div className="flex items-baseline justify-between">
-                  <span className="font-serif italic text-sm text-graphite">Total Invoice (25%)</span>
+                  <span className="font-serif italic text-sm text-graphite">Total Invoice {fullyPaid ? '(— none)' : '(25%)'}</span>
                   <span className="font-mono tabular text-sm font-medium text-num-ink">{formatMoney(Number(summary.out_total_invoice))}</span>
                 </div>
                 <div className="flex items-baseline justify-between">
@@ -147,6 +155,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
             <h2 className="font-serif text-2xl text-ink mb-1">CTC Input</h2>
 
             <CTCInputGrid
+              mode={payoutMode}
               directors={(directors ?? []).map(d => ({
                 id: d.id,
                 code: d.code,
@@ -175,16 +184,21 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
           {/* Per-Director Payouts Table */}
           {hasPayouts && (
             <section className="mb-16">
-              <div className="flex items-baseline justify-between mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-3 mb-6">
                 <div>
                   <h2 className="font-serif text-2xl text-ink mb-1">Per-Director Payouts</h2>
+                  <Link
+                    href={tabHref('submission')}
+                    className="font-serif italic text-sm text-accent hover:text-accent-hover"
+                  >
+                    {submission ? 'View submission →' : 'Submit to Finance →'}
+                  </Link>
                 </div>
-                <Link
-                  href={tabHref('submission')}
-                  className="font-serif italic text-sm text-accent hover:text-accent-hover"
-                >
-                  {submission ? 'View submission →' : 'Submit to Finance →'}
-                </Link>
+                <PayoutModeSwitch
+                  period={period}
+                  currentMode={payoutMode}
+                  locked={!allDraft}
+                />
               </div>
 
               <div className="overflow-x-auto">
@@ -194,8 +208,8 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
                       <th>Director</th>
                       <th className="right">Gross</th>
                       <th className="right">Saving</th>
-                      <th className="right">Payroll (75%)</th>
-                      <th className="right">Invoice (25%)</th>
+                      <th className="right">Payroll {fullyPaid ? '(95%)' : '(75%)'}</th>
+                      <th className="right">Invoice {fullyPaid ? '(—)' : '(25%)'}</th>
                       <th className="right">Net</th>
                       <th className="right"></th>
                     </tr>
@@ -236,6 +250,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
           period={period}
           periodLabel={periodLabel}
           submission={submission}
+          fullyPaid={fullyPaid}
           hasPayouts={hasPayouts}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           summary={summary as any}
@@ -280,6 +295,7 @@ function SubmissionTab({
   period,
   periodLabel,
   submission,
+  fullyPaid,
   hasPayouts,
   summary,
   liveByCompany,
@@ -288,6 +304,7 @@ function SubmissionTab({
   periodLabel: string
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   submission: any
+  fullyPaid: boolean
   hasPayouts: boolean
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   summary: any
@@ -381,11 +398,11 @@ function SubmissionTab({
             <div className="num text-num-ink text-xl tracking-[-0.01em] mt-1">{formatMoney(totals.gross)}</div>
           </div>
           <div>
-            <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Payroll (75%)</div>
+            <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Payroll {fullyPaid ? '(95% · Fully Paid)' : '(75%)'}</div>
             <div className="num text-graphite text-md mt-1">{formatMoney(totals.payrollGross)}</div>
           </div>
           <div>
-            <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Invoice (25%)</div>
+            <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Invoice {fullyPaid ? '(— none)' : '(25%)'}</div>
             <div className="num text-graphite text-md mt-1">{formatMoney(totals.invoice)}</div>
           </div>
           <div>

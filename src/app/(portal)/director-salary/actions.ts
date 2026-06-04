@@ -10,6 +10,7 @@ import {
   type CTCRecord,
   type DirectorConfig,
   type StatutoryLookup,
+  type PayoutMode,
 } from '@/lib/salary'
 import { notifyDirectorSalaryCalculated } from '@/lib/slack'
 import dayjs from 'dayjs'
@@ -106,10 +107,14 @@ export interface CalculateResult {
   error?: string
 }
 
-export async function calculateDirectorSalary(period: string): Promise<CalculateResult> {
+export async function calculateDirectorSalary(
+  period: string,
+  mode: PayoutMode = 'split',
+): Promise<CalculateResult> {
   const user = await requireRole(['hr', 'principal'])
   const supabase = await createClient()
 
+  const fullyPaid = mode === 'fully_paid'
   const periodNorm = dayjs(period).startOf('month').format('YYYY-MM-DD')
 
   await assertPeriodOpen(supabase, periodNorm)
@@ -189,11 +194,13 @@ export async function calculateDirectorSalary(period: string): Promise<Calculate
     const allowanceShare = afterSaving * pool.allowanceRatio
     const advanceRepaidProvisional = Math.min(openingAdvanceBalance, allowanceShare)
     const afterOffset = afterSaving - advanceRepaidProvisional
-    const payrollCalc = afterOffset * 0.75
+    // fully_paid: 100% of afterOffset is the payroll portion, no invoice.
+    const payrollCalc = fullyPaid ? afterOffset : afterOffset * 0.75
     const payrollGross = Math.max(payrollCalc, dirConfig.minPayout)
-    const invoiceBase = afterOffset * 0.25
+    const invoiceBase = fullyPaid ? 0 : afterOffset * 0.25
 
-    // Statutory lookups for 75% payroll (based on B+K wages)
+    // Statutory lookups for the payroll portion (based on B+K wages only —
+    // the Allowance share carries no statutory in either mode)
     const payrollBkWages = payrollGross * pool.basicRatio
     const { data: epfPayroll } = await supabase.rpc('lookup_epf', { p_wages: payrollBkWages })
     const { data: socsoPayroll } = await supabase.rpc('lookup_socso', { p_wages: payrollBkWages })
@@ -208,19 +215,25 @@ export async function calculateDirectorSalary(period: string): Promise<Calculate
       eisEe: eisPayroll?.[0]?.employee ?? 0,
     }
 
-    // Statutory lookups for 25% invoice (based on B+K wages of invoice portion)
-    const invoiceBkWages = invoiceBase * pool.basicRatio
-    const { data: epfInv } = await supabase.rpc('lookup_epf', { p_wages: invoiceBkWages })
-    const { data: socsoInv } = await supabase.rpc('lookup_socso', { p_wages: invoiceBkWages })
-    const { data: eisInv } = await supabase.rpc('lookup_eis', { p_wages: invoiceBkWages })
+    // Statutory lookups for the 25% invoice portion (skipped in fully_paid —
+    // there is no invoice portion).
+    let invoiceStat: StatutoryLookup = {
+      epfEr: 0, epfEe: 0, socsoEr: 0, socsoEe: 0, eisEr: 0, eisEe: 0,
+    }
+    if (!fullyPaid) {
+      const invoiceBkWages = invoiceBase * pool.basicRatio
+      const { data: epfInv } = await supabase.rpc('lookup_epf', { p_wages: invoiceBkWages })
+      const { data: socsoInv } = await supabase.rpc('lookup_socso', { p_wages: invoiceBkWages })
+      const { data: eisInv } = await supabase.rpc('lookup_eis', { p_wages: invoiceBkWages })
 
-    const invoiceStat: StatutoryLookup = {
-      epfEr: epfInv?.[0]?.employer ?? 0,
-      epfEe: 0,
-      socsoEr: socsoInv?.[0]?.employer ?? 0,
-      socsoEe: 0,
-      eisEr: eisInv?.[0]?.employer ?? 0,
-      eisEe: 0,
+      invoiceStat = {
+        epfEr: epfInv?.[0]?.employer ?? 0,
+        epfEe: 0,
+        socsoEr: socsoInv?.[0]?.employer ?? 0,
+        socsoEe: 0,
+        eisEr: eisInv?.[0]?.employer ?? 0,
+        eisEe: 0,
+      }
     }
 
     // PCB lookup (auto-suggest)
@@ -234,7 +247,7 @@ export async function calculateDirectorSalary(period: string): Promise<Calculate
     const payout = calculateDirectorPayout(
       dirConfig, pool, totalWeightage, savingRate,
       payrollStat, invoiceStat, pcbAmount ?? 0,
-      openingAdvanceBalance
+      openingAdvanceBalance, mode
     )
 
     totalSaving += payout.savingAmount
@@ -247,6 +260,7 @@ export async function calculateDirectorSalary(period: string): Promise<Calculate
       calculation_snapshot: {
         pool,
         director: dirConfig,
+        payout_mode: mode,
         payroll_statutory: payrollStat,
         invoice_statutory: invoiceStat,
         pcb_lookup: pcbAmount ?? 0,
@@ -273,6 +287,7 @@ export async function calculateDirectorSalary(period: string): Promise<Calculate
     payouts: payouts.map(p => ({
       director_id: p.directorId,
       director_code: p.director_code,
+      payout_mode: p.mode,
       gross_amount: p.grossAmount,
       saving_amount: p.savingAmount,
       after_saving: p.afterSaving,

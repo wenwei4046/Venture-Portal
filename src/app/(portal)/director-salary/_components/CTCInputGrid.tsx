@@ -3,6 +3,7 @@
 import { useState, useTransition, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { batchSaveCTC, calculateDirectorSalary, type BatchCTCInput } from '../actions'
+import type { PayoutMode } from '@/lib/salary'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 
@@ -35,6 +36,8 @@ interface Props {
   companies: Company[]
   existingCTC: ExistingCTC[]
   period: string
+  /** Recalculate in this mode (preserves the current Fully Paid choice). */
+  mode?: PayoutMode
 }
 
 interface ERBreakdown {
@@ -44,7 +47,7 @@ interface ERBreakdown {
   total: number
 }
 
-export default function CTCInputGrid({ directors, companies, existingCTC, period }: Props) {
+export default function CTCInputGrid({ directors, companies, existingCTC, period, mode = 'split' }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -164,7 +167,7 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
         setStatus('saving')
         await batchSaveCTC(period, records)
         setStatus('calculating')
-        const res = await calculateDirectorSalary(period)
+        const res = await calculateDirectorSalary(period, mode)
         setSavedCount(res.saved)
         setStatus('done')
         router.refresh()

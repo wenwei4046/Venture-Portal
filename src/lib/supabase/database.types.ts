@@ -1077,6 +1077,7 @@ export type Database = {
           invoice_epf_er: number | null
           invoice_socso_er: number | null
           invoice_total: number | null
+          payout_mode: string
           payroll_allow: number | null
           payroll_bk: number | null
           payroll_calc: number | null
@@ -1116,6 +1117,7 @@ export type Database = {
           invoice_epf_er?: number | null
           invoice_socso_er?: number | null
           invoice_total?: number | null
+          payout_mode?: string
           payroll_allow?: number | null
           payroll_bk?: number | null
           payroll_calc?: number | null
@@ -1155,6 +1157,7 @@ export type Database = {
           invoice_epf_er?: number | null
           invoice_socso_er?: number | null
           invoice_total?: number | null
+          payout_mode?: string
           payroll_allow?: number | null
           payroll_bk?: number | null
           payroll_calc?: number | null
@@ -2086,6 +2089,7 @@ export type Database = {
           description: string | null
           director_id: string | null
           id: string
+          period_month: string | null
           release_approved_at: string | null
           release_approved_by: string | null
           transaction_type: Database["public"]["Enums"]["invoice_pool_txn_type"]
@@ -2096,6 +2100,7 @@ export type Database = {
           description?: string | null
           director_id?: string | null
           id?: string
+          period_month?: string | null
           release_approved_at?: string | null
           release_approved_by?: string | null
           transaction_type: Database["public"]["Enums"]["invoice_pool_txn_type"]
@@ -2106,6 +2111,7 @@ export type Database = {
           description?: string | null
           director_id?: string | null
           id?: string
+          period_month?: string | null
           release_approved_at?: string | null
           release_approved_by?: string | null
           transaction_type?: Database["public"]["Enums"]["invoice_pool_txn_type"]

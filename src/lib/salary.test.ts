@@ -270,3 +270,105 @@ describe('salary.ts — edge cases', () => {
     expect(payout.afterSaving).toBe(payout.grossAmount)
   })
 })
+
+// ─── Fully Paid mode (mig 281, user 2026-06-04 R5) ──────────────────
+// Only the 5% saving is deducted; the remaining 95% (post advance-offset)
+// pays as ONE standard payroll. Invoice side fully zeroed — nothing
+// accumulates into invoice_payout_pool. Statutory still keyed on B+K only.
+
+describe('salary.ts — fully_paid mode', () => {
+  const pool = calculatePool(testCTCRecords)
+  const totalWeightage = 4.0
+  const savingRate = 0.05
+  const payrollStat: StatutoryLookup = {
+    epfEr: 1248, epfEe: 1144,
+    socsoEr: 104.15, socsoEe: 29.75,
+    eisEr: 9.90, eisEe: 9.90,
+  }
+  // Engine must IGNORE invoice statutory in fully_paid — pass non-zero
+  // values on purpose to prove they cannot leak into the result.
+  const poisonInvoiceStat: StatutoryLookup = {
+    epfEr: 396, socsoEr: 53.35, eisEr: 6.10,
+    epfEe: 0, socsoEe: 0, eisEe: 0,
+  }
+
+  it('pays 100% of after-offset as payroll, zero invoice', () => {
+    const payout = calculateDirectorPayout(
+      testDirectors[0], pool, totalWeightage, savingRate,
+      payrollStat, poisonInvoiceStat, 0, 0, 'fully_paid'
+    )
+
+    // Saving unchanged: 5% on whole gross
+    expect(payout.grossAmount).toBeCloseTo(17829.94, 0)
+    expect(payout.savingAmount).toBeCloseTo(891.50, 0)
+    expect(payout.afterSaving).toBeCloseTo(16938.44, 0)
+
+    // 95% of gross == afterSaving → all of it is payroll (no advance offset here)
+    expect(payout.payrollCalc).toBeCloseTo(16938.44, 1)
+    expect(payout.payrollGross).toBeCloseTo(16938.44, 1) // above min 14400 → no top-up
+    expect(payout.advanceAmount).toBe(0)
+
+    // Invoice side fully zeroed despite poisoned lookup values
+    expect(payout.invoiceBase).toBe(0)
+    expect(payout.invoiceBk).toBe(0)
+    expect(payout.invoiceEpfEr).toBe(0)
+    expect(payout.invoiceSocsoEr).toBe(0)
+    expect(payout.invoiceEisEr).toBe(0)
+    expect(payout.invoiceTotal).toBe(0)
+
+    expect(payout.mode).toBe('fully_paid')
+  })
+
+  it('keeps B+K-with-statutory / Allowance-without composition', () => {
+    const payout = calculateDirectorPayout(
+      testDirectors[0], pool, totalWeightage, savingRate,
+      payrollStat, poisonInvoiceStat, 0, 0, 'fully_paid'
+    )
+
+    // payroll_bk + payroll_allow foot to payroll_gross; the BK share is what
+    // statutory lookups are keyed on (orchestrator passes B+K wages only).
+    expect(payout.payrollBk + payout.payrollAllow).toBeCloseTo(payout.payrollGross, 1)
+    expect(payout.payrollBk).toBeCloseTo(payout.payrollGross * pool.basicRatio, 0)
+
+    // Net = gross − all payroll statutory (ER+EE) − PCB
+    const expectedNet =
+      payout.payrollGross
+      - payrollStat.epfEr - payrollStat.epfEe
+      - payrollStat.socsoEr - payrollStat.socsoEe
+      - payrollStat.eisEr - payrollStat.eisEe
+      - payout.payrollPcb
+    expect(payout.payrollNet).toBeCloseTo(expectedNet, 1)
+  })
+
+  it('statutory surplus counts payroll ER only (no invoice ER out)', () => {
+    const payout = calculateDirectorPayout(
+      testDirectors[0], pool, totalWeightage, savingRate,
+      payrollStat, poisonInvoiceStat, 0, 0, 'fully_paid'
+    )
+    const expectedOut = payrollStat.epfEr + payrollStat.socsoEr + payrollStat.eisEr
+    expect(payout.statutoryErOut).toBeCloseTo(expectedOut, 1)
+  })
+
+  it('still applies the allowance → advance offset before paying out', () => {
+    const openingBalance = 2000
+    const payout = calculateDirectorPayout(
+      testDirectors[0], pool, totalWeightage, savingRate,
+      payrollStat, poisonInvoiceStat, 0, openingBalance, 'fully_paid'
+    )
+    expect(payout.advanceRepaid).toBeGreaterThan(0)
+    expect(payout.advanceRepaid).toBeLessThanOrEqual(openingBalance)
+    // payroll = afterSaving − advanceRepaid (100% of after-offset)
+    expect(payout.payrollCalc).toBeCloseTo(payout.afterSaving - payout.advanceRepaid, 1)
+  })
+
+  it('defaults to split mode when mode arg omitted (back-compat)', () => {
+    const payout = calculateDirectorPayout(
+      testDirectors[0], pool, totalWeightage, savingRate,
+      payrollStat, poisonInvoiceStat, 0, 0
+    )
+    expect(payout.mode).toBe('split')
+    expect(payout.payrollCalc).toBeCloseTo(payout.afterSaving * 0.75, 1)
+    expect(payout.invoiceBase).toBeCloseTo(payout.afterSaving * 0.25, 1)
+    expect(payout.invoiceTotal).toBeGreaterThan(0)
+  })
+})
