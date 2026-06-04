@@ -62,6 +62,28 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
   const fullyPaid = payoutMode === 'fully_paid'
   const allDraft = (payouts ?? []).every(p => p.status === 'draft')
 
+  // Live preview totals for the Submission tab — computed from director_payouts
+  // EXACTLY the way submit_director_salary_to_finance computes the snapshot,
+  // so what HR previews is what Finance will receive (transparency rule).
+  const liveTotals = hasPayouts
+    ? (payouts ?? []).reduce(
+        (acc, p) => ({
+          gross: acc.gross + Number(p.gross_amount ?? 0),
+          payrollGross: acc.payrollGross + Number(p.payroll_gross ?? 0),
+          payrollNet: acc.payrollNet + Number(p.payroll_net ?? 0),
+          statutoryEr:
+            acc.statutoryEr +
+            Number(p.payroll_epf_er ?? 0) +
+            Number(p.payroll_socso_er ?? 0) +
+            Number(p.payroll_eis_er ?? 0),
+          invoice: acc.invoice + Number(p.invoice_total ?? 0),
+          saving: acc.saving + Number(p.saving_amount ?? 0),
+          directors: acc.directors + 1,
+        }),
+        { gross: 0, payrollGross: 0, payrollNet: 0, statutoryEr: 0, invoice: 0, saving: 0, directors: 0 },
+      )
+    : null
+
   const tabHref = (t: 'calculation' | 'submission') =>
     `/director-salary?period=${dayjs(period).format('YYYY-MM')}${t === 'submission' ? '&tab=submission' : ''}`
 
@@ -252,8 +274,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
           submission={submission}
           fullyPaid={fullyPaid}
           hasPayouts={hasPayouts}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          summary={summary as any}
+          liveTotals={liveTotals}
           liveByCompany={((liveByCompany as ByCompanyRow[] | null) ?? []).map(r => ({
             ...r,
             total_ctc: Number(r.total_ctc),
@@ -291,13 +312,23 @@ function TabLink({
 // Transparency rule: every total the submit RPC writes is shown by-source on
 // this page BEFORE submitting (payout totals from director_payouts, the
 // per-subsidiary split from director_ctc). Missing source → disabled button.
+interface SubmissionTotals {
+  gross: number
+  payrollGross: number
+  payrollNet: number
+  statutoryEr: number
+  invoice: number
+  saving: number
+  directors: number
+}
+
 function SubmissionTab({
   period,
   periodLabel,
   submission,
   fullyPaid,
   hasPayouts,
-  summary,
+  liveTotals,
   liveByCompany,
 }: {
   period: string
@@ -306,8 +337,7 @@ function SubmissionTab({
   submission: any
   fullyPaid: boolean
   hasPayouts: boolean
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  summary: any
+  liveTotals: SubmissionTotals | null
   liveByCompany: ByCompanyRow[]
 }) {
   const submitted = !!submission
@@ -322,7 +352,7 @@ function SubmissionTab({
     : liveByCompany
   const byCompanyTotal = byCompany.reduce((s, r) => s + r.total_ctc, 0)
 
-  const totals = submitted
+  const totals: SubmissionTotals | null = submitted
     ? {
         gross: Number(submission.total_gross),
         payrollGross: Number(submission.total_payroll_gross),
@@ -332,17 +362,7 @@ function SubmissionTab({
         saving: Number(submission.total_saving),
         directors: Number(submission.director_count),
       }
-    : summary
-      ? {
-          gross: Number(summary.out_pool_total ?? 0),
-          payrollGross: Number(summary.out_total_payroll_gross ?? 0),
-          payrollNet: Number(summary.out_total_payroll_net ?? 0),
-          statutoryEr: 0,
-          invoice: Number(summary.out_total_invoice ?? 0),
-          saving: Number(summary.out_total_saving ?? 0),
-          directors: Number(summary.out_payout_count ?? 0),
-        }
-      : null
+    : liveTotals
 
   return (
     <div>
