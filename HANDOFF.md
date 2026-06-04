@@ -1,9 +1,52 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-06-03)
+# HOUZS Venture Portal — Session Handoff (checkpoint 2026-06-04)
 
 > Context-window handoff. Read this first to continue. User communicates in 华语 (Mandarin).
-> Supersedes the 2026-05-28 checkpoint. Latest session shipped consolidated invoice
-> settlement + single-settle payment date + batch-entry discoverability (see next section).
-> Earlier 2026-05-28 work (GL re-import + dept-pool restructure + billing UX) is still current below.
+> Supersedes the 2026-06-03 checkpoint. Latest session: HR simplification — approval
+> removal + director decoupling + Fully Paid mode (branch `feat/hr-simplify-direct-submit`).
+> Earlier 2026-06-03 work (consolidated settlement + segment attribution) still current below.
+
+## Latest session (2026-06-04): HR simplification — no HR-side approval
+
+Branch `feat/hr-simplify-direct-submit` (7 phases, migs 278-282 ALL APPLIED TO LIVE DB).
+User decisions: director fully decoupled from staff payroll_run / billing OPEX cards are
+the per-dept salary surface / GL split at payment time (cash basis).
+
+1. **HR submit → straight to Finance (mig 278).** `submit_payroll_to_principal`
+   (name kept) now lands the run in `status='approved'+approved_at` directly — NO
+   approval_requests row, no director gate, `director_salary_total=0`. New
+   `reopen_payroll_run` RPC + ReopenPayrollButton (run→'rejected' with marker reason
+   `Reopened by HR for edits`, rows→draft; blocked once a payment request is in flight).
+   All period-keyed payroll_runs reads now `.neq('status','rejected')` (fixes latent
+   multi-row maybeSingle bug). Dashboard HR cycle 9→8 steps. BillingView
+   `payrollApproved`→`payrollSubmitted`. Principal money-side PV approvals UNCHANGED.
+2. **Director Payroll Submission (mig 279).** New aggregate-only table
+   `director_salary_submissions` (totals + per-subsidiary `by_company` JSONB from
+   director_ctc; Finance-safe, no per-director). RPCs `submit_director_salary_to_finance`
+   (draft→confirmed + snapshot; absorbs old confirmPayouts) + `reopen_director_salary`.
+   /director-salary now tabbed: Calculation | Director Payroll Submission. BillingView
+   Director OPEX card reads the submission (legacy run fallback) + new per-subsidiary
+   section for Finance.
+3. **Designation (mig 280).** `hr_staff_costs.designation` — InfoTech Employee List
+   import now stores it (parser always read col 4); staff forms/list/detail updated.
+4. **Staff PCB editable** on payslip (added to `updateStaffStatutory` whitelist).
+5. **Fully Paid mode (mig 281).** `director_payouts.payout_mode` ('split'|'fully_paid').
+   fully_paid: only 5% saving deducted, 95% (post advance-offset) paid as ONE payroll,
+   B+K with statutory / Allowance without, invoice side zeroed. Engine param in
+   salary.ts + PayoutModeSwitch on Calculation tab + 5 regression tests.
+   **BUG FIX bundled:** recalc used to duplicate invoice_payout_pool accumulate rows —
+   rows now carry `period_month` + delete-before-reinsert (openings with NULL period safe).
+6. **Per-dept salary GL (mig 282).** payroll_bank_transfer PV approval posts one JE per
+   source dept pool (segment via new `pool_key_to_segment`); `derive_journal_segment`
+   resolves Stage-G payout PVs to the staff's department segment.
+
+⚠️ Flagged, NOT fixed (needs user decision):
+- Stage-G disbursement PVs are voucher_type='other' → Dr 9000 G&A, while Stage-E already
+  books Dr 9030 gross+ER — possible GL expense double-count when both stages run. Verify
+  before the first full payment cycle under the new flow.
+- mig 122 grants Finance own-dept INDIVIDUAL-row SELECT on hr_monthly_payroll +
+  hr_staff_costs — conflicts with "Finance sees aggregates only" rule. Tighten when convenient.
+- /approvals/payroll-run/[id] page + approve/reject actions kept as read-only legacy
+  (no new 'submitted' runs can exist).
 
 ## Latest session (2026-06-03): Consolidated invoice settlement
 
