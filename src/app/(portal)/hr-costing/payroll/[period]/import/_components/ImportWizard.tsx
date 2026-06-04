@@ -100,12 +100,14 @@ export default function ImportWizard({ period }: Props) {
         <div className="mt-5 text-xs font-sans text-muted space-y-1">
           <p className="font-serif italic text-graphite">Three fields are imported per row:</p>
           <ul className="list-disc ml-5 space-y-0.5">
-            <li><span className="font-mono">Tot. Sal</span> → Basic Salary</li>
             <li><span className="font-mono">OT Amt</span> → OT Amount</li>
             <li><span className="font-mono">Allowance Add</span> → Non-Statutory Allowance</li>
+            <li><span className="font-mono">No Pay $</span> → Unpaid Leave Days (converted via contract basic)</li>
           </ul>
           <p className="mt-2 text-muted italic">
-            Statutory + PCB + Net are recomputed by the system, not taken from the file.
+            Basic Salary is NEVER overwritten — the contract basic from the staff master
+            is the source of truth. Statutory + PCB + Net are recomputed by the system,
+            not taken from the file.
           </p>
         </div>
         {error && <p className="mt-4 text-sm font-serif italic text-danger">{error}</p>}

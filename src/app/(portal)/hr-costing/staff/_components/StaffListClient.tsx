@@ -7,6 +7,8 @@ import StaffActions from './StaffActions'
 export interface StaffRow {
   id: string
   employee_name: string
+  employee_code: string | null
+  designation: string | null
   dept_name: string | null
 }
 
@@ -23,6 +25,8 @@ export default function StaffListClient({ staff }: Props) {
     return staff.filter(
       s =>
         s.employee_name.toLowerCase().includes(q) ||
+        (s.employee_code ?? '').toLowerCase().includes(q) ||
+        (s.designation ?? '').toLowerCase().includes(q) ||
         (s.dept_name ?? '').toLowerCase().includes(q)
     )
   }, [staff, query])
@@ -55,6 +59,7 @@ export default function StaffListClient({ staff }: Props) {
             <thead>
               <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
                 <th className="text-left py-3 pr-4 font-medium">Name</th>
+                <th className="text-left py-3 pr-4 font-medium">Designation</th>
                 <th className="text-left py-3 pr-4 font-medium">Department</th>
                 <th className="text-right py-3 pr-4 font-medium">Actions</th>
               </tr>
@@ -72,6 +77,12 @@ export default function StaffListClient({ staff }: Props) {
                     >
                       {s.employee_name}
                     </Link>
+                    {s.employee_code && (
+                      <div className="font-mono text-[11px] text-muted mt-0.5">{s.employee_code}</div>
+                    )}
+                  </td>
+                  <td className="py-4 pr-4 font-serif italic text-graphite">
+                    {s.designation ?? '—'}
                   </td>
                   <td className="py-4 pr-4 font-serif italic text-graphite">
                     {s.dept_name ?? '—'}

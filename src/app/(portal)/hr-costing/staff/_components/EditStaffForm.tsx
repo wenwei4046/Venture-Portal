@@ -7,6 +7,7 @@ import { updateStaff } from '../actions'
 interface StaffRow {
   id: string
   employee_name: string
+  designation: string | null
   department_name: string
   basic_salary: number
   allowances: number
@@ -89,6 +90,17 @@ export default function EditStaffForm({ staff }: Props) {
             readOnly
             disabled
             className="w-full px-3 py-2 bg-surface-2 border border-hairline rounded-md text-sm font-sans text-muted italic"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+            Designation <span className="text-xs text-muted ml-1 font-normal">(optional)</span>
+          </label>
+          <input
+            name="designation"
+            defaultValue={staff.designation ?? ''}
+            placeholder="e.g. Marketing Executive"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
           />
         </div>
         <div>

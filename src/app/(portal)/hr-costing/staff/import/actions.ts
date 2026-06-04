@@ -37,6 +37,7 @@ export interface StaffPreviewItem {
   employee_name: string
   dept_code: string
   dept_name_portal: string
+  designation: string | null
   basic_salary: number
 }
 
@@ -127,6 +128,7 @@ export async function previewInfotechStaffImport(
       employee_name: row.employeeName,
       dept_code: row.deptCode,
       dept_name_portal: mappedDeptName,
+      designation: row.designation,
       basic_salary: row.basicSalary,
     })
   })
@@ -178,6 +180,7 @@ export async function applyInfotechStaffImport(
       employee_name: src.employeeName,
       employee_code: src.employeeCode,
       department_id: deptId,
+      designation: src.designation,
       basic_salary: src.basicSalary,
       allowances: 0,
       non_statutory_allowance: 0,

@@ -108,8 +108,8 @@ export default function ImportStaffWizard() {
         <div className="mt-5 text-xs font-sans text-muted space-y-1">
           <p className="font-serif italic text-graphite">Imported per row:</p>
           <ul className="list-disc ml-5 space-y-0.5">
-            <li>Employee code, name, department (mapped from InfoTech dept code)</li>
-            <li>Basic salary, hire date, NRIC</li>
+            <li>Employee code, name, designation, department (mapped from InfoTech dept code)</li>
+            <li>Basic salary (contract master), hire date, NRIC</li>
             <li>Bank account number (bank name must be filled manually later)</li>
           </ul>
           <p className="mt-2 text-muted italic">
@@ -196,6 +196,7 @@ export default function ImportStaffWizard() {
                   <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
                     <th className="text-left py-2 px-4 font-medium">Code</th>
                     <th className="text-left py-2 px-4 font-medium">Name</th>
+                    <th className="text-left py-2 px-4 font-medium">Designation</th>
                     <th className="text-left py-2 px-4 font-medium">Department</th>
                     <th className="text-right py-2 px-4 font-medium">Basic</th>
                   </tr>
@@ -208,6 +209,9 @@ export default function ImportStaffWizard() {
                     >
                       <td className="py-2 px-4 font-mono text-ink">{p.employee_code}</td>
                       <td className="py-2 px-4 font-serif text-ink">{p.employee_name}</td>
+                      <td className="py-2 px-4 font-serif italic text-graphite">
+                        {p.designation ?? '—'}
+                      </td>
                       <td className="py-2 px-4 font-serif italic text-graphite">
                         {p.dept_name_portal}
                       </td>

@@ -1875,6 +1875,7 @@ export type Database = {
           created_at: string
           created_by: string
           department_id: string
+          designation: string | null
           eis_er: number | null
           email: string | null
           emergency_contact_name: string | null
@@ -1909,6 +1910,7 @@ export type Database = {
           created_at?: string
           created_by: string
           department_id: string
+          designation?: string | null
           eis_er?: number | null
           email?: string | null
           emergency_contact_name?: string | null
@@ -1943,6 +1945,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           department_id?: string
+          designation?: string | null
           eis_er?: number | null
           email?: string | null
           emergency_contact_name?: string | null
