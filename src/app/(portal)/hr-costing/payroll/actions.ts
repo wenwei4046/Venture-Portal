@@ -91,14 +91,14 @@ export async function updatePayrollRow(
   revalidatePath('/hr-costing/payroll', 'layout')
 }
 
-// ─── Override / Reset Statutory (Phase 11.2) ───────────────────────────────
+// ─── Override / Reset Statutory (Phase 11.2 + PCB 2026-06-04) ──────────────
 //
 // The compute trigger on hr_monthly_payroll only fires when one of basic_salary,
 // statutory_allowance, non_statutory_allowance, ot_*, commission_amount,
 // unpaid_leave_days, period_month, or staff_id is in the UPDATE clause. So we
-// can update epf_*/socso_*/eis_* directly without the trigger overwriting us.
-// Reset fires a no-op update on basic_salary to force the trigger to re-run
-// the JADUAL lookups + recompute gross/net.
+// can update epf_*/socso_*/eis_*/pcb directly without the trigger overwriting
+// us. Reset fires a no-op update on basic_salary to force the trigger to
+// re-run the JADUAL lookups + recompute gross/net.
 
 const STAFF_STAT_FIELDS = [
   'epf_er',
@@ -107,6 +107,7 @@ const STAFF_STAT_FIELDS = [
   'socso_ee',
   'eis_er',
   'eis_ee',
+  'pcb',
 ] as const
 type StaffStatutoryField = (typeof STAFF_STAT_FIELDS)[number]
 export type StaffStatutoryUpdate = Partial<Record<StaffStatutoryField, number>>
