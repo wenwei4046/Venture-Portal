@@ -155,6 +155,7 @@ export default async function DashboardPage() {
           .from('payroll_runs')
           .select('id, status, total_amount, submitted_at, approved_at, paid_at')
           .eq('period_month', period)
+          .neq('status', 'rejected')
           .maybeSingle(),
         supabase
           .from('claims')
@@ -226,30 +227,28 @@ export default async function DashboardPage() {
 
       // Cycle step state — 'done' / 'active' / 'waiting' / 'pending'.
       // Exactly one 'active' at a time so HR always has one obvious next click.
-      // Nine steps mirror the split flow post-refactor:
-      //   1 staff master · 2 import · 3 review drafts · 4 submit for approval
-      //   5 Principal approves costing · 6 request payment from Finance
-      //   7 Finance generates + Principal approves PV · 8 HR Pool → staff (bank CSV)
-      //   9 Statutory files
+      // Eight steps since mig 278 removed the Principal costing approval:
+      //   1 staff master · 2 import · 3 review drafts · 4 submit to Finance
+      //   5 request payment from Finance · 6 Finance generates + Principal
+      //   approves PV · 7 HR Pool → staff (bank CSV) · 8 Statutory files
       type StepState = 'done' | 'active' | 'waiting' | 'pending'
       const s1: StepState = totalStaff > 0 ? 'done' : 'active'
       const s2: StepState = payrollImported ? 'done' : (s1 === 'done' ? 'active' : 'pending')
       const s3: StepState = (rows.length > 0 && draftCount === 0) ? 'done' : (s2 === 'done' && draftCount > 0 ? 'active' : 'pending')
       const s4: StepState = runSubmitted ? 'done' : (s3 === 'done' ? 'active' : 'pending')
-      const s5: StepState = runApproved ? 'done' : (runSubmitted ? 'waiting' : 'pending')
-      const s6: StepState = requestActive
+      const s5: StepState = requestActive
         ? 'done'
         : runApproved
           ? 'active'
           : 'pending'
-      const s7: StepState = poolFunded
+      const s6: StepState = poolFunded
         ? 'done'
         : requestStatus === 'submitted' || requestStatus === 'pv_generated'
           ? 'waiting'
           : 'pending'
+      const s7: StepState = poolFunded ? 'active' : 'pending'
       const s8: StepState = poolFunded ? 'active' : 'pending'
-      const s9: StepState = poolFunded ? 'active' : 'pending'
-      const doneCount = [s1, s2, s3, s4, s5, s6, s7, s8, s9].filter(s => s === 'done').length
+      const doneCount = [s1, s2, s3, s4, s5, s6, s7, s8].filter(s => s === 'done').length
 
       return (
         <div>
@@ -260,7 +259,7 @@ export default async function DashboardPage() {
               </div>
               <h1 className="page-title">Monthly Payroll Cycle</h1>
               <p className="font-serif italic text-graphite text-base mt-3">
-                {dayjs().format('MMMM YYYY')} · <em>{doneCount} of 9 steps complete</em>
+                {dayjs().format('MMMM YYYY')} · <em>{doneCount} of 8 steps complete</em>
               </p>
             </div>
             <Link
@@ -311,12 +310,12 @@ export default async function DashboardPage() {
               <CycleStep
                 n={4}
                 state={s4}
-                title="Submit for Approval"
+                title="Submit to Finance"
                 detail={
                   runSubmitted
-                    ? `Submitted · RM ${formatMoneyBare(Number(payrollRun?.total_amount ?? 0))}`
+                    ? `Submitted · RM ${formatMoneyBare(Number(payrollRun?.total_amount ?? 0))}${payrollRun?.approved_at ? ` · ${dayjs(payrollRun.approved_at).format('D MMM HH:mm')}` : ''}`
                     : s4 === 'active'
-                      ? 'Send the payroll numbers to Principal'
+                      ? 'Figures go straight to Finance — no approval round-trip'
                       : 'Finish drafts first'
                 }
                 ctaLabel={s4 === 'active' ? 'Go to grid →' : 'View →'}
@@ -326,36 +325,21 @@ export default async function DashboardPage() {
               <CycleStep
                 n={5}
                 state={s5}
-                title="Principal approves costing"
-                detail={
-                  runApproved
-                    ? `Approved ${payrollRun?.approved_at ? dayjs(payrollRun.approved_at).format('D MMM HH:mm') : ''}`
-                    : s5 === 'waiting'
-                      ? 'Awaiting Principal sign-off — no money moves yet'
-                      : '—'
-                }
-                ctaLabel=""
-                ctaHref=""
-                hideCta
-              />
-              <CycleStep
-                n={6}
-                state={s6}
                 title="Request payment from Finance"
                 detail={
                   requestActive
                     ? 'Request sent to Finance'
-                    : s6 === 'active'
+                    : s5 === 'active'
                       ? 'Ask Finance to generate the Payment Voucher'
-                      : 'Wait for costing approval'
+                      : 'Submit to Finance first'
                 }
-                ctaLabel={s6 === 'active' ? 'Go to grid →' : 'View →'}
+                ctaLabel={s5 === 'active' ? 'Go to grid →' : 'View →'}
                 ctaHref={periodUrl}
-                hideCta={s6 === 'pending'}
+                hideCta={s5 === 'pending'}
               />
               <CycleStep
-                n={7}
-                state={s7}
+                n={6}
+                state={s6}
                 title="PV approved · HR Pool funded"
                 detail={
                   poolFunded
@@ -371,8 +355,8 @@ export default async function DashboardPage() {
                 hideCta={!paymentRequest?.pv_id}
               />
               <CycleStep
-                n={8}
-                state={s8}
+                n={7}
+                state={s7}
                 title="Bank transfer file"
                 detail={
                   poolFunded
@@ -381,11 +365,11 @@ export default async function DashboardPage() {
                 }
                 ctaLabel="Download CSV →"
                 ctaHref={`${periodUrl}/bank-transfer`}
-                hideCta={s8 === 'pending'}
+                hideCta={s7 === 'pending'}
               />
               <CycleStep
-                n={9}
-                state={s9}
+                n={8}
+                state={s8}
                 title="Statutory files"
                 detail={
                   poolFunded
@@ -394,7 +378,7 @@ export default async function DashboardPage() {
                 }
                 ctaLabel="Go to files →"
                 ctaHref={periodUrl}
-                hideCta={s9 === 'pending'}
+                hideCta={s8 === 'pending'}
               />
             </div>
           </section>

@@ -7,11 +7,12 @@ import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 
 /**
- * HR submits the month's payroll to Principal for approval.
- * Wraps submit_payroll_to_principal RPC (migration 128).
- * Redirects to the approval detail page for the newly-created run.
+ * HR submits the month's payroll straight to Finance — NO Principal approval.
+ * Wraps submit_payroll_to_principal RPC (name kept for compatibility; since
+ * migration 278 it lands the run directly in status='approved' so Finance's
+ * billing view + payment-request flow unlock immediately).
  */
-export async function submitToPrincipal(period: string): Promise<void> {
+export async function submitToFinance(period: string): Promise<void> {
   const user = await requireRole(['hr', 'principal'])
   const supabase = await createClient()
 
@@ -27,9 +28,35 @@ export async function submitToPrincipal(period: string): Promise<void> {
   if (!data) throw new Error('Submit failed: no run id returned')
 
   revalidatePath('/hr-costing/payroll')
-  revalidatePath(`/hr-costing/payroll/${period}`)
-  revalidatePath('/approvals')
-  redirect(`/approvals/payroll-run/${data}`)
+  revalidatePath('/billing')
+  revalidatePath('/dashboard')
+  redirect(`/hr-costing/payroll/${period}`)
+}
+
+/**
+ * HR pulls a submitted (auto-approved) run back to draft for edits — the
+ * replacement for the removed Principal reject path. Wraps reopen_payroll_run
+ * RPC (migration 278): flips the run to 'rejected' with the marker reason
+ * 'Reopened by HR for edits' and hr_monthly_payroll rows back to 'draft'.
+ * Blocked once a payment request is in flight.
+ */
+export async function reopenPayroll(period: string): Promise<void> {
+  const user = await requireRole(['hr', 'principal'])
+  const supabase = await createClient()
+
+  await assertPeriodOpen(supabase, period)
+
+  const { error } = await supabase.rpc('reopen_payroll_run', {
+    p_period: period,
+    p_user_id: user.id,
+  })
+
+  if (error) throw new Error(`Reopen failed: ${error.message}`)
+
+  revalidatePath('/hr-costing/payroll')
+  revalidatePath('/billing')
+  revalidatePath('/dashboard')
+  redirect(`/hr-costing/payroll/${period}`)
 }
 
 export interface PayrollRowUpdate {

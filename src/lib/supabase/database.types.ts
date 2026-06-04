@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -4272,6 +4272,10 @@ export type Database = {
       reject_payroll_run: {
         Args: { p_approver: string; p_reason: string; p_run_id: string }
         Returns: undefined
+      }
+      reopen_payroll_run: {
+        Args: { p_period: string; p_user_id: string }
+        Returns: string
       }
       request_loan_cancel: {
         Args: { p_loan_id: string; p_reason?: string }

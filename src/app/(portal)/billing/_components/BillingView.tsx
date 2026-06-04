@@ -156,24 +156,23 @@ export default async function BillingView({ searchParams }: Props) {
   const directorAttributionInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'director_attribution').length
   const marketingInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'marketing_project').length
 
-  // Pull the 5 per-dept OPEX totals from the payroll_run, but ONLY if
-  // Principal has approved it (approved_at IS NOT NULL). HR-submitted-only
-  // (still pending) shouldn't propagate into the billing view — Finance
-  // should not see the figures or be able to invoice until Principal signs
-  // off on HR's submission.
+  // Pull the per-dept OPEX totals from the live payroll_run. Since mig 278
+  // HR's Submit lands the run directly in status='approved' (approved_at set
+  // at submit) — no Principal gate. Rejected rows are reopen history, skip.
   const { data: payrollRun } = await supabase
     .from('payroll_runs')
     .select(
       'marketing_opex_total, hr_opex_total, finance_opex_total, director_office_total, director_salary_total, approved_at'
     )
     .eq('period_month', period)
+    .neq('status', 'rejected')
     .maybeSingle()
-  const payrollApproved = !!payrollRun?.approved_at
-  const marketingFromPayroll = payrollApproved ? Number(payrollRun?.marketing_opex_total ?? 0) : 0
-  const hrFromPayroll = payrollApproved ? Number(payrollRun?.hr_opex_total ?? 0) : 0
-  const financeFromPayroll = payrollApproved ? Number(payrollRun?.finance_opex_total ?? 0) : 0
-  const directorOfficeFromPayroll = payrollApproved ? Number(payrollRun?.director_office_total ?? 0) : 0
-  const directorFromPayroll = payrollApproved ? Number(payrollRun?.director_salary_total ?? 0) : 0
+  const payrollSubmitted = !!payrollRun?.approved_at
+  const marketingFromPayroll = payrollSubmitted ? Number(payrollRun?.marketing_opex_total ?? 0) : 0
+  const hrFromPayroll = payrollSubmitted ? Number(payrollRun?.hr_opex_total ?? 0) : 0
+  const financeFromPayroll = payrollSubmitted ? Number(payrollRun?.finance_opex_total ?? 0) : 0
+  const directorOfficeFromPayroll = payrollSubmitted ? Number(payrollRun?.director_office_total ?? 0) : 0
+  const directorFromPayroll = payrollSubmitted ? Number(payrollRun?.director_salary_total ?? 0) : 0
 
   const companyList = companies ?? []
   const companyMap = new Map(
@@ -224,7 +223,7 @@ export default async function BillingView({ searchParams }: Props) {
           <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
             {invoiceList.length > 0
               ? formatMoney(invoiceTotal)
-              : payrollApproved
+              : payrollSubmitted
                 ? formatMoney(
                     marketingFromPayroll +
                       hrFromPayroll +
@@ -241,13 +240,11 @@ export default async function BillingView({ searchParams }: Props) {
                 {' · '}
                 <em className="font-serif italic">generated</em>
               </>
-            ) : payrollApproved ? (
+            ) : payrollSubmitted ? (
               <>
-                Principal approved · {formatMoney(hrTotalCtc)} HR CTC ·{' '}
+                HR submitted · {formatMoney(hrTotalCtc)} HR CTC ·{' '}
                 <em className="font-serif italic">ready for invoice generation</em>
               </>
-            ) : submitted ? (
-              <em className="font-serif italic">HR submitted — awaiting Principal approval</em>
             ) : (
               <em className="font-serif italic">HR has not submitted this period yet</em>
             )}
@@ -280,7 +277,7 @@ export default async function BillingView({ searchParams }: Props) {
           invoiced={hrAttributionTotal}
           invoiceCount={hrInvoiceCount}
           invoiceMode="hr_attribution"
-          payrollApproved={payrollApproved}
+          payrollSubmitted={payrollSubmitted}
           canCreate={user.role === 'finance'}
           companies={companyList}
           currentPeriod={period}
@@ -292,7 +289,7 @@ export default async function BillingView({ searchParams }: Props) {
           invoiced={financeAttributionTotal}
           invoiceCount={financeInvoiceCount}
           invoiceMode="finance_attribution"
-          payrollApproved={payrollApproved}
+          payrollSubmitted={payrollSubmitted}
           canCreate={user.role === 'finance'}
           companies={companyList}
           currentPeriod={period}
@@ -304,7 +301,7 @@ export default async function BillingView({ searchParams }: Props) {
           invoiced={directorOfficeTotal}
           invoiceCount={directorOfficeInvoiceCount}
           invoiceMode="director_office_attribution"
-          payrollApproved={payrollApproved}
+          payrollSubmitted={payrollSubmitted}
           canCreate={user.role === 'finance'}
           companies={companyList}
           currentPeriod={period}
@@ -316,7 +313,7 @@ export default async function BillingView({ searchParams }: Props) {
           invoiced={directorAttributionTotal}
           invoiceCount={directorAttributionInvoiceCount}
           invoiceMode="director_attribution"
-          payrollApproved={payrollApproved}
+          payrollSubmitted={payrollSubmitted}
           canCreate={user.role === 'finance'}
           companies={companyList}
           currentPeriod={period}
@@ -328,7 +325,7 @@ export default async function BillingView({ searchParams }: Props) {
           invoiced={marketingTotal}
           invoiceCount={marketingInvoiceCount}
           invoiceMode="marketing_project"
-          payrollApproved={payrollApproved}
+          payrollSubmitted={payrollSubmitted}
           canCreate={user.role === 'finance'}
           companies={companyList}
           currentPeriod={period}
@@ -385,7 +382,7 @@ function DeptCostCard({
   invoiced,
   invoiceCount,
   invoiceMode,
-  payrollApproved,
+  payrollSubmitted,
   canCreate,
   companies,
   currentPeriod,
@@ -397,7 +394,7 @@ function DeptCostCard({
   invoiced: number
   invoiceCount: number
   invoiceMode: CreateInvoiceMode
-  payrollApproved: boolean
+  payrollSubmitted: boolean
   canCreate: boolean
   companies: Array<{ id: string; name: string; short_code: string }>
   currentPeriod: string
@@ -414,14 +411,14 @@ function DeptCostCard({
   const hasRequired = required > 0.005
   // Main number: invoiced total once invoices exist; otherwise the
   // approved-payroll target (Finance uses this to know what to bill).
-  // payrollApproved gating happens upstream (required is forced to 0 when
+  // payrollSubmitted gating happens upstream (required is forced to 0 when
   // Principal hasn't approved), so reaching this branch implies approval.
   const amount = hasInvoices ? invoiced : required
   const muted = !hasInvoices && !hasRequired
 
   let note: string
-  if (!payrollApproved) {
-    note = 'awaiting Principal approval'
+  if (!payrollSubmitted) {
+    note = 'awaiting HR costing'
   } else if (hasInvoices) {
     const gap = Math.round((required - invoiced) * 100) / 100
     if (Math.abs(gap) < 0.01) {
@@ -444,7 +441,7 @@ function DeptCostCard({
         {formatMoney(amount)}
       </div>
       <div className="font-mono text-xs text-muted mt-2">{note}</div>
-      {canCreate && payrollApproved && (
+      {canCreate && payrollSubmitted && (
         <div className="mt-3 pt-3 border-t border-hairline">
           <CreateInvoiceButton
             companies={companies}
