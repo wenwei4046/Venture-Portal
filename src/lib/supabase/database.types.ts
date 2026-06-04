@@ -1200,6 +1200,62 @@ export type Database = {
           },
         ]
       }
+      director_salary_submissions: {
+        Row: {
+          by_company: Json
+          created_at: string
+          director_count: number
+          id: string
+          period_month: string
+          submitted_at: string
+          submitted_by: string
+          total_gross: number
+          total_invoice: number
+          total_payroll_gross: number
+          total_payroll_net: number
+          total_saving: number
+          total_statutory_er: number
+        }
+        Insert: {
+          by_company?: Json
+          created_at?: string
+          director_count?: number
+          id?: string
+          period_month: string
+          submitted_at?: string
+          submitted_by: string
+          total_gross?: number
+          total_invoice?: number
+          total_payroll_gross?: number
+          total_payroll_net?: number
+          total_saving?: number
+          total_statutory_er?: number
+        }
+        Update: {
+          by_company?: Json
+          created_at?: string
+          director_count?: number
+          id?: string
+          period_month?: string
+          submitted_at?: string
+          submitted_by?: string
+          total_gross?: number
+          total_invoice?: number
+          total_payroll_gross?: number
+          total_payroll_net?: number
+          total_saving?: number
+          total_statutory_er?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "director_salary_submissions_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       directors: {
         Row: {
           children_count: number
@@ -4273,6 +4329,10 @@ export type Database = {
         Args: { p_approver: string; p_reason: string; p_run_id: string }
         Returns: undefined
       }
+      reopen_director_salary: {
+        Args: { p_period: string; p_user_id: string }
+        Returns: undefined
+      }
       reopen_payroll_run: {
         Args: { p_period: string; p_user_id: string }
         Returns: string
@@ -4290,6 +4350,10 @@ export type Database = {
           p_payee_company_id: string
           p_payee_name: string
         }
+        Returns: string
+      }
+      submit_director_salary_to_finance: {
+        Args: { p_period: string; p_user_id: string }
         Returns: string
       }
       submit_invoice_request: {

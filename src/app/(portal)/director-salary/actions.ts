@@ -529,25 +529,53 @@ export async function resetDirectorStatutoryToLookup(payoutId: string) {
   revalidatePath('/director-salary')
 }
 
-// ─── Confirm Payouts ───────────────────────────────────────────────
+// ─── Director Payroll Submission (mig 279) ─────────────────────────
+//
+// Replaces the old Confirm step: submitting flips draft payouts to
+// 'confirmed' AND writes the aggregate-only submission snapshot (totals +
+// per-subsidiary CTC) that Finance reads — no Principal approval involved.
 
-export async function confirmPayouts(period: string) {
-  await requireRole(['hr', 'principal'])
+export async function submitDirectorSalaryToFinance(period: string) {
+  const user = await requireRole(['hr', 'principal'])
   const supabase = await createClient()
 
   const periodNorm = dayjs(period).startOf('month').format('YYYY-MM-DD')
 
   await assertPeriodOpen(supabase, periodNorm)
 
-  const { error, count } = await supabase
-    .from('director_payouts')
-    .update({ status: 'confirmed' })
-    .eq('period_month', periodNorm)
-    .eq('status', 'draft')
+  const { error } = await supabase.rpc('submit_director_salary_to_finance', {
+    p_period: periodNorm,
+    p_user_id: user.id,
+  })
 
-  if (error) throw new Error(`Failed to confirm payouts: ${error.message}`)
+  if (error) throw new Error(`Submit failed: ${error.message}`)
 
   revalidatePath('/director-salary')
+  revalidatePath('/billing')
   revalidatePath('/dashboard')
-  return { confirmed: count ?? 0 }
+}
+
+/**
+ * Pull a submission back so HR can recalculate / edit statutory. Confirmed
+ * payouts flip to draft and the snapshot row is deleted. The RPC blocks once
+ * any payout is paid or disbursement PVs exist.
+ */
+export async function reopenDirectorSalary(period: string) {
+  const user = await requireRole(['hr', 'principal'])
+  const supabase = await createClient()
+
+  const periodNorm = dayjs(period).startOf('month').format('YYYY-MM-DD')
+
+  await assertPeriodOpen(supabase, periodNorm)
+
+  const { error } = await supabase.rpc('reopen_director_salary', {
+    p_period: periodNorm,
+    p_user_id: user.id,
+  })
+
+  if (error) throw new Error(`Reopen failed: ${error.message}`)
+
+  revalidatePath('/director-salary')
+  revalidatePath('/billing')
+  revalidatePath('/dashboard')
 }

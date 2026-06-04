@@ -172,7 +172,36 @@ export default async function BillingView({ searchParams }: Props) {
   const hrFromPayroll = payrollSubmitted ? Number(payrollRun?.hr_opex_total ?? 0) : 0
   const financeFromPayroll = payrollSubmitted ? Number(payrollRun?.finance_opex_total ?? 0) : 0
   const directorOfficeFromPayroll = payrollSubmitted ? Number(payrollRun?.director_office_total ?? 0) : 0
-  const directorFromPayroll = payrollSubmitted ? Number(payrollRun?.director_salary_total ?? 0) : 0
+
+  // Director salary is decoupled from the staff run (mig 278/279) — Finance
+  // reads the Director Payroll Submission snapshot. Legacy runs (pre-278)
+  // still carry director_salary_total, so fall back to that.
+  const { data: directorSubmission } = await supabase
+    .from('director_salary_submissions')
+    .select('total_gross, total_payroll_gross, total_invoice, total_saving, director_count, by_company, submitted_at')
+    .eq('period_month', period)
+    .maybeSingle()
+  const directorSubmitted = !!directorSubmission
+  const directorFromPayroll = directorSubmitted
+    ? Number(directorSubmission?.total_gross ?? 0)
+    : payrollSubmitted
+      ? Number(payrollRun?.director_salary_total ?? 0)
+      : 0
+  const directorCostReady =
+    directorSubmitted || (payrollSubmitted && Number(payrollRun?.director_salary_total ?? 0) > 0)
+  const directorByCompany: Array<{
+    company_id: string
+    company_name: string
+    company_short_code: string
+    total_ctc: number
+  }> = directorSubmitted
+    ? (((directorSubmission?.by_company ?? []) as unknown) as Array<{
+        company_id: string
+        company_name: string
+        company_short_code: string
+        total_ctc: number
+      }>).map(r => ({ ...r, total_ctc: Number(r.total_ctc) }))
+    : []
 
   const companyList = companies ?? []
   const companyMap = new Map(
@@ -223,7 +252,7 @@ export default async function BillingView({ searchParams }: Props) {
           <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
             {invoiceList.length > 0
               ? formatMoney(invoiceTotal)
-              : payrollSubmitted
+              : payrollSubmitted || directorSubmitted
                 ? formatMoney(
                     marketingFromPayroll +
                       hrFromPayroll +
@@ -245,6 +274,8 @@ export default async function BillingView({ searchParams }: Props) {
                 HR submitted · {formatMoney(hrTotalCtc)} HR CTC ·{' '}
                 <em className="font-serif italic">ready for invoice generation</em>
               </>
+            ) : directorSubmitted ? (
+              <em className="font-serif italic">Director salary submitted — staff payroll pending</em>
             ) : (
               <em className="font-serif italic">HR has not submitted this period yet</em>
             )}
@@ -313,7 +344,8 @@ export default async function BillingView({ searchParams }: Props) {
           invoiced={directorAttributionTotal}
           invoiceCount={directorAttributionInvoiceCount}
           invoiceMode="director_attribution"
-          payrollSubmitted={payrollSubmitted}
+          payrollSubmitted={directorCostReady}
+          awaitingNote="awaiting Director Salary submission"
           canCreate={user.role === 'finance'}
           companies={companyList}
           currentPeriod={period}
@@ -333,6 +365,53 @@ export default async function BillingView({ searchParams }: Props) {
           marketingNote
         />
       </div>
+
+      {/* Director Payroll Submission — per-subsidiary contribution (mig 279).
+          This is what Finance bills each subsidiary for director salary;
+          Create Invoice → Director attribution auto-fills from the same data. */}
+      {directorSubmitted && directorByCompany.length > 0 && (
+        <section className="mb-12">
+          <div className="sect-head">
+            <h2>Director Salary Submission</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">
+              {directorByCompany.length} SUBSIDIAR{directorByCompany.length === 1 ? 'Y' : 'IES'}
+            </span>
+          </div>
+          <div className="font-mono text-xs text-muted mb-4">
+            Submitted {directorSubmission?.submitted_at ? dayjs(directorSubmission.submitted_at).format('D MMM YYYY HH:mm') : ''} ·{' '}
+            {Number(directorSubmission?.director_count ?? 0)} director{Number(directorSubmission?.director_count ?? 0) === 1 ? '' : 's'} ·{' '}
+            total {formatMoney(Number(directorSubmission?.total_gross ?? 0))}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="ledger-table">
+              <thead>
+                <tr>
+                  <th>Subsidiary</th>
+                  <th className="right">CTC Contribution</th>
+                </tr>
+              </thead>
+              <tbody>
+                {directorByCompany.map(r => (
+                  <tr key={r.company_id}>
+                    <td>
+                      <div className="font-serif text-[15px] text-ink">{r.company_short_code}</div>
+                      <div className="font-mono text-[11px] text-graphite mt-0.5">{r.company_name}</div>
+                    </td>
+                    <td className="num">{formatMoney(r.total_ctc)}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td className="font-serif italic text-accent">Total</td>
+                  <td className="num font-semibold">
+                    {formatMoney(directorByCompany.reduce((s, r) => s + r.total_ctc, 0))}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <InvoicesList invoices={invoiceList} companyMap={companyMap} departmentMap={departmentMap} period={period} categories={categoryList} bankAccounts={bankList} />
 
@@ -383,6 +462,7 @@ function DeptCostCard({
   invoiceCount,
   invoiceMode,
   payrollSubmitted,
+  awaitingNote,
   canCreate,
   companies,
   currentPeriod,
@@ -395,6 +475,7 @@ function DeptCostCard({
   invoiceCount: number
   invoiceMode: CreateInvoiceMode
   payrollSubmitted: boolean
+  awaitingNote?: string
   canCreate: boolean
   companies: Array<{ id: string; name: string; short_code: string }>
   currentPeriod: string
@@ -418,7 +499,7 @@ function DeptCostCard({
 
   let note: string
   if (!payrollSubmitted) {
-    note = 'awaiting HR costing'
+    note = awaitingNote ?? 'awaiting HR costing'
   } else if (hasInvoices) {
     const gap = Math.round((required - invoiced) * 100) / 100
     if (Math.abs(gap) < 0.01) {
