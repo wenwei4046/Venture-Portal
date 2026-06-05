@@ -14,6 +14,7 @@ import Link from 'next/link'
 import { SegmentedReport, type ReportSegment } from '@/app/(portal)/reports/_components/SegmentedReport'
 import { SegmentExportButtons } from '@/app/(portal)/reports/_components/SegmentExportButtons'
 import { RevenueGroups } from './_components/RevenueGroups'
+import PeriodMonthPicker from '@/app/(portal)/reports/_components/PeriodMonthPicker'
 
 interface Props {
   searchParams: Promise<{ from?: string; to?: string; period?: string }>
@@ -44,14 +45,7 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
           <h1 className="page-title">Income Statement</h1>
         </div>
         <div className="shrink-0 flex items-center gap-3">
-          <form>
-            <input
-              type="month"
-              name="period"
-              defaultValue={dayjs(from).format('YYYY-MM')}
-              className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
-            />
-          </form>
+          <PeriodMonthPicker value={dayjs(from).format('YYYY-MM')} />
           <SegmentExportButtons basePath="/reports/income-statement/export" from={from} to={to} />
         </div>
       </div>

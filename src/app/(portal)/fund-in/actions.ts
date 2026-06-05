@@ -440,14 +440,16 @@ export async function listPayableFundSources(): Promise<PayableFundSource[]> {
     { data: sources },
     { data: companies },
     { data: departments },
+    { data: directors },
     { data: repayments },
   ] = await Promise.all([
     supabase
       .from('fund_source_outstanding')
       .select('fund_source_id, source_type, from_company_id, from_director_id, from_department_id, original_amount, cost_rate, lock_in_months, outstanding, monthly_payment, total_principal_paid'),
-    supabase.from('fund_sources').select('id, status'),
+    supabase.from('fund_sources').select('id, status, from_freetext_name'),
     supabase.from('companies').select('id, name, short_code'),
     supabase.from('departments').select('id, name'),
+    supabase.from('directors').select('id, name'),
     supabase
       .from('fund_source_repayments')
       .select('fund_source_id, payment_type, payment_date')
@@ -455,8 +457,10 @@ export async function listPayableFundSources(): Promise<PayableFundSource[]> {
   ])
 
   const statusMap = new Map((sources ?? []).map((s) => [s.id, s.status]))
+  const freetextMap = new Map((sources ?? []).map((s) => [s.id, (s as { from_freetext_name: string | null }).from_freetext_name]))
   const companyMap = new Map((companies ?? []).map((c) => [c.id, c]))
   const departmentMap = new Map((departments ?? []).map((d) => [d.id, d.name]))
+  const directorMap = new Map((directors ?? []).map((d) => [d.id, d.name]))
 
   // Count distinct principal payment months per fund source (periods paid)
   const periodsPaidMap = new Map<string, Set<string>>()
@@ -492,6 +496,10 @@ export async function listPayableFundSources(): Promise<PayableFundSource[]> {
       } else if (o.from_company_id) {
         const company = companyMap.get(o.from_company_id)
         counterparty = company ? `${company.short_code ?? company.name}` : 'Company'
+      } else if (o.from_director_id) {
+        counterparty = directorMap.get(o.from_director_id) ?? 'Director'
+      } else if (freetextMap.get(o.fund_source_id)) {
+        counterparty = freetextMap.get(o.fund_source_id) as string
       } else {
         counterparty = 'Director'
       }

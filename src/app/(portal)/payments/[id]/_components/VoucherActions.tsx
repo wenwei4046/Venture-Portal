@@ -14,6 +14,9 @@ interface Props {
   submitForApproval: (formData: FormData) => Promise<void>
   approveVoucher: (formData: FormData) => Promise<void>
   voidVoucher: (formData: FormData) => Promise<void>
+  /** Reverse a PAID incoming receipt (credit). Optional — only wired for those. */
+  voidPaidReceipt?: (formData: FormData) => Promise<void>
+  direction?: string
 }
 
 export default function VoucherActions({
@@ -27,6 +30,8 @@ export default function VoucherActions({
   submitForApproval,
   approveVoucher,
   voidVoucher,
+  voidPaidReceipt,
+  direction,
 }: Props) {
   const [isPending, startTransition] = useTransition()
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -54,12 +59,42 @@ export default function VoucherActions({
 
   // Status-driven rendering
   if (status === 'paid' || status === 'voided') {
+    const canReverse = status === 'paid' && direction === 'credit' && !!voidPaidReceipt
     return (
       <div className="bg-surface border border-hairline rounded-md p-4 max-w-3xl">
         <p className="font-serif italic text-graphite text-sm">
           This voucher has been <em className={status === 'paid' ? 'text-ledger' : 'text-danger'}>{status}</em>.
-          No further actions available.
+          {canReverse ? '' : ' No further actions available.'}
         </p>
+        {canReverse ? (
+          <div className="mt-4">
+            {message ? (
+              <p className={`text-sm font-sans mb-3 ${message.type === 'error' ? 'text-danger' : 'text-ledger'}`}>{message.text}</p>
+            ) : null}
+            {confirmAction === 'approve' ? (
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-sans text-danger">确认作废这张已付收据?会反冲银行、池、总账,并把发票退回未收。</span>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => handleAction(voidPaidReceipt!)}
+                  className="bg-danger hover:opacity-90 text-white font-serif italic text-sm px-4 py-2 rounded-md transition-opacity disabled:opacity-50"
+                >
+                  {isPending ? '作废中…' : '确认作废'}
+                </button>
+                <button type="button" onClick={() => setConfirmAction(null)} className="text-sm font-sans text-muted hover:text-ink">取消</button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setMessage(null); setConfirmAction('approve') }}
+                className="bg-surface hover:bg-surface-2 border border-danger text-danger font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+              >
+                作废收据 · Void receipt
+              </button>
+            )}
+          </div>
+        ) : null}
       </div>
     )
   }

@@ -69,3 +69,5 @@ motion-*.png
 spatial-*.png
 visual-*.png
 .gstack/
+
+.env.local.shared

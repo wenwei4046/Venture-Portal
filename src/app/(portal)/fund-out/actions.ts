@@ -239,14 +239,24 @@ export async function recordRepayment(formData: FormData) {
   //   interest  → dr Bank / cr 4010 Interest Income — Loans
   //   penalty   → dr Bank / cr 4020 Penalty Income
   //   netting   → dr Bank / cr 4010 (treated as interest-style gain)
-  const { data: primaryBank } = await supabase
-    .from('bank_accounts')
-    .select('gl_account_code')
-    .eq('is_primary', true)
-    .eq('status', 'active')
-    .maybeSingle()
+  // Honor a caller-supplied bank (e.g. the receive form's bank picker); else
+  // fall back to the primary active bank (the loan-detail RepaymentForm path).
+  const bankAccountIdParam = (formData.get('bank_account_id') as string) || null
+  const { data: primaryBank } = bankAccountIdParam
+    ? await supabase.from('bank_accounts').select('id, gl_account_code, current_balance').eq('id', bankAccountIdParam).maybeSingle()
+    : await supabase.from('bank_accounts').select('id, gl_account_code, current_balance').eq('is_primary', true).eq('status', 'active').maybeSingle()
 
   const bankGl = primaryBank?.gl_account_code ?? '3000'
+
+  // Bank cache: a repayment received increases the bank balance. The GL Dr Bank
+  // is posted below, but the cached current_balance must move too (it's not
+  // trigger-maintained), else the dashboard/settings bank figure understates.
+  if (primaryBank?.id) {
+    await supabase
+      .from('bank_accounts')
+      .update({ current_balance: Math.round((Number(primaryBank.current_balance) + amount) * 100) / 100 })
+      .eq('id', primaryBank.id)
+  }
   // Mig 238 unified COA + 2026-05-15 fix:
   //   - principal → <borrower's leaf under 3020 Loans Receivable>. The user
   //     split 3020 into a header + per-borrower leaves (`3051 Amount Due
@@ -280,6 +290,52 @@ export async function recordRepayment(formData: FormData) {
   revalidatePath(`/fund-out/${loanId}`)
   revalidatePath('/fund-out')
   revalidatePath('/dashboard')
+}
+
+// ─── Record a loan repayment RECEIVED, from the receive (收款) form ──────────
+// Thin wrapper so the unified receive form can record an incoming loan
+// repayment (sub → HV) with a principal / interest / penalty split, reusing the
+// proven recordRepayment logic (one call per non-zero type). Mirrors the
+// outgoing payment form's "this is a loan repayment" option.
+export async function recordLoanRepaymentReceived(formData: FormData) {
+  await requireRole(['finance'])
+  const loanId = (formData.get('loan_id') as string) ?? ''
+  const paymentDate = (formData.get('payment_date') as string) ?? ''
+  const bankAccountId = (formData.get('bank_account_id') as string) || ''
+  const notes = (formData.get('notes') as string) || ''
+  if (!loanId) throw new Error('Loan is required')
+  if (!paymentDate) throw new Error('Payment date is required')
+
+  // ORDER MATTERS: record interest + penalty BEFORE principal. A principal
+  // repayment that clears the outstanding balance flips the loan to
+  // `fully_repaid` (DB trigger), after which recordRepayment's active-loan
+  // guard rejects any further repayment. So principal MUST be last — otherwise
+  // a combined principal+interest payment that fully settles the loan records
+  // the principal, then throws "Cannot record repayment on fully_repaid loan"
+  // on the interest leg, leaving a half-posted transaction.
+  const parts: Array<[PaymentType, number]> = [
+    ['interest', parseFloat((formData.get('repayment_interest') as string) ?? '0') || 0],
+    ['penalty', parseFloat((formData.get('repayment_penalty') as string) ?? '0') || 0],
+    ['principal', parseFloat((formData.get('repayment_principal') as string) ?? '0') || 0],
+  ]
+  const nonZero = parts.filter(([, amt]) => amt > 0)
+  if (nonZero.length === 0) throw new Error('Enter at least one of principal / interest / penalty')
+
+  for (const [type, amt] of nonZero) {
+    const fd = new FormData()
+    fd.set('loan_id', loanId)
+    fd.set('payment_type', type)
+    fd.set('amount', String(amt))
+    fd.set('payment_date', paymentDate)
+    if (bankAccountId) fd.set('bank_account_id', bankAccountId)
+    if (notes) fd.set('notes', notes)
+    await recordRepayment(fd)
+  }
+
+  revalidatePath('/payments')
+  revalidatePath('/fund-out')
+  revalidatePath('/dashboard')
+  redirect(`/fund-out/${loanId}`)
 }
 
 // ─── Cancel loan (Finance) ───────────────────────────────────────────────────

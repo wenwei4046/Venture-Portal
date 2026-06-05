@@ -1443,6 +1443,7 @@ export type Database = {
           account_code: string | null
           amount: number
           capital_type: string
+          compound_interest: boolean
           cost_rate: number
           created_at: string
           created_by: string
@@ -1469,6 +1470,7 @@ export type Database = {
           account_code?: string | null
           amount: number
           capital_type?: string
+          compound_interest?: boolean
           cost_rate: number
           created_at?: string
           created_by: string
@@ -1495,6 +1497,7 @@ export type Database = {
           account_code?: string | null
           amount?: number
           capital_type?: string
+          compound_interest?: boolean
           cost_rate?: number
           created_at?: string
           created_by?: string
@@ -2456,6 +2459,7 @@ export type Database = {
           approved_by: string | null
           base_rate: number
           company_id: string
+          compound_interest: boolean
           created_at: string
           created_by: string
           disbursement_date: string | null
@@ -2474,6 +2478,7 @@ export type Database = {
           approved_by?: string | null
           base_rate: number
           company_id: string
+          compound_interest?: boolean
           created_at?: string
           created_by: string
           disbursement_date?: string | null
@@ -2492,6 +2497,7 @@ export type Database = {
           approved_by?: string | null
           base_rate?: number
           company_id?: string
+          compound_interest?: boolean
           created_at?: string
           created_by?: string
           disbursement_date?: string | null
@@ -4312,6 +4318,10 @@ export type Database = {
       next_account_code: {
         Args: { p_type: Database["public"]["Enums"]["account_type"] }
         Returns: string
+      }
+      pool_key_to_segment: {
+        Args: { p_pool: string }
+        Returns: Database["public"]["Enums"]["gl_segment"]
       }
       post_journal_entry: {
         Args: {

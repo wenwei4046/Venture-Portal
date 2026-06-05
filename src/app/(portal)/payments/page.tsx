@@ -191,12 +191,20 @@ export default async function PaymentsPage({ searchParams }: Props) {
             ) : null}
           </Link>
           {user.role === 'finance' ? (
-            <Link
-              href="/payments/new"
-              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-            >
-              Create payment
-            </Link>
+            <>
+              <Link
+                href="/payments/new?mode=loan_repayment"
+                className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+              >
+                收到 loan 还款
+              </Link>
+              <Link
+                href="/payments/new"
+                className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+              >
+                Create payment
+              </Link>
+            </>
           ) : null}
         </div>
       </div>

@@ -4,7 +4,7 @@ import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
-import { submitForApproval, approveVoucher, voidVoucher } from '../actions'
+import { submitForApproval, approveVoucher, voidVoucher, voidPaidReceipt } from '../actions'
 import VoucherActions from './_components/VoucherActions'
 import AttachmentUploader from './_components/AttachmentUploader'
 import AttachmentList from '@/components/voucher/AttachmentList'
@@ -260,6 +260,8 @@ export default async function PaymentDetailPage({ params }: Props) {
         submitForApproval={submitForApproval}
         approveVoucher={approveVoucher}
         voidVoucher={voidVoucher}
+        voidPaidReceipt={voidPaidReceipt}
+        direction={voucher.direction}
       />
     </div>
   )
