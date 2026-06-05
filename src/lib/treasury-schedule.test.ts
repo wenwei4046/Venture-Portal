@@ -1,5 +1,19 @@
 import { describe, it, expect } from 'vitest'
-import { loanMonthlyInstallment, sumSchedule } from './treasury-schedule'
+import { loanMonthlyInstallment, sumSchedule, isLoanUnscheduled } from './treasury-schedule'
+
+describe('isLoanUnscheduled', () => {
+  it('true for empty/undecided/no-method terms', () => {
+    expect(isLoanUnscheduled(null)).toBe(true)
+    expect(isLoanUnscheduled('')).toBe(true)
+    expect(isLoanUnscheduled('新增 · 利息/期数/方式未定 · 放款日2026-04-30')).toBe(true)
+    expect(isLoanUnscheduled('无息垫款 · 0% · 原表无还款方式')).toBe(true)
+  })
+  it('false for confirmed schedules', () => {
+    expect(isLoanUnscheduled('EMI 分期 · 月息4% · 6期')).toBe(false)
+    expect(isLoanUnscheduled('一次还清 · 月息2% · 1期')).toBe(false)
+    expect(isLoanUnscheduled('自定义分期 · 月息2% · 2期')).toBe(false)
+  })
+})
 
 describe('loanMonthlyInstallment', () => {
   it('computes flat monthly principal + interest (CAR 100,000 @ 2% × 12)', () => {

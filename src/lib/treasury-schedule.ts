@@ -40,6 +40,16 @@ export function loanMonthlyInstallment(i: InstallmentInput): Installment {
   }
 }
 
+/** A loan has NO confirmed repayment plan when its repayment_terms is empty or
+ *  flags the schedule as undecided ("未定") / no method ("无还款方式" /
+ *  "原表无还款方式"). Such loans go to the "no fixed term" table, not the
+ *  this-month 应收 schedule. */
+export function isLoanUnscheduled(repaymentTerms: string | null | undefined): boolean {
+  const t = (repaymentTerms ?? '').trim()
+  if (!t) return true
+  return t.includes('未定') || t.includes('无还款方式')
+}
+
 export interface ScheduleTotals {
   principal: number
   interest: number

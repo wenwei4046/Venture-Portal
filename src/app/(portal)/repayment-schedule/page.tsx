@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
-import { loanMonthlyInstallment, sumSchedule } from '@/lib/treasury-schedule'
+import { loanMonthlyInstallment, sumSchedule, isLoanUnscheduled } from '@/lib/treasury-schedule'
 import { listPayableFundSources } from '../fund-in/actions'
 
 export const dynamic = 'force-dynamic'
@@ -24,7 +24,7 @@ export default async function RepaymentSchedulePage() {
   const [{ data: loans }, { data: loanOut }, { data: companies }] = await Promise.all([
     supabase
       .from('loans')
-      .select('id, company_id, principal, effective_rate, tenure_months, status')
+      .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms')
       .eq('status', 'active'),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
     supabase.from('companies').select('id, short_code, name'),
@@ -33,8 +33,22 @@ export default async function RepaymentSchedulePage() {
   const coById = new Map((companies ?? []).map((c) => [c.id as string, c]))
 
   const collectRows: Row[] = []
+  const collectNoTermRows: Array<{ key: string; counterparty: string; detail: string; outstanding: number; monthlyInterest: number }> = []
   for (const l of loans ?? []) {
     const out = outById.get(l.id as string)
+    const co = l.company_id ? coById.get(l.company_id as string) : null
+    const counterparty = co?.short_code ?? co?.name ?? '—'
+    // No confirmed plan (未定 / 无还款方式) → separate table, not a this-month installment.
+    if (isLoanUnscheduled(l.repayment_terms as string | null)) {
+      collectNoTermRows.push({
+        key: l.id as string,
+        counterparty,
+        detail: `RM ${Number(l.principal).toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(Number(l.effective_rate) * 100).toFixed(3)}%/mo · 未定`,
+        outstanding: Number(out?.outstanding ?? l.principal),
+        monthlyInterest: Math.round(Number(l.principal) * Number(l.effective_rate) * 100) / 100,
+      })
+      continue
+    }
     const inst = loanMonthlyInstallment({
       principal: Number(l.principal),
       effectiveRate: Number(l.effective_rate),
@@ -42,10 +56,9 @@ export default async function RepaymentSchedulePage() {
       principalPaid: Number(out?.total_principal_paid ?? 0),
     })
     if (inst.remainingPeriods <= 0) continue // outside tenure — nothing due
-    const co = l.company_id ? coById.get(l.company_id as string) : null
     collectRows.push({
       key: l.id as string,
-      counterparty: co?.short_code ?? co?.name ?? '—',
+      counterparty,
       detail: `RM ${Number(l.principal).toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(Number(l.effective_rate) * 100).toFixed(3)}%/mo · ${l.tenure_months}mo · ${inst.remainingPeriods} left`,
       principalDue: inst.principalDue,
       interestDue: inst.interestDue,
@@ -53,6 +66,9 @@ export default async function RepaymentSchedulePage() {
     })
   }
   collectRows.sort((a, b) => b.totalDue - a.totalDue)
+  collectNoTermRows.sort((a, b) => b.outstanding - a.outstanding)
+  const collectNoTermOutstanding = Math.round(collectNoTermRows.reduce((s, r) => s + r.outstanding, 0) * 100) / 100
+  const collectNoTermInterest = Math.round(collectNoTermRows.reduce((s, r) => s + r.monthlyInterest, 0) * 100) / 100
 
   // ── 应付 (To repay): active fund sources HV received (reuse existing calc) ──
   // Split: sources WITH a fixed repayment term (lock_in_months set) show a
@@ -126,53 +142,81 @@ export default async function RepaymentSchedulePage() {
         </div>
       </div>
 
-      <ScheduleSection title="应收 · To collect (loans lent out)" rows={collectRows} totals={collectTot} tone="credit" />
-      <ScheduleSection title="应付 · To repay — 按期 (scheduled fund sources)" rows={repayRows} totals={repayTot} tone="debit" />
+      <ScheduleSection title="应收 · To collect — 按期 (scheduled loans)" rows={collectRows} totals={collectTot} tone="credit" />
+      <NoTermSection
+        title="应收 · 无固定期限 (未定 — undecided plan)"
+        note="还款利息/期数/方式未定的贷款 —— 不计入本月应收。列出尚欠本金与每月利息。"
+        rows={collectNoTermRows}
+        outstanding={collectNoTermOutstanding}
+        interest={collectNoTermInterest}
+      />
 
-      {/* No fixed term — separate table, NOT counted in the this-month 应付 total */}
-      <section className="mb-12 max-w-4xl">
-        <div className="sect-head">
-          <h2>无固定期限 · No fixed term (on-demand / at maturity)</h2>
-          <span className="rule" aria-hidden />
-          <span className="count">{formatMoney(noTermOutstanding)}</span>
-        </div>
-        <p className="font-serif italic text-muted text-xs mb-3">
-          没有约定还款期数的资金来源 —— 不计入本月应付。下面列出尚欠本金与每月利息(持有成本)。
-        </p>
-        {noTermRows.length === 0 ? (
-          <p className="font-serif italic text-muted text-sm">无。</p>
-        ) : (
-          <table className="ledger-table">
-            <thead>
-              <tr>
-                <th>对方 · Counterparty</th>
-                <th className="num">尚欠本金 · Outstanding</th>
-                <th className="num">月利息 · Monthly interest</th>
-              </tr>
-            </thead>
-            <tbody>
-              {noTermRows.map((r) => (
-                <tr key={r.key}>
-                  <td>
-                    <div className="font-serif text-md text-ink">{r.counterparty}</div>
-                    <div className="font-mono text-xs text-muted">{r.detail}</div>
-                  </td>
-                  <td className="num">{formatMoney(r.outstanding)}</td>
-                  <td className="num">{formatMoney(r.monthlyInterest)}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 border-hairline">
-                <td className="font-serif italic text-ink font-medium">小计 · Subtotal</td>
-                <td className="num font-semibold">{formatMoney(noTermOutstanding)}</td>
-                <td className="num font-semibold">{formatMoney(noTermInterest)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        )}
-      </section>
+      <ScheduleSection title="应付 · To repay — 按期 (scheduled fund sources)" rows={repayRows} totals={repayTot} tone="debit" />
+      <NoTermSection
+        title="应付 · 无固定期限 (on-demand / at maturity)"
+        note="没有约定还款期数的资金来源 —— 不计入本月应付。列出尚欠本金与每月利息(持有成本)。要分期请到 Fund In 编辑该笔、填还款期数。"
+        rows={noTermRows}
+        outstanding={noTermOutstanding}
+        interest={noTermInterest}
+      />
     </div>
+  )
+}
+
+function NoTermSection({
+  title,
+  note,
+  rows,
+  outstanding,
+  interest,
+}: {
+  title: string
+  note: string
+  rows: Array<{ key: string; counterparty: string; detail: string; outstanding: number; monthlyInterest: number }>
+  outstanding: number
+  interest: number
+}) {
+  return (
+    <section className="mb-12 max-w-4xl">
+      <div className="sect-head">
+        <h2>{title}</h2>
+        <span className="rule" aria-hidden />
+        <span className="count">{formatMoney(outstanding)}</span>
+      </div>
+      <p className="font-serif italic text-muted text-xs mb-3">{note}</p>
+      {rows.length === 0 ? (
+        <p className="font-serif italic text-muted text-sm">无。</p>
+      ) : (
+        <table className="ledger-table">
+          <thead>
+            <tr>
+              <th>对方 · Counterparty</th>
+              <th className="num">尚欠本金 · Outstanding</th>
+              <th className="num">月利息 · Monthly interest</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.key}>
+                <td>
+                  <div className="font-serif text-md text-ink">{r.counterparty}</div>
+                  <div className="font-mono text-xs text-muted">{r.detail}</div>
+                </td>
+                <td className="num">{formatMoney(r.outstanding)}</td>
+                <td className="num">{formatMoney(r.monthlyInterest)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t-2 border-hairline">
+              <td className="font-serif italic text-ink font-medium">小计 · Subtotal</td>
+              <td className="num font-semibold">{formatMoney(outstanding)}</td>
+              <td className="num font-semibold">{formatMoney(interest)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      )}
+    </section>
   )
 }
 
