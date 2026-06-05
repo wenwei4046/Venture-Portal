@@ -4257,6 +4257,7 @@ export type Database = {
           submitted_by_name: string
         }[]
       }
+      hr_dashboard_summary: { Args: { p_period?: string }; Returns: Json }
       is_period_locked: { Args: { p_date: string }; Returns: boolean }
       log_data_access: {
         Args: {
