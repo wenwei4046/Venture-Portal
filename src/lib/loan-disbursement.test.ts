@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+﻿import { describe, it, expect } from 'vitest'
 import {
   bsAccountsForDisbursement,
   validateDisbursementAccount,
@@ -6,15 +6,15 @@ import {
 } from './loan-disbursement'
 
 const rows: RawAccountRow[] = [
-  { code: '3030', name: 'Accounts Receivable — Subs', account_type: 'asset', is_active: true },
-  { code: '2000', name: 'Equipment / Computer', account_type: 'fixed_asset', is_active: true },
-  { code: '4000', name: 'Fund Sources Payable', account_type: 'liability', is_active: true },
-  { code: '1010', name: 'HV Operating Fund', account_type: 'equity', is_active: true },
-  { code: '9020', name: 'Office Rental', account_type: 'expense', is_active: true },
-  { code: '5000', name: 'Service revenue', account_type: 'revenue', is_active: true },
-  { code: '6000', name: 'Cost of services', account_type: 'cost', is_active: true },
-  { code: '7000', name: 'Penalty Income', account_type: 'other_income', is_active: true },
-  { code: '3099', name: 'Old asset code', account_type: 'asset', is_active: false },
+  { code: '3030', name: 'Accounts Receivable â€” Subs', account_type: 'asset', is_active: true, parent_code: null },
+  { code: '2000', name: 'Equipment / Computer', account_type: 'fixed_asset', is_active: true, parent_code: null },
+  { code: '4000', name: 'Fund Sources Payable', account_type: 'liability', is_active: true, parent_code: null },
+  { code: '1010', name: 'HV Operating Fund', account_type: 'equity', is_active: true, parent_code: null },
+  { code: '9020', name: 'Office Rental', account_type: 'expense', is_active: true, parent_code: null },
+  { code: '5000', name: 'Service revenue', account_type: 'revenue', is_active: true, parent_code: null },
+  { code: '6000', name: 'Cost of services', account_type: 'cost', is_active: true, parent_code: null },
+  { code: '7000', name: 'Penalty Income', account_type: 'other_income', is_active: true, parent_code: null },
+  { code: '3099', name: 'Old asset code', account_type: 'asset', is_active: false, parent_code: null },
 ]
 
 describe('bsAccountsForDisbursement', () => {
