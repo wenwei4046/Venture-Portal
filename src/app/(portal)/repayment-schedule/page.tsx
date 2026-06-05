@@ -55,9 +55,12 @@ export default async function RepaymentSchedulePage() {
   collectRows.sort((a, b) => b.totalDue - a.totalDue)
 
   // ── 应付 (To repay): active fund sources HV received (reuse existing calc) ──
+  // Split: sources WITH a fixed repayment term (lock_in_months set) show a
+  // this-month installment; no-term (on-demand / at-maturity) sources go to a
+  // separate table — they have no scheduled monthly principal.
   const payable = await listPayableFundSources()
   const repayRows: Row[] = payable
-    .filter((p) => p.remaining_periods > 0)
+    .filter((p) => p.lock_in_months != null && p.remaining_periods > 0)
     .map((p) => ({
       key: p.id,
       counterparty: p.label.split(' · ')[0] ?? '—',
@@ -67,6 +70,20 @@ export default async function RepaymentSchedulePage() {
       totalDue: p.monthly_payment,
     }))
     .sort((a, b) => b.totalDue - a.totalDue)
+
+  // No fixed term — listed separately (outstanding + monthly interest carry cost)
+  const noTermRows = payable
+    .filter((p) => p.lock_in_months == null)
+    .map((p) => ({
+      key: p.id,
+      counterparty: p.label.split(' · ')[0] ?? '—',
+      detail: `RM ${p.original_amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(p.cost_rate * 100).toFixed(3)}%/mo · 无固定期限`,
+      outstanding: p.outstanding,
+      monthlyInterest: p.monthly_interest,
+    }))
+    .sort((a, b) => b.outstanding - a.outstanding)
+  const noTermOutstanding = Math.round(noTermRows.reduce((s, r) => s + r.outstanding, 0) * 100) / 100
+  const noTermInterest = Math.round(noTermRows.reduce((s, r) => s + r.monthlyInterest, 0) * 100) / 100
 
   const collectTot = sumSchedule(collectRows)
   const repayTot = sumSchedule(repayRows)
@@ -110,7 +127,51 @@ export default async function RepaymentSchedulePage() {
       </div>
 
       <ScheduleSection title="应收 · To collect (loans lent out)" rows={collectRows} totals={collectTot} tone="credit" />
-      <ScheduleSection title="应付 · To repay (fund sources)" rows={repayRows} totals={repayTot} tone="debit" />
+      <ScheduleSection title="应付 · To repay — 按期 (scheduled fund sources)" rows={repayRows} totals={repayTot} tone="debit" />
+
+      {/* No fixed term — separate table, NOT counted in the this-month 应付 total */}
+      <section className="mb-12 max-w-4xl">
+        <div className="sect-head">
+          <h2>无固定期限 · No fixed term (on-demand / at maturity)</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">{formatMoney(noTermOutstanding)}</span>
+        </div>
+        <p className="font-serif italic text-muted text-xs mb-3">
+          没有约定还款期数的资金来源 —— 不计入本月应付。下面列出尚欠本金与每月利息(持有成本)。
+        </p>
+        {noTermRows.length === 0 ? (
+          <p className="font-serif italic text-muted text-sm">无。</p>
+        ) : (
+          <table className="ledger-table">
+            <thead>
+              <tr>
+                <th>对方 · Counterparty</th>
+                <th className="num">尚欠本金 · Outstanding</th>
+                <th className="num">月利息 · Monthly interest</th>
+              </tr>
+            </thead>
+            <tbody>
+              {noTermRows.map((r) => (
+                <tr key={r.key}>
+                  <td>
+                    <div className="font-serif text-md text-ink">{r.counterparty}</div>
+                    <div className="font-mono text-xs text-muted">{r.detail}</div>
+                  </td>
+                  <td className="num">{formatMoney(r.outstanding)}</td>
+                  <td className="num">{formatMoney(r.monthlyInterest)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-hairline">
+                <td className="font-serif italic text-ink font-medium">小计 · Subtotal</td>
+                <td className="num font-semibold">{formatMoney(noTermOutstanding)}</td>
+                <td className="num font-semibold">{formatMoney(noTermInterest)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        )}
+      </section>
     </div>
   )
 }
