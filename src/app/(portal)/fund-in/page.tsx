@@ -124,12 +124,20 @@ export default async function FundInPage({ searchParams }: Props) {
           </div>
           <h1 className="page-title">Fund IN</h1>
         </div>
-        <Link
-          href="/fund-in/new"
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-        >
-          Record new fund source
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/repayment-schedule"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+          >
+            本月还款排程
+          </Link>
+          <Link
+            href="/fund-in/new"
+            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+          >
+            Record new fund source
+          </Link>
+        </div>
       </div>
 
       {/* ───────── Summary hero ───────── */}
