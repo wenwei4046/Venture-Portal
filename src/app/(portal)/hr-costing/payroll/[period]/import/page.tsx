@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireRole } from '@/lib/auth'
 import ImportWizard from './_components/ImportWizard'
+import PeriodPicker from '../../_components/PeriodPicker'
 
 interface PageProps {
   params: Promise<{ period: string }>
@@ -32,7 +33,12 @@ export default async function ImportPage({ params }: PageProps) {
             <em>I.</em> HR · PAYROLL IMPORT · {formatPeriodLabel(period).toUpperCase()}
           </div>
           <h1 className="page-title">Import InfoTech</h1>
+          <p className="font-serif italic text-graphite text-base mt-3">
+            Importing into <em>{formatPeriodLabel(period)}</em> — switch the period to import a different month.
+          </p>
         </div>
+        {/* suffix keeps you on the import page while changing the target month */}
+        <PeriodPicker period={period} suffix="/import" />
       </div>
 
       <ImportWizard period={period} />

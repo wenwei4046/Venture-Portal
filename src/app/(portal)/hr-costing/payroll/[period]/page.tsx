@@ -5,6 +5,7 @@ import { requireRole } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import PayrollGrid, { type PayrollRowData } from '../_components/PayrollGrid'
 import CopyFromLastMonthButton from '../_components/CopyFromLastMonthButton'
+import CreatePeriodButton from '../_components/CreatePeriodButton'
 import SubmitToFinanceButton from '../_components/SubmitToFinanceButton'
 import ReopenPayrollButton from '../_components/ReopenPayrollButton'
 import MoreActionsDropdown from '../_components/MoreActionsDropdown'
@@ -139,9 +140,18 @@ export default async function PayrollGridPage({ params }: PageProps) {
             <PeriodPicker period={period} />
           </div>
         </div>
-        <p className="font-sans text-sm text-muted mb-12">
-          Open <Link href="/hr-costing/payroll" className="text-accent hover:underline">Payroll</Link> to create the current period, or pick a different month above.
-        </p>
+        {/* Act on THIS month directly — create draft rows from the staff
+            master, or import the InfoTech file for this period. The picker
+            above switches months. */}
+        <div className="flex items-center gap-3 flex-wrap mb-12">
+          <CreatePeriodButton period={period} />
+          <Link
+            href={`/hr-costing/payroll/${period}/import`}
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+          >
+            Import InfoTech →
+          </Link>
+        </div>
         {hasDirectorPayouts && (
           <DirectorSalarySection rows={directorPayouts} period={period} />
         )}
