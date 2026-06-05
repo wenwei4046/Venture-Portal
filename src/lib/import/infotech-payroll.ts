@@ -19,30 +19,28 @@
  *   Sub-total rows (between departments): "Sub Total:" in col 2
  *   Grand total row (last): "Grand Total:" in col 2
  *
- * Our mapping (InfoTech col → hr_monthly_payroll field). Updated 2026-04-26
- * (Bug 2, option γ+):
- *   col 1 Code          → matches hr_staff_costs.employee_code (primary match)
- *   col 2 Emp. Name     → matches hr_staff_costs.employee_name (fallback fuzzy)
- *   col 3 Tot. Sal      → PARSED but NOT WRITTEN to DB. InfoTech's "Tot. Sal"
- *                         is the total monthly payable (basic + fixed
- *                         allowances ± EL deduction), not the contract basic.
- *                         Writing it to basic_salary was overwriting the
- *                         master contract value with a derived per-month
- *                         number — wrong. basic_salary stays at the
- *                         hr_staff_costs (master) value; HR edits it there
- *                         when contracts genuinely change.
- *   col 4 OT Amt        → ot_amount
- *   col 7 Allowance Add → non_statutory_allowance
- *     (our schema treats InfoTech's "Allowance" as non-statutory; HR adjusts
- *      statutory_allowance manually on the grid if needed.)
- *   col 8 No Pay        → unpaid_leave_days (NEW). The wizard converts the
- *                         dollar amount into days using contract_basic and
- *                         days_in_month: days = (noPay / basic) * dim. The
- *                         DB trigger then pro-rates basic by the same days,
- *                         so the EL deduction round-trips correctly.
- *   other cols (OT hours, Bonus, EPF/SOCSO/EIS values, PCB, NettWgs): NOT
- *     imported. DB trigger recomputes statutory + net from the inputs so
- *     the grid is always the source of truth.
+ * Our mapping (InfoTech col → hr_monthly_payroll field). Updated 2026-06-05
+ * (user decision: the file is the single source of truth — EVERYTHING is
+ * imported verbatim, including statutory + gross + net; the system does NOT
+ * recompute on import. The earlier 2026-04-26 "never write basic" rule is
+ * superseded):
+ *   col  1 Code          → matches hr_staff_costs.employee_code (primary match)
+ *   col  2 Emp. Name     → matches hr_staff_costs.employee_name (fallback fuzzy)
+ *   col  3 Tot. Sal      → basic_salary (per-month figure, verbatim)
+ *   col  4 OT Amt        → ot_amount (+ Shift col 5 + Rest/PH col 6 folded in —
+ *                          hourly-work earnings; schema has no separate columns)
+ *   col  7 Allowance Add → non_statutory_allowance
+ *   col  8 No Pay        → parsed for display; NOT converted to leave days —
+ *                          the file's gross/net already reflect it
+ *   col  9 Bonus         → commission_amount
+ *   col 10 Gross         → gross (verbatim)
+ *   col 12/13 EPF ER/EE  → epf_er / epf_ee (verbatim)
+ *   col 15/16 SOCSO      → socso_er / socso_ee (verbatim)
+ *   col 18/19 EIS        → eis_er / eis_ee (verbatim)
+ *   col 23 PCB           → pcb (verbatim)
+ *   col 25 NettWgs       → net (verbatim)
+ *   (col 11 Ded / 21 HRDF / 22 Zakat / 24 CP38 — parsed but no schema column;
+ *    HRDF is an employer levy outside payslips, the others are zero in HV data.)
  */
 
 import { read, utils, type WorkBook } from 'xlsx'
@@ -54,6 +52,16 @@ export interface InfotechRow {
   otAmount: number
   nonStatutoryAllowance: number
   noPayDeduction: number // informational (negative in source, positive here)
+  bonus: number
+  gross: number
+  epfEr: number
+  epfEe: number
+  socsoEr: number
+  socsoEe: number
+  eisEr: number
+  eisEe: number
+  pcb: number
+  net: number
 }
 
 export interface InfotechParseResult {
@@ -141,7 +149,9 @@ export function parseInfotechGrid(
     }
 
     const basic = num(row[3])
-    const ot = num(row[4])
+    // OT + Shift + Rest/PH all land in ot_amount — hourly-work earnings with
+    // no dedicated schema columns. Zero in HV data except OT itself.
+    const ot = num(row[4]) + num(row[5]) + num(row[6])
     const allow = num(row[7])
     const noPay = num(row[8]) // negative in file; store as positive magnitude
     const gross = num(row[10])
@@ -153,6 +163,16 @@ export function parseInfotechGrid(
       otAmount: ot,
       nonStatutoryAllowance: allow,
       noPayDeduction: Math.abs(noPay),
+      bonus: num(row[9]),
+      gross,
+      epfEr: num(row[12]),
+      epfEe: num(row[13]),
+      socsoEr: num(row[15]),
+      socsoEe: num(row[16]),
+      eisEr: num(row[18]),
+      eisEe: num(row[19]),
+      pcb: num(row[23]),
+      net: num(row[25]),
     })
     grossSum += gross
   }
