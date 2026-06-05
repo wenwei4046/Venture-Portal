@@ -2,7 +2,7 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { loanMonthlyInstallment, isLoanUnscheduled } from '@/lib/treasury-schedule'
+import { loanMonthlyInstallment, isLoanUnscheduled, compoundInterestState } from '@/lib/treasury-schedule'
 import { listPayableFundSources } from '../fund-in/actions'
 import ScheduleView, { type SchedRow, type NoTermRow } from './_components/ScheduleView'
 
@@ -16,27 +16,31 @@ export default async function RepaymentSchedulePage() {
   await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
-  const monthStart = dayjs().startOf('month').format('YYYY-MM-DD')
-  const monthEnd = dayjs().endOf('month').format('YYYY-MM-DD')
+  const currentYM = dayjs().format('YYYY-MM')
 
-  // ── 应收 (loans) + this-month collections ──
+  // ── 应收 (loans) + repayment history (for done-this-month + compounding) ──
   const [{ data: loans }, { data: loanOut }, { data: companies }, { data: loanReps }] = await Promise.all([
     supabase
       .from('loans')
-      .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms')
+      .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date')
       .eq('status', 'active'),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
     supabase.from('companies').select('id, short_code, name'),
-    supabase
-      .from('repayments')
-      .select('loan_id, payment_type, payment_date')
-      .eq('payment_type', 'principal')
-      .gte('payment_date', monthStart)
-      .lte('payment_date', monthEnd),
+    supabase.from('repayments').select('loan_id, amount, payment_date'),
   ])
   const outById = new Map((loanOut ?? []).map((o) => [o.loan_id as string, o]))
   const coById = new Map((companies ?? []).map((c) => [c.id as string, c]))
-  const loanDoneThisMonth = new Set((loanReps ?? []).map((r) => r.loan_id as string))
+  // Per-loan repayments grouped by calendar month + this-month done set.
+  const loanPayByMonth = new Map<string, Record<string, number>>()
+  const loanDoneThisMonth = new Set<string>()
+  for (const rp of loanReps ?? []) {
+    const lid = rp.loan_id as string
+    const ym = (rp.payment_date as string).slice(0, 7)
+    const m = loanPayByMonth.get(lid) ?? {}
+    m[ym] = r2((m[ym] ?? 0) + Number(rp.amount))
+    loanPayByMonth.set(lid, m)
+    if (ym === currentYM) loanDoneThisMonth.add(lid)
+  }
 
   const collectRows: SchedRow[] = []
   const collectNoTerm: NoTermRow[] = []
@@ -63,28 +67,34 @@ export default async function RepaymentSchedulePage() {
       principalPaid: Number(out?.total_principal_paid ?? 0),
     })
     if (inst.remainingPeriods <= 0) continue
+    const compounding = (l as { compound_interest?: boolean }).compound_interest === true && rate > 0
+    let interestDue = inst.interestDue
+    let extra = ''
+    if (compounding) {
+      const startYM = ((l.disbursement_date as string | null) ?? '').slice(0, 7) || currentYM
+      const cs = compoundInterestState({ principal, monthlyRate: rate, startYM, currentYM, paymentsByMonth: loanPayByMonth.get(l.id as string) ?? {} })
+      interestDue = cs.thisMonthInterest
+      extra = ` · 利滚利 余额 RM ${cs.balance.toLocaleString('en-MY', { minimumFractionDigits: 2 })}`
+    }
     collectRows.push({
       key: l.id as string,
       counterparty,
-      detail: `RM ${principal.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(rate * 100).toFixed(3)}%/mo · ${l.tenure_months}mo · ${inst.remainingPeriods} left`,
+      detail: `RM ${principal.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(rate * 100).toFixed(3)}%/mo · ${l.tenure_months}mo · ${inst.remainingPeriods} left${extra}`,
       principalDue: inst.principalDue,
-      interestDue: inst.interestDue,
-      totalDue: inst.totalDue,
+      interestDue,
+      totalDue: r2(inst.principalDue + interestDue),
       done: loanDoneThisMonth.has(l.id as string),
+      compound: compounding,
     })
   }
   collectRows.sort((a, b) => Number(a.done) - Number(b.done) || b.totalDue - a.totalDue)
   collectNoTerm.sort((a, b) => b.outstanding - a.outstanding)
 
-  // ── 应付 (fund sources) + this-month repayments + pending repayment PVs ──
-  const [payable, { data: fsReps }, { data: pendingPvs }] = await Promise.all([
+  // ── 应付 (fund sources) + repayment history + compounding meta + pending PVs ──
+  const [payable, { data: fsMetaRows }, { data: fsReps }, { data: pendingPvs }] = await Promise.all([
     listPayableFundSources(),
-    supabase
-      .from('fund_source_repayments')
-      .select('fund_source_id, payment_type, payment_date')
-      .eq('payment_type', 'principal')
-      .gte('payment_date', monthStart)
-      .lte('payment_date', monthEnd),
+    supabase.from('fund_sources').select('id, compound_interest, effective_date'),
+    supabase.from('fund_source_repayments').select('fund_source_id, amount, payment_date'),
     supabase
       .from('payment_vouchers')
       .select('fund_source_id, repayment_breakdown, status, voucher_no')
@@ -92,7 +102,17 @@ export default async function RepaymentSchedulePage() {
       .not('repayment_breakdown', 'is', null)
       .in('status', ['draft', 'pending_approval', 'approved']),
   ])
-  const fsDoneThisMonth = new Set((fsReps ?? []).map((r) => r.fund_source_id as string))
+  const fsMeta = new Map((fsMetaRows ?? []).map((m) => [m.id as string, m as { compound_interest?: boolean; effective_date?: string | null }]))
+  const fsPayByMonth = new Map<string, Record<string, number>>()
+  const fsDoneThisMonth = new Set<string>()
+  for (const rp of fsReps ?? []) {
+    const fid = rp.fund_source_id as string
+    const ym = (rp.payment_date as string).slice(0, 7)
+    const m = fsPayByMonth.get(fid) ?? {}
+    m[ym] = r2((m[ym] ?? 0) + Number(rp.amount))
+    fsPayByMonth.set(fid, m)
+    if (ym === currentYM) fsDoneThisMonth.add(fid)
+  }
   const pendingPvByFs = new Map<string, { principal: number; interest: number; voucherNo: string }>()
   for (const pv of pendingPvs ?? []) {
     const fsId = pv.fund_source_id as string
@@ -110,14 +130,25 @@ export default async function RepaymentSchedulePage() {
     const cp = p.label.split(' · ')[0] ?? '—'
     const done = fsDoneThisMonth.has(p.id)
     if (p.lock_in_months != null && p.remaining_periods > 0) {
+      const meta = fsMeta.get(p.id)
+      const compounding = meta?.compound_interest === true && p.cost_rate > 0
+      let interestDue = p.monthly_interest
+      let extra = ''
+      if (compounding) {
+        const startYM = (meta?.effective_date ?? '').slice(0, 7) || currentYM
+        const cs = compoundInterestState({ principal: p.original_amount, monthlyRate: p.cost_rate, startYM, currentYM, paymentsByMonth: fsPayByMonth.get(p.id) ?? {} })
+        interestDue = cs.thisMonthInterest
+        extra = ` · 利滚利 余额 RM ${cs.balance.toLocaleString('en-MY', { minimumFractionDigits: 2 })}`
+      }
       repayRows.push({
         key: p.id,
         counterparty: cp,
-        detail: `RM ${p.original_amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(p.cost_rate * 100).toFixed(3)}%/mo · ${p.total_periods}mo · ${p.remaining_periods} left`,
+        detail: `RM ${p.original_amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(p.cost_rate * 100).toFixed(3)}%/mo · ${p.total_periods}mo · ${p.remaining_periods} left${extra}`,
         principalDue: p.monthly_principal,
-        interestDue: p.monthly_interest,
-        totalDue: p.monthly_payment,
+        interestDue,
+        totalDue: r2(p.monthly_principal + interestDue),
         done,
+        compound: compounding,
       })
     } else if (pendingPvByFs.has(p.id)) {
       const bd = pendingPvByFs.get(p.id)!

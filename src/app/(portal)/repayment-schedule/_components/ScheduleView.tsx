@@ -14,6 +14,8 @@ export interface SchedRow {
   done: boolean
   /** A repayment PV exists but is not yet approved (应付 only). */
   pending?: boolean
+  /** Interest is computed with monthly compounding (利滚利). */
+  compound?: boolean
 }
 
 export interface NoTermRow {
@@ -149,6 +151,7 @@ function ScheduleSection({ title, rows, tone }: { title: string; rows: SchedRow[
                 <td>
                   <div className="font-serif text-md text-ink">
                     {r.counterparty}
+                    {r.compound ? <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5">利滚利</span> : null}
                     {r.done ? <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-ledger border border-hairline rounded px-1.5 py-0.5">本月已收/付</span> : null}
                     {r.pending ? <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-alert border border-hairline rounded px-1.5 py-0.5">待审批 PV</span> : null}
                   </div>

@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -1077,6 +1077,7 @@ export type Database = {
           invoice_epf_er: number | null
           invoice_socso_er: number | null
           invoice_total: number | null
+          payout_mode: string
           payroll_allow: number | null
           payroll_bk: number | null
           payroll_calc: number | null
@@ -1116,6 +1117,7 @@ export type Database = {
           invoice_epf_er?: number | null
           invoice_socso_er?: number | null
           invoice_total?: number | null
+          payout_mode?: string
           payroll_allow?: number | null
           payroll_bk?: number | null
           payroll_calc?: number | null
@@ -1155,6 +1157,7 @@ export type Database = {
           invoice_epf_er?: number | null
           invoice_socso_er?: number | null
           invoice_total?: number | null
+          payout_mode?: string
           payroll_allow?: number | null
           payroll_bk?: number | null
           payroll_calc?: number | null
@@ -1194,6 +1197,62 @@ export type Database = {
           {
             foreignKeyName: "director_payouts_statutory_overridden_by_fkey"
             columns: ["statutory_overridden_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      director_salary_submissions: {
+        Row: {
+          by_company: Json
+          created_at: string
+          director_count: number
+          id: string
+          period_month: string
+          submitted_at: string
+          submitted_by: string
+          total_gross: number
+          total_invoice: number
+          total_payroll_gross: number
+          total_payroll_net: number
+          total_saving: number
+          total_statutory_er: number
+        }
+        Insert: {
+          by_company?: Json
+          created_at?: string
+          director_count?: number
+          id?: string
+          period_month: string
+          submitted_at?: string
+          submitted_by: string
+          total_gross?: number
+          total_invoice?: number
+          total_payroll_gross?: number
+          total_payroll_net?: number
+          total_saving?: number
+          total_statutory_er?: number
+        }
+        Update: {
+          by_company?: Json
+          created_at?: string
+          director_count?: number
+          id?: string
+          period_month?: string
+          submitted_at?: string
+          submitted_by?: string
+          total_gross?: number
+          total_invoice?: number
+          total_payroll_gross?: number
+          total_payroll_net?: number
+          total_saving?: number
+          total_statutory_er?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "director_salary_submissions_submitted_by_fkey"
+            columns: ["submitted_by"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -1384,6 +1443,7 @@ export type Database = {
           account_code: string | null
           amount: number
           capital_type: string
+          compound_interest: boolean
           cost_rate: number
           created_at: string
           created_by: string
@@ -1410,6 +1470,7 @@ export type Database = {
           account_code?: string | null
           amount: number
           capital_type?: string
+          compound_interest?: boolean
           cost_rate: number
           created_at?: string
           created_by: string
@@ -1436,6 +1497,7 @@ export type Database = {
           account_code?: string | null
           amount?: number
           capital_type?: string
+          compound_interest?: boolean
           cost_rate?: number
           created_at?: string
           created_by?: string
@@ -1819,6 +1881,7 @@ export type Database = {
           created_at: string
           created_by: string
           department_id: string
+          designation: string | null
           eis_er: number | null
           email: string | null
           emergency_contact_name: string | null
@@ -1853,6 +1916,7 @@ export type Database = {
           created_at?: string
           created_by: string
           department_id: string
+          designation?: string | null
           eis_er?: number | null
           email?: string | null
           emergency_contact_name?: string | null
@@ -1887,6 +1951,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           department_id?: string
+          designation?: string | null
           eis_er?: number | null
           email?: string | null
           emergency_contact_name?: string | null
@@ -2027,6 +2092,7 @@ export type Database = {
           description: string | null
           director_id: string | null
           id: string
+          period_month: string | null
           release_approved_at: string | null
           release_approved_by: string | null
           transaction_type: Database["public"]["Enums"]["invoice_pool_txn_type"]
@@ -2037,6 +2103,7 @@ export type Database = {
           description?: string | null
           director_id?: string | null
           id?: string
+          period_month?: string | null
           release_approved_at?: string | null
           release_approved_by?: string | null
           transaction_type: Database["public"]["Enums"]["invoice_pool_txn_type"]
@@ -2047,6 +2114,7 @@ export type Database = {
           description?: string | null
           director_id?: string | null
           id?: string
+          period_month?: string | null
           release_approved_at?: string | null
           release_approved_by?: string | null
           transaction_type?: Database["public"]["Enums"]["invoice_pool_txn_type"]
@@ -2391,6 +2459,7 @@ export type Database = {
           approved_by: string | null
           base_rate: number
           company_id: string
+          compound_interest: boolean
           created_at: string
           created_by: string
           disbursement_date: string | null
@@ -2409,6 +2478,7 @@ export type Database = {
           approved_by?: string | null
           base_rate: number
           company_id: string
+          compound_interest?: boolean
           created_at?: string
           created_by: string
           disbursement_date?: string | null
@@ -2427,6 +2497,7 @@ export type Database = {
           approved_by?: string | null
           base_rate?: number
           company_id?: string
+          compound_interest?: boolean
           created_at?: string
           created_by?: string
           disbursement_date?: string | null
@@ -4248,6 +4319,10 @@ export type Database = {
         Args: { p_type: Database["public"]["Enums"]["account_type"] }
         Returns: string
       }
+      pool_key_to_segment: {
+        Args: { p_pool: string }
+        Returns: Database["public"]["Enums"]["gl_segment"]
+      }
       post_journal_entry: {
         Args: {
           p_created_by: string
@@ -4273,6 +4348,14 @@ export type Database = {
         Args: { p_approver: string; p_reason: string; p_run_id: string }
         Returns: undefined
       }
+      reopen_director_salary: {
+        Args: { p_period: string; p_user_id: string }
+        Returns: undefined
+      }
+      reopen_payroll_run: {
+        Args: { p_period: string; p_user_id: string }
+        Returns: string
+      }
       request_loan_cancel: {
         Args: { p_loan_id: string; p_reason?: string }
         Returns: string
@@ -4286,6 +4369,10 @@ export type Database = {
           p_payee_company_id: string
           p_payee_name: string
         }
+        Returns: string
+      }
+      submit_director_salary_to_finance: {
+        Args: { p_period: string; p_user_id: string }
         Returns: string
       }
       submit_invoice_request: {

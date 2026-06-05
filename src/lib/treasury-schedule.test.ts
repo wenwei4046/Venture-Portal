@@ -1,5 +1,42 @@
 import { describe, it, expect } from 'vitest'
-import { loanMonthlyInstallment, sumSchedule, isLoanUnscheduled } from './treasury-schedule'
+import { loanMonthlyInstallment, sumSchedule, isLoanUnscheduled, compoundInterestState } from './treasury-schedule'
+
+describe('compoundInterestState (利滚利)', () => {
+  it('compounds unpaid months: 10,000 @ 2% from Jan, current Apr, no payments', () => {
+    const r = compoundInterestState({
+      principal: 10000, monthlyRate: 0.02, startYM: '2026-01', currentYM: '2026-04', paymentsByMonth: {},
+    })
+    // Jan→10,200, Feb→10,404, Mar→10,612.08; Apr interest = 10,612.08 × 2%
+    expect(r.balance).toBe(10612.08)
+    expect(r.thisMonthInterest).toBe(212.24)
+  })
+
+  it('a paid month does not capitalise (balance shrinks by payment)', () => {
+    const r = compoundInterestState({
+      principal: 10000, monthlyRate: 0.02, startYM: '2026-01', currentYM: '2026-03',
+      paymentsByMonth: { '2026-01': 200 }, // Jan interest serviced
+    })
+    // Jan: 10000+200-200=10000; Feb: 10000+200=10200; Mar interest = 204
+    expect(r.balance).toBe(10200)
+    expect(r.thisMonthInterest).toBe(204)
+  })
+
+  it('0% never compounds', () => {
+    const r = compoundInterestState({
+      principal: 50000, monthlyRate: 0, startYM: '2026-01', currentYM: '2026-12', paymentsByMonth: {},
+    })
+    expect(r.balance).toBe(50000)
+    expect(r.thisMonthInterest).toBe(0)
+  })
+
+  it('start == current month: just this-month interest on principal', () => {
+    const r = compoundInterestState({
+      principal: 10000, monthlyRate: 0.02, startYM: '2026-06', currentYM: '2026-06', paymentsByMonth: {},
+    })
+    expect(r.balance).toBe(10000)
+    expect(r.thisMonthInterest).toBe(200)
+  })
+})
 
 describe('isLoanUnscheduled', () => {
   it('true for empty/undecided/no-method terms', () => {

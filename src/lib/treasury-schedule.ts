@@ -50,6 +50,55 @@ export function isLoanUnscheduled(repaymentTerms: string | null | undefined): bo
   return t.includes('未定') || t.includes('无还款方式')
 }
 
+// ─── Compounding interest (利滚利) ──────────────────────────────────────────
+// Month-by-month balance roll-forward: each month interest = balance × rate;
+// balance += interest − (that month's repayments). An unpaid month therefore
+// capitalises its interest into the balance (利滚利); a paid month shrinks it.
+//判定按自然月 — 月内迟还(20号到期22号还)仍算当月已还。
+
+function nextYM(ym: string): string {
+  const [y, m] = ym.split('-').map(Number)
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`
+}
+
+export interface CompoundInput {
+  principal: number
+  /** Monthly rate as decimal, e.g. 0.02 = 2%/month. */
+  monthlyRate: number
+  startYM: string // 'YYYY-MM' — first month interest accrues
+  currentYM: string // 'YYYY-MM' — the month we want the figure for
+  /** Total repaid (principal+interest) per calendar month, keyed 'YYYY-MM'. */
+  paymentsByMonth: Record<string, number>
+}
+
+export interface CompoundState {
+  /** Outstanding incl. capitalised interest, at the START of currentYM. */
+  balance: number
+  /** Interest due for currentYM on the compounded balance. */
+  thisMonthInterest: number
+  /** Net change vs original principal (capitalised interest minus principal repaid). */
+  netChange: number
+}
+
+export function compoundInterestState(i: CompoundInput): CompoundState {
+  let balance = i.principal
+  let ym = i.startYM
+  let guard = 0
+  while (ym < i.currentYM && guard < 1200) {
+    const interest = r2(balance * i.monthlyRate)
+    const paid = i.paymentsByMonth[ym] ?? 0
+    balance = r2(balance + interest - paid)
+    if (balance < 0) balance = 0
+    ym = nextYM(ym)
+    guard++
+  }
+  return {
+    balance,
+    thisMonthInterest: r2(balance * i.monthlyRate),
+    netChange: r2(balance - i.principal),
+  }
+}
+
 export interface ScheduleTotals {
   principal: number
   interest: number
