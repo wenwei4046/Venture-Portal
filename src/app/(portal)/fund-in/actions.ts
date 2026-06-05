@@ -429,9 +429,16 @@ export interface PayableFundSource {
   total_periods: number
   periods_paid: number
   remaining_periods: number
+  /** True when this source has zero remaining outstanding but had a principal
+   *  repayment in the month passed via opts.includeSettledInMonth. Lets the
+   *  schedule render it as a 已付 (done) row in the full-plan view instead of
+   *  dropping off entirely once fully repaid. */
+  settled_in_month?: boolean
 }
 
-export async function listPayableFundSources(): Promise<PayableFundSource[]> {
+export async function listPayableFundSources(
+  opts?: { includeSettledInMonth?: string },
+): Promise<PayableFundSource[]> {
   await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
@@ -471,11 +478,19 @@ export async function listPayableFundSources(): Promise<PayableFundSource[]> {
     periodsPaidMap.set(r.fund_source_id, set)
   }
 
+  const settleMonth = opts?.includeSettledInMonth ?? null
   return (outstanding ?? [])
     .filter((o): o is typeof o & { fund_source_id: string; source_type: string } => {
       if (o.fund_source_id == null || o.source_type == null) return false
       const status = statusMap.get(o.fund_source_id)
-      return status === 'active' && Number(o.outstanding) > 0
+      if (status === 'active' && Number(o.outstanding) > 0) return true
+      // Optionally also surface sources fully repaid (principal paid) in the
+      // requested month, so the schedule can show them as a 已付 row even
+      // though they now carry zero outstanding.
+      if (settleMonth && Number(o.outstanding) <= 0) {
+        return periodsPaidMap.get(o.fund_source_id)?.has(settleMonth) ?? false
+      }
+      return false
     })
     .map((o) => {
       const amount = Number(o.original_amount)
@@ -521,6 +536,7 @@ export async function listPayableFundSources(): Promise<PayableFundSource[]> {
         total_periods: months,
         periods_paid: periodsPaid,
         remaining_periods: remaining,
+        settled_in_month: !(statusMap.get(o.fund_source_id) === 'active' && Number(o.outstanding) > 0),
       }
     })
     .sort((a, b) => b.remaining_periods - a.remaining_periods)

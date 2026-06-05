@@ -23,23 +23,32 @@ export default async function RepaymentSchedulePage() {
     supabase
       .from('loans')
       .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date')
-      .eq('status', 'active'),
+      .in('status', ['active', 'fully_repaid']),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
     supabase.from('companies').select('id, short_code, name'),
-    supabase.from('repayments').select('loan_id, amount, payment_date'),
+    supabase.from('repayments').select('loan_id, amount, payment_date, payment_type'),
   ])
   const outById = new Map((loanOut ?? []).map((o) => [o.loan_id as string, o]))
   const coById = new Map((companies ?? []).map((c) => [c.id as string, c]))
   // Per-loan repayments grouped by calendar month + this-month done set.
   const loanPayByMonth = new Map<string, Record<string, number>>()
   const loanDoneThisMonth = new Set<string>()
+  // This-month actuals split by type, for rendering 已收 rows of loans that
+  // were fully repaid this month (and so dropped off the active schedule).
+  const loanThisMonthByType = new Map<string, { principal: number; interest: number }>()
   for (const rp of loanReps ?? []) {
     const lid = rp.loan_id as string
     const ym = (rp.payment_date as string).slice(0, 7)
     const m = loanPayByMonth.get(lid) ?? {}
     m[ym] = r2((m[ym] ?? 0) + Number(rp.amount))
     loanPayByMonth.set(lid, m)
-    if (ym === currentYM) loanDoneThisMonth.add(lid)
+    if (ym === currentYM) {
+      loanDoneThisMonth.add(lid)
+      const cur = loanThisMonthByType.get(lid) ?? { principal: 0, interest: 0 }
+      if ((rp.payment_type as string) === 'principal') cur.principal = r2(cur.principal + Number(rp.amount))
+      else cur.interest = r2(cur.interest + Number(rp.amount)) // interest + penalty + netting
+      loanThisMonthByType.set(lid, cur)
+    }
   }
 
   const collectRows: SchedRow[] = []
@@ -50,6 +59,23 @@ export default async function RepaymentSchedulePage() {
     const counterparty = co?.short_code ?? co?.name ?? '—'
     const principal = Number(l.principal)
     const rate = Number(l.effective_rate)
+    // Loan fully repaid: it no longer has a scheduled installment, but if the
+    // settlement happened THIS month surface it as a 已收 row (full-plan view)
+    // showing what was actually collected — otherwise it vanishes silently.
+    if ((l.status as string) !== 'active') {
+      const tm = loanThisMonthByType.get(l.id as string)
+      if (!tm || r2(tm.principal + tm.interest) <= 0) continue
+      collectRows.push({
+        key: l.id as string,
+        counterparty,
+        detail: `RM ${principal.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(rate * 100).toFixed(3)}%/mo · 本月结清`,
+        principalDue: tm.principal,
+        interestDue: tm.interest,
+        totalDue: r2(tm.principal + tm.interest),
+        done: true,
+      })
+      continue
+    }
     if (isLoanUnscheduled(l.repayment_terms as string | null)) {
       collectNoTerm.push({
         key: l.id as string,
@@ -92,9 +118,9 @@ export default async function RepaymentSchedulePage() {
 
   // ── 应付 (fund sources) + repayment history + compounding meta + pending PVs ──
   const [payable, { data: fsMetaRows }, { data: fsReps }, { data: pendingPvs }] = await Promise.all([
-    listPayableFundSources(),
+    listPayableFundSources({ includeSettledInMonth: currentYM }),
     supabase.from('fund_sources').select('id, compound_interest, effective_date'),
-    supabase.from('fund_source_repayments').select('fund_source_id, amount, payment_date'),
+    supabase.from('fund_source_repayments').select('fund_source_id, amount, payment_date, payment_type'),
     supabase
       .from('payment_vouchers')
       .select('fund_source_id, repayment_breakdown, status, voucher_no')
@@ -105,13 +131,20 @@ export default async function RepaymentSchedulePage() {
   const fsMeta = new Map((fsMetaRows ?? []).map((m) => [m.id as string, m as { compound_interest?: boolean; effective_date?: string | null }]))
   const fsPayByMonth = new Map<string, Record<string, number>>()
   const fsDoneThisMonth = new Set<string>()
+  const fsThisMonthByType = new Map<string, { principal: number; interest: number }>()
   for (const rp of fsReps ?? []) {
     const fid = rp.fund_source_id as string
     const ym = (rp.payment_date as string).slice(0, 7)
     const m = fsPayByMonth.get(fid) ?? {}
     m[ym] = r2((m[ym] ?? 0) + Number(rp.amount))
     fsPayByMonth.set(fid, m)
-    if (ym === currentYM) fsDoneThisMonth.add(fid)
+    if (ym === currentYM) {
+      fsDoneThisMonth.add(fid)
+      const cur = fsThisMonthByType.get(fid) ?? { principal: 0, interest: 0 }
+      if ((rp.payment_type as string) === 'principal') cur.principal = r2(cur.principal + Number(rp.amount))
+      else cur.interest = r2(cur.interest + Number(rp.amount))
+      fsThisMonthByType.set(fid, cur)
+    }
   }
   const pendingPvByFs = new Map<string, { principal: number; interest: number; voucherNo: string }>()
   for (const pv of pendingPvs ?? []) {
@@ -128,6 +161,21 @@ export default async function RepaymentSchedulePage() {
   const repayNoTerm: NoTermRow[] = []
   for (const p of payable) {
     const cp = p.label.split(' · ')[0] ?? '—'
+    // Fund source fully repaid this month → 已付 row showing actuals.
+    if (p.settled_in_month) {
+      const tm = fsThisMonthByType.get(p.id) ?? { principal: 0, interest: 0 }
+      if (r2(tm.principal + tm.interest) <= 0) continue
+      repayRows.push({
+        key: p.id,
+        counterparty: cp,
+        detail: `RM ${p.original_amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(p.cost_rate * 100).toFixed(3)}%/mo · 本月结清`,
+        principalDue: tm.principal,
+        interestDue: tm.interest,
+        totalDue: r2(tm.principal + tm.interest),
+        done: true,
+      })
+      continue
+    }
     const done = fsDoneThisMonth.has(p.id)
     if (p.lock_in_months != null && p.remaining_periods > 0) {
       const meta = fsMeta.get(p.id)
