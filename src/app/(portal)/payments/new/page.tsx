@@ -3,6 +3,7 @@ import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import type { AccountType } from '@/lib/coa'
 import NewPaymentForm from '../_components/NewPaymentForm'
+import LoanRepaymentReceivedForm from '../_components/LoanRepaymentReceivedForm'
 import { listPayableFundSources } from '../../fund-in/actions'
 import { invoicePoolForBillingMode } from '@/lib/cfo-reports'
 
@@ -19,15 +20,52 @@ function poolForBillingMode(mode: string): string {
 }
 
 interface Props {
-  searchParams: Promise<{ invoice_id?: string; preset?: string }>
+  searchParams: Promise<{ invoice_id?: string; preset?: string; mode?: string }>
 }
 
 export default async function NewPaymentPage({ searchParams }: Props) {
   await requireRole(['finance'])
   const supabase = await createClient()
 
-  const { invoice_id: invoiceId, preset } = await searchParams
+  const { invoice_id: invoiceId, preset, mode } = await searchParams
   const nonBillablePreset = preset === 'non_billable'
+
+  // Dedicated flow: record a loan repayment RECEIVED (sub → HV).
+  if (mode === 'loan_repayment') {
+    const [{ data: loans }, { data: loanOut }, { data: cos }, { data: banks }] = await Promise.all([
+      supabase.from('loans').select('id, company_id, principal, effective_rate, tenure_months').eq('status', 'active'),
+      supabase.from('loan_outstanding').select('loan_id, outstanding'),
+      supabase.from('companies').select('id, short_code, name'),
+      supabase.from('bank_accounts').select('id, bank_name, account_number, current_balance').eq('status', 'active').order('is_primary', { ascending: false }),
+    ])
+    const outMap = new Map((loanOut ?? []).map((o) => [o.loan_id as string, Number(o.outstanding)]))
+    const coMap = new Map((cos ?? []).map((c) => [c.id as string, c]))
+    const loanOptions = (loans ?? [])
+      .map((l) => {
+        const co = l.company_id ? coMap.get(l.company_id as string) : null
+        const outstanding = outMap.get(l.id as string) ?? Number(l.principal)
+        return {
+          id: l.id as string,
+          outstanding,
+          label: `${co?.short_code ?? co?.name ?? '—'} · RM ${Number(l.principal).toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(Number(l.effective_rate) * 100).toFixed(3)}%/mo · 欠 ${outstanding.toLocaleString('en-MY', { minimumFractionDigits: 2 })}`,
+        }
+      })
+      .filter((l) => l.outstanding > 0)
+      .sort((a, b) => b.outstanding - a.outstanding)
+
+    return (
+      <div>
+        <Link href="/payments" className="text-sm text-muted hover:text-accent font-sans transition-colors">← Back to Payments</Link>
+        <div className="page-head">
+          <div>
+            <div className="page-eyebrow"><em>I.</em> TREASURY · OFFICIAL RECEIPT · LOAN REPAYMENT</div>
+            <h1 className="page-title">收到 Loan 还款</h1>
+          </div>
+        </div>
+        <LoanRepaymentReceivedForm loans={loanOptions} bankAccounts={(banks ?? []).map((b) => ({ id: b.id, bank_name: b.bank_name, account_number: b.account_number ?? '', current_balance: Number(b.current_balance ?? 0) }))} />
+      </div>
+    )
+  }
 
   const [
     { data: companies },

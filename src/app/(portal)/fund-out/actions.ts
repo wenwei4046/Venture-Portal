@@ -239,12 +239,12 @@ export async function recordRepayment(formData: FormData) {
   //   interest  → dr Bank / cr 4010 Interest Income — Loans
   //   penalty   → dr Bank / cr 4020 Penalty Income
   //   netting   → dr Bank / cr 4010 (treated as interest-style gain)
-  const { data: primaryBank } = await supabase
-    .from('bank_accounts')
-    .select('gl_account_code')
-    .eq('is_primary', true)
-    .eq('status', 'active')
-    .maybeSingle()
+  // Honor a caller-supplied bank (e.g. the receive form's bank picker); else
+  // fall back to the primary active bank (the loan-detail RepaymentForm path).
+  const bankAccountIdParam = (formData.get('bank_account_id') as string) || null
+  const { data: primaryBank } = bankAccountIdParam
+    ? await supabase.from('bank_accounts').select('gl_account_code').eq('id', bankAccountIdParam).maybeSingle()
+    : await supabase.from('bank_accounts').select('gl_account_code').eq('is_primary', true).eq('status', 'active').maybeSingle()
 
   const bankGl = primaryBank?.gl_account_code ?? '3000'
   // Mig 238 unified COA + 2026-05-15 fix:
@@ -280,6 +280,45 @@ export async function recordRepayment(formData: FormData) {
   revalidatePath(`/fund-out/${loanId}`)
   revalidatePath('/fund-out')
   revalidatePath('/dashboard')
+}
+
+// ─── Record a loan repayment RECEIVED, from the receive (收款) form ──────────
+// Thin wrapper so the unified receive form can record an incoming loan
+// repayment (sub → HV) with a principal / interest / penalty split, reusing the
+// proven recordRepayment logic (one call per non-zero type). Mirrors the
+// outgoing payment form's "this is a loan repayment" option.
+export async function recordLoanRepaymentReceived(formData: FormData) {
+  await requireRole(['finance'])
+  const loanId = (formData.get('loan_id') as string) ?? ''
+  const paymentDate = (formData.get('payment_date') as string) ?? ''
+  const bankAccountId = (formData.get('bank_account_id') as string) || ''
+  const notes = (formData.get('notes') as string) || ''
+  if (!loanId) throw new Error('Loan is required')
+  if (!paymentDate) throw new Error('Payment date is required')
+
+  const parts: Array<[PaymentType, number]> = [
+    ['principal', parseFloat((formData.get('repayment_principal') as string) ?? '0') || 0],
+    ['interest', parseFloat((formData.get('repayment_interest') as string) ?? '0') || 0],
+    ['penalty', parseFloat((formData.get('repayment_penalty') as string) ?? '0') || 0],
+  ]
+  const nonZero = parts.filter(([, amt]) => amt > 0)
+  if (nonZero.length === 0) throw new Error('Enter at least one of principal / interest / penalty')
+
+  for (const [type, amt] of nonZero) {
+    const fd = new FormData()
+    fd.set('loan_id', loanId)
+    fd.set('payment_type', type)
+    fd.set('amount', String(amt))
+    fd.set('payment_date', paymentDate)
+    if (bankAccountId) fd.set('bank_account_id', bankAccountId)
+    if (notes) fd.set('notes', notes)
+    await recordRepayment(fd)
+  }
+
+  revalidatePath('/payments')
+  revalidatePath('/fund-out')
+  revalidatePath('/dashboard')
+  redirect(`/fund-out/${loanId}`)
 }
 
 // ─── Cancel loan (Finance) ───────────────────────────────────────────────────
