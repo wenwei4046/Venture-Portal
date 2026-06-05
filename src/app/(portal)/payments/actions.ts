@@ -9,6 +9,7 @@ import { postJournalEntry, r2 } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
 import { ACCOUNT_TYPES, type AccountType } from '@/lib/coa'
 import { segmentForBillingMode } from '@/lib/invoice-settlement'
+import { INVOICE_BILLING_MODE_TO_POOL } from '@/lib/cfo-reports'
 
 // ─── Create payment voucher (Finance) ────────────────────────────────────────
 
@@ -872,6 +873,124 @@ export async function voidVoucher(formData: FormData) {
   revalidatePath(`/payments/${id}`)
   revalidatePath('/payments')
   revalidatePath('/approvals')
+  redirect('/payments')
+}
+
+// ─── Void a PAID receipt / billing-payment (reverse all effects) ────────────
+// A paid credit voucher (Official Receipt) already moved money — bank cache,
+// pool ledgers, GL, and the invoice(s) it settled. The plain voidVoucher only
+// flips draft/pending status; this one fully REVERSES a paid credit voucher so
+// a wrong receipt can be undone. Steps: reverse bank cache, reverse each linked
+// GL entry, reverse the pool credits, un-settle the invoice(s), mark voided.
+export async function voidPaidReceipt(formData: FormData) {
+  const user = await requireRole(['finance', 'principal'])
+  const supabase = await createClient()
+
+  const id = (formData.get('id') as string) ?? ''
+  if (!id) throw new Error('Voucher id is required')
+
+  const { data: v } = await supabase
+    .from('payment_vouchers')
+    .select('id, voucher_no, direction, voucher_type, status, amount, bank_account_id, target_pool, invoice_id, payee_name')
+    .eq('id', id)
+    .single()
+  if (!v) throw new Error('Voucher not found')
+  if (v.status !== 'paid') throw new Error(`Only paid vouchers can be reversed (status=${v.status})`)
+  if (v.direction !== 'credit') throw new Error('Only incoming receipts (credit) can be reversed here')
+
+  const amount = r2(Number(v.amount))
+  const nowIso = new Date().toISOString()
+
+  // 1) Reverse bank cache (the receipt had added to it)
+  if (v.bank_account_id) {
+    const { data: bank } = await supabase
+      .from('bank_accounts')
+      .select('current_balance')
+      .eq('id', v.bank_account_id)
+      .single()
+    if (bank) {
+      await supabase
+        .from('bank_accounts')
+        .update({ current_balance: r2(Number(bank.current_balance) - amount) })
+        .eq('id', v.bank_account_id)
+    }
+  }
+
+  // 2) Reverse every GL entry posted for this voucher (swap debit/credit, keep segment)
+  const { data: entries } = await supabase
+    .from('journal_entries')
+    .select('id, segment, description')
+    .eq('reference_type', 'payment_voucher')
+    .eq('reference_id', id)
+  for (const e of entries ?? []) {
+    const { data: lines } = await supabase
+      .from('journal_lines')
+      .select('account_code, debit, credit, description')
+      .eq('entry_id', e.id)
+    if (!lines || lines.length === 0) continue
+    try {
+      await postJournalEntry(supabase, {
+        transactionDate: dayjs().format('YYYY-MM-DD'),
+        description: `VOID ${v.voucher_no}: reversal of ${e.description ?? ''}`.trim(),
+        referenceType: 'payment_voucher_void',
+        referenceId: id,
+        segment: (e.segment as string) ?? undefined,
+        lines: lines.map((l) => ({
+          accountCode: l.account_code as string,
+          debit: l.credit ? Number(l.credit) : undefined,
+          credit: l.debit ? Number(l.debit) : undefined,
+          description: `Reversal — ${l.description ?? ''}`.trim(),
+        })),
+        createdBy: user.id,
+      })
+    } catch (jeErr) {
+      console.error('void reversal JE failed:', jeErr)
+    }
+  }
+
+  // 3) Reverse pool credits + un-settle invoices
+  const { data: linked } = await supabase
+    .from('invoices')
+    .select('id, billing_mode, total_amount')
+    .eq('settlement_voucher_id', id)
+  if (linked && linked.length > 0) {
+    // Consolidated receipt — pools were credited per invoice by billing_mode.
+    for (const inv of linked) {
+      const pool = INVOICE_BILLING_MODE_TO_POOL[inv.billing_mode as string] ?? 'venture_pool'
+      await adjustPool(supabase, pool, 'out', r2(Number(inv.total_amount)), `VOID ${v.voucher_no}: reverse ${inv.id}`, user.id, null, nowIso)
+    }
+    await supabase
+      .from('invoices')
+      .update({ status: 'issued', settlement_voucher_id: null } as never)
+      .eq('settlement_voucher_id', id)
+  } else {
+    // Single settle / general receive — single target_pool credit.
+    if (v.target_pool) {
+      await adjustPool(supabase, v.target_pool, 'out', amount, `VOID ${v.voucher_no}: reverse pool`, user.id, null, nowIso)
+    }
+    if (v.invoice_id) {
+      await supabase
+        .from('invoices')
+        .update({ status: 'issued' })
+        .eq('id', v.invoice_id)
+        .in('status', ['paid', 'paid_via_netting'])
+    }
+  }
+
+  // 4) Mark the voucher voided (race-guarded on still-paid)
+  const { error: updErr } = await supabase
+    .from('payment_vouchers')
+    .update({ status: 'voided' })
+    .eq('id', id)
+    .eq('status', 'paid')
+  if (updErr) throw new Error(`Failed to void voucher: ${updErr.message}`)
+
+  revalidatePath(`/payments/${id}`)
+  revalidatePath('/payments')
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+  revalidatePath('/dashboard')
+  revalidatePath('/dept-pool')
   redirect('/payments')
 }
 
