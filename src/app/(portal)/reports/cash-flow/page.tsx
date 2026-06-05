@@ -11,6 +11,7 @@ import {
 import { poolLabel, comparePools } from '@/lib/pools'
 import { SegmentedReport, type ReportSegment } from '@/app/(portal)/reports/_components/SegmentedReport'
 import { SegmentExportButtons } from '@/app/(portal)/reports/_components/SegmentExportButtons'
+import PeriodMonthPicker from '@/app/(portal)/reports/_components/PeriodMonthPicker'
 import type { CashFlowCategory } from '@/lib/coa'
 import dayjs from 'dayjs'
 import Link from 'next/link'
@@ -64,14 +65,7 @@ export default async function CashFlowPage({ searchParams }: Props) {
           <h1 className="page-title">Cash Flow Statement</h1>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <form>
-            <input
-              type="month"
-              name="period"
-              defaultValue={dayjs(from).format('YYYY-MM')}
-              className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
-            />
-          </form>
+          <PeriodMonthPicker value={dayjs(from).format('YYYY-MM')} />
           <SegmentExportButtons basePath="/reports/cash-flow/export" from={from} to={to} />
         </div>
       </div>
