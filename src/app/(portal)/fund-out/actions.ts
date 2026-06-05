@@ -243,10 +243,20 @@ export async function recordRepayment(formData: FormData) {
   // fall back to the primary active bank (the loan-detail RepaymentForm path).
   const bankAccountIdParam = (formData.get('bank_account_id') as string) || null
   const { data: primaryBank } = bankAccountIdParam
-    ? await supabase.from('bank_accounts').select('gl_account_code').eq('id', bankAccountIdParam).maybeSingle()
-    : await supabase.from('bank_accounts').select('gl_account_code').eq('is_primary', true).eq('status', 'active').maybeSingle()
+    ? await supabase.from('bank_accounts').select('id, gl_account_code, current_balance').eq('id', bankAccountIdParam).maybeSingle()
+    : await supabase.from('bank_accounts').select('id, gl_account_code, current_balance').eq('is_primary', true).eq('status', 'active').maybeSingle()
 
   const bankGl = primaryBank?.gl_account_code ?? '3000'
+
+  // Bank cache: a repayment received increases the bank balance. The GL Dr Bank
+  // is posted below, but the cached current_balance must move too (it's not
+  // trigger-maintained), else the dashboard/settings bank figure understates.
+  if (primaryBank?.id) {
+    await supabase
+      .from('bank_accounts')
+      .update({ current_balance: Math.round((Number(primaryBank.current_balance) + amount) * 100) / 100 })
+      .eq('id', primaryBank.id)
+  }
   // Mig 238 unified COA + 2026-05-15 fix:
   //   - principal → <borrower's leaf under 3020 Loans Receivable>. The user
   //     split 3020 into a header + per-borrower leaves (`3051 Amount Due
