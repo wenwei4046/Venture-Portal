@@ -306,10 +306,17 @@ export async function recordLoanRepaymentReceived(formData: FormData) {
   if (!loanId) throw new Error('Loan is required')
   if (!paymentDate) throw new Error('Payment date is required')
 
+  // ORDER MATTERS: record interest + penalty BEFORE principal. A principal
+  // repayment that clears the outstanding balance flips the loan to
+  // `fully_repaid` (DB trigger), after which recordRepayment's active-loan
+  // guard rejects any further repayment. So principal MUST be last — otherwise
+  // a combined principal+interest payment that fully settles the loan records
+  // the principal, then throws "Cannot record repayment on fully_repaid loan"
+  // on the interest leg, leaving a half-posted transaction.
   const parts: Array<[PaymentType, number]> = [
-    ['principal', parseFloat((formData.get('repayment_principal') as string) ?? '0') || 0],
     ['interest', parseFloat((formData.get('repayment_interest') as string) ?? '0') || 0],
     ['penalty', parseFloat((formData.get('repayment_penalty') as string) ?? '0') || 0],
+    ['principal', parseFloat((formData.get('repayment_principal') as string) ?? '0') || 0],
   ]
   const nonZero = parts.filter(([, amt]) => amt > 0)
   if (nonZero.length === 0) throw new Error('Enter at least one of principal / interest / penalty')
