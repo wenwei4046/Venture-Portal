@@ -26,6 +26,24 @@ export interface NoTermRow {
   monthlyInterest: number
 }
 
+export interface CompoundRow {
+  key: string
+  counterparty: string
+  detail: string
+  /** Outstanding balance incl. capitalised interest (本金 + 已滚利息). */
+  balance: number
+  /** Interest rolled into the balance so far (累计已滚利息). */
+  accrued: number
+  /** Interest the balance accrues this month (本月利息). */
+  thisMonthInterest: number
+}
+
+export interface CompoundTotals {
+  balance: number
+  accrued: number
+  thisMonthInterest: number
+}
+
 type Mode = 'all' | 'outstanding'
 
 function r2(n: number): number {
@@ -37,19 +55,27 @@ export default function ScheduleView({
   collectNoTerm,
   collectNoTermOutstanding,
   collectNoTermInterest,
+  collectCompound,
+  collectCompoundTotals,
   repayRows,
   repayNoTerm,
   repayNoTermOutstanding,
   repayNoTermInterest,
+  repayCompound,
+  repayCompoundTotals,
 }: {
   collectRows: SchedRow[]
   collectNoTerm: NoTermRow[]
   collectNoTermOutstanding: number
   collectNoTermInterest: number
+  collectCompound: CompoundRow[]
+  collectCompoundTotals: CompoundTotals
   repayRows: SchedRow[]
   repayNoTerm: NoTermRow[]
   repayNoTermOutstanding: number
   repayNoTermInterest: number
+  repayCompound: CompoundRow[]
+  repayCompoundTotals: CompoundTotals
 }) {
   const [mode, setMode] = useState<Mode>('all')
 
@@ -102,6 +128,13 @@ export default function ScheduleView({
       </div>
 
       <ScheduleSection title="应收 · To collect — 按期 (scheduled loans)" rows={collectVisible} tone="credit" />
+      <CompoundSection
+        title="应收 · 利滚利挂账 (本金未定还款 · 利息逐月滚入)"
+        note="这些贷款本金暂不收回 —— 每月利息滚进余额、越滚越多,不计入上方本月应收现金。「累计已滚利息」= 到目前为止滚进去的利息总额。"
+        rows={collectCompound}
+        totals={collectCompoundTotals}
+        tone="credit"
+      />
       <NoTermSection
         title="应收 · 无固定期限 (未定 — undecided plan)"
         note="还款利息/期数/方式未定的贷款 —— 不计入本月应收。列出尚欠本金与每月利息。"
@@ -111,6 +144,13 @@ export default function ScheduleView({
       />
 
       <ScheduleSection title="应付 · To repay — 按期 (scheduled fund sources)" rows={repayVisible} tone="debit" />
+      <CompoundSection
+        title="应付 · 利滚利挂账 (本金未定还款 · 利息逐月滚入)"
+        note="这些资金来源本金暂不偿还 —— 每月利息滚进余额,不计入上方本月应付现金。"
+        rows={repayCompound}
+        totals={repayCompoundTotals}
+        tone="debit"
+      />
       <NoTermSection
         title="应付 · 无固定期限 (on-demand / at maturity)"
         note="没有约定还款期数、也没有待审批 PV 的资金来源 —— 不计入本月应付。要分期请到 Fund In 编辑该笔、填还款期数。"
@@ -173,6 +213,66 @@ function ScheduleSection({ title, rows, tone }: { title: string; rows: SchedRow[
           </tfoot>
         </table>
       )}
+    </section>
+  )
+}
+
+function CompoundSection({
+  title,
+  note,
+  rows,
+  totals,
+  tone,
+}: {
+  title: string
+  note: string
+  rows: CompoundRow[]
+  totals: CompoundTotals
+  tone: 'credit' | 'debit'
+}) {
+  if (rows.length === 0) return null
+  return (
+    <section className="mb-12 max-w-4xl">
+      <div className="sect-head">
+        <h2>{title}</h2>
+        <span className="rule" aria-hidden />
+        <span className="count text-info">{formatMoney(totals.balance)}</span>
+      </div>
+      <p className="font-serif italic text-muted text-xs mb-3">{note}</p>
+      <table className="ledger-table">
+        <thead>
+          <tr>
+            <th>对方 · Counterparty</th>
+            <th className="num">当前余额 · Balance</th>
+            <th className="num">累计已滚利息 · Rolled interest</th>
+            <th className="num">本月利息 · This month</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key}>
+              <td>
+                <div className="font-serif text-md text-ink">
+                  {r.counterparty}
+                  <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5">利滚利</span>
+                </div>
+                <div className="font-mono text-xs text-muted">{r.detail}</div>
+              </td>
+              <td className="num font-medium">{formatMoney(r.balance)}</td>
+              <td className="num text-info">{formatMoney(r.accrued)}</td>
+              <td className="num">{formatMoney(r.thisMonthInterest)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="border-t-2 border-hairline">
+            <td className="font-serif italic text-ink font-medium">小计 · Subtotal</td>
+            <td className={`num font-semibold ${tone === 'credit' ? 'text-ledger' : 'text-danger'}`}>{formatMoney(totals.balance)}</td>
+            <td className="num font-semibold text-info">{formatMoney(totals.accrued)}</td>
+            <td className="num font-semibold">{formatMoney(totals.thisMonthInterest)}</td>
+          </tr>
+        </tfoot>
+      </table>
     </section>
   )
 }
