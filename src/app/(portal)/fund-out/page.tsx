@@ -1,9 +1,11 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import ExportCSVButton from './_components/ExportCSVButton'
 import LoansTable from './_components/LoansTable'
+import LoanTabs from './_components/LoanTabs'
 
 type LoanRow = {
   id: string
@@ -24,9 +26,14 @@ type OutstandingRow = {
   total_interest_paid: number
 }
 
-export default async function FundOutPage() {
+interface Props {
+  searchParams: Promise<{ status?: string }>
+}
+
+export default async function FundOutPage({ searchParams }: Props) {
   await requireRole(['principal', 'finance'])
   const supabase = await createClient()
+  const { status: statusFilter } = await searchParams
 
   const [
     { data: loans },
@@ -48,6 +55,10 @@ export default async function FundOutPage() {
 
   const active = loanList.filter((l) => l.status === 'active')
   const pending = loanList.filter((l) => l.status === 'pending_approval')
+
+  // Tab filter (defaults to active, mirroring Fund IN)
+  const tab = statusFilter ?? 'active'
+  const filtered = tab === 'all' ? loanList : loanList.filter((l) => l.status === tab)
 
   const totalOutstanding = active.reduce((sum, l) => {
     const out = outstandingMap.get(l.id)
@@ -141,27 +152,39 @@ export default async function FundOutPage() {
           <div className="sect-head">
             <h2>Loans</h2>
             <span className="rule" aria-hidden />
-            <span className="count">{loanList.length} TOTAL · MOST RECENT FIRST</span>
+            <span className="count">{filtered.length} {tab === 'all' ? 'TOTAL' : tab.replace('_', ' ').toUpperCase()}</span>
           </div>
 
-          <div className="overflow-x-auto">
-            <LoansTable
-              rows={loanList.map((loan) => {
-                const company = companyMap.get(loan.company_id)
-                const out = outstandingMap.get(loan.id)
-                return {
-                  id: loan.id,
-                  companyName: company?.name ?? '—',
-                  companyCode: company?.code ?? '',
-                  createdAt: loan.created_at as string,
-                  principal: Number(loan.principal),
-                  outstanding: Number(out?.outstanding ?? loan.principal),
-                  effectiveRate: Number(loan.effective_rate),
-                  status: loan.status,
-                }
-              })}
-            />
-          </div>
+          <Suspense fallback={null}>
+            <LoanTabs />
+          </Suspense>
+
+          {filtered.length === 0 ? (
+            <div className="border border-hairline rounded-md bg-surface p-8 text-center">
+              <p className="font-serif italic text-muted text-sm">
+                No {tab.replace('_', ' ')} loans.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <LoansTable
+                rows={filtered.map((loan) => {
+                  const company = companyMap.get(loan.company_id)
+                  const out = outstandingMap.get(loan.id)
+                  return {
+                    id: loan.id,
+                    companyName: company?.name ?? '—',
+                    companyCode: company?.code ?? '',
+                    createdAt: loan.created_at as string,
+                    principal: Number(loan.principal),
+                    outstanding: Number(out?.outstanding ?? loan.principal),
+                    effectiveRate: Number(loan.effective_rate),
+                    status: loan.status,
+                  }
+                })}
+              />
+            </div>
+          )}
         </section>
       )}
     </div>
