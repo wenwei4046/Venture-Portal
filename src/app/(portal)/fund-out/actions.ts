@@ -10,6 +10,7 @@ import { postJournalEntry } from '@/lib/journal'
 import { validateDisbursementAccount } from '@/lib/loan-disbursement'
 import { resolveLoansReceivableLeaf } from '@/lib/loans-coa'
 import type { PaymentType } from '@/types'
+import type { Json } from '@/lib/supabase/database.types'
 
 // ─── Create new loan (Finance) ────────────────────────────────────────────────
 //
@@ -334,6 +335,49 @@ export async function recordLoanRepaymentReceived(formData: FormData) {
 
   revalidatePath('/payments')
   revalidatePath('/fund-out')
+  revalidatePath('/dashboard')
+  redirect(`/fund-out/${loanId}`)
+}
+
+// ─── Amend an active loan (Principal — self-service, direct apply) ────────────
+// Principal is the top approval authority, so edits apply immediately via the
+// amend_loan SECURITY DEFINER RPC (audited by loans.updated_at). Only the
+// fields the form sends are changed. Finance-initiated edits that route through
+// the approval queue are a separate follow-up.
+export async function amendLoan(formData: FormData): Promise<{ error: string } | undefined> {
+  await requireRole(['principal'])
+  const supabase = await createClient()
+
+  const loanId = (formData.get('loan_id') as string) ?? ''
+  if (!loanId) return { error: 'Loan id is required' }
+
+  const ratePctRaw = (formData.get('effective_rate_percent') as string) ?? ''
+  const tenureRaw = (formData.get('tenure_months') as string) ?? ''
+  const disbursementDate = (formData.get('disbursement_date') as string) || null
+  const repaymentTerms = (formData.get('repayment_terms') as string) ?? ''
+  const compound = formData.get('compound_interest') === 'on'
+
+  const payload: Record<string, Json> = { compound_interest: compound }
+
+  if (ratePctRaw.trim() !== '') {
+    const ratePct = parseFloat(ratePctRaw)
+    if (isNaN(ratePct) || ratePct < 0 || ratePct >= 100) return { error: '利率必须在 0–100% 之间' }
+    payload.effective_rate = Math.round((ratePct / 100) * 1e6) / 1e6
+  }
+  if (tenureRaw.trim() !== '') {
+    const tenure = parseInt(tenureRaw, 10)
+    if (isNaN(tenure) || tenure < 1 || tenure > 120) return { error: '期数必须在 1–120 之间' }
+    payload.tenure_months = tenure
+  }
+  if (disbursementDate) payload.disbursement_date = disbursementDate
+  if (repaymentTerms.trim()) payload.repayment_terms = repaymentTerms.trim()
+
+  const { error } = await supabase.rpc('amend_loan', { p_loan_id: loanId, p_payload: payload })
+  if (error) return { error: `修改失败: ${error.message}` }
+
+  revalidatePath(`/fund-out/${loanId}`)
+  revalidatePath('/fund-out')
+  revalidatePath('/repayment-schedule')
   revalidatePath('/dashboard')
   redirect(`/fund-out/${loanId}`)
 }

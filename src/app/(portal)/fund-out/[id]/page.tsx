@@ -93,7 +93,17 @@ export default async function LoanDetailPage({ params }: Props) {
             {company?.short_code} · Created <em>{dayjs(loan.created_at).format('D MMMM YYYY')}</em>
           </p>
         </div>
-        <LoanStatus status={loan.status} />
+        <div className="flex items-center gap-3">
+          {user.role === 'principal' && loan.status === 'active' ? (
+            <Link
+              href={`/fund-out/${loan.id}/edit`}
+              className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            >
+              修改条款 · Amend
+            </Link>
+          ) : null}
+          <LoanStatus status={loan.status} />
+        </div>
       </div>
 
       {/* ───────── Hero outstanding ───────── */}

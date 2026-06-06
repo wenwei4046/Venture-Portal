@@ -136,7 +136,17 @@ export default async function FundSourceDetailPage({ params }: Props) {
             {fromSubLabel}{fromSubLabel ? ' · ' : ''}Recorded <em>{dayjs(source.created_at).format('D MMMM YYYY')}</em>
           </p>
         </div>
-        <StatusBadge status={source.status} />
+        <div className="flex items-center gap-3">
+          {user.role === 'principal' && isActive ? (
+            <Link
+              href={`/fund-in/${source.id}/edit`}
+              className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            >
+              修改条款 · Amend
+            </Link>
+          ) : null}
+          <StatusBadge status={source.status} />
+        </div>
       </div>
 
       {/* ───────── Hero: principal + outstanding ───────── */}

@@ -3983,6 +3983,14 @@ export type Database = {
       }
     }
     Functions: {
+      amend_fund_source: {
+        Args: { p_fund_source_id: string; p_payload: Json }
+        Returns: undefined
+      }
+      amend_loan: {
+        Args: { p_loan_id: string; p_payload: Json }
+        Returns: undefined
+      }
       apply_pool_adjustment: {
         Args: {
           p_amount: number
@@ -4257,6 +4265,7 @@ export type Database = {
           submitted_by_name: string
         }[]
       }
+      hr_dashboard_summary: { Args: { p_period?: string }; Returns: Json }
       is_period_locked: { Args: { p_date: string }; Returns: boolean }
       log_data_access: {
         Args: {

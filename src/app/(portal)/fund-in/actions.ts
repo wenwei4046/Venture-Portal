@@ -7,6 +7,53 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import type { FundSourceType } from '@/types'
+import type { Json } from '@/lib/supabase/database.types'
+
+// ─── Amend an ACTIVE fund source (Principal — self-service, direct apply) ─────
+// Principal is the top approval authority, so edits apply immediately via the
+// amend_fund_source SECURITY DEFINER RPC (audited by fund_sources.updated_at).
+// Only the fields the form sends are changed. The existing updateFundSource
+// path stays for pending_approval edits by Finance.
+export async function amendFundSource(formData: FormData): Promise<{ error: string } | undefined> {
+  await requireRole(['principal'])
+  const supabase = await createClient()
+
+  const id = (formData.get('fund_source_id') as string) ?? ''
+  if (!id) return { error: 'Fund source id is required' }
+
+  const ratePctRaw = (formData.get('cost_rate_percent') as string) ?? ''
+  const lockRaw = (formData.get('lock_in_months') as string) ?? ''
+  const repaymentDate = (formData.get('repayment_date') as string) || null
+  const compound = formData.get('compound_interest') === 'on'
+  const notes = (formData.get('notes') as string) ?? ''
+
+  const payload: Record<string, Json> = { compound_interest: compound }
+
+  if (ratePctRaw.trim() !== '') {
+    const ratePct = parseFloat(ratePctRaw)
+    if (isNaN(ratePct) || ratePct < 0 || ratePct >= 100) return { error: '利率必须在 0–100% 之间' }
+    payload.cost_rate = Math.round((ratePct / 100) * 1e6) / 1e6
+  }
+  // lock_in_months: empty => 无固定期限 (null). Always sent so the RPC applies it.
+  if (lockRaw.trim() === '') {
+    payload.lock_in_months = null
+  } else {
+    const n = parseInt(lockRaw, 10)
+    if (isNaN(n) || n < 1 || n > 120) return { error: '期数必须在 1–120,或留空表示无固定期限' }
+    payload.lock_in_months = n
+  }
+  if (repaymentDate) payload.repayment_date = repaymentDate
+  if (notes.trim()) payload.notes = notes.trim()
+
+  const { error } = await supabase.rpc('amend_fund_source', { p_fund_source_id: id, p_payload: payload })
+  if (error) return { error: `修改失败: ${error.message}` }
+
+  revalidatePath(`/fund-in/${id}`)
+  revalidatePath('/fund-in')
+  revalidatePath('/repayment-schedule')
+  revalidatePath('/dashboard')
+  redirect(`/fund-in/${id}`)
+}
 
 interface CreateFundSourceInput {
   source_type: FundSourceType
