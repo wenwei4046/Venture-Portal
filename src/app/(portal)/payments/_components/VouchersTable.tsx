@@ -19,6 +19,7 @@ export interface VoucherRow {
   status: string
   catLabel: string
   poolLabel: string
+  description: string | null
   paymentOrCreatedDate: string // ISO; client formats for display
 }
 
@@ -36,8 +37,8 @@ export default function VouchersTable({ rows }: { rows: VoucherRow[] }) {
       rows={rows}
       getRowKey={(v) => v.id}
       defaultSort={{ key: 'voucher_no', dir: 'desc' }}
-      searchKeys={['voucher_no', 'payee_name', 'catLabel', 'poolLabel']}
-      searchPlaceholder="Search voucher # / payee / category…"
+      searchKeys={['voucher_no', 'payee_name', 'catLabel', 'poolLabel', 'description']}
+      searchPlaceholder="Search voucher # / payee / category / description…"
       columns={[
         {
           key: 'voucher_no',
@@ -66,6 +67,19 @@ export default function VouchersTable({ rows }: { rows: VoucherRow[] }) {
           render: (v) => v.payee_name,
           sortValue: (v) => v.payee_name,
           cellClassName: 'font-serif text-[15px] text-ink truncate max-w-[200px]',
+        },
+        {
+          key: 'description',
+          label: 'Description',
+          render: (v) => {
+            const d = v.description?.trim()
+            if (!d) return <span className="text-muted">—</span>
+            const firstLine = d.split(/\r?\n/)[0]
+            const text = firstLine.length > 48 ? `${firstLine.slice(0, 48)}…` : firstLine
+            return <span title={d}>{text}</span>
+          },
+          sortValue: (v) => v.description ?? '',
+          cellClassName: 'font-serif italic text-graphite text-sm',
         },
         {
           key: 'amount',

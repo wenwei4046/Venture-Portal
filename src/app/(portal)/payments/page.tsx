@@ -296,6 +296,7 @@ export default async function PaymentsPage({ searchParams }: Props) {
                     status: v.status,
                     catLabel,
                     poolLabel,
+                    description: (v.description as string | null) ?? null,
                     paymentOrCreatedDate: (v.payment_date ?? v.created_at) as string,
                   }
                 })}
