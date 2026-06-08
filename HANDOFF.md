@@ -1,9 +1,110 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-06-03)
+# HOUZS Venture Portal — Session Handoff (checkpoint 2026-06-08)
 
 > Context-window handoff. Read this first to continue. User communicates in 华语 (Mandarin).
-> Supersedes the 2026-05-28 checkpoint. Latest session shipped consolidated invoice
-> settlement + single-settle payment date + batch-entry discoverability (see next section).
-> Earlier 2026-05-28 work (GL re-import + dept-pool restructure + billing UX) is still current below.
+> Supersedes the 2026-06-03 checkpoint (still valid below). This session = a long
+> Finance-hardening + UX run. Live on main, latest commit `7d7f36c`. tsc clean
+> (only pre-existing `loan-disbursement.test.ts` errors remain — unrelated).
+
+## Latest session (2026-06-08): Finance hardening, treasury fixes, billing/PV UX
+
+Worked DIRECTLY (no superpowers flow — per CLAUDE.md). All DB changes applied via
+Supabase MCP `apply_migration` AND saved to `supabase/migrations/` for parity
+(Vercel builds the Next app only; migrations are not run by CI).
+
+### Bug fixes (root-caused + deployed)
+1. **Repayment ordering crash (two paths).** A principal repayment that clears the
+   outstanding flips the loan/fund-source to fully_repaid/repaid mid-transaction
+   (trigger), then the block-repayment trigger rejects the interest/penalty legs →
+   whole tx aborts (surfaced as the redacted "Server Components render" error).
+   Fixed by recording **interest+penalty BEFORE principal**:
+   - `recordLoanRepaymentReceived` (fund-out/actions.ts) — commit `7f94b10`.
+   - `approve_single_voucher` RPC (PV-approval path) — mig `20260606010000`.
+2. **Dept-pool overdraw, opt-in.** `approve_single_voucher` gained
+   `p_allow_overdraw` → sets txn-local GUC `app.allow_pool_overdraw`; trigger
+   `check_dept_pool_sufficient` honors it. UI: "允许部门池透支" checkbox on the
+   approval screen (`ApprovalActions`). Default still blocks. mig `20260606020000`.
+3. **internal_transfer** voucher_type = pure bank→bank move: skips dept-pool
+   deduction, posts per-segment GL, and credits the DEST bank cache (trigger).
+   migs `…030000` (dest-cache trigger), `…035000` (RPC), `…040000` (trigger incl
+   internal_transfer). UI: "这是内部转账" checkbox on `NewPaymentForm`.
+4. **expense / claim_payout → per-segment GL** (root cause of dept_pool↔GL drift):
+   was one corporate-segment JE; now one segment-tagged JE per source pool. mig
+   `20260606050000`.
+5. **pool_key_to_segment**: `dept_pool_director` → `'director'` (was wrongly
+   `director_office`). mig `20260606060000`. Only `approve_single_voucher` uses it.
+
+### Features (deployed)
+- **Self-service edit (Principal)** of ACTIVE loans + fund sources: rate / terms /
+  期数 / 起始日 / 利滚利 toggle. RPCs `amend_loan`, `amend_fund_source`
+  (SECURITY DEFINER, principal-only) — mig `20260606000000`. UI: `LoanAmendForm`,
+  `AmendFundSourceForm`, "修改条款" buttons on the loan + fund-source detail pages.
+  **Pending phase 2**: Finance-initiated edits via the approval queue (not built).
+- **Repayment schedule**: new **利滚利挂账** section (compound items show principal
+  0, current balance, 累计已滚利息, 本月利息; works for any term) + settled-this-month
+  items shown as 已收/已付 done rows (full-plan view). `listPayableFundSources`
+  gained `opts.includeSettledInMonth`.
+- **Fund Out list**: status tabs (Pending/Active/Repaid/Cancelled/All), like Fund In.
+- **Billing**: Copy invoice (`copyInvoice` → new draft, current month) on each row;
+  Description as its own column; batch-settle "全选可结算发票" moved into the search
+  toolbar (`SortableTable` gained a `toolbarRight` slot); batch print uses the
+  existing `/billing/invoice-doc?ids=`.
+- **Payments (PV/OR)**: per-department source breakdown table on the VIEW + APPROVE
+  pages; **Copy PV** (`copyPaymentVoucher` → new draft → edit); **Print PV/OR PDF**
+  new route `/payments/voucher-doc` (?id=/?ids=) + format `_format/voucher-doc-pdf.tsx`
+  (mirrors invoice-doc); Description column on the payments list.
+- **Excel-style per-column value filter** built into `SortableTable` (funnel in
+  header → checkbox facet of distinct values + search + (All)/(Blanks)/Clear,
+  fixed-positioned). Enabled on PV/OR (Category/Pool/Payee/Description/Status) and
+  invoice (Company/Mode/Description/Status) lists. Composes with search + sort.
+
+### Data corrections (direct SQL, recorded for audit — NOT in migrations)
+- Loan d3921b67 (CONTS): backfilled the **interest 3,000** leg lost to the ordering
+  bug (repayment row + JE Dr3000/Cr7000 + HL cache +3,000), 2026-06-05.
+- **HV-PV-202606-0008** (HV repaying its 2990 borrowing 45,000+900): split the
+  single 3054 source (wrong — that's a receivable) into **4051 Amount Due to 2990
+  45,000 + 9010 Interest Expense 900**, so it posts Dr payable/interest / Cr bank.
+- **HV-PV-202606-0007** ("Transfer to Alliance for Payroll"): re-classed to
+  `internal_transfer`; reversed its 4 dept-pool expense_out rows (a transfer isn't a
+  dept expense — cash still the depts', staged in Alliance); GL re-posted per dept
+  segment; Alliance bank cache +95,050.24.
+- **HL bank cache** corrected to **19,672.56** (= real Hong Leong balance the user
+  confirmed; cache was +3,000 stale). **Alliance cache** = 95,972.71.
+- **Marketing claims HV-PV-202606-0010 (400.85) + 0011 (934.73) = 1,335.58**: JE
+  segment re-tagged corporate→marketing (they're Marketing's spend).
+- **利滚利 flags**: loans LO#15/12/11/26/16/13/14 set `compound_interest=true`
+  (LO#11 also got its 15k principal recorded as repaid 2026-04, direct-to-source);
+  LO#29 (2990 45k) too. **LO#25 (HK 71,457.13) split into 3 loans** LO#25A/B/C
+  (42,881.63 fr 2025-09 / 22,873.50 fr 2025-12 / 5,702 fr 2026-03), all compound.
+  **LO#4 left as a normal scheduled loan** (user reverted). 15 loans got
+  「资金来源」remarks; 2990 LO-NEW-2990 noted "资金从 Kingsley 借过来". Kingsley
+  fund source (100k, 0%) set to 12期 / repayment_date 2026-04-20.
+
+### Reconciliation — FULLY TIED at session end
+All 5 dept pools: dept_pool_balances == GL bank-segment (diff 0.00 each).
+Dept-pool "Total cash available" **115,645.27** == per-bank grand **115,645.27**.
+Banks: HL cache=GL=19,672.56; Alliance cache=GL=95,972.71.
+
+### Migrations added this session
+`20260606000000` amend RPCs · `…010000` repayment-order · `…020000` overdraw ·
+`…030000` dest-bank trigger · `…035000` internal_transfer RPC · `…040000` trigger
+incl internal_transfer · `…050000` expense/claim per-segment · `…060000`
+pool_key_to_segment director fix.
+
+### PENDING / pick up next
+1. **Ledger Excel filter** — `/reports/ledger` uses `LedgerSections` (grouped-by-
+   account hand-rolled table, NOT SortableTable). User to choose: filter the grouped
+   report (e.g. by segment/account) vs flatten to a SortableTable. Asked, awaiting.
+2. **利滚利 → GL posting (Interest-in-Suspense)** still DEFERRED — 利滚利 is
+   calc+display only; `loan_outstanding`/GL don't include capitalized interest.
+   COA already has `3060-3065` (Interest in Suspense — Recv) + `4060-4064` (Pay).
+3. **Finance-via-approval edit** (phase 2 of self-service amend): new approval types
+   `loan_amend`/`fund_source_amend` + payload + approve dispatch. Not built.
+4. **Finance process-review "first 4"** (from the audit this session): (a) GL-post
+   failures must fail loud / flag, not silent console.error; (b) write-action audit
+   log (approvals/JE/edits/period-close); (c) auto bank↔GL + dept-pool↔GL recon page
+   + month-end checklist; (d) period-lock also on Finance data entry (currently only
+   blocks Principal approval).
+5. (Optional) Per-row Print/Copy on the payments LIST (currently on PV detail page).
 
 ## Latest session (2026-06-03): Consolidated invoice settlement
 
