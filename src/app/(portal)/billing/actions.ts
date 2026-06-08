@@ -179,6 +179,84 @@ export interface InvoiceLineInput {
   categoryCode: string
 }
 
+// ─── Copy an existing invoice into a new DRAFT for the current month ──────────
+// Monthly billing repeats with small tweaks, so let Finance duplicate a prior
+// invoice (header + line items + who-to-bill + mode) as a fresh draft, then
+// edit the amount / description via the inline Edit modal before issuing.
+export async function copyInvoice(formData: FormData): Promise<void> {
+  const user = await requireRole(['finance'])
+  const supabase = await createClient()
+
+  const sourceId = (formData.get('invoice_id') as string) ?? ''
+  if (!sourceId) throw new Error('Invoice id is required')
+
+  const { data: src, error: srcErr } = await supabase
+    .from('invoices')
+    .select('billing_mode, billable_to_type, company_id, billable_to_department_id, billable_to_freetext_name, category_code, base_amount, total_amount, description, reference_no')
+    .eq('id', sourceId)
+    .single()
+  if (srcErr || !src) throw new Error('Source invoice not found')
+
+  // New draft lands in the CURRENT billing month (copy last month → bill this).
+  const period = dayjs().startOf('month').format('YYYY-MM-DD')
+  await assertPeriodOpen(supabase, period)
+
+  const { data: invoiceNo, error: mintErr } = await supabase.rpc('mint_invoice_no', { p_period: period })
+  if (mintErr || !invoiceNo) {
+    throw new Error(`Failed to mint invoice number: ${mintErr?.message ?? 'unknown'}`)
+  }
+
+  const { data: created, error: invErr } = await supabase
+    .from('invoices')
+    .insert({
+      invoice_no: invoiceNo as string,
+      period_month: period,
+      billing_mode: src.billing_mode,
+      category_code: src.category_code,
+      base_amount: src.base_amount,
+      total_amount: src.total_amount,
+      status: 'draft',
+      invoice_date: dayjs().format('YYYY-MM-DD'),
+      due_date: null,
+      description: src.description,
+      reference_no: src.reference_no,
+      created_by: user.id,
+      billable_to_type: src.billable_to_type,
+      company_id: src.company_id,
+      billable_to_department_id: src.billable_to_department_id,
+      billable_to_freetext_name: src.billable_to_freetext_name,
+    })
+    .select('id')
+    .single()
+  if (invErr || !created) throw new Error(`Failed to copy invoice: ${invErr?.message ?? 'unknown'}`)
+
+  // Copy line items if the source is a multi-line invoice.
+  const { data: lines } = await supabase
+    .from('invoice_lines')
+    .select('line_no, description, amount, category_code')
+    .eq('invoice_id', sourceId)
+    .order('line_no')
+  if (lines && lines.length > 0) {
+    const { error: linesErr } = await supabase.from('invoice_lines').insert(
+      lines.map((l) => ({
+        invoice_id: created.id,
+        line_no: l.line_no,
+        description: l.description,
+        amount: l.amount,
+        category_code: l.category_code,
+      })),
+    )
+    if (linesErr) {
+      await supabase.from('invoices').delete().eq('id', created.id).eq('status', 'draft')
+      throw new Error(`Failed to copy invoice lines (rolled back): ${linesErr.message}`)
+    }
+  }
+
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+  redirect('/billing')
+}
+
 export async function createMultiLineInvoice(
   payload: {
     billableType: BillableToKind

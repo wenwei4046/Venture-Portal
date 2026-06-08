@@ -312,6 +312,42 @@ export default async function ApprovalDetailPage({ params }: Props) {
             ) : null}
           </div>
 
+          {voucherContext.sources.length > 0 ? (
+            <div className="mt-4">
+              <div className="sect-head">
+                <h2>{voucherContext.voucher.direction === 'credit' ? 'Credited to' : 'Deducted from'}</h2>
+                <span className="rule" aria-hidden />
+                <span className="count">{voucherContext.sources.length} SOURCE{voucherContext.sources.length === 1 ? '' : 'S'} · PER DEPARTMENT</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="ledger-table">
+                  <thead>
+                    <tr>
+                      <th>Pool / Department</th>
+                      <th>Account</th>
+                      <th className="num">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {voucherContext.sources.map((s, i) => (
+                      <tr key={i}>
+                        <td className="font-serif text-md text-ink">{formatPoolLabel(s.pool) ?? s.pool}</td>
+                        <td className="font-mono text-xs text-graphite">{s.account_label ?? '—'}</td>
+                        <td className="num">{formatMoney(Number(s.amount))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-hairline">
+                      <td className="font-serif italic text-ink font-medium" colSpan={2}>Total</td>
+                      <td className="num font-semibold">{formatMoney(voucherContext.sources.reduce((sum, s) => sum + Number(s.amount), 0))}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          ) : null}
+
           <div className="mt-4">
             <div className="sect-head">
               <h2>Attachments</h2>

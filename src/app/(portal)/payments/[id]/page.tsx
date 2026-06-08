@@ -14,6 +14,7 @@ const POOL_LABELS: Record<string, string> = {
   dept_pool_director: 'Director Pool',
   dept_pool_marketing: 'Marketing Dept Pool',
   dept_pool_finance: 'Finance Dept Pool',
+  dept_pool_director_office: 'Director Office Pool',
   dept_pool_hr: 'HR Dept Pool',
   invoice_payout_pool: 'Invoice Payout Pool',
 }
@@ -196,6 +197,43 @@ export default async function PaymentDetailPage({ params }: Props) {
           ) : null}
         </div>
       </div>
+
+      {/* ── Payment sources (per-pool / per-department breakdown) ── */}
+      {sourceRows.length > 0 ? (
+        <section className="mb-12">
+          <div className="sect-head">
+            <h2>{voucher.direction === 'debit' ? 'Deducted from' : 'Credited to'}</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">{sourceRows.length} SOURCE{sourceRows.length === 1 ? '' : 'S'} · PER DEPARTMENT</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="ledger-table">
+              <thead>
+                <tr>
+                  <th>Pool / Department</th>
+                  <th>Account</th>
+                  <th className="num">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sourceRows.map((r, i) => (
+                  <tr key={i}>
+                    <td className="font-serif text-md text-ink">{POOL_LABELS[r.pool] ?? r.pool.replace(/_/g, ' ')}</td>
+                    <td className="font-mono text-xs text-graphite">{r.chart_of_accounts?.name ?? (r.account_code ? r.account_code.replace(/_/g, ' ') : '—')}</td>
+                    <td className="num">{formatMoney(Number(r.amount))}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-hairline">
+                  <td className="font-serif italic text-ink font-medium" colSpan={2}>Total</td>
+                  <td className="num font-semibold">{formatMoney(sourceRows.reduce((s, r) => s + Number(r.amount), 0))}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
       {/* ── Audit trail ── */}
       <section className="mb-12">

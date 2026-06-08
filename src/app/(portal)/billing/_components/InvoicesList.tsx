@@ -7,6 +7,7 @@ import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
 import { ApproveInvoiceButton, BulkIssueInvoicesButton, DeleteInvoiceButton, EditInvoiceButton } from './InvoiceActions'
 import CreateCreditNoteButton from './CreateCreditNoteButton'
+import CopyInvoiceButton from './CopyInvoiceButton'
 import InvoiceDetailButton from './InvoiceDetailButton'
 import SortableTable from '@/components/SortableTable'
 import type { AccountType } from '@/lib/coa'
@@ -321,6 +322,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                       ? categories.find((c) => c.code === inv.category_code)?.label
                       : undefined
                     return (
+                      <div>
                       <InvoiceDetailButton
                         invoice={{
                           id: inv.id,
@@ -341,6 +343,15 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                         categoryLabel={categoryLabel}
                         billingModeLabel={formatBillingMode(inv.billing_mode)}
                       />
+                      {inv.description?.trim() ? (
+                        <div
+                          className="font-serif italic text-graphite text-xs mt-1 max-w-[280px] truncate"
+                          title={inv.description}
+                        >
+                          {inv.description}
+                        </div>
+                      ) : null}
+                      </div>
                     )
                   },
                   sortValue: (inv) => inv.invoice_no ?? inv.id,
@@ -398,6 +409,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                         >
                           PDF
                         </Link>
+                        <CopyInvoiceButton id={inv.id} invoiceNo={inv.invoice_no} />
                         {inv.status === 'draft' ? (
                           <>
                             <EditInvoiceButton
