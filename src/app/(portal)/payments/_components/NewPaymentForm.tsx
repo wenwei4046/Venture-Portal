@@ -101,6 +101,11 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
   const isInvoicePay = !!invoicePreset
   const isNonBillable = !!nonBillablePreset && !isInvoicePay
   const [direction, setDirection] = useState<'debit' | 'credit'>(isInvoicePay ? 'credit' : 'debit')
+  // Payroll / bank-to-bank transfer: when this debit's source rows are dept
+  // pools (one per department), tick this so the GL posts ONE journal entry PER
+  // department segment (voucher_type=payroll_bank_transfer) instead of lumping
+  // the whole amount into the corporate/Venture segment.
+  const [isPayrollTransfer, setIsPayrollTransfer] = useState(false)
   // Inter-billing: invoice issued to an internal dept pool (or director /
   // freetext non-cash counterparty) settles without touching a bank — the
   // money moves between pool ledgers, not banks. Default payment_method to
@@ -309,13 +314,38 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
           <input type="hidden" name="direction" value={direction} />
         </div>
       )}
-      {/* voucher_type: billing_payment when settling, else derived from direction */}
+      {/* voucher_type: billing_payment when settling; payroll_bank_transfer when
+          this debit is a per-department bank transfer; else derived from direction */}
       <input
         type="hidden"
         name="voucher_type"
-        value={isInvoicePay ? 'billing_payment' : direction === 'debit' ? 'expense' : 'receive_payment'}
+        value={
+          isInvoicePay
+            ? 'billing_payment'
+            : direction === 'debit'
+              ? (isPayrollTransfer ? 'payroll_bank_transfer' : 'expense')
+              : 'receive_payment'
+        }
       />
       {isInvoicePay ? <input type="hidden" name="invoice_id" value={invoicePreset!.id} /> : null}
+
+      {/* Per-department split toggle (debit only, standalone vouchers) */}
+      {!isInvoicePay && direction === 'debit' ? (
+        <label className="flex items-start gap-2 mb-6 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isPayrollTransfer}
+            onChange={(e) => setIsPayrollTransfer(e.target.checked)}
+            className="h-4 w-4 mt-0.5 accent-[var(--accent)]"
+          />
+          <span className="text-sm font-sans text-graphite">
+            按部门切分记账 · Split by department (payroll / bank transfer)
+            <span className="block text-xs text-muted font-serif italic mt-0.5">
+              用于「发薪转账到 Alliance」等多部门转账:每个部门的现金会各自记账(按 segment 分开),不会全堆到 Venture。每个来源行 = 一个部门池。
+            </span>
+          </span>
+        </label>
+      ) : null}
 
       {isInvoicePay ? (
         <div className="mb-6 border border-accent-border rounded-md bg-accent-bg p-4">

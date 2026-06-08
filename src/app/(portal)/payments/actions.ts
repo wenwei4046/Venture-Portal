@@ -169,7 +169,7 @@ export async function createPaymentVoucher(formData: FormData) {
     .from('payment_vouchers')
     .insert({
       voucher_no: voucherNo,
-      voucher_type: voucherType as 'loan_repayment' | 'billing_payment' | 'claim_payout' | 'expense' | 'internal_transfer' | 'salary_payout' | 'other' | 'receive_payment',
+      voucher_type: voucherType as 'loan_repayment' | 'billing_payment' | 'claim_payout' | 'expense' | 'internal_transfer' | 'salary_payout' | 'other' | 'receive_payment' | 'payroll_bank_transfer',
       direction,
       // Mig 205: category_code moved to payment_voucher_sources (per-row).
       // Phase 7 Step 16: source_pool deprecated. Debit vouchers get their
