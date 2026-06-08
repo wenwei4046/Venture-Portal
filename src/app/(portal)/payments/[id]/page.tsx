@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { submitForApproval, approveVoucher, voidVoucher, voidPaidReceipt } from '../actions'
 import VoucherActions from './_components/VoucherActions'
+import CopyVoucherButton from './_components/CopyVoucherButton'
 import AttachmentUploader from './_components/AttachmentUploader'
 import AttachmentList from '@/components/voucher/AttachmentList'
 
@@ -141,7 +142,18 @@ export default async function PaymentDetailPage({ params }: Props) {
             Created by <em>{createdByName ?? 'Unknown'}</em> on {dayjs(voucher.created_at).format('D MMMM YYYY HH:mm')}
           </p>
         </div>
-        <StatusBadge status={voucher.status} />
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/payments/voucher-doc?id=${voucher.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+          >
+            Print
+          </Link>
+          {isFinance ? <CopyVoucherButton voucherId={voucher.id} voucherNo={voucher.voucher_no} /> : null}
+          <StatusBadge status={voucher.status} />
+        </div>
       </div>
 
       {/* ── Details grid ── */}

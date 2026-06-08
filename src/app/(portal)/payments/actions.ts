@@ -628,6 +628,80 @@ export async function approveVoucher(formData: FormData) {
 // NOT editable: voucher_no, voucher_type, direction, fund_source_id, loan_id,
 // repayment_breakdown, invoice_id, status, audit fields.
 
+// ─── Copy a payment voucher into a new DRAFT ─────────────────────────────────
+// Recurring expense PVs repeat with small tweaks, so let Finance duplicate one
+// into a fresh draft (header + source rows) and edit it before submitting.
+// Transaction-specific links (invoice/loan/fund_source/repayment_breakdown) are
+// deliberately NOT copied — a copy is a new expense, not a re-run of a repayment.
+export async function copyPaymentVoucher(formData: FormData): Promise<void> {
+  const user = await requireRole(['finance'])
+  const supabase = await createClient()
+
+  const sourceId = (formData.get('voucher_id') as string) ?? ''
+  if (!sourceId) throw new Error('Voucher id is required')
+
+  const { data: src, error: srcErr } = await supabase
+    .from('payment_vouchers')
+    .select('voucher_type, direction, amount, payee_name, payee_company_id, bank_account_id, description, payment_method, target_pool')
+    .eq('id', sourceId)
+    .single()
+  if (srcErr || !src) throw new Error('Source voucher not found')
+
+  // New voucher number — same scheme as createPaymentVoucher.
+  const period = dayjs().format('YYYYMM')
+  const { count } = await supabase.from('payment_vouchers').select('*', { count: 'exact', head: true })
+  const seq = (count ?? 0) + 1
+  const prefix = src.direction === 'credit' ? 'HV-OR-' : 'HV-PV-'
+  const voucherNo = `${prefix}${period}-${String(seq).padStart(4, '0')}`
+
+  const { data: created, error: insErr } = await supabase
+    .from('payment_vouchers')
+    .insert({
+      voucher_no: voucherNo,
+      voucher_type: src.voucher_type,
+      direction: src.direction,
+      status: 'draft' as const,
+      amount: src.amount,
+      payee_name: src.payee_name,
+      payee_company_id: src.payee_company_id,
+      bank_account_id: src.bank_account_id,
+      description: src.description,
+      payment_method: src.payment_method,
+      target_pool: src.target_pool,
+      source_pool: null,
+      created_by: user.id,
+    })
+    .select('id')
+    .single()
+  if (insErr || !created) throw new Error(`Failed to copy voucher: ${insErr?.message ?? 'unknown'}`)
+
+  const { data: srcRows } = await supabase
+    .from('payment_voucher_sources')
+    .select('pool, amount, account_code, role, override_account_type, override_gl_account_code, override_reason')
+    .eq('voucher_id', sourceId)
+  if (srcRows && srcRows.length > 0) {
+    const { error: rowsErr } = await supabase.from('payment_voucher_sources').insert(
+      srcRows.map((r) => ({
+        voucher_id: created.id,
+        pool: r.pool,
+        amount: r.amount,
+        account_code: r.account_code,
+        role: r.role,
+        override_account_type: r.override_account_type,
+        override_gl_account_code: r.override_gl_account_code,
+        override_reason: r.override_reason,
+      })),
+    )
+    if (rowsErr) {
+      await supabase.from('payment_vouchers').delete().eq('id', created.id).eq('status', 'draft')
+      throw new Error(`Failed to copy voucher sources (rolled back): ${rowsErr.message}`)
+    }
+  }
+
+  revalidatePath('/payments')
+  redirect(`/payments/${created.id}/edit`)
+}
+
 export async function updatePaymentVoucher(formData: FormData) {
   const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
