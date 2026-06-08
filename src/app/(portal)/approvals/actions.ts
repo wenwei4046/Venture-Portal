@@ -60,10 +60,14 @@ export async function approveRequest(formData: FormData) {
   // Postgres transaction. Early-return because the RPC does the approval flip
   // itself; skip the generic flip below.
   if (approval.request_type === 'payment_voucher') {
+    // Principal may opt to allow dept-pool overdraw (e.g. payroll that can't
+    // wait for invoice settlement). Default false → sufficiency check still blocks.
+    const allowOverdraw = formData.get('allow_overdraw') === 'on'
     const { error: rpcErr } = await supabase.rpc('approve_single_voucher', {
       p_approval_id: id,
       p_user_id: user.id,
       p_notes: notes ?? '',
+      p_allow_overdraw: allowOverdraw,
     })
     if (rpcErr) {
       throw new Error(`Approval failed: ${rpcErr.message}`)

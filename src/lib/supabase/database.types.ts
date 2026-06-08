@@ -4013,7 +4013,12 @@ export type Database = {
         Returns: undefined
       }
       approve_single_voucher: {
-        Args: { p_approval_id: string; p_notes: string; p_user_id: string }
+        Args: {
+          p_allow_overdraw?: boolean
+          p_approval_id: string
+          p_notes: string
+          p_user_id: string
+        }
         Returns: {
           voucher_id: string
           voucher_no: string
