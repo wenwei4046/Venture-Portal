@@ -357,6 +357,8 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                     )
                   },
                   sortValue: (inv) => resolvePartyLabel(inv, companyMap, departmentMap).primary,
+                  filterValue: (inv) => resolvePartyLabel(inv, companyMap, departmentMap).primary,
+                  filterable: true,
                 },
                 {
                   key: 'description',
@@ -369,6 +371,8 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                     return <span title={d}>{text}</span>
                   },
                   sortValue: (inv) => inv.description ?? '',
+                  filterValue: (inv) => inv.description ?? '',
+                  filterable: true,
                   cellClassName: 'font-serif italic text-graphite text-sm',
                 },
                 {
@@ -376,6 +380,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   label: 'Mode',
                   render: (inv) => formatBillingMode(inv.billing_mode),
                   sortValue: (inv) => formatBillingMode(inv.billing_mode),
+                  filterable: true,
                   cellClassName: 'font-serif italic text-graphite text-sm',
                 },
                 {
@@ -391,6 +396,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   label: 'Status',
                   render: (inv) => <InvoiceStatus status={inv.status} />,
                   sortValue: (inv) => inv.status,
+                  filterable: true,
                 },
                 {
                   key: 'action',

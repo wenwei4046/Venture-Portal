@@ -52,6 +52,7 @@ export default function VouchersTable({ rows }: { rows: VoucherRow[] }) {
           label: 'Category',
           render: (v) => v.catLabel,
           sortValue: (v) => v.catLabel,
+          filterable: true,
           cellClassName: 'font-serif italic text-graphite capitalize',
         },
         {
@@ -59,6 +60,7 @@ export default function VouchersTable({ rows }: { rows: VoucherRow[] }) {
           label: 'Pool',
           render: (v) => v.poolLabel,
           sortValue: (v) => v.poolLabel,
+          filterable: true,
           cellClassName: 'font-mono text-[11px] text-graphite',
         },
         {
@@ -66,6 +68,7 @@ export default function VouchersTable({ rows }: { rows: VoucherRow[] }) {
           label: 'Payee',
           render: (v) => v.payee_name,
           sortValue: (v) => v.payee_name,
+          filterable: true,
           cellClassName: 'font-serif text-[15px] text-ink truncate max-w-[200px]',
         },
         {
@@ -79,6 +82,7 @@ export default function VouchersTable({ rows }: { rows: VoucherRow[] }) {
             return <span title={d}>{text}</span>
           },
           sortValue: (v) => v.description ?? '',
+          filterable: true,
           cellClassName: 'font-serif italic text-graphite text-sm',
         },
         {
@@ -102,6 +106,8 @@ export default function VouchersTable({ rows }: { rows: VoucherRow[] }) {
             </em>
           ),
           sortValue: (v) => v.status,
+          filterValue: (v) => v.status.replace('_', ' '),
+          filterable: true,
         },
         {
           key: 'date',
