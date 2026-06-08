@@ -48,6 +48,8 @@ interface Props<T> {
    */
   searchKeys?: string[]
   searchPlaceholder?: string
+  /** Optional content rendered on the right side of the search/toolbar row. */
+  toolbarRight?: ReactNode
   emptyState?: ReactNode
   /**
    * Optional className applied to the <table>. Defaults to "ledger-table"
@@ -76,6 +78,7 @@ export default function SortableTable<T>({
   getRowKey,
   searchKeys,
   searchPlaceholder = 'Search…',
+  toolbarRight,
   emptyState,
   tableClassName = 'ledger-table',
   footer,
@@ -156,20 +159,25 @@ export default function SortableTable<T>({
 
   return (
     <div>
-      {searchKeys && searchKeys.length > 0 ? (
-        <div className="mb-3 flex items-baseline gap-3">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={searchPlaceholder}
-            className="w-full max-w-md px-3 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-          />
-          {search ? (
-            <span className="font-mono text-xs text-graphite">
-              {visible.length}/{rows.length}
-            </span>
+      {(searchKeys && searchKeys.length > 0) || toolbarRight ? (
+        <div className="mb-3 flex items-center gap-3 flex-wrap">
+          {searchKeys && searchKeys.length > 0 ? (
+            <>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full max-w-md px-3 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+              />
+              {search ? (
+                <span className="font-mono text-xs text-graphite">
+                  {visible.length}/{rows.length}
+                </span>
+              ) : null}
+            </>
           ) : null}
+          {toolbarRight ? <div className="ml-auto flex items-center gap-3 flex-wrap">{toolbarRight}</div> : null}
         </div>
       ) : null}
 

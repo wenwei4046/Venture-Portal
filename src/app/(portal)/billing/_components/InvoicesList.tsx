@@ -160,6 +160,14 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
     setSelectedIds(new Set())
   }
 
+  // Batch print: open a multi-page PDF of the selected invoices (the invoice-doc
+  // route already supports ?ids=a,b,c → one document page per invoice).
+  function printSelected() {
+    const ids = [...selectedIds]
+    if (ids.length === 0) return
+    window.open(`/billing/invoice-doc?ids=${ids.join(',')}`, '_blank', 'noopener,noreferrer')
+  }
+
   function openSettleModal() {
     setSettleError(null)
     setSettleResult(null)
@@ -255,45 +263,35 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
             </div>
           </div>
 
-          {/* Consolidated-settle helper bar: prominent select-all button + count */}
-          {invoices.some(isBatchSettleable) ? (
-            <div className="flex items-center gap-3 mb-4 flex-wrap">
-              <button
-                type="button"
-                onClick={selectAllIssued}
-                className="bg-surface hover:bg-surface-2 border border-hairline rounded-md px-3 py-1.5 text-xs font-sans text-ink transition-colors"
-              >
-                全选可结算发票
-              </button>
-              {selectedIds.size > 0 ? (
-                <button
-                  type="button"
-                  onClick={clearSelection}
-                  className="text-xs font-sans text-muted hover:text-ink"
-                >
-                  清除选择
-                </button>
-              ) : null}
-              <span className="text-xs font-mono text-muted">
-                {selectedIds.size > 0
-                  ? `已选 ${selectedIds.size} 张 · RM ${selectedTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}`
-                  : '勾选同一公司的 issued 发票，合并结算成一张收据'}
-              </span>
-              {crossCompany ? (
-                <span className="text-xs font-serif italic text-danger">
-                  选中了不同公司的单 — 一张收据只能结同一家公司
-                </span>
-              ) : null}
-            </div>
-          ) : null}
-
           <div className="overflow-x-auto">
             <SortableTable<Invoice>
               rows={invoices}
               getRowKey={(inv) => inv.id}
               defaultSort={{ key: 'invoice_no', dir: 'desc' }}
-              searchKeys={['invoice_no', 'company', 'billing_mode']}
+              searchKeys={['invoice_no', 'company', 'billing_mode', 'description']}
               searchPlaceholder="Search invoice # / company / mode…"
+              toolbarRight={
+                invoices.some(isBatchSettleable) ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={selectAllIssued}
+                      className="bg-surface hover:bg-surface-2 border border-hairline rounded-md px-3 py-1.5 text-xs font-sans text-ink transition-colors"
+                    >
+                      全选可结算发票
+                    </button>
+                    {selectedIds.size > 0 ? (
+                      <button
+                        type="button"
+                        onClick={clearSelection}
+                        className="text-xs font-sans text-muted hover:text-ink"
+                      >
+                        清除选择
+                      </button>
+                    ) : null}
+                  </>
+                ) : undefined
+              }
               columns={[
                 {
                   key: '_select',
@@ -322,7 +320,6 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                       ? categories.find((c) => c.code === inv.category_code)?.label
                       : undefined
                     return (
-                      <div>
                       <InvoiceDetailButton
                         invoice={{
                           id: inv.id,
@@ -343,15 +340,6 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                         categoryLabel={categoryLabel}
                         billingModeLabel={formatBillingMode(inv.billing_mode)}
                       />
-                      {inv.description?.trim() ? (
-                        <div
-                          className="font-serif italic text-graphite text-xs mt-1 max-w-[280px] truncate"
-                          title={inv.description}
-                        >
-                          {inv.description}
-                        </div>
-                      ) : null}
-                      </div>
                     )
                   },
                   sortValue: (inv) => inv.invoice_no ?? inv.id,
@@ -369,6 +357,19 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                     )
                   },
                   sortValue: (inv) => resolvePartyLabel(inv, companyMap, departmentMap).primary,
+                },
+                {
+                  key: 'description',
+                  label: 'Description',
+                  render: (inv) => {
+                    const d = inv.description?.trim()
+                    if (!d) return <span className="text-muted">—</span>
+                    const firstLine = d.split(/\r?\n/)[0]
+                    const text = firstLine.length > 48 ? `${firstLine.slice(0, 48)}…` : firstLine
+                    return <span title={d}>{text}</span>
+                  },
+                  sortValue: (inv) => inv.description ?? '',
+                  cellClassName: 'font-serif italic text-graphite text-sm',
                 },
                 {
                   key: 'billing_mode',
@@ -467,6 +468,13 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
             className="text-xs font-sans text-muted hover:text-ink"
           >
             清除
+          </button>
+          <button
+            type="button"
+            onClick={printSelected}
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+          >
+            打印所选 {selectedIds.size} 张
           </button>
           <button
             type="button"
