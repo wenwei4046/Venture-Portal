@@ -91,9 +91,15 @@ incl internal_transfer · `…050000` expense/claim per-segment · `…060000`
 pool_key_to_segment director fix.
 
 ### PENDING / pick up next
-1. **Ledger Excel filter** — `/reports/ledger` uses `LedgerSections` (grouped-by-
-   account hand-rolled table, NOT SortableTable). User to choose: filter the grouped
-   report (e.g. by segment/account) vs flatten to a SortableTable. Asked, awaiting.
+1. ~~**Ledger Excel filter**~~ ✅ DONE (2026-06-09, commit `7f6c2b0`). User picked
+   "keep grouped, add filters" (not flatten). `LedgerSections` gained two funnel
+   facet filters in the toolbar — **Dept (segment)** + **Journal Type** — mirroring
+   the SortableTable facet popover. Compose with the existing search + date sort;
+   zero-match accounts hide; B/F + running balance + per-account totals preserved.
+   ⚠️ Interactive verification was BLOCKED locally: the OneDrive `.next` Fast-Refresh
+   loop left the whole ledger route's client components unhydrated (pre-existing
+   search/sort/Apply equally dead) — verify on live instead. tsc clean, route compiles
+   clean, toolbar renders the two buttons.
 2. **利滚利 → GL posting (Interest-in-Suspense)** still DEFERRED — 利滚利 is
    calc+display only; `loan_outstanding`/GL don't include capitalized interest.
    COA already has `3060-3065` (Interest in Suspense — Recv) + `4060-4064` (Pay).
