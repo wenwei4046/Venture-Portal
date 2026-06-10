@@ -109,8 +109,12 @@ export default function ScheduleView({
         </button>
       </div>
 
-      {/* Hero totals (reflect the active view) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10 max-w-3xl">
+      {/* Hero totals (reflect the active view). Full-width grid like the
+          /payments hero — a max-w-3xl cap squeezed each column below the
+          rendered width of "RM (277,423.46)" at text-3xl, so the unbreakable
+          number token overflowed and overlapped the neighbouring column.
+          lg breakpoint (not sm): below ~1024px the figures stack instead. */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
         <div>
           <div className="font-serif italic text-accent text-sm mb-1">本月应收 · To collect</div>
           <div className="font-serif text-3xl text-num-ink tabular tracking-[-0.01em] text-ledger">{formatMoney(collectTot)}</div>

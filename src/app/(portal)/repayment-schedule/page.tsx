@@ -2,7 +2,7 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { loanMonthlyInstallment, isLoanUnscheduled, compoundInterestState } from '@/lib/treasury-schedule'
+import { loanMonthlyInstallment, isLoanUnscheduled, isBeforeFirstInstallment, compoundInterestState } from '@/lib/treasury-schedule'
 import { listPayableFundSources } from '../fund-in/actions'
 import ScheduleView, { type SchedRow, type NoTermRow, type CompoundRow } from './_components/ScheduleView'
 
@@ -104,6 +104,13 @@ export default async function RepaymentSchedulePage() {
       })
       continue
     }
+    // 放款当月不进本月应收 —— 首期下个月才到期。本月已实际收过款的仍显示(已收行)。
+    if (
+      isBeforeFirstInstallment(l.disbursement_date as string | null, currentYM) &&
+      !loanDoneThisMonth.has(l.id as string)
+    ) {
+      continue
+    }
     const inst = loanMonthlyInstallment({
       principal,
       effectiveRate: rate,
@@ -202,6 +209,15 @@ export default async function RepaymentSchedulePage() {
       continue
     }
     const done = fsDoneThisMonth.has(p.id)
+    // 对称于应收侧:本月才收到的资金来源首期下月才到期,不进本月应付。
+    // 已有还款 PV(主动提前还)或本月已还过的仍照常显示。
+    if (
+      isBeforeFirstInstallment(fsm?.effective_date ?? null, currentYM) &&
+      !pendingPvByFs.has(p.id) &&
+      !done
+    ) {
+      continue
+    }
     if (p.lock_in_months != null && p.remaining_periods > 0) {
       const meta = fsMeta.get(p.id)
       const compounding = meta?.compound_interest === true && p.cost_rate > 0
