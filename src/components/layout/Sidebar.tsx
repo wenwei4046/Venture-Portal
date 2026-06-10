@@ -87,7 +87,7 @@ const navEntries: NavEntry[] = [
   { href: '/fund-in', label: 'Fund IN', section: 'Fund In / Out', visible: canAccessTreasury },
   { href: '/fund-out', label: 'Fund OUT', section: 'Fund In / Out', visible: canAccessTreasury },
   { href: '/overdue', label: 'Overdue', section: 'Fund In / Out', visible: canAccessTreasury },
-  { href: '/repayment-schedule', label: '本月还款排程', section: 'Fund In / Out', visible: canAccessTreasury },
+  { href: '/repayment-schedule', label: 'Repayment Schedule', section: 'Fund In / Out', visible: canAccessTreasury },
   { href: '/statements/monthly', label: 'Statements', section: 'Fund In / Out', visible: canAccessTreasury },
   // HR sees HR Costing as an expandable group covering all monthly sub-pages.
   // Principal sees a flat /hr-costing link in the Departments section below.
