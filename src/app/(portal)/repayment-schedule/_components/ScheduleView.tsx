@@ -45,6 +45,10 @@ export interface CompoundTotals {
 }
 
 type Mode = 'all' | 'outstanding'
+// 'scheduled' = the cash actually due this month (feeds the hero totals);
+// 'reference' = compounding 挂账 + no-fixed-term items, which are excluded
+// from the totals — split into their own tab so the main view stays short.
+type Tab = 'scheduled' | 'reference'
 
 function r2(n: number): number {
   return Math.round(n * 100) / 100
@@ -78,6 +82,7 @@ export default function ScheduleView({
   repayCompoundTotals: CompoundTotals
 }) {
   const [mode, setMode] = useState<Mode>('all')
+  const [tab, setTab] = useState<Tab>('scheduled')
 
   const visible = (rows: SchedRow[]) => (mode === 'all' ? rows : rows.filter((r) => !r.done))
   const sum = (rows: SchedRow[]) => rows.reduce((s, r) => r2(s + r.totalDue), 0)
@@ -88,33 +93,17 @@ export default function ScheduleView({
   const repayTot = sum(repayVisible)
   const net = r2(collectTot - repayTot)
 
+  const referenceCount =
+    collectCompound.length + collectNoTerm.length + repayCompound.length + repayNoTerm.length
+
   return (
     <div>
-      {/* Toggle */}
-      <div className="flex items-center gap-2 mb-8">
-        <span className="font-mono text-xs text-muted mr-1">View:</span>
-        <button
-          type="button"
-          onClick={() => setMode('all')}
-          className={`text-sm px-3 py-1.5 rounded-md border transition-colors ${mode === 'all' ? 'bg-accent text-white border-accent' : 'bg-surface text-graphite border-hairline hover:text-ink'}`}
-        >
-          Full plan (incl. collected &amp; paid)
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('outstanding')}
-          className={`text-sm px-3 py-1.5 rounded-md border transition-colors ${mode === 'outstanding' ? 'bg-accent text-white border-accent' : 'bg-surface text-graphite border-hairline hover:text-ink'}`}
-        >
-          Outstanding only (approved drop off)
-        </button>
-      </div>
-
       {/* Hero totals (reflect the active view). Full-width grid like the
           /payments hero — a max-w-3xl cap squeezed each column below the
           rendered width of "RM (277,423.46)" at text-3xl, so the unbreakable
           number token overflowed and overlapped the neighbouring column.
           lg breakpoint (not sm): below ~1024px the figures stack instead. */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <div>
           <div className="font-serif italic text-accent text-sm mb-1">To collect · this month</div>
           <div className="font-serif text-3xl text-num-ink tabular tracking-[-0.01em] text-ledger">{formatMoney(collectTot)}</div>
@@ -131,38 +120,110 @@ export default function ScheduleView({
         </div>
       </div>
 
-      <ScheduleSection title="To collect — scheduled loans" rows={collectVisible} tone="credit" />
-      <CompoundSection
-        title="To collect — compounding (no repayment plan · interest capitalised monthly)"
-        note="Principal on these loans is not being collected yet — each month's interest rolls into the balance and compounds. Not counted in the cash to collect above. Rolled interest = total interest capitalised so far."
-        rows={collectCompound}
-        totals={collectCompoundTotals}
-        tone="credit"
-      />
-      <NoTermSection
-        title="To collect — no fixed term (undecided plan)"
-        note="Loans with no agreed rate / tenure / method — excluded from this month's collections. Outstanding principal and monthly interest listed for reference."
-        rows={collectNoTerm}
-        outstanding={collectNoTermOutstanding}
-        interest={collectNoTermInterest}
-      />
+      {/* Tabs — scheduled cash (in the totals) vs reference items (excluded) */}
+      <div className="border-b border-hairline mb-6">
+        <nav className="flex gap-6" aria-label="Schedule tabs">
+          <TabButton
+            label="Due this month"
+            isActive={tab === 'scheduled'}
+            onClick={() => setTab('scheduled')}
+          />
+          <TabButton
+            label={`Compounding & no fixed term (${referenceCount})`}
+            isActive={tab === 'reference'}
+            onClick={() => setTab('reference')}
+          />
+        </nav>
+      </div>
 
-      <ScheduleSection title="To repay — scheduled fund sources" rows={repayVisible} tone="debit" />
-      <CompoundSection
-        title="To repay — compounding (no repayment plan · interest capitalised monthly)"
-        note="Principal on these fund sources is not being repaid yet — monthly interest rolls into the balance. Not counted in the cash to repay above."
-        rows={repayCompound}
-        totals={repayCompoundTotals}
-        tone="debit"
-      />
-      <NoTermSection
-        title="To repay — no fixed term (on-demand / at maturity)"
-        note="Fund sources with no agreed tenure and no pending repayment PV — excluded from this month's repayments. To schedule one, edit it in Fund In and set the tenure."
-        rows={repayNoTerm}
-        outstanding={repayNoTermOutstanding}
-        interest={repayNoTermInterest}
-      />
+      {tab === 'scheduled' ? (
+        <>
+          {/* Toggle — only affects the scheduled tables */}
+          <div className="flex items-center gap-2 mb-8">
+            <span className="font-mono text-xs text-muted mr-1">View:</span>
+            <button
+              type="button"
+              onClick={() => setMode('all')}
+              className={`text-sm px-3 py-1.5 rounded-md border transition-colors ${mode === 'all' ? 'bg-accent text-white border-accent' : 'bg-surface text-graphite border-hairline hover:text-ink'}`}
+            >
+              Full plan (incl. collected &amp; paid)
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('outstanding')}
+              className={`text-sm px-3 py-1.5 rounded-md border transition-colors ${mode === 'outstanding' ? 'bg-accent text-white border-accent' : 'bg-surface text-graphite border-hairline hover:text-ink'}`}
+            >
+              Outstanding only (approved drop off)
+            </button>
+          </div>
+
+          {/* Side-by-side on wide screens: collect left, repay right */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-10">
+            <ScheduleSection title="To collect — scheduled loans" rows={collectVisible} tone="credit" />
+            <ScheduleSection title="To repay — scheduled fund sources" rows={repayVisible} tone="debit" />
+          </div>
+        </>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-10">
+          <div>
+            <CompoundSection
+              title="To collect — compounding"
+              note="Principal on these loans is not being collected yet — each month's interest rolls into the balance and compounds. Not counted in the cash to collect on the other tab. Rolled interest = total interest capitalised so far."
+              rows={collectCompound}
+              totals={collectCompoundTotals}
+              tone="credit"
+            />
+            <NoTermSection
+              title="To collect — no fixed term"
+              note="Loans with no agreed rate / tenure / method — excluded from this month's collections. Outstanding principal and monthly interest listed for reference."
+              rows={collectNoTerm}
+              outstanding={collectNoTermOutstanding}
+              interest={collectNoTermInterest}
+            />
+          </div>
+          <div>
+            <CompoundSection
+              title="To repay — compounding"
+              note="Principal on these fund sources is not being repaid yet — monthly interest rolls into the balance. Not counted in the cash to repay on the other tab."
+              rows={repayCompound}
+              totals={repayCompoundTotals}
+              tone="debit"
+            />
+            <NoTermSection
+              title="To repay — no fixed term"
+              note="Fund sources with no agreed tenure and no pending repayment PV — excluded from this month's repayments. To schedule one, edit it in Fund In and set the tenure."
+              rows={repayNoTerm}
+              outstanding={repayNoTermOutstanding}
+              interest={repayNoTermInterest}
+            />
+          </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+function TabButton({
+  label,
+  isActive,
+  onClick,
+}: {
+  label: string
+  isActive: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        isActive
+          ? 'pb-3 border-b-2 border-accent font-serif text-accent text-sm'
+          : 'pb-3 border-b-2 border-transparent font-serif italic text-graphite text-sm hover:text-ink transition-colors'
+      }
+    >
+      {label}
+    </button>
   )
 }
 
