@@ -58,6 +58,15 @@ Supabase MCP `apply_migration` AND saved to `supabase/migrations/` for parity
   invoice (Company/Mode/Description/Status) lists. Composes with search + sort.
 
 ### Data corrections (direct SQL, recorded for audit — NOT in migrations)
+- **2026-06-10: HC fund source 71,457.13 split into 3 compound tranches** mirroring
+  the HK loan side (the money passed HC → HV → Hookka): original row `887388ff`
+  shrunk to **BI#25A 42,881.63 自2025-09** + new rows **BI#25B 22,873.50 自2025-12**
+  / **BI#25C 5,702.00 自2026-03**, all `compound_interest=true` @2%/mo — symmetric
+  with loans LO#25A/B/C. Sum still 71,457.13. No PV/approval referenced the
+  original row. Loans LO#25A/B/C got `· 资金来源: HC` appended to repayment_terms
+  (drives the Fund OUT SC badge). Schedule impact: the HC payable moves from
+  "no fixed term" to the compounding tab; To repay hero unchanged (compound is
+  excluded from totals).
 - **2026-06-10: 9 JEs re-tagged director_office → director** (segment only, no
   amounts moved). Root cause: BOTH segment mappers (SQL `billing_mode_to_segment`
   + TS `segmentForBillingMode`) mapped `director_attribution` → `director_office`
