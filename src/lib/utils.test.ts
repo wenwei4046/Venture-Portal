@@ -1,5 +1,24 @@
 import { describe, it, expect } from 'vitest'
-import { formatMoney, formatMoneyBare, formatRate, cn } from './utils'
+import { formatMoney, formatMoneyBare, formatRate, cn, fundingSourceFromTerms } from './utils'
+
+describe('fundingSourceFromTerms', () => {
+  it('extracts 资金来源: value up to the next · separator', () => {
+    expect(fundingSourceFromTerms('EMI 分期 · 月息4% · 6期 · [LO#3] · 资金来源: HC-58k')).toBe('HC-58k')
+    expect(fundingSourceFromTerms('一次还清 · 月息2% · 1期 · [LO#13] · 资金来源: MK')).toBe('MK')
+    expect(fundingSourceFromTerms('自定义分期 · 月息2% · 2期 · Kingsley经手 · [LO#11] · 资金来源: WL-King')).toBe('WL-King')
+  })
+  it('extracts the 资金从…借过来 form', () => {
+    expect(fundingSourceFromTerms('新增 · 利息/期数/方式未定 · 放款日2026-04-30 · [LO-NEW-2990] · 资金从 Kingsley 借过来')).toBe('Kingsley')
+  })
+  it('supports full-width colon', () => {
+    expect(fundingSourceFromTerms('EMI 分期 · 资金来源：2990')).toBe('2990')
+  })
+  it('returns null when no remark', () => {
+    expect(fundingSourceFromTerms('EMI 分期 · 月息4% · 6期')).toBeNull()
+    expect(fundingSourceFromTerms(null)).toBeNull()
+    expect(fundingSourceFromTerms('')).toBeNull()
+  })
+})
 
 describe('formatMoney', () => {
   it('formats a positive integer with two decimal places', () => {

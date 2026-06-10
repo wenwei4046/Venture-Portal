@@ -47,3 +47,16 @@ export function getPeriodMonth(date?: Date): string {
 export function cn(...classes: (string | undefined | null | false)[]): string {
   return classes.filter(Boolean).join(' ')
 }
+
+// Extract the funding-source remark Finance appends to loans.repayment_terms,
+// e.g. "EMI 分期 · 月息4% · 6期 · [LO#3] · 资金来源: HC-58k" → "HC-58k", or
+// "… · 资金从 Kingsley 借过来" → "Kingsley". Returns null when no remark.
+// Display-only — never used to match data.
+export function fundingSourceFromTerms(terms: string | null | undefined): string | null {
+  if (!terms) return null
+  const src = terms.match(/资金来源[:：]\s*([^·]+)/)
+  if (src?.[1]) return src[1].trim() || null
+  const from = terms.match(/资金从\s*(.+?)\s*借过来/)
+  if (from?.[1]) return from[1].trim() || null
+  return null
+}

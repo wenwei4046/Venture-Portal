@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, fundingSourceFromTerms } from '@/lib/utils'
 import ExportCSVButton from './_components/ExportCSVButton'
 import LoansTable from './_components/LoansTable'
 import LoanTabs from './_components/LoanTabs'
@@ -15,6 +15,7 @@ type LoanRow = {
   risk_premium: number
   effective_rate: number
   disbursement_date: string | null
+  repayment_terms: string | null
   status: 'pending_approval' | 'active' | 'fully_repaid' | 'cancelled'
   created_at: string
 }
@@ -180,6 +181,7 @@ export default async function FundOutPage({ searchParams }: Props) {
                     outstanding: Number(out?.outstanding ?? loan.principal),
                     effectiveRate: Number(loan.effective_rate),
                     status: loan.status,
+                    fundingSource: fundingSourceFromTerms(loan.repayment_terms),
                   }
                 })}
               />

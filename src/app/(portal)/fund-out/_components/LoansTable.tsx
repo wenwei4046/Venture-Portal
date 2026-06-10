@@ -14,6 +14,8 @@ export interface LoanRow {
   outstanding: number
   effectiveRate: number
   status: 'pending_approval' | 'active' | 'fully_repaid' | 'cancelled'
+  /** Funding-source remark parsed out of repayment_terms (资金来源: …), null if none. */
+  fundingSource: string | null
 }
 
 function StatusLabel({ status }: { status: LoanRow['status'] }) {
@@ -39,7 +41,17 @@ export default function LoansTable({ rows }: { rows: LoanRow[] }) {
           label: 'Company',
           render: (l) => (
             <>
-              <div className="font-serif text-[15px] text-ink">{l.companyName}</div>
+              <div className="font-serif text-[15px] text-ink">
+                {l.companyName}
+                {l.fundingSource ? (
+                  <span
+                    className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
+                    title={`资金来源: ${l.fundingSource}`}
+                  >
+                    SRC {l.fundingSource}
+                  </span>
+                ) : null}
+              </div>
               <div className="font-mono text-[11px] text-graphite mt-0.5">
                 {l.companyCode} · {dayjs(l.createdAt).format('D MMM YYYY')}
               </div>
