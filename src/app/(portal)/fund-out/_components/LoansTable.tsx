@@ -48,7 +48,7 @@ export default function LoansTable({ rows }: { rows: LoanRow[] }) {
                     className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
                     title={`资金来源: ${l.fundingSource}`}
                   >
-                    SRC {l.fundingSource}
+                    SC {l.fundingSource}
                   </span>
                 ) : null}
               </div>
