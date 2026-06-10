@@ -117,7 +117,11 @@ describe('segmentForBillingMode', () => {
     expect(segmentForBillingMode('hr_attribution')).toBe('hr')
     expect(segmentForBillingMode('finance_attribution')).toBe('finance')
     expect(segmentForBillingMode('director_office_attribution')).toBe('director_office')
-    expect(segmentForBillingMode('director_attribution')).toBe('director_office')
+    // Regression 2026-06-10: director_attribution settlements credit the
+    // DIRECTOR pool (dept_pool_director), so the GL segment must be
+    // 'director' too — the old 'director_office' mapping forked
+    // dept_pools vs GL by 65,931.62.
+    expect(segmentForBillingMode('director_attribution')).toBe('director')
   })
   it('falls back to corporate for venture_attribution and unknown modes', () => {
     expect(segmentForBillingMode('venture_attribution')).toBe('corporate')

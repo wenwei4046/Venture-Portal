@@ -58,6 +58,17 @@ Supabase MCP `apply_migration` AND saved to `supabase/migrations/` for parity
   invoice (Company/Mode/Description/Status) lists. Composes with search + sort.
 
 ### Data corrections (direct SQL, recorded for audit — NOT in migrations)
+- **2026-06-10: 9 JEs re-tagged director_office → director** (segment only, no
+  amounts moved). Root cause: BOTH segment mappers (SQL `billing_mode_to_segment`
+  + TS `segmentForBillingMode`) mapped `director_attribution` → `director_office`
+  while its POOL is dept_pool_director — settling Director salary-attribution
+  invoices forked dept_pools vs GL by 65,931.62 (Director Office GL showed
+  67,249.04 vs pool 1,317.42). Re-tagged: settlement JEs `JE-202606-0097/0100/
+  0101/0102` (bank-in, 65,931.62) + issue JEs `JE-202606-0027..0031`
+  (AR/revenue side, invoices HV-INV-202605-0055..0059). Mappers fixed: mig
+  `20260610010000` (SQL) + invoice-settlement.ts (TS, + test). Verified: all 5
+  dept pools tie GL exactly (diff 0.00), total bank 163,533.09 unchanged
+  (HL 1,746.32 + Alliance 161,786.77).
 - **2026-06-10: HL bank cache +3,250 → 121,746.32** (= GL 3000). Root cause: two
   loan repayments recorded by Finance on 2026-06-10 (loans `3641efec` 1,500+450,
   `e6569127` 1,000+300) posted GL Dr 3000 but the JS-side cache bump in
