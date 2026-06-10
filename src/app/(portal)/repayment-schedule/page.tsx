@@ -69,7 +69,7 @@ export default async function RepaymentSchedulePage() {
       collectRows.push({
         key: l.id as string,
         counterparty,
-        detail: `RM ${principal.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(rate * 100).toFixed(3)}%/mo · 本月结清`,
+        detail: `RM ${principal.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(rate * 100).toFixed(3)}%/mo · settled this month`,
         principalDue: tm.principal,
         interestDue: tm.interest,
         totalDue: r2(tm.principal + tm.interest),
@@ -87,7 +87,7 @@ export default async function RepaymentSchedulePage() {
       collectCompound.push({
         key: l.id as string,
         counterparty,
-        detail: `原 RM ${principal.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(rate * 100).toFixed(3)}%/mo · 自 ${startYM} 利滚利`,
+        detail: `RM ${principal.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(rate * 100).toFixed(3)}%/mo · compounding since ${startYM}`,
         balance: cs.balance,
         accrued: r2(cs.balance - remainingPrincipal),
         thisMonthInterest: cs.thisMonthInterest,
@@ -98,7 +98,7 @@ export default async function RepaymentSchedulePage() {
       collectNoTerm.push({
         key: l.id as string,
         counterparty,
-        detail: `RM ${principal.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(rate * 100).toFixed(3)}%/mo · 未定`,
+        detail: `RM ${principal.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(rate * 100).toFixed(3)}%/mo · undecided`,
         outstanding: Number(out?.outstanding ?? principal),
         monthlyInterest: r2(principal * rate),
       })
@@ -186,7 +186,7 @@ export default async function RepaymentSchedulePage() {
       repayCompound.push({
         key: p.id,
         counterparty: cp,
-        detail: `原 RM ${p.original_amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(p.cost_rate * 100).toFixed(3)}%/mo · 自 ${startYM} 利滚利`,
+        detail: `RM ${p.original_amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(p.cost_rate * 100).toFixed(3)}%/mo · compounding since ${startYM}`,
         balance: cs.balance,
         accrued: r2(cs.balance - p.outstanding),
         thisMonthInterest: cs.thisMonthInterest,
@@ -200,7 +200,7 @@ export default async function RepaymentSchedulePage() {
       repayRows.push({
         key: p.id,
         counterparty: cp,
-        detail: `RM ${p.original_amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(p.cost_rate * 100).toFixed(3)}%/mo · 本月结清`,
+        detail: `RM ${p.original_amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(p.cost_rate * 100).toFixed(3)}%/mo · settled this month`,
         principalDue: tm.principal,
         interestDue: tm.interest,
         totalDue: r2(tm.principal + tm.interest),
@@ -227,7 +227,7 @@ export default async function RepaymentSchedulePage() {
         const startYM = (meta?.effective_date ?? '').slice(0, 7) || currentYM
         const cs = compoundInterestState({ principal: p.original_amount, monthlyRate: p.cost_rate, startYM, currentYM, paymentsByMonth: fsPayByMonth.get(p.id) ?? {} })
         interestDue = cs.thisMonthInterest
-        extra = ` · 利滚利 余额 RM ${cs.balance.toLocaleString('en-MY', { minimumFractionDigits: 2 })}`
+        extra = ` · compound balance RM ${cs.balance.toLocaleString('en-MY', { minimumFractionDigits: 2 })}`
       }
       repayRows.push({
         key: p.id,
@@ -244,7 +244,7 @@ export default async function RepaymentSchedulePage() {
       repayRows.push({
         key: p.id,
         counterparty: cp,
-        detail: `RM ${p.original_amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(p.cost_rate * 100).toFixed(3)}%/mo · 待审批 ${bd.voucherNo}`,
+        detail: `RM ${p.original_amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(p.cost_rate * 100).toFixed(3)}%/mo · pending ${bd.voucherNo}`,
         principalDue: r2(bd.principal),
         interestDue: r2(bd.interest),
         totalDue: r2(bd.principal + bd.interest),
@@ -255,7 +255,7 @@ export default async function RepaymentSchedulePage() {
       repayNoTerm.push({
         key: p.id,
         counterparty: cp,
-        detail: `RM ${p.original_amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(p.cost_rate * 100).toFixed(3)}%/mo · 无固定期限`,
+        detail: `RM ${p.original_amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(p.cost_rate * 100).toFixed(3)}%/mo · no fixed term`,
         outstanding: p.outstanding,
         monthlyInterest: p.monthly_interest,
       })
@@ -287,13 +287,14 @@ export default async function RepaymentSchedulePage() {
 
       <div className="page-head">
         <div>
-          <div className="page-eyebrow"><em>I.</em> TREASURY · 本月还款排程 · {dayjs().format('MMMM YYYY').toUpperCase()}</div>
-          <h1 className="page-title">本月应收 / 应付</h1>
+          <div className="page-eyebrow"><em>I.</em> TREASURY · DUE THIS MONTH · {dayjs().format('MMMM YYYY').toUpperCase()}</div>
+          <h1 className="page-title">Repayment Schedule</h1>
         </div>
       </div>
 
       <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
-        固定摊还:本金 = 原额 ÷ 期数,利息 = 原额 × 月利率。待审批的还款 PV 会显示「待审批」标签,直到 approve 才算已付。
+        Flat amortisation: principal = original ÷ tenure, interest = original × monthly rate.
+        Repayment PVs awaiting approval carry a &ldquo;Pending PV&rdquo; tag and only count as paid once approved.
       </p>
 
       <ScheduleView
