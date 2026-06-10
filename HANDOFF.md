@@ -58,6 +58,15 @@ Supabase MCP `apply_migration` AND saved to `supabase/migrations/` for parity
   invoice (Company/Mode/Description/Status) lists. Composes with search + sort.
 
 ### Data corrections (direct SQL, recorded for audit — NOT in migrations)
+- **2026-06-10: HL bank cache +3,250 → 121,746.32** (= GL 3000). Root cause: two
+  loan repayments recorded by Finance on 2026-06-10 (loans `3641efec` 1,500+450,
+  `e6569127` 1,000+300) posted GL Dr 3000 but the JS-side cache bump in
+  `recordRepayment` (fund-out/actions.ts L255) was **silently blocked by RLS** —
+  `bank_accounts` UPDATE policy is principal-only, the update isn't error-checked,
+  PostgREST returns success with 0 rows. Code fix still pending: move the bump
+  into a SECURITY DEFINER RPC/trigger or check rowcount + fail loud (ties into
+  process-review "first 4" item (a)). Alliance unaffected (settle path bumps via
+  SECURITY DEFINER trigger).
 - Loan d3921b67 (CONTS): backfilled the **interest 3,000** leg lost to the ordering
   bug (repayment row + JE Dr3000/Cr7000 + HL cache +3,000), 2026-06-05.
 - **HV-PV-202606-0008** (HV repaying its 2990 borrowing 45,000+900): split the
