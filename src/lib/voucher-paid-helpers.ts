@@ -160,19 +160,22 @@ export async function applyVoucherPaidSideEffects(
   if (voucher.bank_account_id) {
     const { data: bank } = await supabase
       .from('bank_accounts')
-      .select('current_balance, gl_account_code')
+      .select('gl_account_code')
       .eq('id', voucher.bank_account_id)
       .single()
 
     if (bank) {
       bankGlCode = bank.gl_account_code ?? '3000'
-      const newBalance = isCredit
-        ? Number(bank.current_balance) + amount
-        : Number(bank.current_balance) - amount
-      await supabase
-        .from('bank_accounts')
-        .update({ current_balance: newBalance })
-        .eq('id', voucher.bank_account_id)
+      // Via bump_bank_balance RPC (mig 20260610000000): a direct
+      // bank_accounts.update is silently blocked by RLS for non-principal
+      // callers (UPDATE policy is principal-only) — fail loud instead.
+      const { error: bumpErr } = await supabase.rpc('bump_bank_balance', {
+        p_bank_account_id: voucher.bank_account_id,
+        p_delta: isCredit ? amount : -amount,
+      })
+      if (bumpErr) {
+        throw new Error(`Voucher paid but bank balance update failed: ${bumpErr.message}`)
+      }
     }
   }
 

@@ -63,10 +63,20 @@ Supabase MCP `apply_migration` AND saved to `supabase/migrations/` for parity
   `e6569127` 1,000+300) posted GL Dr 3000 but the JS-side cache bump in
   `recordRepayment` (fund-out/actions.ts L255) was **silently blocked by RLS** —
   `bank_accounts` UPDATE policy is principal-only, the update isn't error-checked,
-  PostgREST returns success with 0 rows. Code fix still pending: move the bump
-  into a SECURITY DEFINER RPC/trigger or check rowcount + fail loud (ties into
-  process-review "first 4" item (a)). Alliance unaffected (settle path bumps via
+  PostgREST returns success with 0 rows. Alliance unaffected (settle path bumps via
   SECURITY DEFINER trigger).
+  **FIXED same day** — mig `20260610000000` adds `bump_bank_balance(uuid, numeric)`
+  SECURITY DEFINER RPC (finance+principal guard null-safe fail-closed, atomic
+  `+delta` so no read-modify-write race, raises on unknown bank). Swapped in at the
+  3 non-principal call sites, each now error-checked + fail-loud: `recordRepayment`
+  (fund-out/actions.ts), `voidPaidReceipt` (payments/actions.ts),
+  `applyVoucherPaidSideEffects` (voucher-paid-helpers.ts — currently caller-less).
+  The 3 principal-only direct updates in approvals/actions.ts (L160/275/605) left
+  as-is (RLS permits principal; candidates for later unification onto the RPC).
+  RPC verified via rollback probes: finance ✓ / hr rejected ✓ / null-role rejected ✓
+  / unknown bank raises ✓. types regenerated; tsc clean; 250 tests pass.
+  The Cont loan (120k, HV-PV-202606-0027) was approved after the cache fix —
+  HL now ~1,746.32 (thin!), Alliance 161,786.77.
 - Loan d3921b67 (CONTS): backfilled the **interest 3,000** leg lost to the ordering
   bug (repayment row + JE Dr3000/Cr7000 + HL cache +3,000), 2026-06-05.
 - **HV-PV-202606-0008** (HV repaying its 2990 borrowing 45,000+900): split the

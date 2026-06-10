@@ -975,18 +975,17 @@ export async function voidPaidReceipt(formData: FormData) {
   const amount = r2(Number(v.amount))
   const nowIso = new Date().toISOString()
 
-  // 1) Reverse bank cache (the receipt had added to it)
+  // 1) Reverse bank cache (the receipt had added to it). Via bump_bank_balance
+  // RPC (mig 20260610000000) — the old direct update was silently blocked by
+  // RLS when Finance ran the void (bank_accounts UPDATE policy is
+  // principal-only), leaving the cache overstated vs GL.
   if (v.bank_account_id) {
-    const { data: bank } = await supabase
-      .from('bank_accounts')
-      .select('current_balance')
-      .eq('id', v.bank_account_id)
-      .single()
-    if (bank) {
-      await supabase
-        .from('bank_accounts')
-        .update({ current_balance: r2(Number(bank.current_balance) - amount) })
-        .eq('id', v.bank_account_id)
+    const { error: bumpErr } = await supabase.rpc('bump_bank_balance', {
+      p_bank_account_id: v.bank_account_id,
+      p_delta: -amount,
+    })
+    if (bumpErr) {
+      throw new Error(`Failed to reverse bank balance: ${bumpErr.message}`)
     }
   }
 

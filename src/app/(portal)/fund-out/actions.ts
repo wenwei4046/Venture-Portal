@@ -252,11 +252,18 @@ export async function recordRepayment(formData: FormData) {
   // Bank cache: a repayment received increases the bank balance. The GL Dr Bank
   // is posted below, but the cached current_balance must move too (it's not
   // trigger-maintained), else the dashboard/settings bank figure understates.
+  // Via bump_bank_balance RPC (mig 20260610000000): the old direct
+  // bank_accounts.update was silently blocked by RLS for Finance (UPDATE policy
+  // is principal-only, PostgREST returns success with 0 rows) — cache drifted
+  // vs GL on every Finance-recorded repayment.
   if (primaryBank?.id) {
-    await supabase
-      .from('bank_accounts')
-      .update({ current_balance: Math.round((Number(primaryBank.current_balance) + amount) * 100) / 100 })
-      .eq('id', primaryBank.id)
+    const { error: bumpErr } = await supabase.rpc('bump_bank_balance', {
+      p_bank_account_id: primaryBank.id,
+      p_delta: amount,
+    })
+    if (bumpErr) {
+      throw new Error(`Repayment recorded but bank balance update failed: ${bumpErr.message}`)
+    }
   }
   // Mig 238 unified COA + 2026-05-15 fix:
   //   - principal → <borrower's leaf under 3020 Loans Receivable>. The user

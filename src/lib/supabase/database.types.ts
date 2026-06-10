@@ -4059,6 +4059,10 @@ export type Database = {
           staff_snapshot: Json
         }[]
       }
+      bump_bank_balance: {
+        Args: { p_bank_account_id: string; p_delta: number }
+        Returns: number
+      }
       bump_bank_for_paid_credit: {
         Args: { p_voucher_id: string }
         Returns: undefined
