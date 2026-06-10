@@ -83,18 +83,12 @@ const navEntries: NavEntry[] = [
   // /statements IS the invoices landing (Phase 7 Step 11 merge); the monthly
   // statements list lives at /statements/monthly (inside Fund In / Out below).
   { href: '/statements', label: 'Invoice', section: 'Daily Operations', exact: true, visible: canAccessTreasury },
-  {
-    label: 'Fund In / Out',
-    section: 'Daily Operations',
-    visible: canAccessTreasury,
-    children: [
-      { href: '/fund-in', label: 'Fund IN', visible: canAccessTreasury },
-      { href: '/fund-out', label: 'Fund OUT', visible: canAccessTreasury },
-      { href: '/overdue', label: 'Overdue', visible: canAccessTreasury },
-      { href: '/repayment-schedule', label: '本月还款排程', visible: canAccessTreasury },
-      { href: '/statements/monthly', label: 'Statements', visible: canAccessTreasury },
-    ],
-  },
+  // ── Fund In / Out (its own section, flat — user 2026-06-10) ──
+  { href: '/fund-in', label: 'Fund IN', section: 'Fund In / Out', visible: canAccessTreasury },
+  { href: '/fund-out', label: 'Fund OUT', section: 'Fund In / Out', visible: canAccessTreasury },
+  { href: '/overdue', label: 'Overdue', section: 'Fund In / Out', visible: canAccessTreasury },
+  { href: '/repayment-schedule', label: '本月还款排程', section: 'Fund In / Out', visible: canAccessTreasury },
+  { href: '/statements/monthly', label: 'Statements', section: 'Fund In / Out', visible: canAccessTreasury },
   // HR sees HR Costing as an expandable group covering all monthly sub-pages.
   // Principal sees a flat /hr-costing link in the Departments section below.
   {
