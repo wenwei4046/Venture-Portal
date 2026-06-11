@@ -107,7 +107,7 @@ HOUZS Venture Portal (VP) 是 HOUZS Venture Sdn Bhd 的内部银行系统。User
 :root {
   --font-serif: 'Instrument Serif', 'Noto Serif TC', Georgia, serif;
   --font-sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono:  'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+  --font-mono:  'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace;
   --font-cjk:   'Noto Serif TC', 'PingFang TC', 'Source Han Serif TC', serif;
 }
 ```
@@ -116,7 +116,7 @@ HOUZS Venture Portal (VP) 是 HOUZS Venture Sdn Bhd 的内部银行系统。User
 ```html
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Serif+TC:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Serif+TC:wght@400;600;700&display=swap" rel="stylesheet">
 ```
 
 All 4 fonts are free. No licensing cost.
@@ -128,10 +128,10 @@ All 4 fonts are free. No licensing cost.
 | Display — page titles, hero numbers | **Instrument Serif** | 400 regular | `<h1>`, hero money values, section titles |
 | Display italic — emphasis, active states, labels | **Instrument Serif Italic** | 400 italic | "*Free pool*", "*Pending your hand*", sidebar active item |
 | Body — UI text, descriptions, form labels | **Inter** | 400/500/600 | Most body copy, form labels, button text (sans) |
-| Data — money, rates, dates | **JetBrains Mono** | 400/500 | All money columns, rate values, date strings. `font-variant-numeric: tabular-nums slashed-zero` |
+| Data — money, rates, dates | **IBM Plex Mono** | 400/500 | All money columns, rate values, date strings. `font-variant-numeric: tabular-nums` |
 | CJK — Chinese labels | **Noto Serif TC** | 400/600/700 | 董事长 · 本月对账单 · 内部账册. Pairs with Instrument Serif. |
 
-**Key rule:** Display = always Instrument Serif. Body = Inter. Data = JetBrains Mono. No exceptions without explicit DESIGN.md update.
+**Key rule:** Display = always Instrument Serif. Body = Inter. Data = IBM Plex Mono. No exceptions without explicit DESIGN.md update.
 
 ### Type scale
 
@@ -150,11 +150,11 @@ All 4 fonts are free. No licensing cost.
 | `text-hero` | 64px | 64px | serif | Solvency hero number on Dashboard |
 | `text-hero-lg` | 72px | 72px | serif | Reserved for single most important number |
 
-**Money numbers always use tabular-nums + slashed-zero:**
+**Money numbers always use tabular-nums (plain zero):**
 ```css
 .tabular, .mono {
   font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums slashed-zero;
+  font-variant-numeric: tabular-nums;
 }
 ```
 
@@ -383,7 +383,7 @@ These are the load-bearing classes that make a page feel "v3.0 ledger-dense" ins
 | `.page-eyebrow` | Mono uppercase 10.5px label with rust italic roman numeral inside `<em>` | Inside `.page-head`, above the `.page-title`. Format: `<em>I.</em> SECTION · PAGE NAME`. |
 | `.page-title` | Instrument Serif 38px ink with negative letter-spacing | The `<h1>` inside `.page-head`. |
 | `.sect-head` | Flex baseline row: italic serif title + hairline rule extending right + uppercase mono counter | Section dividers inside a page. Replaces hand-rolled `<h2>` + `<p>` mb-6 pattern. |
-| `.num` | JetBrains Mono + `tabular-nums slashed-zero` + 13.5px + weight 500 + `--num-ink` | Every money cell in a table or grid. Right-aligns inside `.ledger-table td.num`. |
+| `.num` | IBM Plex Mono + `tabular-nums` + 13.5px + weight 500 + `--num-ink` | Every money cell in a table or grid. Right-aligns inside `.ledger-table td.num`. |
 | `.num.neg` | Same as `.num` but `--danger` red | Negative amounts (`(1,234.56)` style). |
 | `.num-hero` | 56px serif + tabular + `--num-ink` + tight letter-spacing; auto-styles `<span class="cents">` and `<span class="unit">` to graphite | Dashboard / page hero figures (Free pool, Total outstanding, etc.). |
 | `.ledger-table` | Surface bg + 1px hairline border + 6px radius + zebra rows + `surface-2` thead + accent-bg hover + `td.num` right-align | Every data list table. Replaces ad-hoc `<table className="w-full text-sm">…border-b…hover:bg-surface-2/40`. |
@@ -463,7 +463,7 @@ Components required for Phase 1 (many already exist, need restyling):
 | `<ApprovalCard>` | Pending approval item | Hairline border, serif title, mono amount, italic rust "*Approve*" button + secondary button |
 | `<DataTable>` | Fund sources / loans / overdue list | 48px rows, hairline dividers, tabular mono for money, serif heading row |
 | `<StatusLabel>` | "*active*" / "*overdue 15d*" / "*pending*" | Italic serif + semantic color (no pill, no bg) |
-| `<MoneyCell>` | Money display | Mono tabular slashed-zero, right-aligned in tables |
+| `<MoneyCell>` | Money display | Mono tabular, right-aligned in tables |
 | `<DateCell>` | Date display | "Wed 9 Apr 2026" serif OR "9 Apr 2026" mono depending on context |
 | `<Button variant="seal">` | Primary action (Approve, Save) | Rust `--accent` bg, white text, italic serif font, rounded-md 6px, no shadow |
 | `<Button variant="secondary">` | Secondary action | Transparent bg, hairline border, sans graphite text, rounded-md |
@@ -650,7 +650,7 @@ Add `@axe-core/react` in dev and `eslint-plugin-jsx-a11y` in CI.
 
 | Context | Format | Font |
 |---|---|---|
-| Tables, detail views | `RM 100,000.00` | JetBrains Mono tabular slashed-zero |
+| Tables, detail views | `RM 100,000.00` | IBM Plex Mono tabular |
 | Hero numbers | `RM 12,847,203.55` | Instrument Serif 64px |
 | KPI cards | `RM 100K` / `RM 1.2M` | Instrument Serif 28-40px |
 | Negative (contra) | `(1,234.56)` | mono + `--danger` color |
@@ -660,7 +660,7 @@ Add `@axe-core/react` in dev and `eslint-plugin-jsx-a11y` in CI.
 | Context | Format | Font |
 |---|---|---|
 | Serif display | "Wed 9 Apr 2026" | Instrument Serif |
-| Mono meta | "9 Apr 2026" / "Wed 09:42" | JetBrains Mono |
+| Mono meta | "9 Apr 2026" / "Wed 09:42" | IBM Plex Mono |
 | Form input | ISO `2026-04-09` | mono |
 | Period | "April 2026" | serif |
 

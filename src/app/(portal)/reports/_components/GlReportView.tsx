@@ -276,10 +276,14 @@ function SectionRows({
 }) {
   const rows: React.ReactNode[] = []
 
+  // Section title = small-caps eyebrow (matches the portal's sect-head
+  // convention) so it reads clearly apart from the serif-italic subtotal rows.
   rows.push(
-    <tr key={`sect-${section.key}`} className="bg-surface border-t-2 border-hairline">
-      <td colSpan={colCount} className="font-serif italic text-ink font-semibold text-[15px]">
-        {section.label}
+    <tr key={`sect-${section.key}`} className="border-t-2 border-hairline">
+      <td colSpan={colCount} className="pt-3.5">
+        <span className="font-sans text-[10.5px] font-semibold uppercase tracking-[0.18em] text-accent">
+          {section.label}
+        </span>
       </td>
     </tr>,
   )
