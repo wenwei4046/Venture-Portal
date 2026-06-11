@@ -5,6 +5,7 @@ import {
   billingModeToCategoryCode,
   billingModeLabel,
   invoiceJeDate,
+  deptNameToSegment,
   fallbackRevenueGlCode,
   BILLING_MODES,
   AUTO_GENERATED_BILLING_MODES,
@@ -122,5 +123,19 @@ describe('fallbackRevenueGlCode', () => {
     expect(fallbackRevenueGlCode('marketing_project')).toBe('5000')
     expect(fallbackRevenueGlCode('venture_attribution')).toBe('5000')
     expect(fallbackRevenueGlCode(null)).toBe('5000')
+  })
+})
+
+describe('deptNameToSegment', () => {
+  it('maps the five dept pools to their GL segments', () => {
+    expect(deptNameToSegment('Marketing')).toBe('marketing')
+    expect(deptNameToSegment('Director Office')).toBe('director_office')
+    expect(deptNameToSegment('Director')).toBe('director')
+    expect(deptNameToSegment('HR')).toBe('hr')
+    expect(deptNameToSegment('Finance')).toBe('finance')
+  })
+  it('returns undefined for unknown names (JE falls back to derived segment)', () => {
+    expect(deptNameToSegment('Ops')).toBeUndefined()
+    expect(deptNameToSegment(null)).toBeUndefined()
   })
 })

@@ -58,6 +58,14 @@ Supabase MCP `apply_migration` AND saved to `supabase/migrations/` for parity
   invoice (Company/Mode/Description/Status) lists. Composes with search + sort.
 
 ### Data corrections (direct SQL, recorded for audit — NOT in migrations)
+- **2026-06-11: 7 inter-billing expense JEs re-tagged corporate → marketing**
+  (JE-202605-0007/0014/0021/0028/0035/0042 + JE-202606-0038 — the Dr 9051 /
+  Cr 3030 twins of Marketing's utilities rebills). Root cause: the inter-billing
+  expense JE inherited the INVOICE's billing_mode segment (venture_attribution →
+  corporate) instead of the PAYING dept's. Code fixed same commit:
+  `deptNameToSegment` (lib/billing.ts, tested) passed as explicit `segment` at
+  both inter-billing JE posting sites (single + bulk issue). No bank lines
+  touched — all 5 dept pools still tie GL exactly (diff 0.00).
 - **2026-06-11: 17 salary-invoice issue JEs re-pointed 5000 → 5020 Salary Income**
   (credit lines only; May revenue now splits 5000 Service Revenue 59,949.19 +
   5020 Salary Income 123,924.95 = 183,874.14 unchanged). Root cause: the salary

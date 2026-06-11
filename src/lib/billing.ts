@@ -139,3 +139,20 @@ export function fallbackRevenueGlCode(billingMode: string | null): string {
       return '5000'
   }
 }
+
+/**
+ * Department name → GL segment, for tagging inter-billing EXPENSE JEs with the
+ * PAYING department (user 2026-06-11: Marketing's inter-billed utilities were
+ * landing in Venture's P&L because the JE inherited the invoice's
+ * billing_mode segment instead of the payer's).
+ */
+export function deptNameToSegment(name: string | null | undefined): string | undefined {
+  switch (name) {
+    case 'Marketing': return 'marketing'
+    case 'HR': return 'hr'
+    case 'Finance': return 'finance'
+    case 'Director Office': return 'director_office'
+    case 'Director': return 'director'
+    default: return undefined
+  }
+}

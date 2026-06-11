@@ -9,7 +9,7 @@ import { assertPeriodOpen } from '@/lib/period-lock'
 import { postJournalEntry } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
 import { validateConsolidation, poolAttributions, segmentForBillingMode } from '@/lib/invoice-settlement'
-import { fallbackRevenueGlCode, invoiceJeDate } from '@/lib/billing'
+import { deptNameToSegment, fallbackRevenueGlCode, invoiceJeDate } from '@/lib/billing'
 import { INVOICE_BILLING_MODE_TO_POOL } from '@/lib/cfo-reports'
 
 // Mig 200/P1-6a: invoice billing_mode → revenue GL code mapping.
@@ -1044,6 +1044,9 @@ export async function approveInvoice(formData: FormData) {
                 inv.period_month,
                 dayjs().format('YYYY-MM-DD'),
               ),
+              // The EXPENSE belongs to the PAYING dept's P&L, not the
+              // invoice's billing_mode segment (user 2026-06-11).
+              segment: deptNameToSegment(payingDept.name),
               description: `Invoice ${inv.invoice_no ?? inv.id} issued — inter-billing expense (${payingDept.name})`,
               referenceType: 'invoice',
               referenceId: inv.id,
@@ -1141,6 +1144,8 @@ export async function approveInvoicesForPeriod(formData: FormData) {
           try {
             await postJournalEntry(supabase, {
               transactionDate: txnDate,
+              // The EXPENSE belongs to the PAYING dept's P&L (user 2026-06-11).
+              segment: deptNameToSegment(payingDept.name),
               description: `Invoice ${row.invoice_no ?? row.id} issued (bulk) — inter-billing expense (${payingDept.name})`,
               referenceType: 'invoice',
               referenceId: row.id,
