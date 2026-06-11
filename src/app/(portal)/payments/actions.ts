@@ -334,27 +334,37 @@ export async function createPaymentVoucher(formData: FormData) {
           .select('name')
           .eq('id', inv.billable_to_department_id)
           .maybeSingle()
-        if (dept?.name) {
-          // Convention from mig 253: '9051 Inter-billing — Marketing',
-          // '9052 Inter-billing — Finance', etc. Match by suffix so a
-          // renamed dept still works as long as the COA row exists.
-          const { data: acct } = await supabase
-            .from('chart_of_accounts')
-            .select('code, name')
-            .eq('type', 'expense')
-            .ilike('name', `Inter-billing % ${dept.name}`)
-            .maybeSingle()
-          if (acct?.code) {
-            // Pool key follows the dept_pool_<slug> convention used by
-            // INVOICE_BILLING_MODE_TO_POOL ('dept_pool_marketing',
-            // 'dept_pool_director_office', etc).
-            const payingPool = `dept_pool_${dept.name.toLowerCase().replace(/\s+/g, '_')}`
-            interBilling = {
-              expenseCode: acct.code,
-              payingPool,
-              partyLabel: dept.name,
-            }
-          }
+        // Fail loud (2026-06-11): if resolution fails, interBilling stays
+        // null and the voucher silently falls through to the BANK settlement
+        // path — bank cache bumped + Dr bank / Cr 3030 for money that never
+        // moved. A netting settle on a dept_pool invoice must resolve or die.
+        if (!dept?.name) {
+          throw new Error(
+            `Netting settle: paying department ${inv.billable_to_department_id} not found for invoice ${invoiceId}`,
+          )
+        }
+        // Convention from mig 253: '9051 Inter-billing — Marketing',
+        // '9052 Inter-billing — Finance', etc. Match by suffix so a
+        // renamed dept still works as long as the COA row exists.
+        const { data: acct } = await supabase
+          .from('chart_of_accounts')
+          .select('code, name')
+          .eq('type', 'expense')
+          .ilike('name', `Inter-billing % ${dept.name}`)
+          .maybeSingle()
+        if (!acct?.code) {
+          throw new Error(
+            `Netting settle: no active expense account named "Inter-billing — ${dept.name}" in the COA (9051–9055 range)`,
+          )
+        }
+        // Pool key follows the dept_pool_<slug> convention used by
+        // INVOICE_BILLING_MODE_TO_POOL ('dept_pool_marketing',
+        // 'dept_pool_director_office', etc).
+        const payingPool = `dept_pool_${dept.name.toLowerCase().replace(/\s+/g, '_')}`
+        interBilling = {
+          expenseCode: acct.code,
+          payingPool,
+          partyLabel: dept.name,
         }
       }
     }

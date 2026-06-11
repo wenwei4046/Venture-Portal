@@ -1036,38 +1036,46 @@ export async function approveInvoice(formData: FormData) {
         .select('name')
         .eq('id', billableDeptId)
         .maybeSingle()
-      if (payingDept?.name) {
-        const { data: expenseAcct } = await supabase
-          .from('chart_of_accounts')
-          .select('code')
-          .eq('type', 'expense')
-          .ilike('name', `Inter-billing % ${payingDept.name}`)
-          .maybeSingle()
-        if (expenseAcct?.code) {
-          try {
-            await postJournalEntry(supabase, {
-              transactionDate: invoiceJeDate(
-                (inv as { invoice_date?: string | null }).invoice_date,
-                inv.period_month,
-                dayjs().format('YYYY-MM-DD'),
-              ),
-              // The EXPENSE belongs to the PAYING dept's P&L, not the
-              // invoice's billing_mode segment (user 2026-06-11).
-              segment: deptNameToSegment(payingDept.name),
-              description: `Invoice ${inv.invoice_no ?? inv.id} issued — inter-billing expense (${payingDept.name})`,
-              referenceType: 'invoice',
-              referenceId: inv.id,
-              createdBy: user.id,
-              lines: [
-                { accountCode: expenseAcct.code, debit: amount, description: `Inter-billing expense — ${payingDept.name}` },
-                { accountCode: '3030', credit: amount, description: `AR cleared — inter-billing ${inv.invoice_no ?? ''}`.trim() },
-              ],
-            })
-          } catch (jeErr) {
-            const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
-            throw new Error(`Invoice issued but inter-billing expense JE failed: ${msg}`)
-          }
-        }
+      // Fail loud (2026-06-11): a silent skip here posts the receiver's
+      // revenue but never the payer's expense — asymmetric P&L with no trace.
+      if (!payingDept?.name) {
+        throw new Error(
+          `Invoice issued but inter-billing expense JE skipped: paying department ${billableDeptId} not found`,
+        )
+      }
+      const { data: expenseAcct } = await supabase
+        .from('chart_of_accounts')
+        .select('code')
+        .eq('type', 'expense')
+        .ilike('name', `Inter-billing % ${payingDept.name}`)
+        .maybeSingle()
+      if (!expenseAcct?.code) {
+        throw new Error(
+          `Invoice issued but inter-billing expense JE skipped: no active expense account named "Inter-billing — ${payingDept.name}" in the COA (9051–9055 range)`,
+        )
+      }
+      try {
+        await postJournalEntry(supabase, {
+          transactionDate: invoiceJeDate(
+            (inv as { invoice_date?: string | null }).invoice_date,
+            inv.period_month,
+            dayjs().format('YYYY-MM-DD'),
+          ),
+          // The EXPENSE belongs to the PAYING dept's P&L, not the
+          // invoice's billing_mode segment (user 2026-06-11).
+          segment: deptNameToSegment(payingDept.name),
+          description: `Invoice ${inv.invoice_no ?? inv.id} issued — inter-billing expense (${payingDept.name})`,
+          referenceType: 'invoice',
+          referenceId: inv.id,
+          createdBy: user.id,
+          lines: [
+            { accountCode: expenseAcct.code, debit: amount, description: `Inter-billing expense — ${payingDept.name}` },
+            { accountCode: '3030', credit: amount, description: `AR cleared — inter-billing ${inv.invoice_no ?? ''}`.trim() },
+          ],
+        })
+      } catch (jeErr) {
+        const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
+        throw new Error(`Invoice issued but inter-billing expense JE failed: ${msg}`)
       }
     }
   }
@@ -1140,33 +1148,41 @@ export async function approveInvoicesForPeriod(formData: FormData) {
         .select('name')
         .eq('id', rowBillableDeptId)
         .maybeSingle()
-      if (payingDept?.name) {
-        const { data: expenseAcct } = await supabase
-          .from('chart_of_accounts')
-          .select('code')
-          .eq('type', 'expense')
-          .ilike('name', `Inter-billing % ${payingDept.name}`)
-          .maybeSingle()
-        if (expenseAcct?.code) {
-          try {
-            await postJournalEntry(supabase, {
-              transactionDate: txnDate,
-              // The EXPENSE belongs to the PAYING dept's P&L (user 2026-06-11).
-              segment: deptNameToSegment(payingDept.name),
-              description: `Invoice ${row.invoice_no ?? row.id} issued (bulk) — inter-billing expense (${payingDept.name})`,
-              referenceType: 'invoice',
-              referenceId: row.id,
-              createdBy: user.id,
-              lines: [
-                { accountCode: expenseAcct.code, debit: amount, description: `Inter-billing expense — ${payingDept.name}` },
-                { accountCode: '3030', credit: amount, description: `AR cleared — inter-billing ${row.invoice_no ?? ''}`.trim() },
-              ],
-            })
-          } catch (jeErr) {
-            const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
-            throw new Error(`Bulk issue: inter-billing expense JE failed for invoice ${row.invoice_no ?? row.id}: ${msg}`)
-          }
-        }
+      // Fail loud (2026-06-11): a silent skip posts the receiver's revenue
+      // but never the payer's expense — asymmetric P&L with no trace.
+      if (!payingDept?.name) {
+        throw new Error(
+          `Bulk issue: inter-billing expense JE skipped for invoice ${row.invoice_no ?? row.id}: paying department ${rowBillableDeptId} not found`,
+        )
+      }
+      const { data: expenseAcct } = await supabase
+        .from('chart_of_accounts')
+        .select('code')
+        .eq('type', 'expense')
+        .ilike('name', `Inter-billing % ${payingDept.name}`)
+        .maybeSingle()
+      if (!expenseAcct?.code) {
+        throw new Error(
+          `Bulk issue: inter-billing expense JE skipped for invoice ${row.invoice_no ?? row.id}: no active expense account named "Inter-billing — ${payingDept.name}" in the COA (9051–9055 range)`,
+        )
+      }
+      try {
+        await postJournalEntry(supabase, {
+          transactionDate: txnDate,
+          // The EXPENSE belongs to the PAYING dept's P&L (user 2026-06-11).
+          segment: deptNameToSegment(payingDept.name),
+          description: `Invoice ${row.invoice_no ?? row.id} issued (bulk) — inter-billing expense (${payingDept.name})`,
+          referenceType: 'invoice',
+          referenceId: row.id,
+          createdBy: user.id,
+          lines: [
+            { accountCode: expenseAcct.code, debit: amount, description: `Inter-billing expense — ${payingDept.name}` },
+            { accountCode: '3030', credit: amount, description: `AR cleared — inter-billing ${row.invoice_no ?? ''}`.trim() },
+          ],
+        })
+      } catch (jeErr) {
+        const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
+        throw new Error(`Bulk issue: inter-billing expense JE failed for invoice ${row.invoice_no ?? row.id}: ${msg}`)
       }
     }
   }
