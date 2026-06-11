@@ -121,3 +121,21 @@ export function invoiceJeDate(
   }
   return today
 }
+
+/**
+ * Fallback revenue GL code when an invoice carries no explicit category:
+ * the four *_attribution billing modes ARE salary recharges by definition →
+ * 5020 Salary Income; everything else stays on 5000 Service Revenue — Subs.
+ * (user 2026-06-11: salary invoices were landing under Service Revenue.)
+ */
+export function fallbackRevenueGlCode(billingMode: string | null): string {
+  switch (billingMode) {
+    case 'hr_attribution':
+    case 'finance_attribution':
+    case 'director_office_attribution':
+    case 'director_attribution':
+      return '5020'
+    default:
+      return '5000'
+  }
+}

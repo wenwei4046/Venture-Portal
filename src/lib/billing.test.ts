@@ -5,6 +5,7 @@ import {
   billingModeToCategoryCode,
   billingModeLabel,
   invoiceJeDate,
+  fallbackRevenueGlCode,
   BILLING_MODES,
   AUTO_GENERATED_BILLING_MODES,
 } from './billing'
@@ -107,5 +108,19 @@ describe('invoiceJeDate', () => {
   })
   it('falls back to today when both are missing', () => {
     expect(invoiceJeDate(null, null, '2026-06-04')).toBe('2026-06-04')
+  })
+})
+
+describe('fallbackRevenueGlCode', () => {
+  it('routes salary-attribution modes to 5020 Salary Income', () => {
+    expect(fallbackRevenueGlCode('hr_attribution')).toBe('5020')
+    expect(fallbackRevenueGlCode('finance_attribution')).toBe('5020')
+    expect(fallbackRevenueGlCode('director_office_attribution')).toBe('5020')
+    expect(fallbackRevenueGlCode('director_attribution')).toBe('5020')
+  })
+  it('keeps service billing on 5000', () => {
+    expect(fallbackRevenueGlCode('marketing_project')).toBe('5000')
+    expect(fallbackRevenueGlCode('venture_attribution')).toBe('5000')
+    expect(fallbackRevenueGlCode(null)).toBe('5000')
   })
 })

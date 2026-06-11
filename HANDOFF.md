@@ -58,6 +58,16 @@ Supabase MCP `apply_migration` AND saved to `supabase/migrations/` for parity
   invoice (Company/Mode/Description/Status) lists. Composes with search + sort.
 
 ### Data corrections (direct SQL, recorded for audit — NOT in migrations)
+- **2026-06-11: 17 salary-invoice issue JEs re-pointed 5000 → 5020 Salary Income**
+  (credit lines only; May revenue now splits 5000 Service Revenue 59,949.19 +
+  5020 Salary Income 123,924.95 = 183,874.14 unchanged). Root cause: the salary
+  attribution invoices (HV-INV-202605-0043..0059) were created with no
+  category_code → `revenueGlCode` fallback credited everything to 5000. Code
+  fixed same commit: `fallbackRevenueGlCode` (lib/billing.ts, tested) routes the
+  four *_attribution modes to 5020 when no category is picked. The 17 invoices
+  also got `category_code='5020'` backfilled. NOTE: marketing salary invoices
+  use `marketing_project` mode — those still need Finance to pick category 5020
+  manually at creation (can't infer salary-vs-service from the mode).
 - **2026-06-11: 17 invoice-issue JEs re-dated June → 2026-05-31** (+ period_month
   → 2026-05-01). Root cause: all four invoice-issue JE posting sites in
   billing/actions.ts dated the revenue JE `dayjs()` (the day Finance clicked

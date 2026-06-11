@@ -9,19 +9,15 @@ import { assertPeriodOpen } from '@/lib/period-lock'
 import { postJournalEntry } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
 import { validateConsolidation, poolAttributions, segmentForBillingMode } from '@/lib/invoice-settlement'
-import { invoiceJeDate } from '@/lib/billing'
+import { fallbackRevenueGlCode, invoiceJeDate } from '@/lib/billing'
 import { INVOICE_BILLING_MODE_TO_POOL } from '@/lib/cfo-reports'
 
 // Mig 200/P1-6a: invoice billing_mode → revenue GL code mapping.
-// Mig 238 reseed: revenue lives in the 5000-5999 range; 4030 / 4040 are now
-// liability accounts (Statutory Payable / Director Invoice Payable). The
-// b348724 GL-remap pass missed this fallback, so invoices issued without an
-// explicit revenue category_code were silently crediting liabilities and
-// inflating the balance sheet by their amount. Until per-billing-mode
-// revenue sub-accounts exist, every fallback routes to Service Revenue — Subs
-// (5000), the sole revenue account seeded in mig 238.
-function revenueGlCode(_billingMode: string | null): string {
-  return '5000'
+// 2026-06-11: fallback now lives in lib/billing.ts (fallbackRevenueGlCode) —
+// the four *_attribution modes are salary recharges and default to 5020
+// Salary Income; everything else stays on 5000 Service Revenue — Subs.
+function revenueGlCode(billingMode: string | null): string {
+  return fallbackRevenueGlCode(billingMode)
 }
 
 // Note: invoices.category_code (added by mig 230) keeps its column name; only
