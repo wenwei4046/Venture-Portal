@@ -8,7 +8,7 @@ import dayjs from 'dayjs'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { buildPnl, fetchAllJournalLines, fetchCoaAccounts, monthPeriod, prevMonth } from '@/lib/gl-reports'
+import { applyInvoiceRefs, buildPnl, fetchAllJournalLines, fetchCoaAccounts, fetchInvoiceRefs, monthPeriod } from '@/lib/gl-reports'
 import { pnlBlocks } from '@/lib/gl-report-blocks'
 import GlReportView from '../_components/GlReportView'
 import { REPORT_SEGMENTS } from '../_components/report-segments'
@@ -26,17 +26,20 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
 
   const params = await searchParams
   const period = params.period ?? dayjs().format('YYYY-MM')
-  const compare = params.compare ?? prevMonth(period)
+  // Comparison is OPT-IN (user 2026-06-11): default is a clean single-month view.
+  const compare = params.compare ?? ''
   const segment = params.segment ?? ''
 
-  const [lines, accounts] = await Promise.all([
+  const [rawLines, accounts, invoiceRefs] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
+    fetchInvoiceRefs(supabase),
   ])
+  const lines = applyInvoiceRefs(rawLines, invoiceRefs)
 
   const pnl = buildPnl(lines, accounts, {
     current: monthPeriod(period),
-    previous: monthPeriod(compare),
+    previous: monthPeriod(compare || period),
     segment: segment || undefined,
   })
 
@@ -74,7 +77,7 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
         blocks={blocks}
         pctBase={{ current: pnl.revenue.current, previous: pnl.revenue.previous }}
         currentLabel={dayjs(`${period}-01`).format('MMM YYYY')}
-        compareLabel={dayjs(`${compare}-01`).format('MMM YYYY')}
+        compareLabel={compare ? dayjs(`${compare}-01`).format('MMM YYYY') : ''}
       />
     </div>
   )

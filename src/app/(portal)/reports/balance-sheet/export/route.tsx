@@ -3,7 +3,7 @@
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { buildBalanceSheet, fetchAllJournalLines, fetchCoaAccounts, monthPeriod, prevMonth } from '@/lib/gl-reports'
+import { buildBalanceSheet, fetchAllJournalLines, fetchCoaAccounts, monthPeriod } from '@/lib/gl-reports'
 import { balanceSheetBlocks } from '@/lib/gl-report-blocks'
 import { glStatementExportResponse } from '@/lib/export/gl-statement'
 
@@ -14,9 +14,9 @@ export async function GET(req: Request) {
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? ('pdf' as const) : ('xlsx' as const)
   const period = url.searchParams.get('period') ?? dayjs().format('YYYY-MM')
-  const compare = url.searchParams.get('compare') ?? prevMonth(period)
+  const compare = url.searchParams.get('compare') ?? '' // '' = single-month export
   const segment = url.searchParams.get('segment') ?? ''
-  if (!YM.test(period) || !YM.test(compare)) {
+  if (!YM.test(period) || (compare && !YM.test(compare))) {
     return Response.json({ error: 'invalid period/compare (YYYY-MM)' }, { status: 400 })
   }
 
@@ -27,7 +27,7 @@ export async function GET(req: Request) {
   ])
   const bs = buildBalanceSheet(lines, accounts, {
     current: monthPeriod(period),
-    previous: monthPeriod(compare),
+    previous: monthPeriod(compare || period),
     segment: segment || undefined,
   })
 
@@ -39,7 +39,7 @@ export async function GET(req: Request) {
     title: 'Balance Sheet',
     periodLabel: `As at ${asAt(period)}${segment ? ` · ${segment}` : ''}`,
     currentLabel: asAt(period),
-    compareLabel: asAt(compare),
+    compareLabel: compare ? asAt(compare) : '',
     blocks: balanceSheetBlocks(bs, segment || undefined),
   })
 }

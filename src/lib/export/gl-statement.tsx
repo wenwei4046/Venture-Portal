@@ -15,6 +15,7 @@ export interface GlStatementExportArgs {
   title: string
   periodLabel: string
   currentLabel: string
+  /** '' = single-month export (no compare / Δ% columns). */
   compareLabel: string
   blocks: ReportBlock[]
   /** Revenue base — adds the % Rev column (P&L only). */
@@ -23,12 +24,12 @@ export interface GlStatementExportArgs {
 
 export function glStatementExportResponse(args: GlStatementExportArgs): Response | Promise<Response> {
   const withPct = args.pctBase !== undefined
-  const flat = flattenGlReport(args.blocks, { pctBase: args.pctBase })
+  const withCompare = args.compareLabel !== ''
+  const flat = flattenGlReport(args.blocks, { pctBase: args.pctBase, withCompare })
   const headerRow = [
     'Account',
     args.currentLabel,
-    args.compareLabel,
-    'Δ%',
+    ...(withCompare ? [args.compareLabel, 'Δ%'] : []),
     ...(withPct ? ['% Rev'] : []),
   ]
 
@@ -40,38 +41,32 @@ export function glStatementExportResponse(args: GlStatementExportArgs): Response
         headerRow,
         rows: flat.rows,
         sectionBreaks: flat.sectionBreaks,
-        columnWidths: [52, 16, 16, 9, ...(withPct ? [9] : [])],
+        columnWidths: [52, 16, ...(withCompare ? [16, 9] : []), ...(withPct ? [9] : [])],
       }),
     })
   }
 
   // PDF: interleave the section titles into the flat rows (uppercase marker
   // rows — PdfTable has no per-row emphasis).
+  const blank = Array<null>(headerRow.length - 1).fill(null)
   const rows: (string | number | null)[][] = []
   let nextBreak = 0
   const breaks = flat.sectionBreaks
   for (let i = 0; i <= flat.rows.length; i++) {
     while (nextBreak < breaks.length && breaks[nextBreak].afterRow === i) {
-      rows.push([breaks[nextBreak].title.toUpperCase(), null, null, null, ...(withPct ? [null] : [])])
+      rows.push([breaks[nextBreak].title.toUpperCase(), ...blank])
       nextBreak += 1
     }
     if (i < flat.rows.length) rows.push(flat.rows[i])
   }
 
-  const columns: PdfColumn[] = withPct
-    ? [
-        { label: 'Account', width: 240 },
-        { label: args.currentLabel, width: 85, align: 'right' },
-        { label: args.compareLabel, width: 85, align: 'right' },
-        { label: 'Δ%', width: 55, align: 'right' },
-        { label: '% Rev', width: 55, align: 'right' },
-      ]
-    : [
-        { label: 'Account', width: 260, },
-        { label: args.currentLabel, width: 95, align: 'right' },
-        { label: args.compareLabel, width: 95, align: 'right' },
-        { label: 'Δ%', width: 70, align: 'right' },
-      ]
+  // A4 portrait usable width ≈ 520pt — distribute what the column set needs.
+  const numCols = headerRow.length - 1
+  const numWidth = numCols === 1 ? 120 : numCols === 2 ? 100 : numCols === 3 ? 85 : 70
+  const columns: PdfColumn[] = [
+    { label: 'Account', width: 520 - numCols * numWidth },
+    ...headerRow.slice(1).map((label) => ({ label, width: numWidth, align: 'right' as const })),
+  ]
 
   return exportPdfResponse({
     filename: args.filename,

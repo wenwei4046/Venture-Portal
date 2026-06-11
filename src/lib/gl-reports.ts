@@ -26,6 +26,8 @@ export interface GlLine {
   entry_no: string | null
   entry_description: string | null
   segment: string
+  ref_type: string | null
+  ref_id: string | null
 }
 
 export interface CoaAccount {
@@ -46,7 +48,7 @@ export async function fetchAllJournalLines(supabase: SupabaseClient): Promise<Gl
     const { data, error } = await supabase
       .from('journal_lines')
       .select(
-        'account_code, debit, credit, description, entry_id, journal_entries!inner(transaction_date, entry_no, description, segment)',
+        'account_code, debit, credit, description, entry_id, journal_entries!inner(transaction_date, entry_no, description, segment, reference_type, reference_id)',
       )
       .order('id', { ascending: true })
       .range(fromIdx, fromIdx + PAGE - 1)
@@ -57,6 +59,8 @@ export async function fetchAllJournalLines(supabase: SupabaseClient): Promise<Gl
         entry_no: string | null
         description: string | null
         segment: string | null
+        reference_type: string | null
+        reference_id: string | null
       }
       out.push({
         account_code: row.account_code as string,
@@ -68,11 +72,44 @@ export async function fetchAllJournalLines(supabase: SupabaseClient): Promise<Gl
         entry_no: je.entry_no,
         entry_description: je.description,
         segment: je.segment ?? '',
+        ref_type: je.reference_type,
+        ref_id: je.reference_id,
       })
     }
     if (!data || data.length < PAGE) break
   }
   return out
+}
+
+export interface InvoiceRef {
+  invoice_no: string | null
+  description: string | null
+}
+
+/** invoice id → number + description, for enriching drill-down rows. */
+export async function fetchInvoiceRefs(supabase: SupabaseClient): Promise<Map<string, InvoiceRef>> {
+  const { data, error } = await supabase.from('invoices').select('id, invoice_no, description')
+  if (error) throw new Error(`fetchInvoiceRefs: ${error.message}`)
+  return new Map(
+    (data ?? []).map((i) => [
+      i.id as string,
+      { invoice_no: (i.invoice_no as string | null) ?? null, description: (i.description as string | null) ?? null },
+    ]),
+  )
+}
+
+/** Replace the generic line descriptions of invoice-reference JEs ("Service
+ *  billing revenue recognised", "issued (bulk)") with the actual invoice
+ *  number + invoice description, so drill-down rows read like the bill
+ *  (user 2026-06-11). Pure — returns new line objects. */
+export function applyInvoiceRefs(lines: GlLine[], refs: Map<string, InvoiceRef>): GlLine[] {
+  return lines.map((l) => {
+    if (l.ref_type !== 'invoice' || !l.ref_id) return l
+    const ref = refs.get(l.ref_id)
+    if (!ref?.invoice_no) return l
+    const label = ref.description ? `${ref.invoice_no} · ${ref.description}` : ref.invoice_no
+    return { ...l, description: label }
+  })
 }
 
 export async function fetchCoaAccounts(supabase: SupabaseClient): Promise<CoaAccount[]> {

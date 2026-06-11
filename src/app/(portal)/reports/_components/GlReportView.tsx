@@ -17,7 +17,8 @@ export type { ReportBlock }
 export interface GlReportViewProps {
   basePath: string
   period: string // 'YYYY-MM'
-  compare: string // 'YYYY-MM'
+  /** 'YYYY-MM' or '' — comparison is OPT-IN (default single-month view). */
+  compare: string
   segment: string // '' = all
   segments: { value: string; label: string }[]
   blocks: ReportBlock[]
@@ -26,6 +27,12 @@ export interface GlReportViewProps {
   /** Column header labels, e.g. "Jun 2026" / "May 2026" or "As at 30 Jun". */
   currentLabel: string
   compareLabel: string
+}
+
+function stepMonth(ym: string, delta: number): string {
+  const [y, m] = ym.split('-').map(Number)
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1))
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
 }
 
 function money(n: number): string {
@@ -62,7 +69,7 @@ export default function GlReportView({
   function navigate(nextPeriod: string, nextCompare: string, nextSegment: string) {
     const qs = new URLSearchParams()
     qs.set('period', nextPeriod)
-    qs.set('compare', nextCompare)
+    if (nextCompare) qs.set('compare', nextCompare)
     if (nextSegment) qs.set('segment', nextSegment)
     router.push(`${basePath}?${qs.toString()}`)
   }
@@ -74,29 +81,67 @@ export default function GlReportView({
     apply(next)
   }
 
-  const colCount = 4 + (pctBase ? 1 : 0)
+  const withCompare = compare !== ''
+  const colCount = 2 + (withCompare ? 2 : 0) + (pctBase ? 1 : 0)
 
   return (
     <div>
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
-        <label className="flex items-center gap-2 font-mono text-xs text-muted">
+        <label className="flex items-center gap-1.5 font-mono text-xs text-muted">
           Period
+          <button
+            type="button"
+            onClick={() => navigate(stepMonth(period, -1), compare, segment)}
+            className="px-2 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-sm text-graphite hover:text-ink transition-colors"
+            aria-label="Previous month"
+          >
+            ‹
+          </button>
           <input
             type="month"
             value={period}
             onChange={(e) => e.target.value && navigate(e.target.value, compare, segment)}
             className="px-2 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink font-mono focus:outline-none focus:border-accent-border"
           />
+          <button
+            type="button"
+            onClick={() => navigate(stepMonth(period, 1), compare, segment)}
+            className="px-2 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-sm text-graphite hover:text-ink transition-colors"
+            aria-label="Next month"
+          >
+            ›
+          </button>
         </label>
-        <label className="flex items-center gap-2 font-mono text-xs text-muted">
-          vs
-          <input
-            type="month"
-            value={compare}
-            onChange={(e) => e.target.value && navigate(period, e.target.value, segment)}
-            className="px-2 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink font-mono focus:outline-none focus:border-accent-border"
-          />
+        <label className="flex items-center gap-1.5 font-mono text-xs text-muted">
+          Compare
+          {withCompare ? (
+            <>
+              <input
+                type="month"
+                value={compare}
+                onChange={(e) => navigate(period, e.target.value, segment)}
+                className="px-2 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink font-mono focus:outline-none focus:border-accent-border"
+              />
+              <button
+                type="button"
+                onClick={() => navigate(period, '', segment)}
+                className="px-2 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs text-graphite hover:text-danger transition-colors"
+                title="Remove comparison"
+              >
+                ×
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => navigate(period, stepMonth(period, -1), segment)}
+              className="px-2.5 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+              title="Compare with the previous month"
+            >
+              + vs last month
+            </button>
+          )}
         </label>
         <label className="flex items-center gap-2 font-mono text-xs text-muted">
           Segment
@@ -141,8 +186,8 @@ export default function GlReportView({
           <tr>
             <th>Account</th>
             <th className="num">{currentLabel}</th>
-            <th className="num">{compareLabel}</th>
-            <th className="num">Δ%</th>
+            {withCompare ? <th className="num">{compareLabel}</th> : null}
+            {withCompare ? <th className="num">Δ%</th> : null}
             {pctBase ? <th className="num">% Rev</th> : null}
           </tr>
         </thead>
@@ -158,6 +203,7 @@ export default function GlReportView({
                 onToggleTxns={(code) => toggle(openTxns, code, setOpenTxns)}
                 pctBase={pctBase}
                 colCount={colCount}
+                withCompare={withCompare}
               />
             ) : (
               <tr
@@ -189,10 +235,14 @@ export default function GlReportView({
                 >
                   {b.row.current < 0 ? <span className="neg">{money(b.row.current)}</span> : money(b.row.current)}
                 </td>
-                <td className="num text-graphite">
-                  {b.row.previous < 0 ? <span className="neg">{money(b.row.previous)}</span> : money(b.row.previous)}
-                </td>
-                <td className="num text-graphite">{deltaPct(b.row.current, b.row.previous)}</td>
+                {withCompare ? (
+                  <td className="num text-graphite">
+                    {b.row.previous < 0 ? <span className="neg">{money(b.row.previous)}</span> : money(b.row.previous)}
+                  </td>
+                ) : null}
+                {withCompare ? (
+                  <td className="num text-graphite">{deltaPct(b.row.current, b.row.previous)}</td>
+                ) : null}
                 {pctBase ? (
                   <td className="num text-graphite">{pctOf(b.row.current, pctBase.current)}</td>
                 ) : null}
@@ -213,6 +263,7 @@ function SectionRows({
   onToggleTxns,
   pctBase,
   colCount,
+  withCompare,
 }: {
   section: ReportSection
   collapsed: Set<string>
@@ -221,6 +272,7 @@ function SectionRows({
   onToggleTxns: (code: string) => void
   pctBase?: { current: number; previous: number }
   colCount: number
+  withCompare: boolean
 }) {
   const rows: React.ReactNode[] = []
 
@@ -273,10 +325,12 @@ function SectionRows({
         <td className={`num ${isGroup ? 'font-medium' : ''}`}>
           {n.current < 0 ? <span className="neg">{money(n.current)}</span> : money(n.current)}
         </td>
-        <td className="num text-graphite">
-          {n.previous < 0 ? <span className="neg">{money(n.previous)}</span> : money(n.previous)}
-        </td>
-        <td className="num text-graphite">{deltaPct(n.current, n.previous)}</td>
+        {withCompare ? (
+          <td className="num text-graphite">
+            {n.previous < 0 ? <span className="neg">{money(n.previous)}</span> : money(n.previous)}
+          </td>
+        ) : null}
+        {withCompare ? <td className="num text-graphite">{deltaPct(n.current, n.previous)}</td> : null}
         {pctBase ? <td className="num text-graphite">{pctOf(n.current, pctBase.current)}</td> : null}
       </tr>,
     )
@@ -297,7 +351,7 @@ function SectionRows({
             <td className="num font-mono text-[11px] text-graphite">
               {t.amount < 0 ? <span className="neg">{money(t.amount)}</span> : money(t.amount)}
             </td>
-            <td colSpan={colCount - 2} />
+            {colCount > 2 ? <td colSpan={colCount - 2} /> : null}
           </tr>,
         )
       }

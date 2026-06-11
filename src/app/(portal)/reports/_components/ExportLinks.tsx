@@ -14,7 +14,8 @@ export default function ExportLinks({
   segment: string
 }) {
   const qs = (format: string) => {
-    const p = new URLSearchParams({ format, period, compare })
+    const p = new URLSearchParams({ format, period })
+    if (compare) p.set('compare', compare)
     if (segment) p.set('segment', segment)
     return `${basePath}?${p.toString()}`
   }

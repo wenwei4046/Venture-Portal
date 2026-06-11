@@ -9,11 +9,12 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import {
+  applyInvoiceRefs,
   buildBalanceSheet,
   fetchAllJournalLines,
   fetchCoaAccounts,
+  fetchInvoiceRefs,
   monthPeriod,
-  prevMonth,
 } from '@/lib/gl-reports'
 import { balanceSheetBlocks } from '@/lib/gl-report-blocks'
 import GlReportView from '../_components/GlReportView'
@@ -32,17 +33,20 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
 
   const params = await searchParams
   const period = params.period ?? dayjs().format('YYYY-MM')
-  const compare = params.compare ?? prevMonth(period)
+  // Comparison is OPT-IN (user 2026-06-11): default is a clean single-month view.
+  const compare = params.compare ?? ''
   const segment = params.segment ?? ''
 
-  const [lines, accounts] = await Promise.all([
+  const [rawLines, accounts, invoiceRefs] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
+    fetchInvoiceRefs(supabase),
   ])
+  const lines = applyInvoiceRefs(rawLines, invoiceRefs)
 
   const bs = buildBalanceSheet(lines, accounts, {
     current: monthPeriod(period),
-    previous: monthPeriod(compare),
+    previous: monthPeriod(compare || period),
     segment: segment || undefined,
   })
 
@@ -80,7 +84,7 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
         segments={REPORT_SEGMENTS}
         blocks={blocks}
         currentLabel={asAt(period)}
-        compareLabel={asAt(compare)}
+        compareLabel={compare ? asAt(compare) : ''}
       />
     </div>
   )

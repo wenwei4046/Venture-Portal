@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  applyInvoiceRefs,
   buildPnl,
   buildBalanceSheet,
   buildCashFlow,
@@ -42,6 +43,8 @@ function entry(date: string, legs: Array<[string, number, number]>, segment = 'c
     entry_no: `JE-${id}`,
     entry_description: `entry ${id}`,
     segment,
+    ref_type: null,
+    ref_id: null,
   }))
 }
 
@@ -162,6 +165,32 @@ describe('gl-report-blocks flatten (export path)', async () => {
     const child = flat.rows.find((r) => String(r[0]).includes('3051'))
     expect(String(child?.[0]).startsWith('    ')).toBe(true)
     expect(flat.rows[0]).toHaveLength(4) // no % Rev column
+  })
+})
+
+describe('applyInvoiceRefs', () => {
+  it('replaces generic line descriptions with invoice no + description', () => {
+    const line: GlLine = {
+      ...entry('2026-06-01', [['5000', 0, 100]])[0],
+      ref_type: 'invoice',
+      ref_id: 'inv-1',
+      description: 'Service billing revenue recognised',
+    }
+    const refs = new Map([['inv-1', { invoice_no: 'HV-INV-202605-0044', description: "Salary - HR - May'26" }]])
+    const [enriched] = applyInvoiceRefs([line], refs)
+    expect(enriched.description).toBe("HV-INV-202605-0044 · Salary - HR - May'26")
+    // Non-invoice lines untouched.
+    const other = { ...line, ref_type: 'payment_voucher' }
+    expect(applyInvoiceRefs([other], refs)[0].description).toBe('Service billing revenue recognised')
+  })
+})
+
+describe('flattenGlReport withCompare=false (single-month export)', async () => {
+  const { pnlBlocks, flattenGlReport } = await import('./gl-report-blocks')
+  it('drops the compare and Δ% columns', () => {
+    const pnl = buildPnl(LINES, ACCOUNTS, FILTER)
+    const flat = flattenGlReport(pnlBlocks(pnl), { pctBase: pnl.revenue.current, withCompare: false })
+    expect(flat.rows[0]).toHaveLength(3) // Account | current | % Rev
   })
 })
 

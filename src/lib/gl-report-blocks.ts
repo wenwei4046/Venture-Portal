@@ -195,24 +195,29 @@ export interface FlatGlReport {
   sectionBreaks: { afterRow: number; title: string }[]
 }
 
-/** Serialise blocks into flat rows: Account | current | compare | Δ% | (% Rev).
- *  Account groups are depth-indented; summary rows carry their sub-label. */
+/** Serialise blocks into flat rows: Account | current | [compare | Δ%] | (% Rev).
+ *  Account groups are depth-indented; summary rows carry their sub-label.
+ *  `withCompare: false` drops the comparison + Δ% columns (single-month view). */
 export function flattenGlReport(
   blocks: ReportBlock[],
-  opts: { pctBase?: number },
+  opts: { pctBase?: number; withCompare?: boolean },
 ): FlatGlReport {
   const withPct = opts.pctBase !== undefined
+  const withCompare = opts.withCompare !== false
   const rows: (string | number | null)[][] = []
   const sectionBreaks: { afterRow: number; title: string }[] = []
 
+  const cells = (label: string, current: number, previous: number): (string | number | null)[] => [
+    label,
+    current,
+    ...(withCompare ? [previous, deltaPct(current, previous)] : []),
+    ...(withPct ? [pctOf(current, opts.pctBase!)] : []),
+  ]
+
   const pushNode = (n: AccountNode, depth: number) => {
-    rows.push([
-      `${'    '.repeat(depth)}${n.code === '—' ? '' : `${n.code} `}${n.name}`,
-      n.current,
-      n.previous,
-      deltaPct(n.current, n.previous),
-      ...(withPct ? [pctOf(n.current, opts.pctBase!)] : []),
-    ])
+    rows.push(
+      cells(`${'    '.repeat(depth)}${n.code === '—' ? '' : `${n.code} `}${n.name}`, n.current, n.previous),
+    )
     for (const c of n.children) pushNode(c, depth + 1)
   }
 
@@ -222,13 +227,7 @@ export function flattenGlReport(
       for (const n of b.section.nodes) pushNode(n, 0)
     } else {
       const label = b.row.sub ? `${b.row.label} (${b.row.sub})` : b.row.label
-      rows.push([
-        label,
-        b.row.current,
-        b.row.previous,
-        deltaPct(b.row.current, b.row.previous),
-        ...(withPct ? [pctOf(b.row.current, opts.pctBase!)] : []),
-      ])
+      rows.push(cells(label, b.row.current, b.row.previous))
     }
   }
 

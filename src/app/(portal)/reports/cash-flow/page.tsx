@@ -9,11 +9,12 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import {
+  applyInvoiceRefs,
   buildCashFlow,
   fetchAllJournalLines,
   fetchCoaAccounts,
+  fetchInvoiceRefs,
   monthPeriod,
-  prevMonth,
 } from '@/lib/gl-reports'
 import { cashFlowBlocks } from '@/lib/gl-report-blocks'
 import GlReportView from '../_components/GlReportView'
@@ -32,14 +33,17 @@ export default async function CashFlowPage({ searchParams }: Props) {
 
   const params = await searchParams
   const period = params.period ?? dayjs().format('YYYY-MM')
-  const compare = params.compare ?? prevMonth(period)
+  // Comparison is OPT-IN (user 2026-06-11): default is a clean single-month view.
+  const compare = params.compare ?? ''
   const segment = params.segment ?? ''
 
-  const [lines, accounts, { data: banks }] = await Promise.all([
+  const [rawLines, accounts, invoiceRefs, { data: banks }] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
+    fetchInvoiceRefs(supabase),
     supabase.from('bank_accounts').select('gl_account_code'),
   ])
+  const lines = applyInvoiceRefs(rawLines, invoiceRefs)
   const bankCodes = new Set(
     (banks ?? []).map((b) => b.gl_account_code as string | null).filter((c): c is string => !!c),
   )
@@ -49,7 +53,7 @@ export default async function CashFlowPage({ searchParams }: Props) {
     accounts,
     {
       current: monthPeriod(period),
-      previous: monthPeriod(compare),
+      previous: monthPeriod(compare || period),
       segment: segment || undefined,
     },
     bankCodes,
@@ -90,7 +94,7 @@ export default async function CashFlowPage({ searchParams }: Props) {
         segments={REPORT_SEGMENTS}
         blocks={blocks}
         currentLabel={dayjs(`${period}-01`).format('MMM YYYY')}
-        compareLabel={dayjs(`${compare}-01`).format('MMM YYYY')}
+        compareLabel={compare ? dayjs(`${compare}-01`).format('MMM YYYY') : ''}
       />
     </div>
   )
