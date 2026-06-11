@@ -58,6 +58,15 @@ Supabase MCP `apply_migration` AND saved to `supabase/migrations/` for parity
   invoice (Company/Mode/Description/Status) lists. Composes with search + sort.
 
 ### Data corrections (direct SQL, recorded for audit — NOT in migrations)
+- **2026-06-11: LO#11 / BI#11 both reduced 25k → 10k** (user: the 15k was a
+  recording correction — Liang's money via Kingsley was effectively 10k in /
+  10k out, never through HV's bank). App: fund_sources BI#11 amount 25,000 →
+  10,000 (it had NO repayment rows — the 15k "repaid" on Liang's account was
+  BI#7's 15×1,000 installments, unrelated); loans LO#11 principal 25,000 →
+  10,000 + deleted the phantom 15,000 principal repayment row (2026-04-15,
+  "直接还源头公司"). GL: correction JE dated 2026-04-15 Dr 4055 / Cr 3053
+  15,000 (id 103ed4cb). Verified: CONTS app = GL = 617,200.00 exactly; TB
+  still 0.00; Liang residual app-vs-GL gap 300 (pre-existing legacy noise).
 - **2026-06-11: PV-000059 advertisement claim 2,807.34 re-pointed 9088 → 9095.**
   TB stopped tallying by exactly 2,807.34: a child account (9095 Advertisment -
   Hiring) was created UNDER 9088 Advertisement, silently turning 9088 into a
