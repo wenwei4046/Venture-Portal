@@ -9,11 +9,11 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import {
-  applyInvoiceRefs,
+  applyGlRefs,
   buildCashFlow,
   fetchAllJournalLines,
   fetchCoaAccounts,
-  fetchInvoiceRefs,
+  fetchGlRefs,
   monthPeriod,
 } from '@/lib/gl-reports'
 import { cashFlowBlocks } from '@/lib/gl-report-blocks'
@@ -37,13 +37,13 @@ export default async function CashFlowPage({ searchParams }: Props) {
   const compare = params.compare ?? ''
   const segment = params.segment ?? ''
 
-  const [rawLines, accounts, invoiceRefs, { data: banks }] = await Promise.all([
+  const [rawLines, accounts, glRefs, { data: banks }] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
-    fetchInvoiceRefs(supabase),
+    fetchGlRefs(supabase),
     supabase.from('bank_accounts').select('gl_account_code'),
   ])
-  const lines = applyInvoiceRefs(rawLines, invoiceRefs)
+  const lines = applyGlRefs(rawLines, glRefs)
   const bankCodes = new Set(
     (banks ?? []).map((b) => b.gl_account_code as string | null).filter((c): c is string => !!c),
   )

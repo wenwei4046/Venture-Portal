@@ -28,6 +28,8 @@ export interface GlLine {
   segment: string
   ref_type: string | null
   ref_id: string | null
+  /** Counterparty for drill-down rows: invoice bill-to / voucher payee. */
+  party?: string | null
 }
 
 export interface CoaAccount {
@@ -84,31 +86,74 @@ export async function fetchAllJournalLines(supabase: SupabaseClient): Promise<Gl
 export interface InvoiceRef {
   invoice_no: string | null
   description: string | null
+  /** Bill-to label: company short code/name, department, or freetext payer. */
+  billTo: string | null
 }
 
-/** invoice id → number + description, for enriching drill-down rows. */
-export async function fetchInvoiceRefs(supabase: SupabaseClient): Promise<Map<string, InvoiceRef>> {
-  const { data, error } = await supabase.from('invoices').select('id, invoice_no, description')
-  if (error) throw new Error(`fetchInvoiceRefs: ${error.message}`)
-  return new Map(
-    (data ?? []).map((i) => [
-      i.id as string,
-      { invoice_no: (i.invoice_no as string | null) ?? null, description: (i.description as string | null) ?? null },
-    ]),
-  )
+export interface GlRefs {
+  invoices: Map<string, InvoiceRef>
+  /** payment voucher id → payee (PV: paid to / OR: received from). */
+  voucherPayees: Map<string, string>
 }
 
-/** Replace the generic line descriptions of invoice-reference JEs ("Service
- *  billing revenue recognised", "issued (bulk)") with the actual invoice
- *  number + invoice description, so drill-down rows read like the bill
- *  (user 2026-06-11). Pure — returns new line objects. */
-export function applyInvoiceRefs(lines: GlLine[], refs: Map<string, InvoiceRef>): GlLine[] {
+/** Reference lookups for enriching drill-down rows: invoice number /
+ *  description / bill-to, and voucher payee names. */
+export async function fetchGlRefs(supabase: SupabaseClient): Promise<GlRefs> {
+  const [{ data: invoices, error: iErr }, { data: companies }, { data: departments }, { data: vouchers, error: vErr }] =
+    await Promise.all([
+      supabase
+        .from('invoices')
+        .select('id, invoice_no, description, company_id, billable_to_department_id, billable_to_freetext_name'),
+      supabase.from('companies').select('id, name, short_code'),
+      supabase.from('departments').select('id, name'),
+      supabase.from('payment_vouchers').select('id, payee_name'),
+    ])
+  if (iErr) throw new Error(`fetchGlRefs invoices: ${iErr.message}`)
+  if (vErr) throw new Error(`fetchGlRefs vouchers: ${vErr.message}`)
+
+  const coById = new Map((companies ?? []).map((c) => [c.id as string, (c.short_code as string | null) ?? (c.name as string)]))
+  const deptById = new Map((departments ?? []).map((d) => [d.id as string, d.name as string]))
+
+  return {
+    invoices: new Map(
+      (invoices ?? []).map((i) => [
+        i.id as string,
+        {
+          invoice_no: (i.invoice_no as string | null) ?? null,
+          description: (i.description as string | null) ?? null,
+          billTo:
+            (i.company_id ? coById.get(i.company_id as string) : null) ??
+            (i.billable_to_department_id ? deptById.get(i.billable_to_department_id as string) : null) ??
+            ((i.billable_to_freetext_name as string | null) || null),
+        },
+      ]),
+    ),
+    voucherPayees: new Map(
+      (vouchers ?? [])
+        .filter((v) => v.payee_name)
+        .map((v) => [v.id as string, v.payee_name as string]),
+    ),
+  }
+}
+
+/** Enrich drill-down lines: invoice JEs get "invoice_no · description" plus the
+ *  bill-to company as the counterparty; voucher JEs (PV/OR) get the payee as
+ *  the counterparty (pay-out to / received from). Pure — returns new objects. */
+export function applyGlRefs(lines: GlLine[], refs: GlRefs): GlLine[] {
   return lines.map((l) => {
-    if (l.ref_type !== 'invoice' || !l.ref_id) return l
-    const ref = refs.get(l.ref_id)
-    if (!ref?.invoice_no) return l
-    const label = ref.description ? `${ref.invoice_no} · ${ref.description}` : ref.invoice_no
-    return { ...l, description: label }
+    if (!l.ref_id) return l
+    if (l.ref_type === 'invoice') {
+      const ref = refs.invoices.get(l.ref_id)
+      if (!ref?.invoice_no) return l
+      const label = ref.description ? `${ref.invoice_no} · ${ref.description}` : ref.invoice_no
+      return { ...l, description: label, party: ref.billTo }
+    }
+    if (l.ref_type === 'payment_voucher' || l.ref_type === 'payment_voucher_void') {
+      const payee = refs.voucherPayees.get(l.ref_id)
+      if (!payee) return l
+      return { ...l, party: payee }
+    }
+    return l
   })
 }
 
@@ -134,6 +179,8 @@ export interface GlTxn {
   entryNo: string | null
   description: string
   segment: string
+  /** Counterparty: invoice bill-to / voucher payee (null when unknown). */
+  party: string | null
   /** Signed in the account's NATURAL direction (positive grows the account). */
   amount: number
 }
@@ -234,6 +281,7 @@ export function bucketAccounts(
           entryNo: l.entry_no,
           description: l.description || l.entry_description || '',
           segment: l.segment,
+          party: l.party ?? null,
           amount: amt,
         })
       }
@@ -500,6 +548,7 @@ export function buildCashFlow(
           entryNo: c.entry_no,
           description: c.description || c.entry_description || '',
           segment: c.segment,
+          party: c.party ?? null,
           amount: share,
         })
       }

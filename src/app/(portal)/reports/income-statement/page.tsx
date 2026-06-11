@@ -8,7 +8,7 @@ import dayjs from 'dayjs'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { applyInvoiceRefs, buildPnl, fetchAllJournalLines, fetchCoaAccounts, fetchInvoiceRefs, monthPeriod } from '@/lib/gl-reports'
+import { applyGlRefs, buildPnl, fetchAllJournalLines, fetchCoaAccounts, fetchGlRefs, monthPeriod } from '@/lib/gl-reports'
 import { pnlBlocks } from '@/lib/gl-report-blocks'
 import GlReportView from '../_components/GlReportView'
 import { REPORT_SEGMENTS } from '../_components/report-segments'
@@ -30,12 +30,12 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
   const compare = params.compare ?? ''
   const segment = params.segment ?? ''
 
-  const [rawLines, accounts, invoiceRefs] = await Promise.all([
+  const [rawLines, accounts, glRefs] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
-    fetchInvoiceRefs(supabase),
+    fetchGlRefs(supabase),
   ])
-  const lines = applyInvoiceRefs(rawLines, invoiceRefs)
+  const lines = applyGlRefs(rawLines, glRefs)
 
   const pnl = buildPnl(lines, accounts, {
     current: monthPeriod(period),

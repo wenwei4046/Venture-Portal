@@ -289,38 +289,53 @@ function SectionRows({
     const isCollapsed = collapsed.has(n.code)
     const txnsOpen = openTxns.has(n.code)
     const hasTxns = !isGroup && n.txns.length > 0
+    // The whole code+name area toggles — not just the arrow (user 2026-06-11).
+    const toggleAction = isGroup
+      ? () => onToggleGroup(n.code)
+      : hasTxns
+        ? () => onToggleTxns(n.code)
+        : undefined
     rows.push(
       <tr key={n.code}>
         <td>
-          <div className="flex items-baseline" style={{ paddingLeft: `${depth * 18}px` }}>
+          <button
+            type="button"
+            onClick={toggleAction}
+            disabled={!toggleAction}
+            className={`flex items-baseline text-left w-full ${toggleAction ? 'cursor-pointer group' : 'cursor-default'}`}
+            style={{ paddingLeft: `${depth * 18}px` }}
+            aria-label={
+              isGroup
+                ? isCollapsed
+                  ? 'Expand'
+                  : 'Collapse'
+                : hasTxns
+                  ? txnsOpen
+                    ? 'Hide transactions'
+                    : 'Show transactions'
+                  : undefined
+            }
+            title={hasTxns ? `${n.txns.length} transaction${n.txns.length === 1 ? '' : 's'} this period` : undefined}
+          >
             {isGroup ? (
-              <button
-                type="button"
-                onClick={() => onToggleGroup(n.code)}
-                className="mr-1.5 font-mono text-[10px] text-graphite hover:text-ink w-3"
-                aria-label={isCollapsed ? 'Expand' : 'Collapse'}
-              >
+              <span className="mr-1.5 font-mono text-[10px] text-graphite group-hover:text-ink w-3">
                 {isCollapsed ? '▸' : '▾'}
-              </button>
+              </span>
             ) : hasTxns ? (
-              <button
-                type="button"
-                onClick={() => onToggleTxns(n.code)}
-                className="mr-1.5 font-mono text-[10px] text-muted hover:text-accent w-3"
-                aria-label={txnsOpen ? 'Hide transactions' : 'Show transactions'}
-                title={`${n.txns.length} transaction${n.txns.length === 1 ? '' : 's'} this period`}
-              >
+              <span className="mr-1.5 font-mono text-[10px] text-muted group-hover:text-accent w-3">
                 {txnsOpen ? '▾' : '▸'}
-              </button>
+              </span>
             ) : (
               <span className="mr-1.5 w-3" aria-hidden />
             )}
             <span className="font-mono text-xs text-graphite mr-2">{n.code}</span>
-            <span className={`text-sm ${isGroup ? 'font-medium text-ink' : 'text-ink'}`}>{n.name}</span>
+            <span className={`text-sm text-ink ${isGroup ? 'font-medium' : ''} ${toggleAction ? 'group-hover:text-accent transition-colors' : ''}`}>
+              {n.name}
+            </span>
             {hasTxns ? (
               <span className="ml-2 font-mono text-[10px] text-muted">({n.txns.length})</span>
             ) : null}
-          </div>
+          </button>
         </td>
         <td className={`num ${isGroup ? 'font-medium' : ''}`}>
           {n.current < 0 ? <span className="neg">{money(n.current)}</span> : money(n.current)}
@@ -342,10 +357,10 @@ function SectionRows({
             <td>
               <div className="flex items-baseline gap-3 font-mono text-[11px] text-graphite" style={{ paddingLeft: `${depth * 18 + 22}px` }}>
                 <span>{dayjs(t.date).format('D MMM')}</span>
-                <span className="text-accent">{t.entryNo ?? '—'}</span>
-                <span className="text-muted truncate max-w-[26rem]" title={t.description}>
+                <span className="text-muted truncate max-w-[24rem]" title={t.description}>
                   {t.description}
                 </span>
+                {t.party ? <span className="text-accent shrink-0">{t.party}</span> : null}
               </div>
             </td>
             <td className="num font-mono text-[11px] text-graphite">

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  applyInvoiceRefs,
+  applyGlRefs,
   buildPnl,
   buildBalanceSheet,
   buildCashFlow,
@@ -168,20 +168,45 @@ describe('gl-report-blocks flatten (export path)', async () => {
   })
 })
 
-describe('applyInvoiceRefs', () => {
-  it('replaces generic line descriptions with invoice no + description', () => {
+describe('applyGlRefs', () => {
+  const refs = {
+    invoices: new Map([
+      ['inv-1', { invoice_no: 'HV-INV-202605-0044', description: "Salary - HR - May'26", billTo: 'HC' }],
+    ]),
+    voucherPayees: new Map([['pv-1', 'TNB Berhad']]),
+  }
+
+  it('enriches invoice JEs with invoice no + description + bill-to party', () => {
     const line: GlLine = {
       ...entry('2026-06-01', [['5000', 0, 100]])[0],
       ref_type: 'invoice',
       ref_id: 'inv-1',
       description: 'Service billing revenue recognised',
     }
-    const refs = new Map([['inv-1', { invoice_no: 'HV-INV-202605-0044', description: "Salary - HR - May'26" }]])
-    const [enriched] = applyInvoiceRefs([line], refs)
+    const [enriched] = applyGlRefs([line], refs)
     expect(enriched.description).toBe("HV-INV-202605-0044 · Salary - HR - May'26")
-    // Non-invoice lines untouched.
-    const other = { ...line, ref_type: 'payment_voucher' }
-    expect(applyInvoiceRefs([other], refs)[0].description).toBe('Service billing revenue recognised')
+    expect(enriched.party).toBe('HC')
+  })
+
+  it('enriches voucher JEs with the payee, leaving the description alone', () => {
+    const line: GlLine = {
+      ...entry('2026-06-01', [['9091', 100, 0]])[0],
+      ref_type: 'payment_voucher',
+      ref_id: 'pv-1',
+      description: 'PV HV-PV-202606-0001: Utilities',
+    }
+    const [enriched] = applyGlRefs([line], refs)
+    expect(enriched.description).toBe('PV HV-PV-202606-0001: Utilities')
+    expect(enriched.party).toBe('TNB Berhad')
+  })
+
+  it('leaves unmatched lines untouched', () => {
+    const line: GlLine = {
+      ...entry('2026-06-01', [['9000', 100, 0]])[0],
+      ref_type: 'repayment',
+      ref_id: 'x',
+    }
+    expect(applyGlRefs([line], refs)[0].party).toBeUndefined()
   })
 })
 
