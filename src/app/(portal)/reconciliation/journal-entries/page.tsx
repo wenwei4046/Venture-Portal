@@ -89,6 +89,7 @@ export default async function JournalEntriesPage() {
               <th>Voucher</th>
               <th>Date</th>
               <th>Description</th>
+              <th>Segment</th>
               <th className="right">Amount</th>
             </tr>
           </thead>
@@ -113,6 +114,9 @@ export default async function JournalEntriesPage() {
                   </td>
                   <td className="font-serif text-[15px] text-ink">
                     {entry.description}
+                  </td>
+                  <td className="font-mono text-[11px] uppercase tracking-wide text-graphite">
+                    {((entry.segment as string) ?? 'unallocated').replace(/_/g, ' ')}
                   </td>
                   <td className="num">{formatMoney(Number(entry.total_amount))}</td>
                 </tr>

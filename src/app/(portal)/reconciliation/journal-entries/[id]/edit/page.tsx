@@ -45,6 +45,7 @@ export default async function EditJournalVoucherPage({
     id: entry.id,
     transaction_date: entry.transaction_date,
     description: entry.description,
+    segment: (entry.segment as string) ?? 'unallocated',
     lines: (lineRows ?? []).map((l) => ({
       account_code: l.account_code,
       debit: l.debit != null ? Number(l.debit) : null,

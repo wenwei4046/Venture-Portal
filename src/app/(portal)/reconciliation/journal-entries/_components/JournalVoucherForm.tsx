@@ -33,8 +33,22 @@ interface ExistingEntry {
   id: string
   transaction_date: string
   description: string
+  segment: string
   lines: EntryLine[]
 }
+
+// Actual gl_segment posting values (NOT the report filter list — that one
+// folds treasury into Venture for filtering only).
+const SEGMENT_OPTIONS = [
+  { value: 'unallocated', label: 'Unallocated (top-level adjustment)' },
+  { value: 'corporate', label: 'Venture (Office)' },
+  { value: 'treasury', label: 'Treasury' },
+  { value: 'marketing', label: 'Marketing' },
+  { value: 'hr', label: 'HR' },
+  { value: 'finance', label: 'Finance' },
+  { value: 'director_office', label: 'Director Office' },
+  { value: 'director', label: 'Director' },
+]
 
 interface Props {
   accounts: AccountOption[]
@@ -62,6 +76,7 @@ export default function JournalVoucherForm({ accounts, entry }: Props) {
     entry?.transaction_date ?? today()
   )
   const [description, setDescription] = useState<string>(entry?.description ?? '')
+  const [segment, setSegment] = useState<string>(entry?.segment ?? 'unallocated')
   const [lines, setLines] = useState<LineDraft[]>(() => {
     if (entry && entry.lines.length > 0) {
       return entry.lines.map((l) => ({
@@ -150,6 +165,7 @@ export default function JournalVoucherForm({ accounts, entry }: Props) {
     const payload = {
       transaction_date: transactionDate,
       description: description.trim(),
+      segment,
       lines: lines.map((l) => ({
         account_code: l.account_code,
         debit: parseFloat(l.debit) || 0,
@@ -230,6 +246,28 @@ export default function JournalVoucherForm({ accounts, entry }: Props) {
             placeholder="e.g., Reclassify prepaid insurance to expense"
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
           />
+        </div>
+        <div>
+          <label
+            htmlFor="segment"
+            className="block text-sm font-sans font-medium text-graphite mb-1.5"
+          >
+            Segment <span className="text-danger">*</span>
+          </label>
+          <select
+            id="segment"
+            name="segment"
+            value={segment}
+            onChange={(e) => setSegment(e.target.value)}
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+          >
+            {SEGMENT_OPTIONS.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+          <p className="font-serif italic text-muted text-xs mt-1.5">
+            Drives which department P&amp;L this voucher appears in. Unallocated stays out of every department view.
+          </p>
         </div>
       </div>
 

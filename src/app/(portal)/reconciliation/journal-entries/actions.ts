@@ -24,6 +24,8 @@ export interface JournalVoucherLineInput {
 export interface JournalVoucherInput {
   transaction_date: string
   description: string
+  /** GL segment the JV belongs to (mig 20260612000000). 'unallocated' = top-level adjustment. */
+  segment: string
   lines: JournalVoucherLineInput[]
 }
 
@@ -44,6 +46,7 @@ export async function createJournalVoucher(input: JournalVoucherInput): Promise<
     p_transaction_date: input.transaction_date,
     p_description: input.description.trim(),
     p_lines: normalizeLines(input.lines),
+    p_segment: input.segment || 'unallocated',
   } as never)
 
   if (error) throw new Error(error.message)
@@ -64,6 +67,7 @@ export async function updateJournalVoucher(
     p_transaction_date: input.transaction_date,
     p_description: input.description.trim(),
     p_lines: normalizeLines(input.lines),
+    p_segment: input.segment || 'unallocated',
   } as never)
 
   if (error) throw new Error(error.message)
