@@ -163,7 +163,9 @@ export default async function RepaymentSchedulePage() {
     if (ym === currentYM) {
       fsDoneThisMonth.add(fid)
       const cur = fsThisMonthByType.get(fid) ?? { principal: 0, interest: 0 }
-      if ((rp.payment_type as string) === 'principal') cur.principal = r2(cur.principal + Number(rp.amount))
+      // Fund-source side: 'netting' is a non-cash PRINCIPAL knock-off (L32
+      // convention; the fund_source_outstanding view counts it the same way).
+      if (['principal', 'netting'].includes(rp.payment_type as string)) cur.principal = r2(cur.principal + Number(rp.amount))
       else cur.interest = r2(cur.interest + Number(rp.amount))
       fsThisMonthByType.set(fid, cur)
     }

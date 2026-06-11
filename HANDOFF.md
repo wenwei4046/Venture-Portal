@@ -66,6 +66,41 @@ SQL per the established convention. Key closures: TB Dr=Cr ties at 0.00; 2990
 payable = 228,613.75 exact (155k netting reclassed via 4 dated JEs Dr 3054/Cr 4051);
 LO#11/BI#11 reduced 25k→10k per user; CONTS receivable ties at 617,200.)
 
+### Full finance-module verification (2026-06-11, four read-only agents + fixes)
+All four domains verified against live data. Results:
+- **Billing/invoices: 8/8 checks clean.** Every non-draft invoice has exactly one
+  revenue JE (amounts tie); all 7 dept_pool invoices have the 9051-55 expense JE;
+  all 46 paid invoices tie to settlement vouchers (bulk vouchers = exact sum of
+  their invoices); JE months align with period_month; invoice_lines sums tie;
+  no orphans. Informational: 36 May invoices credit 9091 (cost-recovery rebill
+  by category_code — by design, reduces expense instead of grossing revenue).
+- **Payments/vouchers: all clean** (JEs balanced, PVS sums tie, both bank caches
+  = GL to the cent, the one voided receipt fully reversed, no orphans/dup nos).
+  Agent flagged PV-0027 (120k) as "no postings" — FALSE ALARM: its JE is
+  reference_type='loan' (combined-approval path) + venture_pool fund_out exists;
+  bank cache ties. Real fix applied: pv.journal_entry_id backlink was NULL →
+  set to JE-202606-0103 (direct SQL).
+- **Treasury:** all 4xxx/305x leaves tie app↔GL except known counterparty items.
+  **Fixed: fund_source_outstanding view excluded payment_type='netting'** → HC
+  showed 53,613.75 too high in app (L32 knock-off is a non-cash principal
+  reduction). Mig `20260611030000` counts netting as principal on the FS side
+  (loans side unchanged BY DESIGN — loan netting posts 7000 interest-style);
+  repayment-schedule page's this-month split aligned. HC now 593,163.78 = GL.
+  New findings logged, NOT yet fixed (user decisions): ① GL 7000 interest income
+  is short 28,816.71 vs app records — FY2025 backfilled interest (LO#5/#7/#19)
+  never posted to 7000 (may sit unlabelled in opening JVs), plus an orphan
+  1,400.00 7000 credit (JV 2026-04-29) with no repayments row; ② Hookka split
+  across leaves 3055 (95,381.63) + 3058 (28,575.50) — per-leaf statements
+  misattribute, merge needs a reclass JV; ③ 13 backfill repayment rows dated
+  before instrument start (LO#5/#7 Apr-May 2025; L32 netting 2026-03 vs FS
+  effective 2026-05) — cosmetic, fix dates or annotate.
+- **Pools/payroll/claims/statements:** dept_pool_balances view = manual recompute,
+  all 5 pools still tie their GL segments to 0.00 post re-dating; venture_pool no
+  legacy-type activity; invoice_payout_pool 37,218.37 all-accumulate; statements
+  2026-05 all tie. Payroll runs / claims / dept_payment_requests tables are
+  EMPTY — the known design gaps there (benefit-claim GL, dept-request rollback)
+  currently have RM 0.00 exposure.
+
 ### Still open (awaiting user verification with counterparties)
 - 4054 LWS 450 · 4055 LWL 300 · 4056 CMK 6,936 · AR 3030 vs open invoices 12,647.54.
 - Red flags not yet fixed: loan disbursement primary-bank-only; PV-path loan
