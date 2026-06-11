@@ -86,14 +86,21 @@ All four domains verified against live data. Results:
   reduction). Mig `20260611030000` counts netting as principal on the FS side
   (loans side unchanged BY DESIGN — loan netting posts 7000 interest-style);
   repayment-schedule page's this-month split aligned. HC now 593,163.78 = GL.
-  New findings logged, NOT yet fixed (user decisions): ① GL 7000 interest income
-  is short 28,816.71 vs app records — FY2025 backfilled interest (LO#5/#7/#19)
-  never posted to 7000 (may sit unlabelled in opening JVs), plus an orphan
-  1,400.00 7000 credit (JV 2026-04-29) with no repayments row; ② Hookka split
-  across leaves 3055 (95,381.63) + 3058 (28,575.50) — per-leaf statements
-  misattribute, merge needs a reclass JV; ③ 13 backfill repayment rows dated
-  before instrument start (LO#5/#7 Apr-May 2025; L32 netting 2026-03 vs FS
-  effective 2026-05) — cosmetic, fix dates or annotate.
+  New findings — user ruled on all three (2026-06-11):
+  ① GL 7000 interest income short 28,816.71 vs app records (FY2025 backfilled
+  interest LO#5/#7/#19 never posted to 7000, likely inside opening JVs) —
+  **user: do NOT post a catch-up for now**; leave as documented note. The
+  "orphan 1,400" was investigated and is NOT an orphan: OR-000027 manual JV
+  2026-04-29 (THE CONTS, Dr 3000 5,000+1,400 / Cr 3053 5,000 "REFUND TO MR
+  LIANG" / Cr 7000 1,400 "INTEREST INCOME OF FUND 2%") — real receipt, in GL
+  and bank; only the app-side repayments table lacks a matching row.
+  ② Hookka NOT split wrongly — user confirmed 3055 Hookka Manufacturing and
+  3058 Hooka Industries are TWO different companies. Not an issue; leaves stay.
+  ③ Backdated rows: fixed by direct SQL (user-approved) — instrument start
+  dates aligned to first recorded movement (all non-compound, maturity NULL,
+  nothing computes from these dates): LO#7 disbursement → 2025-04-05, LO#5 →
+  2025-05-05, FS Liang-60k → 2025-04-05, FS WS-90k → 2025-05-05, FS HC-L32 →
+  2026-03-26 (the knock-off JV date). 0 before-start rows remain on either side.
 - **Pools/payroll/claims/statements:** dept_pool_balances view = manual recompute,
   all 5 pools still tie their GL segments to 0.00 post re-dating; venture_pool no
   legacy-type activity; invoice_payout_pool 37,218.37 all-accumulate; statements
