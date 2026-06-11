@@ -3,6 +3,7 @@ import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { loanMonthlyInstallment, isLoanUnscheduled, isBeforeFirstInstallment, compoundInterestState } from '@/lib/treasury-schedule'
+import { fundingSourceFromTerms } from '@/lib/utils'
 import { listPayableFundSources } from '../fund-in/actions'
 import ScheduleView, { type SchedRow, type NoTermRow, type CompoundRow } from './_components/ScheduleView'
 
@@ -60,6 +61,7 @@ export default async function RepaymentSchedulePage() {
     const counterparty = co?.short_code ?? co?.name ?? '—'
     const principal = Number(l.principal)
     const rate = Number(l.effective_rate)
+    const source = fundingSourceFromTerms(l.repayment_terms as string | null)
     // Loan fully repaid: it no longer has a scheduled installment, but if the
     // settlement happened THIS month surface it as a 已收 row (full-plan view)
     // showing what was actually collected — otherwise it vanishes silently.
@@ -74,6 +76,7 @@ export default async function RepaymentSchedulePage() {
         interestDue: tm.interest,
         totalDue: r2(tm.principal + tm.interest),
         done: true,
+        source,
       })
       continue
     }
@@ -91,6 +94,7 @@ export default async function RepaymentSchedulePage() {
         balance: cs.balance,
         accrued: r2(cs.balance - remainingPrincipal),
         thisMonthInterest: cs.thisMonthInterest,
+        source,
       })
       continue
     }
@@ -101,6 +105,7 @@ export default async function RepaymentSchedulePage() {
         detail: `RM ${principal.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(rate * 100).toFixed(3)}%/mo · undecided`,
         outstanding: Number(out?.outstanding ?? principal),
         monthlyInterest: r2(principal * rate),
+        source,
       })
       continue
     }
@@ -126,6 +131,7 @@ export default async function RepaymentSchedulePage() {
       interestDue: inst.interestDue,
       totalDue: r2(inst.principalDue + inst.interestDue),
       done: loanDoneThisMonth.has(l.id as string),
+      source,
     })
   }
   collectRows.sort((a, b) => Number(a.done) - Number(b.done) || b.totalDue - a.totalDue)

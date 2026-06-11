@@ -16,6 +16,8 @@ export interface SchedRow {
   pending?: boolean
   /** Interest is computed with monthly compounding (利滚利). */
   compound?: boolean
+  /** Funding-source remark parsed from repayment_terms (资金来源: …), 应收 only. */
+  source?: string | null
 }
 
 export interface NoTermRow {
@@ -24,6 +26,8 @@ export interface NoTermRow {
   detail: string
   outstanding: number
   monthlyInterest: number
+  /** Funding-source remark parsed from repayment_terms (资金来源: …), 应收 only. */
+  source?: string | null
 }
 
 export interface CompoundRow {
@@ -36,6 +40,8 @@ export interface CompoundRow {
   accrued: number
   /** Interest the balance accrues this month (本月利息). */
   thisMonthInterest: number
+  /** Funding-source remark parsed from repayment_terms (资金来源: …), 应收 only. */
+  source?: string | null
 }
 
 export interface CompoundTotals {
@@ -227,6 +233,19 @@ function TabButton({
   )
 }
 
+/** Funding-source chip — same style as the Fund OUT list's SC badge. */
+function SourceChip({ source }: { source?: string | null }) {
+  if (!source) return null
+  return (
+    <span
+      className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
+      title={`资金来源: ${source}`}
+    >
+      SC {source}
+    </span>
+  )
+}
+
 function ScheduleSection({ title, rows, tone }: { title: string; rows: SchedRow[]; tone: 'credit' | 'debit' }) {
   const principal = rows.reduce((s, r) => r2(s + r.principalDue), 0)
   const interest = rows.reduce((s, r) => r2(s + r.interestDue), 0)
@@ -256,6 +275,7 @@ function ScheduleSection({ title, rows, tone }: { title: string; rows: SchedRow[
                 <td>
                   <div className="font-serif text-md text-ink">
                     {r.counterparty}
+                    <SourceChip source={r.source} />
                     {r.compound ? <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5">Compound</span> : null}
                     {r.done ? <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-ledger border border-hairline rounded px-1.5 py-0.5">Paid this month</span> : null}
                     {r.pending ? <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-alert border border-hairline rounded px-1.5 py-0.5">Pending PV</span> : null}
@@ -319,6 +339,7 @@ function CompoundSection({
               <td>
                 <div className="font-serif text-md text-ink">
                   {r.counterparty}
+                  <SourceChip source={r.source} />
                   <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5">Compound</span>
                 </div>
                 <div className="font-mono text-xs text-muted">{r.detail}</div>
@@ -378,7 +399,10 @@ function NoTermSection({
             {rows.map((r) => (
               <tr key={r.key}>
                 <td>
-                  <div className="font-serif text-md text-ink">{r.counterparty}</div>
+                  <div className="font-serif text-md text-ink">
+                    {r.counterparty}
+                    <SourceChip source={r.source} />
+                  </div>
                   <div className="font-mono text-xs text-muted">{r.detail}</div>
                 </td>
                 <td className="num">{formatMoney(r.outstanding)}</td>
