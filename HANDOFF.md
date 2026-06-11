@@ -93,7 +93,13 @@ All four domains verified against live data. Results:
   "orphan 1,400" was investigated and is NOT an orphan: OR-000027 manual JV
   2026-04-29 (THE CONTS, Dr 3000 5,000+1,400 / Cr 3053 5,000 "REFUND TO MR
   LIANG" / Cr 7000 1,400 "INTEREST INCOME OF FUND 2%") — real receipt, in GL
-  and bank; only the app-side repayments table lacks a matching row.
+  and bank. **User confirmed (2026-06-11): the 1,400 is genuine interest
+  income.** App-side repayments row added by direct SQL (interest, 2026-04-29,
+  parked on LO#19 per the CONTS-APR28K reallocatable convention, notes
+  reference OR-000027). The 5,000 principal leg was NOT added — April CONTS
+  receipts were already bundled into the 28,000 CONTS-APR28K row; a separate
+  row would double-count. CONTS outstanding unchanged at 617,200 ✓. Remaining
+  app-vs-GL-7000 delta is now exactly the deferred FY2025 backfill 30,216.71.
   ② Hookka NOT split wrongly — user confirmed 3055 Hookka Manufacturing and
   3058 Hooka Industries are TWO different companies. Not an issue; leaves stay.
   ③ Backdated rows: fixed by direct SQL (user-approved) — instrument start
