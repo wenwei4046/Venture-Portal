@@ -129,6 +129,18 @@ Banks: HL cache=GL=19,672.56; Alliance cache=GL=95,972.71.
 incl internal_transfer · `…050000` expense/claim per-segment · `…060000`
 pool_key_to_segment director fix.
 
+### 2026-06-11: GL-driven reports rebuild (commit `3cc0a37`)
+P&L / Balance Sheet / Cash Flow pages REPLACED — now built straight from
+journal_lines via `src/lib/gl-reports.ts` (pure, 11 tests) + shared
+`GlReportView` renderer. Format per the-conts.pages.dev reference: current |
+compare | Δ% | %Rev columns, collapsible COA groups (parent_code), inline txn
+drill-down, month/compare pickers + segment dropdown. BS adds synthetic
+"Retained & current earnings" so A=L+E ties; CF is direct-method via COA
+cash_flow_category with opening/closing reconciliation (closing cash = bank GL
+sum). The old cfo-reports engine still powers the EXPORT routes (xlsx/pdf) —
+export buttons removed from the 3 pages until exports are rebuilt on the new
+engine. Old 6-pool P&L layout replaced by the segment dropdown.
+
 ### PENDING / pick up next
 1. ~~**Ledger Excel filter**~~ ✅ DONE (2026-06-09, commit `7f6c2b0`). User picked
    "keep grouped, add filters" (not flatten). `LedgerSections` gained two funnel
