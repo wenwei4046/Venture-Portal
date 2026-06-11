@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Instrument_Serif, Inter, Noto_Serif_TC, Overpass_Mono } from 'next/font/google'
+import { Instrument_Serif, Inter, Noto_Serif_TC, Chivo_Mono } from 'next/font/google'
 import NextTopLoader from 'nextjs-toploader'
 import './globals.css'
 
@@ -20,11 +20,13 @@ const inter = Inter({
   display: 'swap',
 })
 
-// Overpass Mono (2026-06-11): the user wants a completely PLAIN digit 0 — no
-// dot, no slash. Canvas-tested 18 Google mono fonts: JetBrains / IBM Plex /
-// Roboto / DM / Geist etc. all bake a mark into the zero glyph; Overpass Mono
-// (with Chivo Mono / Azeret Mono / Courier Prime) renders a clean empty oval.
-const overpassMono = Overpass_Mono({
+// Chivo Mono (2026-06-11): the user wants a completely PLAIN digit 0 — no dot,
+// no slash. Verified at the GLYPH level (fontkit contour count: plain zero =
+// 2 contours, marked = 3): JetBrains / IBM Plex / Roboto / Overpass / PT etc.
+// all bake a mark into the zero; Chivo Mono / Azeret Mono / Courier Prime /
+// B612 Mono / Cutive Mono are truly plain. Don't swap without re-running the
+// contour check — canvas screenshots can silently test a fallback font.
+const chivoMono = Chivo_Mono({
   subsets: ['latin'],
   weight: ['400', '500', '600'],
   variable: '--font-mono',
@@ -51,7 +53,7 @@ export default function RootLayout({
   return (
     <html
       lang="en-MY"
-      className={`${instrumentSerif.variable} ${inter.variable} ${overpassMono.variable} ${notoSerifTc.variable}`}
+      className={`${instrumentSerif.variable} ${inter.variable} ${chivoMono.variable} ${notoSerifTc.variable}`}
       suppressHydrationWarning
     >
       <head>

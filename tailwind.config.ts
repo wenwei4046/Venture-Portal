@@ -48,7 +48,7 @@ const config: Config = {
       fontFamily: {
         sans: ['var(--font-sans)', 'Inter', 'system-ui', 'sans-serif'],
         serif: ['var(--font-serif)', '"Instrument Serif"', '"Noto Serif TC"', 'Georgia', 'serif'],
-        mono: ['var(--font-mono)', '"Overpass Mono"', 'Menlo', 'monospace'],
+        mono: ['var(--font-mono)', '"Chivo Mono"', 'Menlo', 'monospace'],
         cjk: ['var(--font-cjk)', '"Noto Serif TC"', 'serif'],
       },
 
