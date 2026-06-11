@@ -1,9 +1,57 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-06-08)
+# HOUZS Venture Portal — Session Handoff (checkpoint 2026-06-11)
 
 > Context-window handoff. Read this first to continue. User communicates in 华语 (Mandarin).
-> Supersedes the 2026-06-03 checkpoint (still valid below). This session = a long
-> Finance-hardening + UX run. Live on main, latest commit `7d7f36c`. tsc clean
-> (only pre-existing `loan-disbursement.test.ts` errors remain — unrelated).
+> Supersedes the 2026-06-08 checkpoint (still valid below).
+
+## Latest session (2026-06-10 → 11): GL reports rebuild, full document audit, fail-loud sweep
+
+Highlights (each verified: tsc clean, 283 tests, next build, deployed via `git push origin main`):
+
+### Fail-loud sweep + receive-form GL fix + netting void (the "开工" queue, all 4 items done)
+1. **GL/pool/bank failures now throw** instead of console.error (silent drift was the
+   root cause of every pool/cache reconciliation gap found in the audit):
+   - `billing/actions.ts#settleInvoicesConsolidated` — bank bump + per-segment GL post.
+   - `payments/actions.ts#createPaymentVoucher` credit path — `bump_bank_for_paid_credit` + GL post.
+   - `payments/actions.ts#voidPaidReceipt` — GL reversal (now includes `entry_no` in msg).
+   - `lib/voucher-paid-helpers.ts#adjustPool` — full rewrite: checks every insert's
+     `error` (supabase-js doesn't throw!), unknown pool names throw too.
+   - `payments/payroll-requests/actions.ts` — approval-queue insert now throws; moved
+     AFTER the request→PV link so a failure can't be retried into a duplicate PV.
+   - `hr-costing/actions.ts` — approval-queue insert throws (period-unique guards retry).
+   - Deleted dead `applyVoucherPaidSideEffects` (zero callers, swallowed-error style).
+2. **Receive form account picker now drives the GL credit** (user decision 2026-06-03):
+   `createPaymentVoucher` credit JE credits `accountCode ?? '3030'` instead of hardcoded
+   3030. Invoice settles unchanged (their picker defaults to 3030); non-AR receipts
+   (e.g. 3071 Other Debtor) stop draining AR. Consolidated settle keeps literal 3030 —
+   that path is genuinely AR. Relevant to the open AR 12,647.54 gap below.
+3. **Netting void path** — `voidPaidReceipt` now: skips bank reversal when
+   `payment_method='netting'`; reverses ALL pool rows via new SECURITY DEFINER RPC
+   `reverse_voucher_pool_rows(p_voucher_no)` (mig `20260611010000`, also in
+   supabase/migrations/): new `dept_pool_txn_type` values `void_in`/`void_out`
+   (balance view updated; monthly In/Out cards unaffected by design), idempotency
+   guard on `VOID <voucher_no>:%` descriptions, matches rows by the `PV <voucher_no>:`
+   description prefix. **Discovery:** the old adjustPool-based void reversal NEVER
+   worked for dept pools (expense_has_approval CHECK + RLS rejected it, error
+   swallowed) — voided receipts silently left pools credited. RPC covers consolidated,
+   single-settle, AND the paying-side `inter_billing_out` row from netting.
+4. **docs/FLOWS.md** — condensed as-built flow map of all document lifecycles
+   (invoices, PV/OR, loans/fund-sources, claims/payroll/dept-requests/statements),
+   account codes verified against current code (agent reports had stale pre-238
+   codes). Ends with the remaining red-flag list.
+
+(Reports rebuild, font, sidebar, repayment-schedule, and all data corrections from
+2026-06-10→11 are documented in the conversation log; data corrections were direct
+SQL per the established convention. Key closures: TB Dr=Cr ties at 0.00; 2990
+payable = 228,613.75 exact (155k netting reclassed via 4 dated JEs Dr 3054/Cr 4051);
+LO#11/BI#11 reduced 25k→10k per user; CONTS receivable ties at 617,200.)
+
+### Still open (awaiting user verification with counterparties)
+- 4054 LWS 450 · 4055 LWL 300 · 4056 CMK 6,936 · AR 3030 vs open invoices 12,647.54.
+- Red flags not yet fixed: loan disbursement primary-bank-only; PV-path loan
+  repayments skip venture_pool; benefit claims have no GL path; dept-request pool
+  debit has no rollback. See docs/FLOWS.md "Known gaps".
+
+---
 
 ## Latest session (2026-06-08): Finance hardening, treasury fixes, billing/PV UX
 

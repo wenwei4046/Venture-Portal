@@ -84,8 +84,14 @@ export async function submitHRCostSummary(formData: FormData) {
     workflow_state: 'submitted',
   })
   if (approvalErr) {
-    // Best-effort: don't block the submission on an approval insert hiccup.
-    console.error('HR costing approval queue failed:', approvalErr.message)
+    // Fail loud (2026-06-11 audit): a swallowed failure here leaves the
+    // submission pending forever with no entry in Principal's queue. The
+    // period-unique constraint already guards a retry from duplicating the
+    // submission itself.
+    throw new Error(
+      `HR cost summary saved, but opening the approval queue entry failed: ${approvalErr.message}. ` +
+        `The snapshot will not appear in /approvals — contact an engineer.`,
+    )
   }
 
   revalidatePath('/hr-costing')

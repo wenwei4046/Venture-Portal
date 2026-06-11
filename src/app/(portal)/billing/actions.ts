@@ -846,11 +846,14 @@ export async function settleInvoicesConsolidated(payload: {
     .insert({ voucher_id: pv.id, pool: 'venture_pool', amount: total, account_code: '3030' })
   if (srcErr) throw new Error(`source row insert failed: ${srcErr.message}`)
 
-  // Bank cache
+  // Bank cache — fail loud (2026-06-11 audit): a swallowed bump drifts the
+  // bank cache vs GL and the next big approval bounces on "insufficient".
   const { error: bumpErr } = await supabase.rpc('bump_bank_for_paid_credit', {
     p_voucher_id: pv.id,
   })
-  if (bumpErr) console.error('bump_bank_for_paid_credit warning:', bumpErr.message)
+  if (bumpErr) {
+    throw new Error(`Receipt ${voucherNo} created but bank balance update failed: ${bumpErr.message}`)
+  }
 
   // Pool credit — attribute EACH invoice to its OWN dept pool by billing_mode.
   // A consolidated receipt can span departments (same company can have e.g. a
@@ -903,7 +906,11 @@ export async function settleInvoicesConsolidated(payload: {
         createdBy: user.id,
       })
     } catch (jeErr) {
-      console.error('GL posting warning for consolidated settle:', seg, jeErr)
+      // Fail loud (2026-06-11 audit): a swallowed JE leaves the settlement
+      // cash missing from the GL — bank-segment recon and the statements
+      // silently drift until someone hunts it down.
+      const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
+      throw new Error(`Receipt ${voucherNo} created but settlement GL posting failed (segment ${seg}): ${msg}`)
     }
   }
 
