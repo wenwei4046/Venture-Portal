@@ -54,17 +54,26 @@ export default function GlReportView({
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [openTxns, setOpenTxns] = useState<Set<string>>(new Set())
 
-  const allGroupCodes = useMemo(() => {
-    const codes: string[] = []
+  // L1 = top accounts only · L2 = every account level · L3 = + transactions.
+  const { allGroupCodes, allTxnCodes } = useMemo(() => {
+    const groups: string[] = []
+    const txns: string[] = []
     const walk = (n: AccountNode) => {
       if (n.children.length > 0) {
-        codes.push(n.code)
+        groups.push(n.code)
         n.children.forEach(walk)
+      } else if (n.txns.length > 0) {
+        txns.push(n.code)
       }
     }
     for (const b of blocks) if (b.kind === 'section') b.section.nodes.forEach(walk)
-    return codes
+    return { allGroupCodes: groups, allTxnCodes: txns }
   }, [blocks])
+
+  const setLevel = (level: 1 | 2 | 3) => {
+    setCollapsed(level === 1 ? new Set(allGroupCodes) : new Set())
+    setOpenTxns(level === 3 ? new Set(allTxnCodes) : new Set())
+  }
 
   function navigate(nextPeriod: string, nextCompare: string, nextSegment: string) {
     const qs = new URLSearchParams()
@@ -157,27 +166,23 @@ export default function GlReportView({
             ))}
           </select>
         </label>
-        <div className="ml-auto flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setCollapsed(new Set())
-              setOpenTxns(new Set())
-            }}
-            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-          >
-            Expand all
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setCollapsed(new Set(allGroupCodes))
-              setOpenTxns(new Set())
-            }}
-            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-          >
-            Collapse all
-          </button>
+        <div className="ml-auto flex items-center gap-1.5">
+          <span className="font-mono text-xs text-muted mr-1">Detail</span>
+          {([
+            [1, 'L1', 'Top accounts only'],
+            [2, 'L2', 'All account levels'],
+            [3, 'L3', 'Everything incl. transactions'],
+          ] as const).map(([lvl, label, title]) => (
+            <button
+              key={lvl}
+              type="button"
+              onClick={() => setLevel(lvl)}
+              title={title}
+              className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
