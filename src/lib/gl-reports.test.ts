@@ -137,6 +137,34 @@ describe('buildCashFlow', () => {
   })
 })
 
+describe('gl-report-blocks flatten (export path)', async () => {
+  const { pnlBlocks, balanceSheetBlocks, flattenGlReport } = await import('./gl-report-blocks')
+
+  it('flattens P&L blocks with section breaks + summary rows', () => {
+    const pnl = buildPnl(LINES, ACCOUNTS, FILTER)
+    const flat = flattenGlReport(pnlBlocks(pnl), { pctBase: pnl.revenue.current })
+    // Sections in statement order.
+    expect(flat.sectionBreaks.map((b) => b.title)).toEqual([
+      'Revenue', 'Cost of Goods Sold', 'Other Income', 'Expenses',
+    ])
+    // Summary rows present with margin subs folded into the label.
+    const labels = flat.rows.map((r) => r[0])
+    expect(labels).toContain('Total Revenue')
+    expect(labels.some((l) => String(l).startsWith('Gross Profit ('))).toBe(true)
+    expect(labels.some((l) => String(l).startsWith('Net Income / (Loss) ('))).toBe(true)
+    // % Rev column on every row.
+    expect(flat.rows[0]).toHaveLength(5)
+  })
+
+  it('indents child accounts under their header in the Balance Sheet', () => {
+    const bs = buildBalanceSheet(LINES, ACCOUNTS, FILTER)
+    const flat = flattenGlReport(balanceSheetBlocks(bs), {})
+    const child = flat.rows.find((r) => String(r[0]).includes('3051'))
+    expect(String(child?.[0]).startsWith('    ')).toBe(true)
+    expect(flat.rows[0]).toHaveLength(4) // no % Rev column
+  })
+})
+
 describe('period helpers', () => {
   it('monthPeriod covers the full month', () => {
     expect(monthPeriod('2026-06')).toEqual({ from: '2026-06-01', to: '2026-06-30' })

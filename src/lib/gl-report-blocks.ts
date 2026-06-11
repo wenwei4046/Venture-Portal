@@ -1,0 +1,240 @@
+// Presentation structure for the GL-driven statements, shared by the pages
+// (GlReportView) AND the xlsx/pdf export routes — one source of truth for
+// section order, subtotal rows, and labels, so the screen and the files can
+// never drift apart.
+
+import type {
+  AccountNode,
+  BalanceSheetReport,
+  CashFlowReport,
+  PnlReport,
+  ReportSection,
+} from './gl-reports'
+
+function r2(n: number): number {
+  return Math.round(n * 100) / 100
+}
+
+export interface SummaryRow {
+  label: string
+  current: number
+  previous: number
+  /** Optional sub-line under the label, e.g. "38.5% gross margin". */
+  sub?: string
+  emphasis?: 'normal' | 'strong'
+  tone?: 'ledger' | 'danger' | 'auto'
+}
+
+export type ReportBlock =
+  | { kind: 'section'; section: ReportSection }
+  | { kind: 'summary'; row: SummaryRow }
+
+export function deltaPct(current: number, previous: number): string {
+  if (Math.abs(previous) < 0.005) return '—'
+  const pct = ((current - previous) / Math.abs(previous)) * 100
+  const sign = pct > 0 ? '+' : ''
+  return `${sign}${pct.toFixed(1)}%`
+}
+
+export function pctOf(n: number, base: number): string {
+  if (Math.abs(base) < 0.005) return '—'
+  return `${((n / base) * 100).toFixed(1)}%`
+}
+
+// ─── Block builders (one per statement) ──────────────────────────────────────
+
+export function pnlBlocks(pnl: PnlReport): ReportBlock[] {
+  const margin = (n: number) =>
+    Math.abs(pnl.revenue.current) < 0.005 ? undefined : `${((n / pnl.revenue.current) * 100).toFixed(1)}%`
+  const gm = margin(pnl.grossProfit.current)
+  const nm = margin(pnl.netIncome.current)
+  return [
+    { kind: 'section', section: pnl.revenue },
+    {
+      kind: 'summary',
+      row: { label: 'Total Revenue', current: pnl.revenue.current, previous: pnl.revenue.previous, emphasis: 'strong', tone: 'ledger' },
+    },
+    { kind: 'section', section: pnl.cost },
+    {
+      kind: 'summary',
+      row: {
+        label: 'Gross Profit',
+        current: pnl.grossProfit.current,
+        previous: pnl.grossProfit.previous,
+        sub: gm ? `${gm} gross margin` : undefined,
+        emphasis: 'strong',
+        tone: 'auto',
+      },
+    },
+    { kind: 'section', section: pnl.otherIncome },
+    { kind: 'section', section: pnl.expense },
+    {
+      kind: 'summary',
+      row: {
+        label: 'Net Income / (Loss)',
+        current: pnl.netIncome.current,
+        previous: pnl.netIncome.previous,
+        sub: nm ? `${nm} net margin` : undefined,
+        emphasis: 'strong',
+        tone: 'auto',
+      },
+    },
+  ]
+}
+
+export function balanceSheetBlocks(bs: BalanceSheetReport, segment?: string): ReportBlock[] {
+  // Surface cumulative earnings as a row inside Equity so the sheet ties.
+  const equityWithEarnings: ReportSection = {
+    ...bs.equity,
+    nodes: [
+      ...bs.equity.nodes,
+      {
+        code: '—',
+        name: 'Retained & current earnings (cumulative P&L)',
+        current: bs.earnings.current,
+        previous: bs.earnings.previous,
+        txns: [],
+        children: [],
+      },
+    ],
+    current: r2(bs.equity.current + bs.earnings.current),
+    previous: r2(bs.equity.previous + bs.earnings.previous),
+  }
+  return [
+    ...(bs.fixedAssets.nodes.length > 0
+      ? ([{ kind: 'section', section: bs.fixedAssets }] as ReportBlock[])
+      : []),
+    { kind: 'section', section: bs.assets },
+    {
+      kind: 'summary',
+      row: { label: 'Total Assets', current: bs.totalAssets.current, previous: bs.totalAssets.previous, emphasis: 'strong', tone: 'ledger' },
+    },
+    { kind: 'section', section: bs.liabilities },
+    {
+      kind: 'summary',
+      row: { label: 'Total Liabilities', current: bs.liabilities.current, previous: bs.liabilities.previous },
+    },
+    { kind: 'section', section: equityWithEarnings },
+    {
+      kind: 'summary',
+      row: {
+        label: 'Total Liabilities & Equity',
+        current: bs.totalLiabEquity.current,
+        previous: bs.totalLiabEquity.previous,
+        emphasis: 'strong',
+        tone: 'ledger',
+      },
+    },
+    ...(Math.abs(bs.check.current) > 0.005 || Math.abs(bs.check.previous) > 0.005
+      ? ([
+          {
+            kind: 'summary',
+            row: {
+              label: segment ? 'Segment imbalance (expected with a segment filter)' : '⚠ Out of balance (Assets − L&E)',
+              current: bs.check.current,
+              previous: bs.check.previous,
+              tone: 'danger',
+            },
+          },
+        ] as ReportBlock[])
+      : []),
+  ]
+}
+
+export function cashFlowBlocks(cf: CashFlowReport): ReportBlock[] {
+  return [
+    { kind: 'section', section: cf.operating },
+    {
+      kind: 'summary',
+      row: { label: 'Net cash — operating', current: cf.operating.current, previous: cf.operating.previous, tone: 'auto' },
+    },
+    { kind: 'section', section: cf.investing },
+    {
+      kind: 'summary',
+      row: { label: 'Net cash — investing', current: cf.investing.current, previous: cf.investing.previous, tone: 'auto' },
+    },
+    { kind: 'section', section: cf.financing },
+    {
+      kind: 'summary',
+      row: { label: 'Net cash — financing', current: cf.financing.current, previous: cf.financing.previous, tone: 'auto' },
+    },
+    {
+      kind: 'summary',
+      row: { label: 'Net change in cash', current: cf.netChange.current, previous: cf.netChange.previous, emphasis: 'strong', tone: 'auto' },
+    },
+    {
+      kind: 'summary',
+      row: { label: 'Opening cash', current: cf.openingCash.current, previous: cf.openingCash.previous },
+    },
+    {
+      kind: 'summary',
+      row: { label: 'Closing cash', current: cf.closingCash.current, previous: cf.closingCash.previous, emphasis: 'strong', tone: 'ledger' },
+    },
+    ...(Math.abs(cf.check.current) > 0.005 || Math.abs(cf.check.previous) > 0.005
+      ? ([
+          {
+            kind: 'summary',
+            row: {
+              label: '⚠ Uncategorised cash movement (closing − opening − net change)',
+              current: cf.check.current,
+              previous: cf.check.previous,
+              tone: 'danger',
+            },
+          },
+        ] as ReportBlock[])
+      : []),
+  ]
+}
+
+// ─── Flattener for exports (xlsx rows / pdf table rows) ──────────────────────
+
+export interface FlatGlReport {
+  headerRow: string[]
+  rows: (string | number | null)[][]
+  /** afterRow indices for buildXlsxBuffer sectionBreaks. */
+  sectionBreaks: { afterRow: number; title: string }[]
+}
+
+/** Serialise blocks into flat rows: Account | current | compare | Δ% | (% Rev).
+ *  Account groups are depth-indented; summary rows carry their sub-label. */
+export function flattenGlReport(
+  blocks: ReportBlock[],
+  opts: { pctBase?: number },
+): FlatGlReport {
+  const withPct = opts.pctBase !== undefined
+  const rows: (string | number | null)[][] = []
+  const sectionBreaks: { afterRow: number; title: string }[] = []
+
+  const pushNode = (n: AccountNode, depth: number) => {
+    rows.push([
+      `${'    '.repeat(depth)}${n.code === '—' ? '' : `${n.code} `}${n.name}`,
+      n.current,
+      n.previous,
+      deltaPct(n.current, n.previous),
+      ...(withPct ? [pctOf(n.current, opts.pctBase!)] : []),
+    ])
+    for (const c of n.children) pushNode(c, depth + 1)
+  }
+
+  for (const b of blocks) {
+    if (b.kind === 'section') {
+      sectionBreaks.push({ afterRow: rows.length, title: b.section.label })
+      for (const n of b.section.nodes) pushNode(n, 0)
+    } else {
+      const label = b.row.sub ? `${b.row.label} (${b.row.sub})` : b.row.label
+      rows.push([
+        label,
+        b.row.current,
+        b.row.previous,
+        deltaPct(b.row.current, b.row.previous),
+        ...(withPct ? [pctOf(b.row.current, opts.pctBase!)] : []),
+      ])
+    }
+  }
+
+  return {
+    headerRow: [], // caller supplies labels (period names differ per report)
+    rows,
+    sectionBreaks,
+  }
+}

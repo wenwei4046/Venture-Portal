@@ -1,27 +1,45 @@
+// GL-driven Balance Sheet export (xlsx/pdf) — same engine + blocks as the page.
+
+import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { fetchBalanceSheet } from '@/lib/cfo-reports'
-import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
-import { buildBalanceSheetXlsx } from './_format/xlsx'
-import { BalanceSheetPdf } from './_format/pdf'
-import dayjs from 'dayjs'
+import { buildBalanceSheet, fetchAllJournalLines, fetchCoaAccounts, monthPeriod, prevMonth } from '@/lib/gl-reports'
+import { balanceSheetBlocks } from '@/lib/gl-report-blocks'
+import { glStatementExportResponse } from '@/lib/export/gl-statement'
+
+const YM = /^\d{4}-\d{2}$/
 
 export async function GET(req: Request) {
   await requireRole(['principal', 'finance'])
   const url = new URL(req.url)
-  const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
-  const asOf = url.searchParams.get('as_of') ?? dayjs().format('YYYY-MM-DD')
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(asOf)) {
-    return Response.json({ error: 'invalid as_of date' }, { status: 400 })
+  const format = url.searchParams.get('format') === 'pdf' ? ('pdf' as const) : ('xlsx' as const)
+  const period = url.searchParams.get('period') ?? dayjs().format('YYYY-MM')
+  const compare = url.searchParams.get('compare') ?? prevMonth(period)
+  const segment = url.searchParams.get('segment') ?? ''
+  if (!YM.test(period) || !YM.test(compare)) {
+    return Response.json({ error: 'invalid period/compare (YYYY-MM)' }, { status: 400 })
   }
 
   const supabase = await createClient()
-  const bs = await fetchBalanceSheet(supabase, { asOf })
+  const [lines, accounts] = await Promise.all([
+    fetchAllJournalLines(supabase),
+    fetchCoaAccounts(supabase),
+  ])
+  const bs = buildBalanceSheet(lines, accounts, {
+    current: monthPeriod(period),
+    previous: monthPeriod(compare),
+    segment: segment || undefined,
+  })
 
-  const filename = `balance-sheet-${asOf.replace(/-/g, '')}`
-  if (format === 'xlsx') {
-    return exportXlsxResponse({ filename, buffer: buildBalanceSheetXlsx(bs) })
-  }
-  return exportPdfResponse({ filename, element: <BalanceSheetPdf bs={bs} /> })
+  const asAt = (ym: string) => dayjs(monthPeriod(ym).to).format('D MMM YYYY')
+
+  return glStatementExportResponse({
+    format,
+    filename: `balance-sheet-${period}${segment ? `-${segment}` : ''}`,
+    title: 'Balance Sheet',
+    periodLabel: `As at ${asAt(period)}${segment ? ` · ${segment}` : ''}`,
+    currentLabel: asAt(period),
+    compareLabel: asAt(compare),
+    blocks: balanceSheetBlocks(bs, segment || undefined),
+  })
 }

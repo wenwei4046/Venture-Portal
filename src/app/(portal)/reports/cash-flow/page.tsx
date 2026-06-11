@@ -15,8 +15,10 @@ import {
   monthPeriod,
   prevMonth,
 } from '@/lib/gl-reports'
-import GlReportView, { type ReportBlock } from '../_components/GlReportView'
+import { cashFlowBlocks } from '@/lib/gl-report-blocks'
+import GlReportView from '../_components/GlReportView'
 import { REPORT_SEGMENTS } from '../_components/report-segments'
+import ExportLinks from '../_components/ExportLinks'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,61 +55,7 @@ export default async function CashFlowPage({ searchParams }: Props) {
     bankCodes,
   )
 
-  const blocks: ReportBlock[] = [
-    { kind: 'section', section: cf.operating },
-    {
-      kind: 'summary',
-      row: { label: 'Net cash — operating', current: cf.operating.current, previous: cf.operating.previous, tone: 'auto' },
-    },
-    { kind: 'section', section: cf.investing },
-    {
-      kind: 'summary',
-      row: { label: 'Net cash — investing', current: cf.investing.current, previous: cf.investing.previous, tone: 'auto' },
-    },
-    { kind: 'section', section: cf.financing },
-    {
-      kind: 'summary',
-      row: { label: 'Net cash — financing', current: cf.financing.current, previous: cf.financing.previous, tone: 'auto' },
-    },
-    {
-      kind: 'summary',
-      row: {
-        label: 'Net change in cash',
-        current: cf.netChange.current,
-        previous: cf.netChange.previous,
-        emphasis: 'strong',
-        tone: 'auto',
-      },
-    },
-    {
-      kind: 'summary',
-      row: { label: 'Opening cash', current: cf.openingCash.current, previous: cf.openingCash.previous },
-    },
-    {
-      kind: 'summary',
-      row: {
-        label: 'Closing cash',
-        current: cf.closingCash.current,
-        previous: cf.closingCash.previous,
-        emphasis: 'strong',
-        tone: 'ledger',
-      },
-    },
-    ...(Math.abs(cf.check.current) > 0.005 || Math.abs(cf.check.previous) > 0.005
-      ? ([
-          {
-            kind: 'summary',
-            row: {
-              label: '⚠ Uncategorised cash movement (closing − opening − net change)',
-              current: cf.check.current,
-              previous: cf.check.previous,
-              tone: 'danger',
-            },
-          },
-        ] as ReportBlock[])
-      : []),
-  ]
-
+  const blocks = cashFlowBlocks(cf)
   const periodLabel = dayjs(`${period}-01`).format('MMMM YYYY')
 
   return (
@@ -123,6 +71,7 @@ export default async function CashFlowPage({ searchParams }: Props) {
           </div>
           <h1 className="page-title">Cash Flow Statement</h1>
         </div>
+        <ExportLinks basePath="/reports/cash-flow/export" period={period} compare={compare} segment={segment} />
       </div>
 
       <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">

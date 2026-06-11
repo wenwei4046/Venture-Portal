@@ -9,8 +9,10 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { buildPnl, fetchAllJournalLines, fetchCoaAccounts, monthPeriod, prevMonth } from '@/lib/gl-reports'
-import GlReportView, { type ReportBlock } from '../_components/GlReportView'
+import { pnlBlocks } from '@/lib/gl-report-blocks'
+import GlReportView from '../_components/GlReportView'
 import { REPORT_SEGMENTS } from '../_components/report-segments'
+import ExportLinks from '../_components/ExportLinks'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,42 +40,7 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
     segment: segment || undefined,
   })
 
-  const margin = (n: number) =>
-    Math.abs(pnl.revenue.current) < 0.005 ? '' : `${((n / pnl.revenue.current) * 100).toFixed(1)}%`
-
-  const blocks: ReportBlock[] = [
-    { kind: 'section', section: pnl.revenue },
-    {
-      kind: 'summary',
-      row: { label: 'Total Revenue', current: pnl.revenue.current, previous: pnl.revenue.previous, emphasis: 'strong', tone: 'ledger' },
-    },
-    { kind: 'section', section: pnl.cost },
-    {
-      kind: 'summary',
-      row: {
-        label: 'Gross Profit',
-        current: pnl.grossProfit.current,
-        previous: pnl.grossProfit.previous,
-        sub: margin(pnl.grossProfit.current) ? `${margin(pnl.grossProfit.current)} gross margin` : undefined,
-        emphasis: 'strong',
-        tone: 'auto',
-      },
-    },
-    { kind: 'section', section: pnl.otherIncome },
-    { kind: 'section', section: pnl.expense },
-    {
-      kind: 'summary',
-      row: {
-        label: 'Net Income / (Loss)',
-        current: pnl.netIncome.current,
-        previous: pnl.netIncome.previous,
-        sub: margin(pnl.netIncome.current) ? `${margin(pnl.netIncome.current)} net margin` : undefined,
-        emphasis: 'strong',
-        tone: 'auto',
-      },
-    },
-  ]
-
+  const blocks = pnlBlocks(pnl)
   const periodLabel = dayjs(`${period}-01`).format('MMMM YYYY')
 
   return (
@@ -89,6 +56,7 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
           </div>
           <h1 className="page-title">P&amp;L Statement</h1>
         </div>
+        <ExportLinks basePath="/reports/income-statement/export" period={period} compare={compare} segment={segment} />
       </div>
 
       <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">

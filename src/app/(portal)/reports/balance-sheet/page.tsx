@@ -14,10 +14,11 @@ import {
   fetchCoaAccounts,
   monthPeriod,
   prevMonth,
-  type ReportSection,
 } from '@/lib/gl-reports'
-import GlReportView, { type ReportBlock } from '../_components/GlReportView'
+import { balanceSheetBlocks } from '@/lib/gl-report-blocks'
+import GlReportView from '../_components/GlReportView'
 import { REPORT_SEGMENTS } from '../_components/report-segments'
+import ExportLinks from '../_components/ExportLinks'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,64 +46,7 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
     segment: segment || undefined,
   })
 
-  // Surface cumulative earnings as a row inside Equity so the sheet ties.
-  const equityWithEarnings: ReportSection = {
-    ...bs.equity,
-    nodes: [
-      ...bs.equity.nodes,
-      {
-        code: '—',
-        name: 'Retained & current earnings (cumulative P&L)',
-        current: bs.earnings.current,
-        previous: bs.earnings.previous,
-        txns: [],
-        children: [],
-      },
-    ],
-    current: Math.round((bs.equity.current + bs.earnings.current) * 100) / 100,
-    previous: Math.round((bs.equity.previous + bs.earnings.previous) * 100) / 100,
-  }
-
-  const blocks: ReportBlock[] = [
-    ...(bs.fixedAssets.nodes.length > 0
-      ? ([{ kind: 'section', section: bs.fixedAssets }] as ReportBlock[])
-      : []),
-    { kind: 'section', section: bs.assets },
-    {
-      kind: 'summary',
-      row: { label: 'Total Assets', current: bs.totalAssets.current, previous: bs.totalAssets.previous, emphasis: 'strong', tone: 'ledger' },
-    },
-    { kind: 'section', section: bs.liabilities },
-    {
-      kind: 'summary',
-      row: { label: 'Total Liabilities', current: bs.liabilities.current, previous: bs.liabilities.previous },
-    },
-    { kind: 'section', section: equityWithEarnings },
-    {
-      kind: 'summary',
-      row: {
-        label: 'Total Liabilities & Equity',
-        current: bs.totalLiabEquity.current,
-        previous: bs.totalLiabEquity.previous,
-        emphasis: 'strong',
-        tone: 'ledger',
-      },
-    },
-    ...(Math.abs(bs.check.current) > 0.005 || Math.abs(bs.check.previous) > 0.005
-      ? ([
-          {
-            kind: 'summary',
-            row: {
-              label: segment ? 'Segment imbalance (expected with a segment filter)' : '⚠ Out of balance (Assets − L&E)',
-              current: bs.check.current,
-              previous: bs.check.previous,
-              tone: 'danger',
-            },
-          },
-        ] as ReportBlock[])
-      : []),
-  ]
-
+  const blocks = balanceSheetBlocks(bs, segment || undefined)
   const asAt = (ym: string) => dayjs(monthPeriod(ym).to).format('D MMM YYYY')
 
   return (
@@ -118,6 +62,7 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
           </div>
           <h1 className="page-title">Balance Sheet</h1>
         </div>
+        <ExportLinks basePath="/reports/balance-sheet/export" period={period} compare={compare} segment={segment} />
       </div>
 
       <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">

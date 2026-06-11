@@ -1,32 +1,53 @@
+// GL-driven Cash Flow export (xlsx/pdf) — same engine + blocks as the page.
+
+import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { fetchCashflowStatement, pivotCashflowByPool } from '@/lib/cfo-reports'
-import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
-import { buildCashflowXlsx } from './_format/xlsx'
-import { CashflowPdf } from './_format/pdf'
-import dayjs from 'dayjs'
+import { buildCashFlow, fetchAllJournalLines, fetchCoaAccounts, monthPeriod, prevMonth } from '@/lib/gl-reports'
+import { cashFlowBlocks } from '@/lib/gl-report-blocks'
+import { glStatementExportResponse } from '@/lib/export/gl-statement'
+
+const YM = /^\d{4}-\d{2}$/
 
 export async function GET(req: Request) {
   await requireRole(['principal', 'finance'])
   const url = new URL(req.url)
-  const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
-  const from = url.searchParams.get('from') ?? dayjs().startOf('month').format('YYYY-MM-DD')
-  const to = url.searchParams.get('to') ?? dayjs().format('YYYY-MM-DD')
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
-    return Response.json({ error: 'invalid from/to date' }, { status: 400 })
+  const format = url.searchParams.get('format') === 'pdf' ? ('pdf' as const) : ('xlsx' as const)
+  const period = url.searchParams.get('period') ?? dayjs().format('YYYY-MM')
+  const compare = url.searchParams.get('compare') ?? prevMonth(period)
+  const segment = url.searchParams.get('segment') ?? ''
+  if (!YM.test(period) || !YM.test(compare)) {
+    return Response.json({ error: 'invalid period/compare (YYYY-MM)' }, { status: 400 })
   }
+
   const supabase = await createClient()
-  const stmt = await fetchCashflowStatement(supabase, { from, to })
-  const periodLabel = `${dayjs(from).format('D MMM YYYY')} – ${dayjs(to).format('D MMM YYYY')}`
-  const seg = url.searchParams.get('seg') ?? 'summary'
-  const isSummary = seg === 'summary'
-  const block = isSummary ? null : pivotCashflowByPool(stmt).pools.find((p) => p.pool === seg) ?? null
-  if (!isSummary && !block) {
-    return Response.json({ error: 'unknown seg' }, { status: 400 })
-  }
-  const filename = `cash-flow-${isSummary ? 'summary' : seg}-${from}-${to}`
-  if (format === 'xlsx') {
-    return exportXlsxResponse({ filename, buffer: buildCashflowXlsx(stmt, { block }) })
-  }
-  return exportPdfResponse({ filename, element: <CashflowPdf stmt={stmt} periodLabel={periodLabel} block={block} /> })
+  const [lines, accounts, { data: banks }] = await Promise.all([
+    fetchAllJournalLines(supabase),
+    fetchCoaAccounts(supabase),
+    supabase.from('bank_accounts').select('gl_account_code'),
+  ])
+  const bankCodes = new Set(
+    (banks ?? []).map((b) => b.gl_account_code as string | null).filter((c): c is string => !!c),
+  )
+
+  const cf = buildCashFlow(
+    lines,
+    accounts,
+    {
+      current: monthPeriod(period),
+      previous: monthPeriod(compare),
+      segment: segment || undefined,
+    },
+    bankCodes,
+  )
+
+  return glStatementExportResponse({
+    format,
+    filename: `cash-flow-${period}${segment ? `-${segment}` : ''}`,
+    title: 'Cash Flow Statement',
+    periodLabel: `${dayjs(`${period}-01`).format('MMMM YYYY')}${segment ? ` · ${segment}` : ''}`,
+    currentLabel: dayjs(`${period}-01`).format('MMM YYYY'),
+    compareLabel: dayjs(`${compare}-01`).format('MMM YYYY'),
+    blocks: cashFlowBlocks(cf),
+  })
 }

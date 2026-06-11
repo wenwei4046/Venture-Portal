@@ -10,22 +10,9 @@ import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import { formatMoneyBare } from '@/lib/utils'
 import type { AccountNode, ReportSection } from '@/lib/gl-reports'
+import { deltaPct, pctOf, type ReportBlock } from '@/lib/gl-report-blocks'
 
-export interface SummaryRow {
-  label: string
-  current: number
-  previous: number
-  /** Optional sub-line under the label, e.g. "38.5% gross margin". */
-  sub?: string
-  /** Visual weight: section subtotal vs the headline (Net Income etc). */
-  emphasis?: 'normal' | 'strong'
-  /** Tint the current-period figure. */
-  tone?: 'ledger' | 'danger' | 'auto'
-}
-
-export type ReportBlock =
-  | { kind: 'section'; section: ReportSection }
-  | { kind: 'summary'; row: SummaryRow }
+export type { ReportBlock }
 
 export interface GlReportViewProps {
   basePath: string
@@ -43,18 +30,6 @@ export interface GlReportViewProps {
 
 function money(n: number): string {
   return formatMoneyBare(n)
-}
-
-function deltaPct(current: number, previous: number): string {
-  if (Math.abs(previous) < 0.005) return '—'
-  const pct = ((current - previous) / Math.abs(previous)) * 100
-  const sign = pct > 0 ? '+' : ''
-  return `${sign}${pct.toFixed(1)}%`
-}
-
-function pctOf(n: number, base: number): string {
-  if (Math.abs(base) < 0.005) return '—'
-  return `${((n / base) * 100).toFixed(1)}%`
 }
 
 export default function GlReportView({
