@@ -390,6 +390,18 @@ table.ledger-table tbody tr { border-bottom: 1px solid rgb(var(--hairline)); }
 table.ledger-table tbody tr:last-child { border-bottom: 0; }
 table.ledger-table tbody tr:nth-child(even) { background: rgb(var(--surface-2) / 0.35); }
 table.ledger-table tbody tr:hover { background: rgb(var(--accent-bg)); }
+
+/* GL statements (P&L / BS / CF): role-based row colouring replaces zebra
+   striping — section title / group / leaf / transaction detail / summary each
+   get their own band so the hierarchy reads at a glance (user 2026-06-11). */
+table.ledger-table.gl-report tbody tr:nth-child(even) { background: transparent; }
+table.ledger-table.gl-report tbody tr.row-sect { background: rgb(var(--surface-2) / 0.7); }
+table.ledger-table.gl-report tbody tr.row-group { background: rgb(var(--surface)); }
+table.ledger-table.gl-report tbody tr.row-leaf { background: transparent; }
+table.ledger-table.gl-report tbody tr.row-txn { background: rgb(var(--info-bg) / 0.45); }
+table.ledger-table.gl-report tbody tr.row-summary { background: rgb(var(--surface)); }
+table.ledger-table.gl-report tbody tr.row-summary-strong { background: rgb(var(--accent-bg) / 0.55); }
+table.ledger-table.gl-report tbody tr:hover { background: rgb(var(--accent-bg)); }
 table.ledger-table td {
   padding: 14px 16px;
   vertical-align: baseline;

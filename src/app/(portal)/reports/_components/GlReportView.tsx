@@ -181,7 +181,7 @@ export default function GlReportView({
         </div>
       </div>
 
-      <table className="ledger-table">
+      <table className="ledger-table gl-report">
         <thead>
           <tr>
             <th>Account</th>
@@ -210,8 +210,8 @@ export default function GlReportView({
                 key={`summary-${i}`}
                 className={
                   b.row.emphasis === 'strong'
-                    ? 'border-t-2 border-hairline bg-surface'
-                    : 'border-t border-hairline'
+                    ? 'row-summary-strong border-t-2 border-hairline'
+                    : 'row-summary border-t border-hairline'
                 }
               >
                 <td className={`font-serif italic ${b.row.emphasis === 'strong' ? 'text-ink font-semibold' : 'text-ink font-medium'}`}>
@@ -279,7 +279,7 @@ function SectionRows({
   // Section title = small-caps eyebrow (matches the portal's sect-head
   // convention) so it reads clearly apart from the serif-italic subtotal rows.
   rows.push(
-    <tr key={`sect-${section.key}`} className="border-t-2 border-hairline">
+    <tr key={`sect-${section.key}`} className="row-sect border-t-2 border-hairline">
       <td colSpan={colCount} className="pt-3.5">
         <span className="font-sans text-[10.5px] font-semibold uppercase tracking-[0.18em] text-accent">
           {section.label}
@@ -300,7 +300,7 @@ function SectionRows({
         ? () => onToggleTxns(n.code)
         : undefined
     rows.push(
-      <tr key={n.code}>
+      <tr key={n.code} className={isGroup ? 'row-group' : 'row-leaf'}>
         <td>
           <button
             type="button"
@@ -357,7 +357,7 @@ function SectionRows({
       for (let i = 0; i < n.txns.length; i++) {
         const t = n.txns[i]
         rows.push(
-          <tr key={`${n.code}-txn-${i}`} className="bg-surface/60">
+          <tr key={`${n.code}-txn-${i}`} className="row-txn">
             <td>
               <div className="flex items-baseline gap-3 font-mono text-[11px] text-graphite" style={{ paddingLeft: `${depth * 18 + 22}px` }}>
                 <span>{dayjs(t.date).format('D MMM')}</span>
