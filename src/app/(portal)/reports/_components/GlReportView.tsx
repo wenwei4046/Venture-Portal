@@ -36,6 +36,9 @@ function stepMonth(ym: string, delta: number): string {
 }
 
 function money(n: number): string {
+  // Accounting convention: zero renders as a dash (matches the Excel/PDF
+  // exports' `#,##0.00;(#,##0.00);—` number format).
+  if (Math.abs(n) < 0.005) return '—'
   return formatMoneyBare(n)
 }
 

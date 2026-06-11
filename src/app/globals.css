@@ -385,7 +385,9 @@ table.ledger-table thead th {
   background: rgb(var(--surface-2));
   border-bottom: 1px solid rgb(var(--hairline));
 }
-table.ledger-table thead th.right { text-align: right; }
+/* Number-column headers align with their right-aligned figures. */
+table.ledger-table thead th.right,
+table.ledger-table thead th.num { text-align: right; }
 table.ledger-table tbody tr { border-bottom: 1px solid rgb(var(--hairline)); }
 table.ledger-table tbody tr:last-child { border-bottom: 0; }
 table.ledger-table tbody tr:nth-child(even) { background: rgb(var(--surface-2) / 0.35); }
