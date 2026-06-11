@@ -58,6 +58,14 @@ Supabase MCP `apply_migration` AND saved to `supabase/migrations/` for parity
   invoice (Company/Mode/Description/Status) lists. Composes with search + sort.
 
 ### Data corrections (direct SQL, recorded for audit — NOT in migrations)
+- **2026-06-11: PV-000059 advertisement claim 2,807.34 re-pointed 9088 → 9095.**
+  TB stopped tallying by exactly 2,807.34: a child account (9095 Advertisment -
+  Hiring) was created UNDER 9088 Advertisement, silently turning 9088 into a
+  header — and the leaf-only Trial Balance dropped 9088's one existing line
+  (the 2026-05-05 recruitment-ad claim from the GL import). Moved the line to
+  9095 (it IS a hiring ad). Verified: 0 postings remain on any header account,
+  leaf-only Dr−Cr = 0.00. ⚠ Trap to guard later: mig 256 blocks POSTING to
+  headers, but nothing stops CREATING a child under an already-posted account.
 - **2026-06-11: 7 inter-billing expense JEs re-tagged corporate → marketing**
   (JE-202605-0007/0014/0021/0028/0035/0042 + JE-202606-0038 — the Dr 9051 /
   Cr 3030 twins of Marketing's utilities rebills). Root cause: the inter-billing
