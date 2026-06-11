@@ -120,7 +120,7 @@ h1, h2, h3, h4 {
 /* Tabular numbers for money + data */
 .tabular,
 .mono {
-  font-family: var(--font-mono), 'IBM Plex Mono', Menlo, monospace;
+  font-family: var(--font-mono), 'Overpass Mono', Menlo, monospace;
   font-variant-numeric: tabular-nums;
 }
 
@@ -350,7 +350,7 @@ select:focus {
 @layer components {
   .num,
   .num-hero {
-    font-family: var(--font-mono), 'IBM Plex Mono', Menlo, monospace;
+    font-family: var(--font-mono), 'Overpass Mono', Menlo, monospace;
     font-variant-numeric: tabular-nums;
     color: rgb(var(--num-ink));
     letter-spacing: 0;
@@ -429,7 +429,7 @@ table.ledger-table td.right { text-align: right; }
   background: rgb(var(--accent));
 }
 .page-eyebrow {
-  font-family: var(--font-mono), 'IBM Plex Mono', Menlo, monospace;
+  font-family: var(--font-mono), 'Overpass Mono', Menlo, monospace;
   font-size: 10.5px;
   font-weight: 500;
   text-transform: uppercase;
@@ -480,7 +480,7 @@ table.ledger-table td.right { text-align: right; }
 }
 .sect-head .count {
   flex-shrink: 0;
-  font-family: var(--font-mono), 'IBM Plex Mono', Menlo, monospace;
+  font-family: var(--font-mono), 'Overpass Mono', Menlo, monospace;
   font-size: 11px;
   color: rgb(var(--muted));
   letter-spacing: 0.04em;
@@ -492,7 +492,7 @@ table.ledger-table td.right { text-align: right; }
   display: inline-block;
   padding: 2px 8px;
   border-radius: 99px;
-  font-family: var(--font-mono), 'IBM Plex Mono', Menlo, monospace;
+  font-family: var(--font-mono), 'Overpass Mono', Menlo, monospace;
   font-size: 10.5px;
   font-weight: 500;
   letter-spacing: 0.02em;

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { IBM_Plex_Mono, Instrument_Serif, Inter, Noto_Serif_TC } from 'next/font/google'
+import { Instrument_Serif, Inter, Noto_Serif_TC, Overpass_Mono } from 'next/font/google'
 import NextTopLoader from 'nextjs-toploader'
 import './globals.css'
 
@@ -20,10 +20,11 @@ const inter = Inter({
   display: 'swap',
 })
 
-// IBM Plex Mono replaced JetBrains Mono 2026-06-11: JetBrains Mono's digit 0
-// has a baked-in centre dot (a glyph, not a togglable font feature) and the
-// user wants plain zeros across every number in the system.
-const plexMono = IBM_Plex_Mono({
+// Overpass Mono (2026-06-11): the user wants a completely PLAIN digit 0 — no
+// dot, no slash. Canvas-tested 18 Google mono fonts: JetBrains / IBM Plex /
+// Roboto / DM / Geist etc. all bake a mark into the zero glyph; Overpass Mono
+// (with Chivo Mono / Azeret Mono / Courier Prime) renders a clean empty oval.
+const overpassMono = Overpass_Mono({
   subsets: ['latin'],
   weight: ['400', '500', '600'],
   variable: '--font-mono',
@@ -50,7 +51,7 @@ export default function RootLayout({
   return (
     <html
       lang="en-MY"
-      className={`${instrumentSerif.variable} ${inter.variable} ${plexMono.variable} ${notoSerifTc.variable}`}
+      className={`${instrumentSerif.variable} ${inter.variable} ${overpassMono.variable} ${notoSerifTc.variable}`}
       suppressHydrationWarning
     >
       <head>
