@@ -137,9 +137,13 @@ compare | Δ% | %Rev columns, collapsible COA groups (parent_code), inline txn
 drill-down, month/compare pickers + segment dropdown. BS adds synthetic
 "Retained & current earnings" so A=L+E ties; CF is direct-method via COA
 cash_flow_category with opening/closing reconciliation (closing cash = bank GL
-sum). The old cfo-reports engine still powers the EXPORT routes (xlsx/pdf) —
-export buttons removed from the 3 pages until exports are rebuilt on the new
-engine. Old 6-pool P&L layout replaced by the segment dropdown.
+sum). Exports REBUILT same day (commit `3a5f48e`): block assembly lives in
+`lib/gl-report-blocks.ts` (shared by pages + exports — one source of truth),
+`lib/export/gl-statement.tsx` renders xlsx/pdf; Export buttons restored on all
+3 pages forwarding period/compare/segment. Old cfo-reports export formats +
+orphaned components (SegmentedReport/SegmentExportButtons/RevenueGroups/
+PeriodMonthPicker) deleted. Old 6-pool P&L layout replaced by the segment
+dropdown. cfo-reports.ts itself stays (fetchLedgers etc. still used).
 
 ### PENDING / pick up next
 1. ~~**Ledger Excel filter**~~ ✅ DONE (2026-06-09, commit `7f6c2b0`). User picked
