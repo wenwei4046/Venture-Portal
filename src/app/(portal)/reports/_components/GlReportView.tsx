@@ -20,7 +20,7 @@ export interface GlReportViewProps {
   /** 'YYYY-MM' or '' — comparison is OPT-IN (default single-month view). */
   compare: string
   segment: string // '' = all
-  segments: { value: string; label: string }[]
+  segments: { value: string; label: string; dot?: string }[]
   blocks: ReportBlock[]
   /** When set, a "% Rev" column shows each row ÷ this base (P&L only). */
   pctBase?: { current: number; previous: number }
@@ -93,99 +93,121 @@ export default function GlReportView({
   const withCompare = compare !== ''
   const colCount = 2 + (withCompare ? 2 : 0) + (pctBase ? 1 : 0)
 
+  const railHead = 'font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted mb-2'
+  const railBtn =
+    'px-2 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors'
+
   return (
-    <div>
-      {/* Controls */}
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <label className="flex items-center gap-1.5 font-mono text-xs text-muted">
-          Period
-          <button
-            type="button"
-            onClick={() => navigate(stepMonth(period, -1), compare, segment)}
-            className="px-2 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-sm text-graphite hover:text-ink transition-colors"
-            aria-label="Previous month"
-          >
-            ‹
-          </button>
-          <input
-            type="month"
-            value={period}
-            onChange={(e) => e.target.value && navigate(e.target.value, compare, segment)}
-            className="px-2 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink font-mono focus:outline-none focus:border-accent-border"
-          />
-          <button
-            type="button"
-            onClick={() => navigate(stepMonth(period, 1), compare, segment)}
-            className="px-2 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-sm text-graphite hover:text-ink transition-colors"
-            aria-label="Next month"
-          >
-            ›
-          </button>
-        </label>
-        <label className="flex items-center gap-1.5 font-mono text-xs text-muted">
-          Compare
+    <div className="flex flex-col lg:flex-row gap-8 items-start">
+      {/* ── Left rail: period / compare / detail / segment ── */}
+      <aside className="w-full lg:w-60 shrink-0 lg:sticky lg:top-4 space-y-6">
+        <div>
+          <div className={railHead}>Period</div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => navigate(stepMonth(period, -1), compare, segment)}
+              className={railBtn}
+              aria-label="Previous month"
+            >
+              ‹
+            </button>
+            <input
+              type="month"
+              value={period}
+              onChange={(e) => e.target.value && navigate(e.target.value, compare, segment)}
+              className="flex-1 min-w-0 px-2 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink font-mono focus:outline-none focus:border-accent-border"
+            />
+            <button
+              type="button"
+              onClick={() => navigate(stepMonth(period, 1), compare, segment)}
+              className={railBtn}
+              aria-label="Next month"
+            >
+              ›
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div className={railHead}>Compare</div>
           {withCompare ? (
-            <>
+            <div className="flex items-center gap-1.5">
               <input
                 type="month"
                 value={compare}
                 onChange={(e) => navigate(period, e.target.value, segment)}
-                className="px-2 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink font-mono focus:outline-none focus:border-accent-border"
+                className="flex-1 min-w-0 px-2 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink font-mono focus:outline-none focus:border-accent-border"
               />
               <button
                 type="button"
                 onClick={() => navigate(period, '', segment)}
-                className="px-2 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs text-graphite hover:text-danger transition-colors"
+                className={`${railBtn} hover:text-danger`}
                 title="Remove comparison"
               >
                 ×
               </button>
-            </>
+            </div>
           ) : (
             <button
               type="button"
               onClick={() => navigate(period, stepMonth(period, -1), segment)}
-              className="px-2.5 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+              className={`${railBtn} w-full`}
               title="Compare with the previous month"
             >
               + vs last month
             </button>
           )}
-        </label>
-        <label className="flex items-center gap-2 font-mono text-xs text-muted">
-          Segment
-          <select
-            value={segment}
-            onChange={(e) => navigate(period, compare, e.target.value)}
-            className="px-2 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-          >
-            {segments.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="ml-auto flex items-center gap-1.5">
-          <span className="font-mono text-xs text-muted mr-1">Detail</span>
-          {([
-            [1, 'L1', 'Top accounts only'],
-            [2, 'L2', 'All account levels'],
-            [3, 'L3', 'Everything incl. transactions'],
-          ] as const).map(([lvl, label, title]) => (
-            <button
-              key={lvl}
-              type="button"
-              onClick={() => setLevel(lvl)}
-              title={title}
-              className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-            >
-              {label}
-            </button>
-          ))}
         </div>
-      </div>
 
+        <div>
+          <div className={railHead}>Detail level</div>
+          <div className="flex items-center gap-1.5">
+            {([
+              [1, 'L1', 'Top accounts only'],
+              [2, 'L2', 'All account levels'],
+              [3, 'L3', 'Everything incl. transactions'],
+            ] as const).map(([lvl, label, title]) => (
+              <button key={lvl} type="button" onClick={() => setLevel(lvl)} title={title} className={`${railBtn} flex-1`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className={railHead}>Segment</div>
+          <div className="space-y-0.5">
+            {segments.map((s) => {
+              const active = segment === s.value
+              return (
+                <button
+                  key={s.value}
+                  type="button"
+                  onClick={() => navigate(period, compare, s.value)}
+                  className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-left text-[13px] transition-colors ${
+                    active ? 'bg-accent-bg text-ink font-medium' : 'text-graphite hover:bg-surface-2 hover:text-ink'
+                  }`}
+                >
+                  <span
+                    className={`inline-flex w-3.5 h-3.5 rounded-full border items-center justify-center shrink-0 ${
+                      active ? 'border-accent' : 'border-hairline'
+                    }`}
+                    aria-hidden
+                  >
+                    {active ? <span className="w-1.5 h-1.5 rounded-full bg-accent" /> : null}
+                  </span>
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${s.dot ?? 'bg-muted'}`} aria-hidden />
+                  <span className="truncate">{s.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </aside>
+
+      {/* ── Statement table ── */}
+      <div className="flex-1 min-w-0 overflow-x-auto">
       <table className="ledger-table gl-report">
         <thead>
           <tr>
@@ -256,6 +278,7 @@ export default function GlReportView({
           )}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

@@ -6,6 +6,7 @@ import { requireRole } from '@/lib/auth'
 import { buildBalanceSheet, fetchAllJournalLines, fetchCoaAccounts, monthPeriod } from '@/lib/gl-reports'
 import { balanceSheetBlocks } from '@/lib/gl-report-blocks'
 import { glStatementExportResponse } from '@/lib/export/gl-statement'
+import { segmentFilterFor } from '../../_components/report-segments'
 
 const YM = /^\d{4}-\d{2}$/
 
@@ -28,7 +29,7 @@ export async function GET(req: Request) {
   const bs = buildBalanceSheet(lines, accounts, {
     current: monthPeriod(period),
     previous: monthPeriod(compare || period),
-    segment: segment || undefined,
+    segment: segmentFilterFor(segment),
   })
 
   const asAt = (ym: string) => dayjs(monthPeriod(ym).to).format('D MMM YYYY')

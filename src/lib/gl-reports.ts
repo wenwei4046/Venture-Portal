@@ -211,8 +211,9 @@ export interface Period {
 export interface ReportFilter {
   current: Period
   previous: Period
-  /** journal_entries.segment filter; undefined/'' = all segments. */
-  segment?: string
+  /** journal_entries.segment filter; undefined/'' = all segments.
+   *  An array means "any of" (e.g. Venture = ['corporate','treasury']). */
+  segment?: string | string[]
 }
 
 // Natural sign per account type: these grow on the DEBIT side; everything else
@@ -224,7 +225,8 @@ export function naturalNet(type: AccountType, debit: number, credit: number): nu
 }
 
 const inPeriod = (l: GlLine, p: Period) => l.date >= p.from && l.date <= p.to
-const segPass = (l: GlLine, segment?: string) => !segment || l.segment === segment
+const segPass = (l: GlLine, segment?: string | string[]) =>
+  !segment || segment.length === 0 || (Array.isArray(segment) ? segment.includes(l.segment) : l.segment === segment)
 
 function typeOf(code: string, byCode: Map<string, CoaAccount>): AccountType | null {
   const acc = byCode.get(code)

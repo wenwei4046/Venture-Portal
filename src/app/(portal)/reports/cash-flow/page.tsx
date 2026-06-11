@@ -18,7 +18,7 @@ import {
 } from '@/lib/gl-reports'
 import { cashFlowBlocks } from '@/lib/gl-report-blocks'
 import GlReportView from '../_components/GlReportView'
-import { REPORT_SEGMENTS } from '../_components/report-segments'
+import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
 import ExportLinks from '../_components/ExportLinks'
 
 export const dynamic = 'force-dynamic'
@@ -54,7 +54,7 @@ export default async function CashFlowPage({ searchParams }: Props) {
     {
       current: monthPeriod(period),
       previous: monthPeriod(compare || period),
-      segment: segment || undefined,
+      segment: segmentFilterFor(segment),
     },
     bankCodes,
   )

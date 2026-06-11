@@ -11,7 +11,7 @@ import { requireRole } from '@/lib/auth'
 import { applyGlRefs, buildPnl, fetchAllJournalLines, fetchCoaAccounts, fetchGlRefs, monthPeriod } from '@/lib/gl-reports'
 import { pnlBlocks } from '@/lib/gl-report-blocks'
 import GlReportView from '../_components/GlReportView'
-import { REPORT_SEGMENTS } from '../_components/report-segments'
+import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
 import ExportLinks from '../_components/ExportLinks'
 
 export const dynamic = 'force-dynamic'
@@ -40,7 +40,7 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
   const pnl = buildPnl(lines, accounts, {
     current: monthPeriod(period),
     previous: monthPeriod(compare || period),
-    segment: segment || undefined,
+    segment: segmentFilterFor(segment),
   })
 
   const blocks = pnlBlocks(pnl)
