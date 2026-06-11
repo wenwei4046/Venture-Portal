@@ -273,22 +273,48 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
               toolbarRight={
                 invoices.some(isBatchSettleable) ? (
                   <>
+                    {/* Selection summary + batch actions — inline in the toolbar
+                        (between search and 全选), not a floating bar (user 2026-06-11). */}
+                    {selectedIds.size > 0 && !showSettleModal ? (
+                      <div className="flex items-center gap-2.5 bg-paper border border-hairline rounded-md px-3 py-1">
+                        <span className="font-mono text-xs text-ink whitespace-nowrap">
+                          {selectedIds.size} 张 ·{' '}
+                          <span className="font-semibold">
+                            RM {selectedTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={clearSelection}
+                          className="text-xs font-sans text-muted hover:text-ink"
+                        >
+                          清除
+                        </button>
+                        <button
+                          type="button"
+                          onClick={printSelected}
+                          className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-xs font-sans px-3 py-1 rounded-md transition-colors whitespace-nowrap"
+                        >
+                          打印所选 {selectedIds.size} 张
+                        </button>
+                        <button
+                          type="button"
+                          onClick={openSettleModal}
+                          disabled={selectedInvoices.length === 0 || crossCompany}
+                          title={crossCompany ? '一张收据只能结同一家公司的单' : undefined}
+                          className="bg-accent hover:bg-accent-hover text-white text-xs font-sans px-3 py-1 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        >
+                          {crossCompany ? '不同公司不能合并' : `合并结算 ${selectedInvoices.length} 张 → 生成收据`}
+                        </button>
+                      </div>
+                    ) : null}
                     <button
                       type="button"
                       onClick={selectAllIssued}
-                      className="bg-surface hover:bg-surface-2 border border-hairline rounded-md px-3 py-1.5 text-xs font-sans text-ink transition-colors"
+                      className="bg-surface hover:bg-surface-2 border border-hairline rounded-md px-3 py-1.5 text-xs font-sans text-ink transition-colors whitespace-nowrap"
                     >
                       全选可结算发票
                     </button>
-                    {selectedIds.size > 0 ? (
-                      <button
-                        type="button"
-                        onClick={clearSelection}
-                        className="text-xs font-sans text-muted hover:text-ink"
-                      >
-                        清除选择
-                      </button>
-                    ) : null}
                   </>
                 ) : undefined
               }
@@ -461,38 +487,6 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
           </div>
         </>
       )}
-
-      {/* Floating consolidated-settle action bar (bottom right). */}
-      {selectedIds.size > 0 && !showSettleModal ? (
-        <div className="fixed bottom-6 right-6 z-30 bg-paper border border-hairline rounded-md shadow-lg px-4 py-3 flex items-center gap-3">
-          <div className="font-mono text-sm text-ink">
-            {selectedIds.size} 张 · <span className="font-semibold">RM {selectedTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}</span>
-          </div>
-          <button
-            type="button"
-            onClick={clearSelection}
-            className="text-xs font-sans text-muted hover:text-ink"
-          >
-            清除
-          </button>
-          <button
-            type="button"
-            onClick={printSelected}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-          >
-            打印所选 {selectedIds.size} 张
-          </button>
-          <button
-            type="button"
-            onClick={openSettleModal}
-            disabled={selectedInvoices.length === 0 || crossCompany}
-            title={crossCompany ? '一张收据只能结同一家公司的单' : undefined}
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {crossCompany ? '不同公司不能合并' : `合并结算 ${selectedInvoices.length} 张 → 生成收据`}
-          </button>
-        </div>
-      ) : null}
 
       {/* Batch-settle modal */}
       {showSettleModal ? (
