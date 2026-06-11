@@ -58,6 +58,19 @@ Supabase MCP `apply_migration` AND saved to `supabase/migrations/` for parity
   invoice (Company/Mode/Description/Status) lists. Composes with search + sort.
 
 ### Data corrections (direct SQL, recorded for audit — NOT in migrations)
+- **2026-06-11: 2990 grossed up in GL — 4 reclass JEs Dr 3054 / Cr 4051**
+  (45,000 @04-07 LO#29 · 10,000 @04-30 LO-NEW-2990 · 55,000 @05-07 + 45,000
+  @06-08 = LO#33's 100k), total 155,000. The accountant's workbook had NETTED
+  HV's loans to 2990 against the deposit payable (4051 debits described as
+  "rental pay on behalf" / "Carress→2990" / "fund transfer"); the app records
+  gross. Verified after: 2990 payable app = GL = 228,613.75 exactly; GL 3054 =
+  167,588.80 = 155,000 loans + 12,588.80 expense-paid-on-behalf (June expense
+  PV split to 3054 — a real non-loan receivable, app loans module doesn't track
+  it). TB 0.00, banks + dept pools all tie.
+  **Remaining known small gaps** (legacy baseline noise, awaiting user
+  verification with counterparties): 4054 LWS 450 · 4055 LWL 300 · 4056 CMK
+  6,936 · AR 3030 vs open invoices 12,647.54 (receive form hardcodes Cr 3030 —
+  process fix queued).
 - **2026-06-11: LO#11 / BI#11 both reduced 25k → 10k** (user: the 15k was a
   recording correction — Liang's money via Kingsley was effectively 10k in /
   10k out, never through HV's bank). App: fund_sources BI#11 amount 25,000 →
