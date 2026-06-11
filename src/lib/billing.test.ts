@@ -4,6 +4,7 @@ import {
   isValidInvoiceNoFormat,
   billingModeToCategoryCode,
   billingModeLabel,
+  invoiceJeDate,
   BILLING_MODES,
   AUTO_GENERATED_BILLING_MODES,
 } from './billing'
@@ -91,5 +92,20 @@ describe('billingModeLabel — UI display', () => {
     expect(billingModeLabel('director_office_attribution')).toBe('Director Office OPEX')
     expect(billingModeLabel('director_attribution')).toBe('Director OPEX')
     expect(billingModeLabel('non_billable')).toBe('Non-billable')
+  })
+})
+
+describe('invoiceJeDate', () => {
+  // Regression 2026-06-11: 17 May invoices (dated 2026-05-31) were bulk-issued
+  // on June 4/7 and their revenue JEs landed in JUNE's P&L.
+  it('uses the invoice date even when issued in a later month', () => {
+    expect(invoiceJeDate('2026-05-31', '2026-05-01', '2026-06-04')).toBe('2026-05-31')
+  })
+  it('falls back to period month-end for garbage dates (year-0005 typo)', () => {
+    expect(invoiceJeDate('0005-05-31', '2026-05-01', '2026-06-04')).toBe('2026-05-31')
+    expect(invoiceJeDate(null, '2026-02-01', '2026-06-04')).toBe('2026-02-28')
+  })
+  it('falls back to today when both are missing', () => {
+    expect(invoiceJeDate(null, null, '2026-06-04')).toBe('2026-06-04')
   })
 })

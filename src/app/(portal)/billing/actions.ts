@@ -9,6 +9,7 @@ import { assertPeriodOpen } from '@/lib/period-lock'
 import { postJournalEntry } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
 import { validateConsolidation, poolAttributions, segmentForBillingMode } from '@/lib/invoice-settlement'
+import { invoiceJeDate } from '@/lib/billing'
 import { INVOICE_BILLING_MODE_TO_POOL } from '@/lib/cfo-reports'
 
 // Mig 200/P1-6a: invoice billing_mode → revenue GL code mapping.
@@ -942,7 +943,7 @@ export async function approveInvoice(formData: FormData) {
 
   const { data: inv } = await supabase
     .from('invoices')
-    .select('id, invoice_no, period_month, status, total_amount, billing_mode, company_id, category_code, billable_to_type, billable_to_department_id')
+    .select('id, invoice_no, invoice_date, period_month, status, total_amount, billing_mode, company_id, category_code, billable_to_type, billable_to_department_id')
     .eq('id', id)
     .single()
   if (!inv) throw new Error('Invoice not found')
@@ -974,11 +975,10 @@ export async function approveInvoice(formData: FormData) {
       .eq('invoice_id', inv.id)
       .order('line_no')
     try {
-      // transaction_date = the day this JE is being booked (today), NOT the
-      // end-of-period. period_month already captures which accounting period
-      // the entry belongs to. Using endOf(period_month) creates future-dated
-      // JEs that get excluded from BS snapshots run mid-period, leaving AR
-      // looking "credit-only" when the invoice has already been settled.
+      // transaction_date = the INVOICE date (user 2026-06-11): revenue belongs
+      // to the month printed on the invoice, not the day Finance clicked
+      // Issue — a May-31 invoice issued June 4 must land in May's P&L.
+      // invoiceJeDate falls back to period month-end, then today.
       const jeLines: Array<{ accountCode: string; debit?: number; credit?: number; description: string }> = [
         { accountCode: '3030', debit: amount, description: `AR — invoice ${inv.invoice_no ?? ''}`.trim() },
       ]
@@ -1003,7 +1003,11 @@ export async function approveInvoice(formData: FormData) {
         })
       }
       await postJournalEntry(supabase, {
-        transactionDate: dayjs().format('YYYY-MM-DD'),
+        transactionDate: invoiceJeDate(
+          (inv as { invoice_date?: string | null }).invoice_date,
+          inv.period_month,
+          dayjs().format('YYYY-MM-DD'),
+        ),
         description: `Invoice ${inv.invoice_no ?? inv.id} issued`,
         referenceType: 'invoice',
         referenceId: inv.id,
@@ -1039,7 +1043,11 @@ export async function approveInvoice(formData: FormData) {
         if (expenseAcct?.code) {
           try {
             await postJournalEntry(supabase, {
-              transactionDate: dayjs().format('YYYY-MM-DD'),
+              transactionDate: invoiceJeDate(
+                (inv as { invoice_date?: string | null }).invoice_date,
+                inv.period_month,
+                dayjs().format('YYYY-MM-DD'),
+              ),
               description: `Invoice ${inv.invoice_no ?? inv.id} issued — inter-billing expense (${payingDept.name})`,
               referenceType: 'invoice',
               referenceId: inv.id,
@@ -1075,7 +1083,7 @@ export async function approveInvoicesForPeriod(formData: FormData) {
   // Pull draft rows up-front so we can post AR accrual JEs after the bulk update.
   const { data: draftInvoices } = await supabase
     .from('invoices')
-    .select('id, invoice_no, total_amount, billing_mode, category_code, billable_to_type, billable_to_department_id')
+    .select('id, invoice_no, invoice_date, total_amount, billing_mode, category_code, billable_to_type, billable_to_department_id')
     .eq('period_month', period)
     .eq('status', 'draft')
 
@@ -1088,12 +1096,17 @@ export async function approveInvoicesForPeriod(formData: FormData) {
   if (error) throw new Error(`Failed to bulk issue invoices: ${error.message}`)
 
   // Mig 200/P1-6a: post AR accrual per newly-issued invoice.
-  // transaction_date = today (when actually issued). period_month already
-  // tracks accounting period via the journal_entries.period_month column.
-  const txnDate = dayjs().format('YYYY-MM-DD')
+  // transaction_date = the INVOICE date (user 2026-06-11): a May-31 invoice
+  // bulk-issued on June 4 must land in May's P&L, not June's.
+  const todayStr = dayjs().format('YYYY-MM-DD')
   for (const row of draftInvoices ?? []) {
     const amount = Number(row.total_amount ?? 0)
     if (amount <= 0) continue
+    const txnDate = invoiceJeDate(
+      (row as { invoice_date?: string | null }).invoice_date,
+      period,
+      todayStr,
+    )
     const revenueCode = await resolveRevenueGlCode(supabase, row.category_code, row.billing_mode)
     try {
       await postJournalEntry(supabase, {

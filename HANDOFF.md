@@ -58,6 +58,15 @@ Supabase MCP `apply_migration` AND saved to `supabase/migrations/` for parity
   invoice (Company/Mode/Description/Status) lists. Composes with search + sort.
 
 ### Data corrections (direct SQL, recorded for audit — NOT in migrations)
+- **2026-06-11: 17 invoice-issue JEs re-dated June → 2026-05-31** (+ period_month
+  → 2026-05-01). Root cause: all four invoice-issue JE posting sites in
+  billing/actions.ts dated the revenue JE `dayjs()` (the day Finance clicked
+  Issue) — May invoices bulk-issued 4/7 June showed in JUNE's P&L. Code fixed
+  same commit: `invoiceJeDate()` (lib/billing.ts, tested) = invoice_date,
+  falling back to period month-end then today; applied at single + bulk issue
+  and both inter-billing twins. Also fixed `HV-INV-202605-0052.invoice_date`
+  year typo 0005-05-31 → 2026-05-31. Verified: 0 remaining issue-JE month
+  mismatches; May revenue 183,874.14, June 0.
 - **2026-06-10: HC fund source 71,457.13 split into 3 compound tranches** mirroring
   the HK loan side (the money passed HC → HV → Hookka): original row `887388ff`
   shrunk to **BI#25A 42,881.63 自2025-09** + new rows **BI#25B 22,873.50 自2025-12**

@@ -95,3 +95,29 @@ export function billingModeLabel(mode: BillingMode): string {
       return 'Non-billable'
   }
 }
+
+/**
+ * The transaction date for an invoice-issue journal entry: revenue belongs to
+ * the INVOICE date, not the day Finance happened to click Issue. A May-31
+ * invoice issued on June 4 must land in May's P&L (user 2026-06-11).
+ * Falls back to the period month-end for missing/garbage invoice dates
+ * (e.g. a year-0005 typo), then to today.
+ */
+export function invoiceJeDate(
+  invoiceDate: string | null | undefined,
+  periodMonth: string | null | undefined,
+  today: string,
+): string {
+  const valid = (d: string | null | undefined): d is string => {
+    if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return false
+    const year = Number(d.slice(0, 4))
+    return year >= 2000 && year <= 2100
+  }
+  if (valid(invoiceDate)) return invoiceDate
+  if (valid(periodMonth)) {
+    const [y, m] = periodMonth.split('-').map(Number)
+    const last = new Date(Date.UTC(y, m, 0)).getUTCDate()
+    return `${periodMonth.slice(0, 7)}-${String(last).padStart(2, '0')}`
+  }
+  return today
+}
