@@ -38,6 +38,27 @@ Highlights (each verified: tsc clean, 283 tests, next build, deployed via `git p
    (invoices, PV/OR, loans/fund-sources, claims/payroll/dept-requests/statements),
    account codes verified against current code (agent reports had stale pre-238
    codes). Ends with the remaining red-flag list.
+5. **PV GL date = Finance's payment date, not Principal's approval date** (user
+   report: P&L expenses showed the approve day). Mig `20260611020000` patches
+   approve_single_voucher / approve_voucher_batch / approve_voucher_batch_partial
+   from their LIVE definitions (pg_get_functiondef + anchored replaces, mig-156
+   style; every anchor verified or the migration fails loud): payment_date no
+   longer overwritten (COALESCE keeps Finance's value), JE transaction_date /
+   period_month / JE-YYYYMM entry_no use COALESCE(payment_date, today),
+   repayment rows use LEAST(payment_date, today), period-lock checked against
+   the JE date per voucher. App side: createPaymentVoucher stores payment_date
+   for DEBIT drafts too (was credit-only), updatePaymentVoucher + EditPaymentForm
+   can edit it while draft/pending. Smoke-tested in a rolled-back tx
+   (JE landed on the backdated payment_date ✓). Historical audit: all existing
+   create-day vs JE-day drifts are WITHIN June 2026 (no month crossings), so
+   monthly P&L attribution was never wrong — day-level backfill offered to user,
+   pending their decision. Pre-fix vouchers have payment_date == approval day
+   (the original Finance date was overwritten and is unrecoverable).
+   **Latent (noted, not fixed):** approve_voucher_batch[_partial] still insert
+   repayments principal-FIRST (single was fixed in mig 20260606010000 to
+   interest→penalty→principal) and post unsegmented single JEs (no per-segment
+   branch like single's mig 20260606050000) — only matters for grouped voucher
+   approvals (payroll groups today), queue if needed.
 
 (Reports rebuild, font, sidebar, repayment-schedule, and all data corrections from
 2026-06-10→11 are documented in the conversation log; data corrections were direct

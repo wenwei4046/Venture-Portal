@@ -192,12 +192,15 @@ export async function createPaymentVoucher(formData: FormData) {
       fund_source_id: fundSourceId,
       repayment_breakdown: repaymentBreakdown,
       created_by: user.id,
+      // Stored for DEBIT drafts too (2026-06-11): approve_single_voucher /
+      // approve_voucher_batch[_partial] now post the GL on this date, so the
+      // P&L reflects Finance's stated payment date, not Principal's approval day.
+      payment_date: paymentDateStr,
       ...(isAutoComplete ? {
         approved_by: user.id,
         approved_at: nowIso,
         executed_by: user.id,
         executed_at: nowIso,
-        payment_date: paymentDateStr,
       } : {}),
     })
     .select('id')
@@ -736,6 +739,11 @@ export async function updatePaymentVoucher(formData: FormData) {
   const paymentMethod = (formData.get('payment_method') as string) || 'bank_transfer'
   const targetPool = (formData.get('target_pool') as string) || null
   const notes = ((formData.get('notes') as string) ?? '').trim() || null
+  // Editable while draft/pending: drives the approval-time GL date (see create).
+  const rawEditPaymentDate = (formData.get('payment_date') as string)?.trim()
+  const editPaymentDate = rawEditPaymentDate && /^\d{4}-\d{2}-\d{2}$/.test(rawEditPaymentDate)
+    ? rawEditPaymentDate
+    : null
 
   if (isNaN(amount) || amount <= 0) throw new Error('Amount must be greater than 0')
   if (!description) throw new Error('Description is required')
@@ -778,6 +786,7 @@ export async function updatePaymentVoucher(formData: FormData) {
       payment_method: paymentMethod,
       notes,
       target_pool: current.direction === 'credit' ? targetPool : null,
+      ...(editPaymentDate ? { payment_date: editPaymentDate } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)

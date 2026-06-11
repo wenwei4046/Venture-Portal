@@ -35,6 +35,7 @@ interface Props {
     description: string
     notes: string | null
     payment_method: string | null
+    payment_date: string | null
     target_pool: string | null
     fund_source_id: string | null
     loan_id: string | null
@@ -99,6 +100,7 @@ export default function EditPaymentForm({
   const [bankAccountId, setBankAccountId] = useState(voucher.bank_account_id ?? '')
   const [description, setDescription] = useState(voucher.description)
   const [paymentMethod, setPaymentMethod] = useState(voucher.payment_method ?? 'bank_transfer')
+  const [paymentDate, setPaymentDate] = useState(voucher.payment_date ?? '')
   const [notes, setNotes] = useState(voucher.notes ?? '')
   const [targetPool, setTargetPool] = useState(voucher.target_pool ?? '')
   const [accountCode, setAccountCode] = useState(initialCreditAccountCode ?? '')
@@ -123,6 +125,7 @@ export default function EditPaymentForm({
     formData.set('bank_account_id', bankAccountId)
     formData.set('description', description)
     formData.set('payment_method', paymentMethod)
+    formData.set('payment_date', paymentDate)
     formData.set('notes', notes)
 
     if (isDebit) {
@@ -270,6 +273,21 @@ export default function EditPaymentForm({
               <option key={p.value} value={p.value}>{p.label}</option>
             ))}
           </select>
+        </div>
+        <div>
+          <label htmlFor="edit_payment_date" className="block text-sm font-sans font-medium text-graphite mb-1.5">
+            Payment date
+          </label>
+          <input
+            id="edit_payment_date"
+            type="date"
+            value={paymentDate}
+            onChange={(e) => setPaymentDate(e.target.value)}
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink font-mono focus:outline-none focus:border-accent-border"
+          />
+          <p className="font-serif italic text-muted text-xs mt-1.5">
+            Drives the GL posting date at approval — set the actual date the money moves.
+          </p>
         </div>
       </div>
 

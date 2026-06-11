@@ -86,10 +86,15 @@ Credit states: `paid` on creation (auto-complete) → `voided` via `voidPaidRece
    payment_date. **Throws on failure** (fixed 2026-06-11).
 5. Invoice → `paid` / `paid_via_netting`.
 
-### Approve (debit) — `approve_single_voucher` RPC (latest: mig 20260606050000)
+### Approve (debit) — `approve_single_voucher` RPC (latest: mig 20260611020000)
 Single atomic Postgres tx. Principal-only, period-open check, self-approval block,
 no group_id (groups use `approve_voucher_batch[_partial]`, mig 171/182 — same logic
 per voucher, aggregate bank pre-check, per-row approve/reject).
+**Dates (mig 20260611020000):** GL transaction_date / period_month / JE-YYYYMM
+entry_no = `COALESCE(voucher.payment_date, approval day)` — the P&L lands on the
+date Finance put on the PV, not Principal's approval day. `payment_date` is no
+longer overwritten at approval. Repayment rows use `LEAST(payment_date, today)`.
+Period-lock is checked against the JE date (per voucher in the batch RPCs).
 1. Bank row `FOR UPDATE`, sufficiency check (debit), cache `current_balance ±= amount`.
 2. Voucher → paid (race-guarded), approval_request → approved.
 3. Pools: debit — `apply_pool_adjustment(pool,'out')` per PVS row (`expense_out` /
@@ -265,6 +270,12 @@ picker honored, netting void support incl. `reverse_voucher_pool_rows`,
    narrow but don't eliminate the collision window across all minting sites.
 8. **Fund-source cancellation has no executing RPC** — the `tier_change` approval is
    recorded but nothing reverses the liability/bank/venture_pool.
+9. **Batch approve RPCs lag single** (`approve_voucher_batch[_partial]`, only
+   reachable via grouped approvals — payroll groups today): repayment rows still
+   insert principal-FIRST (single was reordered in mig 20260606010000), and all
+   debit GL goes through the single-JE branch with NO segment tag (single got
+   per-segment JEs in migs 20260606035000/050000). Dates were aligned with single
+   in mig 20260611020000.
 
 ---
 
