@@ -251,8 +251,14 @@ rejection returns the request to Finance (`dept_request_pv_rejected`);
 refunds the disbursing bank); `execute_fund_source_cancel` exists and is wired to
 the tier_change approval; batch approve RPCs aligned with single (interest→
 penalty→principal, per-segment GL, internal_transfer pool skip, payment-date GL
-dating). Manual JVs sync the bank cache (mig 20260612020000) and carry a segment
-(mig 20260612000000).
+dating). Manual JVs carry a segment (mig 20260612000000), sync the bank cache
+(mig 20260612020000), and — when a DEPT-segment JV moves a bank account — move
+that dept's pool by the same bank delta via `jv_in`/`jv_out` rows
+(mig 20260612060000; pure reclass JVs and corporate/treasury/unallocated JVs
+touch no pool). Draft invoices are fully editable via the create-form-mirroring
+modal incl. line items (updateDraftInvoiceFull). Entry points split: /payments
+lists debit PVs, /receipts lists credit ORs; /payments/new is debit-locked,
+?mode=receipt credit-locked.
 
 Remaining known items:
 1. **`DEPT_POOL_GL` map (approvals/actions.ts) collides with post-238 asset codes**
