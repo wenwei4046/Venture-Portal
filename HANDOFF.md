@@ -169,6 +169,14 @@ Manual JVs also gained segment (mig ...000000), bank-cache sync (...020000)
 and dept-pool sync for dept-segment JVs with bank movement (...060000,
 jv_in/jv_out txn types; pool rule: pool == per-segment net bank movement).
 
+### FY2025 interest 30,216.71 — CLOSED, no action ever needed (user 2026-06-12)
+The 36 backfilled interest rows on LO#5/#7/#19 (The Cont, 2025-01 → 2026-03,
+totalling 30,216.71) were collected by a DIFFERENT company — the debt was only
+transferred to HV recently. So HV GL correctly has NO 7000 income for those
+periods; the system-side repayment rows exist purely to track installment
+progress (已还期数). Do NOT post a catch-up JV. The app-vs-GL-7000 "delta" of
+30,216.71 is by design, permanently. (Supersedes the earlier "deferred" note.)
+
 ### Counterparty rulings applied (2026-06-12, direct SQL)
 - LWS 450 + LWL 300: user ruled the opening books had knocked these off the
   PRINCIPAL payables but they were INTEREST. Reclass JE (manual_jv, treasury):
