@@ -132,6 +132,8 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
       p_company_name: company.name,
       p_disbursement_date: loanStartDate,
       p_disbursement_account_code: disbursementAccountCode,
+      // Mig 20260612040000: which bank pays out (empty = primary).
+      p_bank_account_id: ((formData.get('bank_account_id') as string) || null) as never,
     }
   )
 

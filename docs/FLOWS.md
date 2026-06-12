@@ -235,47 +235,32 @@ States: `draft → issued → paid`. Display-only throughout:
 
 ---
 
-## Known gaps / red flags (2026-06-11)
+## Known gaps / red flags
 
-Remaining UNFIXED findings. (Already fixed today, so NOT gaps: fail-loud on
-consolidated-settle/credit-PV/void GL+bank+pool failures, adjustPool throwing,
-payroll-request + hr-costing approval-queue inserts throwing, credit-GL account
-picker honored, netting void support incl. `reverse_voucher_pool_rows`,
-`applyVoucherPaidSideEffects` removed.)
+**2026-06-12 red-flag sweep CLOSED the previous list** (migs 20260612010000–050000):
+loan disbursement now pays from the PV's bank (picker on the loan form, fallback
+primary); PV-path loan repayments write venture_pool `loan_repayment_in`
+(principal portion); benefit claims draft a `claim_payout` PV like project claims
+(claim PVs also default bank to primary); dept requests no longer double-debit
+the pool (approve RPCs skip `reference_type='dept_payment_request'`), stage-3 PV
+generation now writes the required PVS row + lands the GL on the forced Dr 4050,
+and `cancel_dept_payment_request` refunds the stage-1 reservation (`void_in` +
+reversing accrual JE) with a Cancel button on /payments/dept-requests; PV
+rejection returns the request to Finance (`dept_request_pv_rejected`);
+`execute_loan_cancel` uses current COA codes (305x leaf from the disbursement JE,
+refunds the disbursing bank); `execute_fund_source_cancel` exists and is wired to
+the tier_change approval; batch approve RPCs aligned with single (interest→
+penalty→principal, per-segment GL, internal_transfer pool skip, payment-date GL
+dating). Manual JVs sync the bank cache (mig 20260612020000) and carry a segment
+(mig 20260612000000).
 
-1. **Loan disbursement is primary-bank-only.** `approvals/actions.ts#approveRequestGroup`
-   debits the `is_primary` bank (direct cache UPDATE, not the `bump_bank_balance` RPC)
-   and credits its GL code regardless of which bank actually pays. No bank picker on
-   the loan form.
-2. **PV-path loan repayments skip venture_pool.** `approve_single_voucher` syncs
-   `repayments` but never writes `loan_repayment_in`; only the direct
-   `fund-out/actions.ts#recordRepayment` path does. venture_pool understates principal
-   inflows for PV-settled repayments.
-3. **Benefit claims have no GL path.** `claims/actions.ts#approveClaim` only drafts a
-   PV for `claim_type='project'`; benefit claims terminate at status flips with no
-   voucher, no pool debit, no JE.
-4. **Dept-request pool debit has no rollback.** Stage-2 `approve_dept_payment_expense`
-   debits the dept pool immediately; if Finance never generates the PV or Principal
-   rejects it, the `expense_out` reservation is never reversed. (Related: stage-3 RPC
-   writes no PVS row, and dept-pool source rows added at edit time are debited a second
-   time at PV approval.)
-5. **Stale pre-238 account codes in `execute_loan_cancel` (mig 229).** Active-loan
-   cancellation posts Dr bank-GL-fallback `'1010'` / Cr `'1020'` — codes that meant
-   Bank/Loans-Receivable pre-unification but are equity codes (or nonexistent leaves)
-   in the current COA. Needs re-pointing at the 305x borrower leaf.
-6. **`DEPT_POOL_GL` map (approvals/actions.ts) collides with post-238 asset codes**
+Remaining known items:
+1. **`DEPT_POOL_GL` map (approvals/actions.ts) collides with post-238 asset codes**
    (3030/3040/3050/3070/3080 labelled equity vs 3030 AR–Subs / 305x loan leaves).
-   dept_pool fund-source approval JEs may post to the wrong accounts.
-7. **Voucher numbering is count-based** (`COUNT(*)+1`); advisory locks (mig 178/180)
+   dept_pool fund-source approval JEs may post to the wrong accounts. (dept_pool
+   fund sources are also excluded from `execute_fund_source_cancel` — manual.)
+2. **Voucher numbering is count-based** (`COUNT(*)+1`); advisory locks (mig 178/180)
    narrow but don't eliminate the collision window across all minting sites.
-8. **Fund-source cancellation has no executing RPC** — the `tier_change` approval is
-   recorded but nothing reverses the liability/bank/venture_pool.
-9. **Batch approve RPCs lag single** (`approve_voucher_batch[_partial]`, only
-   reachable via grouped approvals — payroll groups today): repayment rows still
-   insert principal-FIRST (single was reordered in mig 20260606010000), and all
-   debit GL goes through the single-JE branch with NO segment tag (single got
-   per-segment JEs in migs 20260606035000/050000). Dates were aligned with single
-   in mig 20260611020000.
 
 ---
 

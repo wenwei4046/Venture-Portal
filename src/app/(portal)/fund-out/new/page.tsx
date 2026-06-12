@@ -14,6 +14,7 @@ export default async function NewLoanPage() {
     { data: companyRows },
     { data: baseRateRow },
     { data: acctRows },
+    { data: bankRows },
   ] = await Promise.all([
     supabase.from('companies').select('*').eq('is_active', true).order('short_code'),
     supabase
@@ -30,6 +31,11 @@ export default async function NewLoanPage() {
       .eq('is_active', true)
       .order('type')
       .order('code'),
+    supabase
+      .from('bank_accounts')
+      .select('id, bank_name, account_number, current_balance, is_primary')
+      .eq('status', 'active')
+      .order('is_primary', { ascending: false }),
   ])
 
   const companies = (companyRows ?? []) as Company[]
@@ -68,7 +74,18 @@ export default async function NewLoanPage() {
       </div>
 
       {baseRate ? (
-        <NewLoanForm companies={companies} baseRate={baseRate} bsAccounts={bsAccounts} />
+        <NewLoanForm
+          companies={companies}
+          baseRate={baseRate}
+          bsAccounts={bsAccounts}
+          banks={(bankRows ?? []).map((b) => ({
+            id: b.id,
+            bank_name: b.bank_name,
+            account_number: b.account_number,
+            current_balance: Number(b.current_balance ?? 0),
+            is_primary: !!b.is_primary,
+          }))}
+        />
       ) : (
         <div className="bg-alert-bg border border-alert rounded-md p-6 max-w-3xl">
           <p className="font-serif text-lg text-alert mb-1">

@@ -114,11 +114,52 @@ All four domains verified against live data. Results:
   EMPTY — the known design gaps there (benefit-claim GL, dept-request rollback)
   currently have RM 0.00 exposure.
 
+### Red-flag sweep CLOSED (2026-06-12, user 开工; migs 20260612010000–050000)
+All six audit red flags fixed in one run (see docs/FLOWS.md "Known gaps" for the
+condensed list and what remains):
+1. **PV-path loan repayments → venture_pool** `loan_repayment_in` (principal
+   portion), in all three approve RPCs.
+2. **JV bank-cache auto-sync** (mig 20260612020000): `jv_apply_bank_cache`
+   helper; create applies, update reverses-then-applies, delete reverses.
+   Smoke-tested in a rolled-back tx (+100 → restore ✓). JVs also carry a
+   segment since mig 20260612000000.
+3. **Dept requests**: approve RPCs skip the pool debit for
+   `reference_type='dept_payment_request'` (reserved at stage-1 — was a
+   double debit); stage-3 was BROKEN end-to-end (generate RPC wrote no PVS
+   row → approve always raised; PV was 'draft' while its approval was
+   pending; voucher_type='expense' would have re-recognised the expense via
+   the per-segment branch) — generate_pv_for_dept_request rewritten (PVS row
+   acct 4050, status pending_approval, dept_pool key underscore fix), approve
+   RPCs exclude dept_payment_request from the per-segment branch (falls to
+   forced Dr 4050 AP-clearing); NEW cancel_dept_payment_request refunds the
+   stage-1 reservation (dept_pools 'void_in' + reversing accrual JE, voids a
+   pending PV) with a Cancel button on /payments/dept-requests; NEW
+   dept_request_pv_rejected returns the request to pending_finance_pv on PV
+   rejection (wired in rejectRequest).
+4. **Loan disbursement bank**: new-loan form has a Pay-from-bank picker →
+   create_loan_with_approval(p_bank_account_id) (old 10-arg dropped);
+   approveRequestGroup checks/debits the PV's bank via bump_bank_balance and
+   credits its GL code (was primary-only, read-modify-write).
+5. **Benefit claims** now draft the same claim_payout PV as project claims
+   (pool = claim.source_pool, acct 9000); claim PVs default bank to primary
+   (a debit PV approved with NO bank posted GL Cr 3000 without a cache
+   debit); claim-side inserts fail loud.
+6. **Cancel executors** (mig 20260612050000): execute_loan_cancel re-pointed
+   to current COA (Cr = 305x leaf resolved from the disbursement JE, fallback
+   PVS account, else loud; refunds the DISBURSING bank, GL fallback 3000 —
+   was '1010'/'1020'); NEW execute_fund_source_cancel (blocks on repayments,
+   refuses dept_pool-type sources, venture_pool fund_out reversal, primary
+   bank − with sufficiency check, JE Dr 4xxx leaf / Cr bank, status
+   cancelled) wired into approveRequest's tier_change-on-fund_sources branch.
+7. **Batch approve RPCs fully aligned with single** (mig 20260612010000 full
+   rewrites): interest→penalty→principal order, per-segment GL branch,
+   internal_transfer pool skip, payment-date GL dating, per-voucher period
+   check, venture_pool repayment inflow, dept_payment_request skip.
+
 ### Still open (awaiting user verification with counterparties)
 - 4054 LWS 450 · 4055 LWL 300 · 4056 CMK 6,936 · AR 3030 vs open invoices 12,647.54.
-- Red flags not yet fixed: loan disbursement primary-bank-only; PV-path loan
-  repayments skip venture_pool; benefit claims have no GL path; dept-request pool
-  debit has no rollback. See docs/FLOWS.md "Known gaps".
+- Remaining code items: DEPT_POOL_GL map collides with post-238 codes (dept_pool
+  fund-source JEs); count-based voucher numbering. See docs/FLOWS.md.
 
 ---
 

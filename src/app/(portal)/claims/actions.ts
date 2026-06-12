@@ -70,9 +70,10 @@ export async function approveClaim(claimId: string) {
 
   if (claimErr) throw new Error(`Failed to approve: ${claimErr.message}`)
 
-  // Only pool claims create a voucher — benefit claims remain on the
-  // HR payroll path (unchanged).
-  if (claim.claim_type === 'project' && Number(claim.amount) > 0) {
+  // BOTH claim types draft a voucher (2026-06-12 — benefit claims previously
+  // terminated at status flips with no voucher, no pool debit, no GL).
+  // Money moves when Principal approves the PV, same as every other payout.
+  if (Number(claim.amount) > 0) {
     const amount = Number(claim.amount)
     const sourcePool = claim.source_pool ?? 'venture_pool'
     const { count } = await supabase
@@ -80,6 +81,16 @@ export async function approveClaim(claimId: string) {
       .select('*', { count: 'exact', head: true })
     const period = new Date().toISOString().slice(0, 7).replace('-', '')
     const voucherNo = `HV-PV-${period}-${String((count ?? 0) + 1).padStart(4, '0')}`
+
+    // Default the paying bank to primary — a debit PV approved with NO bank
+    // posts the GL bank credit (fallback 3000) without debiting the cache.
+    // Finance can switch the bank on the PV edit page before approval.
+    const { data: primaryBank } = await supabase
+      .from('bank_accounts')
+      .select('id')
+      .eq('is_primary', true)
+      .eq('status', 'active')
+      .maybeSingle()
 
     const { data: voucher, error: vchErr } = await supabase
       .from('payment_vouchers')
@@ -90,6 +101,7 @@ export async function approveClaim(claimId: string) {
         status: 'pending_approval',
         amount,
         payee_name: claim.claimant_name,
+        bank_account_id: primaryBank?.id ?? null,
         description: `Claim payout: ${claim.claimant_name} — ${claim.description ?? ''}`.trim(),
         payment_method: 'bank_transfer',
         source_pool: sourcePool,
@@ -105,14 +117,15 @@ export async function approveClaim(claimId: string) {
     // Post-mig 238: PVS rows must reference a chart_of_accounts code via
     // account_code (NOT NULL). Claims book to G&A Expenses (9000) by default
     // — Principal can override at approval time if needed.
-    await supabase.from('payment_voucher_sources').insert({
+    const { error: pvsErr } = await supabase.from('payment_voucher_sources').insert({
       voucher_id: voucher.id,
       pool: sourcePool,
       amount,
       account_code: '9000',
     })
+    if (pvsErr) throw new Error(`Claim voucher ${voucherNo} drafted but source row failed: ${pvsErr.message}`)
 
-    await supabase.from('approval_requests').insert({
+    const { error: apprErr } = await supabase.from('approval_requests').insert({
       request_type: 'payment_voucher',
       reference_id: voucher.id,
       reference_table: 'payment_vouchers',
@@ -122,11 +135,13 @@ export async function approveClaim(claimId: string) {
       status: 'pending',
       workflow_state: 'submitted',
     })
+    if (apprErr) throw new Error(`Claim voucher ${voucherNo} drafted but approval queue entry failed: ${apprErr.message}`)
 
-    await supabase
+    const { error: linkErr } = await supabase
       .from('claims')
       .update({ voucher_id: voucher.id })
       .eq('id', claimId)
+    if (linkErr) throw new Error(`Claim voucher ${voucherNo} drafted but linking back to the claim failed: ${linkErr.message}`)
   }
 
   revalidatePath('/claims')
