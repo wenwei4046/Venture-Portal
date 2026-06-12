@@ -9,19 +9,19 @@ export default async function NewJournalVoucherPage() {
 
   const { data: acctRows } = await supabase
     .from('chart_of_accounts')
-    .select('code, name, parent_code')
+    .select('code, name, type, parent_code')
     .eq('is_active', true)
     .order('code')
 
-  const rows = acctRows ?? []
-  // Leaves = codes that are NOT a parent_code of any other account. Posting is
-  // only allowed to leaf accounts (a DB trigger rejects header accounts).
-  const parentCodes = new Set(
-    rows.map((r) => r.parent_code).filter((c): c is string => !!c)
-  )
-  const leafAccounts = rows
-    .filter((r) => !parentCodes.has(r.code))
-    .map((r) => ({ code: r.code, name: r.name }))
+  // Full rows for AccountPicker — it hides header accounts itself and gives
+  // type-ahead search (user 2026-06-12: JV 录科目要能打字快速找到).
+  const leafAccounts = (acctRows ?? []).map((r) => ({
+    code: r.code,
+    name: r.name,
+    type: r.type,
+    parent_code: (r as { parent_code: string | null }).parent_code ?? null,
+    is_active: true,
+  }))
 
   return (
     <div>

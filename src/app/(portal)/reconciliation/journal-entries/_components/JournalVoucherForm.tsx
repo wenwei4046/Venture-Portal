@@ -3,16 +3,12 @@
 import { useMemo, useRef, useState, useTransition, useEffect } from 'react'
 import Link from 'next/link'
 import { formatMoney } from '@/lib/utils'
+import AccountPicker, { type AccountOption } from '@/components/AccountPicker'
 import {
   createJournalVoucher,
   updateJournalVoucher,
   deleteJournalVoucher,
 } from '../actions'
-
-interface AccountOption {
-  code: string
-  name: string
-}
 
 interface LineDraft {
   key: string
@@ -296,19 +292,16 @@ export default function JournalVoucherForm({ accounts, entry }: Props) {
               key={line.key}
               className="grid grid-cols-1 sm:grid-cols-[2fr_1.2fr_1.2fr_1.8fr_auto] gap-2 px-3 py-2 border-t border-hairline first:border-t-0 sm:border-t items-center"
             >
-              <select
-                aria-label="Account"
+              {/* Type-ahead account search (user 2026-06-12) — same picker as
+                  the PV/invoice forms; headers hidden, type any part of the
+                  code or name to narrow. */}
+              <AccountPicker
+                accounts={accounts}
                 value={line.account_code}
-                onChange={(e) => updateLine(line.key, { account_code: e.target.value })}
-                className="w-full px-2 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-              >
-                <option value="">Select account…</option>
-                {accounts.map((a) => (
-                  <option key={a.code} value={a.code}>
-                    {a.code} — {a.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(code) => updateLine(line.key, { account_code: code })}
+                name={`jv_line_acct_${line.key}`}
+                placeholder="Type code or name…"
+              />
 
               <input
                 aria-label="Debit"
