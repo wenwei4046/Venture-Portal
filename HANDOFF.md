@@ -186,9 +186,13 @@ Cr 7000 + app interest row on LO#16) −91.26 (books invoice I-000078,
 "MARKETING NOTION 1/3 of 273.78" 2026-05-15, Dr 3030 / Cr 9087 — MISSED by
 the one-time opening import; verified absent from invoices and statement
 lines). After reclasses: GL 3030 19,960.72 vs open non-dept invoices
-19,869.46 — residual is exactly the 91.26. PENDING: user to name who
-I-000078 is billed to; then insert a matching system invoice row DIRECTLY
-(status issued, NO new JE — the GL already carries it via the books JV).
+19,869.46 — residual is exactly the 91.26. RESOLVED (user ruling, same
+day): I-000078 is DREAM CRAFTER's debt and no invoice is to be created —
+reclass JV Dr 3059 / Cr 3030 91.26 moved it onto DC's leaf, and the [LO-DC]
+TB-backfill advance was bumped 2,904 → 2,995.26 so app=GL ties. Final state:
+GL 3030 19,869.46 == open non-dept invoices 19,869.46 (gap ZERO); 3059
+2,995.26 == DC app outstanding; TB 0.00. NO historical reconciliation items
+remain open — every audit finding is now fixed or closed by user ruling.
 
 ### Counterparty rulings applied (2026-06-12, direct SQL)
 - LWS 450 + LWL 300: user ruled the opening books had knocked these off the
