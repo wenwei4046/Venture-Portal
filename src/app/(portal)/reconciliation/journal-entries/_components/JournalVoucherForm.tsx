@@ -266,7 +266,9 @@ export default function JournalVoucherForm({ accounts, entry }: Props) {
             ))}
           </select>
           <p className="font-serif italic text-muted text-xs mt-1.5">
-            Drives which department P&amp;L this voucher appears in. Unallocated stays out of every department view.
+            Drives which department P&amp;L this voucher appears in. If the voucher
+            also moves a bank account, the department&apos;s pool moves by the same
+            amount. Unallocated stays out of every department view.
           </p>
         </div>
       </div>

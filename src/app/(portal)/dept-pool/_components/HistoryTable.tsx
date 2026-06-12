@@ -25,8 +25,12 @@ export default async function HistoryTable({ deptId, filter = 'all' }: Props) {
     .order('created_at', { ascending: false })
     .limit(200)
 
-  if (filter === 'in') query = query.eq('transaction_type', 'np_in')
-  if (filter === 'out') query = query.in('transaction_type', ['expense_out', 'inter_billing_out'])
+  // *_in adds to the balance, *_out subtracts (void_* = void reversals,
+  // jv_* = manual-JV bank movements; both balance-only, see mig 20260612060000).
+  // Cast: void_*/jv_* (migs 20260611010000/20260612060000) are not yet in the
+  // generated database.types.ts enum union.
+  if (filter === 'in') query = query.in('transaction_type', ['np_in', 'void_in', 'jv_in'] as never[])
+  if (filter === 'out') query = query.in('transaction_type', ['expense_out', 'inter_billing_out', 'void_out', 'jv_out'] as never[])
 
   const { data: rows } = await query
 
@@ -73,7 +77,7 @@ export default async function HistoryTable({ deptId, filter = 'all' }: Props) {
             </thead>
             <tbody>
               {(rows ?? []).map((row) => {
-                const isIn = row.transaction_type === 'np_in'
+                const isIn = ['np_in', 'void_in', 'jv_in'].includes(row.transaction_type as string)
                 const signed = isIn ? Number(row.amount) : -Number(row.amount)
                 return (
                   <tr key={row.id} className="border-b border-hairline last:border-0">
