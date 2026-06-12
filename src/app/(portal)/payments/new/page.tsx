@@ -150,10 +150,10 @@ export default async function NewPaymentPage({ searchParams }: Props) {
   return (
     <div>
       <Link
-        href={invoicePreset ? '/billing' : '/payments'}
+        href={invoicePreset ? '/billing' : isReceiptMode ? '/receipts' : '/payments'}
         className="text-sm text-muted hover:text-accent font-sans transition-colors"
       >
-        ← Back to {invoicePreset ? 'Billing' : 'Payments'}
+        ← Back to {invoicePreset ? 'Billing' : isReceiptMode ? 'Receipts' : 'Payments'}
       </Link>
       <div className="page-head">
         <div>

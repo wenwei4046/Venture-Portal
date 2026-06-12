@@ -46,12 +46,17 @@ export async function GET(req: Request) {
   const toFilter = url.searchParams.get('to') ?? ''
   const minFilter = url.searchParams.get('min') ? parseFloat(url.searchParams.get('min')!) : null
   const maxFilter = url.searchParams.get('max') ? parseFloat(url.searchParams.get('max')!) : null
+  // Side split (2026-06-12): /payments exports debit (PV), /receipts credit (OR).
+  const rawDirection = url.searchParams.get('direction') ?? ''
+  const directionFilter = rawDirection === 'debit' || rawDirection === 'credit' ? rawDirection : null
 
   // Fetch vouchers (same query as page)
-  const { data: vouchers } = await supabase
+  let voucherQuery = supabase
     .from('payment_vouchers')
     .select('*')
     .order('created_at', { ascending: false })
+  if (directionFilter) voucherQuery = voucherQuery.eq('direction', directionFilter)
+  const { data: vouchers } = await voucherQuery
 
   // Post-mig 238: PVS rows reference chart_of_accounts via account_code
   // Load once, index by voucher_id, then derive pool list + account name list

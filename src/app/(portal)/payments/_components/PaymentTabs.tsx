@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { SlidingTabs } from '@/components/motion/SlidingTabs'
 
 const TABS = [
@@ -14,6 +14,7 @@ const TABS = [
 
 export default function PaymentTabs() {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const current = searchParams.get('status') ?? 'all'
 
@@ -28,7 +29,8 @@ export default function PaymentTabs() {
         } else {
           params.set('status', key)
         }
-        router.push(`/payments?${params.toString()}`)
+        // Pathname-relative so the same tabs work on /payments AND /receipts.
+        router.push(`${pathname}?${params.toString()}`)
       }}
     />
   )
