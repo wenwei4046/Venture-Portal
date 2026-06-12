@@ -56,6 +56,10 @@ interface Props {
   invoicePreset?: InvoicePreset | null
   nonBillablePreset?: boolean
   payableFundSources?: PayableFundSource[]
+  /** Entry-point split (2026-06-12): '/payments/new' = pay-only (debit),
+   *  '?mode=receipt' = receive-only (credit). Locks the direction and hides
+   *  the toggle; undefined keeps the legacy toggle (invoice preset path). */
+  lockedDirection?: 'debit' | 'credit'
 }
 
 const TYPE_BADGE: Record<AccountType, { label: string; className: string }> = {
@@ -95,12 +99,14 @@ interface SourceRow {
   override_reason?: string
 }
 
-export default function NewPaymentForm({ companies, bankAccounts, accounts, invoicePreset, nonBillablePreset, payableFundSources = [] }: Props) {
+export default function NewPaymentForm({ companies, bankAccounts, accounts, invoicePreset, nonBillablePreset, payableFundSources = [], lockedDirection }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const isInvoicePay = !!invoicePreset
   const isNonBillable = !!nonBillablePreset && !isInvoicePay
-  const [direction, setDirection] = useState<'debit' | 'credit'>(isInvoicePay ? 'credit' : 'debit')
+  const [direction, setDirection] = useState<'debit' | 'credit'>(
+    isInvoicePay ? 'credit' : lockedDirection ?? 'debit',
+  )
   // Internal transfer: a pure bank-to-bank cash move (e.g. HL → Alliance to
   // stage payroll). Tick this so the voucher is booked as voucher_type=
   // internal_transfer — it does NOT consume any dept/venture pool (no expense
@@ -282,9 +288,13 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
 
   return (
     <form ref={formRef} action={handleSubmit} className="bg-surface border border-hairline rounded-md p-8 max-w-3xl">
-      {/* Direction: toggle for standalone vouchers, locked to credit when settling an invoice */}
+      {/* Direction: locked per entry point (Create payment = debit, Receipt =
+          credit, settle-invoice = credit). The toggle only survives on legacy
+          paths with no lock. */}
       {isInvoicePay ? (
         <input type="hidden" name="direction" value="credit" />
+      ) : lockedDirection ? (
+        <input type="hidden" name="direction" value={lockedDirection} />
       ) : (
         <div className="mb-6">
           <label className="block text-sm font-sans font-medium text-graphite mb-2">

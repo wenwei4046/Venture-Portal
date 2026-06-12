@@ -55,7 +55,7 @@ export default async function NewPaymentPage({ searchParams }: Props) {
 
     return (
       <div>
-        <Link href="/payments" className="text-sm text-muted hover:text-accent font-sans transition-colors">← Back to Payments</Link>
+        <Link href="/payments/new?mode=receipt" className="text-sm text-muted hover:text-accent font-sans transition-colors">← Back to Receipt</Link>
         <div className="page-head">
           <div>
             <div className="page-eyebrow"><em>I.</em> TREASURY · OFFICIAL RECEIPT · LOAN REPAYMENT</div>
@@ -123,20 +123,29 @@ export default async function NewPaymentPage({ searchParams }: Props) {
     }
   }
 
+  // Split entry points (user 2026-06-12): the sidebar Receipt entry
+  // (?mode=receipt) is receive-only — Credit form + a shortcut to the
+  // dedicated 收到 Loan 还款 flow. The Payments page's Create payment is
+  // pay-only (debit). No more direction toggle on either.
+  const isReceiptMode = mode === 'receipt' && !invoicePreset && !nonBillablePreset
+
   const headingTitle = invoicePreset
     ? 'Settle invoice'
     : nonBillablePreset
       ? 'Non-billable expense'
-      : 'Create payment'
+      : isReceiptMode
+        ? 'Create receipt'
+        : 'Create payment'
 
   // mig 252: settle-invoice is incoming money → Official Receipt (OR);
-  // expense / payment paths stay as Payment Voucher (PV). "NEW" stays
-  // generic because the form lets the user pick debit or credit.
+  // expense / payment paths stay as Payment Voucher (PV).
   const headingEyebrow = invoicePreset
     ? 'OFFICIAL RECEIPT · SETTLE INVOICE'
     : nonBillablePreset
       ? 'PAYMENT VOUCHER · NON-BILLABLE'
-      : 'PAYMENT VOUCHER / OFFICIAL RECEIPT · NEW'
+      : isReceiptMode
+        ? 'OFFICIAL RECEIPT · NEW'
+        : 'PAYMENT VOUCHER · NEW'
 
   return (
     <div>
@@ -153,6 +162,14 @@ export default async function NewPaymentPage({ searchParams }: Props) {
           </div>
           <h1 className="page-title">{headingTitle}</h1>
         </div>
+        {isReceiptMode ? (
+          <Link
+            href="/payments/new?mode=loan_repayment"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-graphite hover:text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+          >
+            收到 Loan 还款 →
+          </Link>
+        ) : null}
       </div>
 
       <NewPaymentForm
@@ -168,6 +185,7 @@ export default async function NewPaymentPage({ searchParams }: Props) {
         invoicePreset={invoicePreset}
         nonBillablePreset={nonBillablePreset}
         payableFundSources={payableFundSources}
+        lockedDirection={isReceiptMode ? 'credit' : invoicePreset ? undefined : 'debit'}
       />
     </div>
   )

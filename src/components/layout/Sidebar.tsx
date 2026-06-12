@@ -79,7 +79,9 @@ const navEntries: NavEntry[] = [
   // Receive-money form (settle invoice / record loan repayment / open an OR).
   // The page is requireRole(['finance']) — hidden from Principal until that
   // gate is opened up.
-  { href: '/payments/new', label: 'Receipt', section: 'Daily Operations', visible: (r) => r === 'finance' },
+  // Receive-only entry (2026-06-12): credit form + 收到 Loan 还款 shortcut.
+  // The Payments page's own "Create payment" button opens the debit-only form.
+  { href: '/payments/new?mode=receipt', label: 'Receipt', section: 'Daily Operations', visible: (r) => r === 'finance' },
   // /statements IS the invoices landing (Phase 7 Step 11 merge); the monthly
   // statements list lives at /statements/monthly (inside Fund In / Out below).
   { href: '/statements', label: 'Invoice', section: 'Daily Operations', exact: true, visible: canAccessTreasury },
