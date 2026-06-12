@@ -169,6 +169,18 @@ Manual JVs also gained segment (mig ...000000), bank-cache sync (...020000)
 and dept-pool sync for dept-segment JVs with bank movement (...060000,
 jv_in/jv_out txn types; pool rule: pool == per-segment net bank movement).
 
+### Counterparty rulings applied (2026-06-12, direct SQL)
+- LWS 450 + LWL 300: user ruled the opening books had knocked these off the
+  PRINCIPAL payables but they were INTEREST. Reclass JE (manual_jv, treasury):
+  Dr 9010 Interest Expense 750 / Cr 4054 450 / Cr 4055 300. App=GL=131,500 and
+  57,200 now tie exactly.
+- CMK 6,936: user ruled the repayment IS recorded on CMK side — system was
+  missing it. fund_source_repayments principal row 6,936 added (notes flag the
+  ruling); app=GL=42,064 ties. No GL/bank change (cash already in openings).
+- Remaining counterparty item: AR 3030 (GL 7,221.92) vs open non-dept invoices
+  19,869.46 — gap 12,647.54: receipts historically credited 3030 without being
+  tied to specific invoices; needs per-invoice paid/unpaid confirmation.
+
 ### Still open (awaiting user verification with counterparties)
 - 4054 LWS 450 · 4055 LWL 300 · 4056 CMK 6,936 · AR 3030 vs open invoices 12,647.54.
 - Remaining code items: DEPT_POOL_GL map collides with post-238 codes (dept_pool
