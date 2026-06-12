@@ -283,14 +283,18 @@ export default function AccountsSection({ accounts }: Props) {
                   </span>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="ledger-table">
+                  {/* table-fixed + explicit widths on the non-name columns so
+                      the Code column lands at the SAME x-position in every
+                      type section — each section is its own <table>, and
+                      auto layout let name length shift the columns around. */}
+                  <table className="ledger-table table-fixed w-full">
                     <thead>
                       <tr>
                         <th>Name</th>
-                        <th>Code</th>
-                        <th>Cash Flow</th>
-                        <th>Status</th>
-                        <th></th>
+                        <th className="w-24">Code</th>
+                        <th className="w-28">Cash Flow</th>
+                        <th className="w-24">Status</th>
+                        <th className="w-16"></th>
                       </tr>
                     </thead>
                     <tbody>
