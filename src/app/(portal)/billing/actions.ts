@@ -811,6 +811,127 @@ export async function updateDraftInvoice(formData: FormData): Promise<void> {
   revalidatePath('/statements')
 }
 
+// ─── Full draft edit (Finance) ───────────────────────────────────────────────
+// The edit modal mirrors the create form 1:1 (user 2026-06-12: "edit 时和我开
+// invoice 时一样，全部都能改，multi-line 也一样"). Same payload contract +
+// validation as createMultiLineInvoice; lines are REPLACED wholesale.
+// Format rule: 2+ lines → multi-line shape (invoice_lines rows, header
+// category NULL so issue fans the Cr out per line); exactly 1 line → simple
+// shape (no line rows; the line's description/category live on the header,
+// same as createManualInvoice would have written).
+export async function updateDraftInvoiceFull(payload: {
+  id: string
+  billableType: BillableToKind
+  billingMode: CreateInvoiceMode
+  period: string // YYYY-MM
+  invoiceDate: string
+  dueDate: string
+  referenceNo: string
+  headerDescription: string
+  companyId?: string
+  departmentId?: string
+  freetextName?: string
+  lines: InvoiceLineInput[]
+}): Promise<void> {
+  await requireRole(['finance'])
+  const supabase = await createClient()
+
+  if (!payload.id) throw new Error('Invoice id is required')
+  if (!['subsidiary', 'director', 'dept_pool', 'freetext'].includes(payload.billableType)) {
+    throw new Error(`Unsupported billable_to_type: ${payload.billableType}`)
+  }
+  if (!CREATE_INVOICE_MODES.includes(payload.billingMode)) {
+    throw new Error(`Unsupported billing mode: ${payload.billingMode}`)
+  }
+  if (payload.billableType === 'subsidiary' && !payload.companyId) throw new Error('Subsidiary is required')
+  if (payload.billableType === 'dept_pool' && !payload.departmentId) throw new Error('Department is required')
+  if (
+    (payload.billableType === 'director' || payload.billableType === 'freetext') &&
+    !payload.freetextName?.trim()
+  ) {
+    throw new Error('Billable party name is required')
+  }
+  if (!payload.period) throw new Error('Period is required')
+  if (!payload.lines || payload.lines.length === 0) {
+    throw new Error('At least one line item is required')
+  }
+  for (let i = 0; i < payload.lines.length; i++) {
+    const ln = payload.lines[i]
+    if (!Number.isFinite(ln.amount) || ln.amount <= 0) {
+      throw new Error(`Line ${i + 1}: amount must be a positive number`)
+    }
+    if (!ln.description.trim()) {
+      throw new Error(`Line ${i + 1}: description is required`)
+    }
+  }
+
+  const { data: inv } = await supabase
+    .from('invoices')
+    .select('id, status, period_month, invoice_no')
+    .eq('id', payload.id)
+    .single()
+  if (!inv) throw new Error('Invoice not found')
+  if (inv.status !== 'draft') {
+    throw new Error(`Cannot edit: invoice ${inv.invoice_no ?? inv.id} is ${inv.status}`)
+  }
+  await assertPeriodOpen(supabase, inv.period_month)
+  const period = dayjs(payload.period).startOf('month').format('YYYY-MM-DD')
+  if (period !== inv.period_month) await assertPeriodOpen(supabase, period)
+
+  const total = payload.lines.reduce((s, l) => s + Number(l.amount), 0)
+  const totalRounded = Math.round(total * 100) / 100
+  const isMulti = payload.lines.length >= 2
+  const single = payload.lines[0]
+
+  const { error: updErr } = await supabase
+    .from('invoices')
+    .update({
+      period_month: period,
+      billing_mode: payload.billingMode,
+      category_code: isMulti ? null : single.categoryCode.trim() || null,
+      base_amount: totalRounded,
+      total_amount: totalRounded,
+      invoice_date: payload.invoiceDate || null,
+      due_date: payload.dueDate || null,
+      description: isMulti
+        ? payload.headerDescription.trim() || null
+        : payload.headerDescription.trim() || single.description.trim(),
+      reference_no: payload.referenceNo.trim() || null,
+      billable_to_type: payload.billableType,
+      company_id: payload.billableType === 'subsidiary' ? payload.companyId : null,
+      billable_to_department_id: payload.billableType === 'dept_pool' ? payload.departmentId : null,
+      billable_to_freetext_name:
+        payload.billableType === 'director' || payload.billableType === 'freetext'
+          ? payload.freetextName?.trim() ?? null
+          : null,
+    })
+    .eq('id', payload.id)
+    .eq('status', 'draft')
+  if (updErr) throw new Error(`Failed to update invoice: ${updErr.message}`)
+
+  // Replace the line set. Wholesale delete+insert keeps line_no contiguous.
+  const { error: delErr } = await supabase
+    .from('invoice_lines')
+    .delete()
+    .eq('invoice_id', payload.id)
+  if (delErr) throw new Error(`Failed to replace invoice lines: ${delErr.message}`)
+  if (isMulti) {
+    const { error: insErr } = await supabase.from('invoice_lines').insert(
+      payload.lines.map((l, i) => ({
+        invoice_id: payload.id,
+        line_no: i + 1,
+        description: l.description.trim(),
+        amount: Math.round(Number(l.amount) * 100) / 100,
+        category_code: l.categoryCode.trim() || null,
+      })),
+    )
+    if (insErr) throw new Error(`Failed to write invoice lines: ${insErr.message}`)
+  }
+
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+}
+
 // ─── Consolidated invoice settlement (Finance) ─────────────────────────────
 // Settle N issued invoices of the SAME payer into ONE Official Receipt voucher.
 // Cross-payer selections are rejected (one receipt = one company). Replaces the

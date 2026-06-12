@@ -106,11 +106,13 @@ interface Props {
   /** Banks shown in the batch-settle modal. Drives which bank account
    *  receives the inflow when knocking off multiple issued invoices. */
   bankAccounts?: Array<{ id: string; bank_name: string; account_number: string | null }>
+  /** invoice_id → line items, prefills the (create-form-mirroring) edit modal. */
+  invoiceLines?: Record<string, Array<{ description: string | null; amount: number; category_code: string | null }>>
 }
 
 // Invoices for the selected period. Populated by Step 5's generate_monthly_invoices
 // RPC. Until Step 5 ships, this section shows the empty state with an explanation.
-export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [], bankAccounts = [] }: Props) {
+export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [], bankAccounts = [], invoiceLines = {} }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -462,6 +464,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                                 billable_to_freetext_name: inv.billable_to_freetext_name ?? null,
                                 period_month: inv.period_month ?? null,
                               }}
+                              initialLines={invoiceLines[inv.id] ?? []}
                               categories={categories ?? []}
                               companies={Array.from(companyMap, ([cid, c]) => ({ id: cid, name: c.name }))}
                               departments={Array.from(departmentMap, ([did, dname]) => ({ id: did, name: dname }))}

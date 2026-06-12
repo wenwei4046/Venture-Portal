@@ -1,26 +1,50 @@
 'use client'
 
-import { useTransition, useState } from 'react'
+import { useMemo, useTransition, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { approveInvoice, approveInvoicesForPeriod, deleteDraftInvoice, updateDraftInvoice } from '../actions'
+import { useRouter } from 'next/navigation'
+import {
+  approveInvoice,
+  approveInvoicesForPeriod,
+  deleteDraftInvoice,
+  updateDraftInvoiceFull,
+  type BillableToKind,
+  type CreateInvoiceMode,
+} from '../actions'
 import AccountPicker, { type AccountOption } from '@/components/AccountPicker'
 import type { AccountType } from '@/lib/coa'
 
-const BILLING_MODE_OPTIONS = [
-  { value: 'hr_attribution', label: 'HR attribution' },
-  { value: 'finance_attribution', label: 'Finance attribution' },
-  { value: 'director_office_attribution', label: 'Director Office attribution' },
-  { value: 'director_attribution', label: 'Director attribution' },
-  { value: 'marketing_project', label: 'Marketing project' },
-  { value: 'venture_attribution', label: 'Venture attribution' },
+// Same option sets as the create forms — the edit modal mirrors them 1:1.
+const BILLABLE_OPTIONS: Array<{ value: BillableToKind; label: string }> = [
+  { value: 'subsidiary', label: 'Subsidiary' },
+  { value: 'director',   label: 'Director' },
+  { value: 'dept_pool',  label: 'Dept Pool' },
+  { value: 'freetext',   label: 'Other' },
 ]
 
-const BILLABLE_TYPE_OPTIONS = [
-  { value: 'subsidiary', label: 'Subsidiary' },
-  { value: 'director', label: 'Director' },
-  { value: 'dept_pool', label: 'Department (inter-billing)' },
-  { value: 'freetext', label: 'Other party (free text)' },
+const POOL_OPTIONS: Array<{ value: CreateInvoiceMode; label: string }> = [
+  { value: 'venture_attribution',         label: 'Venture Pool' },
+  { value: 'marketing_project',           label: 'Marketing Department Pool' },
+  { value: 'hr_attribution',              label: 'HR Department Pool' },
+  { value: 'finance_attribution',         label: 'Finance Department Pool' },
+  { value: 'director_office_attribution', label: 'Director Office Department Pool' },
+  { value: 'director_attribution',        label: 'Director Department Pool' },
 ]
+
+interface EditLineRow {
+  uid: string
+  description: string
+  amount: string
+  categoryCode: string
+}
+
+function newEditLine(): EditLineRow {
+  return { uid: crypto.randomUUID(), description: '', amount: '', categoryCode: '' }
+}
+
+function fmtRm(n: number): string {
+  return n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
 
 export function ApproveInvoiceButton({ id }: { id: string }) {
   const [isPending, startTransition] = useTransition()
@@ -90,17 +114,20 @@ export function DeleteInvoiceButton({ id, invoiceNo }: { id: string; invoiceNo: 
   )
 }
 
-// Edit a draft invoice — EVERY field is editable while draft (user
-// 2026-06-12): amount, category, description, dates, reference, plus the
-// structural fields (billing mode, who to bill, period). Drafts have no
-// GL/pool footprint, so nothing needs unwinding. Rendered via createPortal
-// to document.body so `fixed` centers on the VIEWPORT — inside the table it
-// inherited a transformed ancestor and landed mid-document (user had to
-// scroll to find it).
+// Edit a draft invoice — the modal mirrors the CREATE form 1:1 (user
+// 2026-06-12): bill-to segment buttons, pool/billing mode, period, LINE
+// ITEMS (add/remove — multi-line invoices edit their lines here), dates,
+// header description, reference. Drafts have no GL/pool footprint, so
+// everything is editable; the format follows the line count (2+ lines =
+// multi-line invoice, 1 line = simple invoice), exactly like creating.
+// Rendered via createPortal(document.body) so `fixed` centers on the
+// VIEWPORT — inside the table it inherited a transformed ancestor and
+// landed mid-document (user had to scroll to find it).
 export function EditInvoiceButton({
   id,
   invoiceNo,
   initial,
+  initialLines = [],
   categories,
   companies = [],
   departments = [],
@@ -121,78 +148,119 @@ export function EditInvoiceButton({
     billable_to_freetext_name?: string | null
     period_month?: string | null
   }
+  initialLines?: Array<{ description: string | null; amount: number; category_code: string | null }>
   categories: Array<{ code: string; label: string; type: AccountType; parent_code: string | null }>
   companies?: Array<{ id: string; name: string }>
   departments?: Array<{ id: string; name: string }>
 }) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const [amount, setAmount] = useState(String(initial.total_amount ?? ''))
-  const [categoryCode, setCategoryCode] = useState(initial.category_code ?? '')
-  const [description, setDescription] = useState(initial.description ?? '')
+  const isMultiSource = initialLines.length > 0
+
+  const [billableType, setBillableType] = useState<BillableToKind>(
+    (initial.billable_to_type as BillableToKind) ?? 'subsidiary',
+  )
+  const [companyId, setCompanyId] = useState(initial.company_id ?? '')
+  const [deptId, setDeptId] = useState(initial.billable_to_department_id ?? '')
+  const [freetextName, setFreetextName] = useState(initial.billable_to_freetext_name ?? '')
+  const [billingMode, setBillingMode] = useState<CreateInvoiceMode>(
+    (initial.billing_mode as CreateInvoiceMode) ?? 'venture_attribution',
+  )
+  const [period, setPeriod] = useState((initial.period_month ?? '').slice(0, 7))
   const [invoiceDate, setInvoiceDate] = useState(initial.invoice_date ?? '')
   const [dueDate, setDueDate] = useState(initial.due_date ?? '')
+  // Multi-line source: the header description is the summary. Simple source:
+  // the single line carries the description, header stays blank (matching
+  // what saving 1 line writes back).
+  const [headerDescription, setHeaderDescription] = useState(
+    isMultiSource ? initial.description ?? '' : '',
+  )
   const [referenceNo, setReferenceNo] = useState(initial.reference_no ?? '')
-  const [billingMode, setBillingMode] = useState(initial.billing_mode ?? 'venture_attribution')
-  const [billableType, setBillableType] = useState(initial.billable_to_type ?? 'subsidiary')
-  const [companyId, setCompanyId] = useState(initial.company_id ?? '')
-  const [billableDeptId, setBillableDeptId] = useState(initial.billable_to_department_id ?? '')
-  const [billableFreetext, setBillableFreetext] = useState(initial.billable_to_freetext_name ?? '')
-  const [periodMonth, setPeriodMonth] = useState((initial.period_month ?? '').slice(0, 7))
+  const [lines, setLines] = useState<EditLineRow[]>(() =>
+    isMultiSource
+      ? initialLines.map((l) => ({
+          uid: crypto.randomUUID(),
+          description: l.description ?? '',
+          amount: String(l.amount),
+          categoryCode: l.category_code ?? '',
+        }))
+      : [
+          {
+            uid: crypto.randomUUID(),
+            description: initial.description ?? '',
+            amount: String(initial.total_amount ?? ''),
+            categoryCode: initial.category_code ?? '',
+          },
+        ],
+  )
 
-  const categoryOptions: AccountOption[] = categories.map((c) => ({
-    code: c.code,
-    name: c.label,
-    type: c.type,
-    parent_code: c.parent_code,
-    is_active: true,
-  }))
+  const categoryOptions: AccountOption[] = useMemo(
+    () =>
+      categories.map((c) => ({
+        code: c.code,
+        name: c.label,
+        type: c.type,
+        parent_code: c.parent_code,
+        is_active: true,
+      })),
+    [categories],
+  )
+
+  const total = useMemo(
+    () => lines.reduce((s, l) => s + (Number(l.amount) || 0), 0),
+    [lines],
+  )
+
+  function updateLine(uid: string, patch: Partial<EditLineRow>) {
+    setLines((prev) => prev.map((l) => (l.uid === uid ? { ...l, ...patch } : l)))
+  }
+  function addLine() {
+    setLines((prev) => [...prev, newEditLine()])
+  }
+  function removeLine(uid: string) {
+    setLines((prev) => (prev.length === 1 ? prev : prev.filter((l) => l.uid !== uid)))
+  }
 
   function handleSubmit() {
     setError(null)
-    const amt = Number(amount)
-    if (!Number.isFinite(amt) || amt <= 0) {
-      setError('Amount must be a positive number')
-      return
+    if (billableType === 'subsidiary' && !companyId) return setError('Pick a subsidiary')
+    if (billableType === 'dept_pool' && !deptId) return setError('Pick a department')
+    if ((billableType === 'director' || billableType === 'freetext') && !freetextName.trim()) {
+      return setError(billableType === 'director' ? 'Enter director name' : 'Enter party name')
     }
-    if (!description.trim()) {
-      setError('Description is required')
-      return
+    const validLines = lines.filter((l) => Number(l.amount) > 0 && l.description.trim())
+    if (validLines.length === 0) {
+      return setError('Add at least one line with description + amount')
     }
-    if (billableType === 'subsidiary' && !companyId) {
-      setError('Pick the subsidiary to bill')
-      return
-    }
-    if (billableType === 'dept_pool' && !billableDeptId) {
-      setError('Pick the department to bill')
-      return
-    }
-    if ((billableType === 'director' || billableType === 'freetext') && !billableFreetext.trim()) {
-      setError('Billable party name is required')
-      return
-    }
+
     startTransition(async () => {
       try {
-        const fd = new FormData()
-        fd.set('id', id)
-        fd.set('amount', amt.toFixed(2))
-        fd.set('category_code', categoryCode.trim())
-        fd.set('description', description.trim())
-        fd.set('invoice_date', invoiceDate)
-        fd.set('due_date', dueDate)
-        fd.set('reference_no', referenceNo.trim())
-        fd.set('billing_mode', billingMode)
-        fd.set('billable_to_type', billableType)
-        fd.set('company_id', companyId)
-        fd.set('billable_to_department_id', billableDeptId)
-        fd.set('billable_to_freetext_name', billableFreetext.trim())
-        if (periodMonth) fd.set('period_month', `${periodMonth}-01`)
-        await updateDraftInvoice(fd)
+        await updateDraftInvoiceFull({
+          id,
+          billableType,
+          billingMode,
+          period,
+          invoiceDate,
+          dueDate,
+          referenceNo,
+          headerDescription,
+          companyId: billableType === 'subsidiary' ? companyId : undefined,
+          departmentId: billableType === 'dept_pool' ? deptId : undefined,
+          freetextName:
+            billableType === 'director' || billableType === 'freetext' ? freetextName.trim() : undefined,
+          lines: validLines.map((l) => ({
+            description: l.description.trim(),
+            amount: Number(l.amount),
+            categoryCode: l.categoryCode.trim(),
+          })),
+        })
         setOpen(false)
+        router.refresh()
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error')
+        setError(err instanceof Error ? err.message : 'Save failed')
       }
     })
   }
@@ -203,15 +271,15 @@ export function EditInvoiceButton({
       onClick={() => !isPending && setOpen(false)}
     >
       <div
-        className="bg-paper border border-hairline rounded-md shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col"
+        className="bg-paper border border-hairline rounded-md shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-baseline justify-between px-6 py-4 border-b border-hairline shrink-0">
           <div>
             <h2 className="font-serif text-2xl text-ink">Edit draft invoice</h2>
             <p className="font-serif italic text-graphite text-xs mt-1">
-              {invoiceNo ?? id.slice(0, 8)} · drafts are fully editable — nothing is
-              posted until you approve &amp; issue.
+              {invoiceNo ?? id.slice(0, 8)} · drafts are fully editable — nothing posts
+              until approve &amp; issue. 2+ lines saves as a multi-line invoice.
             </p>
           </div>
           <button
@@ -225,118 +293,175 @@ export function EditInvoiceButton({
         </div>
 
         <div className="p-6 space-y-5 overflow-y-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Bill to" required>
-              <select
-                value={billableType}
-                onChange={(e) => setBillableType(e.target.value)}
-                disabled={isPending}
-                className={inputCls}
-              >
-                {BILLABLE_TYPE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </Field>
-            {billableType === 'subsidiary' ? (
-              <Field label="Subsidiary" required>
-                <select
-                  value={companyId}
-                  onChange={(e) => setCompanyId(e.target.value)}
+          {/* Bill-to type — same segment buttons as the create form */}
+          <div>
+            <div className="text-xs font-sans font-medium text-graphite mb-1">
+              Bill to <span className="text-danger">*</span>
+            </div>
+            <div className="flex flex-wrap gap-0 border border-hairline rounded-md overflow-hidden w-fit">
+              {BILLABLE_OPTIONS.map((opt, i) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setBillableType(opt.value)}
                   disabled={isPending}
-                  className={inputCls}
+                  className={
+                    billableType === opt.value
+                      ? 'px-4 py-2 bg-accent-bg text-accent font-serif italic text-sm'
+                      : `px-4 py-2 text-graphite font-sans text-sm hover:bg-surface-2${i > 0 ? ' border-l border-hairline' : ''}`
+                  }
                 >
-                  <option value="">Select…</option>
-                  {companies.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </Field>
-            ) : billableType === 'dept_pool' ? (
-              <Field label="Department" required>
-                <select
-                  value={billableDeptId}
-                  onChange={(e) => setBillableDeptId(e.target.value)}
-                  disabled={isPending}
-                  className={inputCls}
-                >
-                  <option value="">Select…</option>
-                  {departments.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </select>
-              </Field>
-            ) : (
-              <Field label={billableType === 'director' ? 'Director name' : 'Party name'} required>
-                <input
-                  type="text"
-                  value={billableFreetext}
-                  onChange={(e) => setBillableFreetext(e.target.value)}
-                  disabled={isPending}
-                  className={inputCls}
-                />
-              </Field>
-            )}
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Billing mode" required>
+          {billableType === 'subsidiary' ? (
+            <Field label="Subsidiary" required>
               <select
-                value={billingMode}
-                onChange={(e) => setBillingMode(e.target.value)}
+                value={companyId}
+                onChange={(e) => setCompanyId(e.target.value)}
                 disabled={isPending}
                 className={inputCls}
               >
-                {BILLING_MODE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                <option value="">Select subsidiary…</option>
+                {companies.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
             </Field>
-            <Field label="Period">
+          ) : billableType === 'dept_pool' ? (
+            <Field label="Department" required>
+              <select
+                value={deptId}
+                onChange={(e) => setDeptId(e.target.value)}
+                disabled={isPending}
+                className={inputCls}
+              >
+                <option value="">Select a department…</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </Field>
+          ) : (
+            <Field
+              label={billableType === 'director' ? 'Director name' : 'Bill to (free text)'}
+              required
+            >
+              <input
+                type="text"
+                value={freetextName}
+                onChange={(e) => setFreetextName(e.target.value)}
+                disabled={isPending}
+                maxLength={120}
+                className={inputCls}
+              />
+            </Field>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Pool / billing mode" required>
+              <select
+                value={billingMode}
+                onChange={(e) => setBillingMode(e.target.value as CreateInvoiceMode)}
+                disabled={isPending}
+                className={inputCls}
+              >
+                {POOL_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Period" required>
               <input
                 type="month"
-                value={periodMonth}
-                onChange={(e) => setPeriodMonth(e.target.value)}
+                value={period}
+                onChange={(e) => setPeriod(e.target.value)}
                 disabled={isPending}
                 className={`${inputCls} font-mono`}
               />
             </Field>
           </div>
 
-          <Field label="Amount (RM)" required>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))}
-              disabled={isPending}
-              className={`${inputCls} font-mono tabular text-right`}
-            />
-          </Field>
+          {/* Line items — identical to the multi-line create form */}
+          <div>
+            <div className="flex items-baseline justify-between mb-2">
+              <div className="text-xs font-sans font-medium text-graphite">
+                Line items <span className="text-danger">*</span>
+              </div>
+              <span className="font-serif italic text-muted text-xs">
+                {lines.length} {lines.length === 1 ? 'line' : 'lines'} · Total RM {fmtRm(total)}
+              </span>
+            </div>
 
-          <Field label="Category">
-            <AccountPicker
-              accounts={categoryOptions}
-              value={categoryCode}
-              onChange={setCategoryCode}
-              name="category_picker"
-              placeholder="Select category…"
-              disabled={isPending}
-            />
-          </Field>
+            <div className="space-y-3">
+              {lines.map((l, idx) => (
+                <div key={l.uid} className="border border-hairline rounded-md bg-surface p-4">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="text-xs font-mono uppercase tracking-wide text-muted">Line {idx + 1}</div>
+                    <button
+                      onClick={() => removeLine(l.uid)}
+                      disabled={isPending || lines.length === 1}
+                      className="text-muted hover:text-danger disabled:opacity-30 disabled:cursor-not-allowed text-lg leading-none"
+                      aria-label="Remove line"
+                      type="button"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    <Field label="Description" required>
+                      <input
+                        type="text"
+                        value={l.description}
+                        onChange={(e) => updateLine(l.uid, { description: e.target.value })}
+                        disabled={isPending}
+                        placeholder="What is this line for?"
+                        className={inputCls}
+                      />
+                    </Field>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <Field label="Category">
+                        <AccountPicker
+                          accounts={categoryOptions}
+                          value={l.categoryCode}
+                          onChange={(code) => updateLine(l.uid, { categoryCode: code })}
+                          name={`edit_line_cat_${l.uid}`}
+                          placeholder="Select category…"
+                          disabled={isPending}
+                        />
+                      </Field>
+                      <Field label="Amount (RM)" required>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={l.amount}
+                          onChange={(e) => updateLine(l.uid, { amount: e.target.value.replace(/[^\d.]/g, '') })}
+                          placeholder="0.00"
+                          disabled={isPending}
+                          className={`${inputCls} font-mono tabular text-right`}
+                        />
+                      </Field>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
 
-          <Field label="Description" required>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
+            <button
+              onClick={addLine}
               disabled={isPending}
-              className={`${inputCls} resize-y`}
-            />
-          </Field>
+              className="mt-3 text-xs font-sans text-accent hover:text-accent-hover underline-offset-2 hover:underline"
+              type="button"
+            >
+              + Add line
+            </button>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Invoice date">
+            <Field label="Invoice date" required>
               <input
                 type="date"
                 value={invoiceDate}
@@ -356,7 +481,20 @@ export function EditInvoiceButton({
             </Field>
           </div>
 
-          <Field label="Reference no">
+          <Field
+            label="Header description (optional)"
+            hint="Shows as the invoice summary; per-line descriptions are the detail. With a single line, the line description is used."
+          >
+            <textarea
+              value={headerDescription}
+              onChange={(e) => setHeaderDescription(e.target.value)}
+              rows={2}
+              disabled={isPending}
+              className={`${inputCls} resize-y`}
+            />
+          </Field>
+
+          <Field label="Reference no" hint="PO number, contract ref — optional">
             <input
               type="text"
               value={referenceNo}
@@ -373,21 +511,26 @@ export function EditInvoiceButton({
           ) : null}
         </div>
 
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-hairline bg-surface shrink-0">
-          <button
-            onClick={() => !isPending && setOpen(false)}
-            disabled={isPending}
-            className="text-sm font-sans text-muted hover:text-ink disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={isPending}
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50"
-          >
-            {isPending ? 'Saving…' : 'Save changes'}
-          </button>
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-hairline bg-surface shrink-0">
+          <div className="font-serif italic text-muted text-xs">
+            {lines.filter((l) => Number(l.amount) > 0 && l.description.trim()).length} valid line(s) · Total RM {fmtRm(total)}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => !isPending && setOpen(false)}
+              disabled={isPending}
+              className="text-sm font-sans text-muted hover:text-ink disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={isPending}
+              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50"
+            >
+              {isPending ? 'Saving…' : 'Save changes'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -413,10 +556,12 @@ const inputCls =
 function Field({
   label,
   required,
+  hint,
   children,
 }: {
   label: string
   required?: boolean
+  hint?: string
   children: React.ReactNode
 }) {
   return (
@@ -426,6 +571,7 @@ function Field({
         {required && <span className="text-danger ml-0.5">*</span>}
       </div>
       {children}
+      {hint && <div className="font-serif italic text-muted text-xs mt-1">{hint}</div>}
     </label>
   )
 }
