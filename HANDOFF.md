@@ -177,6 +177,19 @@ periods; the system-side repayment rows exist purely to track installment
 progress (已还期数). Do NOT post a catch-up JV. The app-vs-GL-7000 "delta" of
 30,216.71 is by design, permanently. (Supersedes the earlier "deferred" note.)
 
+### AR 12,647.54 decomposed and resolved (2026-06-12, direct SQL)
+Exact composition: +12,588.80 (HV-OR-202606-0005, HC "3D Design Fee Return"
+hardcode-credited 3030; user: returns 2990 on-behalf money → reclass Dr 3030 /
+Cr 3054 — 3054 now EXACTLY 155,000 = the loans) +150.00 (OR-202606-0032,
+CONTS interest via HV to LWS, hardcode-credited 3030 → reclass Dr 3030 /
+Cr 7000 + app interest row on LO#16) −91.26 (books invoice I-000078,
+"MARKETING NOTION 1/3 of 273.78" 2026-05-15, Dr 3030 / Cr 9087 — MISSED by
+the one-time opening import; verified absent from invoices and statement
+lines). After reclasses: GL 3030 19,960.72 vs open non-dept invoices
+19,869.46 — residual is exactly the 91.26. PENDING: user to name who
+I-000078 is billed to; then insert a matching system invoice row DIRECTLY
+(status issued, NO new JE — the GL already carries it via the books JV).
+
 ### Counterparty rulings applied (2026-06-12, direct SQL)
 - LWS 450 + LWL 300: user ruled the opening books had knocked these off the
   PRINCIPAL payables but they were INTEREST. Reclass JE (manual_jv, treasury):
