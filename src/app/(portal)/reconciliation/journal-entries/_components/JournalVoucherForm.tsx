@@ -49,6 +49,13 @@ const SEGMENT_OPTIONS = [
 interface Props {
   accounts: AccountOption[]
   entry?: ExistingEntry
+  /** Copy mode: prefill a CREATE form from an existing JV (?from=<id>).
+   *  Unlike `entry`, nothing exists yet — posting only happens on submit. */
+  prefill?: {
+    description: string
+    segment: string
+    lines: EntryLine[]
+  }
 }
 
 let keySeq = 0
@@ -65,17 +72,20 @@ function today() {
   return new Date().toISOString().slice(0, 10)
 }
 
-export default function JournalVoucherForm({ accounts, entry }: Props) {
+export default function JournalVoucherForm({ accounts, entry, prefill }: Props) {
   const isEdit = !!entry
+  // Copy mode keeps the source's description/segment/lines but always dates
+  // the new voucher TODAY (recurring adjustments are usually re-dated anyway).
+  const seed = entry ?? (prefill ? { ...prefill, transaction_date: today() } : null)
 
   const [transactionDate, setTransactionDate] = useState<string>(
     entry?.transaction_date ?? today()
   )
-  const [description, setDescription] = useState<string>(entry?.description ?? '')
-  const [segment, setSegment] = useState<string>(entry?.segment ?? 'unallocated')
+  const [description, setDescription] = useState<string>(seed?.description ?? '')
+  const [segment, setSegment] = useState<string>(seed?.segment ?? 'unallocated')
   const [lines, setLines] = useState<LineDraft[]>(() => {
-    if (entry && entry.lines.length > 0) {
-      return entry.lines.map((l) => ({
+    if (seed && seed.lines.length > 0) {
+      return seed.lines.map((l) => ({
         key: nextKey(),
         account_code: l.account_code,
         debit: l.debit != null ? String(l.debit) : '',

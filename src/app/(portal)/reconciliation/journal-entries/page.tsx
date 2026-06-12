@@ -107,6 +107,14 @@ export default async function JournalEntriesPage() {
                     </Link>
                     <div className="font-mono text-[11px] text-graphite mt-0.5">
                       {lines.length} lines
+                      {' · '}
+                      <Link
+                        href={`/reconciliation/journal-entries/new?from=${entry.id}`}
+                        className="text-accent hover:underline"
+                        title="Open a new voucher prefilled from this one — posts only when you submit"
+                      >
+                        Copy
+                      </Link>
                     </div>
                   </td>
                   <td className="font-mono text-[12px] text-graphite">
