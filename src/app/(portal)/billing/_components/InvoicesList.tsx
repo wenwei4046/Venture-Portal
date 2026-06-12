@@ -455,8 +455,16 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                                 invoice_date: inv.invoice_date ?? null,
                                 due_date: inv.due_date ?? null,
                                 reference_no: inv.reference_no ?? null,
+                                billing_mode: inv.billing_mode ?? null,
+                                billable_to_type: inv.billable_to_type ?? null,
+                                company_id: inv.company_id ?? null,
+                                billable_to_department_id: inv.billable_to_department_id ?? null,
+                                billable_to_freetext_name: inv.billable_to_freetext_name ?? null,
+                                period_month: inv.period_month ?? null,
                               }}
                               categories={categories ?? []}
+                              companies={Array.from(companyMap, ([cid, c]) => ({ id: cid, name: c.name }))}
+                              departments={Array.from(departmentMap, ([did, dname]) => ({ id: did, name: dname }))}
                             />
                             <DeleteInvoiceButton id={inv.id} invoiceNo={inv.invoice_no} />
                             <ApproveInvoiceButton id={inv.id} />

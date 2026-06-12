@@ -714,22 +714,94 @@ export async function updateDraftInvoice(formData: FormData): Promise<void> {
     throw new Error('Amount must be a positive number')
   }
 
+  // Multi-line invoices: total_amount must stay = SUM(lines). Until a line
+  // editor exists, an amount change here would silently break that tie.
+  const { data: lineRows } = await supabase
+    .from('invoice_lines')
+    .select('amount')
+    .eq('invoice_id', id)
+  if (lineRows && lineRows.length > 0) {
+    const lineSum = lineRows.reduce((s, l) => s + Number(l.amount), 0)
+    if (Math.abs(lineSum - amount) > 0.005) {
+      throw new Error(
+        `This invoice has ${lineRows.length} line items summing RM ${lineSum.toFixed(2)} — the total must match. Edit or recreate the lines instead of overriding the total.`,
+      )
+    }
+  }
+
   const categoryCode = String(formData.get('category_code') ?? '').trim() || null
   const description = String(formData.get('description') ?? '').trim() || null
   const invoiceDate = String(formData.get('invoice_date') ?? '').trim() || null
   const dueDate = String(formData.get('due_date') ?? '').trim() || null
   const referenceNo = String(formData.get('reference_no') ?? '').trim() || null
 
+  // Structural fields — fully editable while draft (user 2026-06-12). Drafts
+  // have no GL/pool/statement footprint (everything posts at issue), so the
+  // same validation as createManualInvoice is all that's needed.
+  const updates: {
+    total_amount: number
+    base_amount: number
+    category_code: string | null
+    description: string | null
+    invoice_date: string | null
+    due_date: string | null
+    reference_no: string | null
+    billing_mode?: CreateInvoiceMode
+    billable_to_type?: BillableToKind
+    company_id?: string | null
+    billable_to_department_id?: string | null
+    billable_to_freetext_name?: string | null
+    period_month?: string
+  } = {
+    total_amount: amount,
+    base_amount: amount,
+    category_code: categoryCode,
+    description,
+    invoice_date: invoiceDate,
+    due_date: dueDate,
+    reference_no: referenceNo,
+  }
+
+  const rawMode = String(formData.get('billing_mode') ?? '').trim()
+  if (rawMode) {
+    if (!CREATE_INVOICE_MODES.includes(rawMode as CreateInvoiceMode)) {
+      throw new Error(`Unsupported billing mode: ${rawMode}`)
+    }
+    updates.billing_mode = rawMode as CreateInvoiceMode
+  }
+
+  const rawBillableType = String(formData.get('billable_to_type') ?? '').trim()
+  if (rawBillableType) {
+    if (!['subsidiary', 'director', 'dept_pool', 'freetext'].includes(rawBillableType)) {
+      throw new Error(`Unsupported billable_to_type: ${rawBillableType}`)
+    }
+    const companyId = String(formData.get('company_id') ?? '').trim()
+    const billableDeptId = String(formData.get('billable_to_department_id') ?? '').trim()
+    const billableFreetext = String(formData.get('billable_to_freetext_name') ?? '').trim()
+    if (rawBillableType === 'subsidiary' && !companyId) throw new Error('Subsidiary is required')
+    if (rawBillableType === 'dept_pool' && !billableDeptId) throw new Error('Department is required')
+    if ((rawBillableType === 'director' || rawBillableType === 'freetext') && !billableFreetext) {
+      throw new Error('Billable party name is required')
+    }
+    updates.billable_to_type = rawBillableType as BillableToKind
+    updates.company_id = rawBillableType === 'subsidiary' ? companyId : null
+    updates.billable_to_department_id = rawBillableType === 'dept_pool' ? billableDeptId : null
+    updates.billable_to_freetext_name =
+      rawBillableType === 'director' || rawBillableType === 'freetext' ? billableFreetext : null
+  }
+
+  const rawPeriod = String(formData.get('period_month') ?? '').trim()
+  if (rawPeriod) {
+    const newPeriod = dayjs(rawPeriod).startOf('month').format('YYYY-MM-DD')
+    if (newPeriod !== inv.period_month) {
+      await assertPeriodOpen(supabase, newPeriod)
+      updates.period_month = newPeriod
+    }
+  }
+
   const { error } = await supabase
     .from('invoices')
-    .update({
-      total_amount: amount,
-      category_code: categoryCode,
-      description,
-      invoice_date: invoiceDate,
-      due_date: dueDate,
-      reference_no: referenceNo,
-    })
+    .update(updates)
     .eq('id', id)
     .eq('status', 'draft')
 
