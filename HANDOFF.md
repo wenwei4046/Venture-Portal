@@ -156,6 +156,19 @@ condensed list and what remains):
    internal_transfer pool skip, payment-date GL dating, per-voucher period
    check, venture_pool repayment inflow, dept_payment_request skip.
 
+### COA admin upgrades (2026-06-12)
+Settings > Chart of Accounts: tree rows (name indented + own code column,
+click parent row to expand/collapse), drag-and-drop reparenting (DB triggers
+enforce type/cycle/posted-parent), and CODE RENAME with full history
+migration via rename_account_code RPC (mig 20260612070000 — clones the COA
+row, re-points journal_lines / PVS(+overrides) / bank gl links /
+fund_sources / children / invoice+credit-note+dept-request+statement
+category codes, deletes the old row; validates 4 digits + same type range).
+updateAccount accepts new_code and surfaces per-table re-point counts.
+Manual JVs also gained segment (mig ...000000), bank-cache sync (...020000)
+and dept-pool sync for dept-segment JVs with bank movement (...060000,
+jv_in/jv_out txn types; pool rule: pool == per-segment net bank movement).
+
 ### Still open (awaiting user verification with counterparties)
 - 4054 LWS 450 · 4055 LWL 300 · 4056 CMK 6,936 · AR 3030 vs open invoices 12,647.54.
 - Remaining code items: DEPT_POOL_GL map collides with post-238 codes (dept_pool
