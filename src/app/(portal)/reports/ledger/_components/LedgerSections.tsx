@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, type MouseEvent } from 'react'
+import { createPortal } from 'react-dom'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
 import type { Ledger, LedgerLine } from '@/lib/cfo-reports'
@@ -286,7 +287,10 @@ function FacetFilter({
         {active ? <span className="text-accent">●</span> : null}
       </button>
 
-      {open && anchor ? (
+      {/* Portaled to document.body — a transformed ancestor re-bases `fixed`
+          and the panel lands away from its button (user report 2026-06-12). */}
+      {open && anchor && typeof document !== 'undefined' ? (
+        createPortal(
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden />
           <div
@@ -339,7 +343,9 @@ function FacetFilter({
               </button>
             </div>
           </div>
-        </>
+        </>,
+        document.body,
+        )
       ) : null}
     </>
   )
