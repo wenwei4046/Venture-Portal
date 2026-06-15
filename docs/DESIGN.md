@@ -105,18 +105,25 @@ HOUZS Venture Portal (VP) 是 HOUZS Venture Sdn Bhd 的内部银行系统。User
 
 ```css
 :root {
-  --font-serif: 'Instrument Serif', 'Noto Serif TC', Georgia, serif;
-  --font-sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono:  'Chivo Mono', 'SF Mono', Menlo, Consolas, monospace;
-  --font-cjk:   'Noto Serif TC', 'PingFang TC', 'Source Han Serif TC', serif;
+  /* --font-cjk is appended into EVERY chain below (after the Latin face, before
+     the generic) so Latin glyphs use the Latin face and CJK codepoints fall
+     through to one consistent Chinese face everywhere — never the OS default. */
+  --font-serif: 'Instrument Serif', Georgia, var(--font-cjk), serif;
+  --font-sans:  'Inter', -apple-system, BlinkMacSystemFont, var(--font-cjk), sans-serif;
+  --font-mono:  'Chivo Mono', 'SF Mono', Menlo, Consolas, var(--font-cjk), monospace;
+  --font-cjk:   'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 ```
+
+The UI is authored in **Simplified Chinese**, so CJK = a simplified sans (Noto
+Sans SC) that pairs cleanly with Inter and stays legible in dense ledger tables.
+Loaded via `next/font` in `layout.tsx` (variable `--font-cjk`, `preload: false`).
 
 **Load via Google Fonts:**
 ```html
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=Chivo+Mono:wght@400;500;600&family=Noto+Serif+TC:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=Chivo+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
 ```
 
 All 4 fonts are free. No licensing cost.
@@ -129,7 +136,7 @@ All 4 fonts are free. No licensing cost.
 | Display italic — emphasis, active states, labels | **Instrument Serif Italic** | 400 italic | "*Free pool*", "*Pending your hand*", sidebar active item |
 | Body — UI text, descriptions, form labels | **Inter** | 400/500/600 | Most body copy, form labels, button text (sans) |
 | Data — money, rates, dates | **Chivo Mono** | 400/500 | All money columns, rate values, date strings. `font-variant-numeric: tabular-nums` |
-| CJK — Chinese labels | **Noto Serif TC** | 400/600/700 | 董事长 · 本月对账单 · 内部账册. Pairs with Instrument Serif. |
+| CJK — Chinese labels | **Noto Sans SC** | 400/500/700 | 董事长 · 本月对账单 · 内部账册. Simplified sans; pairs with Inter. Latin always uses the Latin face — CJK falls through `--font-cjk`. |
 
 **Key rule:** Display = always Instrument Serif. Body = Inter. Data = Chivo Mono. No exceptions without explicit DESIGN.md update.
 

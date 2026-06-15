@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Instrument_Serif, Inter, Noto_Serif_TC, Chivo_Mono } from 'next/font/google'
+import { Instrument_Serif, Inter, Noto_Sans_SC, Chivo_Mono } from 'next/font/google'
 import NextTopLoader from 'nextjs-toploader'
 import './globals.css'
 
@@ -33,8 +33,13 @@ const chivoMono = Chivo_Mono({
   display: 'swap',
 })
 
-const notoSerifTc = Noto_Serif_TC({
-  weight: ['400', '600', '700'],
+// Noto Sans SC (2026-06-15): the UI is written in Simplified Chinese, so CJK
+// runs render in a clean simplified sans that pairs with Inter for body/tables.
+// This is wired into every font-family chain in globals.css via --font-cjk, as
+// the CJK fallback after the Latin face — Latin glyphs stay on Inter/Instrument/
+// Chivo, CJK codepoints fall through to here. (Replaces the unused Noto Serif TC.)
+const notoSansSc = Noto_Sans_SC({
+  weight: ['400', '500', '700'],
   variable: '--font-cjk',
   display: 'swap',
   preload: false, // CJK fonts are large — defer preload
@@ -53,7 +58,7 @@ export default function RootLayout({
   return (
     <html
       lang="en-MY"
-      className={`${instrumentSerif.variable} ${inter.variable} ${chivoMono.variable} ${notoSerifTc.variable}`}
+      className={`${instrumentSerif.variable} ${inter.variable} ${chivoMono.variable} ${notoSansSc.variable}`}
       suppressHydrationWarning
     >
       <head>
