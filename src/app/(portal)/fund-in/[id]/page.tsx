@@ -42,6 +42,19 @@ export default async function FundSourceDetailPage({ params }: Props) {
 
   if (error || !source) notFound()
 
+  // A filed-but-not-yet-approved cancellation (cancelFundSource files a
+  // tier_change approval). Finance can't see /approvals (principal-only), so
+  // surface "审批中" here so the click doesn't look like a no-op (2026-06-15).
+  const { data: pendingCancel } = await supabase
+    .from('approval_requests')
+    .select('created_at, submitted_by, users:submitted_by(name)')
+    .eq('reference_id', source.id)
+    .eq('reference_table', 'fund_sources')
+    .eq('request_type', 'tier_change')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .maybeSingle()
+
   // Resolve from-label
   let fromLabel = '—'
   let fromSubLabel = ''
@@ -341,7 +354,21 @@ export default async function FundSourceDetailPage({ params }: Props) {
       ) : null}
 
       {/* ───────── Actions (Finance only) ───────── */}
-      {canFinanceEdit && isPending ? (
+      {pendingCancel ? (
+        // Cancellation already filed — show it (Finance can't open /approvals).
+        <section className="border-t border-hairline pt-8">
+          <div className="border border-alert/30 bg-alert/5 rounded-md px-4 py-3">
+            <div className="text-sm text-alert font-sans font-medium">
+              ⏳ 取消申请审批中 · Cancellation pending Principal approval
+            </div>
+            <p className="text-xs text-muted mt-1 italic font-serif">
+              Requested by {((pendingCancel.users as { name?: string } | null)?.name) ?? 'Finance'} on{' '}
+              {dayjs(pendingCancel.created_at).format('D MMM YYYY HH:mm')}. Principal approves it in
+              Approvals; the deposit reverses (bank, Venture Pool, GL) and is marked cancelled.
+            </p>
+          </div>
+        </section>
+      ) : canFinanceEdit && isPending ? (
         <section className="border-t border-hairline pt-8">
           <div className="sect-head">
             <h2>Actions</h2>
