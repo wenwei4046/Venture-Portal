@@ -156,12 +156,15 @@ export async function createFundSource(formData: FormData) {
   }
 
   const cost_rate = raw.cost_rate_percent / 100
+  // 利滚利 — compound interest, settable at creation (2026-06-12; was edit-only).
+  const compound = formData.get('compound_interest') === 'on'
 
   const basePayload = {
     source_type: raw.source_type,
     capital_type: 'paid' as const,
     amount: raw.amount,
     cost_rate,
+    compound_interest: compound,
     lock_in_months: raw.lock_in_months || null,
     effective_date: raw.effective_date,
     repayment_date: raw.repayment_date,

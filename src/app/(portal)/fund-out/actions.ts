@@ -141,6 +141,19 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
     return { error: `Failed to create loan: ${rpcError?.message ?? 'unknown'}` }
   }
 
+  // 利滚利 — compound interest, settable at creation (2026-06-12; was edit-only).
+  // The RPC doesn't take it, so flag the just-created loan. Safe: it's still
+  // pending_approval (no GL/cash yet), and compounding only affects the
+  // schedule/accrual math, not the disbursement.
+  if (formData.get('compound_interest') === 'on') {
+    const { error: cErr } = await supabase
+      .from('loans')
+      .update({ compound_interest: true })
+      .eq('id', loanId as string)
+      .eq('status', 'pending_approval')
+    if (cErr) return { error: `Loan created but marking 利滚利 failed: ${cErr.message}` }
+  }
+
   revalidatePath('/fund-out')
   revalidatePath('/approvals')
   revalidatePath('/dashboard')

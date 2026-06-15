@@ -317,6 +317,22 @@ export default function NewFundSourceForm({ companies, departments, liabilityAcc
         ) : null}
       </div>
 
+      {/* ───────── 利滚利 · Compound interest (settable at creation) ───────── */}
+      <div className="mb-6">
+        <label className="flex items-center gap-2">
+          <input
+            id="compound_interest"
+            name="compound_interest"
+            type="checkbox"
+            className="h-4 w-4 accent-[var(--accent)]"
+          />
+          <span className="text-sm font-sans font-medium text-graphite">利滚利 · Compound interest</span>
+        </label>
+        <p className="font-serif italic text-muted text-xs mt-1.5">
+          勾选后未付利息每月并入本金继续生息（利滚利）。不勾则为单利按月计。
+        </p>
+      </div>
+
       {/* ───────── Notes ───────── */}
       <div className="mb-6">
         <label htmlFor="notes" className="block text-sm font-sans font-medium text-graphite mb-1.5">
