@@ -34,9 +34,10 @@ export default function NewFundSourceForm({ companies, departments, liabilityAcc
   const [accountCode, setAccountCode] = useState<string>('')
   const formRef = useRef<HTMLFormElement>(null)
 
-  const defaultRepaymentDate = dayjs().add(12, 'month').format('YYYY-MM-DD')
-  const [repaymentDate, setRepaymentDate] = useState<string>(defaultRepaymentDate)
-  const [lockInMonths, setLockInMonths] = useState<number>(12)
+  // Default to 无固定期限 (blank): interest accrues from the effective date,
+  // terms can be set later via the edit form (2026-06-12).
+  const [repaymentDate, setRepaymentDate] = useState<string>('')
+  const [lockInMonths, setLockInMonths] = useState<number>(0)
 
   useEffect(() => {
     if (error && formRef.current) {
@@ -247,7 +248,7 @@ export default function NewFundSourceForm({ companies, departments, liabilityAcc
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
         <div>
           <label htmlFor="lock_in_months" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Repayment period
+            Repayment period <span className="text-muted font-normal">(optional)</span>
           </label>
           <div className="relative">
             <input
@@ -257,26 +258,25 @@ export default function NewFundSourceForm({ companies, departments, liabilityAcc
               step="1"
               min="1"
               max="120"
-              defaultValue="12"
-              required
+              placeholder="留空 = 无固定期限"
               onChange={(e) => {
                 const v = parseInt(e.target.value, 10)
-                if (!isNaN(v) && v >= 1) setLockInMonths(v)
+                setLockInMonths(!isNaN(v) && v >= 1 ? v : 0)
               }}
-              className="w-full px-3 py-2 pr-16 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
+              className="w-full px-3 py-2 pr-16 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink placeholder:text-muted placeholder:font-sans placeholder:not-italic focus:outline-none focus:border-accent-border"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted font-mono">
               months
             </span>
           </div>
           <p className="font-serif italic text-muted text-xs mt-1.5">
-            Total repayment = (Principal + Interest) ÷ months
+            留空 = 无固定期限，只按月滚利息。Total repayment = (Principal + Interest) ÷ months
           </p>
         </div>
 
         <div>
           <label htmlFor="effective_date" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Effective date
+            Effective date <span className="text-danger">*</span>
           </label>
           <input
             id="effective_date"
@@ -288,27 +288,25 @@ export default function NewFundSourceForm({ companies, departments, liabilityAcc
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
           />
           <p className="font-serif italic text-muted text-xs mt-1.5">
-            Day HV receives the capital
+            钱进来当天 = 利息从这天开始算。Day HV receives the capital — interest accrues from here.
           </p>
         </div>
       </div>
 
-      {/* ───────── Repayment date (Phase 7) ───────── */}
+      {/* ───────── Repayment date (Phase 7) — optional ───────── */}
       <div className="mb-6">
         <label htmlFor="repayment_date" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-          Expected repayment date <span className="text-danger">*</span>
+          Expected repayment date <span className="text-muted font-normal">(optional)</span>
         </label>
         <input
           id="repayment_date"
           name="repayment_date"
           type="date"
-          required
-          defaultValue={defaultRepaymentDate}
           onChange={(e) => setRepaymentDate(e.target.value)}
           className="w-full max-w-sm px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
         />
         <p className="font-serif italic text-muted text-xs mt-1.5">
-          Date the first installment is due. Must be on or after the effective date.
+          还没定就留空 — 利息照算。First installment date; leave blank if not decided yet. Must be on or after the effective date.
         </p>
         {repaymentDate && lockInMonths >= 1 ? (
           <p className="font-serif italic text-muted text-xs mt-1.5">

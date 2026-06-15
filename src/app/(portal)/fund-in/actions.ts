@@ -115,19 +115,21 @@ export async function createFundSource(formData: FormData) {
   if (isNaN(raw.cost_rate_percent) || raw.cost_rate_percent < 0 || raw.cost_rate_percent >= 100) {
     throw new Error('Interest rate must be between 0 and 100%')
   }
-  if (isNaN(raw.lock_in_months) || raw.lock_in_months < 1) {
-    throw new Error('Repayment period must be at least 1 month')
+  // Repayment period is OPTIONAL (2026-06-12): blank = 无固定期限. Interest
+  // still accrues from the effective date; the deposit lands in the schedule's
+  // "Compounding & no fixed term" tab until terms are set via the edit form.
+  // Only validate the value when one was actually entered.
+  if (!isNaN(raw.lock_in_months) && raw.lock_in_months < 1) {
+    throw new Error('Repayment period must be at least 1 month (or leave blank for no fixed term)')
   }
   if (!raw.effective_date) {
-    throw new Error('Effective date is required')
+    throw new Error('Effective date is required (interest accrues from this date)')
   }
   if (dayjs(raw.effective_date).isAfter(dayjs(), 'day')) {
     throw new Error('Effective date cannot be in the future')
   }
-  if (!raw.repayment_date) {
-    throw new Error('Repayment date is required')
-  }
-  if (dayjs(raw.repayment_date).isBefore(dayjs(raw.effective_date), 'day')) {
+  // Repayment date is OPTIONAL too — only checked when provided.
+  if (raw.repayment_date && dayjs(raw.repayment_date).isBefore(dayjs(raw.effective_date), 'day')) {
     throw new Error('Repayment date must be on or after effective date')
   }
 
@@ -165,14 +167,15 @@ export async function createFundSource(formData: FormData) {
     amount: raw.amount,
     cost_rate,
     compound_interest: compound,
-    lock_in_months: raw.lock_in_months || null,
+    // Blank → null (无固定期限). NaN (blank number) is falsy → null.
+    lock_in_months: !isNaN(raw.lock_in_months) && raw.lock_in_months >= 1 ? raw.lock_in_months : null,
     effective_date: raw.effective_date,
-    repayment_date: raw.repayment_date,
+    repayment_date: raw.repayment_date || null,
     account_code: accountCode,
     // Mig 12 trigger auto-fills maturity_date from effective_date + lock_in_months
-    // when null. Set it explicitly to the user-entered repayment_date so the
-    // detail page's "MATURES …" line matches what Finance promised.
-    maturity_date: raw.repayment_date,
+    // when a lock-in exists. With no fixed term both stay null; the user-entered
+    // repayment_date (when present) seeds maturity so the detail page matches.
+    maturity_date: raw.repayment_date || null,
     early_withdrawal: false,
     // Phase 7: starts in pending_approval. Principal approval flips to 'active'
     // and posts the Venture Pool credit + bank balance bump.
