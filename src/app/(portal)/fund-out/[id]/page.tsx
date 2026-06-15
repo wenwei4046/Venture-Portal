@@ -52,6 +52,19 @@ export default async function LoanDetailPage({ params }: Props) {
     supabase.from('users').select('name').eq('id', loan.created_by).single(),
   ])
 
+  // A filed-but-not-yet-approved cancellation. Finance can't see /approvals
+  // (principal-only), so surface "审批中" here so it doesn't look like the
+  // Request cancellation click did nothing (user 2026-06-15).
+  const { data: pendingCancel } = await supabase
+    .from('approval_requests')
+    .select('created_at, submitted_by, users:submitted_by(name)')
+    .eq('reference_id', loan.id)
+    .eq('reference_table', 'loans')
+    .eq('request_type', 'loan_cancel')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .maybeSingle()
+
   const outstandingAmount = Number(outstanding?.outstanding ?? loan.principal)
   const monthlyInterest = outstandingAmount * Number(loan.effective_rate)
   const totalPrincipalPaid = Number(outstanding?.total_principal_paid ?? 0)
@@ -216,7 +229,20 @@ export default async function LoanDetailPage({ params }: Props) {
           )}
         </div>
 
-        {canCancelLoan ? (
+        {pendingCancel ? (
+          // A cancellation request is already filed. Show it (Finance can't
+          // open /approvals, so this is their only window into the status).
+          <div className="mt-5 border border-alert/30 bg-alert/5 rounded-md px-4 py-3">
+            <div className="text-sm text-alert font-sans font-medium">
+              ⏳ 取消申请审批中 · Cancellation pending Principal approval
+            </div>
+            <p className="text-xs text-muted mt-1 italic font-serif">
+              Requested by {((pendingCancel.users as { name?: string } | null)?.name) ?? 'Finance'} on{' '}
+              {dayjs(pendingCancel.created_at).format('D MMM YYYY HH:mm')}. Principal approves it in
+              Approvals; the loan reverses (bank, Venture Pool, GL) and is marked cancelled.
+            </p>
+          </div>
+        ) : canCancelLoan ? (
           <form action={cancelLoan} className="mt-5">
             <input type="hidden" name="id" value={loan.id} />
             {isActive ? (
