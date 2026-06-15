@@ -1569,32 +1569,36 @@ export async function fetchTrialBalance(
       type: r.type as AccountType,
     }))
 
-  // ── 2: Period-bounded JE id set (non-reversed, transaction_date <= asOf).
-  const { data: jes, error: jeErr } = await supabase
-    .from('journal_entries')
-    .select('id')
-    .lte('transaction_date', asOf)
-    .eq('is_reversed', false)
-  if (jeErr) throw new Error(`fetchTrialBalance JEs: ${jeErr.message}`)
-  const jeIds = (jes ?? []).map((j) => j.id as string)
-
-  // ── 3: Per-leaf-account net (Dr − Cr). Single batched journal_lines query
-  //    is far cheaper than one call per account.
+  // ── 2-3: Per-leaf-account net (Dr − Cr) over all non-reversed entries dated
+  //    on/before asOf.
+  //
+  //    CRITICAL: journal_lines must be PAGINATED. PostgREST caps an unranged
+  //    select at 1000 rows, so once the ledger exceeds 1000 lines an unpaginated
+  //    fetch silently truncates the sum and the trial balance stops tying — the
+  //    Σ Dr / Σ Cr totals come out unequal and whole accounts go missing
+  //    (regression found 2026-06-16: 1,939 lines → TB short by ~RM 100k).
+  //    We inner-join journal_entries to filter by date/reversed in the same
+  //    pass, which also avoids a fragile .in() over hundreds of entry UUIDs
+  //    (that URL can blow past length limits and fail outright).
+  const leafSet = new Set(leafAccounts.map((a) => a.code))
   const netByCode = new Map<string, number>()
-  if (jeIds.length > 0) {
-    const leafCodes = leafAccounts.map((a) => a.code)
+  const PAGE = 1000
+  for (let fromIdx = 0; ; fromIdx += PAGE) {
     const { data: lines, error: jlErr } = await supabase
       .from('journal_lines')
-      .select('account_code, debit, credit')
-      .in('entry_id', jeIds)
-      .in('account_code', leafCodes)
+      .select('account_code, debit, credit, journal_entries!inner(transaction_date, is_reversed)')
+      .order('id', { ascending: true })
+      .range(fromIdx, fromIdx + PAGE - 1)
     if (jlErr) throw new Error(`fetchTrialBalance lines: ${jlErr.message}`)
     for (const l of lines ?? []) {
+      const je = l.journal_entries as unknown as { transaction_date: string; is_reversed: boolean }
+      if (je.is_reversed) continue
+      if (je.transaction_date > asOf) continue
       const code = l.account_code as string
-      const dr = Number(l.debit ?? 0)
-      const cr = Number(l.credit ?? 0)
-      netByCode.set(code, (netByCode.get(code) ?? 0) + dr - cr)
+      if (!leafSet.has(code)) continue
+      netByCode.set(code, (netByCode.get(code) ?? 0) + Number(l.debit ?? 0) - Number(l.credit ?? 0))
     }
+    if (!lines || lines.length < PAGE) break
   }
 
   return buildTrialBalance({ accounts: leafAccounts, netByCode, asOf, showZeroBalance })
