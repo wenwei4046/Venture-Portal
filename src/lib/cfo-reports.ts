@@ -915,12 +915,20 @@ async function gatherTreasury(
     return { interestIncome: 0, penaltyIncome: 0, interestExpense: 0, managedCodes }
   }
 
-  const { data: lines, error: lErr } = await supabase
-    .from('journal_lines')
-    .select('account_code, debit, credit, entry_id')
-    .in('entry_id', entryIds)
-    .in('account_code', watchCodes)
-  if (lErr) throw new Error(`cfo-reports treasury lines: ${lErr.message}`)
+  // Paginate — PostgREST caps an unranged select at 1000 rows (see fetchTrialBalance).
+  const lines: Record<string, unknown>[] = []
+  for (let fromIdx = 0; ; fromIdx += 1000) {
+    const { data: page, error: lErr } = await supabase
+      .from('journal_lines')
+      .select('account_code, debit, credit, entry_id')
+      .in('entry_id', entryIds)
+      .in('account_code', watchCodes)
+      .order('id', { ascending: true })
+      .range(fromIdx, fromIdx + 999)
+    if (lErr) throw new Error(`cfo-reports treasury lines: ${lErr.message}`)
+    lines.push(...((page ?? []) as Record<string, unknown>[]))
+    if (!page || page.length < 1000) break
+  }
 
   let interestIncome = 0
   let penaltyIncome = 0
@@ -962,11 +970,19 @@ async function gatherManualJvPnl(
   }
   const entryIds = Array.from(segmentByEntryId.keys())
 
-  const { data: lines, error: lErr } = await supabase
-    .from('journal_lines')
-    .select('entry_id, account_code, debit, credit')
-    .in('entry_id', entryIds)
-  if (lErr) throw new Error(`cfo-reports manual-JV lines: ${lErr.message}`)
+  // Paginate — PostgREST caps an unranged select at 1000 rows (see fetchTrialBalance).
+  const lines: Record<string, unknown>[] = []
+  for (let fromIdx = 0; ; fromIdx += 1000) {
+    const { data: page, error: lErr } = await supabase
+      .from('journal_lines')
+      .select('entry_id, account_code, debit, credit')
+      .in('entry_id', entryIds)
+      .order('id', { ascending: true })
+      .range(fromIdx, fromIdx + 999)
+    if (lErr) throw new Error(`cfo-reports manual-JV lines: ${lErr.message}`)
+    lines.push(...((page ?? []) as Record<string, unknown>[]))
+    if (!page || page.length < 1000) break
+  }
 
   const accountByCode = await fetchAccountIndex(supabase)
 
@@ -1316,11 +1332,19 @@ async function sumGlNetAcrossCodes(
 ): Promise<number> {
   const { jeIds, codes, sign } = args
   if (jeIds.length === 0 || codes.length === 0) return 0
-  const { data: lines } = await supabase
-    .from('journal_lines')
-    .select('debit, credit')
-    .in('entry_id', jeIds)
-    .in('account_code', codes)
+  // Paginate — PostgREST caps an unranged select at 1000 rows (see fetchTrialBalance).
+  const lines: Record<string, unknown>[] = []
+  for (let fromIdx = 0; ; fromIdx += 1000) {
+    const { data: page } = await supabase
+      .from('journal_lines')
+      .select('debit, credit')
+      .in('entry_id', jeIds)
+      .in('account_code', codes)
+      .order('id', { ascending: true })
+      .range(fromIdx, fromIdx + 999)
+    lines.push(...((page ?? []) as Record<string, unknown>[]))
+    if (!page || page.length < 1000) break
+  }
   let net = 0
   for (const l of lines ?? []) {
     const dr = Number(l.debit ?? 0)
@@ -1905,12 +1929,20 @@ export async function fetchLedgers(
   const openingJeIds = (openingJes ?? []).map((j) => j.id as string)
   const openingByCode = new Map<string, number>()
   if (openingJeIds.length > 0) {
-    const { data: openLines, error: openJlErr } = await supabase
-      .from('journal_lines')
-      .select('account_code, debit, credit')
-      .in('entry_id', openingJeIds)
-      .in('account_code', leafCodes)
-    if (openJlErr) throw new Error(`fetchLedgers opening lines: ${openJlErr.message}`)
+    // Paginate — PostgREST caps an unranged select at 1000 rows (see fetchTrialBalance).
+    const openLines: Record<string, unknown>[] = []
+    for (let fromIdx = 0; ; fromIdx += 1000) {
+      const { data: page, error: openJlErr } = await supabase
+        .from('journal_lines')
+        .select('account_code, debit, credit')
+        .in('entry_id', openingJeIds)
+        .in('account_code', leafCodes)
+        .order('id', { ascending: true })
+        .range(fromIdx, fromIdx + 999)
+      if (openJlErr) throw new Error(`fetchLedgers opening lines: ${openJlErr.message}`)
+      openLines.push(...((page ?? []) as Record<string, unknown>[]))
+      if (!page || page.length < 1000) break
+    }
     for (const l of openLines ?? []) {
       const code = l.account_code as string
       openingByCode.set(
@@ -1982,12 +2014,20 @@ export async function fetchLedgers(
   const linesByCode = new Map<string, LineWithMeta[]>()
   for (const c of leafCodes) linesByCode.set(c, [])
   if (periodJeIds.length > 0) {
-    const { data: lines, error: jlErr } = await supabase
-      .from('journal_lines')
-      .select('id, entry_id, account_code, debit, credit')
-      .in('entry_id', periodJeIds)
-      .in('account_code', leafCodes)
-    if (jlErr) throw new Error(`fetchLedgers period lines: ${jlErr.message}`)
+    // Paginate — PostgREST caps an unranged select at 1000 rows (see fetchTrialBalance).
+    const lines: Record<string, unknown>[] = []
+    for (let fromIdx = 0; ; fromIdx += 1000) {
+      const { data: page, error: jlErr } = await supabase
+        .from('journal_lines')
+        .select('id, entry_id, account_code, debit, credit')
+        .in('entry_id', periodJeIds)
+        .in('account_code', leafCodes)
+        .order('id', { ascending: true })
+        .range(fromIdx, fromIdx + 999)
+      if (jlErr) throw new Error(`fetchLedgers period lines: ${jlErr.message}`)
+      lines.push(...((page ?? []) as Record<string, unknown>[]))
+      if (!page || page.length < 1000) break
+    }
     for (const l of lines ?? []) {
       const je = jeById.get(l.entry_id as string)
       if (!je) continue
