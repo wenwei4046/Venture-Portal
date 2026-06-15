@@ -543,6 +543,18 @@ export async function approveRequestGroup(formData: FormData) {
   }
   const voucherApproval = voucherApprovals[0]
 
+  // GL date = the loan's start date (disbursement_date), NOT the approval day,
+  // so a late-recorded loan lands in the month the money actually moved
+  // (user 2026-06-15: "我有时会迟记录"). Falls back to today if unset.
+  const { data: loanRow } = await supabase
+    .from('loans')
+    .select('disbursement_date')
+    .eq('id', loanApproval.reference_id)
+    .single()
+  const disbDate = (loanRow?.disbursement_date as string | null) || todayStr
+  // The disbursement month must be open — can't backdate into a closed period.
+  await assertPeriodOpen(supabase, disbDate)
+
   // ─── Pre-flight: bank balance check ───
   const { data: voucher } = await supabase
     .from('payment_vouchers')
@@ -623,7 +635,7 @@ export async function approveRequestGroup(formData: FormData) {
       approved_at: now,
       executed_by: user.id,
       executed_at: now,
-      payment_date: todayStr,
+      payment_date: disbDate,
     })
     .eq('id', voucher.id)
     .eq('status', 'pending_approval')
@@ -678,7 +690,7 @@ export async function approveRequestGroup(formData: FormData) {
   const loansReceivableLeaf = await resolveLoansReceivableLeaf(supabase, loanApproval.reference_id)
   try {
     await postJournalEntry(supabase, {
-      transactionDate: todayStr,
+      transactionDate: disbDate,
       description: `Loan disbursement approved — ${loanApproval.description ?? loanApproval.reference_id}`,
       referenceType: 'loan',
       referenceId: loanApproval.reference_id,
