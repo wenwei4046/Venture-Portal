@@ -301,11 +301,13 @@ export async function recordRepayment(formData: FormData) {
   //     Trial Balance and tripped mig 256's header-rejection trigger.
   //     resolveLoansReceivableLeaf() does the per-borrower lookup.
   //   - 7010 Penalty Income (other_income)
-  //   - 7000 Interest Income — Loans (other_income)  ← interest + netting
+  //   - 5027 Interest Income — Loans (revenue) ← interest + netting.
+  //     User 2026-06-15: interest income belongs in Revenue (it's the core
+  //     lending revenue), so it was reclassed 7000 → 5027 (revenue range).
   const creditAccount =
     paymentType === 'principal' ? await resolveLoansReceivableLeaf(supabase, loanId) :
     paymentType === 'penalty'   ? '7010' :
-                                  '7000'   // interest + netting
+                                  '5027'   // interest + netting
 
   try {
     await postJournalEntry(supabase, {

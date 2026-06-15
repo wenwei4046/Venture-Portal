@@ -194,6 +194,27 @@ GL 3030 19,869.46 == open non-dept invoices 19,869.46 (gap ZERO); 3059
 2,995.26 == DC app outstanding; TB 0.00. NO historical reconciliation items
 remain open — every audit finding is now fixed or closed by user ruling.
 
+### Interest income → Revenue (user 2026-06-15, direct SQL)
+User wants interest income in Revenue and interest expense in Cost.
+- Interest Expense - Fund Sources (6000) was ALREADY type=cost ✅ no change.
+- Interest Income - Loans reclassed 7000 (other_income) → 5027 (revenue) via
+  change_account_type RPC; 13 lines (RM 19,520) re-pointed, TB still 0.00.
+  App ref updated: fund-out/actions.ts recordRepayment credits 5027 for
+  interest/netting (was 7000). A DB trigger coa_enforce_code_range forces the
+  code into the type range, so the code HAD to move to 5xxx (can't keep 7000).
+- ⚠️ LESSON: RAISE-to-rollback smoke tests via Supabase MCP execute_sql do NOT
+  reliably roll back — an earlier change_account_type(7000→revenue) "smoke"
+  PERSISTED (found 7000 empty / 5027 holding the lines during the 2026-06-15
+  accounting review). It was first restored to 7000/other_income, then
+  intentionally moved to 5027/revenue per the user. Full-DB sweep confirmed no
+  OTHER smoke artifacts leaked (no JE-SMOKE, no SMOKE vouchers, 9030 intact).
+  Going forward: do NOT rely on in-block RAISE to undo test writes here.
+- Penalty Income (7010) left in other_income — user only specified interest.
+- Interest is recorded CASH-basis (income/expense only on receipt/payment); no
+  monthly accrual JE for the 21 active loans / 15 deposits (3040 Interest
+  Receivable = 0). Accrual feature discussed, pending user go-ahead +
+  traceability design.
+
 ### Counterparty rulings applied (2026-06-12, direct SQL)
 - LWS 450 + LWL 300: user ruled the opening books had knocked these off the
   PRINCIPAL payables but they were INTEREST. Reclass JE (manual_jv, treasury):
