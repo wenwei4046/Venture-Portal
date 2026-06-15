@@ -546,7 +546,19 @@ function AccountForm({
         const fd = new FormData()
         if (mode === 'edit') {
           fd.set('code', initial?.code ?? '')
-          if (newCode.trim() && newCode.trim() !== initial?.code) {
+          const typeChanged = type !== initial?.type
+          if (typeChanged) {
+            // A type change auto-allocates a new code in the new range and
+            // re-points all history — it owns the code, so skip new_code.
+            if (
+              !window.confirm(
+                `Change type of ${initial?.code} (${initial?.name}) to ${typeLabel(type)}?\n\nThe account gets a new code in the ${rangeFor(type)[0]}–${rangeFor(type)[1]} range and every past transaction is re-pointed to it. The account is detached from any parent. This cannot be undone from the UI.`,
+              )
+            ) {
+              return
+            }
+            fd.set('new_type', type)
+          } else if (newCode.trim() && newCode.trim() !== initial?.code) {
             if (
               !window.confirm(
                 `Change code ${initial?.code} → ${newCode.trim()}?\n\nEvery historical transaction posted to ${initial?.code} (journal lines, voucher sources, bank links, invoice categories) will be re-pointed to ${newCode.trim()}. This cannot be undone from the UI.`,
@@ -579,9 +591,8 @@ function AccountForm({
           <select
             value={type}
             onChange={(e) => handleTypeChange(e.target.value as AccountType)}
-            disabled={mode === 'edit'}
             required
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border disabled:bg-stone disabled:text-graphite"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
           >
             {ACCOUNT_TYPES.map((t) => {
               const [s, e] = rangeFor(t)
@@ -592,9 +603,15 @@ function AccountForm({
               )
             })}
           </select>
-          {mode === 'edit' ? (
+          {mode === 'edit' && type !== initial?.type ? (
+            <p className="font-serif italic text-alert text-xs mt-1.5">
+              Changing type moves this account to a new code in the{' '}
+              {rangeFor(type)[0]}–{rangeFor(type)[1]} range and re-points every
+              past transaction. You&apos;ll be asked to confirm.
+            </p>
+          ) : mode === 'edit' ? (
             <p className="font-serif italic text-muted text-xs mt-1.5">
-              Type is locked after creation (would invalidate the code range).
+              Change the type to recategorise — the code migrates to the new range with its history.
             </p>
           ) : null}
         </div>
@@ -610,13 +627,18 @@ function AccountForm({
             <>
               <input
                 type="text"
-                value={newCode}
+                value={type !== initial?.type ? 'auto in new range' : newCode}
                 onChange={(e) => setNewCode(e.target.value)}
+                disabled={type !== initial?.type}
                 pattern="\d{4}"
                 maxLength={4}
-                className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+                className={`w-full px-3 py-2 border border-hairline rounded-md text-sm font-mono focus:outline-none focus:border-accent-border ${
+                  type !== initial?.type
+                    ? 'bg-stone text-graphite'
+                    : 'bg-paper text-ink'
+                }`}
               />
-              {newCode.trim() !== initial?.code ? (
+              {type === initial?.type && newCode.trim() !== initial?.code ? (
                 <p className="font-serif italic text-alert text-xs mt-1.5">
                   Changing the code re-points every past transaction from{' '}
                   {initial?.code} to {newCode.trim() || '…'} (4 digits, same

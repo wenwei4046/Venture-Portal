@@ -67,7 +67,15 @@ export function pnlBlocks(pnl: PnlReport): ReportBlock[] {
       },
     },
     { kind: 'section', section: pnl.otherIncome },
+    {
+      kind: 'summary',
+      row: { label: 'Total Other Income', current: pnl.otherIncome.current, previous: pnl.otherIncome.previous, tone: 'ledger' },
+    },
     { kind: 'section', section: pnl.expense },
+    {
+      kind: 'summary',
+      row: { label: 'Total Expenses', current: pnl.expense.current, previous: pnl.expense.previous, tone: 'danger' },
+    },
     {
       kind: 'summary',
       row: {
