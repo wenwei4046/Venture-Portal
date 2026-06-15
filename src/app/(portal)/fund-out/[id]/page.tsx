@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
+import { isLoanUnscheduled } from '@/lib/treasury-schedule'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
@@ -71,7 +72,11 @@ export default async function LoanDetailPage({ params }: Props) {
   const totalInterestPaid = Number(outstanding?.total_interest_paid ?? 0)
   const repaymentList = repayments ?? []
   const tenureMonths = Number(loan.tenure_months ?? 0)
-  const maturityDate = loan.disbursement_date && tenureMonths > 0
+  // No-fixed-term loans store tenure_months=1 as a placeholder (the schedule
+  // keys off repayment_terms via isLoanUnscheduled). Don't render that "1
+  // month" / maturity literally — show 无固定期限 instead (user 2026-06-15).
+  const noFixedTerm = isLoanUnscheduled(loan.repayment_terms as string | null)
+  const maturityDate = !noFixedTerm && loan.disbursement_date && tenureMonths > 0
     ? dayjs(loan.disbursement_date).add(tenureMonths, 'month')
     : null
 
@@ -172,9 +177,13 @@ export default async function LoanDetailPage({ params }: Props) {
               Tenure
             </div>
             <div className="font-serif text-xl text-num-ink tabular">
-              {tenureMonths} {tenureMonths === 1 ? 'month' : 'months'}
+              {noFixedTerm ? '无固定期限' : `${tenureMonths} ${tenureMonths === 1 ? 'month' : 'months'}`}
             </div>
-            {maturityDate ? (
+            {noFixedTerm ? (
+              <div className="font-serif italic text-graphite text-xs mt-2">
+                利息从放款日起算 · 还款日未定 — interest accrues monthly, no maturity
+              </div>
+            ) : maturityDate ? (
               <div className="font-mono text-[11.5px] text-graphite mt-2 tracking-[0.02em] font-medium">
                 MATURES {maturityDate.format('D MMM YYYY').toUpperCase()}
               </div>
