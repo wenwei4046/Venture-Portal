@@ -224,8 +224,8 @@ function TabButton({
       onClick={onClick}
       className={
         isActive
-          ? 'pb-3 border-b-2 border-accent font-serif text-accent text-sm'
-          : 'pb-3 border-b-2 border-transparent font-serif italic text-graphite text-sm hover:text-ink transition-colors'
+          ? 'pb-3 border-b-2 border-accent font-serif text-accent text-lg font-medium'
+          : 'pb-3 border-b-2 border-transparent font-serif italic text-graphite text-lg hover:text-ink transition-colors'
       }
     >
       {label}
