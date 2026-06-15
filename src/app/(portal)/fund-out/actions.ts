@@ -26,8 +26,14 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
 
   const companyId = (formData.get('company_id') as string) ?? ''
   const principal = parseFloat((formData.get('principal') as string) ?? '0')
-  const tenureMonths = parseInt((formData.get('tenure_months') as string) ?? '', 10)
-  const repaymentTerms = (formData.get('repayment_terms') as string) ?? ''
+  const rawTenure = (formData.get('tenure_months') as string) ?? ''
+  const tenureMonths = parseInt(rawTenure, 10)
+  // Tenure is OPTIONAL (2026-06-12): blank = 无固定期限. Interest still accrues
+  // from the loan start date. Match the existing no-term convention — store
+  // tenure_months=1 as a placeholder and mark repayment_terms 未定 so
+  // isLoanUnscheduled() routes it to the compounding / no-fixed-term bucket.
+  const noFixedTerm = rawTenure.trim() === ''
+  let repaymentTerms = (formData.get('repayment_terms') as string) ?? ''
   const loanStartDate = (formData.get('loan_start_date') as string) ?? ''
   const disbursementAccountCode = ((formData.get('disbursement_account_code') as string) ?? '').trim()
 
@@ -38,11 +44,19 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
   if (principal > 100_000_000) {
     return { error: 'Principal exceeds RM 100M ceiling' }
   }
-  if (isNaN(tenureMonths) || tenureMonths < 1 || tenureMonths > 12) {
-    return { error: 'Tenure must be between 1 and 12 months' }
+  if (!noFixedTerm && (isNaN(tenureMonths) || tenureMonths < 1 || tenureMonths > 12)) {
+    return { error: 'Tenure must be between 1 and 12 months (or leave blank for no fixed term)' }
   }
   if (!loanStartDate || !dayjs(loanStartDate).isValid()) {
     throw new Error('Loan start date is required')
+  }
+  const effectiveTenure = noFixedTerm ? 1 : tenureMonths
+  if (noFixedTerm) {
+    // Ensure the schedule treats it as unscheduled even if the user left
+    // Repayment terms blank (isLoanUnscheduled keys on this text).
+    repaymentTerms = repaymentTerms.trim()
+      ? `未定还款 · ${repaymentTerms.trim()}`
+      : '利滚利挂账(未定还款) · 利息从放款日起算'
   }
 
   // Surface period-lock conflicts at creation time rather than at approval
@@ -127,7 +141,7 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
       p_base_rate: base,
       p_risk_premium: premium,
       p_effective_rate: effective,
-      p_tenure_months: tenureMonths,
+      p_tenure_months: effectiveTenure,
       p_repayment_terms: repaymentTerms || undefined,
       p_company_name: company.name,
       p_disbursement_date: loanStartDate,

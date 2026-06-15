@@ -176,7 +176,7 @@ export default function NewLoanForm({ companies, baseRate, bsAccounts, banks }: 
             htmlFor="tenure_months"
             className="block text-sm font-sans font-medium text-graphite mb-1.5"
           >
-            Tenure
+            Tenure <span className="text-muted font-normal">(optional)</span>
           </label>
           <div className="relative">
             <input
@@ -186,17 +186,15 @@ export default function NewLoanForm({ companies, baseRate, bsAccounts, banks }: 
               step="1"
               min="1"
               max="12"
-              required
-              defaultValue="12"
-              className="w-full px-3 py-2 pr-16 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
-              placeholder="12"
+              className="w-full px-3 py-2 pr-16 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink placeholder:font-sans focus:outline-none focus:border-accent-border"
+              placeholder="留空 = 无固定期限"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted font-mono">
               months
             </span>
           </div>
           <p className="font-serif italic text-muted text-xs mt-1.5">
-            1–12 months (maximum 12)
+            留空 = 无固定期限，只按月滚利息。1–12 months if scheduled.
           </p>
         </div>
       </div>
@@ -207,7 +205,7 @@ export default function NewLoanForm({ companies, baseRate, bsAccounts, banks }: 
           htmlFor="loan_start_date"
           className="block text-sm font-sans font-medium text-graphite mb-1.5"
         >
-          Loan start date
+          Loan start date <span className="text-danger">*</span>
         </label>
         <input
           id="loan_start_date"
@@ -219,8 +217,8 @@ export default function NewLoanForm({ companies, baseRate, bsAccounts, banks }: 
           className="w-full sm:max-w-xs px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
         />
         <p className="font-serif italic text-muted text-xs mt-1.5">
-          Contractual start date. Defaults to today; back- or future-date as needed.
-          Maturity = start date + tenure.
+          利息从这天开始算。Contractual start date — interest accrues from here.
+          Defaults to today; back- or future-date as needed. Maturity = start date + tenure.
         </p>
       </div>
 
