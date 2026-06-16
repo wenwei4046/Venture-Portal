@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { fetchAllRows } from '@/lib/paginate'
 
 export interface BankTransaction {
   date: string
@@ -72,8 +73,8 @@ export async function reconcileBankStatement(csvText: string): Promise<Reconcili
     { data: fundSources },
     { data: loans },
   ] = await Promise.all([
-    supabase.from('fund_sources').select('amount').eq('status', 'active'),
-    supabase.from('loans').select('principal').eq('status', 'active'),
+    fetchAllRows((lo, hi) => supabase.from('fund_sources').select('amount').eq('status', 'active').order('id', { ascending: true }).range(lo, hi)).then((data) => ({ data })),
+    fetchAllRows((lo, hi) => supabase.from('loans').select('principal').eq('status', 'active').order('id', { ascending: true }).range(lo, hi)).then((data) => ({ data })),
   ])
 
   const totalDeposits = (fundSources ?? []).reduce((s, f) => s + Number(f.amount), 0)

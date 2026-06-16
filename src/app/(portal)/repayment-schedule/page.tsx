@@ -2,6 +2,7 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { fetchAllRows } from '@/lib/paginate'
 import { loanMonthlyInstallment, isLoanUnscheduled, isBeforeFirstInstallment, compoundInterestState } from '@/lib/treasury-schedule'
 import { fundingSourceFromTerms } from '@/lib/utils'
 import { listPayableFundSources } from '../fund-in/actions'
@@ -27,7 +28,7 @@ export default async function RepaymentSchedulePage() {
       .in('status', ['active', 'fully_repaid']),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
     supabase.from('companies').select('id, short_code, name'),
-    supabase.from('repayments').select('loan_id, amount, payment_date, payment_type'),
+    fetchAllRows((lo, hi) => supabase.from('repayments').select('loan_id, amount, payment_date, payment_type').order('id', { ascending: true }).range(lo, hi)).then((data) => ({ data })),
   ])
   const outById = new Map((loanOut ?? []).map((o) => [o.loan_id as string, o]))
   const coById = new Map((companies ?? []).map((c) => [c.id as string, c]))
@@ -142,7 +143,7 @@ export default async function RepaymentSchedulePage() {
   const [payable, { data: fsMetaRows }, { data: fsReps }, { data: pendingPvs }] = await Promise.all([
     listPayableFundSources({ includeSettledInMonth: currentYM }),
     supabase.from('fund_sources').select('id, compound_interest, effective_date'),
-    supabase.from('fund_source_repayments').select('fund_source_id, amount, payment_date, payment_type'),
+    fetchAllRows((lo, hi) => supabase.from('fund_source_repayments').select('fund_source_id, amount, payment_date, payment_type').order('id', { ascending: true }).range(lo, hi)).then((data) => ({ data })),
     supabase
       .from('payment_vouchers')
       .select('fund_source_id, repayment_breakdown, status, voucher_no')

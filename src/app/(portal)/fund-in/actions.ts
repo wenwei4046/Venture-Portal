@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { fetchAllRows } from '@/lib/paginate'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import type { FundSourceType } from '@/types'
 import type { Json } from '@/lib/supabase/database.types'
@@ -510,10 +511,12 @@ export async function listPayableFundSources(
     supabase.from('companies').select('id, name, short_code'),
     supabase.from('departments').select('id, name'),
     supabase.from('directors').select('id, name'),
-    supabase
+    fetchAllRows((lo, hi) => supabase
       .from('fund_source_repayments')
       .select('fund_source_id, payment_type, payment_date')
-      .eq('payment_type', 'principal'),
+      .eq('payment_type', 'principal')
+      .order('id', { ascending: true })
+      .range(lo, hi)).then((data) => ({ data })),
   ])
 
   const statusMap = new Map((sources ?? []).map((s) => [s.id, s.status]))

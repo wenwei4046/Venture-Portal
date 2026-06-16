@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
+import { fetchAllRows } from '@/lib/paginate'
 import dayjs from 'dayjs'
 import DirectorPinGate from '@/components/DirectorPinGate'
 import { isDirectorPinVerified } from '../director-salary/pin-actions'
@@ -36,24 +37,30 @@ export default async function DirectorPoolPage() {
     { data: deptBalances },
   ] = await Promise.all([
     directorDept
-      ? supabase
+      ? fetchAllRows((lo, hi) => supabase
           .from('dept_pools')
           .select('*')
           .eq('department_id', directorDept.id)
           .order('created_at', { ascending: false })
+          .order('id', { ascending: true })
+          .range(lo, hi)).then((data) => ({ data }))
       : Promise.resolve({ data: [] as never[] }),
-    supabase.from('invoice_payout_pool').select('*').order('created_at', { ascending: false }),
+    fetchAllRows((lo, hi) => supabase.from('invoice_payout_pool').select('*').order('created_at', { ascending: false }).order('id', { ascending: true }).range(lo, hi)).then((data) => ({ data })),
     // Saving bucket only deducts pool claims whose source_pool is dept_pool_director.
     // Other source_pool values (venture_pool / dept_pool_marketing / etc) come out
     // of their own pool's ledger — not Saving — so they must not subtract here.
-    supabase.from('claims').select('*').eq('claim_type', 'project').eq('source_pool', 'dept_pool_director').in('status', ['approved', 'paid']),
-    supabase.from('director_payouts').select('saving_amount, statutory_surplus'),
+    fetchAllRows((lo, hi) => supabase.from('claims').select('*').eq('claim_type', 'project').eq('source_pool', 'dept_pool_director').in('status', ['approved', 'paid']).order('id', { ascending: true }).range(lo, hi)).then((data) => ({ data })),
+    fetchAllRows((lo, hi) => supabase.from('director_payouts').select('saving_amount, statutory_surplus').order('id', { ascending: true }).range(lo, hi)).then((data) => ({ data })),
     // For Total Advance: latest confirmed/paid closing balance per director
-    supabase
+    // (pagination preserves the period_month-desc global order, so "first row
+    // per director" below still resolves to that director's latest period).
+    fetchAllRows((lo, hi) => supabase
       .from('director_payouts')
       .select('director_id, period_month, advance_balance')
       .in('status', ['confirmed', 'paid'])
-      .order('period_month', { ascending: false }),
+      .order('period_month', { ascending: false })
+      .order('id', { ascending: true })
+      .range(lo, hi)).then((data) => ({ data })),
     supabase.from('directors').select('id, code, name').order('code'),
     // For per-director Billed/Used/Remaining: other depts' negative balances
     // = amount "borrowed" from Director's invoice pool, pro-rated by ratio.
@@ -139,11 +146,13 @@ export default async function DirectorPoolPage() {
     .reduce((s, v) => s + v, 0) // negative number
 
   // Office (corporate) cash from GL — include if negative.
-  const { data: officeBankRows } = await supabase
+  const officeBankRows = await fetchAllRows((lo, hi) => supabase
     .from('journal_lines')
     .select('debit, credit, journal_entries!inner(segment)')
     .in('account_code', ['3000', '3010'])
     .eq('journal_entries.segment', 'corporate')
+    .order('id', { ascending: true })
+    .range(lo, hi))
   let officeCash = 0
   for (const r of officeBankRows ?? []) {
     officeCash += Number(r.debit ?? 0) - Number(r.credit ?? 0)

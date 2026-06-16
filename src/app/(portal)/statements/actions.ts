@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { fetchAllRows } from '@/lib/paginate'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import {
   billingModeToCategoryCode,
@@ -38,12 +39,14 @@ export async function generateStatements(formData: FormData) {
   }
 
   // 2. Get active fund sources (for loan interest contra lines)
-  const { data: fundSources } = await supabase
+  const fundSources = await fetchAllRows((lo, hi) => supabase
     .from('fund_sources')
     .select('id, from_company_id, amount, cost_rate')
     .eq('status', 'active')
     .in('source_type', ['subsidiary', 'director_loan', 'department_pool'])
     .not('from_company_id', 'is', null)
+    .order('id', { ascending: true })
+    .range(lo, hi))
 
   const loansByCompany = new Map<string, Array<{ id: string; amount: number; cost_rate: number }>>()
   for (const fs of fundSources ?? []) {
@@ -59,10 +62,12 @@ export async function generateStatements(formData: FormData) {
 
   // 2b. Get generated invoices for this period (Step 6 wiring).
   // Groups them by company so each statement can pick up its own lines.
-  const { data: periodInvoices } = await supabase
+  const periodInvoices = await fetchAllRows((lo, hi) => supabase
     .from('invoices')
     .select('id, company_id, billing_mode, total_amount')
     .eq('period_month', period)
+    .order('id', { ascending: true })
+    .range(lo, hi))
 
   const invoicesByCompany = new Map<
     string,

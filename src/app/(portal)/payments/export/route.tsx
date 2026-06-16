@@ -1,6 +1,7 @@
 import React from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { fetchAllRows } from '@/lib/paginate'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildVouchersXlsx } from './_format/xlsx'
 import { VouchersPdf } from './_format/pdf'
@@ -51,12 +52,11 @@ export async function GET(req: Request) {
   const directionFilter = rawDirection === 'debit' || rawDirection === 'credit' ? rawDirection : null
 
   // Fetch vouchers (same query as page)
-  let voucherQuery = supabase
-    .from('payment_vouchers')
-    .select('*')
-    .order('created_at', { ascending: false })
-  if (directionFilter) voucherQuery = voucherQuery.eq('direction', directionFilter)
-  const { data: vouchers } = await voucherQuery
+  const vouchers = await fetchAllRows((lo, hi) => {
+    let voucherQuery = supabase.from('payment_vouchers').select('*').order('created_at', { ascending: false }).order('id', { ascending: true })
+    if (directionFilter) voucherQuery = voucherQuery.eq('direction', directionFilter)
+    return voucherQuery.range(lo, hi)
+  })
 
   // Post-mig 238: PVS rows reference chart_of_accounts via account_code
   // Load once, index by voucher_id, then derive pool list + account name list

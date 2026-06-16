@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/paginate'
 import { formatMoney } from '@/lib/utils'
 import PaymentTabs from './PaymentTabs'
 import PaymentFilters from './PaymentFilters'
@@ -53,11 +54,13 @@ export default async function VoucherLedger({
   const maxFilter = params.max ? parseFloat(params.max) : null
 
   // Fetch this side's vouchers only (category labels live on sources — below)
-  const { data: vouchers } = await supabase
+  const vouchers = await fetchAllRows((lo, hi) => supabase
     .from('payment_vouchers')
     .select('*')
     .eq('direction', direction)
     .order('created_at', { ascending: false })
+    .order('id', { ascending: true })
+    .range(lo, hi))
 
   // Stage D/E surface: payroll requests badge — payment side only.
   const { count: payrollRequestsPending } = isReceipts

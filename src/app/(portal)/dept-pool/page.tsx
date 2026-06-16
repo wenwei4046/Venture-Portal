@@ -2,6 +2,7 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import { redirect } from 'next/navigation'
 import { requireRole } from '@/lib/auth'
+import { fetchAllRows } from '@/lib/paginate'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import { fetchIncomeStatement } from '@/lib/cfo-reports'
@@ -242,9 +243,11 @@ export default async function DeptPoolPage({
   // Marketing's P&L breakdown still lives on /dept-pool/marketing.
   // Accumulated (all-time) In/Out per dept, so In − Out foots exactly to the
   // accumulated Balance. (Previously this-month only.)
-  const { data: poolTxns } = await supabase
+  const poolTxns = await fetchAllRows((lo, hi) => supabase
     .from('dept_pools')
     .select('department_id, transaction_type, amount')
+    .order('id', { ascending: true })
+    .range(lo, hi))
 
   const inOutByDept = new Map<string, { in_amt: number; out_amt: number }>()
   for (const t of poolTxns ?? []) {
@@ -295,11 +298,13 @@ export default async function DeptPoolPage({
     let vIn = 0
     let vOut = 0
     if (cashCodes.length > 0) {
-      const { data: corpCashRows } = await supabase
+      const corpCashRows = await fetchAllRows((lo, hi) => supabase
         .from('journal_lines')
         .select('debit, credit, journal_entries!inner(segment)')
         .in('account_code', cashCodes)
         .in('journal_entries.segment', ['corporate', 'treasury'])
+        .order('id', { ascending: true })
+        .range(lo, hi))
       for (const r of corpCashRows ?? []) {
         vIn += Number(r.debit ?? 0)
         vOut += Number(r.credit ?? 0)
@@ -331,10 +336,12 @@ export default async function DeptPoolPage({
 
     if (banks.length > 0) {
       const codes = banks.map((b) => b.code)
-      const { data: bankLines } = await supabase
+      const bankLines = await fetchAllRows((lo, hi) => supabase
         .from('journal_lines')
         .select('account_code, debit, credit, journal_entries!inner(segment)')
         .in('account_code', codes)
+        .order('id', { ascending: true })
+        .range(lo, hi))
       const agg = new Map<string, Map<string, number>>() // segment -> bankCode -> net
       for (const r of bankLines ?? []) {
         const seg = (r as { journal_entries: { segment: string } }).journal_entries.segment ?? 'unallocated'
