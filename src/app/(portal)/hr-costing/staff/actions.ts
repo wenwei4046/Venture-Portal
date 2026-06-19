@@ -22,6 +22,7 @@ export async function addStaff(formData: FormData) {
 
   const { error } = await supabase.from('hr_staff_costs').insert({
     employee_name: formData.get('name') as string,
+    designation: trimOrNull(formData.get('designation')),
     department_id: dept?.id ?? (formData.get('department_id') as string),
     basic_salary: parseFloat(formData.get('basic_salary') as string) || 0,
     allowances: parseFloat(formData.get('allowances') as string) || 0,
@@ -58,6 +59,7 @@ export async function updateStaff(id: string, formData: FormData) {
     .from('hr_staff_costs')
     .update({
       employee_name: formData.get('name') as string,
+      designation: trimOrNull(formData.get('designation')),
       basic_salary: parseFloat(formData.get('basic_salary') as string) || 0,
       allowances: parseFloat(formData.get('allowances') as string) || 0,
       non_statutory_allowance: parseFloat(formData.get('non_statutory_allowance') as string) || 0,

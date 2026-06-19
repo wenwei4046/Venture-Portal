@@ -49,6 +49,7 @@ export default async function EditStaffPage({ params }: PageProps) {
         staff={{
           id: staff.id,
           employee_name: staff.employee_name,
+          designation: staff.designation ?? null,
           department_name: deptName,
           basic_salary: Number(staff.basic_salary),
           allowances: Number(staff.allowances),

@@ -133,7 +133,10 @@ export default async function PayslipPage({ params }: PageProps) {
               <span className="font-serif">EIS (Employee)</span>
               <EditableStatLine payrollId={row.id} field="eis_ee" value={Number(row.eis_ee)} readOnly={row.status !== 'draft'} />
             </div>
-            <Line label={`PCB (${staff.pcb_category})`} value={row.pcb} />
+            <div className="flex items-baseline justify-between">
+              <span className="font-serif">PCB ({staff.pcb_category})</span>
+              <EditableStatLine payrollId={row.id} field="pcb" value={Number(row.pcb)} readOnly={row.status !== 'draft'} />
+            </div>
             <div className="border-t border-hairline pt-2 mt-2 flex justify-between">
               <span className="font-serif text-ink">Total Deductions</span>
               <span className="num text-num-ink font-semibold">{formatMoney(totalDeductions)}</span>

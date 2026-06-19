@@ -4,7 +4,7 @@ import { useState, useTransition, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { updateStaffStatutory } from '../../../../actions'
 
-type StatField = 'epf_er' | 'epf_ee' | 'socso_er' | 'socso_ee' | 'eis_er' | 'eis_ee'
+type StatField = 'epf_er' | 'epf_ee' | 'socso_er' | 'socso_ee' | 'eis_er' | 'eis_ee' | 'pcb'
 
 interface Props {
   payrollId: string

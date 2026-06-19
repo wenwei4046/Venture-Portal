@@ -69,6 +69,14 @@ export default function AddStaffForm({ departments }: Props) {
             ))}
           </select>
         </div>
+        <div>
+          <label className={labelBase}>Designation <span className={hintBase}>(optional)</span></label>
+          <input
+            name="designation"
+            placeholder="e.g. Marketing Executive"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+          />
+        </div>
       </div>
 
       <div className="border-t border-hairline my-6" />

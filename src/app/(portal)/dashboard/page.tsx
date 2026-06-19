@@ -131,136 +131,87 @@ export default async function DashboardPage() {
     const userRole = currentUser?.role
 
     if (userRole === 'hr') {
-      // HR Dashboard — Monthly Cycle board.
-      // One glance tells HR exactly where this month's payroll stands and
-      // which step is next. Each step links directly to the page where the
-      // action happens so HR never has to hunt for it.
+      // HR Dashboard — data overview. Under the post-mig-278 flow HR's job is
+      // three actions (Import Employment List · Import Payroll · Calculate
+      // Director Salary), so the dashboard is three entry cards over the live
+      // HR figures. One RPC round-trip (hr_dashboard_summary, mig 283).
       const period = dayjs().startOf('month').format('YYYY-MM-DD')
       const periodUrl = `/hr-costing/payroll/${period}`
 
-      const [
-        { data: hrSummary },
-        { data: monthlyPayroll },
-        { data: payrollRun },
-        { data: pendingClaims },
-        { data: dirPayouts },
-        { data: hrDept },
-      ] = await Promise.all([
-        supabase.rpc('get_hr_cost_summary'),
-        supabase
-          .from('hr_monthly_payroll')
-          .select('id, status, net')
-          .eq('period_month', period),
-        supabase
-          .from('payroll_runs')
-          .select('id, status, total_amount, submitted_at, approved_at, paid_at')
-          .eq('period_month', period)
-          .maybeSingle(),
-        supabase
-          .from('claims')
-          .select('id, claim_type, status, claimant_name, amount, description, created_at')
-          .eq('status', 'pending')
-          .order('created_at', { ascending: false })
-          .limit(10),
-        supabase
-          .from('director_payouts')
-          .select('id, status')
-          .eq('period_month', period),
-        supabase
-          .from('departments')
-          .select('id')
-          .eq('name', 'HR')
-          .single(),
-      ])
+      const { data: hrRaw } = await supabase.rpc('hr_dashboard_summary')
 
-      const { data: hrPoolRow } = hrDept?.id
-        ? await supabase
-            .from('dept_pool_balances')
-            .select('balance')
-            .eq('department_id', hrDept.id)
-            .maybeSingle()
-        : { data: null }
-      const poolBalance = Number(hrPoolRow?.balance ?? 0)
+      type HrDeptStaff = {
+        department_id: string
+        department_name: string
+        staff_count: number
+        total_basic: number
+      }
+      type HrPayrollDept = {
+        department_name: string
+        staff_count: number
+        basic: number
+        statutory_er: number
+        statutory_ee: number
+        gross: number
+        net: number
+      }
+      type HrDashboard = {
+        period: string
+        staff: { total_count: number; departments: HrDeptStaff[] }
+        payroll: {
+          run: { status: string; total_amount: number; submitted_at: string | null; approved_at: string | null } | null
+          rows_count: number
+          draft_count: number
+          by_department: HrPayrollDept[]
+        }
+        director: {
+          payout_count: number
+          status: 'not_calculated' | 'draft' | 'confirmed'
+          payout_mode: 'split' | 'fully_paid' | null
+          total_gross: number
+          total_saving: number
+          total_payroll_net: number
+          total_invoice: number
+          submission: { submitted_at: string; total_gross: number; director_count: number } | null
+        }
+        hr_pool_balance: number
+      }
+      const hr = hrRaw as unknown as HrDashboard
 
-      // Latest active payment request for the current run, if any.
-      // Drives steps 6 and 7 on the Monthly Cycle board.
-      const { data: paymentRequest } = payrollRun?.id
-        ? await supabase
-            .from('payroll_payment_requests')
-            .select('id, status, pv_id')
-            .eq('payroll_run_id', payrollRun.id)
-            .in('status', ['submitted', 'pv_generated', 'completed'])
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-        : { data: null }
+      const staffCount = Number(hr?.staff?.total_count ?? 0)
+      const staffDepts = hr?.staff?.departments ?? []
+      const payrollRows = Number(hr?.payroll?.rows_count ?? 0)
+      const draftCount = Number(hr?.payroll?.draft_count ?? 0)
+      const run = hr?.payroll?.run ?? null
+      const payrollDepts = hr?.payroll?.by_department ?? []
+      const director = hr?.director
+      const poolBalance = Number(hr?.hr_pool_balance ?? 0)
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const depts = (hrSummary as any[]) ?? []
-      const totalStaff = depts.reduce((s: number, d: { staff_count: number }) => s + Number(d.staff_count ?? 0), 0)
+      const payrollTotals = payrollDepts.reduce(
+        (acc, d) => ({
+          staff: acc.staff + Number(d.staff_count ?? 0),
+          basic: acc.basic + Number(d.basic ?? 0),
+          statutory: acc.statutory + Number(d.statutory_er ?? 0) + Number(d.statutory_ee ?? 0),
+          gross: acc.gross + Number(d.gross ?? 0),
+          net: acc.net + Number(d.net ?? 0),
+        }),
+        { staff: 0, basic: 0, statutory: 0, gross: 0, net: 0 },
+      )
 
-      const rows = monthlyPayroll ?? []
-      const payrollImported = rows.length > 0
-      const draftCount = rows.filter(r => r.status === 'draft').length
-      const totalNet = rows.reduce((s, r) => s + Number(r.net ?? 0), 0)
-
-      const runStatus = payrollRun?.status as string | undefined
-      const runSubmitted = runStatus === 'submitted' || runStatus === 'approved' || runStatus === 'paid'
-      const runApproved = runStatus === 'approved' || runStatus === 'paid'
-      const runPaid = runStatus === 'paid'
-
-      const requestStatus = paymentRequest?.status as string | undefined
-      const requestActive =
-        requestStatus === 'submitted' ||
-        requestStatus === 'pv_generated' ||
-        requestStatus === 'completed'
-      const poolFunded = requestStatus === 'completed' || runPaid
-
-      const pendingBenefit = (pendingClaims ?? []).filter(c => c.claim_type === 'benefit').length
-      const pendingPool = (pendingClaims ?? []).filter(c => c.claim_type === 'project').length
-      const totalPending = pendingBenefit + pendingPool
-
-      const payoutStatus = (dirPayouts ?? []).length > 0
-        ? (dirPayouts ?? []).every(p => p.status === 'confirmed') ? 'confirmed' : 'draft'
-        : 'not calculated'
-
-      // Cycle step state — 'done' / 'active' / 'waiting' / 'pending'.
-      // Exactly one 'active' at a time so HR always has one obvious next click.
-      // Nine steps mirror the split flow post-refactor:
-      //   1 staff master · 2 import · 3 review drafts · 4 submit for approval
-      //   5 Principal approves costing · 6 request payment from Finance
-      //   7 Finance generates + Principal approves PV · 8 HR Pool → staff (bank CSV)
-      //   9 Statutory files
-      type StepState = 'done' | 'active' | 'waiting' | 'pending'
-      const s1: StepState = totalStaff > 0 ? 'done' : 'active'
-      const s2: StepState = payrollImported ? 'done' : (s1 === 'done' ? 'active' : 'pending')
-      const s3: StepState = (rows.length > 0 && draftCount === 0) ? 'done' : (s2 === 'done' && draftCount > 0 ? 'active' : 'pending')
-      const s4: StepState = runSubmitted ? 'done' : (s3 === 'done' ? 'active' : 'pending')
-      const s5: StepState = runApproved ? 'done' : (runSubmitted ? 'waiting' : 'pending')
-      const s6: StepState = requestActive
-        ? 'done'
-        : runApproved
-          ? 'active'
-          : 'pending'
-      const s7: StepState = poolFunded
-        ? 'done'
-        : requestStatus === 'submitted' || requestStatus === 'pv_generated'
-          ? 'waiting'
-          : 'pending'
-      const s8: StepState = poolFunded ? 'active' : 'pending'
-      const s9: StepState = poolFunded ? 'active' : 'pending'
-      const doneCount = [s1, s2, s3, s4, s5, s6, s7, s8, s9].filter(s => s === 'done').length
+      const runSubmitted = run?.status === 'approved' || run?.status === 'paid' || run?.status === 'submitted'
+      const directorStatus = director?.status ?? 'not_calculated'
+      const directorSubmitted = Boolean(director?.submission)
 
       return (
         <div>
           <div className="page-head">
             <div>
               <div className="page-eyebrow">
-                <em>II.</em> HR · MONTHLY CYCLE
+                <em>II.</em> HR · OVERVIEW
               </div>
-              <h1 className="page-title">Monthly Payroll Cycle</h1>
+              <h1 className="page-title">HR Overview</h1>
               <p className="font-serif italic text-graphite text-base mt-3">
-                {dayjs().format('MMMM YYYY')} · <em>{doneCount} of 9 steps complete</em>
+                {dayjs().format('MMMM YYYY')}
               </p>
             </div>
             <Link
@@ -275,211 +226,187 @@ export default async function DashboardPage() {
             </Link>
           </div>
 
-          {/* Monthly Cycle — the whole HR job in one linear board */}
+          {/* Three entry points — the whole HR job under the direct-submit flow */}
           <section className="mb-12">
-            <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
-              <CycleStep
-                n={1}
-                state={s1}
-                title="Staff master"
-                detail={totalStaff > 0 ? `${totalStaff} active across ${depts.length} dept${depts.length === 1 ? '' : 's'}` : 'Add your first staff'}
-                ctaLabel={totalStaff > 0 ? 'Manage staff →' : 'Add staff →'}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <ActionCard
+                n="I"
+                title="Employment List"
+                status={staffCount > 0 ? `${staffCount} active staff · ${staffDepts.length} dept${staffDepts.length === 1 ? '' : 's'}` : 'No staff yet'}
+                statusTone={staffCount > 0 ? 'ok' : 'idle'}
+                ctaLabel={staffCount > 0 ? 'Manage / re-import →' : 'Import Employment List →'}
                 ctaHref="/hr-costing/staff"
               />
-              <CycleStep
-                n={2}
-                state={s2}
-                title="Import payroll"
-                detail={payrollImported ? `${rows.length} row${rows.length === 1 ? '' : 's'} imported` : 'Upload InfoTech xlsx or start fresh'}
-                ctaLabel={payrollImported ? 'Re-import / open grid →' : 'Start payroll →'}
+              <ActionCard
+                n="II"
+                title="Import Payroll"
+                status={
+                  payrollRows === 0
+                    ? 'Not imported this month'
+                    : runSubmitted
+                      ? `Submitted to Finance · RM ${formatMoneyBare(Number(run?.total_amount ?? 0))}`
+                      : `${payrollRows} row${payrollRows === 1 ? '' : 's'} · ${draftCount} draft`
+                }
+                statusTone={payrollRows === 0 ? 'idle' : runSubmitted ? 'ok' : 'warn'}
+                ctaLabel={payrollRows === 0 ? 'Import Payroll →' : 'Open grid →'}
                 ctaHref={periodUrl}
               />
-              <CycleStep
-                n={3}
-                state={s3}
-                title="Review drafts"
-                detail={
-                  rows.length === 0
-                    ? '—'
-                    : draftCount > 0
-                      ? `${draftCount} draft row${draftCount === 1 ? '' : 's'} pending · RM ${formatMoneyBare(totalNet)} net`
-                      : `All ${rows.length} rows submitted · RM ${formatMoneyBare(totalNet)} net`
+              <ActionCard
+                n="III"
+                title="Director Salary"
+                status={
+                  directorStatus === 'not_calculated'
+                    ? 'Not calculated'
+                    : `${directorStatus === 'confirmed' ? 'Confirmed' : 'Draft'}${director?.payout_mode === 'fully_paid' ? ' · Fully Paid' : director?.payout_mode === 'split' ? ' · 75/25 Split' : ''}${directorSubmitted ? ' · Submitted ✓' : ''}`
                 }
-                ctaLabel="Open grid →"
-                ctaHref={periodUrl}
-              />
-              <CycleStep
-                n={4}
-                state={s4}
-                title="Submit for Approval"
-                detail={
-                  runSubmitted
-                    ? `Submitted · RM ${formatMoneyBare(Number(payrollRun?.total_amount ?? 0))}`
-                    : s4 === 'active'
-                      ? 'Send the payroll numbers to Principal'
-                      : 'Finish drafts first'
-                }
-                ctaLabel={s4 === 'active' ? 'Go to grid →' : 'View →'}
-                ctaHref={periodUrl}
-                hideCta={s4 === 'pending'}
-              />
-              <CycleStep
-                n={5}
-                state={s5}
-                title="Principal approves costing"
-                detail={
-                  runApproved
-                    ? `Approved ${payrollRun?.approved_at ? dayjs(payrollRun.approved_at).format('D MMM HH:mm') : ''}`
-                    : s5 === 'waiting'
-                      ? 'Awaiting Principal sign-off — no money moves yet'
-                      : '—'
-                }
-                ctaLabel=""
-                ctaHref=""
-                hideCta
-              />
-              <CycleStep
-                n={6}
-                state={s6}
-                title="Request payment from Finance"
-                detail={
-                  requestActive
-                    ? 'Request sent to Finance'
-                    : s6 === 'active'
-                      ? 'Ask Finance to generate the Payment Voucher'
-                      : 'Wait for costing approval'
-                }
-                ctaLabel={s6 === 'active' ? 'Go to grid →' : 'View →'}
-                ctaHref={periodUrl}
-                hideCta={s6 === 'pending'}
-              />
-              <CycleStep
-                n={7}
-                state={s7}
-                title="PV approved · HR Pool funded"
-                detail={
-                  poolFunded
-                    ? 'Money landed in HR Pool'
-                    : requestStatus === 'pv_generated'
-                      ? 'PV generated by Finance — awaiting Principal approval'
-                      : requestStatus === 'submitted'
-                        ? 'Finance will generate the PV, then Principal approves'
-                        : '—'
-                }
-                ctaLabel={paymentRequest?.pv_id ? 'View voucher →' : ''}
-                ctaHref={paymentRequest?.pv_id ? `/payments/${paymentRequest.pv_id}` : ''}
-                hideCta={!paymentRequest?.pv_id}
-              />
-              <CycleStep
-                n={8}
-                state={s8}
-                title="Bank transfer file"
-                detail={
-                  poolFunded
-                    ? 'Alliance Bank CSV ready to download'
-                    : 'Available after HR Pool is funded'
-                }
-                ctaLabel="Download CSV →"
-                ctaHref={`${periodUrl}/bank-transfer`}
-                hideCta={s8 === 'pending'}
-              />
-              <CycleStep
-                n={9}
-                state={s9}
-                title="Statutory files"
-                detail={
-                  poolFunded
-                    ? 'KWSP · SOCSO · EIS · LHDN CP39 ready'
-                    : 'Available after HR Pool is funded'
-                }
-                ctaLabel="Go to files →"
-                ctaHref={periodUrl}
-                hideCta={s9 === 'pending'}
+                statusTone={directorStatus === 'not_calculated' ? 'idle' : directorStatus === 'confirmed' ? 'ok' : 'warn'}
+                ctaLabel={directorStatus === 'not_calculated' ? 'Calculate →' : 'Open Director Salary →'}
+                ctaHref="/director-salary"
               />
             </div>
           </section>
 
-          {/* Snapshot — small panel with cross-cycle info */}
+          {/* This month's payroll, per department */}
           <section className="mb-12">
             <div className="sect-head">
-              <h2>Snapshot</h2>
+              <h2>This Month · Payroll</h2>
               <span className="rule" aria-hidden />
-              <span className="count">CROSS-CYCLE · AT A GLANCE</span>
+              <span className="count">
+                {payrollRows} ROW{payrollRows === 1 ? '' : 'S'} · {run?.status ? run.status.toUpperCase() : 'NO RUN'}
+              </span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="border border-hairline rounded-md bg-surface p-5">
-                <div className="font-serif italic text-accent text-sm mb-1">Pending claims</div>
-                <div className="font-serif text-2xl text-num-ink tabular leading-none">{totalPending}</div>
-                <div className="font-mono text-xs text-muted mt-2">
-                  {pendingBenefit} benefit · {pendingPool} pool
-                </div>
+            {payrollDepts.length === 0 ? (
+              <div className="border border-hairline rounded-md bg-surface p-6">
+                <p className="font-serif italic text-graphite text-base">
+                  No payroll imported for {dayjs().format('MMMM YYYY')} yet.
+                </p>
+                <Link href={periodUrl} className="font-serif italic text-sm text-accent hover:text-accent-hover">
+                  Import Payroll →
+                </Link>
               </div>
-              <div className="border border-hairline rounded-md bg-surface p-5">
-                <div className="font-serif italic text-accent text-sm mb-1">Director Salary</div>
-                <div className={`font-serif italic text-lg leading-none ${payoutStatus === 'confirmed' ? 'text-ledger' : payoutStatus === 'draft' ? 'text-alert' : 'text-muted'}`}>
-                  {payoutStatus === 'confirmed' ? 'Confirmed' : payoutStatus === 'draft' ? 'Draft' : 'Not calculated'}
-                </div>
-                <div className="font-mono text-xs text-muted mt-2">
-                  {(dirPayouts ?? []).length} director{(dirPayouts ?? []).length === 1 ? '' : 's'} this period
-                </div>
-              </div>
-              <div className="border border-hairline rounded-md bg-surface p-5">
-                <div className="font-serif italic text-accent text-sm mb-1">Total Net (payroll)</div>
-                <div className="font-serif text-2xl text-num-ink tabular tracking-[-0.01em] leading-none">{formatMoney(totalNet)}</div>
-                <div className="font-mono text-xs text-muted mt-2">
-                  {rows.length} row{rows.length === 1 ? '' : 's'} · {dayjs().format('MMM YYYY')}
-                </div>
-              </div>
-            </div>
+            ) : (
+              <table className="ledger-table">
+                <thead>
+                  <tr>
+                    <th>Department</th>
+                    <th className="num">Staff</th>
+                    <th className="num">Basic</th>
+                    <th className="num">Statutory</th>
+                    <th className="num">Gross</th>
+                    <th className="num">Net</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payrollDepts.map((d) => (
+                    <tr key={d.department_name}>
+                      <td>{d.department_name}</td>
+                      <td className="num">{d.staff_count}</td>
+                      <td className="num">{formatMoneyBare(Number(d.basic))}</td>
+                      <td className="num">{formatMoneyBare(Number(d.statutory_er) + Number(d.statutory_ee))}</td>
+                      <td className="num">{formatMoneyBare(Number(d.gross))}</td>
+                      <td className="num">{formatMoneyBare(Number(d.net))}</td>
+                    </tr>
+                  ))}
+                  <tr className="font-semibold">
+                    <td>Total</td>
+                    <td className="num">{payrollTotals.staff}</td>
+                    <td className="num">{formatMoneyBare(payrollTotals.basic)}</td>
+                    <td className="num">{formatMoneyBare(payrollTotals.statutory)}</td>
+                    <td className="num">{formatMoneyBare(payrollTotals.gross)}</td>
+                    <td className="num">{formatMoneyBare(payrollTotals.net)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
           </section>
 
-          {/* Pending claims drill-down — kept for HR to act without leaving dashboard */}
-          {(pendingClaims ?? []).length > 0 ? (
+          {/* Staff master, per department */}
+          {staffDepts.length > 0 ? (
             <section className="mb-12">
               <div className="sect-head">
-                <h2>Needs your review</h2>
+                <h2>Staff Master</h2>
                 <span className="rule" aria-hidden />
-                <span className="count">{(pendingClaims ?? []).length} CLAIM{(pendingClaims ?? []).length === 1 ? '' : 'S'} · BENEFIT → HR · POOL → FINANCE</span>
+                <span className="count">{staffCount} ACTIVE</span>
               </div>
-              <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
-                {(pendingClaims ?? []).slice(0, 5).map((c) => (
-                  <Link
-                    key={c.id}
-                    href="/claims"
-                    className="flex items-baseline justify-between px-5 py-4 hover:bg-surface-2/40 transition-colors"
-                  >
-                    <div className="flex-1 min-w-0 pr-4">
-                      <div className="flex items-baseline gap-2 mb-1">
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-accent">
-                          {c.claim_type === 'project' ? 'POOL' : 'BENEFIT'}
-                        </span>
-                        <span className="font-serif text-sm text-ink truncate">
-                          {c.claimant_name}
-                        </span>
-                      </div>
-                      <div className="font-serif italic text-graphite text-sm truncate">
-                        {c.description ?? '—'}
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className="num">{formatMoney(Number(c.amount))}</span>
-                      <div className="font-mono text-xs text-muted">
-                        {dayjs(c.created_at).format('D MMM')}
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-                {(pendingClaims ?? []).length > 5 ? (
-                  <Link
-                    href="/claims"
-                    className="block text-center px-5 py-3 font-serif italic text-sm text-accent hover:text-accent-hover"
-                  >
-                    See all {(pendingClaims ?? []).length} →
-                  </Link>
-                ) : null}
-              </div>
+              <table className="ledger-table">
+                <thead>
+                  <tr>
+                    <th>Department</th>
+                    <th className="num">Staff</th>
+                    <th className="num">Total Basic</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {staffDepts.map((d) => (
+                    <tr key={d.department_id}>
+                      <td>{d.department_name}</td>
+                      <td className="num">{d.staff_count}</td>
+                      <td className="num">{formatMoneyBare(Number(d.total_basic))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </section>
           ) : null}
+
+          {/* Director salary status strip */}
+          <section className="mb-12">
+            <div className="sect-head">
+              <h2>Director Salary · {dayjs().format('MMMM')}</h2>
+              <span className="rule" aria-hidden />
+              <span className="count">
+                {director?.payout_count ?? 0} DIRECTOR{(director?.payout_count ?? 0) === 1 ? '' : 'S'}
+              </span>
+            </div>
+            {directorStatus === 'not_calculated' ? (
+              <div className="border border-hairline rounded-md bg-surface p-6">
+                <p className="font-serif italic text-graphite text-base">
+                  Not calculated for {dayjs().format('MMMM YYYY')} yet.
+                </p>
+                <Link href="/director-salary" className="font-serif italic text-sm text-accent hover:text-accent-hover">
+                  Calculate Director Salary →
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="border border-hairline rounded-md bg-surface p-5">
+                  <div className="font-serif italic text-accent text-sm mb-1">Status</div>
+                  <div className={`font-serif italic text-lg leading-none ${directorStatus === 'confirmed' ? 'text-ledger' : 'text-alert'}`}>
+                    {directorStatus === 'confirmed' ? 'Confirmed' : 'Draft'}
+                  </div>
+                  <div className="font-mono text-xs text-muted mt-2">
+                    {director?.payout_mode === 'fully_paid' ? 'Fully Paid mode' : '75/25 split mode'}
+                    {directorSubmitted ? ' · submitted to Finance' : ''}
+                  </div>
+                </div>
+                <div className="border border-hairline rounded-md bg-surface p-5">
+                  <div className="font-serif italic text-accent text-sm mb-1">Total gross</div>
+                  <div className="font-serif text-2xl text-num-ink tabular tracking-[-0.01em] leading-none">
+                    {formatMoney(Number(director?.total_gross ?? 0))}
+                  </div>
+                  <div className="font-mono text-xs text-muted mt-2">
+                    saving {formatMoneyBare(Number(director?.total_saving ?? 0))}
+                  </div>
+                </div>
+                <div className="border border-hairline rounded-md bg-surface p-5">
+                  <div className="font-serif italic text-accent text-sm mb-1">Payroll net</div>
+                  <div className="font-serif text-2xl text-num-ink tabular tracking-[-0.01em] leading-none">
+                    {formatMoney(Number(director?.total_payroll_net ?? 0))}
+                  </div>
+                  <div className="font-mono text-xs text-muted mt-2">paid via payroll</div>
+                </div>
+                <div className="border border-hairline rounded-md bg-surface p-5">
+                  <div className="font-serif italic text-accent text-sm mb-1">Invoice total</div>
+                  <div className="font-serif text-2xl text-num-ink tabular tracking-[-0.01em] leading-none">
+                    {formatMoney(Number(director?.total_invoice ?? 0))}
+                  </div>
+                  <div className="font-mono text-xs text-muted mt-2">
+                    {director?.payout_mode === 'fully_paid' ? 'n/a in Fully Paid mode' : '25% outsource accumulation'}
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
         </div>
       )
     }
@@ -1404,75 +1331,43 @@ export default async function DashboardPage() {
   )
 }
 
-type CycleStepState = 'done' | 'active' | 'waiting' | 'pending'
-
-function CycleStep({
+// HR Overview entry card — one of the three actions that make up the HR job
+// under the direct-submit flow (Employment List / Import Payroll / Director
+// Salary). Roman numeral marker echoes the sidebar convention.
+function ActionCard({
   n,
-  state,
   title,
-  detail,
+  status,
+  statusTone,
   ctaLabel,
   ctaHref,
-  hideCta = false,
 }: {
-  n: number
-  state: CycleStepState
+  n: string
   title: string
-  detail: string
+  status: string
+  statusTone: 'ok' | 'warn' | 'idle'
   ctaLabel: string
   ctaHref: string
-  hideCta?: boolean
 }) {
-  const numStyle =
-    state === 'done'
-      ? 'bg-ledger/10 text-ledger border-ledger/30'
-      : state === 'active'
-        ? 'bg-accent text-white border-accent'
-        : state === 'waiting'
-          ? 'bg-alert/10 text-alert border-alert/30'
-          : 'bg-paper text-muted border-hairline'
-
-  const titleStyle =
-    state === 'pending' ? 'font-serif text-md text-muted' : 'font-serif text-md text-ink'
-
-  const stateLabel =
-    state === 'done' ? 'done' : state === 'active' ? 'next' : state === 'waiting' ? 'waiting' : '—'
-  const stateLabelStyle =
-    state === 'done'
-      ? 'font-serif italic text-ledger text-xs'
-      : state === 'active'
-        ? 'font-serif italic text-accent text-xs'
-        : state === 'waiting'
-          ? 'font-serif italic text-alert text-xs'
-          : 'font-serif italic text-muted text-xs'
+  const toneStyle =
+    statusTone === 'ok'
+      ? 'text-ledger'
+      : statusTone === 'warn'
+        ? 'text-alert'
+        : 'text-muted'
 
   return (
-    <div className="flex items-center gap-5 px-5 py-4">
-      <div
-        className={`shrink-0 w-8 h-8 rounded-full border flex items-center justify-center font-mono text-sm font-medium ${numStyle}`}
-      >
-        {n}
+    <Link
+      href={ctaHref}
+      className="border border-hairline rounded-md bg-surface hover:bg-surface-2 p-5 transition-colors block"
+    >
+      <div className="font-mono text-[10px] uppercase tracking-wider text-accent mb-2">
+        <em className="font-serif normal-case">{n}.</em>
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-3 mb-0.5">
-          <span className={titleStyle}>{title}</span>
-          <span className={stateLabelStyle}>{stateLabel}</span>
-        </div>
-        <div className="font-serif italic text-graphite text-sm truncate">{detail}</div>
-      </div>
-      {!hideCta && ctaHref ? (
-        <Link
-          href={ctaHref}
-          className={
-            state === 'active'
-              ? 'shrink-0 font-serif italic text-sm text-accent hover:text-accent-hover'
-              : 'shrink-0 font-serif italic text-sm text-graphite hover:text-accent'
-          }
-        >
-          {ctaLabel}
-        </Link>
-      ) : null}
-    </div>
+      <div className="font-serif text-lg text-ink mb-1">{title}</div>
+      <div className={`font-serif italic text-sm ${toneStyle}`}>{status}</div>
+      <div className="font-serif italic text-sm text-accent mt-3">{ctaLabel}</div>
+    </Link>
   )
 }
 

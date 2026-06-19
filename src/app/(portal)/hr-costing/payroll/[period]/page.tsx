@@ -5,7 +5,9 @@ import { requireRole } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import PayrollGrid, { type PayrollRowData } from '../_components/PayrollGrid'
 import CopyFromLastMonthButton from '../_components/CopyFromLastMonthButton'
-import SubmitToPrincipalButton from '../_components/SubmitToPrincipalButton'
+import CreatePeriodButton from '../_components/CreatePeriodButton'
+import SubmitToFinanceButton from '../_components/SubmitToFinanceButton'
+import ReopenPayrollButton from '../_components/ReopenPayrollButton'
 import MoreActionsDropdown from '../_components/MoreActionsDropdown'
 import PeriodPicker from '../_components/PeriodPicker'
 import RequestPayrollPaymentButton, {
@@ -45,7 +47,10 @@ export default async function PayrollGridPage({ params }: PageProps) {
 
   const supabase = await createClient()
 
-  const [{ data: rows }, { data: run }, { data: directorRows }] = await Promise.all([
+  // The live run is the single non-rejected one (partial unique index
+  // guarantees <= 1). Rejected rows accumulate via the HR reopen flow
+  // (mig 278) — the latest one drives the reopened/rejected notice.
+  const [{ data: rows }, { data: run }, { data: lastRejected }, { data: directorRows }] = await Promise.all([
     supabase
       .from('hr_monthly_payroll')
       .select(`
@@ -63,6 +68,15 @@ export default async function PayrollGridPage({ params }: PageProps) {
       .from('payroll_runs')
       .select('id, status, total_amount, submitted_at, approved_at, paid_at, rejection_reason, rejected_at')
       .eq('period_month', period)
+      .neq('status', 'rejected')
+      .maybeSingle(),
+    supabase
+      .from('payroll_runs')
+      .select('id, rejection_reason, rejected_at')
+      .eq('period_month', period)
+      .eq('status', 'rejected')
+      .order('rejected_at', { ascending: false })
+      .limit(1)
       .maybeSingle(),
     supabase
       .from('director_payouts')
@@ -126,9 +140,18 @@ export default async function PayrollGridPage({ params }: PageProps) {
             <PeriodPicker period={period} />
           </div>
         </div>
-        <p className="font-sans text-sm text-muted mb-12">
-          Open <Link href="/hr-costing/payroll" className="text-accent hover:underline">Payroll</Link> to create the current period, or pick a different month above.
-        </p>
+        {/* Act on THIS month directly — create draft rows from the staff
+            master, or import the InfoTech file for this period. The picker
+            above switches months. */}
+        <div className="flex items-center gap-3 flex-wrap mb-12">
+          <CreatePeriodButton period={period} />
+          <Link
+            href={`/hr-costing/payroll/${period}/import`}
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+          >
+            Import InfoTech →
+          </Link>
+        </div>
         {hasDirectorPayouts && (
           <DirectorSalarySection rows={directorPayouts} period={period} />
         )}
@@ -196,14 +219,14 @@ export default async function PayrollGridPage({ params }: PageProps) {
   }
 
   // ─── Derive the period's phase from run + latest request ─────────────────
-  // Each phase maps to a distinct UI:
-  //   drafting              → HR editing rows; show Submit for Approval
-  //   awaiting-approval     → Run submitted; show waiting banner
-  //   approved-no-request   → Principal approved costing; show Request button
+  // Each phase maps to a distinct UI (no Principal approval since mig 278 —
+  // Submit lands the run directly in 'approved'):
+  //   drafting              → HR editing rows; show Submit to Finance
+  //   awaiting-approval     → legacy-only: rows submitted but no live run
+  //   approved-no-request   → Submitted to Finance; show Request + Reopen
   //   request-submitted     → HR requested payment; Finance hasn't generated PV
   //   request-pv-generated  → Finance generated PV; awaiting Principal PV approval
   //   completed             → PV approved + executed (HR Pool funded)
-  //   rejected              → Principal rejected; HR edits + re-submits
   //   legacy-paid           → Run paid under the old monolithic RPC (pre-refactor)
   type Phase =
     | 'drafting'
@@ -212,7 +235,6 @@ export default async function PayrollGridPage({ params }: PageProps) {
     | 'request-submitted'
     | 'request-pv-generated'
     | 'completed'
-    | 'rejected'
     | 'legacy-paid'
 
   const allDraft = gridRows.every(r => r.status === 'draft')
@@ -226,8 +248,6 @@ export default async function PayrollGridPage({ params }: PageProps) {
     phase = allDraft ? 'drafting' : 'awaiting-approval'
   } else if (run.status === 'submitted') {
     phase = 'awaiting-approval'
-  } else if (run.status === 'rejected') {
-    phase = 'rejected'
   } else if (run.status === 'paid') {
     phase = 'legacy-paid'
   } else if (run.status === 'approved') {
@@ -236,6 +256,13 @@ export default async function PayrollGridPage({ params }: PageProps) {
     else if (activeRequest.status === 'pv_generated') phase = 'request-pv-generated'
     else if (activeRequest.status === 'completed') phase = 'completed'
   }
+
+  // Reopened / legacy-rejected notice — only relevant while back in drafting.
+  const REOPEN_MARKER = 'Reopened by HR for edits'
+  const showReopenedNote =
+    phase === 'drafting' && lastRejected?.rejection_reason === REOPEN_MARKER
+  const showLegacyRejectedNote =
+    phase === 'drafting' && !!lastRejected && lastRejected.rejection_reason !== REOPEN_MARKER
 
   // Build RequestState prop for the button component
   let requestState: RequestState
@@ -265,17 +292,16 @@ export default async function PayrollGridPage({ params }: PageProps) {
 
   return (
     <div>
-      {/* P1-2: prominent rejection banner so HR sees reason + date at a glance,
-          not a tiny em inside the phase line. Appears only when run is rejected. */}
-      {phase === 'rejected' && run ? (
-        <div className="bg-danger-bg border border-danger rounded-md p-4 mb-6 flex items-start gap-3">
-          <span className="font-serif italic text-danger text-xl leading-none">✕</span>
+      {/* Reopened notice — HR pulled the figures back via Reopen (mig 278). */}
+      {showReopenedNote ? (
+        <div className="bg-surface border border-hairline rounded-md p-4 mb-6 flex items-start gap-3">
+          <span className="font-serif italic text-accent text-xl leading-none">↺</span>
           <div className="flex-1 min-w-0">
-            <p className="font-serif text-danger text-base">
-              Rejected by Principal
-              {run.rejected_at ? (
+            <p className="font-serif text-ink text-base">
+              Reopened for edits
+              {lastRejected?.rejected_at ? (
                 <span className="font-mono text-xs text-muted ml-2">
-                  · {new Date(run.rejected_at).toLocaleString('en-MY', {
+                  · {new Date(lastRejected.rejected_at).toLocaleString('en-MY', {
                     day: 'numeric',
                     month: 'short',
                     year: 'numeric',
@@ -285,9 +311,37 @@ export default async function PayrollGridPage({ params }: PageProps) {
                 </span>
               ) : null}
             </p>
-            {run.rejection_reason ? (
+            <p className="font-sans text-xs text-muted mt-2">
+              Finance can&apos;t see this period&apos;s figures until you click{' '}
+              <em className="font-serif">Submit to Finance</em> again.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Legacy rejection banner — runs rejected by Principal under the old
+          approval flow (pre-mig 278). */}
+      {showLegacyRejectedNote ? (
+        <div className="bg-danger-bg border border-danger rounded-md p-4 mb-6 flex items-start gap-3">
+          <span className="font-serif italic text-danger text-xl leading-none">✕</span>
+          <div className="flex-1 min-w-0">
+            <p className="font-serif text-danger text-base">
+              Rejected by Principal
+              {lastRejected?.rejected_at ? (
+                <span className="font-mono text-xs text-muted ml-2">
+                  · {new Date(lastRejected.rejected_at).toLocaleString('en-MY', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+              ) : null}
+            </p>
+            {lastRejected?.rejection_reason ? (
               <p className="font-serif text-sm text-graphite mt-1 whitespace-pre-wrap">
-                {run.rejection_reason}
+                {lastRejected.rejection_reason}
               </p>
             ) : (
               <p className="font-serif italic text-muted text-sm mt-1">
@@ -295,7 +349,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
               </p>
             )}
             <p className="font-sans text-xs text-muted mt-2">
-              Fix the rows below, then click <em className="font-serif">Submit for Principal approval</em> again.
+              Fix the rows below, then click <em className="font-serif">Submit to Finance</em> again.
             </p>
           </div>
         </div>
@@ -312,7 +366,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
             {totals.staff} staff
             {totals.directors > 0 ? ` · ${totals.directors} director${totals.directors > 1 ? 's' : ''}` : ''}
             {' · '}
-            <PhaseLabel phase={phase} rejectionReason={run?.rejection_reason} />
+            <PhaseLabel phase={phase} />
           </p>
         </div>
         <div className="flex flex-col items-end gap-3">
@@ -324,7 +378,6 @@ export default async function PayrollGridPage({ params }: PageProps) {
             totalGross={totals.gross}
             totalAmount={Number(run?.total_amount ?? totals.gross)}
             requestState={requestState}
-            hasDirectorPayouts={hasDirectorPayouts}
           />
         </div>
       </div>
@@ -339,7 +392,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
           >
             Import InfoTech
           </Link>
-          {(phase === 'drafting' || phase === 'rejected') && (
+          {phase === 'drafting' && (
             <CopyFromLastMonthButton period={period} />
           )}
         </div>
@@ -488,7 +541,6 @@ function DirectorSalarySection({
 
 function PhaseLabel({
   phase,
-  rejectionReason,
 }: {
   phase:
     | 'drafting'
@@ -497,29 +549,21 @@ function PhaseLabel({
     | 'request-submitted'
     | 'request-pv-generated'
     | 'completed'
-    | 'rejected'
     | 'legacy-paid'
-  rejectionReason?: string | null
 }) {
   switch (phase) {
     case 'drafting':
       return <em>Drafts editable inline</em>
     case 'awaiting-approval':
-      return <em>Submitted — awaiting Principal approval of costing</em>
+      return <em>Rows submitted — no live run (legacy state)</em>
     case 'approved-no-request':
-      return <em>Costing approved — request payroll payment from Finance next</em>
+      return <em>Submitted to Finance — request payroll payment next</em>
     case 'request-submitted':
       return <em>Payment request sent to Finance</em>
     case 'request-pv-generated':
       return <em>PV generated by Finance — awaiting Principal approval</em>
     case 'completed':
       return <em>HR Pool funded · ready to pay staff</em>
-    case 'rejected':
-      return (
-        <em className="text-danger">
-          Rejected by Principal{rejectionReason ? ` · ${rejectionReason}` : ''} · edit and re-submit
-        </em>
-      )
     case 'legacy-paid':
       return <em>Completed under the old flow</em>
   }
@@ -532,7 +576,6 @@ function PhaseCta({
   totalGross,
   totalAmount,
   requestState,
-  hasDirectorPayouts,
 }: {
   phase:
     | 'drafting'
@@ -541,28 +584,22 @@ function PhaseCta({
     | 'request-submitted'
     | 'request-pv-generated'
     | 'completed'
-    | 'rejected'
     | 'legacy-paid'
   period: string
   runId?: string
   totalGross: number
   totalAmount: number
   requestState: RequestState
-  hasDirectorPayouts: boolean
 }) {
-  if (phase === 'drafting' || phase === 'rejected') {
+  if (phase === 'drafting') {
     return (
-      <SubmitToPrincipalButton
-        period={period}
-        totalAmount={totalGross}
-        hasDirectorPayouts={hasDirectorPayouts}
-      />
+      <SubmitToFinanceButton period={period} totalAmount={totalGross} />
     )
   }
   if (phase === 'awaiting-approval') {
     return (
       <div className="bg-surface border border-hairline rounded-md px-4 py-2 text-right">
-        <em className="font-serif italic text-accent text-sm">Awaiting Principal</em>
+        <em className="font-serif italic text-accent text-sm">Submitted</em>
         <div className="font-mono text-xs text-muted mt-0.5">
           RM {totalAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
         </div>
@@ -577,11 +614,16 @@ function PhaseCta({
   ) {
     if (!runId) return null
     return (
-      <RequestPayrollPaymentButton
-        runId={runId}
-        totalAmount={totalAmount}
-        state={requestState}
-      />
+      <div className="flex flex-col items-end gap-2">
+        <RequestPayrollPaymentButton
+          runId={runId}
+          totalAmount={totalAmount}
+          state={requestState}
+        />
+        {/* Reopen only makes sense before money starts moving (no active
+            payment request). The RPC enforces the same rule server-side. */}
+        {phase === 'approved-no-request' && <ReopenPayrollButton period={period} />}
+      </div>
     )
   }
   if (phase === 'legacy-paid') {

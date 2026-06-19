@@ -57,7 +57,57 @@ describe('parseInfotechGrid', () => {
       otAmount: 0,
       nonStatutoryAllowance: 1679.96,
       noPayDeduction: 0,
+      bonus: 0,
+      gross: 6679.96,
+      epfEr: 650,
+      epfEe: 550,
+      // Grid truncated after EPF Total — missing cells parse as 0.
+      socsoEr: 0,
+      socsoEe: 0,
+      eisEr: 0,
+      eisEe: 0,
+      pcb: 0,
+      net: 0,
     })
+  })
+
+  it('verbatim-maps a full-width row (HV007 from the HVenture March export)', () => {
+    // Real row from "HVenture PayrollSummary Mar.xlsx" — all 26 columns.
+    const grid: (string | number | null)[][] = [
+      ['No.', 'Code', 'Emp. Name', 'Tot. Sal', 'OT Amt', 'Shift', 'Amount', 'Add', 'No Pay', 'Bonus', 'Gross', 'Ded', 'Emplyr', 'Emp', 'Total', 'Emplyr', 'Emp', 'Total', 'Emplyr', 'Emp', 'Total', 'HRDF', 'Zakat', 'PCB', 'CP38 Amount', 'NettWgs'],
+      ['Code :H-DO    Department:H - DIRECTOR OFFICE'],
+      [1, '  HV007', 'CHOW WAI MAN', 4800, 0, 0, 0, 200, 0, 0, 5000, 0, 624, 528, 1152, 83.15, 23.75, 106.9, 9.5, 9.5, 19, 0, 0, 80.75, 0, 4358],
+    ]
+    const result = parseInfotechGrid(grid)
+    expect(result.rows).toHaveLength(1)
+    expect(result.rows[0]).toEqual({
+      employeeCode: 'HV007',
+      employeeName: 'CHOW WAI MAN',
+      basicSalary: 4800,
+      otAmount: 0,
+      nonStatutoryAllowance: 200,
+      noPayDeduction: 0,
+      bonus: 0,
+      gross: 5000,
+      epfEr: 624,
+      epfEe: 528,
+      socsoEr: 83.15,
+      socsoEe: 23.75,
+      eisEr: 9.5,
+      eisEe: 9.5,
+      pcb: 80.75,
+      net: 4358,
+    })
+  })
+
+  it('folds Shift and Rest/PH amounts into otAmount', () => {
+    const grid: (string | number | null)[][] = [
+      ['No.', 'Code', 'Emp. Name', 'Tot. Sal', 'OT Amt', 'Shift', 'Amount', 'Add', 'No Pay', 'Bonus', 'Gross'],
+      ['Code :X    Department:X - TEST'],
+      [1, 'X001', 'SHIFT WORKER', 3000, 100, 50, 25, 0, 0, 0, 3175],
+    ]
+    const result = parseInfotechGrid(grid)
+    expect(result.rows[0].otAmount).toBe(175) // 100 OT + 50 shift + 25 rest/PH
   })
 
   it('trims leading whitespace from employee codes', () => {

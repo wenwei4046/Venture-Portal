@@ -20,7 +20,7 @@ export default function ImportWizard({ period }: Props) {
   const [preview, setPreview] = useState<PreviewResult | null>(null)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const [applyResult, setApplyResult] = useState<{ updated: number; skipped: number; noChange: number } | null>(null)
+  const [applyResult, setApplyResult] = useState<{ updated: number; created: number; skipped: number; failed: number } | null>(null)
 
   async function handleFile(file: File) {
     setError(null)
@@ -98,14 +98,15 @@ export default function ImportWizard({ period }: Props) {
           <span className="font-sans text-xs text-muted mt-2 block">InfoTech format only</span>
         </label>
         <div className="mt-5 text-xs font-sans text-muted space-y-1">
-          <p className="font-serif italic text-graphite">Three fields are imported per row:</p>
+          <p className="font-serif italic text-graphite">Everything is imported verbatim — the file is the source of truth:</p>
           <ul className="list-disc ml-5 space-y-0.5">
-            <li><span className="font-mono">Tot. Sal</span> → Basic Salary</li>
-            <li><span className="font-mono">OT Amt</span> → OT Amount</li>
-            <li><span className="font-mono">Allowance Add</span> → Non-Statutory Allowance</li>
+            <li><span className="font-mono">Tot. Sal</span> → Basic · <span className="font-mono">OT/Shift/Rest-PH</span> → OT Amount · <span className="font-mono">Allowance Add</span> → Allowance · <span className="font-mono">Bonus</span> → Commission</li>
+            <li><span className="font-mono">EPF / SOCSO / EIS</span> (ER + EE) · <span className="font-mono">PCB</span> · <span className="font-mono">Gross</span> · <span className="font-mono">NettWgs</span> → written exactly as exported, no recompute</li>
+            <li>Missing payroll rows are created automatically — no need to generate the period first</li>
           </ul>
           <p className="mt-2 text-muted italic">
-            Statutory + PCB + Net are recomputed by the system, not taken from the file.
+            Editing an input field on the grid afterwards re-triggers the system recompute for that row.
+            Directors are skipped — Director Salary handles them.
           </p>
         </div>
         {error && <p className="mt-4 text-sm font-serif italic text-danger">{error}</p>}
@@ -115,6 +116,7 @@ export default function ImportWizard({ period }: Props) {
 
   // ───────── Stage: Preview ─────────
   if (stage === 'preview' && preview) {
+    const totalWrites = preview.toUpdate.length + preview.toCreate.length
     return (
       <div className="max-w-4xl">
         <div className="bg-surface border border-hairline rounded-md p-6 mb-6">
@@ -136,39 +138,44 @@ export default function ImportWizard({ period }: Props) {
             </button>
           </div>
           <div className="flex gap-8 mt-4">
-            <Stat label="To update" value={preview.toUpdate.length} />
-            <Stat label="Unchanged" value={preview.noChangeCount} muted />
+            <Stat label="New rows" value={preview.toCreate.length} />
+            <Stat label="Overwritten" value={preview.toUpdate.length} />
             <Stat label="Skipped" value={preview.skipped.length} danger={preview.skipped.length > 0} />
           </div>
         </div>
 
-        {preview.toUpdate.length > 0 && (
+        {(preview.toCreate.length > 0 || preview.toUpdate.length > 0) && (
           <div className="mb-6">
-            <h3 className="font-serif text-lg text-ink mb-3">Updates</h3>
-            <div className="space-y-2">
-              {preview.toUpdate.map(u => (
-                <div key={u.rowIndex} className="border border-hairline rounded-md p-4 bg-surface">
-                  <div className="flex items-baseline justify-between mb-2">
-                    <div className="font-serif text-md text-ink">{u.staffName}</div>
-                    <div className="font-sans text-xs text-muted italic">
-                      matched by {u.matchedBy === 'employee_code' ? 'code' : 'name'}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-1 text-sm">
-                    {u.changes.map(c => (
-                      <div key={c.field} className="font-sans text-graphite">
-                        <span className="text-muted text-xs uppercase">
-                          {c.field.replace(/_/g, ' ')}
-                        </span>
-                        <span className="font-mono tabular ml-2">
-                          {formatMoney(c.from)} → <span className="text-ink font-medium">{formatMoney(c.to)}</span>
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <h3 className="font-serif text-lg text-ink mb-3">Figures from the file</h3>
+            <table className="ledger-table">
+              <thead>
+                <tr>
+                  <th>Staff</th>
+                  <th>Action</th>
+                  <th>Matched by</th>
+                  <th className="num">Gross</th>
+                  <th className="num">Net</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...preview.toCreate.map(r => ({ ...r, action: 'create' as const })),
+                  ...preview.toUpdate.map(r => ({ ...r, action: 'overwrite' as const }))].map(u => (
+                  <tr key={`${u.action}-${u.rowIndex}`}>
+                    <td>{u.staffName}</td>
+                    <td>
+                      <span className={`font-serif italic text-xs ${u.action === 'create' ? 'text-ledger' : 'text-alert'}`}>
+                        {u.action}
+                      </span>
+                    </td>
+                    <td className="font-sans text-xs text-muted">
+                      {u.matchedBy === 'employee_code' ? 'code' : 'name'}
+                    </td>
+                    <td className="num">{formatMoney(u.gross)}</td>
+                    <td className="num">{formatMoney(u.net)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
@@ -191,10 +198,10 @@ export default function ImportWizard({ period }: Props) {
         <div className="flex items-center gap-3 pt-4 border-t border-hairline">
           <button
             onClick={runApply}
-            disabled={isPending || preview.toUpdate.length === 0}
+            disabled={isPending || totalWrites === 0}
             className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md disabled:opacity-50"
           >
-            {isPending ? 'Applying...' : `Apply ${preview.toUpdate.length} updates`}
+            {isPending ? 'Applying...' : `Import ${totalWrites} row${totalWrites === 1 ? '' : 's'} from file`}
           </button>
           {error && <span className="text-sm font-serif italic text-danger">{error}</span>}
         </div>
@@ -207,9 +214,10 @@ export default function ImportWizard({ period }: Props) {
     <div className="bg-surface border border-hairline rounded-md p-8 max-w-2xl">
       <h2 className="font-serif text-xl text-ink mb-2">✓ Import complete</h2>
       <p className="font-serif italic text-graphite mb-6">
-        {applyResult?.updated ?? 0} updated
-        {(applyResult?.noChange ?? 0) > 0 && ` · ${applyResult?.noChange ?? 0} unchanged`}
-        {(applyResult?.skipped ?? 0) > 0 && ` · ${applyResult?.skipped ?? 0} skipped`}.
+        {(applyResult?.created ?? 0) > 0 && `${applyResult?.created ?? 0} created · `}
+        {applyResult?.updated ?? 0} overwritten
+        {(applyResult?.skipped ?? 0) > 0 && ` · ${applyResult?.skipped ?? 0} skipped`}
+        {(applyResult?.failed ?? 0) > 0 && ` · ${applyResult?.failed ?? 0} failed`}.
       </p>
       <div className="flex gap-3">
         <a

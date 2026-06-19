@@ -53,8 +53,19 @@ export interface StatutoryLookup {
   eisEe: number
 }
 
+/**
+ * Payout mode (user 2026-06-04, R5):
+ *  - 'split'      — classic 75% payroll / 25% invoice split (default)
+ *  - 'fully_paid' — only the 5% saving is deducted; the remaining 95%
+ *    (post advance-offset) is paid as ONE standard payroll. No invoice
+ *    portion, nothing accumulates into invoice_payout_pool. Statutory is
+ *    computed on the Basic+KPI share only; Allowance carries no statutory.
+ */
+export type PayoutMode = 'split' | 'fully_paid'
+
 export interface DirectorPayout {
   directorId: string
+  mode: PayoutMode
   grossAmount: number
   savingAmount: number
   afterSaving: number
@@ -130,6 +141,7 @@ export function calculateDirectorPayout(
   invoiceStatutory: StatutoryLookup,
   pcbAmount: number,
   openingAdvanceBalance: number = 0,
+  mode: PayoutMode = 'split',
 ): DirectorPayout {
   // Step 4: Gross
   const grossAmount = r2(pool.totalPool * director.weightage / totalWeightage)
@@ -150,9 +162,12 @@ export function calculateDirectorPayout(
   const allowanceLeftover = r2(allowanceShare - advanceRepaid)
   const afterOffset = r2(bkShare + allowanceLeftover)
 
-  // Step 8: 75/25 split on afterOffset
-  const payrollCalc = r2(afterOffset * 0.75)
-  const invoiceBase = r2(afterOffset * 0.25)
+  // Step 8: split by mode.
+  //   split      → 75% payroll / 25% invoice
+  //   fully_paid → 100% of afterOffset as one standard payroll, no invoice
+  const fullyPaid = mode === 'fully_paid'
+  const payrollCalc = fullyPaid ? afterOffset : r2(afterOffset * 0.75)
+  const invoiceBase = fullyPaid ? 0 : r2(afterOffset * 0.25)
 
   // Step 9: 75% Payroll — top-up if below min
   const advanceAmount = r2(Math.max(0, director.minPayout - payrollCalc))
@@ -182,12 +197,13 @@ export function calculateDirectorPayout(
     - payrollPcb
   )
 
-  // Step 10: 25% Invoice
-  const invoiceBk = r2(invoiceBase * offsetBkRatio)
-  const invoiceEpfEr = r2(invoiceStatutory.epfEr)
-  const invoiceSocsoEr = r2(invoiceStatutory.socsoEr)
-  const invoiceEisEr = r2(invoiceStatutory.eisEr)
-  const invoiceTotal = r2(invoiceBase + invoiceEpfEr + invoiceSocsoEr + invoiceEisEr)
+  // Step 10: 25% Invoice — zeroed entirely in fully_paid mode (nothing
+  // accumulates into invoice_payout_pool; invoiceStatutory is ignored).
+  const invoiceBk = fullyPaid ? 0 : r2(invoiceBase * offsetBkRatio)
+  const invoiceEpfEr = fullyPaid ? 0 : r2(invoiceStatutory.epfEr)
+  const invoiceSocsoEr = fullyPaid ? 0 : r2(invoiceStatutory.socsoEr)
+  const invoiceEisEr = fullyPaid ? 0 : r2(invoiceStatutory.eisEr)
+  const invoiceTotal = fullyPaid ? 0 : r2(invoiceBase + invoiceEpfEr + invoiceSocsoEr + invoiceEisEr)
 
   // Step 11: Statutory surplus
   const dirShare = director.weightage / totalWeightage
@@ -200,6 +216,7 @@ export function calculateDirectorPayout(
 
   return {
     directorId: director.id,
+    mode,
     grossAmount,
     savingAmount,
     afterSaving,

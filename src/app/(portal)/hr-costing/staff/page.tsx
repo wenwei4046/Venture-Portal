@@ -25,6 +25,8 @@ export default async function StaffListPage() {
     return {
       id: s.id,
       employee_name: s.employee_name,
+      employee_code: s.employee_code ?? null,
+      designation: s.designation ?? null,
       dept_name: dept?.name ?? null,
     }
   })

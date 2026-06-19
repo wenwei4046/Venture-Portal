@@ -30,6 +30,7 @@ export default async function HRPaymentPage() {
       .from('payroll_runs')
       .select('id, status, total_amount, rejection_reason')
       .eq('period_month', period)
+      .neq('status', 'rejected')
       .maybeSingle(),
     supabase
       .from('departments')

@@ -6,16 +6,25 @@ import { requireRole } from '@/lib/auth'
 import type { InfotechRow } from '@/lib/import/infotech-payroll'
 
 export interface PreviewResult {
+  /** Matched staff whose period row will be overwritten with the file's figures. */
   toUpdate: Array<{
     rowIndex: number
     staffId: string
     staffName: string
     matchedBy: 'employee_code' | 'employee_name_fuzzy'
-    changes: Array<{ field: string; from: number; to: number }>
+    gross: number
+    net: number
+  }>
+  /** Matched staff with no payroll row yet — a row is created from the file. */
+  toCreate: Array<{
+    rowIndex: number
+    staffId: string
+    staffName: string
+    matchedBy: 'employee_code' | 'employee_name_fuzzy'
+    gross: number
+    net: number
   }>
   skipped: Array<{ rowIndex: number; reason: string; code: string; name: string }>
-  /** Count of InfoTech rows that had no actual data to import (all numbers zero). */
-  noChangeCount: number
 }
 
 function normalise(name: string): string {
@@ -23,26 +32,18 @@ function normalise(name: string): string {
 }
 
 /**
- * Dry-run the InfoTech import: match each row to a staff record, compute the
- * diff against the period's hr_monthly_payroll row, report updates + skips.
+ * Dry-run the InfoTech import: match each row to a staff record and report
+ * what will be written. Verbatim import (user decision 2026-06-05): the file
+ * is the single source of truth — basic, OT, allowance, bonus, EPF/SOCSO/EIS
+ * ER+EE, PCB, gross and net are ALL written exactly as exported. The system
+ * does NOT recompute statutory on import. Editing an input field on the grid
+ * later still re-triggers the JADUAL recompute for that row.
  *
- * Fields touched by import (user decision 2026-04-26, Bug 2 option γ+):
- *   ot_amount               ← OT Amt              (col 4)
- *   non_statutory_allowance ← Allowance Add       (col 7)
- *   unpaid_leave_days       ← No Pay (col 8) → days conversion
+ * Rows are CREATED when the staff has no hr_monthly_payroll row for the
+ * period yet — no need to pre-generate the period before importing.
  *
- * basic_salary is NEVER touched by import. It stays at the contract value
- * from hr_staff_costs (master). Reason: InfoTech "Tot. Sal" (col 3) is
- * the total monthly payable (basic + fixed allowances ± EL deduction),
- * not the contract basic, so writing it back was overwriting good master
- * data with a derived/dynamic value.
- *
- * No Pay → unpaid_leave_days conversion:
- *   days = (noPayDeduction / contract_basic) * days_in_month
- * The DB trigger (mig 122) then applies pro-rata using days_in_month
- * (calendar days), so the round-trip is consistent.
- *
- * DB trigger then recomputes pro-rata + statutory + gross + net.
+ * Directors (no staff match — they're excluded from the staff master by
+ * design) land in `skipped`.
  */
 export async function previewInfotechImport(
   rows: InfotechRow[],
@@ -54,20 +55,13 @@ export async function previewInfotechImport(
   const [{ data: staffList }, { data: payroll }] = await Promise.all([
     supabase
       .from('hr_staff_costs')
-      .select('id, employee_name, employee_code, basic_salary')
+      .select('id, employee_name, employee_code')
       .eq('status', 'active'),
     supabase
       .from('hr_monthly_payroll')
-      .select('id, staff_id, ot_amount, non_statutory_allowance, unpaid_leave_days')
+      .select('id, staff_id, status')
       .eq('period_month', period),
   ])
-
-  // days_in_month from the period (period is 'YYYY-MM-01').
-  // Matches mig 122's EXTRACT(DAY FROM v_period_end) so the round-trip
-  // (days → trigger pro-rata → effective basic) stays consistent.
-  const periodDate = new Date(period)
-  const lastDay = new Date(periodDate.getFullYear(), periodDate.getMonth() + 1, 0)
-  const daysInMonth = lastDay.getDate()
 
   const staff = staffList ?? []
   const payrollByStaff = new Map((payroll ?? []).map(p => [p.staff_id, p]))
@@ -79,14 +73,14 @@ export async function previewInfotechImport(
   const staffByNormName = new Map(staff.map(s => [normalise(s.employee_name), s]))
 
   const toUpdate: PreviewResult['toUpdate'] = []
+  const toCreate: PreviewResult['toCreate'] = []
   const skipped: PreviewResult['skipped'] = []
-  let noChangeCount = 0
 
   rows.forEach((row, idx) => {
     const code = row.employeeCode
     const name = row.employeeName
 
-    let matched: { id: string; employee_name: string; employee_code: string | null; basic_salary: number } | undefined
+    let matched: { id: string; employee_name: string } | undefined
     let matchedBy: 'employee_code' | 'employee_name_fuzzy' | null = null
 
     if (code) {
@@ -110,85 +104,137 @@ export async function previewInfotechImport(
     }
 
     const existing = payrollByStaff.get(matched.id)
-    if (!existing) {
+    if (existing && existing.status !== 'draft') {
       skipped.push({
         rowIndex: idx,
-        reason: 'No payroll row for this staff in the period',
+        reason: `Payroll row is ${existing.status} — reopen the run first`,
         code,
         name,
       })
       return
     }
 
-    // No Pay ($) → unpaid_leave_days conversion. Guard: zero contract basic
-    // means we can't divide — skip the leave update for that staff.
-    const contractBasic = Number(matched.basic_salary)
-    const incomingLeaveDays =
-      contractBasic > 0
-        ? Math.round((row.noPayDeduction / contractBasic) * daysInMonth * 100) / 100
-        : 0
-
-    const changes: Array<{ field: string; from: number; to: number }> = []
-    const deltas: Array<{ field: string; incoming: number; current: number }> = [
-      { field: 'ot_amount', incoming: row.otAmount, current: Number(existing.ot_amount) },
-      { field: 'non_statutory_allowance', incoming: row.nonStatutoryAllowance, current: Number(existing.non_statutory_allowance) },
-      { field: 'unpaid_leave_days', incoming: incomingLeaveDays, current: Number(existing.unpaid_leave_days ?? 0) },
-    ]
-    for (const d of deltas) {
-      if (Math.abs(d.incoming - d.current) < 0.005) continue
-      changes.push({ field: d.field, from: d.current, to: d.incoming })
-    }
-
-    if (changes.length === 0) {
-      noChangeCount++
-      return
-    }
-
-    toUpdate.push({
+    const target = {
       rowIndex: idx,
       staffId: matched.id,
       staffName: matched.employee_name,
       matchedBy,
-      changes,
-    })
+      gross: row.gross,
+      net: row.net,
+    }
+    if (existing) toUpdate.push(target)
+    else toCreate.push(target)
   })
 
-  return { toUpdate, skipped, noChangeCount }
+  return { toUpdate, toCreate, skipped }
 }
 
 /**
- * Apply the previewed updates. Re-runs previewInfotechImport to recompute
- * the diff against the live DB (guards against stale client state), then
- * writes each change via a plain UPDATE — RLS + hr_monthly_payroll status
- * gating still applies.
+ * Apply the import. Re-runs the preview against the live DB (guards against
+ * stale client state), then writes each row in two phases:
+ *
+ *   Phase 1 — input fields (basic/OT/allowance/bonus). This FIRES the compute
+ *     trigger, which recomputes statutory from the JADUAL tables — we let it,
+ *     then immediately overwrite.
+ *   Phase 2 — verbatim figures (EPF/SOCSO/EIS ER+EE, PCB, gross, net). These
+ *     columns are NOT in the trigger's UPDATE OF list, so the values stick.
+ *     Stamped statutory_overridden_at/by — same convention as the manual
+ *     payslip statutory editor, so the grid shows these as file/manual values.
+ *
+ * unpaid_leave_days is reset to 0: the file's gross/net already reflect any
+ * No Pay deduction, so converting it to days would double-count.
  */
 export async function applyInfotechImport(
   rows: InfotechRow[],
   period: string,
-): Promise<{ updated: number; skipped: number; noChange: number }> {
-  await requireRole(['hr', 'principal'])
+): Promise<{ updated: number; created: number; skipped: number; failed: number }> {
+  const user = await requireRole(['hr', 'principal'])
   const supabase = await createClient()
   const preview = await previewInfotechImport(rows, period)
 
   let updated = 0
-  for (const item of preview.toUpdate) {
-    const fields: Partial<{
-      ot_amount: number
-      non_statutory_allowance: number
-      unpaid_leave_days: number
-    }> = {}
-    for (const c of item.changes) {
-      ;(fields as Record<string, number>)[c.field] = c.to
-    }
+  let created = 0
+  let failed = 0
+  const overrideStamp = {
+    statutory_overridden_at: new Date().toISOString(),
+    statutory_overridden_by: user.id,
+  }
+
+  const writeVerbatim = async (staffId: string, row: InfotechRow) => {
     const { error } = await supabase
       .from('hr_monthly_payroll')
-      .update(fields)
+      .update({
+        epf_er: row.epfEr,
+        epf_ee: row.epfEe,
+        socso_er: row.socsoEr,
+        socso_ee: row.socsoEe,
+        eis_er: row.eisEr,
+        eis_ee: row.eisEe,
+        pcb: row.pcb,
+        gross: row.gross,
+        net: row.net,
+        ...overrideStamp,
+      })
+      .eq('staff_id', staffId)
+      .eq('period_month', period)
+      .eq('status', 'draft')
+    if (error) throw new Error(error.message)
+  }
+
+  for (const item of preview.toCreate) {
+    const row = rows[item.rowIndex]
+    // Insert fires the compute trigger (prorata/statutory) — phase 2 then
+    // overwrites every computed figure with the file's values.
+    const { error: insErr } = await supabase.from('hr_monthly_payroll').insert({
+      staff_id: item.staffId,
+      period_month: period,
+      basic_salary: row.basicSalary,
+      ot_amount: row.otAmount,
+      non_statutory_allowance: row.nonStatutoryAllowance,
+      commission_amount: row.bonus,
+      unpaid_leave_days: 0,
+      source: 'imported',
+      status: 'draft',
+    })
+    if (insErr) {
+      failed++
+      continue
+    }
+    try {
+      await writeVerbatim(item.staffId, row)
+      created++
+    } catch {
+      failed++
+    }
+  }
+
+  for (const item of preview.toUpdate) {
+    const row = rows[item.rowIndex]
+    const { error: updErr } = await supabase
+      .from('hr_monthly_payroll')
+      .update({
+        basic_salary: row.basicSalary,
+        ot_amount: row.otAmount,
+        non_statutory_allowance: row.nonStatutoryAllowance,
+        commission_amount: row.bonus,
+        unpaid_leave_days: 0,
+        source: 'imported',
+      })
       .eq('staff_id', item.staffId)
       .eq('period_month', period)
       .eq('status', 'draft')
-    if (!error) updated++
+    if (updErr) {
+      failed++
+      continue
+    }
+    try {
+      await writeVerbatim(item.staffId, row)
+      updated++
+    } catch {
+      failed++
+    }
   }
 
   revalidatePath(`/hr-costing/payroll/${period}`)
-  return { updated, skipped: preview.skipped.length, noChange: preview.noChangeCount }
+  return { updated, created, skipped: preview.skipped.length, failed }
 }

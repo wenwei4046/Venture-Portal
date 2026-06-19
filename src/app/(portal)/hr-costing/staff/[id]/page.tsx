@@ -56,10 +56,11 @@ export default async function StaffDetailPage({ params }: PageProps) {
             {staff.employee_code && (
               <span className="font-mono text-sm text-muted mr-2">{staff.employee_code}</span>
             )}
+            {staff.designation && <em className="mr-2">{staff.designation}</em>}
             {staff.resignation_date && (
               <em className="text-danger">Resigned {staff.resignation_date}</em>
             )}
-            {!staff.employee_code && !staff.resignation_date && (
+            {!staff.employee_code && !staff.designation && !staff.resignation_date && (
               <em>Active employee.</em>
             )}
           </p>
