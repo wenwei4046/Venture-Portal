@@ -22,7 +22,7 @@ export default async function EditJournalVoucherPage({
       .order('created_at'),
     supabase
       .from('chart_of_accounts')
-      .select('code, name, parent_code')
+      .select('code, name, type, parent_code')
       .eq('is_active', true)
       .order('code'),
   ])
@@ -33,18 +33,21 @@ export default async function EditJournalVoucherPage({
     notFound()
   }
 
-  const rows = acctRows ?? []
-  const parentCodes = new Set(
-    rows.map((r) => r.parent_code).filter((c): c is string => !!c)
-  )
-  const leafAccounts = rows
-    .filter((r) => !parentCodes.has(r.code))
-    .map((r) => ({ code: r.code, name: r.name }))
+  // Full rows for AccountPicker — it hides header accounts itself and gives
+  // type-ahead search (user 2026-06-12).
+  const leafAccounts = (acctRows ?? []).map((r) => ({
+    code: r.code,
+    name: r.name,
+    type: r.type,
+    parent_code: (r as { parent_code: string | null }).parent_code ?? null,
+    is_active: true,
+  }))
 
   const formEntry = {
     id: entry.id,
     transaction_date: entry.transaction_date,
     description: entry.description,
+    segment: (entry.segment as string) ?? 'unallocated',
     lines: (lineRows ?? []).map((l) => ({
       account_code: l.account_code,
       debit: l.debit != null ? Number(l.debit) : null,

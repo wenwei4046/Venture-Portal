@@ -1,37 +1,45 @@
+// GL-driven P&L export (xlsx/pdf) — same engine + block structure as the page.
+
+import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { fetchIncomeStatement } from '@/lib/cfo-reports'
-import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
-import { buildIncomeStatementXlsx } from './_format/xlsx'
-import { IncomeStatementPdf } from './_format/pdf'
-import dayjs from 'dayjs'
+import { buildPnl, fetchAllJournalLines, fetchCoaAccounts, monthPeriod } from '@/lib/gl-reports'
+import { pnlBlocks } from '@/lib/gl-report-blocks'
+import { glStatementExportResponse } from '@/lib/export/gl-statement'
+import { segmentFilterFor } from '../../_components/report-segments'
+
+const YM = /^\d{4}-\d{2}$/
 
 export async function GET(req: Request) {
   await requireRole(['principal', 'finance'])
   const url = new URL(req.url)
-  const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
-  const from = url.searchParams.get('from') ?? dayjs().startOf('month').format('YYYY-MM-DD')
-  const to = url.searchParams.get('to') ?? dayjs().format('YYYY-MM-DD')
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
-    return Response.json({ error: 'invalid from/to date' }, { status: 400 })
+  const format = url.searchParams.get('format') === 'pdf' ? ('pdf' as const) : ('xlsx' as const)
+  const period = url.searchParams.get('period') ?? dayjs().format('YYYY-MM')
+  const compare = url.searchParams.get('compare') ?? '' // '' = single-month export
+  const segment = url.searchParams.get('segment') ?? ''
+  if (!YM.test(period) || (compare && !YM.test(compare))) {
+    return Response.json({ error: 'invalid period/compare (YYYY-MM)' }, { status: 400 })
   }
 
   const supabase = await createClient()
-  const stmt = await fetchIncomeStatement(supabase, { from, to })
-  const periodLabel = `${dayjs(from).format('D MMM YYYY')} – ${dayjs(to).format('D MMM YYYY')}`
+  const [lines, accounts] = await Promise.all([
+    fetchAllJournalLines(supabase),
+    fetchCoaAccounts(supabase),
+  ])
+  const pnl = buildPnl(lines, accounts, {
+    current: monthPeriod(period),
+    previous: monthPeriod(compare || period),
+    segment: segmentFilterFor(segment),
+  })
 
-  const seg = url.searchParams.get('seg') ?? 'summary'
-  const isSummary = seg === 'summary'
-  const pool = isSummary ? null : stmt.pools.find((p) => p.pool === seg) ?? null
-  if (!isSummary && !pool) {
-    return Response.json({ error: 'unknown seg' }, { status: 400 })
-  }
-  const segLabel = isSummary ? 'summary' : seg
-  const filename = `income-statement-${segLabel}-${from}-${to}`
-
-  if (format === 'xlsx') {
-    return exportXlsxResponse({ filename, buffer: buildIncomeStatementXlsx(stmt, { pool }) })
-  }
-  return exportPdfResponse({ filename, element: <IncomeStatementPdf stmt={stmt} periodLabel={periodLabel} pool={pool} /> })
+  return glStatementExportResponse({
+    format,
+    filename: `pnl-${period}${segment ? `-${segment}` : ''}`,
+    title: 'P&L Statement',
+    periodLabel: `${dayjs(`${period}-01`).format('MMMM YYYY')}${segment ? ` · ${segment}` : ''}`,
+    currentLabel: dayjs(`${period}-01`).format('MMM YYYY'),
+    compareLabel: compare ? dayjs(`${compare}-01`).format('MMM YYYY') : '',
+    blocks: pnlBlocks(pnl),
+    pctBase: pnl.revenue.current,
+  })
 }

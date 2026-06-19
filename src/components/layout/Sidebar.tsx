@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { UserRole } from '@/types'
 import {
   canAccessTreasury,
@@ -26,7 +26,29 @@ interface NavItem {
   // Match the path exactly. Use for parent-overview links whose href is a
   // strict prefix of sibling child hrefs (e.g. HR Costing > Overview).
   exact?: boolean
+  // Active only when ?tab= equals this value (for links into tabbed pages,
+  // e.g. /settings?tab=accounts). The href should carry the same query.
+  tab?: string
+  // Active only when ?tab= is NOT one of these (the default-tab sibling of a
+  // `tab` link, e.g. Dept Pool Cash vs ?tab=pnl).
+  notTab?: string[]
+  // Never active on these path prefixes (a sibling entry owns them,
+  // e.g. Payments must not light up on /payments/new — that's Receipt's).
+  notPaths?: string[]
   visible: (role: UserRole) => boolean
+}
+
+// Shared active-state test for items and group children.
+function itemActive(item: NavItem, pathname: string, tabParam: string | null): boolean {
+  const path = item.href.split('?')[0]
+  const pathMatch = item.exact
+    ? pathname === path
+    : pathname === path || pathname.startsWith(path + '/')
+  if (!pathMatch) return false
+  if (item.notPaths?.some((p) => pathname === p || pathname.startsWith(p + '/'))) return false
+  if (item.tab !== undefined && tabParam !== item.tab) return false
+  if (item.notTab && item.notTab.includes(tabParam ?? '')) return false
+  return true
 }
 
 interface NavGroup {
@@ -46,25 +68,30 @@ const isHR = (role: UserRole) => role === 'hr'
 const isPrincipalOrFinance = (role: UserRole) =>
   role === 'principal' || role === 'finance'
 
+// Layout per user spec 2026-06-10 (re-grouped from the original phase layout).
 const navEntries: NavEntry[] = [
   { href: '/dashboard', label: 'Overview', visible: () => true },
 
   // ── Daily Operations ──
   { href: '/approvals', label: 'Approvals', section: 'Daily Operations', visible: canApprove },
-  { href: '/payments', label: 'Payments', section: 'Daily Operations', visible: canAccessTreasury },
-  {
-    label: 'Loan',
-    section: 'Daily Operations',
-    visible: canAccessTreasury,
-    children: [
-      { href: '/fund-in', label: 'Fund IN', visible: canAccessTreasury },
-      { href: '/fund-out', label: 'Fund OUT', visible: canAccessTreasury },
-      { href: '/overdue', label: 'Overdue', visible: canAccessTreasury },
-    ],
-  },
-  { href: '/statements', label: 'Statements', section: 'Daily Operations', visible: canAccessTreasury },
-  { href: '/reconciliation', label: 'Reconciliation', section: 'Daily Operations', visible: canAccessTreasury },
-  { href: '/reconciliation/journal-entries', label: 'Journal Entries', section: 'Daily Operations', visible: canAccessTreasury },
+  // /payments/new is Receipt's own entry below — keep Payments off it.
+  { href: '/payments', label: 'Payments', section: 'Daily Operations', notPaths: ['/payments/new'], visible: canAccessTreasury },
+  // Receive-money form (settle invoice / record loan repayment / open an OR).
+  // The page is requireRole(['finance']) — hidden from Principal until that
+  // gate is opened up.
+  // Receipt ledger (2026-06-12): credit vouchers (HV-OR-*) only, same
+  // tabs/filters as Payments; its Create receipt button opens the
+  // credit-locked form at /payments/new?mode=receipt.
+  { href: '/receipts', label: 'Receipt', section: 'Daily Operations', visible: canAccessTreasury },
+  // /statements IS the invoices landing (Phase 7 Step 11 merge); the monthly
+  // statements list lives at /statements/monthly (inside Fund In / Out below).
+  { href: '/statements', label: 'Invoice', section: 'Daily Operations', exact: true, visible: canAccessTreasury },
+  // ── Fund In / Out (its own section, flat — user 2026-06-10) ──
+  { href: '/fund-in', label: 'Fund IN', section: 'Fund In / Out', visible: canAccessTreasury },
+  { href: '/fund-out', label: 'Fund OUT', section: 'Fund In / Out', visible: canAccessTreasury },
+  { href: '/overdue', label: 'Overdue', section: 'Fund In / Out', visible: canAccessTreasury },
+  { href: '/repayment-schedule', label: 'Repayment Schedule', section: 'Fund In / Out', visible: canAccessTreasury },
+  { href: '/statements/monthly', label: 'Statements', section: 'Fund In / Out', visible: canAccessTreasury },
   // HR sees HR Costing as an expandable group covering all monthly sub-pages.
   // Principal sees a flat /hr-costing link in the Departments section below.
   {
@@ -81,7 +108,15 @@ const navEntries: NavEntry[] = [
   { href: '/director-salary', label: 'Director Salary', section: 'Daily Operations', visible: isHR },
 
   // ── Departments ──
-  { href: '/dept-pool', label: 'Dept Pool', section: 'Departments', visible: canAccessDeptPool },
+  {
+    label: 'Dept Pool',
+    section: 'Departments',
+    visible: canAccessDeptPool,
+    children: [
+      { href: '/dept-pool', label: 'Cash', notTab: ['pnl'], visible: canAccessDeptPool },
+      { href: '/dept-pool?tab=pnl', label: 'Accrual P&L', tab: 'pnl', visible: canAccessDeptPool },
+    ],
+  },
   // Venture Pool = HV holding-company cash ledger (5 txn types). Sits next to
   // Dept Pool because users navigate between "department view" and "HV view"
   // when reasoning about money flow. Not under Treasury — Loo grouped it here.
@@ -94,8 +129,6 @@ const navEntries: NavEntry[] = [
   // clicking this would hit notFound().
   { href: '/billing/contracts/new', label: 'New Contract', section: 'Departments', visible: (r) => r === 'dept_manager' },
   { href: '/hr-costing', label: 'HR Costing', section: 'Departments', visible: (r) => r === 'principal' },
-  // Phase 7 Step 11: Billing merged into Statements → Invoices sub-tab.
-  // Legacy /billing URL still redirects for external bookmarks.
   {
     label: 'Director',
     section: 'Departments',
@@ -108,10 +141,43 @@ const navEntries: NavEntry[] = [
   { href: '/claims', label: 'Claims', section: 'Departments', visible: canAccessClaims },
 
   // ── Reports & Admin ──
-  { href: '/reports', label: 'Reports', section: 'Reports & Admin', visible: canAccessReports },
+  { href: '/reports/ledger', label: 'General Ledger', section: 'Reports & Admin', visible: canAccessReports },
+  {
+    label: 'Reports',
+    section: 'Reports & Admin',
+    visible: canAccessReports,
+    children: [
+      { href: '/reports/income-statement', label: 'P&L', visible: canAccessReports },
+      { href: '/reports/cash-flow', label: 'Cash Flow', visible: canAccessReports },
+      { href: '/reports/balance-sheet', label: 'Balance Sheet', visible: canAccessReports },
+      { href: '/reports/trial-balance', label: 'Trial Balance', visible: canAccessReports },
+      { href: '/reports/fund-summary', label: 'Fund Summary', visible: canAccessReports },
+      { href: '/reports/claims', label: 'Claims Report', visible: canAccessReports },
+    ],
+  },
+  { href: '/reconciliation', label: 'Reconciliation', section: 'Reports & Admin', notPaths: ['/reconciliation/journal-entries'], visible: canAccessTreasury },
+  { href: '/reconciliation/journal-entries', label: 'Journal Entries', section: 'Reports & Admin', visible: canAccessTreasury },
   { href: '/audit-log', label: 'Audit Log', section: 'Reports & Admin', visible: canAccessSettings },
-  // Finance lands on the Categories tab (the only one they can edit); Principal sees all tabs.
-  { href: '/settings', label: 'Settings', section: 'Reports & Admin', visible: canAccessCategories },
+  // Settings tabs flattened into the group (user 2026-06-10). Finance only
+  // gets Chart of Account (the categories tab they can edit) + Base Rate
+  // History; the other tabs are Principal-only.
+  {
+    label: 'Settings',
+    section: 'Reports & Admin',
+    visible: canAccessCategories,
+    children: [
+      { href: '/settings?tab=accounts', label: 'Chart of Account', tab: 'accounts', visible: canAccessCategories },
+      { href: '/reports/base-rate', label: 'Base Rate History', visible: canAccessReports },
+      { href: '/settings?tab=treasury', label: 'Treasury', tab: 'treasury', visible: canAccessSettings },
+      { href: '/settings?tab=overdue', label: 'Overdue Config', tab: 'overdue', visible: canAccessSettings },
+      { href: '/settings?tab=splits', label: 'Splits', tab: 'splits', visible: canAccessSettings },
+      { href: '/settings?tab=directors', label: 'Directors', tab: 'directors', visible: canAccessSettings },
+      { href: '/settings?tab=companies', label: 'Companies', tab: 'companies', visible: canAccessSettings },
+      { href: '/settings?tab=banks', label: 'Bank Accounts', tab: 'banks', visible: canAccessSettings },
+      { href: '/settings?tab=periods', label: 'Periods', tab: 'periods', visible: canAccessSettings },
+      { href: '/settings?tab=simulator', label: 'Simulator', tab: 'simulator', visible: canAccessSettings },
+    ],
+  },
 ]
 
 interface SidebarProps {
@@ -122,6 +188,8 @@ interface SidebarProps {
 
 export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
   const router = useRouter()
 
   const visible = navEntries.filter((entry) => entry.visible(role))
@@ -143,9 +211,7 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
     const open: Record<string, boolean> = {}
     for (const entry of visible) {
       if (isGroup(entry)) {
-        open[entry.label] = entry.children.some(
-          (c) => pathname === c.href || pathname.startsWith(c.href + '/')
-        )
+        open[entry.label] = entry.children.some((c) => itemActive(c, pathname, tabParam))
       }
     }
     return open
@@ -173,13 +239,11 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
   useEffect(() => {
     for (const entry of visible) {
       if (isGroup(entry)) {
-        const match = entry.children.some(
-          (c) => pathname === c.href || pathname.startsWith(c.href + '/')
-        )
+        const match = entry.children.some((c) => itemActive(c, pathname, tabParam))
         if (match) setGroupOpen((prev) => ({ ...prev, [entry.label]: true }))
       }
     }
-  }, [pathname]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pathname, tabParam]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-close the mobile drawer when the route changes (user clicked a link).
   useEffect(() => {
@@ -267,9 +331,8 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
               ) : null}
               {section.entries.map((entry) => {
                 if (isGroup(entry)) {
-                  const groupActive = entry.children.some(
-                    (c) =>
-                      pathname === c.href || pathname.startsWith(c.href + '/')
+                  const groupActive = entry.children.some((c) =>
+                    itemActive(c, pathname, tabParam)
                   )
                   const isOpen = !!groupOpen[entry.label]
                   return (
@@ -303,10 +366,7 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
                           {entry.children
                             .filter((c) => c.visible(role))
                             .map((child) => {
-                              const active = child.exact
-                                ? pathname === child.href
-                                : pathname === child.href ||
-                                  pathname.startsWith(child.href + '/')
+                              const active = itemActive(child, pathname, tabParam)
                               return (
                                 <Link
                                   key={child.href}
@@ -336,9 +396,7 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
                 }
 
                 const item = entry as NavItem
-                const active =
-                  pathname === item.href ||
-                  pathname.startsWith(item.href + '/')
+                const active = itemActive(item, pathname, tabParam)
                 return (
                   <Link
                     key={item.href}

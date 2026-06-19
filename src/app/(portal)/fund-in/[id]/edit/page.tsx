@@ -5,13 +5,14 @@ import { createClient } from '@/lib/supabase/server'
 import type { AccountType } from '@/lib/coa'
 import type { AccountOption } from '@/components/AccountPicker'
 import EditFundSourceForm from './_components/EditFundSourceForm'
+import AmendFundSourceForm from './_components/AmendFundSourceForm'
 
 interface Props {
   params: Promise<{ id: string }>
 }
 
 export default async function EditFundSourcePage({ params }: Props) {
-  await requireRole(['finance'])
+  const user = await requireRole(['principal', 'finance'])
   const { id } = await params
   const supabase = await createClient()
 
@@ -27,6 +28,54 @@ export default async function EditFundSourcePage({ params }: Props) {
 
   if (error || !source) notFound()
 
+  // Edit access:
+  //  - pending_approval  → Finance edits via the create/approval flow (EditFundSourceForm)
+  //  - active            → Principal amends terms directly (AmendFundSourceForm)
+  //  - anything else     → frozen → bounce to detail
+  const isPending = source.status === 'pending_approval'
+  const isActiveAmend = source.status === 'active' && user.role === 'principal'
+  if (!isPending && !isActiveAmend) {
+    redirect(`/fund-in/${id}`)
+  }
+
+  // Resolve the read-only "from" label for context.
+  let fromLabel = '—'
+  if (source.from_company_id) {
+    const { data: c } = await supabase.from('companies').select('name, short_code').eq('id', source.from_company_id).single()
+    if (c) fromLabel = `${c.name} (${c.short_code})`
+  } else if (source.from_director_id) {
+    const { data: d } = await supabase.from('directors').select('name, code').eq('id', source.from_director_id).single()
+    if (d) fromLabel = `${d.name} (${d.code})`
+  } else if (source.from_department_id) {
+    const { data: dept } = await supabase.from('departments').select('name').eq('id', source.from_department_id).single()
+    if (dept) fromLabel = dept.name
+  } else if ((source as { from_freetext_name: string | null }).from_freetext_name) {
+    fromLabel = (source as { from_freetext_name: string }).from_freetext_name
+  }
+
+  if (isActiveAmend) {
+    return (
+      <div>
+        <Link href={`/fund-in/${id}`} className="text-sm text-muted hover:text-accent font-sans transition-colors">← Back to fund source</Link>
+        <div className="page-head">
+          <div>
+            <div className="page-eyebrow"><em>I.</em> TREASURY · 修改资金来源条款</div>
+            <h1 className="page-title">{fromLabel}</h1>
+          </div>
+        </div>
+        <AmendFundSourceForm
+          id={source.id}
+          fromLabel={fromLabel}
+          ratePct={(Number(source.cost_rate) * 100).toString()}
+          lockInMonths={(source.lock_in_months ?? '').toString()}
+          repaymentDate={(source.repayment_date as string | null) ?? (source.effective_date as string)}
+          compound={(source as { compound_interest?: boolean }).compound_interest === true}
+          notes={source.notes ?? ''}
+        />
+      </div>
+    )
+  }
+
   const liabilityAccounts: AccountOption[] = (acctRows ?? []).map((a) => ({
     code: a.code as string,
     name: a.name as string,
@@ -35,38 +84,6 @@ export default async function EditFundSourcePage({ params }: Props) {
     is_active: a.is_active as boolean,
   }))
 
-  // Only pending_approval is editable. Anything else → bounce back to the
-  // detail view so Finance sees the current frozen state.
-  if (source.status !== 'pending_approval') {
-    redirect(`/fund-in/${id}`)
-  }
-
-  // Resolve the read-only "from" label so the form can show context without
-  // exposing an editable selector (source_type + from_*_id are locked).
-  let fromLabel = '—'
-  if (source.from_company_id) {
-    const { data: c } = await supabase
-      .from('companies')
-      .select('name, short_code')
-      .eq('id', source.from_company_id)
-      .single()
-    if (c) fromLabel = `${c.name} (${c.short_code})`
-  } else if (source.from_director_id) {
-    const { data: d } = await supabase
-      .from('directors')
-      .select('name, code')
-      .eq('id', source.from_director_id)
-      .single()
-    if (d) fromLabel = `${d.name} (${d.code})`
-  } else if (source.from_department_id) {
-    const { data: dept } = await supabase
-      .from('departments')
-      .select('name')
-      .eq('id', source.from_department_id)
-      .single()
-    if (dept) fromLabel = dept.name
-  }
-
   const typeLabel =
     source.source_type === 'subsidiary' ? 'Subsidiary'
     : source.source_type === 'director_loan' ? 'Director loan'
@@ -74,17 +91,10 @@ export default async function EditFundSourcePage({ params }: Props) {
 
   return (
     <div>
-      <Link
-        href={`/fund-in/${id}`}
-        className="text-sm text-muted hover:text-accent font-sans transition-colors"
-      >
-        ← Back to fund source
-      </Link>
+      <Link href={`/fund-in/${id}`} className="text-sm text-muted hover:text-accent font-sans transition-colors">← Back to fund source</Link>
       <div className="page-head">
         <div>
-          <div className="page-eyebrow">
-            <em>I.</em> TREASURY · EDIT FUND SOURCE
-          </div>
+          <div className="page-eyebrow"><em>I.</em> TREASURY · EDIT FUND SOURCE</div>
           <h1 className="page-title">Edit fund source</h1>
         </div>
       </div>

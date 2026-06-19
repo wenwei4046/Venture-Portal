@@ -85,14 +85,16 @@ export function poolAttributions(
 
 // Mirrors the SQL billing_mode_to_segment (IMMUTABLE) so the TS settlement
 // path tags the bank-in JE with the same segment the revenue used at issue.
-// NOTE: director_attribution → 'director_office' segment (matches SQL), even
-// though its POOL is dept_pool_director.
+// director_attribution → 'director': its settlement cash lands in the
+// DIRECTOR pool (dept_pool_director), so the GL segment must match — the old
+// 'director_office' mapping forked the two ledgers by 65,931.62 (mig
+// 20260610010000 fixed the SQL side the same day).
 const BILLING_MODE_TO_SEGMENT: Record<string, string> = {
   marketing_project: 'marketing',
   hr_attribution: 'hr',
   finance_attribution: 'finance',
   director_office_attribution: 'director_office',
-  director_attribution: 'director_office',
+  director_attribution: 'director',
 }
 
 export function segmentForBillingMode(mode: string): string {

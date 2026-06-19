@@ -3983,6 +3983,14 @@ export type Database = {
       }
     }
     Functions: {
+      amend_fund_source: {
+        Args: { p_fund_source_id: string; p_payload: Json }
+        Returns: undefined
+      }
+      amend_loan: {
+        Args: { p_loan_id: string; p_payload: Json }
+        Returns: undefined
+      }
       apply_pool_adjustment: {
         Args: {
           p_amount: number
@@ -4005,7 +4013,12 @@ export type Database = {
         Returns: undefined
       }
       approve_single_voucher: {
-        Args: { p_approval_id: string; p_notes: string; p_user_id: string }
+        Args: {
+          p_allow_overdraw?: boolean
+          p_approval_id: string
+          p_notes: string
+          p_user_id: string
+        }
         Returns: {
           voucher_id: string
           voucher_no: string
@@ -4045,6 +4058,10 @@ export type Database = {
           staff_allocation_snapshot: Json
           staff_snapshot: Json
         }[]
+      }
+      bump_bank_balance: {
+        Args: { p_bank_account_id: string; p_delta: number }
+        Returns: number
       }
       bump_bank_for_paid_credit: {
         Args: { p_voucher_id: string }

@@ -1,9 +1,13 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type MouseEvent } from 'react'
+import { createPortal } from 'react-dom'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
 import type { Ledger, LedgerLine } from '@/lib/cfo-reports'
+
+/** Sentinel facet token for an empty segment / journal type. */
+const BLANK = ' blank'
 
 function formatSignedBalance(signed: number): string {
   const abs = Math.abs(signed)
@@ -25,6 +29,27 @@ function segmentShort(seg: string): string {
   if (!seg) return ''
   return SEGMENT_SHORT[seg] ?? seg
 }
+
+const SEGMENT_LABEL: Record<string, string> = {
+  marketing: 'Marketing',
+  finance: 'Finance',
+  hr: 'HR',
+  director_office: 'Director Office',
+  director: 'Director',
+  corporate: 'Venture',
+  treasury: 'Treasury',
+  unallocated: 'Unallocated',
+}
+function segmentLabel(seg: string): string {
+  if (seg === BLANK || !seg) return '(Blanks)'
+  return SEGMENT_LABEL[seg] ?? seg
+}
+function journalTypeLabel(jt: string): string {
+  return jt === BLANK || !jt ? '(Blanks)' : jt
+}
+
+const sortFacet = (a: string, b: string): number =>
+  a === BLANK ? 1 : b === BLANK ? -1 : a.localeCompare(b, undefined, { numeric: true })
 
 function isBfLine(l: LedgerLine): boolean {
   return l.description === 'BALANCE B/F' && l.entryDate === ''
@@ -54,22 +79,49 @@ function lineMatches(l: LedgerLine, q: string): boolean {
 export default function LedgerSections({ ledgers }: { ledgers: Ledger[] }) {
   const [query, setQuery] = useState('')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  // Excel-style facet filters. null = no filter (every value passes).
+  const [segSel, setSegSel] = useState<Set<string> | null>(null)
+  const [jtSel, setJtSel] = useState<Set<string> | null>(null)
 
   const q = query.trim().toLowerCase()
 
+  // Distinct segment / journal-type tokens across every real (non-B/F) line, so
+  // the facet lists stay stable regardless of the active search or other filter.
+  const { segTokens, jtTokens } = useMemo(() => {
+    const segs = new Set<string>()
+    const jts = new Set<string>()
+    for (const led of ledgers) {
+      for (const l of led.lines) {
+        if (isBfLine(l)) continue
+        segs.add(l.segment || BLANK)
+        jts.add(l.journalType || BLANK)
+      }
+    }
+    return {
+      segTokens: Array.from(segs).sort(sortFacet),
+      jtTokens: Array.from(jts).sort(sortFacet),
+    }
+  }, [ledgers])
+
   const prepared = useMemo(() => {
+    const segPass = (l: LedgerLine) => !segSel || segSel.has(l.segment || BLANK)
+    const jtPass = (l: LedgerLine) => !jtSel || jtSel.has(l.journalType || BLANK)
+    const filtersActive = !!segSel || !!jtSel
+
     const out: Array<{ led: Ledger; lines: LedgerLine[]; matchedCount: number }> = []
     for (const led of ledgers) {
       const bf = led.lines.find(isBfLine) ?? null
-      const realLines = led.lines.filter((l) => !isBfLine(l))
+      // Facet filters apply to lines regardless of an account-name search hit.
+      const realLines = led.lines.filter((l) => !isBfLine(l) && segPass(l) && jtPass(l))
 
-      // Account-level match: code or name hit → keep all real lines.
+      // Account-level match: code or name hit → keep all (facet-passing) lines.
       const accountHit =
         !!q && (led.code.toLowerCase().includes(q) || led.accountName.toLowerCase().includes(q))
 
       let kept = !q || accountHit ? realLines : realLines.filter((l) => lineMatches(l, q))
-      const matchedCount = q ? kept.length : 0
-      if (q && kept.length === 0) continue // hide sections with zero matches when searching
+      const narrowed = q || filtersActive
+      const matchedCount = narrowed ? kept.length : 0
+      if (narrowed && kept.length === 0) continue // hide sections with zero matches
 
       if (sortDir === 'desc') kept = [...kept].reverse()
 
@@ -77,16 +129,18 @@ export default function LedgerSections({ ledgers }: { ledgers: Ledger[] }) {
       out.push({ led, lines: finalLines, matchedCount })
     }
     return out
-  }, [ledgers, q, sortDir])
+  }, [ledgers, q, sortDir, segSel, jtSel])
 
+  const filtersActive = !!segSel || !!jtSel
+  const narrowed = !!q || filtersActive
   const totalMatches = prepared.reduce((s, p) => s + p.matchedCount, 0)
-  const hiddenSections = q ? ledgers.length - prepared.length : 0
+  const hiddenSections = narrowed ? ledgers.length - prepared.length : 0
 
   return (
     <div className="mt-2">
-      {/* Toolbar — search + sort */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
-        <div className="relative flex-1 max-w-md">
+      {/* Toolbar — search + sort + facet filters */}
+      <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 mb-4">
+        <div className="relative flex-1 min-w-[12rem] max-w-md">
           <input
             type="text"
             value={query}
@@ -115,6 +169,20 @@ export default function LedgerSections({ ledgers }: { ledgers: Ledger[] }) {
             </button>
           ) : null}
         </div>
+        <FacetFilter
+          label="Dept"
+          tokens={segTokens}
+          selected={segSel}
+          onChange={setSegSel}
+          display={segmentLabel}
+        />
+        <FacetFilter
+          label="Journal Type"
+          tokens={jtTokens}
+          selected={jtSel}
+          onChange={setJtSel}
+          display={journalTypeLabel}
+        />
         <button
           type="button"
           onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
@@ -127,7 +195,7 @@ export default function LedgerSections({ ledgers }: { ledgers: Ledger[] }) {
         </button>
       </div>
 
-      {q ? (
+      {narrowed ? (
         <p className="font-serif italic text-muted text-xs mb-4">
           {totalMatches} matching {totalMatches === 1 ? 'line' : 'lines'} across {prepared.length} {prepared.length === 1 ? 'account' : 'accounts'}
           {hiddenSections > 0 ? ` · ${hiddenSections} ${hiddenSections === 1 ? 'account' : 'accounts'} hidden` : ''}
@@ -136,7 +204,11 @@ export default function LedgerSections({ ledgers }: { ledgers: Ledger[] }) {
 
       {prepared.length === 0 ? (
         <p className="font-serif italic text-muted text-sm">
-          No lines match <strong>&ldquo;{query}&rdquo;</strong>. Try a different keyword or clear the search.
+          {q ? (
+            <>No lines match <strong>&ldquo;{query}&rdquo;</strong>. Try a different keyword or clear the filters.</>
+          ) : (
+            <>No lines match the active filters. Clear a filter to see more.</>
+          )}
         </p>
       ) : (
         <div className="space-y-8">
@@ -146,6 +218,136 @@ export default function LedgerSections({ ledgers }: { ledgers: Ledger[] }) {
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * Excel-style facet filter: a toolbar button (funnel) that opens a fixed-
+ * positioned checkbox list of the column's distinct values + (All) + Clear.
+ * Mirrors the per-column filter built into `SortableTable`, adapted for the
+ * hand-rolled grouped ledger. `selected === null` means "all values pass".
+ */
+function FacetFilter({
+  label,
+  tokens,
+  selected,
+  onChange,
+  display,
+}: {
+  label: string
+  tokens: string[]
+  selected: Set<string> | null
+  onChange: (next: Set<string> | null) => void
+  display: (token: string) => string
+}) {
+  const [open, setOpen] = useState(false)
+  const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null)
+  const [search, setSearch] = useState('')
+
+  const active = selected !== null
+  const allChecked = !selected || selected.size === tokens.length
+
+  function openPanel(e: MouseEvent) {
+    e.stopPropagation()
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const left = Math.min(r.left, (typeof window !== 'undefined' ? window.innerWidth : 9999) - 280)
+    setAnchor({ top: r.bottom + 4, left: Math.max(8, left) })
+    setSearch('')
+    setOpen((o) => !o)
+  }
+  function tokenChecked(token: string): boolean {
+    return selected ? selected.has(token) : true
+  }
+  function toggleToken(token: string) {
+    const cur = new Set(selected ?? tokens)
+    if (cur.has(token)) cur.delete(token)
+    else cur.add(token)
+    onChange(cur.size >= tokens.length ? null : cur)
+  }
+  function toggleAll() {
+    onChange(allChecked ? new Set<string>() : null)
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={openPanel}
+        className={`px-3 py-2 border rounded-md text-xs font-mono transition-colors flex items-center gap-2 ${
+          active
+            ? 'bg-surface-2 border-accent-border text-ink'
+            : 'bg-surface hover:bg-surface-2 border-hairline text-graphite hover:text-ink'
+        }`}
+        title={`Filter by ${label}`}
+      >
+        <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+          <path d="M2 3.5h12L9.2 9v4l-2.4 1.2V9L2 3.5z" />
+        </svg>
+        <span>{label}</span>
+        {active ? <span className="text-accent">●</span> : null}
+      </button>
+
+      {/* Portaled to document.body — a transformed ancestor re-bases `fixed`
+          and the panel lands away from its button (user report 2026-06-12). */}
+      {open && anchor && typeof document !== 'undefined' ? (
+        createPortal(
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden />
+          <div
+            className="fixed z-50 w-64 bg-paper border border-hairline rounded-md shadow-xl p-2 text-left font-sans normal-case"
+            style={{ top: anchor.top, left: anchor.left }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <input
+              type="text"
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="搜索值…"
+              className="w-full mb-2 px-2 py-1 text-sm bg-paper border border-hairline rounded text-ink focus:outline-none focus:border-accent-border"
+            />
+            <div className="max-h-56 overflow-y-auto pr-1">
+              {!search.trim() ? (
+                <label className="flex items-center gap-2 py-0.5 text-sm cursor-pointer text-ink">
+                  <input type="checkbox" className="accent-accent" checked={allChecked} onChange={toggleAll} />
+                  <span className="font-medium">(All)</span>
+                </label>
+              ) : null}
+              {tokens
+                .filter((tok) => display(tok).toLowerCase().includes(search.trim().toLowerCase()))
+                .map((tok) => (
+                  <label key={tok} className="flex items-center gap-2 py-0.5 text-sm cursor-pointer text-ink">
+                    <input
+                      type="checkbox"
+                      className="accent-accent shrink-0"
+                      checked={tokenChecked(tok)}
+                      onChange={() => toggleToken(tok)}
+                    />
+                    <span className="truncate" title={display(tok)}>
+                      {display(tok)}
+                    </span>
+                  </label>
+                ))}
+              {tokens.length === 0 ? <div className="text-xs text-muted italic py-1">No values</div> : null}
+            </div>
+            <div className="flex items-center justify-between mt-2 pt-2 border-t border-hairline">
+              <button type="button" onClick={() => onChange(null)} className="text-xs text-muted hover:text-ink">
+                Clear Filter
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="text-xs text-accent hover:text-accent-hover"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </>,
+        document.body,
+        )
+      ) : null}
+    </>
   )
 }
 

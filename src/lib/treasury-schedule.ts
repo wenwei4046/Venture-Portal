@@ -40,6 +40,20 @@ export function loanMonthlyInstallment(i: InstallmentInput): Installment {
   }
 }
 
+/** Flat amortisation convention: the first installment falls due one month
+ *  AFTER disbursement/effective date. A loan disbursed (or fund source
+ *  received) during the current month therefore has NOTHING due this month —
+ *  it must stay off the this-month schedule until next month. Null/empty
+ *  start date → false (keep legacy include-it behavior). */
+export function isBeforeFirstInstallment(
+  startDate: string | null | undefined,
+  currentYM: string,
+): boolean {
+  const ym = (startDate ?? '').slice(0, 7)
+  if (!ym) return false
+  return ym >= currentYM
+}
+
 /** A loan has NO confirmed repayment plan when its repayment_terms is empty or
  *  flags the schedule as undecided ("未定") / no method ("无还款方式" /
  *  "原表无还款方式"). Such loans go to the "no fixed term" table, not the

@@ -159,35 +159,11 @@ export async function generatePvFromRequest(
     )
 
   if (srcErr) {
-    // Best effort: PV exists but source rows failed. Surface the error so
-    // Finance can fix on the detail page before submitting for approval.
-    console.error('Failed to insert voucher sources:', srcErr.message)
+    // PV exists but source rows failed. Surface the error so Finance can fix
+    // on the detail page before submitting for approval.
     throw new Error(
       `PV ${voucher.voucher_no} created but source allocations failed: ${srcErr.message}`,
     )
-  }
-
-  // ── Open an approval_requests row so Principal's /approvals queue shows
-  //    this PV alongside other pending decisions. Matches the pattern that
-  //    createPaymentVoucher → submitForApproval uses when Finance creates
-  //    PVs the normal way (payments/actions.ts:277).
-  const { error: approvalErr } = await supabase
-    .from('approval_requests')
-    .insert({
-      request_type: 'payment_voucher',
-      reference_id: voucher.id,
-      reference_table: 'payment_vouchers',
-      submitted_by: user.id,
-      description: `${voucher.voucher_no}: Payroll bank transfer — ${periodLabel}`,
-      amount,
-      status: 'pending',
-      workflow_state: 'submitted',
-    })
-
-  if (approvalErr) {
-    // Non-fatal: PV is already marked pending_approval; Principal can find
-    // it via /payments?status=pending_approval even without the queue row.
-    console.error('Failed to open approval_request for PV:', approvalErr.message)
   }
 
   // ── Link request → PV and flip state ──────────────────────────────────────
@@ -207,6 +183,33 @@ export async function generatePvFromRequest(
     throw new Error(
       `PV ${voucher.voucher_no} created, but failed to link back to the request: ${linkErr.message}. ` +
         `Contact an engineer.`,
+    )
+  }
+
+  // ── Open an approval_requests row so Principal's /approvals queue shows
+  //    this PV alongside other pending decisions. Matches the pattern that
+  //    createPaymentVoucher → submitForApproval uses when Finance creates
+  //    PVs the normal way. Runs AFTER the request→PV link on purpose: the
+  //    link flips the request off 'submitted', so a failure here can't be
+  //    retried into a duplicate PV. Fail loud (2026-06-11 audit) — without
+  //    the queue row the PV silently never reaches Principal's /approvals.
+  const { error: approvalErr } = await supabase
+    .from('approval_requests')
+    .insert({
+      request_type: 'payment_voucher',
+      reference_id: voucher.id,
+      reference_table: 'payment_vouchers',
+      submitted_by: user.id,
+      description: `${voucher.voucher_no}: Payroll bank transfer — ${periodLabel}`,
+      amount,
+      status: 'pending',
+      workflow_state: 'submitted',
+    })
+
+  if (approvalErr) {
+    throw new Error(
+      `PV ${voucher.voucher_no} created and linked, but opening the approval queue entry failed: ${approvalErr.message}. ` +
+        `Principal can still approve it from /payments (status: pending approval).`,
     )
   }
 

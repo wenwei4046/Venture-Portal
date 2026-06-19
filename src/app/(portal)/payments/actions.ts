@@ -9,7 +9,6 @@ import { postJournalEntry, r2 } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
 import { ACCOUNT_TYPES, type AccountType } from '@/lib/coa'
 import { segmentForBillingMode } from '@/lib/invoice-settlement'
-import { INVOICE_BILLING_MODE_TO_POOL } from '@/lib/cfo-reports'
 
 // ─── Create payment voucher (Finance) ────────────────────────────────────────
 
@@ -169,7 +168,7 @@ export async function createPaymentVoucher(formData: FormData) {
     .from('payment_vouchers')
     .insert({
       voucher_no: voucherNo,
-      voucher_type: voucherType as 'loan_repayment' | 'billing_payment' | 'claim_payout' | 'expense' | 'internal_transfer' | 'salary_payout' | 'other' | 'receive_payment',
+      voucher_type: voucherType as 'loan_repayment' | 'billing_payment' | 'claim_payout' | 'expense' | 'internal_transfer' | 'salary_payout' | 'other' | 'receive_payment' | 'payroll_bank_transfer',
       direction,
       // Mig 205: category_code moved to payment_voucher_sources (per-row).
       // Phase 7 Step 16: source_pool deprecated. Debit vouchers get their
@@ -193,12 +192,15 @@ export async function createPaymentVoucher(formData: FormData) {
       fund_source_id: fundSourceId,
       repayment_breakdown: repaymentBreakdown,
       created_by: user.id,
+      // Stored for DEBIT drafts too (2026-06-11): approve_single_voucher /
+      // approve_voucher_batch[_partial] now post the GL on this date, so the
+      // P&L reflects Finance's stated payment date, not Principal's approval day.
+      payment_date: paymentDateStr,
       ...(isAutoComplete ? {
         approved_by: user.id,
         approved_at: nowIso,
         executed_by: user.id,
         executed_at: nowIso,
-        payment_date: paymentDateStr,
       } : {}),
     })
     .select('id')
@@ -332,27 +334,37 @@ export async function createPaymentVoucher(formData: FormData) {
           .select('name')
           .eq('id', inv.billable_to_department_id)
           .maybeSingle()
-        if (dept?.name) {
-          // Convention from mig 253: '9051 Inter-billing — Marketing',
-          // '9052 Inter-billing — Finance', etc. Match by suffix so a
-          // renamed dept still works as long as the COA row exists.
-          const { data: acct } = await supabase
-            .from('chart_of_accounts')
-            .select('code, name')
-            .eq('type', 'expense')
-            .ilike('name', `Inter-billing % ${dept.name}`)
-            .maybeSingle()
-          if (acct?.code) {
-            // Pool key follows the dept_pool_<slug> convention used by
-            // INVOICE_BILLING_MODE_TO_POOL ('dept_pool_marketing',
-            // 'dept_pool_director_office', etc).
-            const payingPool = `dept_pool_${dept.name.toLowerCase().replace(/\s+/g, '_')}`
-            interBilling = {
-              expenseCode: acct.code,
-              payingPool,
-              partyLabel: dept.name,
-            }
-          }
+        // Fail loud (2026-06-11): if resolution fails, interBilling stays
+        // null and the voucher silently falls through to the BANK settlement
+        // path — bank cache bumped + Dr bank / Cr 3030 for money that never
+        // moved. A netting settle on a dept_pool invoice must resolve or die.
+        if (!dept?.name) {
+          throw new Error(
+            `Netting settle: paying department ${inv.billable_to_department_id} not found for invoice ${invoiceId}`,
+          )
+        }
+        // Convention from mig 253: '9051 Inter-billing — Marketing',
+        // '9052 Inter-billing — Finance', etc. Match by suffix so a
+        // renamed dept still works as long as the COA row exists.
+        const { data: acct } = await supabase
+          .from('chart_of_accounts')
+          .select('code, name')
+          .eq('type', 'expense')
+          .ilike('name', `Inter-billing % ${dept.name}`)
+          .maybeSingle()
+        if (!acct?.code) {
+          throw new Error(
+            `Netting settle: no active expense account named "Inter-billing — ${dept.name}" in the COA (9051–9055 range)`,
+          )
+        }
+        // Pool key follows the dept_pool_<slug> convention used by
+        // INVOICE_BILLING_MODE_TO_POOL ('dept_pool_marketing',
+        // 'dept_pool_director_office', etc).
+        const payingPool = `dept_pool_${dept.name.toLowerCase().replace(/\s+/g, '_')}`
+        interBilling = {
+          expenseCode: acct.code,
+          payingPool,
+          partyLabel: dept.name,
         }
       }
     }
@@ -364,7 +376,9 @@ export async function createPaymentVoucher(formData: FormData) {
         p_voucher_id: data.id,
       })
       if (bumpErr) {
-        console.error('bump_bank_for_paid_credit failed:', bumpErr.message)
+        // Fail loud (2026-06-11 audit): a swallowed bump drifts the bank
+        // cache vs GL until an approval bounces on "insufficient balance".
+        throw new Error(`Receipt ${voucherNo} created but bank balance update failed: ${bumpErr.message}`)
       }
     }
     // Pool balance: add to target pool (the receiving side — e.g. Marketing
@@ -439,12 +453,19 @@ export async function createPaymentVoucher(formData: FormData) {
             : {}),
           lines: [
             { accountCode: glAccountCode, debit: r2(amount), description: `Bank deposit — ${voucherNo}` },
-            { accountCode: '3030', credit: r2(amount), description: `Payment received — ${payeeName}` },
+            // The form's account picker drives the GL credit (user decision
+            // 2026-06-03 / fixed 2026-06-11): a receipt against a non-3030
+            // receivable (e.g. 3071 Other Debtor) credits THAT account —
+            // hardcoding 3030 made AR absorb every receipt.
+            { accountCode: accountCode ?? '3030', credit: r2(amount), description: `Payment received — ${payeeName}` },
           ],
           createdBy: user.id,
         })
-      } catch {
-        console.error('GL posting failed for auto-complete credit voucher', data.id)
+      } catch (jeErr) {
+        // Fail loud (2026-06-11 audit): a swallowed JE leaves the receipt's
+        // cash missing from the GL.
+        const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
+        throw new Error(`Receipt ${voucherNo} created but GL posting failed: ${msg}`)
       }
     }
 
@@ -628,6 +649,80 @@ export async function approveVoucher(formData: FormData) {
 // NOT editable: voucher_no, voucher_type, direction, fund_source_id, loan_id,
 // repayment_breakdown, invoice_id, status, audit fields.
 
+// ─── Copy a payment voucher into a new DRAFT ─────────────────────────────────
+// Recurring expense PVs repeat with small tweaks, so let Finance duplicate one
+// into a fresh draft (header + source rows) and edit it before submitting.
+// Transaction-specific links (invoice/loan/fund_source/repayment_breakdown) are
+// deliberately NOT copied — a copy is a new expense, not a re-run of a repayment.
+export async function copyPaymentVoucher(formData: FormData): Promise<void> {
+  const user = await requireRole(['finance'])
+  const supabase = await createClient()
+
+  const sourceId = (formData.get('voucher_id') as string) ?? ''
+  if (!sourceId) throw new Error('Voucher id is required')
+
+  const { data: src, error: srcErr } = await supabase
+    .from('payment_vouchers')
+    .select('voucher_type, direction, amount, payee_name, payee_company_id, bank_account_id, description, payment_method, target_pool')
+    .eq('id', sourceId)
+    .single()
+  if (srcErr || !src) throw new Error('Source voucher not found')
+
+  // New voucher number — same scheme as createPaymentVoucher.
+  const period = dayjs().format('YYYYMM')
+  const { count } = await supabase.from('payment_vouchers').select('*', { count: 'exact', head: true })
+  const seq = (count ?? 0) + 1
+  const prefix = src.direction === 'credit' ? 'HV-OR-' : 'HV-PV-'
+  const voucherNo = `${prefix}${period}-${String(seq).padStart(4, '0')}`
+
+  const { data: created, error: insErr } = await supabase
+    .from('payment_vouchers')
+    .insert({
+      voucher_no: voucherNo,
+      voucher_type: src.voucher_type,
+      direction: src.direction,
+      status: 'draft' as const,
+      amount: src.amount,
+      payee_name: src.payee_name,
+      payee_company_id: src.payee_company_id,
+      bank_account_id: src.bank_account_id,
+      description: src.description,
+      payment_method: src.payment_method,
+      target_pool: src.target_pool,
+      source_pool: null,
+      created_by: user.id,
+    })
+    .select('id')
+    .single()
+  if (insErr || !created) throw new Error(`Failed to copy voucher: ${insErr?.message ?? 'unknown'}`)
+
+  const { data: srcRows } = await supabase
+    .from('payment_voucher_sources')
+    .select('pool, amount, account_code, role, override_account_type, override_gl_account_code, override_reason')
+    .eq('voucher_id', sourceId)
+  if (srcRows && srcRows.length > 0) {
+    const { error: rowsErr } = await supabase.from('payment_voucher_sources').insert(
+      srcRows.map((r) => ({
+        voucher_id: created.id,
+        pool: r.pool,
+        amount: r.amount,
+        account_code: r.account_code,
+        role: r.role,
+        override_account_type: r.override_account_type,
+        override_gl_account_code: r.override_gl_account_code,
+        override_reason: r.override_reason,
+      })),
+    )
+    if (rowsErr) {
+      await supabase.from('payment_vouchers').delete().eq('id', created.id).eq('status', 'draft')
+      throw new Error(`Failed to copy voucher sources (rolled back): ${rowsErr.message}`)
+    }
+  }
+
+  revalidatePath('/payments')
+  redirect(`/payments/${created.id}/edit`)
+}
+
 export async function updatePaymentVoucher(formData: FormData) {
   const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
@@ -654,6 +749,11 @@ export async function updatePaymentVoucher(formData: FormData) {
   const paymentMethod = (formData.get('payment_method') as string) || 'bank_transfer'
   const targetPool = (formData.get('target_pool') as string) || null
   const notes = ((formData.get('notes') as string) ?? '').trim() || null
+  // Editable while draft/pending: drives the approval-time GL date (see create).
+  const rawEditPaymentDate = (formData.get('payment_date') as string)?.trim()
+  const editPaymentDate = rawEditPaymentDate && /^\d{4}-\d{2}-\d{2}$/.test(rawEditPaymentDate)
+    ? rawEditPaymentDate
+    : null
 
   if (isNaN(amount) || amount <= 0) throw new Error('Amount must be greater than 0')
   if (!description) throw new Error('Description is required')
@@ -696,6 +796,7 @@ export async function updatePaymentVoucher(formData: FormData) {
       payment_method: paymentMethod,
       notes,
       target_pool: current.direction === 'credit' ? targetPool : null,
+      ...(editPaymentDate ? { payment_date: editPaymentDate } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)
@@ -891,7 +992,7 @@ export async function voidPaidReceipt(formData: FormData) {
 
   const { data: v } = await supabase
     .from('payment_vouchers')
-    .select('id, voucher_no, direction, voucher_type, status, amount, bank_account_id, target_pool, invoice_id, payee_name')
+    .select('id, voucher_no, direction, voucher_type, status, amount, bank_account_id, target_pool, invoice_id, payee_name, payment_method')
     .eq('id', id)
     .single()
   if (!v) throw new Error('Voucher not found')
@@ -899,27 +1000,29 @@ export async function voidPaidReceipt(formData: FormData) {
   if (v.direction !== 'credit') throw new Error('Only incoming receipts (credit) can be reversed here')
 
   const amount = r2(Number(v.amount))
-  const nowIso = new Date().toISOString()
+  // Netting settlement never touched the bank (no money moved — the paying
+  // dept was debited via an inter_billing_out pool row instead), so the void
+  // must not touch it either.
+  const isNetting = v.payment_method === 'netting'
 
-  // 1) Reverse bank cache (the receipt had added to it)
-  if (v.bank_account_id) {
-    const { data: bank } = await supabase
-      .from('bank_accounts')
-      .select('current_balance')
-      .eq('id', v.bank_account_id)
-      .single()
-    if (bank) {
-      await supabase
-        .from('bank_accounts')
-        .update({ current_balance: r2(Number(bank.current_balance) - amount) })
-        .eq('id', v.bank_account_id)
+  // 1) Reverse bank cache (the receipt had added to it). Via bump_bank_balance
+  // RPC (mig 20260610000000) — the old direct update was silently blocked by
+  // RLS when Finance ran the void (bank_accounts UPDATE policy is
+  // principal-only), leaving the cache overstated vs GL.
+  if (v.bank_account_id && !isNetting) {
+    const { error: bumpErr } = await supabase.rpc('bump_bank_balance', {
+      p_bank_account_id: v.bank_account_id,
+      p_delta: -amount,
+    })
+    if (bumpErr) {
+      throw new Error(`Failed to reverse bank balance: ${bumpErr.message}`)
     }
   }
 
   // 2) Reverse every GL entry posted for this voucher (swap debit/credit, keep segment)
   const { data: entries } = await supabase
     .from('journal_entries')
-    .select('id, segment, description')
+    .select('id, entry_no, segment, description')
     .eq('reference_type', 'payment_voucher')
     .eq('reference_id', id)
   for (const e of entries ?? []) {
@@ -944,40 +1047,50 @@ export async function voidPaidReceipt(formData: FormData) {
         createdBy: user.id,
       })
     } catch (jeErr) {
-      console.error('void reversal JE failed:', jeErr)
+      // Fail loud (2026-06-11 audit): a swallowed reversal leaves the voided
+      // receipt's GL standing — books overstate cash/AR with zero trace.
+      const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
+      throw new Error(`Void ${v.voucher_no}: GL reversal failed (${e.entry_no ?? e.id}): ${msg}`)
     }
   }
 
-  // 3) Reverse pool credits + un-settle invoices
+  // 3) Reverse every pool row this voucher wrote, via the
+  // reverse_voucher_pool_rows RPC (mig 20260611010000). One call covers all
+  // shapes: consolidated per-invoice dept-pool credits, single target_pool
+  // credit, AND the paying-side inter_billing_out row a netting settlement
+  // leaves behind. SECURITY DEFINER because the old adjustPool('out', …,
+  // approvalId=null) reversal was silently rejected by the
+  // expense_has_approval CHECK + RLS — voided receipts never actually
+  // un-credited dept pools.
+  // Cast: mig 20260611010000 RPC is not yet in the generated database.types.ts.
+  const { error: poolRevErr } = await supabase.rpc('reverse_voucher_pool_rows' as never, {
+    p_voucher_no: v.voucher_no,
+  } as never)
+  if (poolRevErr) {
+    throw new Error(`Void ${v.voucher_no}: pool reversal failed: ${poolRevErr.message}`)
+  }
+
+  // 4) Un-settle the invoice(s) back to issued
   const { data: linked } = await supabase
     .from('invoices')
-    .select('id, billing_mode, total_amount')
+    .select('id')
     .eq('settlement_voucher_id', id)
   if (linked && linked.length > 0) {
-    // Consolidated receipt — pools were credited per invoice by billing_mode.
-    for (const inv of linked) {
-      const pool = INVOICE_BILLING_MODE_TO_POOL[inv.billing_mode as string] ?? 'venture_pool'
-      await adjustPool(supabase, pool, 'out', r2(Number(inv.total_amount)), `VOID ${v.voucher_no}: reverse ${inv.id}`, user.id, null, nowIso)
-    }
-    await supabase
+    const { error: unsettleErr } = await supabase
       .from('invoices')
       .update({ status: 'issued', settlement_voucher_id: null } as never)
       .eq('settlement_voucher_id', id)
-  } else {
-    // Single settle / general receive — single target_pool credit.
-    if (v.target_pool) {
-      await adjustPool(supabase, v.target_pool, 'out', amount, `VOID ${v.voucher_no}: reverse pool`, user.id, null, nowIso)
-    }
-    if (v.invoice_id) {
-      await supabase
-        .from('invoices')
-        .update({ status: 'issued' })
-        .eq('id', v.invoice_id)
-        .in('status', ['paid', 'paid_via_netting'])
-    }
+    if (unsettleErr) throw new Error(`Void ${v.voucher_no}: invoice un-settle failed: ${unsettleErr.message}`)
+  } else if (v.invoice_id) {
+    const { error: unsettleErr } = await supabase
+      .from('invoices')
+      .update({ status: 'issued' })
+      .eq('id', v.invoice_id)
+      .in('status', ['paid', 'paid_via_netting'])
+    if (unsettleErr) throw new Error(`Void ${v.voucher_no}: invoice un-settle failed: ${unsettleErr.message}`)
   }
 
-  // 4) Mark the voucher voided (race-guarded on still-paid)
+  // 5) Mark the voucher voided (race-guarded on still-paid)
   const { error: updErr } = await supabase
     .from('payment_vouchers')
     .update({ status: 'voided' })

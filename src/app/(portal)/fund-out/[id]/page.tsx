@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
+import { isLoanUnscheduled } from '@/lib/treasury-schedule'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
@@ -52,13 +53,30 @@ export default async function LoanDetailPage({ params }: Props) {
     supabase.from('users').select('name').eq('id', loan.created_by).single(),
   ])
 
+  // A filed-but-not-yet-approved cancellation. Finance can't see /approvals
+  // (principal-only), so surface "审批中" here so it doesn't look like the
+  // Request cancellation click did nothing (user 2026-06-15).
+  const { data: pendingCancel } = await supabase
+    .from('approval_requests')
+    .select('created_at, submitted_by, users:submitted_by(name)')
+    .eq('reference_id', loan.id)
+    .eq('reference_table', 'loans')
+    .eq('request_type', 'loan_cancel')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .maybeSingle()
+
   const outstandingAmount = Number(outstanding?.outstanding ?? loan.principal)
   const monthlyInterest = outstandingAmount * Number(loan.effective_rate)
   const totalPrincipalPaid = Number(outstanding?.total_principal_paid ?? 0)
   const totalInterestPaid = Number(outstanding?.total_interest_paid ?? 0)
   const repaymentList = repayments ?? []
   const tenureMonths = Number(loan.tenure_months ?? 0)
-  const maturityDate = loan.disbursement_date && tenureMonths > 0
+  // No-fixed-term loans store tenure_months=1 as a placeholder (the schedule
+  // keys off repayment_terms via isLoanUnscheduled). Don't render that "1
+  // month" / maturity literally — show 无固定期限 instead (user 2026-06-15).
+  const noFixedTerm = isLoanUnscheduled(loan.repayment_terms as string | null)
+  const maturityDate = !noFixedTerm && loan.disbursement_date && tenureMonths > 0
     ? dayjs(loan.disbursement_date).add(tenureMonths, 'month')
     : null
 
@@ -93,7 +111,17 @@ export default async function LoanDetailPage({ params }: Props) {
             {company?.short_code} · Created <em>{dayjs(loan.created_at).format('D MMMM YYYY')}</em>
           </p>
         </div>
-        <LoanStatus status={loan.status} />
+        <div className="flex items-center gap-3">
+          {user.role === 'principal' && loan.status === 'active' ? (
+            <Link
+              href={`/fund-out/${loan.id}/edit`}
+              className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            >
+              修改条款 · Amend
+            </Link>
+          ) : null}
+          <LoanStatus status={loan.status} />
+        </div>
       </div>
 
       {/* ───────── Hero outstanding ───────── */}
@@ -149,9 +177,13 @@ export default async function LoanDetailPage({ params }: Props) {
               Tenure
             </div>
             <div className="font-serif text-xl text-num-ink tabular">
-              {tenureMonths} {tenureMonths === 1 ? 'month' : 'months'}
+              {noFixedTerm ? '无固定期限' : `${tenureMonths} ${tenureMonths === 1 ? 'month' : 'months'}`}
             </div>
-            {maturityDate ? (
+            {noFixedTerm ? (
+              <div className="font-serif italic text-graphite text-xs mt-2">
+                利息从放款日起算 · 还款日未定 — interest accrues monthly, no maturity
+              </div>
+            ) : maturityDate ? (
               <div className="font-mono text-[11.5px] text-graphite mt-2 tracking-[0.02em] font-medium">
                 MATURES {maturityDate.format('D MMM YYYY').toUpperCase()}
               </div>
@@ -206,7 +238,20 @@ export default async function LoanDetailPage({ params }: Props) {
           )}
         </div>
 
-        {canCancelLoan ? (
+        {pendingCancel ? (
+          // A cancellation request is already filed. Show it (Finance can't
+          // open /approvals, so this is their only window into the status).
+          <div className="mt-5 border border-alert/30 bg-alert/5 rounded-md px-4 py-3">
+            <div className="text-sm text-alert font-sans font-medium">
+              ⏳ 取消申请审批中 · Cancellation pending Principal approval
+            </div>
+            <p className="text-xs text-muted mt-1 italic font-serif">
+              Requested by {((pendingCancel.users as { name?: string } | null)?.name) ?? 'Finance'} on{' '}
+              {dayjs(pendingCancel.created_at).format('D MMM YYYY HH:mm')}. Principal approves it in
+              Approvals; the loan reverses (bank, Venture Pool, GL) and is marked cancelled.
+            </p>
+          </div>
+        ) : canCancelLoan ? (
           <form action={cancelLoan} className="mt-5">
             <input type="hidden" name="id" value={loan.id} />
             {isActive ? (

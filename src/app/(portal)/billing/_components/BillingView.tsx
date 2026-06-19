@@ -95,6 +95,28 @@ export default async function BillingView({ searchParams }: Props) {
     account_number: (b.account_number as string | null) ?? null,
   }))
 
+  // Line items for this period's invoices — the edit modal mirrors the
+  // multi-line create form, so drafts need their lines prefilled.
+  const invoiceIds = (invoices ?? []).map((i) => i.id)
+  const { data: lineRows } =
+    invoiceIds.length > 0
+      ? await supabase
+          .from('invoice_lines')
+          .select('invoice_id, line_no, description, amount, category_code')
+          .in('invoice_id', invoiceIds)
+          .order('line_no')
+      : { data: null }
+  const linesByInvoice: Record<string, Array<{ description: string | null; amount: number; category_code: string | null }>> = {}
+  for (const l of lineRows ?? []) {
+    const arr = linesByInvoice[l.invoice_id] ?? []
+    arr.push({
+      description: l.description ?? null,
+      amount: Number(l.amount),
+      category_code: l.category_code ?? null,
+    })
+    linesByInvoice[l.invoice_id] = arr
+  }
+
   // Shape categories as { code, label, type, parent_code } so the downstream
   // CreateInvoiceButton can pass them straight into AccountPicker (mig 246).
   // Keeps the legacy "label" string the rest of the UI already prints.
@@ -413,7 +435,7 @@ export default async function BillingView({ searchParams }: Props) {
         </section>
       )}
 
-      <InvoicesList invoices={invoiceList} companyMap={companyMap} departmentMap={departmentMap} period={period} categories={categoryList} bankAccounts={bankList} />
+      <InvoicesList invoices={invoiceList} companyMap={companyMap} departmentMap={departmentMap} period={period} categories={categoryList} bankAccounts={bankList} invoiceLines={linesByInvoice} />
 
       <MarketingProjectList
         contracts={(marketingContracts ?? [])

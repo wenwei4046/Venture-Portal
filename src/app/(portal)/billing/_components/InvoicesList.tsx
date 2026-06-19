@@ -7,6 +7,7 @@ import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
 import { ApproveInvoiceButton, BulkIssueInvoicesButton, DeleteInvoiceButton, EditInvoiceButton } from './InvoiceActions'
 import CreateCreditNoteButton from './CreateCreditNoteButton'
+import CopyInvoiceButton from './CopyInvoiceButton'
 import InvoiceDetailButton from './InvoiceDetailButton'
 import SortableTable from '@/components/SortableTable'
 import type { AccountType } from '@/lib/coa'
@@ -105,11 +106,13 @@ interface Props {
   /** Banks shown in the batch-settle modal. Drives which bank account
    *  receives the inflow when knocking off multiple issued invoices. */
   bankAccounts?: Array<{ id: string; bank_name: string; account_number: string | null }>
+  /** invoice_id → line items, prefills the (create-form-mirroring) edit modal. */
+  invoiceLines?: Record<string, Array<{ description: string | null; amount: number; category_code: string | null }>>
 }
 
 // Invoices for the selected period. Populated by Step 5's generate_monthly_invoices
 // RPC. Until Step 5 ships, this section shows the empty state with an explanation.
-export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [], bankAccounts = [] }: Props) {
+export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [], bankAccounts = [], invoiceLines = {} }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -157,6 +160,14 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
   }
   function clearSelection() {
     setSelectedIds(new Set())
+  }
+
+  // Batch print: open a multi-page PDF of the selected invoices (the invoice-doc
+  // route already supports ?ids=a,b,c → one document page per invoice).
+  function printSelected() {
+    const ids = [...selectedIds]
+    if (ids.length === 0) return
+    window.open(`/billing/invoice-doc?ids=${ids.join(',')}`, '_blank', 'noopener,noreferrer')
   }
 
   function openSettleModal() {
@@ -254,45 +265,61 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
             </div>
           </div>
 
-          {/* Consolidated-settle helper bar: prominent select-all button + count */}
-          {invoices.some(isBatchSettleable) ? (
-            <div className="flex items-center gap-3 mb-4 flex-wrap">
-              <button
-                type="button"
-                onClick={selectAllIssued}
-                className="bg-surface hover:bg-surface-2 border border-hairline rounded-md px-3 py-1.5 text-xs font-sans text-ink transition-colors"
-              >
-                全选可结算发票
-              </button>
-              {selectedIds.size > 0 ? (
-                <button
-                  type="button"
-                  onClick={clearSelection}
-                  className="text-xs font-sans text-muted hover:text-ink"
-                >
-                  清除选择
-                </button>
-              ) : null}
-              <span className="text-xs font-mono text-muted">
-                {selectedIds.size > 0
-                  ? `已选 ${selectedIds.size} 张 · RM ${selectedTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}`
-                  : '勾选同一公司的 issued 发票，合并结算成一张收据'}
-              </span>
-              {crossCompany ? (
-                <span className="text-xs font-serif italic text-danger">
-                  选中了不同公司的单 — 一张收据只能结同一家公司
-                </span>
-              ) : null}
-            </div>
-          ) : null}
-
           <div className="overflow-x-auto">
             <SortableTable<Invoice>
               rows={invoices}
               getRowKey={(inv) => inv.id}
               defaultSort={{ key: 'invoice_no', dir: 'desc' }}
-              searchKeys={['invoice_no', 'company', 'billing_mode']}
+              searchKeys={['invoice_no', 'company', 'billing_mode', 'description']}
               searchPlaceholder="Search invoice # / company / mode…"
+              toolbarRight={
+                invoices.some(isBatchSettleable) ? (
+                  <>
+                    {/* Selection summary + batch actions — inline in the toolbar
+                        (between search and 全选), not a floating bar (user 2026-06-11). */}
+                    {selectedIds.size > 0 && !showSettleModal ? (
+                      <div className="flex items-center gap-2.5 bg-paper border border-hairline rounded-md px-3 py-1">
+                        <span className="font-mono text-xs text-ink whitespace-nowrap">
+                          {selectedIds.size} 张 ·{' '}
+                          <span className="font-semibold">
+                            RM {selectedTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={clearSelection}
+                          className="text-xs font-sans text-muted hover:text-ink"
+                        >
+                          清除
+                        </button>
+                        <button
+                          type="button"
+                          onClick={printSelected}
+                          className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-xs font-sans px-3 py-1 rounded-md transition-colors whitespace-nowrap"
+                        >
+                          打印所选 {selectedIds.size} 张
+                        </button>
+                        <button
+                          type="button"
+                          onClick={openSettleModal}
+                          disabled={selectedInvoices.length === 0 || crossCompany}
+                          title={crossCompany ? '一张收据只能结同一家公司的单' : undefined}
+                          className="bg-accent hover:bg-accent-hover text-white text-xs font-sans px-3 py-1 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        >
+                          {crossCompany ? '不同公司不能合并' : `合并结算 ${selectedInvoices.length} 张 → 生成收据`}
+                        </button>
+                      </div>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={selectAllIssued}
+                      className="bg-surface hover:bg-surface-2 border border-hairline rounded-md px-3 py-1.5 text-xs font-sans text-ink transition-colors whitespace-nowrap"
+                    >
+                      全选可结算发票
+                    </button>
+                  </>
+                ) : undefined
+              }
               columns={[
                 {
                   key: '_select',
@@ -358,12 +385,30 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                     )
                   },
                   sortValue: (inv) => resolvePartyLabel(inv, companyMap, departmentMap).primary,
+                  filterValue: (inv) => resolvePartyLabel(inv, companyMap, departmentMap).primary,
+                  filterable: true,
+                },
+                {
+                  key: 'description',
+                  label: 'Description',
+                  render: (inv) => {
+                    const d = inv.description?.trim()
+                    if (!d) return <span className="text-muted">—</span>
+                    const firstLine = d.split(/\r?\n/)[0]
+                    const text = firstLine.length > 48 ? `${firstLine.slice(0, 48)}…` : firstLine
+                    return <span title={d}>{text}</span>
+                  },
+                  sortValue: (inv) => inv.description ?? '',
+                  filterValue: (inv) => inv.description ?? '',
+                  filterable: true,
+                  cellClassName: 'font-serif italic text-graphite text-sm',
                 },
                 {
                   key: 'billing_mode',
                   label: 'Mode',
                   render: (inv) => formatBillingMode(inv.billing_mode),
                   sortValue: (inv) => formatBillingMode(inv.billing_mode),
+                  filterable: true,
                   cellClassName: 'font-serif italic text-graphite text-sm',
                 },
                 {
@@ -379,6 +424,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   label: 'Status',
                   render: (inv) => <InvoiceStatus status={inv.status} />,
                   sortValue: (inv) => inv.status,
+                  filterable: true,
                 },
                 {
                   key: 'action',
@@ -398,6 +444,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                         >
                           PDF
                         </Link>
+                        <CopyInvoiceButton id={inv.id} invoiceNo={inv.invoice_no} />
                         {inv.status === 'draft' ? (
                           <>
                             <EditInvoiceButton
@@ -410,8 +457,17 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                                 invoice_date: inv.invoice_date ?? null,
                                 due_date: inv.due_date ?? null,
                                 reference_no: inv.reference_no ?? null,
+                                billing_mode: inv.billing_mode ?? null,
+                                billable_to_type: inv.billable_to_type ?? null,
+                                company_id: inv.company_id ?? null,
+                                billable_to_department_id: inv.billable_to_department_id ?? null,
+                                billable_to_freetext_name: inv.billable_to_freetext_name ?? null,
+                                period_month: inv.period_month ?? null,
                               }}
+                              initialLines={invoiceLines[inv.id] ?? []}
                               categories={categories ?? []}
+                              companies={Array.from(companyMap, ([cid, c]) => ({ id: cid, name: c.name }))}
+                              departments={Array.from(departmentMap, ([did, dname]) => ({ id: did, name: dname }))}
                             />
                             <DeleteInvoiceButton id={inv.id} invoiceNo={inv.invoice_no} />
                             <ApproveInvoiceButton id={inv.id} />
@@ -442,31 +498,6 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
           </div>
         </>
       )}
-
-      {/* Floating consolidated-settle action bar (bottom right). */}
-      {selectedIds.size > 0 && !showSettleModal ? (
-        <div className="fixed bottom-6 right-6 z-30 bg-paper border border-hairline rounded-md shadow-lg px-4 py-3 flex items-center gap-3">
-          <div className="font-mono text-sm text-ink">
-            {selectedIds.size} 张 · <span className="font-semibold">RM {selectedTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}</span>
-          </div>
-          <button
-            type="button"
-            onClick={clearSelection}
-            className="text-xs font-sans text-muted hover:text-ink"
-          >
-            清除
-          </button>
-          <button
-            type="button"
-            onClick={openSettleModal}
-            disabled={selectedInvoices.length === 0 || crossCompany}
-            title={crossCompany ? '一张收据只能结同一家公司的单' : undefined}
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {crossCompany ? '不同公司不能合并' : `合并结算 ${selectedInvoices.length} 张 → 生成收据`}
-          </button>
-        </div>
-      ) : null}
 
       {/* Batch-settle modal */}
       {showSettleModal ? (

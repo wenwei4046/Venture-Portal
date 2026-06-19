@@ -61,6 +61,7 @@ export default function ApprovalActions({
   const [mode, setMode] = useState<'idle' | 'approving' | 'rejecting'>('idle')
   const [error, setError] = useState<string | null>(null)
   const [notes, setNotes] = useState('')
+  const [allowOverdraw, setAllowOverdraw] = useState(false)
 
   async function handleConfirm() {
     if (mode === 'idle') return
@@ -69,6 +70,7 @@ export default function ApprovalActions({
     const formData = new FormData()
     formData.append('id', approvalId)
     formData.append('notes', notes)
+    if (mode === 'approving' && allowOverdraw) formData.append('allow_overdraw', 'on')
 
     startTransition(async () => {
       try {
@@ -161,6 +163,23 @@ export default function ApprovalActions({
         />
       </div>
 
+      {mode === 'approving' && requestType === 'payment_voucher' ? (
+        <label className="flex items-start gap-2 mb-4 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={allowOverdraw}
+            onChange={(e) => setAllowOverdraw(e.target.checked)}
+            className="h-4 w-4 mt-0.5 accent-[var(--accent)]"
+          />
+          <span className="text-sm font-sans text-graphite">
+            允许部门池透支 · Allow dept-pool overdraw
+            <span className="block text-xs text-muted font-serif italic mt-0.5">
+              勾选后,即使某个部门池余额不够,也照样放行(池子会变负数 = 该部门暂由 Venture 垫)。用于不能拖的薪资等。
+            </span>
+          </span>
+        </label>
+      ) : null}
+
       {error ? (
         <div className="bg-danger-bg border border-danger text-danger rounded-md p-3 mb-4 text-sm font-sans">
           {error}
@@ -190,6 +209,7 @@ export default function ApprovalActions({
             setMode('idle')
             setNotes('')
             setError(null)
+            setAllowOverdraw(false)
           }}
           className="text-sm text-graphite hover:text-ink font-sans transition-colors"
         >

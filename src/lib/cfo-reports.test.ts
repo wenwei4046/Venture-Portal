@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { classifyRows, buildTrialBalance, buildLedger, resolveSourceDescriptions, groupRevenueByAccount } from './cfo-reports'
+import { classifyRows, buildTrialBalance, fetchTrialBalance, buildLedger, resolveSourceDescriptions, groupRevenueByAccount } from './cfo-reports'
 import type { RawPvSourceRow, RawInvoiceRow, RawTreasury, CoaLeafAccount, RawLedgerLine } from './cfo-reports'
 
 const pv = (o: Partial<RawPvSourceRow>): RawPvSourceRow => ({
@@ -559,6 +559,86 @@ describe('resolveSourceDescriptions', () => {
     expect(out.size).toBe(2)
     expect(out.get('invoice:inv-1')).toBe('Service fee')
     expect(out.get('payment_voucher:pv-1')).toBe('Office supplies')
+  })
+})
+
+// Mock that mimics PostgREST: chart_of_accounts via .select().eq(); journal_lines
+// via .select().order().range(from,to) returning at most a 1000-row page. This is
+// the contract fetchTrialBalance must honour — an unpaginated read would stop at
+// the first 1000 rows and the trial balance would not tie (regression 2026-06-16).
+function mockSupabaseForTB(
+  coa: Array<{ code: string; name: string; type: string; parent_code: string | null; is_active: boolean }>,
+  lines: Array<{ account_code: string; debit: number; credit: number; transaction_date: string; is_reversed: boolean }>,
+): SupabaseClient {
+  return {
+    from: (table: string) => {
+      if (table === 'chart_of_accounts') {
+        return { select: () => ({ eq: async () => ({ data: coa, error: null }) }) }
+      }
+      if (table === 'journal_lines') {
+        return {
+          select: () => ({
+            order: () => ({
+              range: async (from: number, to: number) => ({
+                // PostgREST caps a page at 1000 rows even if `to` asks for more.
+                data: lines
+                  .slice(from, Math.min(to + 1, from + 1000))
+                  .map((l) => ({
+                    account_code: l.account_code,
+                    debit: l.debit,
+                    credit: l.credit,
+                    journal_entries: { transaction_date: l.transaction_date, is_reversed: l.is_reversed },
+                  })),
+                error: null,
+              }),
+            }),
+          }),
+        }
+      }
+      throw new Error(`unexpected table ${table}`)
+    },
+  } as unknown as SupabaseClient
+}
+
+describe('fetchTrialBalance — pagination', () => {
+  it('sums ALL journal_lines beyond the 1000-row PostgREST cap so the TB ties', async () => {
+    const coa = [
+      { code: '3000', name: 'Bank', type: 'asset', parent_code: null, is_active: true },
+      { code: '4000', name: 'Payable', type: 'liability', parent_code: null, is_active: true },
+    ]
+    // 1500 interleaved lines: 750 debit RM100 → 3000, 750 credit RM100 → 4000.
+    // Truncating at 1000 would sum only 500/500 (RM50k each); the full set is
+    // RM75k each. Asserting 75k catches any silent truncation.
+    const lines = Array.from({ length: 1500 }, (_, i) =>
+      i % 2 === 0
+        ? { account_code: '3000', debit: 100, credit: 0, transaction_date: '2026-01-01', is_reversed: false }
+        : { account_code: '4000', debit: 0, credit: 100, transaction_date: '2026-01-01', is_reversed: false },
+    )
+    const client = mockSupabaseForTB(coa, lines)
+    const tb = await fetchTrialBalance(client, { asOf: '2026-12-31', showZeroBalance: false })
+
+    expect(tb.totals.debit).toBe(75000)
+    expect(tb.totals.credit).toBe(75000)
+    expect(tb.reconciles).toBe(true)
+  })
+
+  it('excludes reversed entries and entries dated after asOf', async () => {
+    const coa = [
+      { code: '3000', name: 'Bank', type: 'asset', parent_code: null, is_active: true },
+      { code: '4000', name: 'Payable', type: 'liability', parent_code: null, is_active: true },
+    ]
+    const lines = [
+      { account_code: '3000', debit: 100, credit: 0, transaction_date: '2026-01-01', is_reversed: false },
+      { account_code: '4000', debit: 0, credit: 100, transaction_date: '2026-01-01', is_reversed: false },
+      { account_code: '3000', debit: 999, credit: 0, transaction_date: '2026-01-01', is_reversed: true }, // reversed → skip
+      { account_code: '3000', debit: 555, credit: 0, transaction_date: '2027-01-01', is_reversed: false }, // after asOf → skip
+    ]
+    const client = mockSupabaseForTB(coa, lines)
+    const tb = await fetchTrialBalance(client, { asOf: '2026-06-30', showZeroBalance: false })
+
+    expect(tb.totals.debit).toBe(100)
+    expect(tb.totals.credit).toBe(100)
+    expect(tb.reconciles).toBe(true)
   })
 })
 

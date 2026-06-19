@@ -9,18 +9,15 @@ import { assertPeriodOpen } from '@/lib/period-lock'
 import { postJournalEntry } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
 import { validateConsolidation, poolAttributions, segmentForBillingMode } from '@/lib/invoice-settlement'
+import { deptNameToSegment, fallbackRevenueGlCode, invoiceJeDate } from '@/lib/billing'
 import { INVOICE_BILLING_MODE_TO_POOL } from '@/lib/cfo-reports'
 
 // Mig 200/P1-6a: invoice billing_mode → revenue GL code mapping.
-// Mig 238 reseed: revenue lives in the 5000-5999 range; 4030 / 4040 are now
-// liability accounts (Statutory Payable / Director Invoice Payable). The
-// b348724 GL-remap pass missed this fallback, so invoices issued without an
-// explicit revenue category_code were silently crediting liabilities and
-// inflating the balance sheet by their amount. Until per-billing-mode
-// revenue sub-accounts exist, every fallback routes to Service Revenue — Subs
-// (5000), the sole revenue account seeded in mig 238.
-function revenueGlCode(_billingMode: string | null): string {
-  return '5000'
+// 2026-06-11: fallback now lives in lib/billing.ts (fallbackRevenueGlCode) —
+// the four *_attribution modes are salary recharges and default to 5020
+// Salary Income; everything else stays on 5000 Service Revenue — Subs.
+function revenueGlCode(billingMode: string | null): string {
+  return fallbackRevenueGlCode(billingMode)
 }
 
 // Note: invoices.category_code (added by mig 230) keeps its column name; only
@@ -177,6 +174,84 @@ export interface InvoiceLineInput {
   description: string
   amount: number
   categoryCode: string
+}
+
+// ─── Copy an existing invoice into a new DRAFT for the current month ──────────
+// Monthly billing repeats with small tweaks, so let Finance duplicate a prior
+// invoice (header + line items + who-to-bill + mode) as a fresh draft, then
+// edit the amount / description via the inline Edit modal before issuing.
+export async function copyInvoice(formData: FormData): Promise<void> {
+  const user = await requireRole(['finance'])
+  const supabase = await createClient()
+
+  const sourceId = (formData.get('invoice_id') as string) ?? ''
+  if (!sourceId) throw new Error('Invoice id is required')
+
+  const { data: src, error: srcErr } = await supabase
+    .from('invoices')
+    .select('billing_mode, billable_to_type, company_id, billable_to_department_id, billable_to_freetext_name, category_code, base_amount, total_amount, description, reference_no')
+    .eq('id', sourceId)
+    .single()
+  if (srcErr || !src) throw new Error('Source invoice not found')
+
+  // New draft lands in the CURRENT billing month (copy last month → bill this).
+  const period = dayjs().startOf('month').format('YYYY-MM-DD')
+  await assertPeriodOpen(supabase, period)
+
+  const { data: invoiceNo, error: mintErr } = await supabase.rpc('mint_invoice_no', { p_period: period })
+  if (mintErr || !invoiceNo) {
+    throw new Error(`Failed to mint invoice number: ${mintErr?.message ?? 'unknown'}`)
+  }
+
+  const { data: created, error: invErr } = await supabase
+    .from('invoices')
+    .insert({
+      invoice_no: invoiceNo as string,
+      period_month: period,
+      billing_mode: src.billing_mode,
+      category_code: src.category_code,
+      base_amount: src.base_amount,
+      total_amount: src.total_amount,
+      status: 'draft',
+      invoice_date: dayjs().format('YYYY-MM-DD'),
+      due_date: null,
+      description: src.description,
+      reference_no: src.reference_no,
+      created_by: user.id,
+      billable_to_type: src.billable_to_type,
+      company_id: src.company_id,
+      billable_to_department_id: src.billable_to_department_id,
+      billable_to_freetext_name: src.billable_to_freetext_name,
+    })
+    .select('id')
+    .single()
+  if (invErr || !created) throw new Error(`Failed to copy invoice: ${invErr?.message ?? 'unknown'}`)
+
+  // Copy line items if the source is a multi-line invoice.
+  const { data: lines } = await supabase
+    .from('invoice_lines')
+    .select('line_no, description, amount, category_code')
+    .eq('invoice_id', sourceId)
+    .order('line_no')
+  if (lines && lines.length > 0) {
+    const { error: linesErr } = await supabase.from('invoice_lines').insert(
+      lines.map((l) => ({
+        invoice_id: created.id,
+        line_no: l.line_no,
+        description: l.description,
+        amount: l.amount,
+        category_code: l.category_code,
+      })),
+    )
+    if (linesErr) {
+      await supabase.from('invoices').delete().eq('id', created.id).eq('status', 'draft')
+      throw new Error(`Failed to copy invoice lines (rolled back): ${linesErr.message}`)
+    }
+  }
+
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+  redirect('/billing')
 }
 
 export async function createMultiLineInvoice(
@@ -639,26 +714,219 @@ export async function updateDraftInvoice(formData: FormData): Promise<void> {
     throw new Error('Amount must be a positive number')
   }
 
+  // Multi-line invoices: total_amount must stay = SUM(lines). Until a line
+  // editor exists, an amount change here would silently break that tie.
+  const { data: lineRows } = await supabase
+    .from('invoice_lines')
+    .select('amount')
+    .eq('invoice_id', id)
+  if (lineRows && lineRows.length > 0) {
+    const lineSum = lineRows.reduce((s, l) => s + Number(l.amount), 0)
+    if (Math.abs(lineSum - amount) > 0.005) {
+      throw new Error(
+        `This invoice has ${lineRows.length} line items summing RM ${lineSum.toFixed(2)} — the total must match. Edit or recreate the lines instead of overriding the total.`,
+      )
+    }
+  }
+
   const categoryCode = String(formData.get('category_code') ?? '').trim() || null
   const description = String(formData.get('description') ?? '').trim() || null
   const invoiceDate = String(formData.get('invoice_date') ?? '').trim() || null
   const dueDate = String(formData.get('due_date') ?? '').trim() || null
   const referenceNo = String(formData.get('reference_no') ?? '').trim() || null
 
+  // Structural fields — fully editable while draft (user 2026-06-12). Drafts
+  // have no GL/pool/statement footprint (everything posts at issue), so the
+  // same validation as createManualInvoice is all that's needed.
+  const updates: {
+    total_amount: number
+    base_amount: number
+    category_code: string | null
+    description: string | null
+    invoice_date: string | null
+    due_date: string | null
+    reference_no: string | null
+    billing_mode?: CreateInvoiceMode
+    billable_to_type?: BillableToKind
+    company_id?: string | null
+    billable_to_department_id?: string | null
+    billable_to_freetext_name?: string | null
+    period_month?: string
+  } = {
+    total_amount: amount,
+    base_amount: amount,
+    category_code: categoryCode,
+    description,
+    invoice_date: invoiceDate,
+    due_date: dueDate,
+    reference_no: referenceNo,
+  }
+
+  const rawMode = String(formData.get('billing_mode') ?? '').trim()
+  if (rawMode) {
+    if (!CREATE_INVOICE_MODES.includes(rawMode as CreateInvoiceMode)) {
+      throw new Error(`Unsupported billing mode: ${rawMode}`)
+    }
+    updates.billing_mode = rawMode as CreateInvoiceMode
+  }
+
+  const rawBillableType = String(formData.get('billable_to_type') ?? '').trim()
+  if (rawBillableType) {
+    if (!['subsidiary', 'director', 'dept_pool', 'freetext'].includes(rawBillableType)) {
+      throw new Error(`Unsupported billable_to_type: ${rawBillableType}`)
+    }
+    const companyId = String(formData.get('company_id') ?? '').trim()
+    const billableDeptId = String(formData.get('billable_to_department_id') ?? '').trim()
+    const billableFreetext = String(formData.get('billable_to_freetext_name') ?? '').trim()
+    if (rawBillableType === 'subsidiary' && !companyId) throw new Error('Subsidiary is required')
+    if (rawBillableType === 'dept_pool' && !billableDeptId) throw new Error('Department is required')
+    if ((rawBillableType === 'director' || rawBillableType === 'freetext') && !billableFreetext) {
+      throw new Error('Billable party name is required')
+    }
+    updates.billable_to_type = rawBillableType as BillableToKind
+    updates.company_id = rawBillableType === 'subsidiary' ? companyId : null
+    updates.billable_to_department_id = rawBillableType === 'dept_pool' ? billableDeptId : null
+    updates.billable_to_freetext_name =
+      rawBillableType === 'director' || rawBillableType === 'freetext' ? billableFreetext : null
+  }
+
+  const rawPeriod = String(formData.get('period_month') ?? '').trim()
+  if (rawPeriod) {
+    const newPeriod = dayjs(rawPeriod).startOf('month').format('YYYY-MM-DD')
+    if (newPeriod !== inv.period_month) {
+      await assertPeriodOpen(supabase, newPeriod)
+      updates.period_month = newPeriod
+    }
+  }
+
   const { error } = await supabase
     .from('invoices')
-    .update({
-      total_amount: amount,
-      category_code: categoryCode,
-      description,
-      invoice_date: invoiceDate,
-      due_date: dueDate,
-      reference_no: referenceNo,
-    })
+    .update(updates)
     .eq('id', id)
     .eq('status', 'draft')
 
   if (error) throw new Error(`Failed to update invoice: ${error.message}`)
+
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+}
+
+// ─── Full draft edit (Finance) ───────────────────────────────────────────────
+// The edit modal mirrors the create form 1:1 (user 2026-06-12: "edit 时和我开
+// invoice 时一样，全部都能改，multi-line 也一样"). Same payload contract +
+// validation as createMultiLineInvoice; lines are REPLACED wholesale.
+// Format rule: 2+ lines → multi-line shape (invoice_lines rows, header
+// category NULL so issue fans the Cr out per line); exactly 1 line → simple
+// shape (no line rows; the line's description/category live on the header,
+// same as createManualInvoice would have written).
+export async function updateDraftInvoiceFull(payload: {
+  id: string
+  billableType: BillableToKind
+  billingMode: CreateInvoiceMode
+  period: string // YYYY-MM
+  invoiceDate: string
+  dueDate: string
+  referenceNo: string
+  headerDescription: string
+  companyId?: string
+  departmentId?: string
+  freetextName?: string
+  lines: InvoiceLineInput[]
+}): Promise<void> {
+  await requireRole(['finance'])
+  const supabase = await createClient()
+
+  if (!payload.id) throw new Error('Invoice id is required')
+  if (!['subsidiary', 'director', 'dept_pool', 'freetext'].includes(payload.billableType)) {
+    throw new Error(`Unsupported billable_to_type: ${payload.billableType}`)
+  }
+  if (!CREATE_INVOICE_MODES.includes(payload.billingMode)) {
+    throw new Error(`Unsupported billing mode: ${payload.billingMode}`)
+  }
+  if (payload.billableType === 'subsidiary' && !payload.companyId) throw new Error('Subsidiary is required')
+  if (payload.billableType === 'dept_pool' && !payload.departmentId) throw new Error('Department is required')
+  if (
+    (payload.billableType === 'director' || payload.billableType === 'freetext') &&
+    !payload.freetextName?.trim()
+  ) {
+    throw new Error('Billable party name is required')
+  }
+  if (!payload.period) throw new Error('Period is required')
+  if (!payload.lines || payload.lines.length === 0) {
+    throw new Error('At least one line item is required')
+  }
+  for (let i = 0; i < payload.lines.length; i++) {
+    const ln = payload.lines[i]
+    if (!Number.isFinite(ln.amount) || ln.amount <= 0) {
+      throw new Error(`Line ${i + 1}: amount must be a positive number`)
+    }
+    if (!ln.description.trim()) {
+      throw new Error(`Line ${i + 1}: description is required`)
+    }
+  }
+
+  const { data: inv } = await supabase
+    .from('invoices')
+    .select('id, status, period_month, invoice_no')
+    .eq('id', payload.id)
+    .single()
+  if (!inv) throw new Error('Invoice not found')
+  if (inv.status !== 'draft') {
+    throw new Error(`Cannot edit: invoice ${inv.invoice_no ?? inv.id} is ${inv.status}`)
+  }
+  await assertPeriodOpen(supabase, inv.period_month)
+  const period = dayjs(payload.period).startOf('month').format('YYYY-MM-DD')
+  if (period !== inv.period_month) await assertPeriodOpen(supabase, period)
+
+  const total = payload.lines.reduce((s, l) => s + Number(l.amount), 0)
+  const totalRounded = Math.round(total * 100) / 100
+  const isMulti = payload.lines.length >= 2
+  const single = payload.lines[0]
+
+  const { error: updErr } = await supabase
+    .from('invoices')
+    .update({
+      period_month: period,
+      billing_mode: payload.billingMode,
+      category_code: isMulti ? null : single.categoryCode.trim() || null,
+      base_amount: totalRounded,
+      total_amount: totalRounded,
+      invoice_date: payload.invoiceDate || null,
+      due_date: payload.dueDate || null,
+      description: isMulti
+        ? payload.headerDescription.trim() || null
+        : payload.headerDescription.trim() || single.description.trim(),
+      reference_no: payload.referenceNo.trim() || null,
+      billable_to_type: payload.billableType,
+      company_id: payload.billableType === 'subsidiary' ? payload.companyId : null,
+      billable_to_department_id: payload.billableType === 'dept_pool' ? payload.departmentId : null,
+      billable_to_freetext_name:
+        payload.billableType === 'director' || payload.billableType === 'freetext'
+          ? payload.freetextName?.trim() ?? null
+          : null,
+    })
+    .eq('id', payload.id)
+    .eq('status', 'draft')
+  if (updErr) throw new Error(`Failed to update invoice: ${updErr.message}`)
+
+  // Replace the line set. Wholesale delete+insert keeps line_no contiguous.
+  const { error: delErr } = await supabase
+    .from('invoice_lines')
+    .delete()
+    .eq('invoice_id', payload.id)
+  if (delErr) throw new Error(`Failed to replace invoice lines: ${delErr.message}`)
+  if (isMulti) {
+    const { error: insErr } = await supabase.from('invoice_lines').insert(
+      payload.lines.map((l, i) => ({
+        invoice_id: payload.id,
+        line_no: i + 1,
+        description: l.description.trim(),
+        amount: Math.round(Number(l.amount) * 100) / 100,
+        category_code: l.categoryCode.trim() || null,
+      })),
+    )
+    if (insErr) throw new Error(`Failed to write invoice lines: ${insErr.message}`)
+  }
 
   revalidatePath('/billing')
   revalidatePath('/statements')
@@ -771,11 +1039,14 @@ export async function settleInvoicesConsolidated(payload: {
     .insert({ voucher_id: pv.id, pool: 'venture_pool', amount: total, account_code: '3030' })
   if (srcErr) throw new Error(`source row insert failed: ${srcErr.message}`)
 
-  // Bank cache
+  // Bank cache — fail loud (2026-06-11 audit): a swallowed bump drifts the
+  // bank cache vs GL and the next big approval bounces on "insufficient".
   const { error: bumpErr } = await supabase.rpc('bump_bank_for_paid_credit', {
     p_voucher_id: pv.id,
   })
-  if (bumpErr) console.error('bump_bank_for_paid_credit warning:', bumpErr.message)
+  if (bumpErr) {
+    throw new Error(`Receipt ${voucherNo} created but bank balance update failed: ${bumpErr.message}`)
+  }
 
   // Pool credit — attribute EACH invoice to its OWN dept pool by billing_mode.
   // A consolidated receipt can span departments (same company can have e.g. a
@@ -828,7 +1099,11 @@ export async function settleInvoicesConsolidated(payload: {
         createdBy: user.id,
       })
     } catch (jeErr) {
-      console.error('GL posting warning for consolidated settle:', seg, jeErr)
+      // Fail loud (2026-06-11 audit): a swallowed JE leaves the settlement
+      // cash missing from the GL — bank-segment recon and the statements
+      // silently drift until someone hunts it down.
+      const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
+      throw new Error(`Receipt ${voucherNo} created but settlement GL posting failed (segment ${seg}): ${msg}`)
     }
   }
 
@@ -864,7 +1139,7 @@ export async function approveInvoice(formData: FormData) {
 
   const { data: inv } = await supabase
     .from('invoices')
-    .select('id, invoice_no, period_month, status, total_amount, billing_mode, company_id, category_code, billable_to_type, billable_to_department_id')
+    .select('id, invoice_no, invoice_date, period_month, status, total_amount, billing_mode, company_id, category_code, billable_to_type, billable_to_department_id')
     .eq('id', id)
     .single()
   if (!inv) throw new Error('Invoice not found')
@@ -896,11 +1171,10 @@ export async function approveInvoice(formData: FormData) {
       .eq('invoice_id', inv.id)
       .order('line_no')
     try {
-      // transaction_date = the day this JE is being booked (today), NOT the
-      // end-of-period. period_month already captures which accounting period
-      // the entry belongs to. Using endOf(period_month) creates future-dated
-      // JEs that get excluded from BS snapshots run mid-period, leaving AR
-      // looking "credit-only" when the invoice has already been settled.
+      // transaction_date = the INVOICE date (user 2026-06-11): revenue belongs
+      // to the month printed on the invoice, not the day Finance clicked
+      // Issue — a May-31 invoice issued June 4 must land in May's P&L.
+      // invoiceJeDate falls back to period month-end, then today.
       const jeLines: Array<{ accountCode: string; debit?: number; credit?: number; description: string }> = [
         { accountCode: '3030', debit: amount, description: `AR — invoice ${inv.invoice_no ?? ''}`.trim() },
       ]
@@ -925,7 +1199,11 @@ export async function approveInvoice(formData: FormData) {
         })
       }
       await postJournalEntry(supabase, {
-        transactionDate: dayjs().format('YYYY-MM-DD'),
+        transactionDate: invoiceJeDate(
+          (inv as { invoice_date?: string | null }).invoice_date,
+          inv.period_month,
+          dayjs().format('YYYY-MM-DD'),
+        ),
         description: `Invoice ${inv.invoice_no ?? inv.id} issued`,
         referenceType: 'invoice',
         referenceId: inv.id,
@@ -951,31 +1229,46 @@ export async function approveInvoice(formData: FormData) {
         .select('name')
         .eq('id', billableDeptId)
         .maybeSingle()
-      if (payingDept?.name) {
-        const { data: expenseAcct } = await supabase
-          .from('chart_of_accounts')
-          .select('code')
-          .eq('type', 'expense')
-          .ilike('name', `Inter-billing % ${payingDept.name}`)
-          .maybeSingle()
-        if (expenseAcct?.code) {
-          try {
-            await postJournalEntry(supabase, {
-              transactionDate: dayjs().format('YYYY-MM-DD'),
-              description: `Invoice ${inv.invoice_no ?? inv.id} issued — inter-billing expense (${payingDept.name})`,
-              referenceType: 'invoice',
-              referenceId: inv.id,
-              createdBy: user.id,
-              lines: [
-                { accountCode: expenseAcct.code, debit: amount, description: `Inter-billing expense — ${payingDept.name}` },
-                { accountCode: '3030', credit: amount, description: `AR cleared — inter-billing ${inv.invoice_no ?? ''}`.trim() },
-              ],
-            })
-          } catch (jeErr) {
-            const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
-            throw new Error(`Invoice issued but inter-billing expense JE failed: ${msg}`)
-          }
-        }
+      // Fail loud (2026-06-11): a silent skip here posts the receiver's
+      // revenue but never the payer's expense — asymmetric P&L with no trace.
+      if (!payingDept?.name) {
+        throw new Error(
+          `Invoice issued but inter-billing expense JE skipped: paying department ${billableDeptId} not found`,
+        )
+      }
+      const { data: expenseAcct } = await supabase
+        .from('chart_of_accounts')
+        .select('code')
+        .eq('type', 'expense')
+        .ilike('name', `Inter-billing % ${payingDept.name}`)
+        .maybeSingle()
+      if (!expenseAcct?.code) {
+        throw new Error(
+          `Invoice issued but inter-billing expense JE skipped: no active expense account named "Inter-billing — ${payingDept.name}" in the COA (9051–9055 range)`,
+        )
+      }
+      try {
+        await postJournalEntry(supabase, {
+          transactionDate: invoiceJeDate(
+            (inv as { invoice_date?: string | null }).invoice_date,
+            inv.period_month,
+            dayjs().format('YYYY-MM-DD'),
+          ),
+          // The EXPENSE belongs to the PAYING dept's P&L, not the
+          // invoice's billing_mode segment (user 2026-06-11).
+          segment: deptNameToSegment(payingDept.name),
+          description: `Invoice ${inv.invoice_no ?? inv.id} issued — inter-billing expense (${payingDept.name})`,
+          referenceType: 'invoice',
+          referenceId: inv.id,
+          createdBy: user.id,
+          lines: [
+            { accountCode: expenseAcct.code, debit: amount, description: `Inter-billing expense — ${payingDept.name}` },
+            { accountCode: '3030', credit: amount, description: `AR cleared — inter-billing ${inv.invoice_no ?? ''}`.trim() },
+          ],
+        })
+      } catch (jeErr) {
+        const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
+        throw new Error(`Invoice issued but inter-billing expense JE failed: ${msg}`)
       }
     }
   }
@@ -997,7 +1290,7 @@ export async function approveInvoicesForPeriod(formData: FormData) {
   // Pull draft rows up-front so we can post AR accrual JEs after the bulk update.
   const { data: draftInvoices } = await supabase
     .from('invoices')
-    .select('id, invoice_no, total_amount, billing_mode, category_code, billable_to_type, billable_to_department_id')
+    .select('id, invoice_no, invoice_date, total_amount, billing_mode, category_code, billable_to_type, billable_to_department_id')
     .eq('period_month', period)
     .eq('status', 'draft')
 
@@ -1010,12 +1303,17 @@ export async function approveInvoicesForPeriod(formData: FormData) {
   if (error) throw new Error(`Failed to bulk issue invoices: ${error.message}`)
 
   // Mig 200/P1-6a: post AR accrual per newly-issued invoice.
-  // transaction_date = today (when actually issued). period_month already
-  // tracks accounting period via the journal_entries.period_month column.
-  const txnDate = dayjs().format('YYYY-MM-DD')
+  // transaction_date = the INVOICE date (user 2026-06-11): a May-31 invoice
+  // bulk-issued on June 4 must land in May's P&L, not June's.
+  const todayStr = dayjs().format('YYYY-MM-DD')
   for (const row of draftInvoices ?? []) {
     const amount = Number(row.total_amount ?? 0)
     if (amount <= 0) continue
+    const txnDate = invoiceJeDate(
+      (row as { invoice_date?: string | null }).invoice_date,
+      period,
+      todayStr,
+    )
     const revenueCode = await resolveRevenueGlCode(supabase, row.category_code, row.billing_mode)
     try {
       await postJournalEntry(supabase, {
@@ -1043,31 +1341,41 @@ export async function approveInvoicesForPeriod(formData: FormData) {
         .select('name')
         .eq('id', rowBillableDeptId)
         .maybeSingle()
-      if (payingDept?.name) {
-        const { data: expenseAcct } = await supabase
-          .from('chart_of_accounts')
-          .select('code')
-          .eq('type', 'expense')
-          .ilike('name', `Inter-billing % ${payingDept.name}`)
-          .maybeSingle()
-        if (expenseAcct?.code) {
-          try {
-            await postJournalEntry(supabase, {
-              transactionDate: txnDate,
-              description: `Invoice ${row.invoice_no ?? row.id} issued (bulk) — inter-billing expense (${payingDept.name})`,
-              referenceType: 'invoice',
-              referenceId: row.id,
-              createdBy: user.id,
-              lines: [
-                { accountCode: expenseAcct.code, debit: amount, description: `Inter-billing expense — ${payingDept.name}` },
-                { accountCode: '3030', credit: amount, description: `AR cleared — inter-billing ${row.invoice_no ?? ''}`.trim() },
-              ],
-            })
-          } catch (jeErr) {
-            const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
-            throw new Error(`Bulk issue: inter-billing expense JE failed for invoice ${row.invoice_no ?? row.id}: ${msg}`)
-          }
-        }
+      // Fail loud (2026-06-11): a silent skip posts the receiver's revenue
+      // but never the payer's expense — asymmetric P&L with no trace.
+      if (!payingDept?.name) {
+        throw new Error(
+          `Bulk issue: inter-billing expense JE skipped for invoice ${row.invoice_no ?? row.id}: paying department ${rowBillableDeptId} not found`,
+        )
+      }
+      const { data: expenseAcct } = await supabase
+        .from('chart_of_accounts')
+        .select('code')
+        .eq('type', 'expense')
+        .ilike('name', `Inter-billing % ${payingDept.name}`)
+        .maybeSingle()
+      if (!expenseAcct?.code) {
+        throw new Error(
+          `Bulk issue: inter-billing expense JE skipped for invoice ${row.invoice_no ?? row.id}: no active expense account named "Inter-billing — ${payingDept.name}" in the COA (9051–9055 range)`,
+        )
+      }
+      try {
+        await postJournalEntry(supabase, {
+          transactionDate: txnDate,
+          // The EXPENSE belongs to the PAYING dept's P&L (user 2026-06-11).
+          segment: deptNameToSegment(payingDept.name),
+          description: `Invoice ${row.invoice_no ?? row.id} issued (bulk) — inter-billing expense (${payingDept.name})`,
+          referenceType: 'invoice',
+          referenceId: row.id,
+          createdBy: user.id,
+          lines: [
+            { accountCode: expenseAcct.code, debit: amount, description: `Inter-billing expense — ${payingDept.name}` },
+            { accountCode: '3030', credit: amount, description: `AR cleared — inter-billing ${row.invoice_no ?? ''}`.trim() },
+          ],
+        })
+      } catch (jeErr) {
+        const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
+        throw new Error(`Bulk issue: inter-billing expense JE failed for invoice ${row.invoice_no ?? row.id}: ${msg}`)
       }
     }
   }

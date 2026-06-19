@@ -22,6 +22,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import dayjs from 'dayjs'
 import { poolLabel, comparePools } from './pools'
+import { fetchAllRows } from './paginate'
 import type { AccountType, CashFlowCategory } from './coa'
 import { CASH_FLOW_CATEGORIES } from './coa'
 import type { Database } from './supabase/database.types'
@@ -738,13 +739,14 @@ async function gatherPvSources(
   const { from, to } = args
 
   // 1) Paid vouchers in window.
-  const { data: vouchers, error: vErr } = await supabase
+  const vouchers = await fetchAllRows((lo, hi) => supabase
     .from('payment_vouchers')
     .select('id, voucher_type, direction, amount, payment_date, status')
     .eq('status', 'paid')
     .gte('payment_date', from)
     .lte('payment_date', to)
-  if (vErr) throw new Error(`cfo-reports vouchers: ${vErr.message}`)
+    .order('id', { ascending: true })
+    .range(lo, hi))
 
   const voucherIds = (vouchers ?? []).map((v) => v.id as string)
   if (voucherIds.length === 0) return []
@@ -774,11 +776,12 @@ async function gatherPvSources(
 
   // 2) Their source rows. Column was renamed category_code → account_code
   //    in migration 238.
-  const { data: sources, error: sErr } = await supabase
+  const sources = await fetchAllRows((lo, hi) => supabase
     .from('payment_voucher_sources')
     .select('voucher_id, pool, account_code, amount')
     .in('voucher_id', voucherIds)
-  if (sErr) throw new Error(`cfo-reports pv sources: ${sErr.message}`)
+    .order('id', { ascending: true })
+    .range(lo, hi))
 
   // 3) Account lookup → name + type + cash_flow_category.
   const accountByCode = await fetchAccountIndex(supabase)
@@ -818,14 +821,14 @@ async function gatherInvoices(
   args: { from: string; to: string },
 ): Promise<RawInvoiceRow[]> {
   const { from, to } = args
-  const { data: invoices, error: iErr } = await supabase
+  const invoices = await fetchAllRows((lo, hi) => supabase
     .from('invoices')
-    .select('invoice_no, description, total_amount, billing_mode, period_month, status, company_id, category_code')
+    .select('invoice_no, description, total_amount, billing_mode, period_month, status, company_id, category_code, id')
     .gte('period_month', from)
     .lte('period_month', to)
     .in('status', INVOICE_REVENUE_STATUSES as unknown as string[])
     .order('id', { ascending: true })
-  if (iErr) throw new Error(`cfo-reports invoices: ${iErr.message}`)
+    .range(lo, hi))
   if (!invoices || invoices.length === 0) return []
 
   const companyIds = Array.from(new Set(invoices.map((i) => i.company_id as string)))
@@ -897,13 +900,14 @@ async function gatherTreasury(
     ...interestExpenseCodes,
   ])
 
-  const { data: jes, error: jeErr } = await supabase
+  const jes = await fetchAllRows((lo, hi) => supabase
     .from('journal_entries')
     .select('id, transaction_date, is_reversed')
     .gte('transaction_date', from)
     .lte('transaction_date', to)
     .eq('is_reversed', false)
-  if (jeErr) throw new Error(`cfo-reports treasury JEs: ${jeErr.message}`)
+    .order('id', { ascending: true })
+    .range(lo, hi))
 
   const entryIds = (jes ?? []).map((j) => j.id as string)
   if (entryIds.length === 0) {
@@ -915,12 +919,20 @@ async function gatherTreasury(
     return { interestIncome: 0, penaltyIncome: 0, interestExpense: 0, managedCodes }
   }
 
-  const { data: lines, error: lErr } = await supabase
-    .from('journal_lines')
-    .select('account_code, debit, credit, entry_id')
-    .in('entry_id', entryIds)
-    .in('account_code', watchCodes)
-  if (lErr) throw new Error(`cfo-reports treasury lines: ${lErr.message}`)
+  // Paginate — PostgREST caps an unranged select at 1000 rows (see fetchTrialBalance).
+  const lines: Record<string, unknown>[] = []
+  for (let fromIdx = 0; ; fromIdx += 1000) {
+    const { data: page, error: lErr } = await supabase
+      .from('journal_lines')
+      .select('account_code, debit, credit, entry_id')
+      .in('entry_id', entryIds)
+      .in('account_code', watchCodes)
+      .order('id', { ascending: true })
+      .range(fromIdx, fromIdx + 999)
+    if (lErr) throw new Error(`cfo-reports treasury lines: ${lErr.message}`)
+    lines.push(...((page ?? []) as Record<string, unknown>[]))
+    if (!page || page.length < 1000) break
+  }
 
   let interestIncome = 0
   let penaltyIncome = 0
@@ -946,14 +958,15 @@ async function gatherManualJvPnl(
 ): Promise<RawManualJvPnlRow[]> {
   const { from, to, managedCodes } = args
 
-  const { data: jes, error: jeErr } = await supabase
+  const jes = await fetchAllRows((lo, hi) => supabase
     .from('journal_entries')
     .select('id, segment')
     .eq('reference_type', 'manual_jv')
     .eq('is_reversed', false)
     .gte('transaction_date', from)
     .lte('transaction_date', to)
-  if (jeErr) throw new Error(`cfo-reports manual-JV JEs: ${jeErr.message}`)
+    .order('id', { ascending: true })
+    .range(lo, hi))
   if (!jes || jes.length === 0) return []
 
   const segmentByEntryId = new Map<string, GlSegment>()
@@ -962,11 +975,19 @@ async function gatherManualJvPnl(
   }
   const entryIds = Array.from(segmentByEntryId.keys())
 
-  const { data: lines, error: lErr } = await supabase
-    .from('journal_lines')
-    .select('entry_id, account_code, debit, credit')
-    .in('entry_id', entryIds)
-  if (lErr) throw new Error(`cfo-reports manual-JV lines: ${lErr.message}`)
+  // Paginate — PostgREST caps an unranged select at 1000 rows (see fetchTrialBalance).
+  const lines: Record<string, unknown>[] = []
+  for (let fromIdx = 0; ; fromIdx += 1000) {
+    const { data: page, error: lErr } = await supabase
+      .from('journal_lines')
+      .select('entry_id, account_code, debit, credit')
+      .in('entry_id', entryIds)
+      .order('id', { ascending: true })
+      .range(fromIdx, fromIdx + 999)
+    if (lErr) throw new Error(`cfo-reports manual-JV lines: ${lErr.message}`)
+    lines.push(...((page ?? []) as Record<string, unknown>[]))
+    if (!page || page.length < 1000) break
+  }
 
   const accountByCode = await fetchAccountIndex(supabase)
 
@@ -1006,7 +1027,7 @@ async function gatherFundSourceInflows(
   args: { from: string; to: string },
 ): Promise<RawFundSourceInflow[]> {
   const { from, to } = args
-  const { data, error } = await supabase
+  const data = await fetchAllRows((lo, hi) => supabase
     .from('fund_sources')
     .select(
       'id, source_type, amount, effective_date, status, from_company_id, from_department_id, from_freetext_name',
@@ -1014,7 +1035,8 @@ async function gatherFundSourceInflows(
     .eq('status', 'active')
     .gte('effective_date', from)
     .lte('effective_date', to)
-  if (error) throw new Error(`cfo-reports fund_sources: ${error.message}`)
+    .order('id', { ascending: true })
+    .range(lo, hi))
   if (!data || data.length === 0) return []
 
   const companyIds = Array.from(
@@ -1068,13 +1090,14 @@ async function gatherRepaymentPrincipalInflows(
   args: { from: string; to: string },
 ): Promise<RawRepaymentPrincipalInflow[]> {
   const { from, to } = args
-  const { data, error } = await supabase
+  const data = await fetchAllRows((lo, hi) => supabase
     .from('repayments')
     .select('id, loan_id, amount, payment_type, payment_date')
     .eq('payment_type', 'principal')
     .gte('payment_date', from)
     .lte('payment_date', to)
-  if (error) throw new Error(`cfo-reports repayments: ${error.message}`)
+    .order('id', { ascending: true })
+    .range(lo, hi))
   if (!data || data.length === 0) return []
 
   const loanIds = Array.from(new Set(data.map((r) => r.loan_id as string)))
@@ -1111,7 +1134,7 @@ async function gatherInterBillingExpenses(
   args: { from: string; to: string },
 ): Promise<RawInterBillingExpenseRow[]> {
   const { from, to } = args
-  const { data: invoices, error } = await supabase
+  const invoices = await fetchAllRows((lo, hi) => supabase
     .from('invoices')
     .select('invoice_no, total_amount, billable_to_department_id')
     .gte('period_month', from)
@@ -1119,7 +1142,8 @@ async function gatherInterBillingExpenses(
     .in('status', INVOICE_REVENUE_STATUSES as unknown as string[])
     .eq('billable_to_type', 'dept_pool')
     .not('billable_to_department_id', 'is', null)
-  if (error) throw new Error(`cfo-reports inter-billing expenses: ${error.message}`)
+    .order('id', { ascending: true })
+    .range(lo, hi))
   if (!invoices || invoices.length === 0) return []
 
   const deptIds = Array.from(
@@ -1256,20 +1280,24 @@ async function fetchActiveBankCodes(supabase: SupabaseClient): Promise<string[]>
 }
 
 async function fetchJeIdsBefore(supabase: SupabaseClient, date: string): Promise<string[]> {
-  const { data } = await supabase
+  const data = await fetchAllRows((lo, hi) => supabase
     .from('journal_entries')
     .select('id')
     .lt('transaction_date', date)
     .eq('is_reversed', false)
+    .order('id', { ascending: true })
+    .range(lo, hi))
   return (data ?? []).map((j) => j.id as string)
 }
 
 async function fetchJeIdsOnOrBefore(supabase: SupabaseClient, date: string): Promise<string[]> {
-  const { data } = await supabase
+  const data = await fetchAllRows((lo, hi) => supabase
     .from('journal_entries')
     .select('id')
     .lte('transaction_date', date)
     .eq('is_reversed', false)
+    .order('id', { ascending: true })
+    .range(lo, hi))
   return (data ?? []).map((j) => j.id as string)
 }
 
@@ -1316,11 +1344,19 @@ async function sumGlNetAcrossCodes(
 ): Promise<number> {
   const { jeIds, codes, sign } = args
   if (jeIds.length === 0 || codes.length === 0) return 0
-  const { data: lines } = await supabase
-    .from('journal_lines')
-    .select('debit, credit')
-    .in('entry_id', jeIds)
-    .in('account_code', codes)
+  // Paginate — PostgREST caps an unranged select at 1000 rows (see fetchTrialBalance).
+  const lines: Record<string, unknown>[] = []
+  for (let fromIdx = 0; ; fromIdx += 1000) {
+    const { data: page } = await supabase
+      .from('journal_lines')
+      .select('debit, credit')
+      .in('entry_id', jeIds)
+      .in('account_code', codes)
+      .order('id', { ascending: true })
+      .range(fromIdx, fromIdx + 999)
+    lines.push(...((page ?? []) as Record<string, unknown>[]))
+    if (!page || page.length < 1000) break
+  }
   let net = 0
   for (const l of lines ?? []) {
     const dr = Number(l.debit ?? 0)
@@ -1337,11 +1373,13 @@ export async function fetchBalanceSheet(
   const { asOf } = args
 
   // ── 1: Period-bounded JE id set ──
-  const { data: jes } = await supabase
+  const jes = await fetchAllRows((lo, hi) => supabase
     .from('journal_entries')
     .select('id')
     .lte('transaction_date', asOf)
     .eq('is_reversed', false)
+    .order('id', { ascending: true })
+    .range(lo, hi))
   const jeIds = (jes ?? []).map((j) => j.id as string)
 
   // ── 2: Chart of accounts grouped by type. Source of truth for the
@@ -1569,32 +1607,36 @@ export async function fetchTrialBalance(
       type: r.type as AccountType,
     }))
 
-  // ── 2: Period-bounded JE id set (non-reversed, transaction_date <= asOf).
-  const { data: jes, error: jeErr } = await supabase
-    .from('journal_entries')
-    .select('id')
-    .lte('transaction_date', asOf)
-    .eq('is_reversed', false)
-  if (jeErr) throw new Error(`fetchTrialBalance JEs: ${jeErr.message}`)
-  const jeIds = (jes ?? []).map((j) => j.id as string)
-
-  // ── 3: Per-leaf-account net (Dr − Cr). Single batched journal_lines query
-  //    is far cheaper than one call per account.
+  // ── 2-3: Per-leaf-account net (Dr − Cr) over all non-reversed entries dated
+  //    on/before asOf.
+  //
+  //    CRITICAL: journal_lines must be PAGINATED. PostgREST caps an unranged
+  //    select at 1000 rows, so once the ledger exceeds 1000 lines an unpaginated
+  //    fetch silently truncates the sum and the trial balance stops tying — the
+  //    Σ Dr / Σ Cr totals come out unequal and whole accounts go missing
+  //    (regression found 2026-06-16: 1,939 lines → TB short by ~RM 100k).
+  //    We inner-join journal_entries to filter by date/reversed in the same
+  //    pass, which also avoids a fragile .in() over hundreds of entry UUIDs
+  //    (that URL can blow past length limits and fail outright).
+  const leafSet = new Set(leafAccounts.map((a) => a.code))
   const netByCode = new Map<string, number>()
-  if (jeIds.length > 0) {
-    const leafCodes = leafAccounts.map((a) => a.code)
+  const PAGE = 1000
+  for (let fromIdx = 0; ; fromIdx += PAGE) {
     const { data: lines, error: jlErr } = await supabase
       .from('journal_lines')
-      .select('account_code, debit, credit')
-      .in('entry_id', jeIds)
-      .in('account_code', leafCodes)
+      .select('account_code, debit, credit, journal_entries!inner(transaction_date, is_reversed)')
+      .order('id', { ascending: true })
+      .range(fromIdx, fromIdx + PAGE - 1)
     if (jlErr) throw new Error(`fetchTrialBalance lines: ${jlErr.message}`)
     for (const l of lines ?? []) {
+      const je = l.journal_entries as unknown as { transaction_date: string; is_reversed: boolean }
+      if (je.is_reversed) continue
+      if (je.transaction_date > asOf) continue
       const code = l.account_code as string
-      const dr = Number(l.debit ?? 0)
-      const cr = Number(l.credit ?? 0)
-      netByCode.set(code, (netByCode.get(code) ?? 0) + dr - cr)
+      if (!leafSet.has(code)) continue
+      netByCode.set(code, (netByCode.get(code) ?? 0) + Number(l.debit ?? 0) - Number(l.credit ?? 0))
     }
+    if (!lines || lines.length < PAGE) break
   }
 
   return buildTrialBalance({ accounts: leafAccounts, netByCode, asOf, showZeroBalance })
@@ -1892,21 +1934,30 @@ export async function fetchLedgers(
 
   // ── 2: Opening balances. Σ (Dr − Cr) for every line on a non-reversed JE
   //    with transaction_date < from. Single batched query. ──
-  const { data: openingJes, error: openJeErr } = await supabase
+  const openingJes = await fetchAllRows((lo, hi) => supabase
     .from('journal_entries')
     .select('id')
     .lt('transaction_date', from)
     .eq('is_reversed', false)
-  if (openJeErr) throw new Error(`fetchLedgers opening JEs: ${openJeErr.message}`)
+    .order('id', { ascending: true })
+    .range(lo, hi))
   const openingJeIds = (openingJes ?? []).map((j) => j.id as string)
   const openingByCode = new Map<string, number>()
   if (openingJeIds.length > 0) {
-    const { data: openLines, error: openJlErr } = await supabase
-      .from('journal_lines')
-      .select('account_code, debit, credit')
-      .in('entry_id', openingJeIds)
-      .in('account_code', leafCodes)
-    if (openJlErr) throw new Error(`fetchLedgers opening lines: ${openJlErr.message}`)
+    // Paginate — PostgREST caps an unranged select at 1000 rows (see fetchTrialBalance).
+    const openLines: Record<string, unknown>[] = []
+    for (let fromIdx = 0; ; fromIdx += 1000) {
+      const { data: page, error: openJlErr } = await supabase
+        .from('journal_lines')
+        .select('account_code, debit, credit')
+        .in('entry_id', openingJeIds)
+        .in('account_code', leafCodes)
+        .order('id', { ascending: true })
+        .range(fromIdx, fromIdx + 999)
+      if (openJlErr) throw new Error(`fetchLedgers opening lines: ${openJlErr.message}`)
+      openLines.push(...((page ?? []) as Record<string, unknown>[]))
+      if (!page || page.length < 1000) break
+    }
     for (const l of openLines ?? []) {
       const code = l.account_code as string
       openingByCode.set(
@@ -1917,7 +1968,7 @@ export async function fetchLedgers(
   }
 
   // ── 3: Period JEs with metadata for the description override. ──
-  const { data: periodJes, error: periodJeErr } = await supabase
+  const periodJes = await fetchAllRows((lo, hi) => supabase
     .from('journal_entries')
     .select('id, entry_no, transaction_date, description, reference_type, reference_id, segment')
     .gte('transaction_date', from)
@@ -1925,7 +1976,8 @@ export async function fetchLedgers(
     .eq('is_reversed', false)
     .order('transaction_date', { ascending: true })
     .order('entry_no', { ascending: true })
-  if (periodJeErr) throw new Error(`fetchLedgers period JEs: ${periodJeErr.message}`)
+    .order('id', { ascending: true })
+    .range(lo, hi))
   const periodJes2 = periodJes ?? []
   const periodJeIds = periodJes2.map((j) => j.id as string)
 
@@ -1978,12 +2030,20 @@ export async function fetchLedgers(
   const linesByCode = new Map<string, LineWithMeta[]>()
   for (const c of leafCodes) linesByCode.set(c, [])
   if (periodJeIds.length > 0) {
-    const { data: lines, error: jlErr } = await supabase
-      .from('journal_lines')
-      .select('id, entry_id, account_code, debit, credit')
-      .in('entry_id', periodJeIds)
-      .in('account_code', leafCodes)
-    if (jlErr) throw new Error(`fetchLedgers period lines: ${jlErr.message}`)
+    // Paginate — PostgREST caps an unranged select at 1000 rows (see fetchTrialBalance).
+    const lines: Record<string, unknown>[] = []
+    for (let fromIdx = 0; ; fromIdx += 1000) {
+      const { data: page, error: jlErr } = await supabase
+        .from('journal_lines')
+        .select('id, entry_id, account_code, debit, credit')
+        .in('entry_id', periodJeIds)
+        .in('account_code', leafCodes)
+        .order('id', { ascending: true })
+        .range(fromIdx, fromIdx + 999)
+      if (jlErr) throw new Error(`fetchLedgers period lines: ${jlErr.message}`)
+      lines.push(...((page ?? []) as Record<string, unknown>[]))
+      if (!page || page.length < 1000) break
+    }
     for (const l of lines ?? []) {
       const je = jeById.get(l.entry_id as string)
       if (!je) continue

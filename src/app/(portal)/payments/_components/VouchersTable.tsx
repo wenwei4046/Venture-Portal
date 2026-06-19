@@ -19,6 +19,7 @@ export interface VoucherRow {
   status: string
   catLabel: string
   poolLabel: string
+  description: string | null
   paymentOrCreatedDate: string // ISO; client formats for display
 }
 
@@ -36,8 +37,8 @@ export default function VouchersTable({ rows }: { rows: VoucherRow[] }) {
       rows={rows}
       getRowKey={(v) => v.id}
       defaultSort={{ key: 'voucher_no', dir: 'desc' }}
-      searchKeys={['voucher_no', 'payee_name', 'catLabel', 'poolLabel']}
-      searchPlaceholder="Search voucher # / payee / category…"
+      searchKeys={['voucher_no', 'payee_name', 'catLabel', 'poolLabel', 'description']}
+      searchPlaceholder="Search voucher # / payee / category / description…"
       columns={[
         {
           key: 'voucher_no',
@@ -51,6 +52,7 @@ export default function VouchersTable({ rows }: { rows: VoucherRow[] }) {
           label: 'Category',
           render: (v) => v.catLabel,
           sortValue: (v) => v.catLabel,
+          filterable: true,
           cellClassName: 'font-serif italic text-graphite capitalize',
         },
         {
@@ -58,6 +60,7 @@ export default function VouchersTable({ rows }: { rows: VoucherRow[] }) {
           label: 'Pool',
           render: (v) => v.poolLabel,
           sortValue: (v) => v.poolLabel,
+          filterable: true,
           cellClassName: 'font-mono text-[11px] text-graphite',
         },
         {
@@ -65,7 +68,22 @@ export default function VouchersTable({ rows }: { rows: VoucherRow[] }) {
           label: 'Payee',
           render: (v) => v.payee_name,
           sortValue: (v) => v.payee_name,
+          filterable: true,
           cellClassName: 'font-serif text-[15px] text-ink truncate max-w-[200px]',
+        },
+        {
+          key: 'description',
+          label: 'Description',
+          render: (v) => {
+            const d = v.description?.trim()
+            if (!d) return <span className="text-muted">—</span>
+            const firstLine = d.split(/\r?\n/)[0]
+            const text = firstLine.length > 48 ? `${firstLine.slice(0, 48)}…` : firstLine
+            return <span title={d}>{text}</span>
+          },
+          sortValue: (v) => v.description ?? '',
+          filterable: true,
+          cellClassName: 'font-serif italic text-graphite text-sm',
         },
         {
           key: 'amount',
@@ -88,6 +106,8 @@ export default function VouchersTable({ rows }: { rows: VoucherRow[] }) {
             </em>
           ),
           sortValue: (v) => v.status,
+          filterValue: (v) => v.status.replace('_', ' '),
+          filterable: true,
         },
         {
           key: 'date',

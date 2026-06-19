@@ -10,7 +10,7 @@ import {
   type AccountType,
   type CashFlowCategory,
 } from '@/lib/coa'
-import { createAccount, updateAccount } from '../actions'
+import { createAccount, updateAccount, moveAccount } from '../actions'
 
 interface Account {
   code: string
@@ -37,7 +37,12 @@ export default function AccountsSection({ accounts }: Props) {
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [showInactive, setShowInactive] = useState(false)
+  // Drag-and-drop reparenting state: the code being dragged + the row
+  // currently hovered as a drop target.
+  const [dragging, setDragging] = useState<string | null>(null)
+  const [dropTarget, setDropTarget] = useState<string | null>(null)
   // Per-parent collapse state (Set of parent codes currently collapsed). Empty
   // set = everything expanded, which is the first-load default so newcomers
   // see the structure.
@@ -49,6 +54,38 @@ export default function AccountsSection({ accounts }: Props) {
       if (next.has(code)) next.delete(code)
       else next.add(code)
       return next
+    })
+  }
+
+  // Drop a dragged account onto a new parent (or null = make it top-level).
+  // Same-type / no-cycle / posted-parent rules live in DB triggers — any
+  // violation comes back as the error banner.
+  function handleDrop(targetParent: string | null) {
+    const code = dragging
+    setDragging(null)
+    setDropTarget(null)
+    if (!code || code === targetParent) return
+    const current = accounts.find((a) => a.code === code)
+    if (current && (current.parent_code ?? null) === targetParent) return
+    const fd = new FormData()
+    fd.set('code', code)
+    fd.set('parent_code', targetParent ?? '')
+    startTransition(async () => {
+      try {
+        const result = await moveAccount(fd)
+        if (result?.error) {
+          setError(result.error)
+          return
+        }
+        setError(null)
+        setNotice(
+          targetParent
+            ? `${code} moved under ${targetParent}.`
+            : `${code} is now a top-level account.`,
+        )
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Move failed')
+      }
     })
   }
 
@@ -129,6 +166,11 @@ export default function AccountsSection({ accounts }: Props) {
       {error ? (
         <div className="mb-4 p-3 border border-danger bg-danger-bg rounded-md text-sm text-danger font-serif">
           {error}
+        </div>
+      ) : null}
+      {notice ? (
+        <div className="mb-4 p-3 border border-ledger bg-ledger-bg rounded-md text-sm text-ledger font-serif">
+          {notice}
         </div>
       ) : null}
 
@@ -241,17 +283,43 @@ export default function AccountsSection({ accounts }: Props) {
                   </span>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="ledger-table">
+                  {/* table-fixed + explicit widths on the non-name columns so
+                      the Code column lands at the SAME x-position in every
+                      type section — each section is its own <table>, and
+                      auto layout let name length shift the columns around. */}
+                  <table className="ledger-table table-fixed w-full">
                     <thead>
                       <tr>
-                        <th>Code</th>
                         <th>Name</th>
-                        <th>Cash Flow</th>
-                        <th>Status</th>
-                        <th></th>
+                        <th className="w-24">Code</th>
+                        <th className="w-28">Cash Flow</th>
+                        <th className="w-24">Status</th>
+                        <th className="w-16"></th>
                       </tr>
                     </thead>
                     <tbody>
+                      {dragging && accounts.find((a) => a.code === dragging)?.type === t ? (
+                        <tr
+                          onDragOver={(e) => {
+                            e.preventDefault()
+                            setDropTarget('__top__' + t)
+                          }}
+                          onDragLeave={() => setDropTarget(null)}
+                          onDrop={(e) => {
+                            e.preventDefault()
+                            handleDrop(null)
+                          }}
+                          className={
+                            dropTarget === '__top__' + t
+                              ? 'bg-accent-bg'
+                              : 'bg-surface'
+                          }
+                        >
+                          <td colSpan={5} className="text-center font-serif italic text-xs text-graphite py-2 border border-dashed border-accent-border">
+                            Drop here to make it a top-level account
+                          </td>
+                        </tr>
+                      ) : null}
                       {sortedRows.map((acc) => {
                         const isEditing = editing === acc.code
                         const isHeader = (childCounts.get(acc.code) ?? 0) > 0
@@ -260,6 +328,14 @@ export default function AccountsSection({ accounts }: Props) {
                           return null
                         }
                         const isCollapsed = isHeader && collapsed.has(acc.code)
+                        const isDragSource = dragging === acc.code
+                        // Valid drop target: same type, not the dragged row,
+                        // not its current parent. Headers and leaves both
+                        // qualify (dropping on a leaf makes it a header).
+                        const isDropOk =
+                          dragging !== null &&
+                          !isDragSource &&
+                          accounts.find((a) => a.code === dragging)?.type === acc.type
                         return (
                           <tr key={acc.code}>
                             {isEditing ? (
@@ -280,6 +356,7 @@ export default function AccountsSection({ accounts }: Props) {
                                           }
                                           setEditing(null)
                                           setError(null)
+                                          setNotice(result?.message ?? null)
                                         } catch (e) {
                                           setError(
                                             e instanceof Error
@@ -295,29 +372,63 @@ export default function AccountsSection({ accounts }: Props) {
                               </td>
                             ) : (
                               <>
-                                <td className="font-mono text-xs text-graphite">
+                                <td
+                                  draggable={!isPending}
+                                  onDragStart={(e) => {
+                                    e.dataTransfer.effectAllowed = 'move'
+                                    setDragging(acc.code)
+                                  }}
+                                  onDragEnd={() => {
+                                    setDragging(null)
+                                    setDropTarget(null)
+                                  }}
+                                  onDragOver={(e) => {
+                                    if (!isDropOk) return
+                                    e.preventDefault()
+                                    setDropTarget(acc.code)
+                                  }}
+                                  onDragLeave={() => {
+                                    if (dropTarget === acc.code) setDropTarget(null)
+                                  }}
+                                  onDrop={(e) => {
+                                    if (!isDropOk) return
+                                    e.preventDefault()
+                                    handleDrop(acc.code)
+                                  }}
+                                  onClick={
+                                    isHeader ? () => toggleCollapsed(acc.code) : undefined
+                                  }
+                                  className={[
+                                    'text-ink select-none',
+                                    isHeader ? 'cursor-pointer' : 'cursor-grab',
+                                    isDragSource ? 'opacity-40' : '',
+                                    dropTarget === acc.code ? 'bg-accent-bg' : '',
+                                  ].join(' ')}
+                                  title={
+                                    isHeader
+                                      ? 'Click to expand/collapse · drag a row onto me to adopt it'
+                                      : 'Drag onto another account to move it there'
+                                  }
+                                >
                                   {isHeader ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => toggleCollapsed(acc.code)}
-                                      aria-label={isCollapsed ? 'Expand children' : 'Collapse children'}
-                                      className="mr-1 inline-block w-3 text-accent hover:text-accent-hover"
-                                    >
+                                    <span className="mr-1.5 inline-block w-3 text-accent">
                                       {isCollapsed ? '▶' : '▼'}
-                                    </button>
-                                  ) : null}
+                                    </span>
+                                  ) : (
+                                    <span className="mr-1.5 inline-block w-3" aria-hidden />
+                                  )}
                                   {acc.parent_code ? (
-                                    <span className="text-muted">└ </span>
+                                    <span className="text-muted pl-4">└ </span>
                                   ) : null}
-                                  {acc.code}
-                                </td>
-                                <td className={acc.parent_code ? 'text-ink pl-4' : 'text-ink'}>
                                   {acc.name}
                                   {isHeader ? (
                                     <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-graphite border border-hairline rounded px-1.5 py-0.5">
-                                      header · {childCounts.get(acc.code)} sub
+                                      {childCounts.get(acc.code)} sub
                                     </span>
                                   ) : null}
+                                </td>
+                                <td className="font-mono text-xs text-graphite">
+                                  {acc.code}
                                 </td>
                                 <td>
                                   <span className="font-mono text-[10px] uppercase tracking-wider text-info">
@@ -336,9 +447,11 @@ export default function AccountsSection({ accounts }: Props) {
                                 <td className="text-right">
                                   <button
                                     type="button"
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                      e.stopPropagation()
                                       setEditing(acc.code)
                                       setError(null)
+                                      setNotice(null)
                                     }}
                                     className="text-xs text-accent hover:text-accent-hover font-serif italic"
                                   >
@@ -386,6 +499,9 @@ function AccountForm({
   )
   const [parentCode, setParentCode] = useState<string>(initial?.parent_code ?? '')
   const [isActive, setIsActive] = useState(initial?.is_active ?? true)
+  // Edit mode: the code is changeable — rename_account_code re-points every
+  // historical transaction to the new code in one transaction.
+  const [newCode, setNewCode] = useState<string>(initial?.code ?? '')
 
   function handleTypeChange(next: AccountType) {
     setType(next)
@@ -430,6 +546,28 @@ function AccountForm({
         const fd = new FormData()
         if (mode === 'edit') {
           fd.set('code', initial?.code ?? '')
+          const typeChanged = type !== initial?.type
+          if (typeChanged) {
+            // A type change auto-allocates a new code in the new range and
+            // re-points all history — it owns the code, so skip new_code.
+            if (
+              !window.confirm(
+                `Change type of ${initial?.code} (${initial?.name}) to ${typeLabel(type)}?\n\nThe account gets a new code in the ${rangeFor(type)[0]}–${rangeFor(type)[1]} range and every past transaction is re-pointed to it. The account is detached from any parent. This cannot be undone from the UI.`,
+              )
+            ) {
+              return
+            }
+            fd.set('new_type', type)
+          } else if (newCode.trim() && newCode.trim() !== initial?.code) {
+            if (
+              !window.confirm(
+                `Change code ${initial?.code} → ${newCode.trim()}?\n\nEvery historical transaction posted to ${initial?.code} (journal lines, voucher sources, bank links, invoice categories) will be re-pointed to ${newCode.trim()}. This cannot be undone from the UI.`,
+              )
+            ) {
+              return
+            }
+            fd.set('new_code', newCode.trim())
+          }
           fd.set('name', name)
           fd.set('cash_flow_category', cfc)
           fd.set('is_active', isActive ? 'true' : 'false')
@@ -453,9 +591,8 @@ function AccountForm({
           <select
             value={type}
             onChange={(e) => handleTypeChange(e.target.value as AccountType)}
-            disabled={mode === 'edit'}
             required
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border disabled:bg-stone disabled:text-graphite"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
           >
             {ACCOUNT_TYPES.map((t) => {
               const [s, e] = rangeFor(t)
@@ -466,9 +603,15 @@ function AccountForm({
               )
             })}
           </select>
-          {mode === 'edit' ? (
+          {mode === 'edit' && type !== initial?.type ? (
+            <p className="font-serif italic text-alert text-xs mt-1.5">
+              Changing type moves this account to a new code in the{' '}
+              {rangeFor(type)[0]}–{rangeFor(type)[1]} range and re-points every
+              past transaction. You&apos;ll be asked to confirm.
+            </p>
+          ) : mode === 'edit' ? (
             <p className="font-serif italic text-muted text-xs mt-1.5">
-              Type is locked after creation (would invalidate the code range).
+              Change the type to recategorise — the code migrates to the new range with its history.
             </p>
           ) : null}
         </div>
@@ -477,15 +620,40 @@ function AccountForm({
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
             Code{' '}
             <span className="text-muted font-normal">
-              {mode === 'create' ? '(auto-generated)' : ''}
+              {mode === 'create' ? '(auto-generated)' : '(editable — migrates history)'}
             </span>
           </label>
-          <input
-            type="text"
-            value={mode === 'edit' ? initial?.code ?? '' : 'auto-generated on save'}
-            disabled
-            className="w-full px-3 py-2 bg-stone border border-hairline rounded-md text-sm font-mono text-graphite"
-          />
+          {mode === 'edit' ? (
+            <>
+              <input
+                type="text"
+                value={type !== initial?.type ? 'auto in new range' : newCode}
+                onChange={(e) => setNewCode(e.target.value)}
+                disabled={type !== initial?.type}
+                pattern="\d{4}"
+                maxLength={4}
+                className={`w-full px-3 py-2 border border-hairline rounded-md text-sm font-mono focus:outline-none focus:border-accent-border ${
+                  type !== initial?.type
+                    ? 'bg-stone text-graphite'
+                    : 'bg-paper text-ink'
+                }`}
+              />
+              {type === initial?.type && newCode.trim() !== initial?.code ? (
+                <p className="font-serif italic text-alert text-xs mt-1.5">
+                  Changing the code re-points every past transaction from{' '}
+                  {initial?.code} to {newCode.trim() || '…'} (4 digits, same
+                  type range). You&apos;ll be asked to confirm.
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <input
+              type="text"
+              value="auto-generated on save"
+              disabled
+              className="w-full px-3 py-2 bg-stone border border-hairline rounded-md text-sm font-mono text-graphite"
+            />
+          )}
         </div>
       </div>
 

@@ -10,6 +10,7 @@ import { postJournalEntry } from '@/lib/journal'
 import { validateDisbursementAccount } from '@/lib/loan-disbursement'
 import { resolveLoansReceivableLeaf } from '@/lib/loans-coa'
 import type { PaymentType } from '@/types'
+import type { Json } from '@/lib/supabase/database.types'
 
 // ─── Create new loan (Finance) ────────────────────────────────────────────────
 //
@@ -25,8 +26,14 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
 
   const companyId = (formData.get('company_id') as string) ?? ''
   const principal = parseFloat((formData.get('principal') as string) ?? '0')
-  const tenureMonths = parseInt((formData.get('tenure_months') as string) ?? '', 10)
-  const repaymentTerms = (formData.get('repayment_terms') as string) ?? ''
+  const rawTenure = (formData.get('tenure_months') as string) ?? ''
+  const tenureMonths = parseInt(rawTenure, 10)
+  // Tenure is OPTIONAL (2026-06-12): blank = 无固定期限. Interest still accrues
+  // from the loan start date. Match the existing no-term convention — store
+  // tenure_months=1 as a placeholder and mark repayment_terms 未定 so
+  // isLoanUnscheduled() routes it to the compounding / no-fixed-term bucket.
+  const noFixedTerm = rawTenure.trim() === ''
+  let repaymentTerms = (formData.get('repayment_terms') as string) ?? ''
   const loanStartDate = (formData.get('loan_start_date') as string) ?? ''
   const disbursementAccountCode = ((formData.get('disbursement_account_code') as string) ?? '').trim()
 
@@ -37,11 +44,19 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
   if (principal > 100_000_000) {
     return { error: 'Principal exceeds RM 100M ceiling' }
   }
-  if (isNaN(tenureMonths) || tenureMonths < 1 || tenureMonths > 12) {
-    return { error: 'Tenure must be between 1 and 12 months' }
+  if (!noFixedTerm && (isNaN(tenureMonths) || tenureMonths < 1 || tenureMonths > 12)) {
+    return { error: 'Tenure must be between 1 and 12 months (or leave blank for no fixed term)' }
   }
   if (!loanStartDate || !dayjs(loanStartDate).isValid()) {
     throw new Error('Loan start date is required')
+  }
+  const effectiveTenure = noFixedTerm ? 1 : tenureMonths
+  if (noFixedTerm) {
+    // Ensure the schedule treats it as unscheduled even if the user left
+    // Repayment terms blank (isLoanUnscheduled keys on this text).
+    repaymentTerms = repaymentTerms.trim()
+      ? `未定还款 · ${repaymentTerms.trim()}`
+      : '利滚利挂账(未定还款) · 利息从放款日起算'
   }
 
   // Surface period-lock conflicts at creation time rather than at approval
@@ -126,16 +141,31 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
       p_base_rate: base,
       p_risk_premium: premium,
       p_effective_rate: effective,
-      p_tenure_months: tenureMonths,
+      p_tenure_months: effectiveTenure,
       p_repayment_terms: repaymentTerms || undefined,
       p_company_name: company.name,
       p_disbursement_date: loanStartDate,
       p_disbursement_account_code: disbursementAccountCode,
+      // Mig 20260612040000: which bank pays out (empty = primary).
+      p_bank_account_id: ((formData.get('bank_account_id') as string) || null) as never,
     }
   )
 
   if (rpcError || !loanId) {
     return { error: `Failed to create loan: ${rpcError?.message ?? 'unknown'}` }
+  }
+
+  // 利滚利 — compound interest, settable at creation (2026-06-12; was edit-only).
+  // The RPC doesn't take it, so flag the just-created loan. Safe: it's still
+  // pending_approval (no GL/cash yet), and compounding only affects the
+  // schedule/accrual math, not the disbursement.
+  if (formData.get('compound_interest') === 'on') {
+    const { error: cErr } = await supabase
+      .from('loans')
+      .update({ compound_interest: true })
+      .eq('id', loanId as string)
+      .eq('status', 'pending_approval')
+    if (cErr) return { error: `Loan created but marking 利滚利 failed: ${cErr.message}` }
   }
 
   revalidatePath('/fund-out')
@@ -251,11 +281,18 @@ export async function recordRepayment(formData: FormData) {
   // Bank cache: a repayment received increases the bank balance. The GL Dr Bank
   // is posted below, but the cached current_balance must move too (it's not
   // trigger-maintained), else the dashboard/settings bank figure understates.
+  // Via bump_bank_balance RPC (mig 20260610000000): the old direct
+  // bank_accounts.update was silently blocked by RLS for Finance (UPDATE policy
+  // is principal-only, PostgREST returns success with 0 rows) — cache drifted
+  // vs GL on every Finance-recorded repayment.
   if (primaryBank?.id) {
-    await supabase
-      .from('bank_accounts')
-      .update({ current_balance: Math.round((Number(primaryBank.current_balance) + amount) * 100) / 100 })
-      .eq('id', primaryBank.id)
+    const { error: bumpErr } = await supabase.rpc('bump_bank_balance', {
+      p_bank_account_id: primaryBank.id,
+      p_delta: amount,
+    })
+    if (bumpErr) {
+      throw new Error(`Repayment recorded but bank balance update failed: ${bumpErr.message}`)
+    }
   }
   // Mig 238 unified COA + 2026-05-15 fix:
   //   - principal → <borrower's leaf under 3020 Loans Receivable>. The user
@@ -264,11 +301,13 @@ export async function recordRepayment(formData: FormData) {
   //     Trial Balance and tripped mig 256's header-rejection trigger.
   //     resolveLoansReceivableLeaf() does the per-borrower lookup.
   //   - 7010 Penalty Income (other_income)
-  //   - 7000 Interest Income — Loans (other_income)  ← interest + netting
+  //   - 5027 Interest Income — Loans (revenue) ← interest + netting.
+  //     User 2026-06-15: interest income belongs in Revenue (it's the core
+  //     lending revenue), so it was reclassed 7000 → 5027 (revenue range).
   const creditAccount =
     paymentType === 'principal' ? await resolveLoansReceivableLeaf(supabase, loanId) :
     paymentType === 'penalty'   ? '7010' :
-                                  '7000'   // interest + netting
+                                  '5027'   // interest + netting
 
   try {
     await postJournalEntry(supabase, {
@@ -334,6 +373,49 @@ export async function recordLoanRepaymentReceived(formData: FormData) {
 
   revalidatePath('/payments')
   revalidatePath('/fund-out')
+  revalidatePath('/dashboard')
+  redirect(`/fund-out/${loanId}`)
+}
+
+// ─── Amend an active loan (Principal — self-service, direct apply) ────────────
+// Principal is the top approval authority, so edits apply immediately via the
+// amend_loan SECURITY DEFINER RPC (audited by loans.updated_at). Only the
+// fields the form sends are changed. Finance-initiated edits that route through
+// the approval queue are a separate follow-up.
+export async function amendLoan(formData: FormData): Promise<{ error: string } | undefined> {
+  await requireRole(['principal'])
+  const supabase = await createClient()
+
+  const loanId = (formData.get('loan_id') as string) ?? ''
+  if (!loanId) return { error: 'Loan id is required' }
+
+  const ratePctRaw = (formData.get('effective_rate_percent') as string) ?? ''
+  const tenureRaw = (formData.get('tenure_months') as string) ?? ''
+  const disbursementDate = (formData.get('disbursement_date') as string) || null
+  const repaymentTerms = (formData.get('repayment_terms') as string) ?? ''
+  const compound = formData.get('compound_interest') === 'on'
+
+  const payload: Record<string, Json> = { compound_interest: compound }
+
+  if (ratePctRaw.trim() !== '') {
+    const ratePct = parseFloat(ratePctRaw)
+    if (isNaN(ratePct) || ratePct < 0 || ratePct >= 100) return { error: '利率必须在 0–100% 之间' }
+    payload.effective_rate = Math.round((ratePct / 100) * 1e6) / 1e6
+  }
+  if (tenureRaw.trim() !== '') {
+    const tenure = parseInt(tenureRaw, 10)
+    if (isNaN(tenure) || tenure < 1 || tenure > 120) return { error: '期数必须在 1–120 之间' }
+    payload.tenure_months = tenure
+  }
+  if (disbursementDate) payload.disbursement_date = disbursementDate
+  if (repaymentTerms.trim()) payload.repayment_terms = repaymentTerms.trim()
+
+  const { error } = await supabase.rpc('amend_loan', { p_loan_id: loanId, p_payload: payload })
+  if (error) return { error: `修改失败: ${error.message}` }
+
+  revalidatePath(`/fund-out/${loanId}`)
+  revalidatePath('/fund-out')
+  revalidatePath('/repayment-schedule')
   revalidatePath('/dashboard')
   redirect(`/fund-out/${loanId}`)
 }

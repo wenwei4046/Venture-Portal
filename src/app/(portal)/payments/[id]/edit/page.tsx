@@ -101,6 +101,7 @@ export default async function EditPaymentPage({ params }: Props) {
           description: voucher.description ?? '',
           notes: voucher.notes,
           payment_method: voucher.payment_method,
+          payment_date: voucher.payment_date,
           target_pool: voucher.target_pool,
           fund_source_id: voucher.fund_source_id,
           loan_id: voucher.loan_id,

@@ -1,5 +1,26 @@
 import { describe, it, expect } from 'vitest'
-import { loanMonthlyInstallment, sumSchedule, isLoanUnscheduled, compoundInterestState } from './treasury-schedule'
+import { loanMonthlyInstallment, sumSchedule, isLoanUnscheduled, isBeforeFirstInstallment, compoundInterestState } from './treasury-schedule'
+
+describe('isBeforeFirstInstallment', () => {
+  // Regression 2026-06-10: The Cont 120k disbursed 10 Jun (1mo tenure) showed
+  // in JUNE's 应收 — its only installment is due in July.
+  it('loan disbursed in the current month → not due yet', () => {
+    expect(isBeforeFirstInstallment('2026-06-10', '2026-06')).toBe(true)
+  })
+  it('disbursed last month → first installment due this month', () => {
+    expect(isBeforeFirstInstallment('2026-05-31', '2026-06')).toBe(false)
+  })
+  it('disbursed long ago → due (overdue handling is elsewhere)', () => {
+    expect(isBeforeFirstInstallment('2025-09-01', '2026-06')).toBe(false)
+  })
+  it('forward-dated disbursement → not due yet', () => {
+    expect(isBeforeFirstInstallment('2026-07-01', '2026-06')).toBe(true)
+  })
+  it('null/empty start date keeps legacy include behavior', () => {
+    expect(isBeforeFirstInstallment(null, '2026-06')).toBe(false)
+    expect(isBeforeFirstInstallment('', '2026-06')).toBe(false)
+  })
+})
 
 describe('compoundInterestState (利滚利)', () => {
   it('compounds unpaid months: 10,000 @ 2% from Jan, current Apr, no payments', () => {

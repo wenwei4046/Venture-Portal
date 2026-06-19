@@ -4,7 +4,6 @@ import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import GenerateStatementsButton from '../_components/GenerateStatementsButton'
-import StatementsTabHeader from '../_components/StatementsTabHeader'
 import StatementsPeriodTable from '../_components/StatementsPeriodTable'
 
 export default async function MonthlyStatementsPage() {
@@ -42,7 +41,6 @@ export default async function MonthlyStatementsPage() {
 
   return (
     <div>
-      <StatementsTabHeader active="statements" />
       <div className="page-head">
         <div>
           <div className="page-eyebrow">

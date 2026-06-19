@@ -3,16 +3,12 @@
 import { useMemo, useRef, useState, useTransition, useEffect } from 'react'
 import Link from 'next/link'
 import { formatMoney } from '@/lib/utils'
+import AccountPicker, { type AccountOption } from '@/components/AccountPicker'
 import {
   createJournalVoucher,
   updateJournalVoucher,
   deleteJournalVoucher,
 } from '../actions'
-
-interface AccountOption {
-  code: string
-  name: string
-}
 
 interface LineDraft {
   key: string
@@ -33,12 +29,33 @@ interface ExistingEntry {
   id: string
   transaction_date: string
   description: string
+  segment: string
   lines: EntryLine[]
 }
+
+// Actual gl_segment posting values (NOT the report filter list — that one
+// folds treasury into Venture for filtering only).
+const SEGMENT_OPTIONS = [
+  { value: 'unallocated', label: 'Unallocated (top-level adjustment)' },
+  { value: 'corporate', label: 'Venture (Office)' },
+  { value: 'treasury', label: 'Treasury' },
+  { value: 'marketing', label: 'Marketing' },
+  { value: 'hr', label: 'HR' },
+  { value: 'finance', label: 'Finance' },
+  { value: 'director_office', label: 'Director Office' },
+  { value: 'director', label: 'Director' },
+]
 
 interface Props {
   accounts: AccountOption[]
   entry?: ExistingEntry
+  /** Copy mode: prefill a CREATE form from an existing JV (?from=<id>).
+   *  Unlike `entry`, nothing exists yet — posting only happens on submit. */
+  prefill?: {
+    description: string
+    segment: string
+    lines: EntryLine[]
+  }
 }
 
 let keySeq = 0
@@ -55,16 +72,20 @@ function today() {
   return new Date().toISOString().slice(0, 10)
 }
 
-export default function JournalVoucherForm({ accounts, entry }: Props) {
+export default function JournalVoucherForm({ accounts, entry, prefill }: Props) {
   const isEdit = !!entry
+  // Copy mode keeps the source's description/segment/lines but always dates
+  // the new voucher TODAY (recurring adjustments are usually re-dated anyway).
+  const seed = entry ?? (prefill ? { ...prefill, transaction_date: today() } : null)
 
   const [transactionDate, setTransactionDate] = useState<string>(
     entry?.transaction_date ?? today()
   )
-  const [description, setDescription] = useState<string>(entry?.description ?? '')
+  const [description, setDescription] = useState<string>(seed?.description ?? '')
+  const [segment, setSegment] = useState<string>(seed?.segment ?? 'unallocated')
   const [lines, setLines] = useState<LineDraft[]>(() => {
-    if (entry && entry.lines.length > 0) {
-      return entry.lines.map((l) => ({
+    if (seed && seed.lines.length > 0) {
+      return seed.lines.map((l) => ({
         key: nextKey(),
         account_code: l.account_code,
         debit: l.debit != null ? String(l.debit) : '',
@@ -150,6 +171,7 @@ export default function JournalVoucherForm({ accounts, entry }: Props) {
     const payload = {
       transaction_date: transactionDate,
       description: description.trim(),
+      segment,
       lines: lines.map((l) => ({
         account_code: l.account_code,
         debit: parseFloat(l.debit) || 0,
@@ -231,6 +253,30 @@ export default function JournalVoucherForm({ accounts, entry }: Props) {
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
           />
         </div>
+        <div>
+          <label
+            htmlFor="segment"
+            className="block text-sm font-sans font-medium text-graphite mb-1.5"
+          >
+            Segment <span className="text-danger">*</span>
+          </label>
+          <select
+            id="segment"
+            name="segment"
+            value={segment}
+            onChange={(e) => setSegment(e.target.value)}
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+          >
+            {SEGMENT_OPTIONS.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+          <p className="font-serif italic text-muted text-xs mt-1.5">
+            Drives which department P&amp;L this voucher appears in. If the voucher
+            also moves a bank account, the department&apos;s pool moves by the same
+            amount. Unallocated stays out of every department view.
+          </p>
+        </div>
       </div>
 
       {/* ───────── Lines ───────── */}
@@ -256,19 +302,16 @@ export default function JournalVoucherForm({ accounts, entry }: Props) {
               key={line.key}
               className="grid grid-cols-1 sm:grid-cols-[2fr_1.2fr_1.2fr_1.8fr_auto] gap-2 px-3 py-2 border-t border-hairline first:border-t-0 sm:border-t items-center"
             >
-              <select
-                aria-label="Account"
+              {/* Type-ahead account search (user 2026-06-12) — same picker as
+                  the PV/invoice forms; headers hidden, type any part of the
+                  code or name to narrow. */}
+              <AccountPicker
+                accounts={accounts}
                 value={line.account_code}
-                onChange={(e) => updateLine(line.key, { account_code: e.target.value })}
-                className="w-full px-2 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-              >
-                <option value="">Select account…</option>
-                {accounts.map((a) => (
-                  <option key={a.code} value={a.code}>
-                    {a.code} — {a.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(code) => updateLine(line.key, { account_code: code })}
+                name={`jv_line_acct_${line.key}`}
+                placeholder="Type code or name…"
+              />
 
               <input
                 aria-label="Debit"

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { fetchAllRows } from '@/lib/paginate'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildClaimsXlsx } from './_format/xlsx'
 import { ClaimsPdf } from './_format/pdf'
@@ -12,7 +13,7 @@ export async function GET(req: Request) {
 
   const supabase = await createClient()
 
-  const { data: claims } = await supabase.from('claims').select('*').order('created_at', { ascending: false })
+  const claims = await fetchAllRows((lo, hi) => supabase.from('claims').select('*').order('created_at', { ascending: false }).order('id', { ascending: true }).range(lo, hi))
 
   const filename = `claims-${dayjs().format('YYYYMMDD')}`
   if (format === 'xlsx') {

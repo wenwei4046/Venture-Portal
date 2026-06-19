@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/paginate'
 import type { TreasuryConfig, OverdueConfig, Company } from '@/types'
 import type { AccountType, CashFlowCategory } from '@/lib/coa'
 import TreasuryConfigSection from './_components/TreasuryConfigSection'
@@ -68,7 +69,7 @@ export default async function SettingsPage({ searchParams }: Props) {
     supabase.from('rent_splits').select('id, company_id, is_hv_share, split_pct'),
     supabase.from('utility_splits').select('id, company_id, is_hv_share, split_pct'),
     supabase.from('directors').select('id, code, name, weightage, min_payout').eq('status', 'active').order('code'),
-    supabase.from('fund_sources').select('amount, cost_rate').eq('status', 'active'),
+    fetchAllRows((lo, hi) => supabase.from('fund_sources').select('amount, cost_rate').eq('status', 'active').order('id', { ascending: true }).range(lo, hi)).then((data) => ({ data })),
     supabase.from('base_rate_history').select('weighted_cost, op_margin, base_rate').order('approved_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('bank_accounts').select('*').order('is_primary', { ascending: false }),
     supabase.from('period_locks').select('period_month, is_locked, closed_at, notes').order('period_month', { ascending: false }),

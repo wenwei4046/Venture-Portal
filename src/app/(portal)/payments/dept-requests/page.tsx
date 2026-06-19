@@ -4,6 +4,7 @@ import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import GenerateDeptPvForm from './_components/GenerateDeptPvForm'
+import { cancelDeptRequest } from './actions'
 
 export default async function DeptRequestsPage() {
   await requireRole(['finance', 'principal'])
@@ -96,6 +97,16 @@ export default async function DeptRequestsPage() {
                     </div>
                   </div>
                   <GenerateDeptPvForm requestId={r.id} banks={bankOptions} />
+                  <form action={cancelDeptRequest} className="mt-2 text-right">
+                    <input type="hidden" name="request_id" value={r.id} />
+                    <input type="hidden" name="reason" value="Cancelled by Finance from dept-requests page" />
+                    <button
+                      type="submit"
+                      className="text-xs text-danger hover:underline font-sans transition-colors"
+                    >
+                      Cancel request (refunds the reserved pool)
+                    </button>
+                  </form>
                 </div>
               )
             })}

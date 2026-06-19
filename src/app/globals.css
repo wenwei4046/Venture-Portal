@@ -95,7 +95,7 @@
 }
 
 html {
-  font-family: var(--font-sans), 'Inter', -apple-system, sans-serif;
+  font-family: var(--font-sans), 'Inter', -apple-system, var(--font-cjk), sans-serif;
   background: rgb(var(--paper));
   color: rgb(var(--ink));
   -webkit-font-smoothing: antialiased;
@@ -112,7 +112,7 @@ body {
 
 /* Headings default to serif */
 h1, h2, h3, h4 {
-  font-family: var(--font-serif), 'Instrument Serif', Georgia, serif;
+  font-family: var(--font-serif), 'Instrument Serif', Georgia, var(--font-cjk), serif;
   font-weight: 400;
   color: rgb(var(--ink));
 }
@@ -120,8 +120,8 @@ h1, h2, h3, h4 {
 /* Tabular numbers for money + data */
 .tabular,
 .mono {
-  font-family: var(--font-mono), 'JetBrains Mono', Menlo, monospace;
-  font-variant-numeric: tabular-nums slashed-zero;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, var(--font-cjk), monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Reduced motion — graded fallback */
@@ -224,7 +224,7 @@ h1, h2, h3, h4 {
   border: none;
   padding: 8px 16px;
   border-radius: 6px;
-  font-family: var(--font-serif), 'Instrument Serif', Georgia, serif;
+  font-family: var(--font-serif), 'Instrument Serif', Georgia, var(--font-cjk), serif;
   font-style: italic;
   font-size: 14px;
   cursor: pointer;
@@ -244,7 +244,7 @@ h1, h2, h3, h4 {
   border: 1px solid rgb(var(--hairline));
   padding: 8px 16px;
   border-radius: 6px;
-  font-family: var(--font-sans), 'Inter', sans-serif;
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -350,8 +350,8 @@ select:focus {
 @layer components {
   .num,
   .num-hero {
-    font-family: var(--font-mono), 'JetBrains Mono', Menlo, monospace;
-    font-variant-numeric: tabular-nums slashed-zero;
+    font-family: var(--font-mono), 'Chivo Mono', Menlo, var(--font-cjk), monospace;
+    font-variant-numeric: tabular-nums;
     color: rgb(var(--num-ink));
     letter-spacing: 0;
   }
@@ -385,11 +385,25 @@ table.ledger-table thead th {
   background: rgb(var(--surface-2));
   border-bottom: 1px solid rgb(var(--hairline));
 }
-table.ledger-table thead th.right { text-align: right; }
+/* Number-column headers align with their right-aligned figures. */
+table.ledger-table thead th.right,
+table.ledger-table thead th.num { text-align: right; }
 table.ledger-table tbody tr { border-bottom: 1px solid rgb(var(--hairline)); }
 table.ledger-table tbody tr:last-child { border-bottom: 0; }
 table.ledger-table tbody tr:nth-child(even) { background: rgb(var(--surface-2) / 0.35); }
 table.ledger-table tbody tr:hover { background: rgb(var(--accent-bg)); }
+
+/* GL statements (P&L / BS / CF): role-based row colouring replaces zebra
+   striping — section title / group / leaf / transaction detail / summary each
+   get their own band so the hierarchy reads at a glance (user 2026-06-11). */
+table.ledger-table.gl-report tbody tr:nth-child(even) { background: transparent; }
+table.ledger-table.gl-report tbody tr.row-sect { background: rgb(var(--surface-2) / 0.7); }
+table.ledger-table.gl-report tbody tr.row-group { background: rgb(var(--surface)); }
+table.ledger-table.gl-report tbody tr.row-leaf { background: transparent; }
+table.ledger-table.gl-report tbody tr.row-txn { background: rgb(var(--info-bg) / 0.45); }
+table.ledger-table.gl-report tbody tr.row-summary { background: rgb(var(--surface)); }
+table.ledger-table.gl-report tbody tr.row-summary-strong { background: rgb(var(--accent-bg) / 0.55); }
+table.ledger-table.gl-report tbody tr:hover { background: rgb(var(--accent-bg)); }
 table.ledger-table td {
   padding: 14px 16px;
   vertical-align: baseline;
@@ -429,7 +443,7 @@ table.ledger-table td.right { text-align: right; }
   background: rgb(var(--accent));
 }
 .page-eyebrow {
-  font-family: var(--font-mono), 'JetBrains Mono', Menlo, monospace;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, var(--font-cjk), monospace;
   font-size: 10.5px;
   font-weight: 500;
   text-transform: uppercase;
@@ -442,14 +456,14 @@ table.ledger-table td.right { text-align: right; }
 }
 .page-eyebrow em {
   color: rgb(var(--accent));
-  font-family: var(--font-serif), 'Instrument Serif', Georgia, serif;
+  font-family: var(--font-serif), 'Instrument Serif', Georgia, var(--font-cjk), serif;
   font-style: italic;
   font-size: 14px;
   text-transform: none;
   letter-spacing: 0.01em;
 }
 .page-title {
-  font-family: var(--font-serif), 'Instrument Serif', Georgia, serif;
+  font-family: var(--font-serif), 'Instrument Serif', Georgia, var(--font-cjk), serif;
   font-size: 38px;
   line-height: 1;
   margin: 0;
@@ -465,7 +479,7 @@ table.ledger-table td.right { text-align: right; }
   margin-bottom: 18px;
 }
 .sect-head h2 {
-  font-family: var(--font-serif), 'Instrument Serif', Georgia, serif;
+  font-family: var(--font-serif), 'Instrument Serif', Georgia, var(--font-cjk), serif;
   font-weight: 400;
   font-size: 22px;
   color: rgb(var(--ink));
@@ -480,7 +494,7 @@ table.ledger-table td.right { text-align: right; }
 }
 .sect-head .count {
   flex-shrink: 0;
-  font-family: var(--font-mono), 'JetBrains Mono', Menlo, monospace;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, var(--font-cjk), monospace;
   font-size: 11px;
   color: rgb(var(--muted));
   letter-spacing: 0.04em;
@@ -492,7 +506,7 @@ table.ledger-table td.right { text-align: right; }
   display: inline-block;
   padding: 2px 8px;
   border-radius: 99px;
-  font-family: var(--font-mono), 'JetBrains Mono', Menlo, monospace;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, var(--font-cjk), monospace;
   font-size: 10.5px;
   font-weight: 500;
   letter-spacing: 0.02em;

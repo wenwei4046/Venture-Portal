@@ -1,6 +1,7 @@
 import React from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { fetchAllRows } from '@/lib/paginate'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildVouchersXlsx } from './_format/xlsx'
 import { VouchersPdf } from './_format/pdf'
@@ -46,12 +47,16 @@ export async function GET(req: Request) {
   const toFilter = url.searchParams.get('to') ?? ''
   const minFilter = url.searchParams.get('min') ? parseFloat(url.searchParams.get('min')!) : null
   const maxFilter = url.searchParams.get('max') ? parseFloat(url.searchParams.get('max')!) : null
+  // Side split (2026-06-12): /payments exports debit (PV), /receipts credit (OR).
+  const rawDirection = url.searchParams.get('direction') ?? ''
+  const directionFilter = rawDirection === 'debit' || rawDirection === 'credit' ? rawDirection : null
 
   // Fetch vouchers (same query as page)
-  const { data: vouchers } = await supabase
-    .from('payment_vouchers')
-    .select('*')
-    .order('created_at', { ascending: false })
+  const vouchers = await fetchAllRows((lo, hi) => {
+    let voucherQuery = supabase.from('payment_vouchers').select('*').order('created_at', { ascending: false }).order('id', { ascending: true })
+    if (directionFilter) voucherQuery = voucherQuery.eq('direction', directionFilter)
+    return voucherQuery.range(lo, hi)
+  })
 
   // Post-mig 238: PVS rows reference chart_of_accounts via account_code
   // Load once, index by voucher_id, then derive pool list + account name list

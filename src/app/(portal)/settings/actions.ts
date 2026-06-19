@@ -360,7 +360,7 @@ export async function toggleCompanyActive(formData: FormData) {
 // chart_of_accounts. The code is auto-allocated by the next_account_code RPC
 // so users can't pick a colliding number.
 
-export type AccountActionResult = { error: string } | undefined
+export type AccountActionResult = { error?: string; message?: string } | undefined
 
 export async function createAccount(formData: FormData): Promise<AccountActionResult> {
   await requireRole(['principal', 'finance'])
@@ -405,6 +405,29 @@ export async function createAccount(formData: FormData): Promise<AccountActionRe
   revalidatePath('/payments/new')
 }
 
+// Drag-and-drop reparenting: move an account under another parent (or detach
+// with an empty parent). Same-type + no-cycle + posted-parent rules are all
+// enforced by DB triggers (migs 246 / 256 / 20260611000000) — their messages
+// surface as the error.
+export async function moveAccount(formData: FormData): Promise<AccountActionResult> {
+  await requireRole(['principal', 'finance'])
+  const supabase = await createClient()
+
+  const code = ((formData.get('code') as string) ?? '').trim()
+  const rawParent = ((formData.get('parent_code') as string) ?? '').trim()
+  if (!code) return { error: 'Account code is required' }
+  if (rawParent === code) return { error: 'An account cannot be its own parent' }
+
+  const { error } = await supabase
+    .from('chart_of_accounts')
+    .update({ parent_code: rawParent === '' ? null : rawParent })
+    .eq('code', code)
+  if (error) return { error: `Move failed: ${error.message}` }
+
+  revalidatePath('/settings')
+  revalidatePath('/payments/new')
+}
+
 export async function updateAccount(formData: FormData): Promise<AccountActionResult> {
   await requireRole(['principal', 'finance'])
   const supabase = await createClient()
@@ -424,6 +447,64 @@ export async function updateAccount(formData: FormData): Promise<AccountActionRe
   if (!code) return { error: 'Account code is required' }
   if (!name) return { error: 'Account name is required' }
 
+  // Type change (mig 20260612080000): a new type forces the code into the new
+  // range, so change_account_type allocates a fresh code there and re-points
+  // ALL history. Runs FIRST so a same-call code rename / cfc / parent edit
+  // applies to the resulting new code. Mutually exclusive with new_code in
+  // practice (the type change picks the code).
+  const rawNewType = ((formData.get('new_type') as string) ?? '').trim()
+  let typedCode = code
+  let typeNote = ''
+  if (rawNewType) {
+    const { data: cur } = await supabase
+      .from('chart_of_accounts')
+      .select('type')
+      .eq('code', code)
+      .maybeSingle()
+    if (cur && cur.type !== rawNewType) {
+      const { data: res, error: typeErr } = await supabase.rpc('change_account_type' as never, {
+        p_old: code,
+        p_new_type: rawNewType,
+      } as never)
+      if (typeErr) return { error: `Type change failed: ${typeErr.message}` }
+      const r = (res ?? {}) as { new_code?: string; repointed?: Record<string, number> }
+      typedCode = r.new_code ?? code
+      const moved = Object.entries(r.repointed ?? {})
+        .filter(([, n]) => Number(n) > 0)
+        .map(([k, n]) => `${k}: ${n}`)
+        .join(', ')
+      typeNote = `Type → ${rawNewType}, code ${code} → ${typedCode}.${moved ? ` Re-pointed — ${moved}.` : ''}`
+    }
+  }
+  // After a type change the working code is the new one; a code rename in the
+  // same submit applies on top of it (rare, but consistent).
+  const baseCode = typedCode
+
+  // Code rename (mig 20260612070000): the rename_account_code RPC clones the
+  // row under the new code and re-points EVERY historical reference
+  // (journal_lines, PV sources, bank GL codes, fund sources, invoice/credit
+  // note/statement category codes, children) in one transaction. The rest of
+  // this update then applies to the NEW code.
+  const rawNewCode = ((formData.get('new_code') as string) ?? '').trim()
+  let effectiveCode = baseCode
+  let renameNote = ''
+  // A type change already moved the code; only honor an explicit rename if it
+  // targets something different from where the type change landed.
+  if (rawNewCode && rawNewCode !== baseCode && !rawNewType) {
+    const { data: counts, error: renameErr } = await supabase.rpc('rename_account_code' as never, {
+      p_old: baseCode,
+      p_new: rawNewCode,
+    } as never)
+    if (renameErr) return { error: `Rename failed: ${renameErr.message}` }
+    effectiveCode = rawNewCode
+    const c = (counts ?? {}) as Record<string, number>
+    const moved = Object.entries(c)
+      .filter(([, n]) => Number(n) > 0)
+      .map(([k, n]) => `${k}: ${n}`)
+      .join(', ')
+    renameNote = `Code ${code} → ${rawNewCode}.${moved ? ` Re-pointed — ${moved}.` : ' No historical rows referenced it.'}`
+  }
+
   // type + code are immutable post-create. name / cash_flow_category /
   // is_active / parent_code are editable. parent_code rejection (same-type,
   // no cycles) is enforced by the coa_enforce_parent_type trigger from
@@ -440,16 +521,21 @@ export async function updateAccount(formData: FormData): Promise<AccountActionRe
     }
     updates.cash_flow_category = rawCfc as CashFlowCategory
   }
-  if (sentParent) {
+  // On a type change the RPC already detached the parent (the old parent is
+  // the old type — a cross-type parent is rejected). Don't re-apply the form's
+  // stale parent; leave the account top-level for the user to re-home.
+  if (sentParent && !rawNewType) {
     updates.parent_code = parentCode
   }
 
   const { error } = await supabase
     .from('chart_of_accounts')
     .update(updates)
-    .eq('code', code)
+    .eq('code', effectiveCode)
   if (error) return { error: `Failed to update account: ${error.message}` }
 
   revalidatePath('/settings')
   revalidatePath('/payments/new')
+  const note = [typeNote, renameNote].filter(Boolean).join(' ')
+  if (note) return { message: note }
 }

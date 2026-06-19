@@ -56,6 +56,10 @@ interface Props {
   invoicePreset?: InvoicePreset | null
   nonBillablePreset?: boolean
   payableFundSources?: PayableFundSource[]
+  /** Entry-point split (2026-06-12): '/payments/new' = pay-only (debit),
+   *  '?mode=receipt' = receive-only (credit). Locks the direction and hides
+   *  the toggle; undefined keeps the legacy toggle (invoice preset path). */
+  lockedDirection?: 'debit' | 'credit'
 }
 
 const TYPE_BADGE: Record<AccountType, { label: string; className: string }> = {
@@ -95,12 +99,21 @@ interface SourceRow {
   override_reason?: string
 }
 
-export default function NewPaymentForm({ companies, bankAccounts, accounts, invoicePreset, nonBillablePreset, payableFundSources = [] }: Props) {
+export default function NewPaymentForm({ companies, bankAccounts, accounts, invoicePreset, nonBillablePreset, payableFundSources = [], lockedDirection }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const isInvoicePay = !!invoicePreset
   const isNonBillable = !!nonBillablePreset && !isInvoicePay
-  const [direction, setDirection] = useState<'debit' | 'credit'>(isInvoicePay ? 'credit' : 'debit')
+  const [direction, setDirection] = useState<'debit' | 'credit'>(
+    isInvoicePay ? 'credit' : lockedDirection ?? 'debit',
+  )
+  // Internal transfer: a pure bank-to-bank cash move (e.g. HL → Alliance to
+  // stage payroll). Tick this so the voucher is booked as voucher_type=
+  // internal_transfer — it does NOT consume any dept/venture pool (no expense
+  // yet; the cost is recognised later when the money is actually spent), and the
+  // GL posts ONE segment-tagged entry per source row so each segment's bank
+  // cash slice moves correctly instead of lumping into Venture/corporate.
+  const [isInternalTransfer, setIsInternalTransfer] = useState(false)
   // Inter-billing: invoice issued to an internal dept pool (or director /
   // freetext non-cash counterparty) settles without touching a bank — the
   // money moves between pool ledgers, not banks. Default payment_method to
@@ -275,9 +288,13 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
 
   return (
     <form ref={formRef} action={handleSubmit} className="bg-surface border border-hairline rounded-md p-8 max-w-3xl">
-      {/* Direction: toggle for standalone vouchers, locked to credit when settling an invoice */}
+      {/* Direction: locked per entry point (Create payment = debit, Receipt =
+          credit, settle-invoice = credit). The toggle only survives on legacy
+          paths with no lock. */}
       {isInvoicePay ? (
         <input type="hidden" name="direction" value="credit" />
+      ) : lockedDirection ? (
+        <input type="hidden" name="direction" value={lockedDirection} />
       ) : (
         <div className="mb-6">
           <label className="block text-sm font-sans font-medium text-graphite mb-2">
@@ -309,13 +326,38 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
           <input type="hidden" name="direction" value={direction} />
         </div>
       )}
-      {/* voucher_type: billing_payment when settling, else derived from direction */}
+      {/* voucher_type: billing_payment when settling; internal_transfer when
+          this debit is a pure bank-to-bank move; else derived from direction */}
       <input
         type="hidden"
         name="voucher_type"
-        value={isInvoicePay ? 'billing_payment' : direction === 'debit' ? 'expense' : 'receive_payment'}
+        value={
+          isInvoicePay
+            ? 'billing_payment'
+            : direction === 'debit'
+              ? (isInternalTransfer ? 'internal_transfer' : 'expense')
+              : 'receive_payment'
+        }
       />
       {isInvoicePay ? <input type="hidden" name="invoice_id" value={invoicePreset!.id} /> : null}
+
+      {/* Internal-transfer toggle (debit only, standalone vouchers) */}
+      {!isInvoicePay && direction === 'debit' ? (
+        <label className="flex items-start gap-2 mb-6 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isInternalTransfer}
+            onChange={(e) => setIsInternalTransfer(e.target.checked)}
+            className="h-4 w-4 mt-0.5 accent-[var(--accent)]"
+          />
+          <span className="text-sm font-sans text-graphite">
+            这是内部转账 · Internal transfer (bank → bank, no pool spent)
+            <span className="block text-xs text-muted font-serif italic mt-0.5">
+              用于「发薪转账到 Alliance」等银行间搬钱:<strong>不会扣部门池</strong>(钱还是各部门的,只是换了银行),按 segment 分开记账。来源科目选目标银行,每行 pool = 该笔归属的部门/Venture。等真正发出去再记花费。
+            </span>
+          </span>
+        </label>
+      ) : null}
 
       {isInvoicePay ? (
         <div className="mb-6 border border-accent-border rounded-md bg-accent-bg p-4">

@@ -60,10 +60,14 @@ export async function approveRequest(formData: FormData) {
   // Postgres transaction. Early-return because the RPC does the approval flip
   // itself; skip the generic flip below.
   if (approval.request_type === 'payment_voucher') {
+    // Principal may opt to allow dept-pool overdraw (e.g. payroll that can't
+    // wait for invoice settlement). Default false → sufficiency check still blocks.
+    const allowOverdraw = formData.get('allow_overdraw') === 'on'
     const { error: rpcErr } = await supabase.rpc('approve_single_voucher', {
       p_approval_id: id,
       p_user_id: user.id,
       p_notes: notes ?? '',
+      p_allow_overdraw: allowOverdraw,
     })
     if (rpcErr) {
       throw new Error(`Approval failed: ${rpcErr.message}`)
@@ -329,8 +333,22 @@ export async function approveRequest(formData: FormData) {
     if (ecErr) {
       throw new Error(`Approval recorded but loan reversal failed: ${ecErr.message}`)
     }
+  } else if (
+    approval.request_type === 'tier_change' &&
+    approval.reference_table === 'fund_sources'
+  ) {
+    // Fund-source cancellation (filed by cancelFundSource as 'tier_change').
+    // Mig 20260612050000: the executor reverses the activation atomically —
+    // venture_pool fund_out, primary bank −, reversing JE Dr 4xxx / Cr bank,
+    // status → cancelled. Previously approval changed nothing financially.
+    const { error: fscErr } = await supabase.rpc('execute_fund_source_cancel' as never, {
+      p_fund_source_id: approval.reference_id,
+    } as never)
+    if (fscErr) {
+      throw new Error(`Approval recorded but fund source reversal failed: ${fscErr.message}`)
+    }
   }
-  // Other request types (base_rate, tier_change, etc) handled in Phase 1.5+
+  // Other request types (base_rate, true tier changes, etc) handled in Phase 1.5+
 
   // Slack notification (non-blocking)
   notifyApprovalDecision(
@@ -419,6 +437,15 @@ export async function rejectRequest(formData: FormData) {
       .update({ status: 'voided' })
       .eq('id', approval.reference_id)
       .eq('status', 'pending_approval')
+    // Dept-request PVs (mig 20260612030000): return the request to Finance
+    // (pending_finance_pv, pv_id cleared) so they can regenerate or cancel.
+    // The stage-1 pool reservation stays until an explicit cancel.
+    const { error: dprRejErr } = await supabase.rpc('dept_request_pv_rejected' as never, {
+      p_voucher_id: approval.reference_id,
+    } as never)
+    if (dprRejErr) {
+      throw new Error(`Voucher rejected, but resetting its dept request failed: ${dprRejErr.message}`)
+    }
   } else if (approval.request_type === 'dept_payment_request') {
     // PR #4: flip dept_payment_request to rejected_expense (no pool debit).
     await supabase.rpc('reject_dept_payment_request', { p_approval_id: id })
@@ -516,6 +543,18 @@ export async function approveRequestGroup(formData: FormData) {
   }
   const voucherApproval = voucherApprovals[0]
 
+  // GL date = the loan's start date (disbursement_date), NOT the approval day,
+  // so a late-recorded loan lands in the month the money actually moved
+  // (user 2026-06-15: "我有时会迟记录"). Falls back to today if unset.
+  const { data: loanRow } = await supabase
+    .from('loans')
+    .select('disbursement_date')
+    .eq('id', loanApproval.reference_id)
+    .single()
+  const disbDate = (loanRow?.disbursement_date as string | null) || todayStr
+  // The disbursement month must be open — can't backdate into a closed period.
+  await assertPeriodOpen(supabase, disbDate)
+
   // ─── Pre-flight: bank balance check ───
   const { data: voucher } = await supabase
     .from('payment_vouchers')
@@ -526,19 +565,29 @@ export async function approveRequestGroup(formData: FormData) {
 
   if (!voucher) throw new Error('Paired voucher not found or not pending approval')
 
-  const { data: primaryBank } = await supabase
-    .from('bank_accounts')
-    .select('id, current_balance, bank_name, gl_account_code')
-    .eq('is_primary', true)
-    .eq('status', 'active')
-    .single()
+  // Pay from the bank ON the disbursement PV (picked at loan creation,
+  // mig 20260612040000). Fallback to primary only for legacy vouchers with
+  // no bank set — the old behavior debited primary unconditionally.
+  const { data: payingBank } = voucher.bank_account_id
+    ? await supabase
+        .from('bank_accounts')
+        .select('id, current_balance, bank_name, gl_account_code')
+        .eq('id', voucher.bank_account_id)
+        .single()
+    : await supabase
+        .from('bank_accounts')
+        .select('id, current_balance, bank_name, gl_account_code')
+        .eq('is_primary', true)
+        .eq('status', 'active')
+        .single()
 
-  if (primaryBank) {
-    const balance = Number(primaryBank.current_balance)
+  if (!payingBank) throw new Error('Disbursement bank account not found')
+  {
+    const balance = Number(payingBank.current_balance)
     const amount = Number(voucher.amount)
     if (balance < amount) {
       throw new Error(
-        `Insufficient bank balance. ${primaryBank.bank_name} has RM ${balance.toFixed(2)} but loan disbursement requires RM ${amount.toFixed(2)}.`
+        `Insufficient bank balance. ${payingBank.bank_name} has RM ${balance.toFixed(2)} but loan disbursement requires RM ${amount.toFixed(2)}.`
       )
     }
   }
@@ -586,7 +635,7 @@ export async function approveRequestGroup(formData: FormData) {
       approved_at: now,
       executed_by: user.id,
       executed_at: now,
-      payment_date: todayStr,
+      payment_date: disbDate,
     })
     .eq('id', voucher.id)
     .eq('status', 'pending_approval')
@@ -595,14 +644,15 @@ export async function approveRequestGroup(formData: FormData) {
     throw new Error(`Group approved but voucher execute failed: ${voucherError.message}`)
   }
 
-  // ─── 4) Debit primary bank ───
-  if (primaryBank) {
-    await supabase
-      .from('bank_accounts')
-      .update({
-        current_balance: Number(primaryBank.current_balance) - Number(voucher.amount),
-      })
-      .eq('id', primaryBank.id)
+  // ─── 4) Debit the disbursement bank (atomic RPC, not read-modify-write) ───
+  {
+    const { error: bumpErr } = await supabase.rpc('bump_bank_balance', {
+      p_bank_account_id: payingBank.id,
+      p_delta: -Number(voucher.amount),
+    })
+    if (bumpErr) {
+      throw new Error(`Group approved but bank debit failed: ${bumpErr.message}`)
+    }
   }
 
   // ─── 5) Venture Pool cash ledger: loan disbursement = fund_out ──────────
@@ -640,14 +690,14 @@ export async function approveRequestGroup(formData: FormData) {
   const loansReceivableLeaf = await resolveLoansReceivableLeaf(supabase, loanApproval.reference_id)
   try {
     await postJournalEntry(supabase, {
-      transactionDate: todayStr,
+      transactionDate: disbDate,
       description: `Loan disbursement approved — ${loanApproval.description ?? loanApproval.reference_id}`,
       referenceType: 'loan',
       referenceId: loanApproval.reference_id,
       createdBy: user.id,
       lines: [
         { accountCode: loansReceivableLeaf, debit: Number(voucher.amount), description: 'Loans Receivable — disbursement' },
-        { accountCode: primaryBank?.gl_account_code ?? '3000', credit: Number(voucher.amount), description: `Bank — loan disbursement ${voucher.voucher_no ?? ''}`.trim() },
+        { accountCode: payingBank.gl_account_code ?? '3000', credit: Number(voucher.amount), description: `Bank — loan disbursement ${voucher.voucher_no ?? ''}`.trim() },
       ],
     })
   } catch (jeErr) {

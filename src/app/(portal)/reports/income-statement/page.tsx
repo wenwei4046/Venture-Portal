@@ -1,35 +1,50 @@
-import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
-import { formatMoney } from '@/lib/utils'
-import {
-  fetchIncomeStatement,
-  startOfMonth,
-  endOfMonth,
-  type PoolPnl,
-  type Line,
-  type IncomeStatement,
-} from '@/lib/cfo-reports'
+// GL-driven P&L (2026-06-11 rebuild). Every figure aggregates journal_lines —
+// the same dataset the Trial Balance ties to. Format per the-conts.pages.dev
+// reference: current | comparison | Δ% | % of revenue, collapsible groups,
+// inline transaction drill-down. The old subledger/manual_jv hybrid engine
+// (cfo-reports.fetchIncomeStatement) is no longer used here.
+
 import dayjs from 'dayjs'
 import Link from 'next/link'
-import { SegmentedReport, type ReportSegment } from '@/app/(portal)/reports/_components/SegmentedReport'
-import { SegmentExportButtons } from '@/app/(portal)/reports/_components/SegmentExportButtons'
-import { RevenueGroups } from './_components/RevenueGroups'
-import PeriodMonthPicker from '@/app/(portal)/reports/_components/PeriodMonthPicker'
+import { createClient } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth'
+import { applyGlRefs, buildPnl, fetchAllJournalLines, fetchCoaAccounts, fetchGlRefs, monthPeriod } from '@/lib/gl-reports'
+import { pnlBlocks } from '@/lib/gl-report-blocks'
+import GlReportView from '../_components/GlReportView'
+import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
+import ExportLinks from '../_components/ExportLinks'
+
+export const dynamic = 'force-dynamic'
 
 interface Props {
-  searchParams: Promise<{ from?: string; to?: string; period?: string }>
+  searchParams: Promise<{ period?: string; compare?: string; segment?: string }>
 }
 
 export default async function IncomeStatementPage({ searchParams }: Props) {
   await requireRole(['principal', 'finance'])
   const supabase = await createClient()
 
-  const { from: rawFrom, to: rawTo, period } = await searchParams
-  const from = rawFrom ?? startOfMonth(period)
-  const to = rawTo ?? endOfMonth(period ?? from)
-  const periodLabel = formatPeriodLabel(from, to)
+  const params = await searchParams
+  const period = params.period ?? dayjs().format('YYYY-MM')
+  // Comparison is OPT-IN (user 2026-06-11): default is a clean single-month view.
+  const compare = params.compare ?? ''
+  const segment = params.segment ?? ''
 
-  const stmt = await fetchIncomeStatement(supabase, { from, to })
+  const [rawLines, accounts, glRefs] = await Promise.all([
+    fetchAllJournalLines(supabase),
+    fetchCoaAccounts(supabase),
+    fetchGlRefs(supabase),
+  ])
+  const lines = applyGlRefs(rawLines, glRefs)
+
+  const pnl = buildPnl(lines, accounts, {
+    current: monthPeriod(period),
+    previous: monthPeriod(compare || period),
+    segment: segmentFilterFor(segment),
+  })
+
+  const blocks = pnlBlocks(pnl)
+  const periodLabel = dayjs(`${period}-01`).format('MMMM YYYY')
 
   return (
     <div>
@@ -40,254 +55,30 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> REPORTS · INCOME STATEMENT · {periodLabel.toUpperCase()}
+            <em>I.</em> REPORTS · P&amp;L STATEMENT · {periodLabel.toUpperCase()}
           </div>
-          <h1 className="page-title">Income Statement</h1>
+          <h1 className="page-title">P&amp;L Statement</h1>
         </div>
-        <div className="shrink-0 flex items-center gap-3">
-          <PeriodMonthPicker value={dayjs(from).format('YYYY-MM')} />
-          <SegmentExportButtons basePath="/reports/income-statement/export" from={from} to={to} />
-        </div>
+        <ExportLinks basePath="/reports/income-statement/export" period={period} compare={compare} segment={segment} />
       </div>
 
-      <p className="font-serif italic text-muted text-sm mb-8 max-w-3xl">
-        One block per pool. Gross profit = revenue − cost. Pool margin = gross
-        profit + other income − operating expense. The Venture Pool folds
-        treasury interest (loan interest in / fund-source interest out) into its
-        revenue and expense lines. Loan and deposit <em>principal</em> never
-        appear here — they sit on the Balance Sheet.
+      <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
+        Built straight from the general ledger — the same journal lines the Trial Balance ties to.
+        Gross profit = revenue − COGS; net income adds other income and deducts expenses.
+        Click ▸ on an account to see its journal transactions for the period.
       </p>
 
-      <div className="max-w-3xl">
-        {stmt.pools.length === 0 ? (
-          <div className="border border-hairline rounded-md bg-surface p-6 text-center">
-            <p className="font-serif italic text-muted text-sm">
-              No revenue or expense activity in this period. Issue invoices or
-              pay expense vouchers to populate the income statement.
-            </p>
-          </div>
-        ) : (
-          <SegmentedReport
-            defaultKey="summary"
-            segments={[
-              {
-                key: 'summary',
-                label: 'Summary',
-                panel: <SummaryBlock stmt={stmt} />,
-              },
-              ...stmt.pools.map<ReportSegment>((p) => ({
-                key: p.pool,
-                label: p.poolLabel,
-                panel: (
-                  <PoolBlock
-                    pool={p}
-                    showTreasuryNote={p.pool === 'venture_pool' && stmt.treasury.net !== 0}
-                  />
-                ),
-              })),
-            ]}
-          />
-        )}
-      </div>
+      <GlReportView
+        basePath="/reports/income-statement"
+        period={period}
+        compare={compare}
+        segment={segment}
+        segments={REPORT_SEGMENTS}
+        blocks={blocks}
+        pctBase={{ current: pnl.revenue.current, previous: pnl.revenue.previous }}
+        currentLabel={dayjs(`${period}-01`).format('MMM YYYY')}
+        compareLabel={compare ? dayjs(`${compare}-01`).format('MMM YYYY') : ''}
+      />
     </div>
   )
-}
-
-// One block per pool — four inner ledger-tables (Revenue / Cost / Other Income
-// / Expense) with a Gross Profit line between Cost and Other Income, and the
-// pool margin at the bottom.
-function PoolBlock({ pool, showTreasuryNote }: { pool: PoolPnl; showTreasuryNote: boolean }) {
-  const empty =
-    pool.revenueGroups.length === 0 &&
-    pool.costLines.length === 0 &&
-    pool.otherIncomeLines.length === 0 &&
-    pool.expenseLines.length === 0
-
-  return (
-    <section>
-      <div className="sect-head">
-        <h2>{pool.poolLabel}</h2>
-        <span className="rule" aria-hidden />
-        <span className={`count ${pool.margin >= 0 ? 'text-ledger' : 'text-danger'}`}>
-          MARGIN {formatMoney(pool.margin)}
-        </span>
-      </div>
-
-      {showTreasuryNote ? (
-        <p className="font-serif italic text-muted text-xs mb-3">incl. loan interest</p>
-      ) : null}
-
-      {empty ? (
-        <p className="font-serif italic text-muted text-sm">No P&amp;L activity in this period.</p>
-      ) : (
-        <div className="space-y-6">
-          <RevenueGroups groups={pool.revenueGroups} subtotal={pool.revenue} />
-          <LineTable
-            title="Cost"
-            lines={pool.costLines}
-            subtotal={pool.cost}
-            tone="debit"
-          />
-
-          {/* Gross Profit divider — between Cost and Other Income */}
-          <table className="ledger-table">
-            <tbody>
-              <tr className="border-t-2 border-hairline">
-                <td className="font-serif italic text-ink font-medium">Gross profit</td>
-                <td className={`num tabular ${pool.grossProfit >= 0 ? 'text-num-ink' : 'text-danger'}`}>
-                  <span className="font-serif text-lg font-semibold tabular tracking-[-0.01em]">
-                    {pool.grossProfit < 0
-                      ? <span className="neg">{formatMoney(pool.grossProfit)}</span>
-                      : formatMoney(pool.grossProfit)}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-
-          <LineTable
-            title="Other income"
-            lines={pool.otherIncomeLines}
-            subtotal={pool.otherIncome}
-            tone="credit"
-          />
-          <LineTable
-            title="Expense"
-            lines={pool.expenseLines}
-            subtotal={pool.expense}
-            tone="debit"
-          />
-
-          {/* Pool margin footer */}
-          <table className="ledger-table">
-            <tfoot>
-              <tr className="border-t-2 border-hairline">
-                <td className="font-serif italic text-ink font-medium">Pool margin</td>
-                <td className={`num ${pool.margin >= 0 ? 'text-ledger' : 'text-danger'}`}>
-                  <span className={`font-serif text-xl font-semibold tabular tracking-[-0.01em] ${pool.margin >= 0 ? 'text-ledger' : 'text-danger'}`}>
-                    {formatMoney(pool.margin)}
-                  </span>
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      )}
-    </section>
-  )
-}
-
-function LineTable({
-  title,
-  lines,
-  subtotal,
-  tone,
-}: {
-  title: string
-  lines: Line[]
-  subtotal: number
-  tone: 'credit' | 'debit'
-}) {
-  const isCredit = tone === 'credit'
-  return (
-    <div>
-      <h3 className="font-serif italic text-accent text-sm mb-2">{title}</h3>
-      {lines.length === 0 ? (
-        <p className="font-serif italic text-muted text-xs">No {title.toLowerCase()}.</p>
-      ) : (
-        <table className="ledger-table">
-          <tbody>
-            {lines.map((l) => (
-              <tr key={l.label}>
-                <td className="text-sm">{l.label}</td>
-                <td className={`num ${isCredit ? 'text-ledger' : ''}`}>
-                  {isCredit
-                    ? (l.amount < 0
-                        ? <span className="neg">{formatMoney(l.amount)}</span>
-                        : formatMoney(l.amount))
-                    : <span className="neg">{formatMoney(-l.amount)}</span>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="border-t border-hairline">
-              <td className="font-serif italic text-graphite text-sm">Subtotal</td>
-              <td className={`num font-semibold ${isCredit ? 'text-ledger' : ''}`}>
-                {isCredit
-                  ? formatMoney(subtotal)
-                  : <span className="neg">{formatMoney(-subtotal)}</span>}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      )}
-    </div>
-  )
-}
-
-function SummaryBlock({ stmt }: { stmt: IncomeStatement }) {
-  const showCost = Math.abs(stmt.groupCost) > 0.005
-  const showOtherIncome = Math.abs(stmt.groupOtherIncome) > 0.005
-  return (
-    <section className="border-t-2 border-hairline pt-6">
-      <div className="sect-head">
-        <h2>Summary</h2>
-        <span className="rule" aria-hidden />
-        <span className="count">ALL POOLS</span>
-      </div>
-      <table className="ledger-table">
-        <tbody>
-          <tr>
-            <td className="text-graphite">Group revenue</td>
-            <td className="num text-ledger">{formatMoney(stmt.groupRevenue)}</td>
-          </tr>
-          {showCost ? (
-            <tr>
-              <td className="text-graphite">− Group cost</td>
-              <td className="num"><span className="neg">{formatMoney(-stmt.groupCost)}</span></td>
-            </tr>
-          ) : null}
-          <tr className="border-t border-hairline">
-            <td className="font-serif italic text-ink font-medium">Gross profit</td>
-            <td className={`num ${stmt.groupGrossProfit >= 0 ? 'text-ledger' : 'text-danger'}`}>
-              <span className={`font-serif text-xl font-semibold tabular tracking-[-0.01em] ${stmt.groupGrossProfit >= 0 ? 'text-ledger' : 'text-danger'}`}>
-                {formatMoney(stmt.groupGrossProfit)}
-              </span>
-            </td>
-          </tr>
-          {showOtherIncome ? (
-            <tr>
-              <td className="text-graphite">+ Group other income</td>
-              <td className="num text-ledger">{formatMoney(stmt.groupOtherIncome)}</td>
-            </tr>
-          ) : null}
-          <tr>
-            <td className="text-graphite">− Group expense</td>
-            <td className="num"><span className="neg">{formatMoney(-stmt.groupExpense)}</span></td>
-          </tr>
-        </tbody>
-        <tfoot>
-          <tr className="border-t-2 border-hairline">
-            <td className="font-serif italic text-ink font-medium">Group net profit</td>
-            <td className={`num ${stmt.groupNetProfit >= 0 ? 'text-ledger' : 'text-danger'}`}>
-              <span className={`font-serif text-2xl font-semibold tabular tracking-[-0.01em] ${stmt.groupNetProfit >= 0 ? 'text-ledger' : 'text-danger'}`}>
-                {formatMoney(stmt.groupNetProfit)}
-              </span>
-            </td>
-          </tr>
-        </tfoot>
-      </table>
-    </section>
-  )
-}
-
-function formatPeriodLabel(from: string, to: string): string {
-  const dFrom = dayjs(from)
-  const dTo = dayjs(to)
-  const wholeMonth = dFrom.startOf('month').isSame(dFrom, 'day')
-                     && dTo.endOf('month').isSame(dTo, 'day')
-                     && dFrom.isSame(dTo, 'month')
-  if (wholeMonth) return dFrom.format('MMMM YYYY')
-  return `${dFrom.format('D MMM')} → ${dTo.format('D MMM YYYY')}`
 }

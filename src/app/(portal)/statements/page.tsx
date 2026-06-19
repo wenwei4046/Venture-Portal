@@ -4,7 +4,6 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import BillingView from '../billing/_components/BillingView'
-import StatementsTabHeader from './_components/StatementsTabHeader'
 import { getPeriodMonth } from '@/lib/utils'
 
 interface Props {
@@ -19,7 +18,6 @@ export default async function StatementsPage(props: Props) {
 
   return (
     <div>
-      <StatementsTabHeader active="invoices" />
       <div className="flex justify-end gap-2 mb-4">
         <Link
           href={`/statements/export?format=xlsx${exportQs}`}

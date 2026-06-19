@@ -4,6 +4,9 @@ import {
   isValidInvoiceNoFormat,
   billingModeToCategoryCode,
   billingModeLabel,
+  invoiceJeDate,
+  deptNameToSegment,
+  fallbackRevenueGlCode,
   BILLING_MODES,
   AUTO_GENERATED_BILLING_MODES,
 } from './billing'
@@ -91,5 +94,48 @@ describe('billingModeLabel — UI display', () => {
     expect(billingModeLabel('director_office_attribution')).toBe('Director Office OPEX')
     expect(billingModeLabel('director_attribution')).toBe('Director OPEX')
     expect(billingModeLabel('non_billable')).toBe('Non-billable')
+  })
+})
+
+describe('invoiceJeDate', () => {
+  // Regression 2026-06-11: 17 May invoices (dated 2026-05-31) were bulk-issued
+  // on June 4/7 and their revenue JEs landed in JUNE's P&L.
+  it('uses the invoice date even when issued in a later month', () => {
+    expect(invoiceJeDate('2026-05-31', '2026-05-01', '2026-06-04')).toBe('2026-05-31')
+  })
+  it('falls back to period month-end for garbage dates (year-0005 typo)', () => {
+    expect(invoiceJeDate('0005-05-31', '2026-05-01', '2026-06-04')).toBe('2026-05-31')
+    expect(invoiceJeDate(null, '2026-02-01', '2026-06-04')).toBe('2026-02-28')
+  })
+  it('falls back to today when both are missing', () => {
+    expect(invoiceJeDate(null, null, '2026-06-04')).toBe('2026-06-04')
+  })
+})
+
+describe('fallbackRevenueGlCode', () => {
+  it('routes salary-attribution modes to 5020 Salary Income', () => {
+    expect(fallbackRevenueGlCode('hr_attribution')).toBe('5020')
+    expect(fallbackRevenueGlCode('finance_attribution')).toBe('5020')
+    expect(fallbackRevenueGlCode('director_office_attribution')).toBe('5020')
+    expect(fallbackRevenueGlCode('director_attribution')).toBe('5020')
+  })
+  it('keeps service billing on 5000', () => {
+    expect(fallbackRevenueGlCode('marketing_project')).toBe('5000')
+    expect(fallbackRevenueGlCode('venture_attribution')).toBe('5000')
+    expect(fallbackRevenueGlCode(null)).toBe('5000')
+  })
+})
+
+describe('deptNameToSegment', () => {
+  it('maps the five dept pools to their GL segments', () => {
+    expect(deptNameToSegment('Marketing')).toBe('marketing')
+    expect(deptNameToSegment('Director Office')).toBe('director_office')
+    expect(deptNameToSegment('Director')).toBe('director')
+    expect(deptNameToSegment('HR')).toBe('hr')
+    expect(deptNameToSegment('Finance')).toBe('finance')
+  })
+  it('returns undefined for unknown names (JE falls back to derived segment)', () => {
+    expect(deptNameToSegment('Ops')).toBeUndefined()
+    expect(deptNameToSegment(null)).toBeUndefined()
   })
 })

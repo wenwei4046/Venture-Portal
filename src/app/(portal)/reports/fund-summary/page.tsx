@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { fetchAllRows } from '@/lib/paginate'
 import { formatMoney } from '@/lib/utils'
 import Link from 'next/link'
 import dayjs from 'dayjs'
@@ -25,20 +26,22 @@ export default async function FundSummaryPage() {
     { data: invoicePoolTxns },
     { data: deptPoolTxns },
   ] = await Promise.all([
-    supabase.from('fund_sources').select('*').eq('status', 'active').order('effective_date'),
-    supabase.from('loans').select('principal, status').eq('status', 'active'),
+    fetchAllRows((lo, hi) => supabase.from('fund_sources').select('*').eq('status', 'active').order('effective_date').order('id', { ascending: true }).range(lo, hi)).then((data) => ({ data })),
+    fetchAllRows((lo, hi) => supabase.from('loans').select('principal, status').eq('status', 'active').order('id', { ascending: true }).range(lo, hi)).then((data) => ({ data })),
     // Venture Pool: corporate-segment journal_lines on HV bank accounts
     // (matches /dept-pool Venture row + dashboard hv_fund_balance per mig 272).
     // Legacy venture_pool table is empty per 2026-05-26 bank-recon decision.
     cashCodes.length > 0
-      ? supabase
+      ? fetchAllRows((lo, hi) => supabase
           .from('journal_lines')
           .select('debit, credit, journal_entries!inner(segment)')
           .in('account_code', cashCodes)
           .in('journal_entries.segment', ['corporate', 'treasury'])
+          .order('id', { ascending: true })
+          .range(lo, hi)).then((data) => ({ data }))
       : Promise.resolve({ data: [] }),
-    supabase.from('invoice_payout_pool').select('transaction_type, amount'),
-    supabase.from('dept_pools').select('transaction_type, amount'),
+    fetchAllRows((lo, hi) => supabase.from('invoice_payout_pool').select('transaction_type, amount').order('id', { ascending: true }).range(lo, hi)).then((data) => ({ data })),
+    fetchAllRows((lo, hi) => supabase.from('dept_pools').select('transaction_type, amount').order('id', { ascending: true }).range(lo, hi)).then((data) => ({ data })),
   ])
 
   // Paid Capital

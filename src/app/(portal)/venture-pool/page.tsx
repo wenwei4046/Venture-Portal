@@ -2,6 +2,7 @@ import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
+import { fetchAllRows } from '@/lib/paginate'
 import PnlCharts from '../dept-pool/_components/PnlCharts'
 
 // Post 2026-05-26 re-import: Venture Pool data is derived from journal_lines
@@ -39,17 +40,26 @@ export default async function VenturePoolPage() {
   }
   async function fetchCorpBankLines(opts: { since?: string; until?: string; limit?: number }) {
     if (cashCodes.length === 0) return [] as RawLine[]
-    let q = supabase
-      .from('journal_lines')
-      .select('id, debit, credit, description, journal_entries!inner(transaction_date, description, reference_type, segment)')
-      .in('account_code', cashCodes)
-      .in('journal_entries.segment', ['corporate', 'treasury'])
-    if (opts.since) q = q.gte('journal_entries.transaction_date', opts.since)
-    if (opts.until) q = q.lt('journal_entries.transaction_date', opts.until)
-    q = q.order('transaction_date', { foreignTable: 'journal_entries', ascending: false })
-    if (opts.limit) q = q.limit(opts.limit)
-    const { data } = await q
-    return (data ?? []) as unknown as RawLine[]
+    const base = () => {
+      let q = supabase
+        .from('journal_lines')
+        .select('id, debit, credit, description, journal_entries!inner(transaction_date, description, reference_type, segment)')
+        .in('account_code', cashCodes)
+        .in('journal_entries.segment', ['corporate', 'treasury'])
+      if (opts.since) q = q.gte('journal_entries.transaction_date', opts.since)
+      if (opts.until) q = q.lt('journal_entries.transaction_date', opts.until)
+      return q
+    }
+    // Display reads pass a limit (most-recent first); the aggregation reads
+    // (no limit) MUST paginate or they truncate at PostgREST's 1000-row cap.
+    if (opts.limit) {
+      const { data } = await base()
+        .order('transaction_date', { foreignTable: 'journal_entries', ascending: false })
+        .limit(opts.limit)
+      return (data ?? []) as unknown as RawLine[]
+    }
+    const rows = await fetchAllRows((lo, hi) => base().order('id', { ascending: true }).range(lo, hi))
+    return rows as unknown as RawLine[]
   }
 
   const [allTimeLines, monthLines, trendLines, ledgerLines] = await Promise.all([

@@ -3,6 +3,7 @@ import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
+import JvRowActions from './_components/JvRowActions'
 
 export default async function JournalEntriesPage() {
   await requireRole(['principal', 'finance'])
@@ -20,22 +21,21 @@ export default async function JournalEntriesPage() {
 
   const entryList = entries ?? []
 
+  // Line COUNTS only — the previous `chart_of_accounts!inner` embed errored
+  // silently, so every row showed "0 lines". The list never displays line
+  // detail, so a bare entry_id select is all that's needed.
   const entryIds = entryList.map((e) => e.id)
   const { data: allLines } =
     entryIds.length > 0
       ? await supabase
           .from('journal_lines')
-          .select('*, chart_of_accounts!inner(name)')
+          .select('entry_id')
           .in('entry_id', entryIds)
-          .order('created_at')
       : { data: null }
 
-  type LineRow = NonNullable<typeof allLines>[number]
-  const linesByEntry = new Map<string, LineRow[]>()
+  const lineCounts = new Map<string, number>()
   for (const line of allLines ?? []) {
-    const existing = linesByEntry.get(line.entry_id) ?? []
-    existing.push(line)
-    linesByEntry.set(line.entry_id, existing)
+    lineCounts.set(line.entry_id, (lineCounts.get(line.entry_id) ?? 0) + 1)
   }
 
   return (
@@ -89,12 +89,14 @@ export default async function JournalEntriesPage() {
               <th>Voucher</th>
               <th>Date</th>
               <th>Description</th>
+              <th>Segment</th>
               <th className="right">Amount</th>
+              <th className="right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {entryList.map((entry) => {
-              const lines = linesByEntry.get(entry.id) ?? []
+              const lineCount = lineCounts.get(entry.id) ?? 0
               return (
                 <tr key={entry.id}>
                   <td>
@@ -105,7 +107,7 @@ export default async function JournalEntriesPage() {
                       {entry.entry_no}
                     </Link>
                     <div className="font-mono text-[11px] text-graphite mt-0.5">
-                      {lines.length} lines
+                      {lineCount} {lineCount === 1 ? 'line' : 'lines'}
                     </div>
                   </td>
                   <td className="font-mono text-[12px] text-graphite">
@@ -114,7 +116,13 @@ export default async function JournalEntriesPage() {
                   <td className="font-serif text-[15px] text-ink">
                     {entry.description}
                   </td>
+                  <td className="font-mono text-[11px] uppercase tracking-wide text-graphite">
+                    {((entry.segment as string) ?? 'unallocated').replace(/_/g, ' ')}
+                  </td>
                   <td className="num">{formatMoney(Number(entry.total_amount))}</td>
+                  <td>
+                    <JvRowActions id={entry.id} entryNo={entry.entry_no} />
+                  </td>
                 </tr>
               )
             })}

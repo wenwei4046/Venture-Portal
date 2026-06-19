@@ -5,8 +5,56 @@ import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { fetchAllRows } from '@/lib/paginate'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import type { FundSourceType } from '@/types'
+import type { Json } from '@/lib/supabase/database.types'
+
+// ─── Amend an ACTIVE fund source (Principal — self-service, direct apply) ─────
+// Principal is the top approval authority, so edits apply immediately via the
+// amend_fund_source SECURITY DEFINER RPC (audited by fund_sources.updated_at).
+// Only the fields the form sends are changed. The existing updateFundSource
+// path stays for pending_approval edits by Finance.
+export async function amendFundSource(formData: FormData): Promise<{ error: string } | undefined> {
+  await requireRole(['principal'])
+  const supabase = await createClient()
+
+  const id = (formData.get('fund_source_id') as string) ?? ''
+  if (!id) return { error: 'Fund source id is required' }
+
+  const ratePctRaw = (formData.get('cost_rate_percent') as string) ?? ''
+  const lockRaw = (formData.get('lock_in_months') as string) ?? ''
+  const repaymentDate = (formData.get('repayment_date') as string) || null
+  const compound = formData.get('compound_interest') === 'on'
+  const notes = (formData.get('notes') as string) ?? ''
+
+  const payload: Record<string, Json> = { compound_interest: compound }
+
+  if (ratePctRaw.trim() !== '') {
+    const ratePct = parseFloat(ratePctRaw)
+    if (isNaN(ratePct) || ratePct < 0 || ratePct >= 100) return { error: '利率必须在 0–100% 之间' }
+    payload.cost_rate = Math.round((ratePct / 100) * 1e6) / 1e6
+  }
+  // lock_in_months: empty => 无固定期限 (null). Always sent so the RPC applies it.
+  if (lockRaw.trim() === '') {
+    payload.lock_in_months = null
+  } else {
+    const n = parseInt(lockRaw, 10)
+    if (isNaN(n) || n < 1 || n > 120) return { error: '期数必须在 1–120,或留空表示无固定期限' }
+    payload.lock_in_months = n
+  }
+  if (repaymentDate) payload.repayment_date = repaymentDate
+  if (notes.trim()) payload.notes = notes.trim()
+
+  const { error } = await supabase.rpc('amend_fund_source', { p_fund_source_id: id, p_payload: payload })
+  if (error) return { error: `修改失败: ${error.message}` }
+
+  revalidatePath(`/fund-in/${id}`)
+  revalidatePath('/fund-in')
+  revalidatePath('/repayment-schedule')
+  revalidatePath('/dashboard')
+  redirect(`/fund-in/${id}`)
+}
 
 interface CreateFundSourceInput {
   source_type: FundSourceType
@@ -68,19 +116,21 @@ export async function createFundSource(formData: FormData) {
   if (isNaN(raw.cost_rate_percent) || raw.cost_rate_percent < 0 || raw.cost_rate_percent >= 100) {
     throw new Error('Interest rate must be between 0 and 100%')
   }
-  if (isNaN(raw.lock_in_months) || raw.lock_in_months < 1) {
-    throw new Error('Repayment period must be at least 1 month')
+  // Repayment period is OPTIONAL (2026-06-12): blank = 无固定期限. Interest
+  // still accrues from the effective date; the deposit lands in the schedule's
+  // "Compounding & no fixed term" tab until terms are set via the edit form.
+  // Only validate the value when one was actually entered.
+  if (!isNaN(raw.lock_in_months) && raw.lock_in_months < 1) {
+    throw new Error('Repayment period must be at least 1 month (or leave blank for no fixed term)')
   }
   if (!raw.effective_date) {
-    throw new Error('Effective date is required')
+    throw new Error('Effective date is required (interest accrues from this date)')
   }
   if (dayjs(raw.effective_date).isAfter(dayjs(), 'day')) {
     throw new Error('Effective date cannot be in the future')
   }
-  if (!raw.repayment_date) {
-    throw new Error('Repayment date is required')
-  }
-  if (dayjs(raw.repayment_date).isBefore(dayjs(raw.effective_date), 'day')) {
+  // Repayment date is OPTIONAL too — only checked when provided.
+  if (raw.repayment_date && dayjs(raw.repayment_date).isBefore(dayjs(raw.effective_date), 'day')) {
     throw new Error('Repayment date must be on or after effective date')
   }
 
@@ -109,20 +159,24 @@ export async function createFundSource(formData: FormData) {
   }
 
   const cost_rate = raw.cost_rate_percent / 100
+  // 利滚利 — compound interest, settable at creation (2026-06-12; was edit-only).
+  const compound = formData.get('compound_interest') === 'on'
 
   const basePayload = {
     source_type: raw.source_type,
     capital_type: 'paid' as const,
     amount: raw.amount,
     cost_rate,
-    lock_in_months: raw.lock_in_months || null,
+    compound_interest: compound,
+    // Blank → null (无固定期限). NaN (blank number) is falsy → null.
+    lock_in_months: !isNaN(raw.lock_in_months) && raw.lock_in_months >= 1 ? raw.lock_in_months : null,
     effective_date: raw.effective_date,
-    repayment_date: raw.repayment_date,
+    repayment_date: raw.repayment_date || null,
     account_code: accountCode,
     // Mig 12 trigger auto-fills maturity_date from effective_date + lock_in_months
-    // when null. Set it explicitly to the user-entered repayment_date so the
-    // detail page's "MATURES …" line matches what Finance promised.
-    maturity_date: raw.repayment_date,
+    // when a lock-in exists. With no fixed term both stay null; the user-entered
+    // repayment_date (when present) seeds maturity so the detail page matches.
+    maturity_date: raw.repayment_date || null,
     early_withdrawal: false,
     // Phase 7: starts in pending_approval. Principal approval flips to 'active'
     // and posts the Venture Pool credit + bank balance bump.
@@ -429,9 +483,16 @@ export interface PayableFundSource {
   total_periods: number
   periods_paid: number
   remaining_periods: number
+  /** True when this source has zero remaining outstanding but had a principal
+   *  repayment in the month passed via opts.includeSettledInMonth. Lets the
+   *  schedule render it as a 已付 (done) row in the full-plan view instead of
+   *  dropping off entirely once fully repaid. */
+  settled_in_month?: boolean
 }
 
-export async function listPayableFundSources(): Promise<PayableFundSource[]> {
+export async function listPayableFundSources(
+  opts?: { includeSettledInMonth?: string },
+): Promise<PayableFundSource[]> {
   await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
@@ -450,10 +511,12 @@ export async function listPayableFundSources(): Promise<PayableFundSource[]> {
     supabase.from('companies').select('id, name, short_code'),
     supabase.from('departments').select('id, name'),
     supabase.from('directors').select('id, name'),
-    supabase
+    fetchAllRows((lo, hi) => supabase
       .from('fund_source_repayments')
       .select('fund_source_id, payment_type, payment_date')
-      .eq('payment_type', 'principal'),
+      .eq('payment_type', 'principal')
+      .order('id', { ascending: true })
+      .range(lo, hi)).then((data) => ({ data })),
   ])
 
   const statusMap = new Map((sources ?? []).map((s) => [s.id, s.status]))
@@ -471,11 +534,19 @@ export async function listPayableFundSources(): Promise<PayableFundSource[]> {
     periodsPaidMap.set(r.fund_source_id, set)
   }
 
+  const settleMonth = opts?.includeSettledInMonth ?? null
   return (outstanding ?? [])
     .filter((o): o is typeof o & { fund_source_id: string; source_type: string } => {
       if (o.fund_source_id == null || o.source_type == null) return false
       const status = statusMap.get(o.fund_source_id)
-      return status === 'active' && Number(o.outstanding) > 0
+      if (status === 'active' && Number(o.outstanding) > 0) return true
+      // Optionally also surface sources fully repaid (principal paid) in the
+      // requested month, so the schedule can show them as a 已付 row even
+      // though they now carry zero outstanding.
+      if (settleMonth && Number(o.outstanding) <= 0) {
+        return periodsPaidMap.get(o.fund_source_id)?.has(settleMonth) ?? false
+      }
+      return false
     })
     .map((o) => {
       const amount = Number(o.original_amount)
@@ -521,6 +592,7 @@ export async function listPayableFundSources(): Promise<PayableFundSource[]> {
         total_periods: months,
         periods_paid: periodsPaid,
         remaining_periods: remaining,
+        settled_in_month: !(statusMap.get(o.fund_source_id) === 'active' && Number(o.outstanding) > 0),
       }
     })
     .sort((a, b) => b.remaining_periods - a.remaining_periods)
