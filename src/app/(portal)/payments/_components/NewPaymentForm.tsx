@@ -272,6 +272,17 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
       formData.set('source_pool', sourceRows[0]?.pool ?? '')
     }
 
+    // Guard: attachments go through the Server Action body, capped at 4 MB
+    // (next.config bodySizeLimit). Reject oversized files up front with a clear
+    // message instead of the cryptic "unexpected response from the server".
+    const totalBytes = files.reduce((s, f) => s + f.size, 0)
+    if (totalBytes > 3.8 * 1024 * 1024) {
+      setError(
+        `附件太大(共 ${(totalBytes / 1024 / 1024).toFixed(1)} MB,上限约 4 MB)。请压缩 PDF / 图片或分批上传。`,
+      )
+      return
+    }
+
     // Append files to formData for server action
     files.forEach((f, i) => formData.append(`attachment_${i}`, f))
     formData.set('attachment_count', String(files.length))
