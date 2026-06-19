@@ -1107,6 +1107,149 @@ export async function voidPaidReceipt(formData: FormData) {
   redirect('/payments')
 }
 
+// ─── Reverse a PAID outgoing payment (debit voucher) ────────────────────────
+// Symmetric to voidPaidReceipt but for money that went OUT. A paid debit voucher
+// already debited the bank, posted GL, and (for pooled payments) debited a pool.
+// This fully REVERSES it so a wrong payment (e.g. amount keyed wrong) can be
+// undone and re-entered correctly. Steps mirror the receipt reversal: add the
+// bank back, reverse each GL entry, reverse the pool rows, delete auto-synced
+// fund-source repayments, un-settle any linked invoice, mark voided.
+//
+// Voucher types that have their OWN dedicated unwind are BLOCKED here with a
+// pointer to the right flow — reversing them generically would leave their
+// downstream records (loans, payroll accruals, claims, dept requests) dangling.
+export async function reversePaidPayment(formData: FormData) {
+  const user = await requireRole(['finance', 'principal'])
+  const supabase = await createClient()
+
+  const id = (formData.get('id') as string) ?? ''
+  if (!id) throw new Error('Voucher id is required')
+
+  const { data: v } = await supabase
+    .from('payment_vouchers')
+    .select('id, voucher_no, direction, voucher_type, status, amount, bank_account_id, invoice_id, fund_source_id, loan_id, reference_type, payment_method')
+    .eq('id', id)
+    .single()
+  if (!v) throw new Error('Voucher not found')
+  if (v.status !== 'paid') throw new Error(`Only paid vouchers can be reversed (status=${v.status})`)
+  if (v.direction !== 'debit') throw new Error('This reverses outgoing payments — use the receipt reversal for incoming credits')
+
+  // Block types with a dedicated unwind flow (generic reversal would orphan their downstream rows).
+  if (v.loan_id && v.voucher_type !== 'loan_repayment') {
+    throw new Error('This is a loan disbursement — cancel it via the loan cancellation flow instead.')
+  }
+  if (v.voucher_type === 'loan_repayment' && v.loan_id) {
+    throw new Error('Loan-repayment vouchers tied to a loan can’t be reversed here — void and recreate.')
+  }
+  if (v.voucher_type === 'payroll_bank_transfer' || v.voucher_type === 'salary_payout') {
+    throw new Error('Payroll / salary payments must be reversed through the payroll flow.')
+  }
+  if (v.reference_type === 'dept_payment_request') {
+    throw new Error('Department payment settlements — cancel via the department request instead.')
+  }
+  if (v.voucher_type === 'claim_payout') {
+    throw new Error('Claim payouts can’t be auto-reversed yet — reopen the claim, then void/recreate manually.')
+  }
+
+  const amount = r2(Number(v.amount))
+  const isNetting = v.payment_method === 'netting'
+
+  // 1) Reverse bank cache — the payment REDUCED it, so add it back. Via
+  //    bump_bank_balance RPC (bank_accounts UPDATE is principal-only under RLS).
+  if (v.bank_account_id && !isNetting) {
+    const { error: bumpErr } = await supabase.rpc('bump_bank_balance', {
+      p_bank_account_id: v.bank_account_id,
+      p_delta: amount,
+    })
+    if (bumpErr) throw new Error(`Failed to reverse bank balance: ${bumpErr.message}`)
+  }
+
+  // 2) Reverse every GL entry posted for this voucher (swap debit/credit, keep segment)
+  const { data: entries } = await supabase
+    .from('journal_entries')
+    .select('id, entry_no, segment, description')
+    .eq('reference_type', 'payment_voucher')
+    .eq('reference_id', id)
+  for (const e of entries ?? []) {
+    const { data: lines } = await supabase
+      .from('journal_lines')
+      .select('account_code, debit, credit, description')
+      .eq('entry_id', e.id)
+    if (!lines || lines.length === 0) continue
+    try {
+      await postJournalEntry(supabase, {
+        transactionDate: dayjs().format('YYYY-MM-DD'),
+        description: `VOID ${v.voucher_no}: reversal of ${e.description ?? ''}`.trim(),
+        referenceType: 'payment_voucher_void',
+        referenceId: id,
+        segment: (e.segment as string) ?? undefined,
+        lines: lines.map((l) => ({
+          accountCode: l.account_code as string,
+          debit: l.credit ? Number(l.credit) : undefined,
+          credit: l.debit ? Number(l.debit) : undefined,
+          description: `Reversal — ${l.description ?? ''}`.trim(),
+        })),
+        createdBy: user.id,
+      })
+    } catch (jeErr) {
+      const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
+      throw new Error(`Reverse ${v.voucher_no}: GL reversal failed (${e.entry_no ?? e.id}): ${msg}`)
+    }
+  }
+
+  // 3) Reverse every pool row this voucher wrote (expense_out → void_in, etc.)
+  const { error: poolRevErr } = await supabase.rpc('reverse_voucher_pool_rows' as never, {
+    p_voucher_no: v.voucher_no,
+  } as never)
+  if (poolRevErr) throw new Error(`Reverse ${v.voucher_no}: pool reversal failed: ${poolRevErr.message}`)
+
+  // 4) Delete auto-synced fund-source repayment rows (HV-repays-a-fund-source vouchers)
+  if (v.fund_source_id) {
+    const { error: fsrErr } = await supabase
+      .from('fund_source_repayments')
+      .delete()
+      .eq('payment_voucher_id', id)
+    if (fsrErr) throw new Error(`Reverse ${v.voucher_no}: fund-source repayment cleanup failed: ${fsrErr.message}`)
+  }
+
+  // 5) Un-settle any invoice this payment closed (billing_payment)
+  const { data: linked } = await supabase
+    .from('invoices')
+    .select('id')
+    .eq('settlement_voucher_id', id)
+  if (linked && linked.length > 0) {
+    const { error: unsettleErr } = await supabase
+      .from('invoices')
+      .update({ status: 'issued', settlement_voucher_id: null } as never)
+      .eq('settlement_voucher_id', id)
+    if (unsettleErr) throw new Error(`Reverse ${v.voucher_no}: invoice un-settle failed: ${unsettleErr.message}`)
+  } else if (v.invoice_id) {
+    const { error: unsettleErr } = await supabase
+      .from('invoices')
+      .update({ status: 'issued' })
+      .eq('id', v.invoice_id)
+      .in('status', ['paid', 'paid_via_netting'])
+    if (unsettleErr) throw new Error(`Reverse ${v.voucher_no}: invoice un-settle failed: ${unsettleErr.message}`)
+  }
+
+  // 6) Mark the voucher voided (race-guarded on still-paid)
+  const { error: updErr } = await supabase
+    .from('payment_vouchers')
+    .update({ status: 'voided' })
+    .eq('id', id)
+    .eq('status', 'paid')
+  if (updErr) throw new Error(`Failed to void voucher: ${updErr.message}`)
+
+  revalidatePath(`/payments/${id}`)
+  revalidatePath('/payments')
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+  revalidatePath('/dashboard')
+  revalidatePath('/dept-pool')
+  revalidatePath('/venture-pool')
+  redirect('/payments')
+}
+
 // NOTE: createPaymentCategory / updatePaymentCategory were removed by the
 // unified-COA migration (237/238). The Chart of Accounts IS the GL now —
 // create/edit accounts via createAccount / updateAccount in settings/actions.ts.
