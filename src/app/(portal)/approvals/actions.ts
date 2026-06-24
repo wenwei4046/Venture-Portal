@@ -9,6 +9,7 @@ import { assertPeriodOpen } from '@/lib/period-lock'
 import { notifyApprovalDecision } from '@/lib/slack'
 import { postJournalEntry } from '@/lib/journal'
 import { resolveLoansReceivableLeaf } from '@/lib/loans-coa'
+import type { Database } from '@/lib/supabase/database.types'
 
 // Mig 197: dept name → equity GL code mirror (must match dept_pool_gl_code SQL helper).
 const DEPT_POOL_GL: Record<string, string> = {
@@ -19,41 +20,24 @@ const DEPT_POOL_GL: Record<string, string> = {
   Director: '3080',
 }
 
-// ─── Approve request (Principal) ──────────────────────────────────────────────
+// ─── Shared approval executor ─────────────────────────────────────────────────
+// The money-moving side-effect chain for approving ONE non-grouped request.
+// Throws on any failure. Callers own the period-lock check + revalidate +
+// redirect, so this stays reusable by both the single-request approveRequest
+// and the multi-select approveRequestsBulk — the logic lives here exactly once.
 
-export async function approveRequest(formData: FormData) {
-  const user = await requireRole(['principal'])
-  const supabase = await createClient()
+// Derive from the generated Row so performApproval's side-effect chain type-checks
+// against the same shape the original `.single()` select returned.
+type ApprovalRecord = Database['public']['Tables']['approval_requests']['Row']
 
-  const id = (formData.get('id') as string) ?? ''
-  const notes = (formData.get('notes') as string) || null
-
-  if (!id) throw new Error('Approval id is required')
-
-  // Fetch the approval to learn what it references
-  const { data: approval, error: fetchError } = await supabase
-    .from('approval_requests')
-    .select('*')
-    .eq('id', id)
-    .eq('status', 'pending')
-    .single()
-
-  if (fetchError || !approval) {
-    throw new Error('Approval not found or already processed')
-  }
-
-  // Phase 7 Step 9: grouped approvals must go through approveRequestGroup
-  if (approval.group_id) {
-    throw new Error('This request is part of a combined approval — use the combined card to approve both together.')
-  }
-
-  // Security: prevent self-approval (defense in depth — CHECK constraint enforces too)
-  if (approval.submitted_by === user.id) {
-    throw new Error('Cannot approve your own submission')
-  }
-
-  // Approving moves money (loan disbursement, voucher exec, pool release) — block if today's period is locked
-  await assertPeriodOpen(supabase, new Date())
+async function performApproval(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  user: { id: string; name: string },
+  approval: ApprovalRecord,
+  opts: { notes: string | null; allowOverdraw: boolean }
+) {
+  const id = approval.id
+  const notes = opts.notes
 
   // P0-1: payment_voucher goes through approve_single_voucher RPC — atomic
   // flip + bank debit + pool adjust + repayment sync + GL journal in one
@@ -62,12 +46,11 @@ export async function approveRequest(formData: FormData) {
   if (approval.request_type === 'payment_voucher') {
     // Principal may opt to allow dept-pool overdraw (e.g. payroll that can't
     // wait for invoice settlement). Default false → sufficiency check still blocks.
-    const allowOverdraw = formData.get('allow_overdraw') === 'on'
     const { error: rpcErr } = await supabase.rpc('approve_single_voucher', {
       p_approval_id: id,
       p_user_id: user.id,
       p_notes: notes ?? '',
-      p_allow_overdraw: allowOverdraw,
+      p_allow_overdraw: opts.allowOverdraw,
     })
     if (rpcErr) {
       throw new Error(`Approval failed: ${rpcErr.message}`)
@@ -79,11 +62,7 @@ export async function approveRequest(formData: FormData) {
       approval.description ?? '',
       user.name
     ).catch(() => {})
-
-    revalidatePath('/approvals')
-    revalidatePath('/payments')
-    revalidatePath('/dashboard')
-    redirect('/approvals')
+    return
   }
 
   const now = new Date().toISOString()
@@ -357,6 +336,48 @@ export async function approveRequest(formData: FormData) {
     approval.description ?? '',
     user.name
   ).catch(() => {})
+}
+
+// ─── Approve request (Principal) — single item ───────────────────────────────
+// Thin wrapper: validate, lock-check, delegate to performApproval, then
+// revalidate + redirect back to the queue.
+
+export async function approveRequest(formData: FormData) {
+  const user = await requireRole(['principal'])
+  const supabase = await createClient()
+
+  const id = (formData.get('id') as string) ?? ''
+  const notes = (formData.get('notes') as string) || null
+
+  if (!id) throw new Error('Approval id is required')
+
+  // Fetch the approval to learn what it references
+  const { data: approval, error: fetchError } = await supabase
+    .from('approval_requests')
+    .select('*')
+    .eq('id', id)
+    .eq('status', 'pending')
+    .single()
+
+  if (fetchError || !approval) {
+    throw new Error('Approval not found or already processed')
+  }
+
+  // Phase 7 Step 9: grouped approvals must go through approveRequestGroup
+  if (approval.group_id) {
+    throw new Error('This request is part of a combined approval — use the combined card to approve both together.')
+  }
+
+  // Security: prevent self-approval (defense in depth — CHECK constraint enforces too)
+  if (approval.submitted_by === user.id) {
+    throw new Error('Cannot approve your own submission')
+  }
+
+  // Approving moves money (loan disbursement, voucher exec, pool release) — block if today's period is locked
+  await assertPeriodOpen(supabase, new Date())
+
+  const allowOverdraw = formData.get('allow_overdraw') === 'on'
+  await performApproval(supabase, user, approval as ApprovalRecord, { notes, allowOverdraw })
 
   revalidatePath('/approvals')
   revalidatePath('/fund-out')
@@ -365,6 +386,94 @@ export async function approveRequest(formData: FormData) {
   revalidatePath('/payments')
   revalidatePath('/dashboard')
   redirect('/approvals')
+}
+
+// ─── Approve requests in bulk (Principal) — multi-select ─────────────────────
+// Approve every selected non-grouped request in one click. Each item settles
+// independently and SEQUENTIALLY (so consecutive debit vouchers draw down the
+// same bank balance in order, keeping each sufficiency check correct), and a
+// failure on one never rolls back the others. Returns a per-item summary
+// instead of redirecting so the caller can surface which rows could not be
+// approved.
+
+export interface BulkApproveResult {
+  approved: number
+  failed: Array<{ id: string; description: string; error: string }>
+}
+
+export async function approveRequestsBulk(args: {
+  ids: string[]
+  notes?: string
+  allowOverdraw?: boolean
+}): Promise<BulkApproveResult> {
+  const user = await requireRole(['principal'])
+  const supabase = await createClient()
+
+  const ids = Array.from(new Set((args.ids ?? []).filter(Boolean)))
+  if (ids.length === 0) throw new Error('No approvals selected')
+
+  // Approving moves money — block the whole batch if today's period is locked.
+  await assertPeriodOpen(supabase, new Date())
+
+  const { data: rows } = await supabase
+    .from('approval_requests')
+    .select('*')
+    .in('id', ids)
+    .eq('status', 'pending')
+
+  const byId = new Map(
+    ((rows ?? []) as ApprovalRecord[]).map((r) => [r.id, r])
+  )
+
+  const result: BulkApproveResult = { approved: 0, failed: [] }
+
+  for (const id of ids) {
+    const approval = byId.get(id)
+    if (!approval) {
+      result.failed.push({ id, description: '—', error: 'Not found or already processed' })
+      continue
+    }
+    const label = approval.description ?? approval.request_type.replace(/_/g, ' ')
+    if (approval.group_id) {
+      result.failed.push({
+        id,
+        description: label,
+        error: 'Part of a combined approval — approve it from its card',
+      })
+      continue
+    }
+    if (approval.submitted_by === user.id) {
+      result.failed.push({
+        id,
+        description: label,
+        error: 'Cannot approve your own submission',
+      })
+      continue
+    }
+    try {
+      await performApproval(supabase, user, approval, {
+        notes: args.notes ?? null,
+        allowOverdraw: !!args.allowOverdraw,
+      })
+      result.approved++
+    } catch (e) {
+      result.failed.push({
+        id,
+        description: label,
+        error: e instanceof Error ? e.message : 'Unknown error',
+      })
+    }
+  }
+
+  revalidatePath('/approvals')
+  revalidatePath('/fund-out')
+  revalidatePath('/overdue')
+  revalidatePath('/invoice-pool')
+  revalidatePath('/payments')
+  revalidatePath('/dashboard')
+  revalidatePath('/hr-costing/payment')
+
+  return result
 }
 
 // ─── Reject request (Principal) ───────────────────────────────────────────────
