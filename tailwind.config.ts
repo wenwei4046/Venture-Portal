@@ -46,10 +46,14 @@ const config: Config = {
 
       // ─── Typography ──────────────────────────────────────────────────────
       fontFamily: {
+        // 2026-06-24: retired Instrument Serif — the whole portal now reads in
+        // Inter to match the HOUZS Century house style. `font-serif` is kept as
+        // an alias of the sans stack so the ~40 pages using it need no edits;
+        // inline `italic` on those elements simply slants Inter.
         sans: ['var(--font-sans)', 'Inter', 'system-ui', 'sans-serif'],
-        serif: ['var(--font-serif)', '"Instrument Serif"', '"Noto Serif TC"', 'Georgia', 'serif'],
+        serif: ['var(--font-sans)', 'Inter', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', '"Chivo Mono"', 'Menlo', 'monospace'],
-        cjk: ['var(--font-cjk)', '"Noto Serif TC"', 'serif'],
+        cjk: ['var(--font-cjk)', '"Noto Sans SC"', 'sans-serif'],
       },
 
       fontSize: {

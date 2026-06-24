@@ -47,7 +47,7 @@ export default function FundPieChart({ slices }: Props) {
             }}
           />
           <Legend
-            wrapperStyle={{ fontSize: 12, fontFamily: 'var(--font-serif)' }}
+            wrapperStyle={{ fontSize: 12, fontFamily: 'var(--font-sans)' }}
           />
         </PieChart>
       </ResponsiveContainer>

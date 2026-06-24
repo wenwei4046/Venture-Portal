@@ -1,17 +1,11 @@
 import type { Metadata } from 'next'
-import { Instrument_Serif, Inter, Noto_Sans_SC, Chivo_Mono } from 'next/font/google'
+import { Inter, Noto_Sans_SC, Chivo_Mono } from 'next/font/google'
 import NextTopLoader from 'nextjs-toploader'
 import './globals.css'
 
-// DESIGN.md v2.0 typography — loaded via next/font for zero-CLS self-hosting
-
-const instrumentSerif = Instrument_Serif({
-  subsets: ['latin'],
-  weight: '400',
-  style: ['normal', 'italic'],
-  variable: '--font-serif',
-  display: 'swap',
-})
+// Typography — loaded via next/font for zero-CLS self-hosting.
+// 2026-06-24: Instrument Serif retired; Inter is the single UI typeface
+// (display + body), Chivo Mono for figures, Noto Sans SC for CJK.
 
 const inter = Inter({
   subsets: ['latin'],
@@ -58,7 +52,7 @@ export default function RootLayout({
   return (
     <html
       lang="en-MY"
-      className={`${instrumentSerif.variable} ${inter.variable} ${chivoMono.variable} ${notoSansSc.variable}`}
+      className={`${inter.variable} ${chivoMono.variable} ${notoSansSc.variable}`}
       suppressHydrationWarning
     >
       <head>
