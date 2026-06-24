@@ -72,7 +72,7 @@ HOUZS Venture Portal (VP) 是 HOUZS Venture Sdn Bhd 的内部银行系统。User
 
 > **VP is a warm research journal for a family office.** Friendly but precise. The Principal opens it every morning and feels like reading his own handwritten notes, not signing a notarized contract. Same paper aesthetic as old-school banking, less severity. Anthropic-flavored, not Bloomberg terminal.
 
-**Mood:** Institutional calm with warmth. Cream paper. Serif headings with italic emphasis. A single rust accent that appears only where decisions happen.
+**Mood:** Institutional calm with warmth. Cream paper. Clean modern sans headings (Inter semibold). A single rust accent that appears only where decisions happen. _(Pre-2026-06-24 this used serif headings — see the Typography note for the switch to Inter.)_
 
 ---
 
@@ -101,6 +101,13 @@ HOUZS Venture Portal (VP) 是 HOUZS Venture Sdn Bhd 的内部银行系统。User
 
 ## Typography
 
+> **2026-06-24 — Instrument Serif retired.** The portal moved to a single modern
+> sans typeface (**Inter**) across display + body, to match the HOUZS Century
+> house style. `--font-serif` is gone; Tailwind's `serif` family now aliases the
+> sans stack, so any legacy `font-serif` utility renders Inter (no per-page
+> edits). The warm cream **background was kept** — only the typeface changed.
+> Numbers still use Chivo Mono.
+
 ### Font stack
 
 ```css
@@ -108,10 +115,10 @@ HOUZS Venture Portal (VP) 是 HOUZS Venture Sdn Bhd 的内部银行系统。User
   /* --font-cjk is appended into EVERY chain below (after the Latin face, before
      the generic) so Latin glyphs use the Latin face and CJK codepoints fall
      through to one consistent Chinese face everywhere — never the OS default. */
-  --font-serif: 'Instrument Serif', Georgia, var(--font-cjk), serif;
   --font-sans:  'Inter', -apple-system, BlinkMacSystemFont, var(--font-cjk), sans-serif;
   --font-mono:  'Chivo Mono', 'SF Mono', Menlo, Consolas, var(--font-cjk), monospace;
   --font-cjk:   'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  /* --font-serif retired — Tailwind `serif` aliases --font-sans (Inter). */
 }
 ```
 
@@ -123,22 +130,22 @@ Loaded via `next/font` in `layout.tsx` (variable `--font-cjk`, `preload: false`)
 ```html
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=Chivo+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Chivo+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
 ```
 
-All 4 fonts are free. No licensing cost.
+All 3 fonts are free. No licensing cost.
 
 ### Roles
 
 | Role | Font | Weight | Usage |
 |---|---|---|---|
-| Display — page titles, hero numbers | **Instrument Serif** | 400 regular | `<h1>`, hero money values, section titles |
-| Display italic — emphasis, active states, labels | **Instrument Serif Italic** | 400 italic | "*Free pool*", "*Pending your hand*", sidebar active item |
-| Body — UI text, descriptions, form labels | **Inter** | 400/500/600 | Most body copy, form labels, button text (sans) |
+| Display — page titles, section titles | **Inter** | 600 semibold | `<h1>` / `.page-title`, `.sect-head h2`. `page-title` is 30px (was 38px serif). |
+| Emphasis, active states, labels | **Inter** | 500/600 (italic only if intentional) | Active sidebar item, key labels. Legacy `font-serif italic` now renders italic Inter — drop the italic if it reads oddly. |
+| Body — UI text, descriptions, form labels | **Inter** | 400/500/600 | Most body copy, form labels, button text |
 | Data — money, rates, dates | **Chivo Mono** | 400/500 | All money columns, rate values, date strings. `font-variant-numeric: tabular-nums` |
 | CJK — Chinese labels | **Noto Sans SC** | 400/500/700 | 董事长 · 本月对账单 · 内部账册. Simplified sans; pairs with Inter. Latin always uses the Latin face — CJK falls through `--font-cjk`. |
 
-**Key rule:** Display = always Instrument Serif. Body = Inter. Data = Chivo Mono. No exceptions without explicit DESIGN.md update.
+**Key rule:** Everything is **Inter** (display = semibold, body = regular/medium). Data = Chivo Mono. CJK = Noto Sans SC. No serif anywhere. No exceptions without explicit DESIGN.md update.
 
 ### Type scale
 
@@ -149,13 +156,13 @@ All 4 fonts are free. No licensing cost.
 | `text-xs` | 11px | 16px | sans | Labels, captions |
 | `text-sm` | 13px | 20px | sans | Body UI, descriptions |
 | `text-base` | 14px | 20px | sans | Form inputs, table rows |
-| `text-md` | 15px | 24px | sans or serif | Approval card titles |
-| `text-lg` | 18px | 24px | serif | Card titles, section subheads |
-| `text-xl` | 22px | 28px | serif | Page subheads |
-| `text-2xl` | 28px | 32px | serif | Section titles |
-| `text-3xl` | 40px | 44px | serif | Page titles |
-| `text-hero` | 64px | 64px | serif | Solvency hero number on Dashboard |
-| `text-hero-lg` | 72px | 72px | serif | Reserved for single most important number |
+| `text-md` | 15px | 24px | sans | Approval card titles |
+| `text-lg` | 18px | 24px | sans | Card titles, section subheads |
+| `text-xl` | 22px | 28px | sans | Page subheads |
+| `text-2xl` | 28px | 32px | sans (600) | Section titles |
+| `text-3xl` | 40px | 44px | sans (600) | Page titles (`.page-title` itself is 30px) |
+| `text-hero` | 64px | 64px | sans / mono | Solvency hero number on Dashboard (figures stay Chivo Mono) |
+| `text-hero-lg` | 72px | 72px | sans / mono | Reserved for single most important number |
 
 **Money numbers always use tabular-nums (plain zero):**
 ```css
