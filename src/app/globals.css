@@ -9,13 +9,13 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* Color — light near-white surfaces (2026-06-24: shifted off the cream
-     "paper" toward a HOUZS Century-style white background; cards are pure
-     white, page sits on a faint warm-gray so white cards lift off it). */
-  --paper: 247 247 245;
-  --surface: 255 255 255;
-  --surface-2: 240 240 237;
-  --hairline: 226 224 219;
+  /* Color — original warm "paper" cream restored (2026-06-24 trial: keep the
+     new Inter typography but revert the background to the cream tones to
+     compare modern-font-on-warm-paper vs the near-white version). */
+  --paper: 243 236 221;
+  --surface: 250 245 234;
+  --surface-2: 232 221 196;
+  --hairline: 198 185 158;
   --ink: 28 22 15;
   --graphite: 90 78 64;
   --muted: 133 119 95;
