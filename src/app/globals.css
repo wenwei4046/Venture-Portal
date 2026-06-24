@@ -3,12 +3,15 @@
 @tailwind utilities;
 
 /* ═══════════════════════════════════════════════════════════════════════
-   HOUZS Venture Portal — DESIGN.md v2.0 global styles
-   Warm paper + Instrument Serif + rust accent
+   HOUZS Venture Portal — global styles
+   2026-06-24: near-white surfaces + Inter (single UI typeface) + rust accent
+   (was warm paper + Instrument Serif). Numbers stay Chivo Mono.
    ═══════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* Color — warm paper, deepened per Finance-readability pass (RGB triplets for Tailwind opacity support) */
+  /* Color — original warm "paper" cream restored (2026-06-24 trial: keep the
+     new Inter typography but revert the background to the cream tones to
+     compare modern-font-on-warm-paper vs the near-white version). */
   --paper: 243 236 221;
   --surface: 250 245 234;
   --surface-2: 232 221 196;
@@ -110,10 +113,10 @@ body {
   line-height: 1.5;
 }
 
-/* Headings default to serif */
+/* Headings — modern sans, semibold (was Instrument Serif 400) */
 h1, h2, h3, h4 {
-  font-family: var(--font-serif), 'Instrument Serif', Georgia, var(--font-cjk), serif;
-  font-weight: 400;
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-weight: 600;
   color: rgb(var(--ink));
 }
 
@@ -224,8 +227,8 @@ h1, h2, h3, h4 {
   border: none;
   padding: 8px 16px;
   border-radius: 6px;
-  font-family: var(--font-serif), 'Instrument Serif', Georgia, var(--font-cjk), serif;
-  font-style: italic;
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-weight: 500;
   font-size: 14px;
   cursor: pointer;
   transition: background 120ms ease-out;
@@ -456,19 +459,21 @@ table.ledger-table td.right { text-align: right; }
 }
 .page-eyebrow em {
   color: rgb(var(--accent));
-  font-family: var(--font-serif), 'Instrument Serif', Georgia, var(--font-cjk), serif;
-  font-style: italic;
-  font-size: 14px;
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 13px;
   text-transform: none;
   letter-spacing: 0.01em;
 }
 .page-title {
-  font-family: var(--font-serif), 'Instrument Serif', Georgia, var(--font-cjk), serif;
-  font-size: 38px;
-  line-height: 1;
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-weight: 600;
+  font-size: 30px;
+  line-height: 1.1;
   margin: 0;
   color: rgb(var(--ink));
-  letter-spacing: -0.012em;
+  letter-spacing: -0.02em;
 }
 
 /* Section head — italic serif title + hairline rule extending right */
@@ -479,9 +484,9 @@ table.ledger-table td.right { text-align: right; }
   margin-bottom: 18px;
 }
 .sect-head h2 {
-  font-family: var(--font-serif), 'Instrument Serif', Georgia, var(--font-cjk), serif;
-  font-weight: 400;
-  font-size: 22px;
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-weight: 600;
+  font-size: 19px;
   color: rgb(var(--ink));
   margin: 0;
   flex-shrink: 0;
