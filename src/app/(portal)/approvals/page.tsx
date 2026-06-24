@@ -1,9 +1,8 @@
-import Link from 'next/link'
 import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
-import CombinedApprovalCard from './_components/CombinedApprovalCard'
+import PendingApprovals from './_components/PendingApprovals'
 
 interface ApprovalRow {
   id: string
@@ -78,6 +77,41 @@ export default async function ApprovalsPage() {
     }
   }
 
+  // Serialize for the client component that owns multi-select + bulk approve.
+  // Groups stay one-card-one-action (CombinedApprovalCard); ungrouped singles
+  // become individually checkbox-selectable rows.
+  const serializedItems = items.map((item) =>
+    item.kind === 'group'
+      ? {
+          kind: 'group' as const,
+          groupId: item.groupId,
+          items: item.items.map((r) => ({
+            request_type: r.request_type,
+            description: r.description,
+            amount: r.amount === null ? null : Number(r.amount),
+            reference_id: r.reference_id,
+            reference_table: r.reference_table,
+          })),
+          submitterName:
+            submitterMap.get(item.items[0].submitted_by) ?? 'Unknown',
+          createdAt: item.createdAt,
+          isSelfSubmitted: item.items.some((r) => r.submitted_by === user.id),
+        }
+      : {
+          kind: 'single' as const,
+          id: item.row.id,
+          requestType: item.row.request_type,
+          typeLabel: formatRequestType(item.row.request_type),
+          description: item.row.description,
+          amount: item.row.amount === null ? null : Number(item.row.amount),
+          createdAt: item.row.created_at,
+          submitterName:
+            submitterMap.get(item.row.submitted_by) ?? 'Unknown',
+          isSelf: item.row.submitted_by === user.id,
+          href: approvalHref(item.row),
+        }
+  )
+
   return (
     <div>
       <div className="page-head">
@@ -89,86 +123,8 @@ export default async function ApprovalsPage() {
         </div>
       </div>
 
-      {/* ───────── Pending queue ───────── */}
-      <section className="mb-12">
-        <div className="sect-head">
-          <h2>Pending</h2>
-          <span className="rule" aria-hidden />
-          <span className="count">{items.length} {items.length === 1 ? 'ITEM' : 'ITEMS'}</span>
-        </div>
-
-        {items.length === 0 ? (
-          <div className="border border-hairline rounded-md bg-surface p-10 text-center">
-            <p className="font-serif italic text-ledger text-lg">
-              All caught up.
-            </p>
-            <p className="font-serif italic text-muted text-sm mt-1">
-              No approvals waiting.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3 row-stagger">
-            {items.map((item, i) =>
-              item.kind === 'group' ? (
-                <div
-                  key={item.groupId}
-                  style={{ '--i': i } as React.CSSProperties}
-                >
-                  <CombinedApprovalCard
-                    groupId={item.groupId}
-                    items={item.items.map((r) => ({
-                      request_type: r.request_type,
-                      description: r.description,
-                      amount: r.amount,
-                      reference_id: r.reference_id,
-                      reference_table: r.reference_table,
-                    }))}
-                    submitterName={
-                      submitterMap.get(item.items[0].submitted_by) ?? 'Unknown'
-                    }
-                    createdAt={item.createdAt}
-                    isSelfSubmitted={item.items.some(
-                      (r) => r.submitted_by === user.id
-                    )}
-                  />
-                </div>
-              ) : (
-                <Link
-                  key={item.row.id}
-                  href={approvalHref(item.row)}
-                  style={{ '--i': i } as React.CSSProperties}
-                  className="block border border-hairline rounded-md bg-surface p-5 hover:bg-surface-2/40 transition-colors"
-                >
-                  <div className="flex items-baseline justify-between mb-2">
-                    <div className="text-xs font-sans font-semibold uppercase tracking-wider text-graphite">
-                      {formatRequestType(item.row.request_type)}
-                    </div>
-                    <div className="font-mono text-xs text-muted">
-                      {dayjs(item.row.created_at).format('D MMM HH:mm')}
-                    </div>
-                  </div>
-                  <div className="font-serif text-lg text-ink mb-1">
-                    {item.row.description ?? 'No description'}
-                  </div>
-                  <div className="flex items-baseline gap-4 mt-2">
-                    {item.row.amount ? (
-                      <div className="font-mono tabular text-md font-semibold text-num-ink">
-                        {formatMoney(Number(item.row.amount))}
-                      </div>
-                    ) : null}
-                    <div className="text-xs text-muted font-sans">
-                      Submitted by{' '}
-                      <span className="font-serif italic text-graphite">
-                        {submitterMap.get(item.row.submitted_by) ?? 'Unknown'}
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              )
-            )}
-          </div>
-        )}
-      </section>
+      {/* ───────── Pending queue (multi-select + bulk approve) ───────── */}
+      <PendingApprovals items={serializedItems} />
 
       {/* ───────── Recent history ───────── */}
       {recent.length > 0 ? (
