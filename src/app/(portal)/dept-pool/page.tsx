@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import { fetchIncomeStatement } from '@/lib/cfo-reports'
 import { deptNameToPoolKey, splitPoolAccrual } from '@/lib/dept-pool-accrual'
+import RevealAmount from './_components/RevealAmount'
 
 // dept_manager only owns their own dept pool. Skip the multi-dept list and
 // land them straight on their own detail page — same content as clicking View.
@@ -478,7 +479,7 @@ export default async function DeptPoolPage({
                         {dept.name}
                       </td>
                       <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">
-                        {formatMoney(balance)}
+                        <RevealAmount text={formatMoney(balance)} />
                       </td>
                       <td className="py-3 pr-4 text-right font-mono tabular text-ledger">
                         {formatMoney(inOut.in_amt)}
@@ -521,7 +522,7 @@ export default async function DeptPoolPage({
                       Venture <span className="font-mono text-xs text-muted">(Office)</span>
                     </td>
                     <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">
-                      {formatMoney(ventureCash.balance)}
+                      <RevealAmount text={formatMoney(ventureCash.balance)} />
                     </td>
                     <td className="py-3 pr-4 text-right font-mono tabular text-ledger">
                       {formatMoney(ventureCash.in_amt)}
