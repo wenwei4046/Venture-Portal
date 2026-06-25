@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { usePathname } from 'next/navigation'
 import type { User } from '@/types'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
@@ -19,6 +20,10 @@ export default function PortalFrame({
   children: React.ReactNode
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  // Wide data reports (month-matrix P&L / Cash Flow) opt out of the 1280px
+  // reading-width cap so the many month columns can use the full content area.
+  const pathname = usePathname()
+  const wide = pathname?.startsWith('/reports/monthly-') ?? false
 
   return (
     <div className="flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible">
@@ -46,7 +51,7 @@ export default function PortalFrame({
           <TopBar user={user} onMenuClick={() => setMobileNavOpen(true)} />
         </div>
         <main className="flex-1 overflow-y-auto print:overflow-visible">
-          <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-6 md:py-10 page-enter print:max-w-none print:p-0">
+          <div className={`${wide ? 'max-w-none' : 'max-w-[1280px]'} mx-auto px-4 md:px-8 py-6 md:py-10 page-enter print:max-w-none print:p-0`}>
             {children}
           </div>
         </main>

@@ -26,7 +26,7 @@ export default function MonthlyMatrix({
 
   return (
     <div className="overflow-x-auto border border-hairline rounded-md">
-      <table className="text-sm border-collapse">
+      <table className="w-full text-sm border-collapse">
         <thead>
           <tr className="border-b border-hairline">
             <th className="sticky left-0 z-10 bg-surface text-left font-sans text-xs uppercase tracking-wide text-muted px-4 py-3 min-w-[220px]">
