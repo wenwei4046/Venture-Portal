@@ -97,15 +97,7 @@ export default async function DeptPoolPage({
           </div>
           {/* Accrual view is read-only — intentionally omits the dept_manager "New project contract" action. */}
           <div className="flex items-center gap-3 shrink-0">
-            {/* Pill active-state is hardcoded per render branch (basis is TS-narrowed after the accrual early-return). Keep the two pills in sync. */}
-            <div className="inline-flex border border-hairline rounded-md overflow-hidden font-mono text-xs">
-              <Link href="/dept-pool?basis=cash" className="px-4 py-2 transition-colors text-graphite hover:text-ink">
-                Cash
-              </Link>
-              <Link href="/dept-pool?basis=accrual" className="px-4 py-2 transition-colors bg-ink text-paper">
-                Accrual · P&amp;L
-              </Link>
-            </div>
+            {/* Cash / Accrual switching lives in the sidebar (Dept Pool > Cash / Accrual P&L). */}
             <Link
               href="/dept-pool/submissions"
               className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
@@ -402,21 +394,7 @@ export default async function DeptPoolPage({
           <h1 className="page-title">Department Pools</h1>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          {/* Pill active-state is hardcoded per render branch (basis is TS-narrowed after the accrual early-return). Keep the two pills in sync. */}
-          <div className="inline-flex border border-hairline rounded-md overflow-hidden font-mono text-xs">
-            <Link
-              href="/dept-pool?basis=cash"
-              className="px-4 py-2 transition-colors bg-ink text-paper"
-            >
-              Cash
-            </Link>
-            <Link
-              href="/dept-pool?basis=accrual"
-              className="px-4 py-2 transition-colors text-graphite hover:text-ink"
-            >
-              Accrual · P&amp;L
-            </Link>
-          </div>
+          {/* Cash / Accrual switching lives in the sidebar (Dept Pool > Cash / Accrual P&L). */}
           <Link
             href="/dept-pool/submissions"
             className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
@@ -470,7 +448,7 @@ export default async function DeptPoolPage({
                   <th className="text-right py-3 pr-4 font-medium">In (to date)</th>
                   <th className="text-right py-3 pr-4 font-medium">Out (to date)</th>
                   <th className="text-right py-3 pr-4 font-medium">Net (to date)</th>
-                  <th className="text-right py-3 pr-4 font-medium">Costing Submission</th>
+                  <th className="text-right py-3 pr-4 font-medium">HR Costing Submission</th>
                   <th className="py-3 text-right font-medium"></th>
                 </tr>
               </thead>
