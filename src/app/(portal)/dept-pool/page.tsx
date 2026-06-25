@@ -64,7 +64,9 @@ export default async function DeptPoolPage({
   }
 
   if (basis === 'accrual') {
-    const from = dayjs(period).startOf('month').format('YYYY-MM-DD')
+    // Cumulative (to-date) accrual P&L — matches the Cash view's all-time basis.
+    // From inception through the end of the current period (not just this month).
+    const from = '2000-01-01'
     const to = dayjs(period).endOf('month').format('YYYY-MM-DD')
     const income = await fetchIncomeStatement(supabase, { from, to })
     const poolByKey = new Map(income.pools.map((p) => [p.pool, p]))
@@ -110,14 +112,14 @@ export default async function DeptPoolPage({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
           <div className="lg:col-span-7">
             <div className="font-serif italic text-accent text-base mb-1">
-              Total net margin · P&amp;L ({dayjs(period).format('MMMM YYYY')})
+              Total net margin · P&amp;L (cumulative to-date)
             </div>
             <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
               {formatMoney(totalNetMargin)}
             </div>
             <div className="font-mono text-xs text-muted mt-2">
-              {visible.length} department{visible.length === 1 ? '' : 's'}{ventureAccrual ? ' + Venture' : ''} visible · Period{' '}
-              {dayjs(period).format('MMMM YYYY')}
+              {visible.length} department{visible.length === 1 ? '' : 's'}{ventureAccrual ? ' + Venture' : ''} visible · Cumulative to-date · as at{' '}
+              {dayjs(period).endOf('month').format('D MMM YYYY')}
             </div>
           </div>
         </div>
@@ -211,8 +213,8 @@ export default async function DeptPoolPage({
         </section>
 
         <p className="font-serif italic text-muted text-xs">
-          Accrual basis — billed revenue − cost − expense − inter-billing, from the
-          P&amp;L engine (ties to /reports/income-statement). Switch to Cash for actual pool movement.
+          Accrual basis, cumulative to date — billed revenue − cost − expense −
+          inter-billing since inception. Switch to Cash for actual pool movement.
         </p>
       </div>
     )
