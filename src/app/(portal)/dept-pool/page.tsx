@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import { fetchIncomeStatement } from '@/lib/cfo-reports'
 import { deptNameToPoolKey, splitPoolAccrual } from '@/lib/dept-pool-accrual'
-import RevealAmount from './_components/RevealAmount'
+import { BalanceProvider, BalanceToggle, BalanceValue } from './_components/RevealAmount'
 
 // dept_manager only owns their own dept pool. Skip the multi-dept list and
 // land them straight on their own detail page — same content as clicking View.
@@ -442,12 +442,13 @@ export default async function DeptPoolPage({
             </p>
           </div>
         ) : (
+          <BalanceProvider>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
                   <th className="text-left py-3 pr-4 font-medium">Department</th>
-                  <th className="text-right py-3 pr-4 font-medium">Balance</th>
+                  <th className="text-right py-3 pr-4 font-medium"><BalanceToggle label="Balance" /></th>
                   <th className="text-right py-3 pr-4 font-medium">In (to date)</th>
                   <th className="text-right py-3 pr-4 font-medium">Out (to date)</th>
                   <th className="text-right py-3 pr-4 font-medium">Net (to date)</th>
@@ -479,7 +480,7 @@ export default async function DeptPoolPage({
                         {dept.name}
                       </td>
                       <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">
-                        <RevealAmount text={formatMoney(balance)} />
+                        <BalanceValue text={formatMoney(balance)} />
                       </td>
                       <td className="py-3 pr-4 text-right font-mono tabular text-ledger">
                         {formatMoney(inOut.in_amt)}
@@ -522,7 +523,7 @@ export default async function DeptPoolPage({
                       Venture <span className="font-mono text-xs text-muted">(Office)</span>
                     </td>
                     <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">
-                      <RevealAmount text={formatMoney(ventureCash.balance)} />
+                      <BalanceValue text={formatMoney(ventureCash.balance)} />
                     </td>
                     <td className="py-3 pr-4 text-right font-mono tabular text-ledger">
                       {formatMoney(ventureCash.in_amt)}
@@ -544,6 +545,7 @@ export default async function DeptPoolPage({
               </tbody>
             </table>
           </div>
+          </BalanceProvider>
         )}
       </section>
 
