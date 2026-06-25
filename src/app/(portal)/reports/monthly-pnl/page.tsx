@@ -4,8 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { fetchAllJournalLines, fetchCoaAccounts } from '@/lib/gl-reports'
 import { buildMonthlyPnl } from '@/lib/monthly-pnl'
-import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
+import { segmentFilterFor } from '../_components/report-segments'
 import MonthlyMatrix from '../_components/MonthlyMatrix'
+import MonthlyReportControls from '../_components/MonthlyReportControls'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,37 +51,6 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
             FY {year} · read-only · all amounts RM · % of sales
           </p>
         </div>
-        <form className="flex items-end gap-3 shrink-0">
-          <label className="flex flex-col gap-1 text-xs font-sans text-muted">
-            Up to month
-            <input
-              type="month"
-              name="period"
-              defaultValue={period}
-              className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-sans text-muted">
-            Segment
-            <select
-              name="segment"
-              defaultValue={segment}
-              className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
-            >
-              {REPORT_SEGMENTS.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="submit"
-            className="px-4 py-2 bg-accent hover:bg-accent-hover text-white font-sans text-sm rounded-md transition-colors"
-          >
-            Apply
-          </button>
-        </form>
       </div>
 
       <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
@@ -90,7 +60,12 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
         against that column&rsquo;s sales.
       </p>
 
-      <MonthlyMatrix columns={matrix.columns} rows={matrix.rows} pctBaseByColumn={matrix.salesByColumn} />
+      <div className="flex gap-8 items-start">
+        <MonthlyReportControls period={period} segment={segment} />
+        <div className="min-w-0 flex-1">
+          <MonthlyMatrix columns={matrix.columns} rows={matrix.rows} pctBaseByColumn={matrix.salesByColumn} />
+        </div>
+      </div>
     </div>
   )
 }

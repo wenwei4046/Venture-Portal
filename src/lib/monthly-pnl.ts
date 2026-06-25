@@ -16,6 +16,8 @@ export interface MatrixRow {
   label: string
   depth: number // indent level (0 = top)
   kind: 'account' | 'subtotal'
+  /** true when this account has child accounts under it (a roll-up parent). */
+  isParent?: boolean
   tone?: 'ledger' | 'danger' | 'auto'
   /** display values aligned to columns (cost/expense already negated). */
   values: number[]
@@ -97,9 +99,10 @@ export function buildMonthlyPnl(
     const walk = (n: AccountNode, depth: number) => {
       rows.push({
         key: n.code,
-        label: n.code === '—' ? n.name : `${n.code} ${n.name}`,
+        label: n.name,
         depth,
         kind: 'account',
+        isParent: n.children.length > 0,
         values: codeMaps.map((cm) => r2((cm.get(n.code) ?? 0) * sign)),
       })
       n.children.forEach((c) => walk(c, depth + 1))
