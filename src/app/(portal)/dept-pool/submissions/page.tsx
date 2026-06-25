@@ -57,7 +57,7 @@ export default async function PastMonthSubmissionsPage() {
           <div className="page-eyebrow">
             <em>I.</em> DEPARTMENTS · HR COST SUBMISSIONS
           </div>
-          <h1 className="page-title">Past Month Submission</h1>
+          <h1 className="page-title">HR Past Month Submission</h1>
         </div>
       </div>
 

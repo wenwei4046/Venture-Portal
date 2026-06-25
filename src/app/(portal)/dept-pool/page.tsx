@@ -102,7 +102,7 @@ export default async function DeptPoolPage({
               href="/dept-pool/submissions"
               className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
             >
-              Past Month Submission
+              HR Past Month Submission
             </Link>
           </div>
         </div>
@@ -399,7 +399,7 @@ export default async function DeptPoolPage({
             href="/dept-pool/submissions"
             className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
           >
-            Past Month Submission
+            HR Past Month Submission
           </Link>
           {user.role === 'dept_manager' ? (
             <Link
