@@ -53,7 +53,8 @@ export function buildMonthlyPnl(
   const throughMonth = Math.min(12, Math.max(1, args.throughMonth))
 
   const months: string[] = []
-  for (let m = 1; m <= throughMonth; m++) months.push(`${year}-${String(m).padStart(2, '0')}`)
+  // Latest month first, so it sits next to the Accumulated column.
+  for (let m = throughMonth; m >= 1; m--) months.push(`${year}-${String(m).padStart(2, '0')}`)
 
   const accPeriod = {
     from: `${year}-01-01`,
@@ -104,13 +105,15 @@ export function buildMonthlyPnl(
       n.children.forEach((c) => walk(c, depth + 1))
     }
     accSection.nodes.forEach((n) => walk(n, 0))
+    // Subtotal `pick` returns the already-signed value — do NOT apply the
+    // section's account sign here (Gross Profit / Net Income are net figures).
     rows.push({
       key: subtotal.key,
       label: subtotal.label,
       depth: 0,
       kind: 'subtotal',
       tone: subtotal.tone,
-      values: reports.map((r) => r2(subtotal.pick(r) * sign)),
+      values: reports.map((r) => r2(subtotal.pick(r))),
     })
   }
 
@@ -124,7 +127,7 @@ export function buildMonthlyPnl(
     key: 'TOTAL_OTHER_INCOME', label: 'Total Other Income', pick: (r) => r.otherIncome.current, tone: 'ledger',
   })
   emitSection(reportAcc.expense, -1, {
-    key: 'TOTAL_EXPENSES', label: 'Total Expenses', pick: (r) => r.expense.current, tone: 'danger',
+    key: 'TOTAL_EXPENSES', label: 'Total Expenses', pick: (r) => -r.expense.current, tone: 'danger',
   })
   rows.push({
     key: 'NET_INCOME',
