@@ -30,8 +30,13 @@ interface NavItem {
   // e.g. /settings?tab=accounts). The href should carry the same query.
   tab?: string
   // Active only when ?tab= is NOT one of these (the default-tab sibling of a
-  // `tab` link, e.g. Dept Pool Cash vs ?tab=pnl).
+  // `tab` link, e.g. Settings default vs ?tab=accounts).
   notTab?: string[]
+  // Active only when ?basis= equals this value. Dept Pool's Cash/Accrual split
+  // uses ?basis= (not ?tab=) — the page reads searchParams.basis.
+  basis?: string
+  // Active only when ?basis= is NOT one of these (the Cash sibling of Accrual).
+  notBasis?: string[]
   // Never active on these path prefixes (a sibling entry owns them,
   // e.g. Payments must not light up on /payments/new — that's Receipt's).
   notPaths?: string[]
@@ -39,7 +44,7 @@ interface NavItem {
 }
 
 // Shared active-state test for items and group children.
-function itemActive(item: NavItem, pathname: string, tabParam: string | null): boolean {
+function itemActive(item: NavItem, pathname: string, tabParam: string | null, basisParam: string | null): boolean {
   const path = item.href.split('?')[0]
   const pathMatch = item.exact
     ? pathname === path
@@ -48,6 +53,8 @@ function itemActive(item: NavItem, pathname: string, tabParam: string | null): b
   if (item.notPaths?.some((p) => pathname === p || pathname.startsWith(p + '/'))) return false
   if (item.tab !== undefined && tabParam !== item.tab) return false
   if (item.notTab && item.notTab.includes(tabParam ?? '')) return false
+  if (item.basis !== undefined && basisParam !== item.basis) return false
+  if (item.notBasis && item.notBasis.includes(basisParam ?? '')) return false
   return true
 }
 
@@ -113,8 +120,8 @@ const navEntries: NavEntry[] = [
     section: 'Departments',
     visible: canAccessDeptPool,
     children: [
-      { href: '/dept-pool', label: 'Cash', notTab: ['pnl'], visible: canAccessDeptPool },
-      { href: '/dept-pool?tab=pnl', label: 'Accrual P&L', tab: 'pnl', visible: canAccessDeptPool },
+      { href: '/dept-pool', label: 'Cash', notBasis: ['accrual'], visible: canAccessDeptPool },
+      { href: '/dept-pool?basis=accrual', label: 'Accrual P&L', basis: 'accrual', visible: canAccessDeptPool },
     ],
   },
   // Venture Pool = HV holding-company cash ledger (5 txn types). Sits next to
@@ -190,6 +197,7 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
+  const basisParam = searchParams.get('basis')
   const router = useRouter()
 
   const visible = navEntries.filter((entry) => entry.visible(role))
@@ -211,7 +219,7 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
     const open: Record<string, boolean> = {}
     for (const entry of visible) {
       if (isGroup(entry)) {
-        open[entry.label] = entry.children.some((c) => itemActive(c, pathname, tabParam))
+        open[entry.label] = entry.children.some((c) => itemActive(c, pathname, tabParam, basisParam))
       }
     }
     return open
@@ -239,7 +247,7 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
   useEffect(() => {
     for (const entry of visible) {
       if (isGroup(entry)) {
-        const match = entry.children.some((c) => itemActive(c, pathname, tabParam))
+        const match = entry.children.some((c) => itemActive(c, pathname, tabParam, basisParam))
         if (match) setGroupOpen((prev) => ({ ...prev, [entry.label]: true }))
       }
     }
@@ -332,7 +340,7 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
               {section.entries.map((entry) => {
                 if (isGroup(entry)) {
                   const groupActive = entry.children.some((c) =>
-                    itemActive(c, pathname, tabParam)
+                    itemActive(c, pathname, tabParam, basisParam)
                   )
                   const isOpen = !!groupOpen[entry.label]
                   return (
@@ -366,7 +374,7 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
                           {entry.children
                             .filter((c) => c.visible(role))
                             .map((child) => {
-                              const active = itemActive(child, pathname, tabParam)
+                              const active = itemActive(child, pathname, tabParam, basisParam)
                               return (
                                 <Link
                                   key={child.href}
@@ -396,7 +404,7 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
                 }
 
                 const item = entry as NavItem
-                const active = itemActive(item, pathname, tabParam)
+                const active = itemActive(item, pathname, tabParam, basisParam)
                 return (
                   <Link
                     key={item.href}
