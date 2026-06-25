@@ -155,6 +155,7 @@ const navEntries: NavEntry[] = [
     visible: canAccessReports,
     children: [
       { href: '/reports/income-statement', label: 'P&L', visible: canAccessReports },
+      { href: '/reports/monthly-pnl', label: 'Monthly P&L', visible: canAccessReports },
       { href: '/reports/cash-flow', label: 'Cash Flow', visible: canAccessReports },
       { href: '/reports/balance-sheet', label: 'Balance Sheet', visible: canAccessReports },
       { href: '/reports/trial-balance', label: 'Trial Balance', visible: canAccessReports },
