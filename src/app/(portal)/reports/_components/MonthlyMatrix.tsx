@@ -18,11 +18,16 @@ export default function MonthlyMatrix({
   /** Per-column base for the % cell. Omit to hide the % column entirely. */
   pctBaseByColumn?: number[]
 }) {
-  // L1 = top accounts only · L2 = one level deeper · L3 = every account level.
+  // L1 = subtotals only · L2 = + top accounts · L3 = every account level.
   const [level, setLevel] = useState<1 | 2 | 3>(3)
   const showPct = Array.isArray(pctBaseByColumn)
 
-  const visibleRows = rows.filter((r) => r.kind === 'subtotal' || r.depth <= level - 1)
+  const visibleRows = rows.filter((r) => {
+    if (r.kind === 'subtotal') return true // subtotals always show
+    if (level === 1) return false // totals only
+    if (level === 2) return r.depth === 0 // + top-level accounts
+    return true // L3: all account levels
+  })
 
   const pct = (value: number, base: number) =>
     Math.abs(base) < 0.005 ? '—' : `${((value / base) * 100).toFixed(1)}%`
@@ -38,7 +43,7 @@ export default function MonthlyMatrix({
             key={lv}
             type="button"
             onClick={() => setLevel(lv)}
-            title={lv === 1 ? 'Top accounts only' : lv === 2 ? 'One level deeper' : 'All account levels'}
+            title={lv === 1 ? 'Totals only' : lv === 2 ? '+ top-level accounts' : 'All account levels'}
             className={`px-2.5 py-1 rounded-md text-xs font-mono border transition-colors ${
               level === lv
                 ? 'bg-ink text-paper border-ink'
