@@ -10,6 +10,12 @@ import {
 } from '../actions'
 import AttachmentList from '@/components/voucher/AttachmentList'
 
+interface ContextItem {
+  request_type: string
+  description: string | null
+  amount: number | null
+}
+
 interface Props {
   groupId: string
   open: boolean
@@ -18,6 +24,18 @@ interface Props {
   // Approve selected / Reject rest button. When false (viewer mode) it
   // stays purely informational.
   actionable?: boolean
+  // Non-voucher members of the group (e.g. the new_loan in a Loan OUT combo).
+  // Shown read-only at the top so the modal reflects every linked request, not
+  // just the vouchers — the per-row voucher fetch only returns vouchers.
+  contextItems?: ContextItem[]
+}
+
+function contextLabel(type: string): string {
+  const labels: Record<string, string> = {
+    new_loan: 'New loan',
+    dept_payment_request: 'Dept Request Payment',
+  }
+  return labels[type] ?? type.replace(/_/g, ' ')
 }
 
 export default function BatchDetailsModal({
@@ -25,6 +43,7 @@ export default function BatchDetailsModal({
   open,
   onClose,
   actionable = false,
+  contextItems = [],
 }: Props) {
   const router = useRouter()
   const [rows, setRows] = useState<BatchVoucherRow[] | null>(null)
@@ -178,6 +197,30 @@ export default function BatchDetailsModal({
         ) : null}
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
+          {contextItems.length > 0 ? (
+            <div className="mb-4 rounded-md border border-hairline bg-surface-2/40 px-3 py-2">
+              <div className="text-[11px] font-sans font-semibold uppercase tracking-wider text-graphite mb-1">
+                Also in this batch · approved together via “Approve both”
+              </div>
+              <ul className="space-y-1">
+                {contextItems.map((c, i) => (
+                  <li key={i} className="flex items-baseline justify-between gap-3">
+                    <span className="font-serif text-sm text-ink truncate min-w-0">
+                      <span className="font-mono text-xs text-muted mr-2">
+                        {contextLabel(c.request_type)}
+                      </span>
+                      {c.description ?? 'No description'}
+                    </span>
+                    {c.amount != null ? (
+                      <span className="font-mono tabular text-sm text-ink shrink-0">
+                        {formatMoney(c.amount)}
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {isLoading && rows === null ? (
             <p className="font-serif italic text-muted text-sm py-8 text-center">
               Loading voucher details…
