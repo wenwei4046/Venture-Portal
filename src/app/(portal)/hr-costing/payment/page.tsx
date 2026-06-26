@@ -315,11 +315,21 @@ export default async function HRPaymentPage() {
           run && (
             <div className="border border-hairline rounded-md bg-surface p-8">
               <h2 className="font-serif italic text-ink text-md mb-2">
-                Request Fund out from Finance
+                Funding from Finance
               </h2>
               <p className="font-serif italic text-graphite text-sm mb-6">
-                Finance generates a Payment Voucher for <strong className="num text-num-ink">RM {formatMoneyBare(totalAmount)}</strong>.
-                Principal approves the PV and money moves from the HV operating account into the HR Pool.
+                {phase === 'approved-ready' ? (
+                  <>
+                    No active funding request — the previous one was cancelled. Re-file the{' '}
+                    <strong className="num text-num-ink">RM {formatMoneyBare(totalAmount)}</strong> request below.
+                    Finance generates the Payment Voucher; Principal approves it and the money moves into the HR Pool.
+                  </>
+                ) : (
+                  <>
+                    The funding request for <strong className="num text-num-ink">RM {formatMoneyBare(totalAmount)}</strong> is filed automatically when you submit the payroll.
+                    Finance generates the Payment Voucher; Principal approves it and the money moves from the HV operating account into the HR Pool.
+                  </>
+                )}
               </p>
               <RequestPayrollPaymentButton
                 runId={run.id}

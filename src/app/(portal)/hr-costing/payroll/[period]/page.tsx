@@ -634,9 +634,13 @@ function PhaseCta({
           totalAmount={totalAmount}
           state={requestState}
         />
-        {/* Reopen only makes sense before money starts moving (no active
-            payment request). The RPC enforces the same rule server-side. */}
-        {phase === 'approved-no-request' && <ReopenPayrollButton period={period} />}
+        {/* Reopen is valid until Finance acts. The funding request is now
+            auto-filed at submit (phase 'request-submitted'); reopen_payroll_run
+            auto-cancels a still-'submitted' request, and blocks once a PV is
+            generated. So allow reopen through 'request-submitted', not after. */}
+        {(phase === 'approved-no-request' || phase === 'request-submitted') && (
+          <ReopenPayrollButton period={period} />
+        )}
       </div>
     )
   }

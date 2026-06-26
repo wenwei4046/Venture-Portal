@@ -382,6 +382,7 @@ export async function cancelPayrollPaymentRequest(
   const period = (req.payroll_runs as any)?.period_month
   if (period) revalidatePath(`/hr-costing/payroll/${period}`)
   revalidatePath('/hr-costing/payroll')
+  revalidatePath('/hr-costing/payment')
   revalidatePath('/dashboard')
   revalidatePath('/payments')
 }
