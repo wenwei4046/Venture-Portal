@@ -21,8 +21,13 @@ interface Props {
   emptyMessage?: string
 }
 
-function isImage(fileType: string): boolean {
-  return (fileType ?? '').startsWith('image/')
+type PreviewKind = 'image' | 'pdf'
+
+function previewKind(fileType: string): PreviewKind | null {
+  const t = fileType ?? ''
+  if (t.startsWith('image/')) return 'image'
+  if (t === 'application/pdf') return 'pdf'
+  return null
 }
 
 export default function AttachmentList({ attachments, emptyMessage }: Props) {
@@ -30,20 +35,24 @@ export default function AttachmentList({ attachments, emptyMessage }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [, startTransition] = useTransition()
 
-  // id → signed image URL, fetched once on mount for inline thumbnails so the
-  // reviewer sees the photos without clicking Download on each one.
+  // id → signed URL, fetched once on mount so images/PDFs render inline and the
+  // reviewer sees them without clicking Download on each one.
   const [previews, setPreviews] = useState<Record<string, string>>({})
-  // Currently enlarged image ({ url, name }) — null = lightbox closed.
-  const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(null)
+  // Currently enlarged attachment — null = lightbox closed.
+  const [lightbox, setLightbox] = useState<
+    { url: string; name: string; kind: PreviewKind } | null
+  >(null)
 
-  const imageIds = attachments.filter((a) => isImage(a.file_type)).map((a) => a.id)
+  const previewIds = attachments
+    .filter((a) => previewKind(a.file_type) !== null)
+    .map((a) => a.id)
   // Stable dependency key so the effect only re-runs when the set changes.
-  const imageKey = imageIds.join(',')
+  const previewKey = previewIds.join(',')
 
   useEffect(() => {
-    if (imageIds.length === 0) return
+    if (previewIds.length === 0) return
     let cancelled = false
-    getAttachmentPreviewUrls(imageIds)
+    getAttachmentPreviewUrls(previewIds)
       .then((rows) => {
         if (cancelled) return
         setPreviews(Object.fromEntries(rows.map((r) => [r.id, r.url])))
@@ -55,7 +64,7 @@ export default function AttachmentList({ attachments, emptyMessage }: Props) {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageKey])
+  }, [previewKey])
 
   useEffect(() => {
     if (!lightbox) return
@@ -95,7 +104,7 @@ export default function AttachmentList({ attachments, emptyMessage }: Props) {
     <div>
       <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
         {attachments.map((a) => {
-          const img = isImage(a.file_type)
+          const kind = previewKind(a.file_type)
           const previewUrl = previews[a.id]
           return (
             <div key={a.id} className="px-5 py-3">
@@ -114,6 +123,17 @@ export default function AttachmentList({ attachments, emptyMessage }: Props) {
                   <span className="font-mono text-xs text-muted hidden sm:block">
                     {dayjs(a.uploaded_at).format('D MMM HH:mm')}
                   </span>
+                  {kind && previewUrl ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLightbox({ url: previewUrl, name: a.file_name, kind })
+                      }
+                      className="text-xs font-serif italic text-accent hover:text-accent-hover"
+                    >
+                      Enlarge
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => handleDownload(a.id)}
@@ -125,21 +145,33 @@ export default function AttachmentList({ attachments, emptyMessage }: Props) {
                 </div>
               </div>
 
-              {img ? (
+              {kind ? (
                 previewUrl ? (
-                  <button
-                    type="button"
-                    onClick={() => setLightbox({ url: previewUrl, name: a.file_name })}
-                    className="mt-3 block cursor-zoom-in rounded-md border border-hairline overflow-hidden bg-paper"
-                    aria-label={`Enlarge ${a.file_name}`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={previewUrl}
-                      alt={a.file_name}
-                      className="max-h-64 w-auto object-contain"
-                    />
-                  </button>
+                  kind === 'image' ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLightbox({ url: previewUrl, name: a.file_name, kind })
+                      }
+                      className="mt-3 block cursor-zoom-in rounded-md border border-hairline overflow-hidden bg-paper"
+                      aria-label={`Enlarge ${a.file_name}`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={previewUrl}
+                        alt={a.file_name}
+                        className="max-h-64 w-auto object-contain"
+                      />
+                    </button>
+                  ) : (
+                    <div className="mt-3 rounded-md border border-hairline overflow-hidden bg-paper">
+                      <iframe
+                        src={`${previewUrl}#toolbar=0&navpanes=0&view=FitH`}
+                        title={a.file_name}
+                        className="w-full h-80 sm:h-96"
+                      />
+                    </div>
+                  )
                 ) : (
                   <div className="mt-3 h-24 rounded-md border border-hairline bg-surface-2/40 flex items-center justify-center">
                     <span className="font-serif italic text-xs text-muted">
@@ -158,26 +190,43 @@ export default function AttachmentList({ attachments, emptyMessage }: Props) {
 
       {lightbox ? (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/80 backdrop-blur-sm p-6"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/70 backdrop-blur-sm p-4 sm:p-8"
           role="dialog"
           aria-modal="true"
           aria-label={lightbox.name}
           onClick={() => setLightbox(null)}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={lightbox.url}
-            alt={lightbox.name}
-            className="max-h-[90vh] max-w-[92vw] object-contain rounded-md shadow-2xl"
+          <div
+            className="bg-paper rounded-lg shadow-2xl w-full max-w-[820px] max-h-[88vh] flex flex-col overflow-hidden"
             onClick={(e) => e.stopPropagation()}
-          />
-          <button
-            type="button"
-            onClick={() => setLightbox(null)}
-            className="fixed top-5 right-6 text-paper/90 hover:text-paper font-serif italic text-sm"
           >
-            Close ✕
-          </button>
+            <div className="shrink-0 flex items-center justify-between gap-4 px-4 py-2.5 border-b border-hairline bg-surface">
+              <span className="font-serif text-sm text-ink truncate">{lightbox.name}</span>
+              <button
+                type="button"
+                onClick={() => setLightbox(null)}
+                className="shrink-0 text-muted hover:text-ink font-serif italic text-sm"
+              >
+                Close ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto bg-surface-2/40">
+              {lightbox.kind === 'image' ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={lightbox.url}
+                  alt={lightbox.name}
+                  className="block max-w-full h-auto mx-auto"
+                />
+              ) : (
+                <iframe
+                  src={lightbox.url}
+                  title={lightbox.name}
+                  className="w-full h-full min-h-[70vh]"
+                />
+              )}
+            </div>
+          </div>
         </div>
       ) : null}
     </div>
