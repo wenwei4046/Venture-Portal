@@ -1,16 +1,11 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { formatMoney, formatMoneyBare } from '@/lib/utils'
+import { formatMoney, formatMoneyBare, getPeriodMonth } from '@/lib/utils'
 import RequestPayrollPaymentButton, {
   type RequestState,
 } from '../payroll/_components/RequestPayrollPaymentButton'
 import CreateDisbursementButton from './_components/CreateDisbursementButton'
-
-function currentPeriod(): string {
-  const now = new Date()
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`
-}
 
 interface DeptBreakdown {
   dept_name: string
@@ -23,7 +18,7 @@ export default async function HRPaymentPage() {
   await requireRole(['principal', 'hr'])
   const supabase = await createClient()
 
-  const period = currentPeriod()
+  const period = getPeriodMonth()
 
   const [{ data: run }, { data: hrDept }, { data: payrollRows }, { data: directorRows }] = await Promise.all([
     supabase

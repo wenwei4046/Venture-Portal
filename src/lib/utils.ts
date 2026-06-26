@@ -40,8 +40,15 @@ export function formatMonth(date: string | Date): string {
   return dayjs(date).format('MMM YYYY')
 }
 
+// Returns the first day of the month (YYYY-MM-01) for the given date, or for
+// "now" when no date is passed. Malaysia is UTC+8 (no DST) but the server runs
+// in UTC, so deriving the current month from raw UTC rolls over 8 hours late —
+// on the 1st, 00:00–08:00 MYT is still the previous month in UTC. Shift into
+// MYT wall-clock before taking the month boundary so the portal's "current
+// period" matches the local Malaysian calendar.
 export function getPeriodMonth(date?: Date): string {
-  return dayjs(date).startOf('month').format('YYYY-MM-DD')
+  const myt = new Date((date ?? new Date()).getTime() + 8 * 60 * 60 * 1000)
+  return `${myt.getUTCFullYear()}-${String(myt.getUTCMonth() + 1).padStart(2, '0')}-01`
 }
 
 export function cn(...classes: (string | undefined | null | false)[]): string {
