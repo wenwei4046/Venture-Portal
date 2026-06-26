@@ -35,13 +35,25 @@ export default function CombinedApprovalCard({
   const [error, setError] = useState<string | null>(null)
   const [showDetails, setShowDetails] = useState(false)
 
-  const hasVouchers = items.some((i) => i.request_type === 'payment_voucher')
+  const voucherItems = items.filter((i) => i.request_type === 'payment_voucher')
+  // Non-voucher members (e.g. the new_loan in a Loan OUT combo). Their presence
+  // means this group cannot be split per-row — approve_voucher_batch_partial
+  // rejects any group containing non-payment_voucher items, so the per-row
+  // modal would error on submit. Those groups get a read-only "View details"
+  // modal instead; the actual approval runs through the card's "Approve both".
+  const contextItems = items.filter((i) => i.request_type !== 'payment_voucher')
+  const hasVouchers = voucherItems.length > 0
+  const hasNonVoucher = contextItems.length > 0
 
-  // Sum every item's amount — handles both the 2-item Loan OUT combo and
-  // N-voucher payroll disbursement batches. Previously we did
-  // items.find(payment_voucher) which only surfaced the first voucher's
-  // amount, so 32-voucher batches displayed RM <one-voucher> as the total.
-  const total = items.reduce((s, i) => s + Number(i.amount ?? 0), 0)
+  // Total disbursement = actual cash out = sum of the payment_voucher amounts.
+  // In a Loan OUT combo the new_loan principal equals its disbursement voucher
+  // (the same money), so summing EVERY item double-counted it (RM 111k shown
+  // for a RM 55k loan). Payroll batches have no loan, so this still sums all of
+  // their vouchers. Fall back to all items only if a group has no voucher.
+  const total = (hasVouchers ? voucherItems : items).reduce(
+    (s, i) => s + Number(i.amount ?? 0),
+    0,
+  )
   const approveLabel =
     items.length === 2 ? 'Approve both' : `Approve all ${items.length}`
   const approvingLabel =
@@ -134,7 +146,7 @@ export default function CombinedApprovalCard({
               onClick={() => setShowDetails(true)}
               className="mt-1 text-xs font-serif italic text-accent hover:text-accent-hover"
             >
-              {isSelfSubmitted ? 'View details →' : 'Review per row →'}
+              {isSelfSubmitted || hasNonVoucher ? 'View details →' : 'Review per row →'}
             </button>
           ) : null}
         </div>
@@ -145,7 +157,8 @@ export default function CombinedApprovalCard({
           groupId={groupId}
           open={showDetails}
           onClose={() => setShowDetails(false)}
-          actionable={!isSelfSubmitted}
+          actionable={!isSelfSubmitted && !hasNonVoucher}
+          contextItems={contextItems}
         />
       ) : null}
 
