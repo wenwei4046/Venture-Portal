@@ -2,47 +2,20 @@
 // month of the fiscal (calendar) year plus an Accumulated (FY-to-date) column,
 // then aligned into a rows × columns matrix. Pure: no DB access.
 
-import dayjs from 'dayjs'
 import type { GlLine, CoaAccount, PnlReport, ReportSection, AccountNode } from './gl-reports'
 import { buildPnl, monthPeriod } from './gl-reports'
+import {
+  type MatrixRow,
+  type MonthlyMatrixData,
+  EMPTY_PERIOD,
+  collectNodeValues,
+  monthColumns,
+  r2,
+} from './monthly-matrix'
 
-export interface MatrixColumn {
-  key: string // 'acc' | 'YYYY-MM'
-  label: string // 'Accumulated' | 'Jan 2026'
-}
-
-export interface MatrixRow {
-  key: string // account code, or subtotal id
-  label: string
-  depth: number // indent level (0 = top)
-  kind: 'account' | 'subtotal'
-  /** true when this account has child accounts under it (a roll-up parent). */
-  isParent?: boolean
-  tone?: 'ledger' | 'danger' | 'auto'
-  /** display values aligned to columns (cost/expense already negated). */
-  values: number[]
-}
-
-export interface MonthlyPnl {
-  columns: MatrixColumn[]
-  rows: MatrixRow[]
+export interface MonthlyPnl extends MonthlyMatrixData {
   /** Revenue total per column — the base for the % column. */
   salesByColumn: number[]
-}
-
-function r2(n: number): number {
-  return Math.round(n * 100) / 100
-}
-
-// An empty range so buildPnl's unused `previous` bucket contributes nothing.
-const EMPTY_PERIOD = { from: '2099-12-31', to: '2099-01-01' }
-
-function collectNodeValues(section: ReportSection, out: Map<string, number>): void {
-  const walk = (n: AccountNode) => {
-    out.set(n.code, n.current)
-    n.children.forEach(walk)
-  }
-  section.nodes.forEach(walk)
 }
 
 /** Build the monthly P&L matrix for a fiscal (calendar) year, Jan → throughMonth. */
@@ -52,16 +25,7 @@ export function buildMonthlyPnl(
   args: { year: number; throughMonth: number; segment?: string | string[] },
 ): MonthlyPnl {
   const { year, segment } = args
-  const throughMonth = Math.min(12, Math.max(1, args.throughMonth))
-
-  const months: string[] = []
-  // Latest month first, so it sits next to the Accumulated column.
-  for (let m = throughMonth; m >= 1; m--) months.push(`${year}-${String(m).padStart(2, '0')}`)
-
-  const accPeriod = {
-    from: `${year}-01-01`,
-    to: dayjs(`${year}-${String(throughMonth).padStart(2, '0')}-01`).endOf('month').format('YYYY-MM-DD'),
-  }
+  const { months, columns, accPeriod } = monthColumns(year, args.throughMonth)
 
   // One report per column. buildPnl is pure over (lines, period).
   const reportAcc = buildPnl(lines, accounts, { current: accPeriod, previous: EMPTY_PERIOD, segment })
@@ -80,12 +44,7 @@ export function buildMonthlyPnl(
     return map
   })
 
-  const columns: MatrixColumn[] = [
-    { key: 'acc', label: 'Accumulated' },
-    ...months.map((ym) => ({ key: ym, label: dayjs(`${ym}-01`).format('MMM YYYY') })),
-  ]
   const salesByColumn = reports.map((rep) => rep.revenue.current)
-
   const rows: MatrixRow[] = []
 
   // Emit a section's account tree (from the Accumulated structure so every
@@ -108,8 +67,8 @@ export function buildMonthlyPnl(
       n.children.forEach((c) => walk(c, depth + 1))
     }
     accSection.nodes.forEach((n) => walk(n, 0))
-    // Subtotal `pick` returns the already-signed value — do NOT apply the
-    // section's account sign here (Gross Profit / Net Income are net figures).
+    // Subtotal `pick` returns the already-signed value — Gross Profit / Net
+    // Income are net figures and must NOT take the section's account sign.
     rows.push({
       key: subtotal.key,
       label: subtotal.label,

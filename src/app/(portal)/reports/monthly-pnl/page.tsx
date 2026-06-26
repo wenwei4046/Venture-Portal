@@ -51,6 +51,20 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
             FY {year} · read-only · all amounts RM · % of sales
           </p>
         </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <a
+            href={`/reports/monthly-pnl/export?format=csv&period=${period}${segment ? `&segment=${segment}` : ''}`}
+            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+          >
+            CSV
+          </a>
+          <a
+            href={`/reports/monthly-pnl/export?format=xlsx&period=${period}${segment ? `&segment=${segment}` : ''}`}
+            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+          >
+            Excel
+          </a>
+        </div>
       </div>
 
       <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
