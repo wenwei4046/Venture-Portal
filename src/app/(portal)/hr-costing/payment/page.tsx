@@ -23,7 +23,7 @@ export default async function HRPaymentPage() {
   const [{ data: run }, { data: hrDept }, { data: payrollRows }, { data: directorRows }] = await Promise.all([
     supabase
       .from('payroll_runs')
-      .select('id, status, total_amount, rejection_reason')
+      .select('id, status, total_amount')
       .eq('period_month', period)
       .neq('status', 'rejected')
       .maybeSingle(),
@@ -142,11 +142,12 @@ export default async function HRPaymentPage() {
     disbursementGroupId = approvalRow?.group_id ?? null
   }
 
+  // No Principal costing approval since mig 278 — Submit to Finance lands the
+  // run directly in 'approved', so there is no 'submitted'/'rejected' run state
+  // to wait on here (the run query also filters rejected out).
   type Phase =
     | 'no-payroll'
     | 'drafts-pending'
-    | 'awaiting-approval'
-    | 'rejected'
     | 'approved-ready'
     | 'request-submitted'
     | 'pv-generated'
@@ -155,8 +156,6 @@ export default async function HRPaymentPage() {
   let phase: Phase = 'no-payroll'
   if (!hasPayroll) phase = 'no-payroll'
   else if (!run) phase = 'drafts-pending'
-  else if (run.status === 'submitted') phase = 'awaiting-approval'
-  else if (run.status === 'rejected') phase = 'rejected'
   else if (run.status === 'approved') {
     if (!requestRow) phase = 'approved-ready'
     else if (requestRow.status === 'submitted') phase = 'request-submitted'
@@ -296,46 +295,16 @@ export default async function HRPaymentPage() {
         {phase === 'drafts-pending' && (
           <div className="py-12 text-center border border-hairline rounded-md bg-surface">
             <p className="font-serif italic text-graphite text-lg mb-2">
-              Payroll hasn&apos;t been submitted to Principal yet.
+              Payroll hasn&apos;t been submitted to Finance yet.
             </p>
             <p className="font-serif italic text-muted text-sm mb-6">
-              Finish editing drafts and click Submit for Approval first.
+              Finish editing the drafts and click Submit to Finance on the Payroll grid first.
             </p>
             <Link
               href="/hr-costing/payroll"
               className="inline-block bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
             >
               Open Payroll grid →
-            </Link>
-          </div>
-        )}
-
-        {phase === 'awaiting-approval' && (
-          <div className="py-10 px-6 text-center border border-accent-border rounded-md bg-surface">
-            <em className="font-serif italic text-accent text-lg">
-              Submitted to Principal — awaiting approval of costing
-            </em>
-            <p className="font-serif italic text-muted text-sm mt-3">
-              You can request payment once Principal approves.
-            </p>
-          </div>
-        )}
-
-        {phase === 'rejected' && (
-          <div className="py-10 px-6 text-center border border-danger rounded-md bg-surface">
-            <em className="font-serif italic text-danger text-lg">
-              Costing rejected by Principal
-            </em>
-            {run?.rejection_reason && (
-              <p className="font-serif italic text-graphite text-sm mt-2">
-                Reason: {run.rejection_reason}
-              </p>
-            )}
-            <Link
-              href="/hr-costing/payroll"
-              className="inline-block mt-4 bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-            >
-              Edit &amp; re-submit →
             </Link>
           </div>
         )}
