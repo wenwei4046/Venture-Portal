@@ -210,7 +210,7 @@ export default function AttachmentList({ attachments, emptyMessage }: Props) {
                 Close ✕
               </button>
             </div>
-            <div className="flex-1 overflow-auto bg-surface-2/40">
+            <div className="flex-1 min-h-0 overflow-auto bg-surface-2/40">
               {lightbox.kind === 'image' ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
