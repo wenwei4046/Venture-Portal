@@ -1286,12 +1286,17 @@ export async function getAttachmentSignedUrl(
   return { url: signed.signedUrl, fileName: attachment.file_name }
 }
 
-// ─── Inline image previews (Principal + Finance) ────────────────────────────
-// Batch-sign the image attachments of a voucher so the detail page / batch
-// modal can render thumbnails inline (no per-file Download click). Non-image
-// types (PDF, xlsx, …) are skipped — they keep the Download link. Longer TTL
-// than getAttachmentSignedUrl because the reviewer keeps the page open while
-// deciding; one createSignedUrls round-trip instead of N.
+// ─── Inline previews (Principal + Finance) ──────────────────────────────────
+// Batch-sign the previewable attachments of a voucher (images + PDFs) so the
+// detail page / batch modal can render them inline — no per-file Download
+// click. Other types (xlsx, docx, csv, …) are skipped and keep the Download
+// link. Longer TTL than getAttachmentSignedUrl because the reviewer keeps the
+// page open while deciding; one createSignedUrls round-trip instead of N.
+
+function isPreviewableType(fileType: string): boolean {
+  const t = fileType ?? ''
+  return t.startsWith('image/') || t === 'application/pdf'
+}
 
 export async function getAttachmentPreviewUrls(
   attachmentIds: string[],
@@ -1309,13 +1314,13 @@ export async function getAttachmentPreviewUrls(
     throw new Error('Attachments not found or access denied')
   }
 
-  const images = rows.filter((r) => (r.file_type ?? '').startsWith('image/'))
-  if (images.length === 0) return []
+  const previewable = rows.filter((r) => isPreviewableType(r.file_type ?? ''))
+  if (previewable.length === 0) return []
 
   const { data: signed, error: signErr } = await supabase.storage
     .from('payment-attachments')
     .createSignedUrls(
-      images.map((r) => r.storage_path),
+      previewable.map((r) => r.storage_path),
       60 * 60,
     )
 
@@ -1329,7 +1334,7 @@ export async function getAttachmentPreviewUrls(
       .map((s) => [s.path as string, s.signedUrl]),
   )
 
-  return images
+  return previewable
     .map((r) => ({ id: r.id, url: urlByPath.get(r.storage_path) ?? '' }))
     .filter((x) => x.url.length > 0)
 }
