@@ -1286,6 +1286,54 @@ export async function getAttachmentSignedUrl(
   return { url: signed.signedUrl, fileName: attachment.file_name }
 }
 
+// ─── Inline image previews (Principal + Finance) ────────────────────────────
+// Batch-sign the image attachments of a voucher so the detail page / batch
+// modal can render thumbnails inline (no per-file Download click). Non-image
+// types (PDF, xlsx, …) are skipped — they keep the Download link. Longer TTL
+// than getAttachmentSignedUrl because the reviewer keeps the page open while
+// deciding; one createSignedUrls round-trip instead of N.
+
+export async function getAttachmentPreviewUrls(
+  attachmentIds: string[],
+): Promise<{ id: string; url: string }[]> {
+  await requireRole(['principal', 'finance'])
+  if (attachmentIds.length === 0) return []
+  const supabase = await createClient()
+
+  const { data: rows, error } = await supabase
+    .from('payment_attachments')
+    .select('id, storage_path, file_type')
+    .in('id', attachmentIds)
+
+  if (error || !rows) {
+    throw new Error('Attachments not found or access denied')
+  }
+
+  const images = rows.filter((r) => (r.file_type ?? '').startsWith('image/'))
+  if (images.length === 0) return []
+
+  const { data: signed, error: signErr } = await supabase.storage
+    .from('payment-attachments')
+    .createSignedUrls(
+      images.map((r) => r.storage_path),
+      60 * 60,
+    )
+
+  if (signErr || !signed) {
+    throw new Error(`Failed to sign preview URLs: ${signErr?.message ?? 'unknown'}`)
+  }
+
+  const urlByPath = new Map(
+    signed
+      .filter((s): s is typeof s & { signedUrl: string } => !!s.signedUrl)
+      .map((s) => [s.path as string, s.signedUrl]),
+  )
+
+  return images
+    .map((r) => ({ id: r.id, url: urlByPath.get(r.storage_path) ?? '' }))
+    .filter((x) => x.url.length > 0)
+}
+
 // ─── Upload voucher attachment (Principal + Finance) ────────────────────────
 
 const ALLOWED_MIME = [
