@@ -185,8 +185,6 @@ function formatRequestType(type: string): string {
     profit_withdrawal: 'PROFIT WITHDRAWAL',
     new_fund_source: 'NEW FUND SOURCE',
     payment_voucher: 'PAYMENT VOUCHER',
-    hr_costing: 'HR COSTING',
-    payroll_run: 'PAYROLL RUN',
     dept_payment_request: 'DEPT REQUEST PAYMENT',
     loan_cancel: 'LOAN CANCEL',
   }
@@ -194,11 +192,11 @@ function formatRequestType(type: string): string {
 }
 
 function approvalHref(row: ApprovalRow): string {
-  // payroll_run approvals have their own detail page with 4-OPEX drill-down +
-  // fan-out approval that runs through approve_payroll_run RPC. All other
-  // types use the generic /approvals/[id] route.
-  if (row.request_type === 'payroll_run' && row.reference_id) {
-    return `/approvals/payroll-run/${row.reference_id}`
-  }
+  // Every type that enters this generic queue uses /approvals/[id]. payroll_run
+  // no longer lands here (submit creates the run already-approved; disbursement
+  // files payment_voucher rows instead) — so the old payroll_run special-case
+  // is gone. The /approvals/payroll-run/[id] page + approve_payroll_run RPC
+  // still exist as a read-only drill-down linked from the dashboard + voucher
+  // upstream-href; they are intentionally kept, not retired.
   return `/approvals/${row.id}`
 }

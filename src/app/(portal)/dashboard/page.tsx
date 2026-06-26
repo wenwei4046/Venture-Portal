@@ -29,10 +29,11 @@ type PendingApproval = {
   created_at: string
 }
 
-// payroll_run approvals have their own detail page with 4-OPEX drill-down +
-// fan-out approval. Everything else uses the generic /approvals/[id] route.
-// Mirrors the same helper in /approvals/page.tsx — both the Approvals tab and
-// the Overview's Pending Action should deep-link to the same detail page.
+// payroll_run keeps its own read-only detail page (4-OPEX drill-down) at
+// /approvals/payroll-run/[ref]; everything else uses the generic
+// /approvals/[id] route. NOTE: payroll_run no longer enters the live approval
+// queue (submit creates the run already-approved), so this branch only fires
+// for legacy/read-only deep-links — the /approvals/page.tsx helper dropped it.
 function approvalHref(req: {
   id: string
   request_type: string
