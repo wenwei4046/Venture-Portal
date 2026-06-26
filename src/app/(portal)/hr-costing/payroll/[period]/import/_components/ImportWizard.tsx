@@ -17,6 +17,11 @@ export default function ImportWizard({ period }: Props) {
   const [rows, setRows] = useState<InfotechRow[]>([])
   const [departments, setDepartments] = useState<string[]>([])
   const [grossSum, setGrossSum] = useState(0)
+  const [sheetInfo, setSheetInfo] = useState<{
+    name?: string
+    label?: string
+    mismatch: boolean
+  } | null>(null)
   const [preview, setPreview] = useState<PreviewResult | null>(null)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -26,7 +31,7 @@ export default function ImportWizard({ period }: Props) {
     setError(null)
     try {
       const buf = await file.arrayBuffer()
-      const parsed = parseInfotechPayroll(buf)
+      const parsed = parseInfotechPayroll(buf, period)
       if (parsed.rows.length === 0) {
         setError('No employee rows detected. Is this an InfoTech "PayRoll Summary Detailed Report (By Department)" export?')
         return
@@ -35,6 +40,11 @@ export default function ImportWizard({ period }: Props) {
       setRows(parsed.rows)
       setDepartments(parsed.departments)
       setGrossSum(parsed.grossSum)
+      setSheetInfo({
+        name: parsed.sheetName,
+        label: parsed.sheetPeriodLabel,
+        mismatch: parsed.periodMismatch ?? false,
+      })
 
       // Run preview straight away
       startTransition(async () => {
@@ -74,6 +84,7 @@ export default function ImportWizard({ period }: Props) {
     setPreview(null)
     setApplyResult(null)
     setError(null)
+    setSheetInfo(null)
   }
 
   // ───────── Stage: Upload ─────────
@@ -125,6 +136,12 @@ export default function ImportWizard({ period }: Props) {
               <h2 className="font-serif text-xl text-ink">Preview</h2>
               <p className="font-serif italic text-graphite text-xs mt-1">
                 <span className="font-mono">{fileName}</span>
+                {sheetInfo?.name && (
+                  <>
+                    {' · '}sheet <span className="font-mono">{sheetInfo.name}</span>
+                    {sheetInfo.label ? ` (${sheetInfo.label})` : ''}
+                  </>
+                )}
                 {departments.length > 0 && ` · ${departments.length} department${departments.length === 1 ? '' : 's'}`}
                 {' · '}gross total <span className="font-mono tabular">{formatMoney(grossSum)}</span>
               </p>
@@ -137,6 +154,16 @@ export default function ImportWizard({ period }: Props) {
               ← upload different file
             </button>
           </div>
+          {sheetInfo?.mismatch && (
+            <div className="mt-3 rounded-md border border-alert bg-alert-bg px-3 py-2">
+              <p className="font-serif italic text-alert text-sm">
+                ⚠ No tab in this file matches the period you’re importing into. Parsed
+                {' '}<span className="font-mono not-italic">{sheetInfo.name}</span>
+                {sheetInfo.label ? ` (${sheetInfo.label})` : ''} instead — check you picked
+                the right file/month before applying.
+              </p>
+            </div>
+          )}
           <div className="flex gap-8 mt-4">
             <Stat label="New rows" value={preview.toCreate.length} />
             <Stat label="Overwritten" value={preview.toUpdate.length} />
