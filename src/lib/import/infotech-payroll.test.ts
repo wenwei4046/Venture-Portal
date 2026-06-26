@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { parseInfotechGrid } from './infotech-payroll'
+import { utils, write } from 'xlsx'
+import { parseInfotechGrid, parseInfotechPayroll } from './infotech-payroll'
 
 // Golden grid based on the actual Carres Mar 2026 export the user provided.
 // Minimal subset — just enough to exercise every code path.
@@ -164,5 +165,58 @@ describe('parseInfotechGrid', () => {
       [1, 'ABC', 'Fake Name', 1000],
     ])
     expect(result.rows).toHaveLength(0)
+  })
+})
+
+// ── Sheet selection (regression for the 2026-06-26 "why got Lin Xiao Ling"
+//    bug): a May file carried the March tab first; the old parser blindly took
+//    SheetNames[0] and imported March, including a since-resigned employee.
+describe('parseInfotechPayroll — sheet selection by period', () => {
+  function reportGrid(monthLabel: string, names: string[]): (string | number | null)[][] {
+    return [
+      ['HOUZS VENTURE HOLDING SDN BHD'],
+      [`Monthly PayRoll Summary Detailed Report (By Department) End Pay - MONTH [${monthLabel}]`],
+      ['Date : 25/05/2026'],
+      ['No.', 'Code', 'Emp. Name', 'Tot. Sal', 'OT Amt', 'Shift', 'Amount', 'Add', 'No Pay', 'Bonus', 'Gross'],
+      ['Code :H-HR    Department:H - HUMAN RESOURCES'],
+      ...names.map((n, i) => [i + 1, `HV${100 + i}`, n, 4600, 0, 0, 0, 0, 0, 0, 4600]),
+    ]
+  }
+
+  function workbook(sheets: { name: string; grid: (string | number | null)[][] }[]): ArrayBuffer {
+    const wb = utils.book_new()
+    for (const s of sheets) utils.book_append_sheet(wb, utils.aoa_to_sheet(s.grid), s.name)
+    return write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer
+  }
+
+  const buf = workbook([
+    { name: 'HVH - Mar Ori', grid: reportGrid('March- 2026', ['TAMMY KHOO', 'LIN XIAO LING']) },
+    { name: 'HVH - May', grid: reportGrid('May- 2026', ['TAMMY KHOO']) },
+    { name: 'INFOTECH', grid: [['PERIOD', 'employee code'], ['052026', 'HV100']] }, // not a report tab
+  ])
+
+  it('picks the May tab (not the first March tab) for a May period', () => {
+    const result = parseInfotechPayroll(buf, '2026-05-01')
+    expect(result.sheetName).toBe('HVH - May')
+    expect(result.sheetPeriodLabel).toBe('May 2026')
+    expect(result.periodMismatch).toBe(false)
+    expect(result.rows.map(r => r.employeeName)).not.toContain('LIN XIAO LING')
+  })
+
+  it('picks the March tab for a March period', () => {
+    const result = parseInfotechPayroll(buf, '2026-03-01')
+    expect(result.sheetName).toBe('HVH - Mar Ori')
+    expect(result.rows.map(r => r.employeeName)).toContain('LIN XIAO LING')
+  })
+
+  it('flags periodMismatch and falls back to the first report tab when no tab matches', () => {
+    const result = parseInfotechPayroll(buf, '2026-07-01')
+    expect(result.periodMismatch).toBe(true)
+    expect(result.sheetName).toBe('HVH - Mar Ori')
+  })
+
+  it('ignores non-report tabs (INFOTECH) when selecting', () => {
+    const result = parseInfotechPayroll(buf, '2026-05-01')
+    expect(result.sheetName).not.toBe('INFOTECH')
   })
 })

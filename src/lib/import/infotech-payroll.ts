@@ -72,6 +72,15 @@ export interface InfotechParseResult {
   skipped: Array<{ excelRow: number; reason: string }>
   /** Sum of basic + OT + allowance across all rows — sanity-check vs Grand Total. */
   grossSum: number
+  /** Workbook sheet (tab) actually parsed — surfaced so the user can see we
+   *  picked the right month when a file carries several monthly tabs. */
+  sheetName?: string
+  /** Month/year detected in that sheet's title, e.g. "May 2026" (display). */
+  sheetPeriodLabel?: string
+  /** True when a target period was requested but NO tab in the file matched
+   *  it — we fell back to the first report tab, which may be the wrong month.
+   *  Drives a "check you imported the right month" warning. */
+  periodMismatch?: boolean
 }
 
 const HEADER_MARKER = 'No.'
@@ -79,21 +88,99 @@ const SUBTOTAL_MARKER = 'Sub Total:'
 const GRAND_TOTAL_MARKER = 'Grand Total:'
 const DEPT_SECTION_MARKER = 'Department:'
 
-/** Parse a File / ArrayBuffer / Uint8Array. Auto-detects xlsx vs CSV. */
+const MONTH_ABBR: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+}
+const MONTH_NAME = [
+  '', 'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+/** A report tab has the "No. | Code | Emp. Name | …" header row. The machine
+ *  INFOTECH tab and the pivot "Details" tab don't, so they're never parsed. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function isReportSheet(grid: any[][]): boolean {
+  return grid.some(
+    (r) => cellStr(r?.[0]) === HEADER_MARKER && cellStr(r?.[1]) === 'Code',
+  )
+}
+
+/** Pull the month/year a report tab covers from its title
+ *  ("… MONTH [May- 2026]") or the "Date : DD/MM/YYYY" line. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function detectSheetPeriod(grid: any[][]): { year: number; month: number; label: string } | null {
+  const head = grid.slice(0, 8).map((r) => (r ?? []).map(cellStr).join(' '))
+  for (const line of head) {
+    const m = /MONTH\s*\[\s*([A-Za-z]{3,})\s*-?\s*(\d{4})\s*\]/i.exec(line)
+    if (m) {
+      const month = MONTH_ABBR[m[1].slice(0, 3).toLowerCase()]
+      if (month) return { year: Number(m[2]), month, label: `${MONTH_NAME[month]} ${m[2]}` }
+    }
+  }
+  for (const line of head) {
+    const d = /Date\s*:\s*\d{1,2}\/(\d{1,2})\/(\d{4})/.exec(line)
+    if (d) {
+      const month = Number(d[1])
+      if (month >= 1 && month <= 12) {
+        return { year: Number(d[2]), month, label: `${MONTH_NAME[month]} ${d[2]}` }
+      }
+    }
+  }
+  return null
+}
+
+/**
+ * Parse a File / ArrayBuffer / Uint8Array. Auto-detects xlsx vs CSV.
+ *
+ * Sheet selection (fix 2026-06-26): a workbook may carry several monthly tabs
+ * (e.g. "HVH - Mar Ori", "HVH - May", "INFOTECH"). We no longer blindly take
+ * the first tab — that imported March (incl. since-resigned staff) for a May
+ * file. When `period` is given we pick the report tab whose title month/year
+ * matches it; otherwise the first report tab. If a period is requested but no
+ * tab matches, we fall back to the first report tab and flag `periodMismatch`.
+ */
 export function parseInfotechPayroll(
   buffer: ArrayBuffer | Uint8Array,
+  period?: string,
 ): InfotechParseResult {
   const workbook: WorkBook = read(buffer, { type: 'array' })
-  const sheetName = workbook.SheetNames[0]
-  if (!sheetName) {
+  if (workbook.SheetNames.length === 0) {
     return { rows: [], departments: [], skipped: [], grossSum: 0 }
   }
-  const sheet = workbook.Sheets[sheetName]
-  // Read as array-of-arrays so positional access is deterministic regardless
-  // of multi-row header shenanigans.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const grid: any[][] = utils.sheet_to_json(sheet, { header: 1, blankrows: false, defval: null })
-  return parseInfotechGrid(grid)
+
+  const gridOf = (name: string): any[][] => // eslint-disable-line @typescript-eslint/no-explicit-any
+    utils.sheet_to_json(workbook.Sheets[name], { header: 1, blankrows: false, defval: null })
+
+  // Only report-format tabs are parseable. Keep them in workbook order.
+  const candidates = workbook.SheetNames
+    .map((name) => ({ name, grid: gridOf(name) }))
+    .filter((c) => isReportSheet(c.grid))
+    .map((c) => ({ ...c, sheetPeriod: detectSheetPeriod(c.grid) }))
+
+  if (candidates.length === 0) {
+    // No recognisable report tab — preserve the old behaviour (first sheet).
+    return { ...parseInfotechGrid(gridOf(workbook.SheetNames[0])), sheetName: workbook.SheetNames[0] }
+  }
+
+  let chosen = candidates[0]
+  let periodMismatch = false
+  if (period) {
+    const year = Number(period.slice(0, 4))
+    const month = Number(period.slice(5, 7))
+    const match = candidates.find(
+      (c) => c.sheetPeriod?.year === year && c.sheetPeriod?.month === month,
+    )
+    if (match) chosen = match
+    else periodMismatch = true
+  }
+
+  return {
+    ...parseInfotechGrid(chosen.grid),
+    sheetName: chosen.name,
+    sheetPeriodLabel: chosen.sheetPeriod?.label,
+    periodMismatch,
+  }
 }
 
 /** Pure parser over a 2-D grid — exported for unit tests. */
