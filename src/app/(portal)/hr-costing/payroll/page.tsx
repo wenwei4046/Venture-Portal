@@ -2,14 +2,10 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import { getPeriodMonth } from '@/lib/utils'
 import CreatePeriodButton from './_components/CreatePeriodButton'
 import ImportInfotechEntryButton from './_components/ImportInfotechEntryButton'
 import PeriodPicker from './_components/PeriodPicker'
-
-function currentPeriod(): string {
-  const now = new Date()
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`
-}
 
 function formatPeriodLabel(period: string): string {
   return new Date(period + 'T00:00:00Z').toLocaleString('en-US', {
@@ -23,7 +19,7 @@ export default async function PayrollLandingPage() {
   await requireRole(['principal', 'hr'])
   const supabase = await createClient()
 
-  const thisPeriod = currentPeriod()
+  const thisPeriod = getPeriodMonth()
 
   // All periods that have payroll rows, newest first — the user picks which
   // month to view; nothing is locked to the current month.
