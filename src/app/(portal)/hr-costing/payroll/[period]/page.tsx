@@ -381,8 +381,8 @@ export default async function PayrollGridPage({ params }: PageProps) {
             phase={phase}
             period={period}
             runId={run?.id}
-            totalGross={totals.gross}
-            totalAmount={Number(run?.total_amount ?? totals.gross)}
+            totalCtc={totalCtc}
+            totalAmount={Number(run?.total_amount ?? totalCtc)}
             requestState={requestState}
           />
         </div>
@@ -585,7 +585,7 @@ function PhaseCta({
   phase,
   period,
   runId,
-  totalGross,
+  totalCtc,
   totalAmount,
   requestState,
 }: {
@@ -599,13 +599,15 @@ function PhaseCta({
     | 'legacy-paid'
   period: string
   runId?: string
-  totalGross: number
+  totalCtc: number
   totalAmount: number
   requestState: RequestState
 }) {
   if (phase === 'drafting') {
+    // total_amount the submit RPC computes is CTC (gross + employer statutory),
+    // not gross — show that so the confirm dialog matches what Finance funds.
     return (
-      <SubmitToFinanceButton period={period} totalAmount={totalGross} />
+      <SubmitToFinanceButton period={period} totalAmount={totalCtc} />
     )
   }
   if (phase === 'awaiting-approval') {
