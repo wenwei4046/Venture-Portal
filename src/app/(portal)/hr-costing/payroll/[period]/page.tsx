@@ -217,6 +217,12 @@ export default async function PayrollGridPage({ params }: PageProps) {
     eis_er: gridRows.reduce((s, r) => s + r.eis_er, 0) + directorTotals.eis_er,
     pcb: gridRows.reduce((s, r) => s + r.pcb, 0) + directorTotals.pcb,
   }
+  // Cost to Company = gross + employer statutory (EPF/SOCSO/EIS ER). This is
+  // HV's full cost per the source file's "TTL CTC" column and the basis on
+  // which shared-services staff are recharged to the subsidiaries — the number
+  // that actually matters, more than gross alone. (HRDF is not stored; it's 0
+  // across HV payroll, so CTC = gross + the three employer contributions.)
+  const totalCtc = totals.gross + totals.epf_er + totals.socso_er + totals.eis_er
 
   // ─── Derive the period's phase from run + latest request ─────────────────
   // Each phase maps to a distinct UI (no Principal approval since mig 278 —
@@ -423,15 +429,21 @@ export default async function PayrollGridPage({ params }: PageProps) {
         />
       </div>
 
-      {/* Summary band — staff paycheck figures + director 75% payroll portion */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mb-10 border-y border-hairline py-6">
+      {/* Summary band — staff paycheck figures + director 75% payroll portion.
+          Total CTC leads: it's HV's full cost (gross + employer statutory) and
+          the recharge basis to subsidiaries; gross/net are components. */}
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-6 mb-10 border-y border-hairline py-6">
+        <div>
+          <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total CTC</div>
+          <div className="num text-num-ink text-xl tracking-[-0.01em] mt-1">{formatMoney(totalCtc)}</div>
+        </div>
         <div>
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total Gross</div>
-          <div className="num text-num-ink text-xl tracking-[-0.01em] mt-1">{formatMoney(totals.gross)}</div>
+          <div className="num text-graphite text-md mt-1">{formatMoney(totals.gross)}</div>
         </div>
         <div>
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total Net</div>
-          <div className="num text-num-ink text-xl tracking-[-0.01em] mt-1">{formatMoney(totals.net)}</div>
+          <div className="num text-graphite text-md mt-1">{formatMoney(totals.net)}</div>
         </div>
         <div>
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">EPF ER</div>
