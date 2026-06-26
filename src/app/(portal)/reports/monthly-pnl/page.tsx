@@ -59,10 +59,10 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
             CSV
           </a>
           <a
-            href={`/reports/monthly-pnl/export?format=xlsx&period=${period}${segment ? `&segment=${segment}` : ''}`}
+            href={`/reports/monthly-pnl/export?format=pdf&period=${period}${segment ? `&segment=${segment}` : ''}`}
             className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
           >
-            Excel
+            PDF
           </a>
         </div>
       </div>
