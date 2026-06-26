@@ -34,7 +34,7 @@ export default function SubmitToFinanceButton({ period, totalAmount }: Props) {
       <div className="flex flex-col items-end gap-2">
         <div className="flex items-center gap-3 bg-surface border border-accent-border rounded-md px-4 py-2">
           <span className="font-serif italic text-graphite text-sm">
-            Submit payroll (RM {totalAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}) to Finance? <em>Figures become visible to Finance immediately — money moves later.</em>
+            Submit payroll · Total CTC RM {totalAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} to Finance? <em>This is the amount Finance funds (gross + employer statutory). Figures become visible to Finance immediately — money moves later.</em>
           </span>
           <button
             onClick={handleConfirm}
