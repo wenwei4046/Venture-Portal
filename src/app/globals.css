@@ -169,7 +169,14 @@ h1, h2, h3, h4 {
 }
 
 .page-enter {
-  animation: page-enter 200ms ease-out both;
+  /* `backwards` (not `both`): the entrance plays identically, but we must NOT
+     retain the `to` transform afterwards. A lingering `transform: translateY(0)`
+     is still a non-`none` transform, which makes this scrolled content box a
+     containing block for fixed descendants — that broke fixed overlays
+     (attachment lightbox, batch modal), anchoring them to the scrolled page
+     instead of the viewport. The end state equals the natural position, so
+     dropping forwards retention is visually identical. */
+  animation: page-enter 200ms ease-out backwards;
 }
 
 /* Loading skeleton shimmer — warm paper sweeps across the hairline tone */
