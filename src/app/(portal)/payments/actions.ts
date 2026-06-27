@@ -992,7 +992,7 @@ export async function voidPaidReceipt(formData: FormData) {
 
   const { data: v } = await supabase
     .from('payment_vouchers')
-    .select('id, voucher_no, direction, voucher_type, status, amount, bank_account_id, target_pool, invoice_id, payee_name, payment_method')
+    .select('id, voucher_no, direction, voucher_type, status, amount, bank_account_id, target_pool, invoice_id, payee_name, payment_method, payment_date')
     .eq('id', id)
     .single()
   if (!v) throw new Error('Voucher not found')
@@ -1004,6 +1004,20 @@ export async function voidPaidReceipt(formData: FormData) {
   // dept was debited via an inter_billing_out pool row instead), so the void
   // must not touch it either.
   const isNetting = v.payment_method === 'netting'
+
+  // Date the reversal in the receipt's own month so it nets there (not a later
+  // month). Fall back to today if that period is locked.
+  const origDate =
+    typeof v.payment_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.payment_date)
+      ? v.payment_date
+      : dayjs().format('YYYY-MM-DD')
+  const { data: lockRow } = await supabase
+    .from('period_locks')
+    .select('id')
+    .eq('period_month', dayjs(origDate).startOf('month').format('YYYY-MM-DD'))
+    .eq('is_locked', true)
+    .maybeSingle()
+  const reversalDate = lockRow ? dayjs().format('YYYY-MM-DD') : origDate
 
   // 1) Reverse bank cache (the receipt had added to it). Via bump_bank_balance
   // RPC (mig 20260610000000) — the old direct update was silently blocked by
@@ -1033,7 +1047,7 @@ export async function voidPaidReceipt(formData: FormData) {
     if (!lines || lines.length === 0) continue
     try {
       await postJournalEntry(supabase, {
-        transactionDate: dayjs().format('YYYY-MM-DD'),
+        transactionDate: reversalDate,
         description: `VOID ${v.voucher_no}: reversal of ${e.description ?? ''}`.trim(),
         referenceType: 'payment_voucher_void',
         referenceId: id,
@@ -1127,7 +1141,7 @@ export async function reversePaidPayment(formData: FormData) {
 
   const { data: v } = await supabase
     .from('payment_vouchers')
-    .select('id, voucher_no, direction, voucher_type, status, amount, bank_account_id, invoice_id, fund_source_id, loan_id, reference_type, payment_method')
+    .select('id, voucher_no, direction, voucher_type, status, amount, bank_account_id, invoice_id, fund_source_id, loan_id, reference_type, payment_method, payment_date')
     .eq('id', id)
     .single()
   if (!v) throw new Error('Voucher not found')
@@ -1154,6 +1168,21 @@ export async function reversePaidPayment(formData: FormData) {
   const amount = r2(Number(v.amount))
   const isNetting = v.payment_method === 'netting'
 
+  // Date the reversal in the ORIGINAL payment's month so it nets there instead
+  // of splitting into a later month (e.g. a May payment reversed in June should
+  // cancel within May). If that month is already locked, fall back to today.
+  const origDate =
+    typeof v.payment_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.payment_date)
+      ? v.payment_date
+      : dayjs().format('YYYY-MM-DD')
+  const { data: lockRow } = await supabase
+    .from('period_locks')
+    .select('id')
+    .eq('period_month', dayjs(origDate).startOf('month').format('YYYY-MM-DD'))
+    .eq('is_locked', true)
+    .maybeSingle()
+  const reversalDate = lockRow ? dayjs().format('YYYY-MM-DD') : origDate
+
   // 1) Reverse bank cache — the payment REDUCED it, so add it back. Via
   //    bump_bank_balance RPC (bank_accounts UPDATE is principal-only under RLS).
   if (v.bank_account_id && !isNetting) {
@@ -1178,7 +1207,7 @@ export async function reversePaidPayment(formData: FormData) {
     if (!lines || lines.length === 0) continue
     try {
       await postJournalEntry(supabase, {
-        transactionDate: dayjs().format('YYYY-MM-DD'),
+        transactionDate: reversalDate,
         description: `VOID ${v.voucher_no}: reversal of ${e.description ?? ''}`.trim(),
         referenceType: 'payment_voucher_void',
         referenceId: id,
