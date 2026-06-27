@@ -3,7 +3,13 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { fetchAllJournalLines, fetchCoaAccounts } from '@/lib/gl-reports'
-import { buildMonthlyCashFlow } from '@/lib/monthly-cash-flow'
+import {
+  buildCashFlowAccounts,
+  buildCustomCashFlowRows,
+  defaultCashFlowLayout,
+  type CashFlowLayout,
+} from '@/lib/cash-flow-custom'
+import { readReportLayout } from '@/lib/report-layouts'
 import { segmentFilterFor } from '../_components/report-segments'
 import MonthlyMatrix from '../_components/MonthlyMatrix'
 import MonthlyReportControls from '../_components/MonthlyReportControls'
@@ -24,20 +30,28 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))
 
-  const [lines, accounts, { data: banks }] = await Promise.all([
+  const [lines, accounts, { data: banks }, savedRaw] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
     supabase.from('bank_accounts').select('gl_account_code'),
+    readReportLayout(supabase, 'cash_flow'),
   ])
   const bankCodes = new Set(
     (banks ?? []).map((b) => b.gl_account_code as string | null).filter((c): c is string => !!c),
   )
 
-  const matrix = buildMonthlyCashFlow(lines, accounts, bankCodes, {
+  const data = buildCashFlowAccounts(lines, accounts, bankCodes, {
     year,
     throughMonth,
     segment: segmentFilterFor(segment),
   })
+
+  const saved = (savedRaw ?? null) as CashFlowLayout | null
+  const layout = saved && Array.isArray(saved.categories) && saved.categories.length > 0
+    ? saved
+    : defaultCashFlowLayout(data.accounts)
+
+  const rows = buildCustomCashFlowRows(data, layout)
 
   return (
     <div>
@@ -56,6 +70,12 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <Link
+            href={`/reports/monthly-cash-flow/layout`}
+            className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white rounded-md text-xs font-sans transition-colors"
+          >
+            Edit layout
+          </Link>
           <a
             href={`/reports/monthly-cash-flow/export?format=xlsx&period=${period}${segment ? `&segment=${segment}` : ''}`}
             className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
@@ -72,16 +92,16 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
       </div>
 
       <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
-        Each month of the fiscal year as its own column, with an Accumulated
-        (year-to-date) column. Direct-method cash movement from the general
-        ledger — operating / investing / financing, then net change and
-        opening → closing cash. Inflows positive, outflows negative.
+        Direct-method cash movement, grouped under your own categories (edit the
+        layout to drag accounts between categories — subtotals recompute
+        automatically). Each month is a column with an Accumulated total; inflows
+        positive, outflows negative.
       </p>
 
       <div className="flex gap-8 items-start">
         <MonthlyReportControls period={period} segment={segment} />
         <div className="min-w-0 flex-1">
-          <MonthlyMatrix columns={matrix.columns} rows={matrix.rows} />
+          <MonthlyMatrix columns={data.columns} rows={rows} />
         </div>
       </div>
     </div>

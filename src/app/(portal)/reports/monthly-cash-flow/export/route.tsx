@@ -2,7 +2,13 @@ import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { fetchAllJournalLines, fetchCoaAccounts } from '@/lib/gl-reports'
-import { buildMonthlyCashFlow } from '@/lib/monthly-cash-flow'
+import {
+  buildCashFlowAccounts,
+  buildCustomCashFlowRows,
+  defaultCashFlowLayout,
+  type CashFlowLayout,
+} from '@/lib/cash-flow-custom'
+import { readReportLayout } from '@/lib/report-layouts'
 import { segmentFilterFor } from '../../_components/report-segments'
 import { exportPdfResponse, exportXlsxResponse } from '@/lib/export/response'
 import { buildMatrixXlsx } from '@/lib/export/monthly-matrix-export'
@@ -19,19 +25,21 @@ export async function GET(req: Request) {
   const throughMonth = Number(period.slice(5, 7))
 
   const supabase = await createClient()
-  const [lines, accounts, { data: banks }] = await Promise.all([
+  const [lines, accounts, { data: banks }, savedRaw] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
     supabase.from('bank_accounts').select('gl_account_code'),
+    readReportLayout(supabase, 'cash_flow'),
   ])
   const bankCodes = new Set(
     (banks ?? []).map((b) => b.gl_account_code as string | null).filter((c): c is string => !!c),
   )
-  const matrix = buildMonthlyCashFlow(lines, accounts, bankCodes, {
-    year,
-    throughMonth,
-    segment: segmentFilterFor(segment),
-  })
+  const data = buildCashFlowAccounts(lines, accounts, bankCodes, { year, throughMonth, segment: segmentFilterFor(segment) })
+  const saved = (savedRaw ?? null) as CashFlowLayout | null
+  const layout = saved && Array.isArray(saved.categories) && saved.categories.length > 0
+    ? saved
+    : defaultCashFlowLayout(data.accounts)
+  const matrix = { columns: data.columns, rows: buildCustomCashFlowRows(data, layout) }
 
   const filename = `monthly-cash-flow-${period}${segment ? `-${segment}` : ''}`
   if (format === 'pdf') {
