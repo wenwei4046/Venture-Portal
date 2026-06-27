@@ -5,7 +5,7 @@ import { requireRole } from '@/lib/auth'
 import { fetchAllJournalLines, fetchCoaAccounts } from '@/lib/gl-reports'
 import { buildCashFlowAccounts, defaultCashFlowLayout, type CashFlowLayout } from '@/lib/cash-flow-custom'
 import { readReportLayout } from '@/lib/report-layouts'
-import CashFlowLayoutEditor from '../_components/CashFlowLayoutEditor'
+import ReportLayoutEditor from '../../_components/ReportLayoutEditor'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,7 +58,7 @@ export default async function CashFlowLayoutPage() {
         </div>
       </div>
 
-      <CashFlowLayoutEditor accounts={accountsMeta} initial={initial} />
+      <ReportLayoutEditor reportKey="cash_flow" accounts={accountsMeta} initial={initial} />
     </div>
   )
 }

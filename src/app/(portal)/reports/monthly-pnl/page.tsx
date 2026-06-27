@@ -3,7 +3,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { fetchAllJournalLines, fetchCoaAccounts } from '@/lib/gl-reports'
-import { buildMonthlyPnl } from '@/lib/monthly-pnl'
+import { buildPnlAccounts, buildCustomPnlRows, defaultPnlLayout } from '@/lib/pnl-custom'
+import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
 import { segmentFilterFor } from '../_components/report-segments'
 import MonthlyMatrix from '../_components/MonthlyMatrix'
 import MonthlyReportControls from '../_components/MonthlyReportControls'
@@ -24,16 +25,18 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))
 
-  const [lines, accounts] = await Promise.all([
+  const [lines, accounts, savedRaw] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
+    readReportLayout(supabase, 'pnl'),
   ])
 
-  const matrix = buildMonthlyPnl(lines, accounts, {
-    year,
-    throughMonth,
-    segment: segmentFilterFor(segment),
-  })
+  const data = buildPnlAccounts(lines, accounts, { year, throughMonth, segment: segmentFilterFor(segment) })
+  const saved = (savedRaw ?? null) as ReportLayout | null
+  const layout = saved && Array.isArray(saved.categories) && saved.categories.length > 0
+    ? saved
+    : defaultPnlLayout(data.accounts)
+  const rows = buildCustomPnlRows(data, layout)
 
   return (
     <div>
@@ -52,6 +55,12 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <Link
+            href="/reports/monthly-pnl/layout"
+            className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white rounded-md text-xs font-sans transition-colors"
+          >
+            Edit layout
+          </Link>
           <a
             href={`/reports/monthly-pnl/export?format=xlsx&period=${period}${segment ? `&segment=${segment}` : ''}`}
             className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
@@ -69,15 +78,15 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
 
       <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
         Each month of the fiscal year as its own column, with an Accumulated
-        (year-to-date) column. Built straight from the general ledger — ties to
-        the single-period P&amp;L. Cost / expense show as negative; % is each line
-        against that column&rsquo;s sales.
+        (year-to-date) column. Grouped under your own categories (edit the layout
+        to drag accounts around — subtotals recompute automatically). Cost /
+        expense show negative; % is each line against that column&rsquo;s sales.
       </p>
 
       <div className="flex gap-8 items-start">
         <MonthlyReportControls period={period} segment={segment} />
         <div className="min-w-0 flex-1">
-          <MonthlyMatrix columns={matrix.columns} rows={matrix.rows} pctBaseByColumn={matrix.salesByColumn} />
+          <MonthlyMatrix columns={data.columns} rows={rows} pctBaseByColumn={data.salesByColumn} />
         </div>
       </div>
     </div>

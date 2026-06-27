@@ -1,5 +1,16 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+// A saved report layout: ordered categories, each holding ordered account codes.
+// Shared by the custom Cash Flow and P&L reports.
+export interface ReportCategory {
+  id: string
+  name: string
+  accounts: string[]
+}
+export interface ReportLayout {
+  categories: ReportCategory[]
+}
+
 // `report_layouts` is newer than the generated database.types.ts, so the typed
 // query builder doesn't know it. Access it through a single localized
 // structural cast here so every call site stays clean and typed.

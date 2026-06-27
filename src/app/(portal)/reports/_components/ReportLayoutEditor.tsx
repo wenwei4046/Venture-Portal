@@ -2,21 +2,25 @@
 
 import { useMemo, useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import type { CashFlowCategory, CashFlowLayout } from '@/lib/cash-flow-custom'
-import { saveCashFlowLayout } from '../actions'
+import type { ReportCategory, ReportLayout } from '@/lib/report-layouts'
+import { saveReportLayout } from '../layout-actions'
 
 interface AccountMeta {
   code: string
   name: string
-  defaultCategory: string
 }
 
-export default function CashFlowLayoutEditor({
+// Drag-and-drop editor for a custom report layout (Cash Flow / P&L): create
+// categories, drag accounts into them, reorder, save. Subtotals recompute on
+// the report automatically. Company-wide, keyed by reportKey.
+export default function ReportLayoutEditor({
+  reportKey,
   accounts,
   initial,
 }: {
+  reportKey: string
   accounts: AccountMeta[]
-  initial: CashFlowLayout
+  initial: ReportLayout
 }) {
   const router = useRouter()
   const [isSaving, startSaving] = useTransition()
@@ -26,15 +30,13 @@ export default function CashFlowLayoutEditor({
   const nameByCode = useMemo(() => new Map(accounts.map((a) => [a.code, a.name])), [accounts])
   const allCodes = useMemo(() => new Set(accounts.map((a) => a.code)), [accounts])
 
-  // Categories hold only codes that still exist. Drop stale ones.
-  const [categories, setCategories] = useState<CashFlowCategory[]>(() =>
+  const [categories, setCategories] = useState<ReportCategory[]>(() =>
     initial.categories.map((c) => ({ ...c, accounts: c.accounts.filter((code) => allCodes.has(code)) })),
   )
 
   const assigned = useMemo(() => new Set(categories.flatMap((c) => c.accounts)), [categories])
   const unassigned = useMemo(() => accounts.filter((a) => !assigned.has(a.code)), [accounts, assigned])
 
-  // Move a code into a target category (or 'unassigned' to remove it everywhere).
   const moveCode = (code: string, targetId: string | 'unassigned') => {
     setCategories((prev) => {
       const stripped = prev.map((c) => ({ ...c, accounts: c.accounts.filter((x) => x !== code) }))
@@ -43,17 +45,11 @@ export default function CashFlowLayoutEditor({
     })
     setMessage(null)
   }
-
-  const addCategory = () => {
-    setCategories((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), name: 'New category', accounts: [] },
-    ])
-  }
+  const addCategory = () =>
+    setCategories((prev) => [...prev, { id: crypto.randomUUID(), name: 'New category', accounts: [] }])
   const renameCategory = (id: string, name: string) =>
     setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, name } : c)))
-  const deleteCategory = (id: string) =>
-    setCategories((prev) => prev.filter((c) => c.id !== id)) // its accounts fall back to Unassigned
+  const deleteCategory = (id: string) => setCategories((prev) => prev.filter((c) => c.id !== id))
   const moveCategory = (id: string, dir: -1 | 1) =>
     setCategories((prev) => {
       const i = prev.findIndex((c) => c.id === id)
@@ -68,7 +64,7 @@ export default function CashFlowLayoutEditor({
     setMessage(null)
     startSaving(async () => {
       try {
-        await saveCashFlowLayout({ categories })
+        await saveReportLayout(reportKey, { categories })
         setMessage({ type: 'success', text: 'Saved. The report now uses this layout.' })
         router.refresh()
       } catch (err) {
@@ -92,13 +88,7 @@ export default function CashFlowLayoutEditor({
     </div>
   )
 
-  const DropZone = ({
-    targetId,
-    children,
-  }: {
-    targetId: string | 'unassigned'
-    children: ReactNode
-  }) => (
+  const DropZone = ({ targetId, children }: { targetId: string | 'unassigned'; children: ReactNode }) => (
     <div
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
@@ -138,7 +128,6 @@ export default function CashFlowLayoutEditor({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 items-start">
-        {/* Unassigned pool */}
         <section>
           <div className="text-xs uppercase tracking-wide text-muted font-sans mb-2">
             Unassigned ({unassigned.length})
@@ -152,7 +141,6 @@ export default function CashFlowLayoutEditor({
           </DropZone>
         </section>
 
-        {/* Categories */}
         <section className="space-y-4">
           {categories.map((cat, idx) => (
             <div key={cat.id} className="border border-hairline rounded-md bg-surface p-4">
