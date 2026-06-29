@@ -148,7 +148,8 @@ export async function GET(req: Request) {
       due_date: inv.due_date,
       description: inv.description,
       reference_no: inv.reference_no,
-      category_label: inv.category_code ? `${inv.category_code} · ${coaMap.get(inv.category_code) ?? ''}`.trim() : null,
+      // Customer-facing: show the category NAME only, never the GL account code.
+      category_label: inv.category_code ? (coaMap.get(inv.category_code) || null) : null,
       bill_to_primary: billTo.primary,
       bill_to_sub: billTo.sub,
       lines: lines && lines.length > 0
