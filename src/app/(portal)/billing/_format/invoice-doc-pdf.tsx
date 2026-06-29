@@ -46,6 +46,19 @@ const styles = StyleSheet.create({
   // Footer / reference
   footerNote: { marginTop: 28, fontSize: 9, color: '#555' },
   footerLine: { marginBottom: 2 },
+  // Bank / payment details
+  bankBox: { marginTop: 20, padding: 10, border: '0.5pt solid #aaa', backgroundColor: '#faf5ea' },
+  bankTitle: {
+    fontSize: 8.5,
+    fontFamily: 'Helvetica-Bold',
+    marginBottom: 5,
+    color: '#333',
+    letterSpacing: 0.5,
+  },
+  bankLine: { fontSize: 9.5, marginBottom: 2.5, color: '#333' },
+  bankLabel: { fontFamily: 'Helvetica-Bold' },
+  bankAcc: { fontFamily: 'Courier-Bold', fontSize: 10.5, color: '#000' },
+  bankNote: { marginTop: 5, fontSize: 8, color: '#888' },
   pageFooter: {
     position: 'absolute',
     fontSize: 7.5,
@@ -214,6 +227,23 @@ function InvoicePage({ inv }: { inv: InvoiceDocData }) {
           </Text>
         </View>
       ) : null}
+
+      <View style={styles.bankBox}>
+        <Text style={styles.bankTitle}>PAYMENT DETAILS</Text>
+        <Text style={styles.bankLine}>
+          <Text style={styles.bankLabel}>Account Name: </Text>
+          Houzs Venture Holding Sdn Bhd
+        </Text>
+        <Text style={styles.bankLine}>
+          <Text style={styles.bankLabel}>Bank: </Text>
+          Hong Leong Bank Berhad
+        </Text>
+        <Text style={styles.bankLine}>
+          <Text style={styles.bankLabel}>Account No.: </Text>
+          <Text style={styles.bankAcc}>23600599248</Text>
+        </Text>
+        <Text style={styles.bankNote}>Kindly quote the invoice number as your payment reference.</Text>
+      </View>
 
       <Text style={styles.pageFooter} fixed>
         HOUZS Venture Holdings Sdn. Bhd. · Generated {generatedAt} · {inv.invoice_no ?? ''}
