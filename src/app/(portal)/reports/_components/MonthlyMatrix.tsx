@@ -111,9 +111,11 @@ export default function MonthlyMatrix({
               const isSub = row.kind === 'subtotal'
               const isParent = row.kind === 'account' && row.isParent
               const isCollapsed = isParent && collapsed.has(row.key)
-              // Three visual tiers: leaf (plain) < parent (faint band + caret) < subtotal (darker band).
-              const cellBg = isSub ? 'bg-surface-2' : isParent ? 'bg-surface' : ''
-              const stickyBg = isSub ? 'bg-surface-2' : isParent ? 'bg-surface' : 'bg-surface'
+              // Three shaded tiers, darkest → lightest: subtotal (surface-2) >
+              // parent roll-up (paper) > leaf / child (surface). Parent sits darker
+              // than its children so the hierarchy reads top-down.
+              const cellBg = isSub ? 'bg-surface-2' : isParent ? 'bg-paper' : 'bg-surface'
+              const stickyBg = isSub ? 'bg-surface-2' : isParent ? 'bg-paper' : 'bg-surface'
               const labelTone = isSub
                 ? row.tone === 'danger'
                   ? 'text-danger'
