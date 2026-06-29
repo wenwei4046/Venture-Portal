@@ -187,9 +187,6 @@ function InvoicePage({ inv }: { inv: InvoiceDocData }) {
               <View key={ln.line_no} style={[styles.amountRow, { borderBottom: '0.5pt solid #ddd' }]}>
                 <View style={{ flex: 1, paddingLeft: 4 }}>
                   <Text style={{ fontSize: 10 }}>{ln.description ?? '—'}</Text>
-                  {ln.category_label ? (
-                    <Text style={{ fontSize: 8, color: '#777', marginTop: 1 }}>{ln.category_label}</Text>
-                  ) : null}
                 </View>
                 <Text style={styles.amountValue}>{fmtMoney(ln.amount)}</Text>
               </View>
