@@ -24,6 +24,9 @@ interface InvoiceRow {
   billable_to_type: 'subsidiary' | 'director' | 'dept_pool' | 'freetext' | null
   billable_to_department_id: string | null
   billable_to_freetext_name: string | null
+  billable_to_freetext_address: string | null
+  billable_to_freetext_phone: string | null
+  billable_to_freetext_email: string | null
   description: string | null
   invoice_date: string | null
   due_date: string | null
@@ -78,7 +81,7 @@ export async function GET(req: Request) {
   let invoicesQuery = supabase
     .from('invoices')
     .select(
-      'id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, description, invoice_date, due_date, reference_no, category_code',
+      'id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code',
     )
 
   if (id) {
@@ -152,6 +155,10 @@ export async function GET(req: Request) {
       category_label: inv.category_code ? (coaMap.get(inv.category_code) || null) : null,
       bill_to_primary: billTo.primary,
       bill_to_sub: billTo.sub,
+      // External (Other) payer contact details — only for freetext invoices.
+      bill_to_address: inv.billable_to_type === 'freetext' ? inv.billable_to_freetext_address : null,
+      bill_to_phone: inv.billable_to_type === 'freetext' ? inv.billable_to_freetext_phone : null,
+      bill_to_email: inv.billable_to_type === 'freetext' ? inv.billable_to_freetext_email : null,
       lines: lines && lines.length > 0
         ? lines.map((ln) => ({
             line_no: ln.line_no,

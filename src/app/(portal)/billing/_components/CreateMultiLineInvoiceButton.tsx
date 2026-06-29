@@ -87,6 +87,9 @@ export default function CreateMultiLineInvoiceButton({
   const [companyId, setCompanyId] = useState('')
   const [deptId, setDeptId] = useState('')
   const [freetextName, setFreetextName] = useState('')
+  const [freetextAddress, setFreetextAddress] = useState('')
+  const [freetextPhone, setFreetextPhone] = useState('')
+  const [freetextEmail, setFreetextEmail] = useState('')
   const [billingMode, setBillingMode] = useState<CreateInvoiceMode>('marketing_project')
 
   const [period, setPeriod] = useState(dayjs(currentPeriod).format('YYYY-MM'))
@@ -125,6 +128,9 @@ export default function CreateMultiLineInvoiceButton({
     setCompanyId('')
     setDeptId('')
     setFreetextName('')
+    setFreetextAddress('')
+    setFreetextPhone('')
+    setFreetextEmail('')
     setBillingMode('marketing_project')
     setPeriod(dayjs(currentPeriod).format('YYYY-MM'))
     setInvoiceDate(dayjs().format('YYYY-MM-DD'))
@@ -174,6 +180,9 @@ export default function CreateMultiLineInvoiceButton({
           departmentId: billableType === 'dept_pool' ? deptId : undefined,
           freetextName:
             billableType === 'director' || billableType === 'freetext' ? freetextName.trim() : undefined,
+          freetextAddress: billableType === 'freetext' ? freetextAddress.trim() : undefined,
+          freetextPhone: billableType === 'freetext' ? freetextPhone.trim() : undefined,
+          freetextEmail: billableType === 'freetext' ? freetextEmail.trim() : undefined,
           lines: validLines.map((l) => ({
             description: l.description.trim(),
             amount: Number(l.amount),
@@ -299,6 +308,45 @@ export default function CreateMultiLineInvoiceButton({
                   />
                 </Field>
               )}
+              {billableType === 'freetext' ? (
+                <>
+                  <Field label="Address (optional)" hint="Shows on the invoice under Bill to.">
+                    <textarea
+                      value={freetextAddress}
+                      onChange={(e) => setFreetextAddress(e.target.value)}
+                      disabled={isPending}
+                      rows={2}
+                      maxLength={300}
+                      placeholder="Street, city, postcode"
+                      className={inputCls}
+                    />
+                  </Field>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Field label="Phone (optional)">
+                      <input
+                        type="text"
+                        value={freetextPhone}
+                        onChange={(e) => setFreetextPhone(e.target.value)}
+                        disabled={isPending}
+                        maxLength={40}
+                        placeholder="e.g., 012-345 6789"
+                        className={inputCls}
+                      />
+                    </Field>
+                    <Field label="Email (optional)">
+                      <input
+                        type="email"
+                        value={freetextEmail}
+                        onChange={(e) => setFreetextEmail(e.target.value)}
+                        disabled={isPending}
+                        maxLength={120}
+                        placeholder="name@example.com"
+                        className={inputCls}
+                      />
+                    </Field>
+                  </div>
+                </>
+              ) : null}
 
               {/* Billing mode + Period */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

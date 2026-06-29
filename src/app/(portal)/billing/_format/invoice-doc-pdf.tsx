@@ -32,6 +32,7 @@ const styles = StyleSheet.create({
   billTo: { marginBottom: 18 },
   billToPrimary: { fontSize: 12, fontFamily: 'Helvetica-Bold', marginBottom: 2 },
   billToSub: { fontSize: 9, color: '#555' },
+  billToContact: { fontSize: 9, color: '#444', marginTop: 2 },
   // Description block
   descBlock: { marginBottom: 24, paddingTop: 4 },
   descText: { fontSize: 10, lineHeight: 1.4 },
@@ -93,6 +94,9 @@ export interface InvoiceDocData {
   // Bill-to resolved upstream
   bill_to_primary: string
   bill_to_sub: string
+  bill_to_address?: string | null
+  bill_to_phone?: string | null
+  bill_to_email?: string | null
   // Multi-line (mig 275). When present, render as a line-items table instead
   // of the flat description block.
   lines?: InvoiceLineData[]
@@ -160,6 +164,9 @@ function InvoicePage({ inv }: { inv: InvoiceDocData }) {
         <Text style={styles.sectionLabel}>Bill to</Text>
         <Text style={styles.billToPrimary}>{inv.bill_to_primary}</Text>
         {inv.bill_to_sub ? <Text style={styles.billToSub}>{inv.bill_to_sub}</Text> : null}
+        {inv.bill_to_address ? <Text style={styles.billToContact}>{inv.bill_to_address}</Text> : null}
+        {inv.bill_to_phone ? <Text style={styles.billToContact}>Tel: {inv.bill_to_phone}</Text> : null}
+        {inv.bill_to_email ? <Text style={styles.billToContact}>Email: {inv.bill_to_email}</Text> : null}
       </View>
 
       <View>

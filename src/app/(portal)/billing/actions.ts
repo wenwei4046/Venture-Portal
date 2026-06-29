@@ -189,7 +189,7 @@ export async function copyInvoice(formData: FormData): Promise<void> {
 
   const { data: src, error: srcErr } = await supabase
     .from('invoices')
-    .select('billing_mode, billable_to_type, company_id, billable_to_department_id, billable_to_freetext_name, category_code, base_amount, total_amount, description, reference_no')
+    .select('billing_mode, billable_to_type, company_id, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_phone, billable_to_freetext_email, category_code, base_amount, total_amount, description, reference_no')
     .eq('id', sourceId)
     .single()
   if (srcErr || !src) throw new Error('Source invoice not found')
@@ -222,6 +222,9 @@ export async function copyInvoice(formData: FormData): Promise<void> {
       company_id: src.company_id,
       billable_to_department_id: src.billable_to_department_id,
       billable_to_freetext_name: src.billable_to_freetext_name,
+      billable_to_freetext_address: src.billable_to_freetext_address,
+      billable_to_freetext_phone: src.billable_to_freetext_phone,
+      billable_to_freetext_email: src.billable_to_freetext_email,
     })
     .select('id')
     .single()
@@ -266,6 +269,9 @@ export async function createMultiLineInvoice(
     companyId?: string
     departmentId?: string
     freetextName?: string
+    freetextAddress?: string
+    freetextPhone?: string
+    freetextEmail?: string
     lines: InvoiceLineInput[]
   },
 ): Promise<{ id: string; invoice_no: string | null }> {
@@ -347,6 +353,12 @@ export async function createMultiLineInvoice(
         payload.billableType === 'director' || payload.billableType === 'freetext'
           ? payload.freetextName?.trim() ?? null
           : null,
+      billable_to_freetext_address:
+        payload.billableType === 'freetext' ? payload.freetextAddress?.trim() || null : null,
+      billable_to_freetext_phone:
+        payload.billableType === 'freetext' ? payload.freetextPhone?.trim() || null : null,
+      billable_to_freetext_email:
+        payload.billableType === 'freetext' ? payload.freetextEmail?.trim() || null : null,
     })
     .select('id, invoice_no')
     .single()
@@ -831,6 +843,9 @@ export async function updateDraftInvoiceFull(payload: {
   companyId?: string
   departmentId?: string
   freetextName?: string
+  freetextAddress?: string
+  freetextPhone?: string
+  freetextEmail?: string
   lines: InvoiceLineInput[]
 }): Promise<void> {
   await requireRole(['finance'])
@@ -904,6 +919,12 @@ export async function updateDraftInvoiceFull(payload: {
         payload.billableType === 'director' || payload.billableType === 'freetext'
           ? payload.freetextName?.trim() ?? null
           : null,
+      billable_to_freetext_address:
+        payload.billableType === 'freetext' ? payload.freetextAddress?.trim() || null : null,
+      billable_to_freetext_phone:
+        payload.billableType === 'freetext' ? payload.freetextPhone?.trim() || null : null,
+      billable_to_freetext_email:
+        payload.billableType === 'freetext' ? payload.freetextEmail?.trim() || null : null,
     })
     .eq('id', payload.id)
     .eq('status', 'draft')

@@ -59,7 +59,7 @@ export default async function BillingView({ searchParams }: Props) {
       .order('created_at', { ascending: false }),
     supabase
       .from('invoices')
-      .select('id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, description, invoice_date, due_date, reference_no, category_code, created_at')
+      .select('id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code, created_at')
       .eq('period_month', period)
       .order('billing_mode', { ascending: true }),
     supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('short_code'),

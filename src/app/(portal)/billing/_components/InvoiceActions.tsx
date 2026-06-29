@@ -146,6 +146,9 @@ export function EditInvoiceButton({
     company_id?: string | null
     billable_to_department_id?: string | null
     billable_to_freetext_name?: string | null
+    billable_to_freetext_address?: string | null
+    billable_to_freetext_phone?: string | null
+    billable_to_freetext_email?: string | null
     period_month?: string | null
   }
   initialLines?: Array<{ description: string | null; amount: number; category_code: string | null }>
@@ -166,6 +169,9 @@ export function EditInvoiceButton({
   const [companyId, setCompanyId] = useState(initial.company_id ?? '')
   const [deptId, setDeptId] = useState(initial.billable_to_department_id ?? '')
   const [freetextName, setFreetextName] = useState(initial.billable_to_freetext_name ?? '')
+  const [freetextAddress, setFreetextAddress] = useState(initial.billable_to_freetext_address ?? '')
+  const [freetextPhone, setFreetextPhone] = useState(initial.billable_to_freetext_phone ?? '')
+  const [freetextEmail, setFreetextEmail] = useState(initial.billable_to_freetext_email ?? '')
   const [billingMode, setBillingMode] = useState<CreateInvoiceMode>(
     (initial.billing_mode as CreateInvoiceMode) ?? 'venture_attribution',
   )
@@ -254,6 +260,9 @@ export function EditInvoiceButton({
           departmentId: billableType === 'dept_pool' ? deptId : undefined,
           freetextName:
             billableType === 'director' || billableType === 'freetext' ? freetextName.trim() : undefined,
+          freetextAddress: billableType === 'freetext' ? freetextAddress.trim() : undefined,
+          freetextPhone: billableType === 'freetext' ? freetextPhone.trim() : undefined,
+          freetextEmail: billableType === 'freetext' ? freetextEmail.trim() : undefined,
           lines: validLines.map((l) => ({
             description: l.description.trim(),
             amount: Number(l.amount),
@@ -363,6 +372,45 @@ export function EditInvoiceButton({
               />
             </Field>
           )}
+          {billableType === 'freetext' ? (
+            <>
+              <Field label="Address (optional)" hint="Shows on the invoice under Bill to.">
+                <textarea
+                  value={freetextAddress}
+                  onChange={(e) => setFreetextAddress(e.target.value)}
+                  disabled={isPending}
+                  rows={2}
+                  maxLength={300}
+                  placeholder="Street, city, postcode"
+                  className={inputCls}
+                />
+              </Field>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Phone (optional)">
+                  <input
+                    type="text"
+                    value={freetextPhone}
+                    onChange={(e) => setFreetextPhone(e.target.value)}
+                    disabled={isPending}
+                    maxLength={40}
+                    placeholder="e.g., 012-345 6789"
+                    className={inputCls}
+                  />
+                </Field>
+                <Field label="Email (optional)">
+                  <input
+                    type="email"
+                    value={freetextEmail}
+                    onChange={(e) => setFreetextEmail(e.target.value)}
+                    disabled={isPending}
+                    maxLength={120}
+                    placeholder="name@example.com"
+                    className={inputCls}
+                  />
+                </Field>
+              </div>
+            </>
+          ) : null}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Pool / billing mode" required>

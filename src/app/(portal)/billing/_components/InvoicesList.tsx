@@ -27,6 +27,9 @@ interface Invoice {
   billable_to_type?: 'subsidiary' | 'director' | 'dept_pool' | 'freetext' | null
   billable_to_department_id?: string | null
   billable_to_freetext_name?: string | null
+  billable_to_freetext_address?: string | null
+  billable_to_freetext_phone?: string | null
+  billable_to_freetext_email?: string | null
   // Detail-modal fields (read-only). No per-invoice detail page exists, so
   // these power the click-into-row popup.
   description?: string | null
@@ -462,6 +465,9 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                                 company_id: inv.company_id ?? null,
                                 billable_to_department_id: inv.billable_to_department_id ?? null,
                                 billable_to_freetext_name: inv.billable_to_freetext_name ?? null,
+                                billable_to_freetext_address: inv.billable_to_freetext_address ?? null,
+                                billable_to_freetext_phone: inv.billable_to_freetext_phone ?? null,
+                                billable_to_freetext_email: inv.billable_to_freetext_email ?? null,
                                 period_month: inv.period_month ?? null,
                               }}
                               initialLines={invoiceLines[inv.id] ?? []}

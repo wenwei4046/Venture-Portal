@@ -2235,7 +2235,10 @@ export type Database = {
         Row: {
           base_amount: number | null
           billable_to_department_id: string | null
+          billable_to_freetext_address: string | null
+          billable_to_freetext_email: string | null
           billable_to_freetext_name: string | null
+          billable_to_freetext_phone: string | null
           billable_to_type: Database["public"]["Enums"]["billable_to_kind"]
           billing_mode: Database["public"]["Enums"]["billing_mode"]
           category_code: string | null
@@ -2260,7 +2263,10 @@ export type Database = {
         Insert: {
           base_amount?: number | null
           billable_to_department_id?: string | null
+          billable_to_freetext_address?: string | null
+          billable_to_freetext_email?: string | null
           billable_to_freetext_name?: string | null
+          billable_to_freetext_phone?: string | null
           billable_to_type: Database["public"]["Enums"]["billable_to_kind"]
           billing_mode: Database["public"]["Enums"]["billing_mode"]
           category_code?: string | null
@@ -2285,7 +2291,10 @@ export type Database = {
         Update: {
           base_amount?: number | null
           billable_to_department_id?: string | null
+          billable_to_freetext_address?: string | null
+          billable_to_freetext_email?: string | null
           billable_to_freetext_name?: string | null
+          billable_to_freetext_phone?: string | null
           billable_to_type?: Database["public"]["Enums"]["billable_to_kind"]
           billing_mode?: Database["public"]["Enums"]["billing_mode"]
           category_code?: string | null
