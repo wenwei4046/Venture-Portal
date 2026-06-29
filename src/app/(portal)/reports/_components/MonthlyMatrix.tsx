@@ -20,14 +20,32 @@ export default function MonthlyMatrix({
 }) {
   // L1 = subtotals only · L2 = + top accounts & parent roll-ups · L3 = every level.
   const [level, setLevel] = useState<1 | 2 | 3>(3)
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
   const showPct = Array.isArray(pctBaseByColumn)
+  const toggle = (key: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
 
-  const visibleRows = rows.filter((r) => {
+  const leveled = rows.filter((r) => {
     if (r.kind === 'subtotal') return true // category / grand-total rows always show
     if (level === 1) return false // totals only
     if (level === 2) return r.depth <= 1 // + top-level accounts & parent roll-ups
     return true // L3: all account levels incl. children
   })
+  // Hide the children of any collapsed parent — everything deeper, until we step
+  // back out to the parent's own depth or shallower.
+  const visibleRows: typeof leveled = []
+  let hideDepth = Infinity
+  for (const r of leveled) {
+    if (r.depth > hideDepth) continue
+    hideDepth = Infinity
+    visibleRows.push(r)
+    if (r.kind === 'account' && r.isParent && collapsed.has(r.key)) hideDepth = r.depth
+  }
 
   const pct = (value: number, base: number) =>
     Math.abs(base) < 0.005 ? '—' : `${((value / base) * 100).toFixed(1)}%`
@@ -92,15 +110,22 @@ export default function MonthlyMatrix({
             {visibleRows.map((row) => {
               const isSub = row.kind === 'subtotal'
               const isParent = row.kind === 'account' && row.isParent
-              const cellBg = isSub ? 'bg-surface-2' : ''
-              const stickyBg = isSub ? 'bg-surface-2' : 'bg-surface'
+              const isCollapsed = isParent && collapsed.has(row.key)
+              // Three visual tiers: leaf (plain) < parent (faint band + caret) < subtotal (darker band).
+              const cellBg = isSub ? 'bg-surface-2' : isParent ? 'bg-surface' : ''
+              const stickyBg = isSub ? 'bg-surface-2' : isParent ? 'bg-surface' : 'bg-surface'
               const labelTone = isSub
                 ? row.tone === 'danger'
                   ? 'text-danger'
                   : row.tone === 'ledger'
                     ? 'text-ledger'
                     : 'text-ink'
-                : row.depth > 0
+                : row.depth >= 2
+                  ? 'text-graphite'
+                  : 'text-ink'
+              const valueTone = isSub
+                ? 'text-num-ink font-semibold'
+                : row.depth >= 2
                   ? 'text-graphite'
                   : 'text-ink'
               const labelWeight = isSub || isParent ? 'font-semibold' : 'font-normal'
@@ -110,7 +135,21 @@ export default function MonthlyMatrix({
                     className={`sticky left-0 z-10 ${stickyBg} px-4 py-2.5 font-sans ${labelTone} ${labelWeight}`}
                     style={{ paddingLeft: `${16 + row.depth * 18}px` }}
                   >
-                    {row.label}
+                    {isParent ? (
+                      <button
+                        type="button"
+                        onClick={() => toggle(row.key)}
+                        className="inline-flex items-center gap-1.5 text-left hover:text-accent transition-colors"
+                        title={isCollapsed ? 'Expand children' : 'Collapse children'}
+                      >
+                        <span className="text-[9px] text-muted w-2 inline-block leading-none">
+                          {isCollapsed ? '▶' : '▼'}
+                        </span>
+                        {row.label}
+                      </button>
+                    ) : (
+                      row.label
+                    )}
                   </td>
                   {columns.map((c, i) => {
                     const v = row.values[i] ?? 0
@@ -118,9 +157,9 @@ export default function MonthlyMatrix({
                     return (
                       <Fragment key={`${row.key}-${c.key}`}>
                         <td
-                          className={`text-right font-mono tabular px-4 py-2.5 border-l border-hairline ${cellBg} ${
-                            isSub ? 'text-num-ink font-semibold' : row.depth > 0 ? 'text-graphite' : 'text-ink'
-                          } ${c.key === 'acc' ? 'font-semibold' : ''}`}
+                          className={`text-right font-mono tabular px-4 py-2.5 border-l border-hairline ${cellBg} ${valueTone} ${
+                            c.key === 'acc' ? 'font-semibold' : ''
+                          }`}
                         >
                           {num(v)}
                         </td>
