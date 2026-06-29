@@ -35,7 +35,10 @@ export default function ReportLayoutEditor({
   )
 
   const assigned = useMemo(() => new Set(categories.flatMap((c) => c.accounts)), [categories])
-  const unassigned = useMemo(() => accounts.filter((a) => !assigned.has(a.code)), [accounts, assigned])
+  const unassigned = useMemo(
+    () => accounts.filter((a) => !assigned.has(a.code)).sort((a, b) => a.name.localeCompare(b.name)),
+    [accounts, assigned],
+  )
 
   const moveCode = (code: string, targetId: string | 'unassigned') => {
     setCategories((prev) => {

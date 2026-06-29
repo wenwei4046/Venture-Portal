@@ -18,15 +18,15 @@ export default function MonthlyMatrix({
   /** Per-column base for the % cell. Omit to hide the % column entirely. */
   pctBaseByColumn?: number[]
 }) {
-  // L1 = subtotals only · L2 = + top accounts · L3 = every account level.
+  // L1 = subtotals only · L2 = + top accounts & parent roll-ups · L3 = every level.
   const [level, setLevel] = useState<1 | 2 | 3>(3)
   const showPct = Array.isArray(pctBaseByColumn)
 
   const visibleRows = rows.filter((r) => {
-    if (r.kind === 'subtotal') return true // subtotals always show
+    if (r.kind === 'subtotal') return true // category / grand-total rows always show
     if (level === 1) return false // totals only
-    if (level === 2) return r.depth === 0 // + top-level accounts
-    return true // L3: all account levels
+    if (level === 2) return r.depth <= 1 // + top-level accounts & parent roll-ups
+    return true // L3: all account levels incl. children
   })
 
   const pct = (value: number, base: number) =>

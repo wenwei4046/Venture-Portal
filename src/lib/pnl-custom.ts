@@ -10,6 +10,7 @@ import {
   type MatrixColumn,
   EMPTY_PERIOD,
   collectNodeValues,
+  buildHierarchyRows,
   monthColumns,
   r2,
 } from './monthly-matrix'
@@ -22,6 +23,7 @@ export interface PnlAccount {
   name: string
   defaultCategory: PnlDefaultCategory
   values: number[] // already signed for display
+  ancestry: { code: string; name: string }[] // COA parents, top → down
 }
 
 export interface MonthlyPnlAccounts {
@@ -56,7 +58,7 @@ export function buildPnlAccounts(
   const list: PnlAccount[] = []
   const seen = new Set<string>()
   const collectLeaves = (section: ReportSection, cat: PnlDefaultCategory, sign: 1 | -1) => {
-    const walk = (n: AccountNode) => {
+    const walk = (n: AccountNode, ancestors: { code: string; name: string }[]) => {
       if (n.children.length === 0) {
         if (!seen.has(n.code)) {
           seen.add(n.code)
@@ -65,13 +67,15 @@ export function buildPnlAccounts(
             name: n.name,
             defaultCategory: cat,
             values: codeMaps.map((cm) => r2((cm.get(n.code) ?? 0) * sign)),
+            ancestry: ancestors,
           })
         }
       } else {
-        n.children.forEach(walk)
+        const next = [...ancestors, { code: n.code, name: n.name }]
+        n.children.forEach((c) => walk(c, next))
       }
     }
-    section.nodes.forEach(walk)
+    section.nodes.forEach((n) => walk(n, []))
   }
   collectLeaves(reportAcc.revenue, 'revenue', 1)
   collectLeaves(reportAcc.cost, 'cost', -1)
@@ -113,18 +117,14 @@ export function buildCustomPnlRows(data: MonthlyPnlAccounts, layout: ReportLayou
 
   for (const cat of layout.categories) {
     const accs = cat.accounts.map((c) => byCode.get(c)).filter((a): a is PnlAccount => !!a)
-    for (const a of accs) {
-      assigned.add(a.code)
-      rows.push({ key: `${cat.id}:${a.code}`, label: a.name, depth: 1, kind: 'account', values: a.values })
-    }
+    accs.forEach((a) => assigned.add(a.code))
+    rows.push(...buildHierarchyRows(accs, cat.id, 1))
     rows.push({ key: `cat:${cat.id}`, label: cat.name, depth: 0, kind: 'subtotal', tone: 'auto', values: colSum(accs.map((a) => a.values), n) })
   }
 
   const leftovers = data.accounts.filter((a) => !assigned.has(a.code))
   if (leftovers.length > 0) {
-    for (const a of leftovers) {
-      rows.push({ key: `unassigned:${a.code}`, label: a.name, depth: 1, kind: 'account', values: a.values })
-    }
+    rows.push(...buildHierarchyRows(leftovers, 'unassigned', 1))
     rows.push({ key: 'cat:unassigned', label: 'Unassigned', depth: 0, kind: 'subtotal', tone: 'danger', values: colSum(leftovers.map((a) => a.values), n) })
   }
 

@@ -62,3 +62,72 @@ export function collectNodeValues(section: ReportSection, out: Map<string, numbe
   }
   section.nodes.forEach(walk)
 }
+
+/** A leaf account plus its COA ancestor chain (top parent → down, excluding the
+ *  leaf itself). Used to re-nest a flat account list back into its hierarchy. */
+export interface HierAccount {
+  code: string
+  name: string
+  values: number[]
+  ancestry: { code: string; name: string }[]
+}
+
+/** Render a flat list of leaf accounts as their COA parent→child hierarchy:
+ *  every parent that has ≥1 child present becomes a bold roll-up row (sum of its
+ *  descendants), with children indented beneath it. Sorted A→Z by name within
+ *  each level. `baseDepth` is the indent of the top level; children go deeper. */
+export function buildHierarchyRows(
+  accounts: HierAccount[],
+  keyPrefix: string,
+  baseDepth: number,
+): MatrixRow[] {
+  if (accounts.length === 0) return []
+  const n = accounts[0].values.length
+
+  interface Node {
+    code: string
+    name: string
+    leaf?: HierAccount
+    children: Map<string, Node>
+  }
+  const roots = new Map<string, Node>()
+  const child = (level: Map<string, Node>, code: string, name: string): Node => {
+    let node = level.get(code)
+    if (!node) {
+      node = { code, name, children: new Map() }
+      level.set(code, node)
+    }
+    return node
+  }
+
+  for (const a of accounts) {
+    let level = roots
+    for (const anc of a.ancestry) level = child(level, anc.code, anc.name).children
+    child(level, a.code, a.name).leaf = a
+  }
+
+  const sum = (node: Node): number[] => {
+    const out = new Array(n).fill(0)
+    if (node.leaf) for (let i = 0; i < n; i++) out[i] = r2(out[i] + (node.leaf.values[i] ?? 0))
+    for (const c of node.children.values()) {
+      const v = sum(c)
+      for (let i = 0; i < n; i++) out[i] = r2(out[i] + (v[i] ?? 0))
+    }
+    return out
+  }
+
+  const sorted = (level: Map<string, Node>) =>
+    [...level.values()].sort((a, b) => a.name.localeCompare(b.name))
+
+  const rows: MatrixRow[] = []
+  const emit = (node: Node, depth: number) => {
+    if (node.children.size > 0) {
+      rows.push({ key: `${keyPrefix}:${node.code}`, label: node.name, depth, kind: 'account', isParent: true, values: sum(node) })
+      for (const c of sorted(node.children)) emit(c, depth + 1)
+    } else {
+      rows.push({ key: `${keyPrefix}:${node.code}`, label: node.name, depth, kind: 'account', values: node.leaf!.values })
+    }
+  }
+  for (const node of sorted(roots)) emit(node, baseDepth)
+  return rows
+}
