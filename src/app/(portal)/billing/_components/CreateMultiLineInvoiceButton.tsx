@@ -152,9 +152,12 @@ export default function CreateMultiLineInvoiceButton({
     if ((billableType === 'director' || billableType === 'freetext') && !freetextName.trim()) {
       return setError(billableType === 'director' ? 'Enter director name' : 'Enter party name')
     }
-    const validLines = lines.filter((l) => Number(l.amount) > 0 && l.description.trim())
+    const validLines = lines.filter((l) => Number(l.amount) > 0)
     if (validLines.length === 0) {
-      return setError('Add at least one line with description + amount')
+      return setError('Add at least one line with an amount')
+    }
+    if (validLines.length >= 2 && validLines.some((l) => !l.description.trim())) {
+      return setError('With 2+ lines, each line needs a description')
     }
 
     startTransition(async () => {
@@ -450,7 +453,7 @@ export default function CreateMultiLineInvoiceButton({
 
             <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-hairline bg-surface">
               <div className="font-serif italic text-muted text-xs">
-                {lines.filter((l) => Number(l.amount) > 0 && l.description.trim()).length} valid line(s) · Total RM {fmt(total)}
+                {lines.filter((l) => Number(l.amount) > 0).length} valid line(s) · Total RM {fmt(total)}
               </div>
               <div className="flex items-center gap-3">
                 <button

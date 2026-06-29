@@ -301,8 +301,8 @@ export async function createMultiLineInvoice(
     if (!Number.isFinite(ln.amount) || ln.amount <= 0) {
       throw new Error(`Line ${i + 1}: amount must be a positive number`)
     }
-    if (!ln.description.trim()) {
-      throw new Error(`Line ${i + 1}: description is required`)
+    if (payload.lines.length >= 2 && !ln.description.trim()) {
+      throw new Error(`Line ${i + 1}: description is required (with 2+ lines)`)
     }
     // category_code is optional but recommended; allow empty (will fall back
     // to revenueGlCode 5000 at issue time, same as single-line invoices).
@@ -860,8 +860,8 @@ export async function updateDraftInvoiceFull(payload: {
     if (!Number.isFinite(ln.amount) || ln.amount <= 0) {
       throw new Error(`Line ${i + 1}: amount must be a positive number`)
     }
-    if (!ln.description.trim()) {
-      throw new Error(`Line ${i + 1}: description is required`)
+    if (payload.lines.length >= 2 && !ln.description.trim()) {
+      throw new Error(`Line ${i + 1}: description is required (with 2+ lines)`)
     }
   }
 
@@ -880,22 +880,22 @@ export async function updateDraftInvoiceFull(payload: {
 
   const total = payload.lines.reduce((s, l) => s + Number(l.amount), 0)
   const totalRounded = Math.round(total * 100) / 100
-  const isMulti = payload.lines.length >= 2
-  const single = payload.lines[0]
-
+  // Mirror createMultiLineInvoice: header description is independent of the
+  // lines, lines always persist (even a single one), and category lives per
+  // line (header category_code stays NULL so issue fans Cr out by line). This
+  // keeps the edit round-trip symmetric — the header no longer collapses into
+  // line 1 the way the old 1-line "simple" shape did.
   const { error: updErr } = await supabase
     .from('invoices')
     .update({
       period_month: period,
       billing_mode: payload.billingMode,
-      category_code: isMulti ? null : single.categoryCode.trim() || null,
+      category_code: null,
       base_amount: totalRounded,
       total_amount: totalRounded,
       invoice_date: payload.invoiceDate || null,
       due_date: payload.dueDate || null,
-      description: isMulti
-        ? payload.headerDescription.trim() || null
-        : payload.headerDescription.trim() || single.description.trim(),
+      description: payload.headerDescription.trim() || null,
       reference_no: payload.referenceNo.trim() || null,
       billable_to_type: payload.billableType,
       company_id: payload.billableType === 'subsidiary' ? payload.companyId : null,
@@ -915,18 +915,16 @@ export async function updateDraftInvoiceFull(payload: {
     .delete()
     .eq('invoice_id', payload.id)
   if (delErr) throw new Error(`Failed to replace invoice lines: ${delErr.message}`)
-  if (isMulti) {
-    const { error: insErr } = await supabase.from('invoice_lines').insert(
-      payload.lines.map((l, i) => ({
-        invoice_id: payload.id,
-        line_no: i + 1,
-        description: l.description.trim(),
-        amount: Math.round(Number(l.amount) * 100) / 100,
-        category_code: l.categoryCode.trim() || null,
-      })),
-    )
-    if (insErr) throw new Error(`Failed to write invoice lines: ${insErr.message}`)
-  }
+  const { error: insErr } = await supabase.from('invoice_lines').insert(
+    payload.lines.map((l, i) => ({
+      invoice_id: payload.id,
+      line_no: i + 1,
+      description: l.description.trim(),
+      amount: Math.round(Number(l.amount) * 100) / 100,
+      category_code: l.categoryCode.trim() || null,
+    })),
+  )
+  if (insErr) throw new Error(`Failed to write invoice lines: ${insErr.message}`)
 
   revalidatePath('/billing')
   revalidatePath('/statements')

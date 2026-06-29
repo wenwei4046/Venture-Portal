@@ -172,12 +172,10 @@ export function EditInvoiceButton({
   const [period, setPeriod] = useState((initial.period_month ?? '').slice(0, 7))
   const [invoiceDate, setInvoiceDate] = useState(initial.invoice_date ?? '')
   const [dueDate, setDueDate] = useState(initial.due_date ?? '')
-  // Multi-line source: the header description is the summary. Simple source:
-  // the single line carries the description, header stays blank (matching
-  // what saving 1 line writes back).
-  const [headerDescription, setHeaderDescription] = useState(
-    isMultiSource ? initial.description ?? '' : '',
-  )
+  // Header description round-trips independently of the lines. For a legacy
+  // single-source invoice (no line rows) the description WAS the summary, so
+  // surface it here in the header field — not buried inside line 1.
+  const [headerDescription, setHeaderDescription] = useState(initial.description ?? '')
   const [referenceNo, setReferenceNo] = useState(initial.reference_no ?? '')
   const [lines, setLines] = useState<EditLineRow[]>(() =>
     isMultiSource
@@ -188,9 +186,11 @@ export function EditInvoiceButton({
           categoryCode: l.category_code ?? '',
         }))
       : [
+          // Single-source: description lives in the header field above, so the
+          // sole line just carries the amount (+ category). Description optional.
           {
             uid: crypto.randomUUID(),
-            description: initial.description ?? '',
+            description: '',
             amount: String(initial.total_amount ?? ''),
             categoryCode: initial.category_code ?? '',
           },
@@ -231,9 +231,12 @@ export function EditInvoiceButton({
     if ((billableType === 'director' || billableType === 'freetext') && !freetextName.trim()) {
       return setError(billableType === 'director' ? 'Enter director name' : 'Enter party name')
     }
-    const validLines = lines.filter((l) => Number(l.amount) > 0 && l.description.trim())
+    const validLines = lines.filter((l) => Number(l.amount) > 0)
     if (validLines.length === 0) {
-      return setError('Add at least one line with description + amount')
+      return setError('Add at least one line with an amount')
+    }
+    if (validLines.length >= 2 && validLines.some((l) => !l.description.trim())) {
+      return setError('With 2+ lines, each line needs a description')
     }
 
     startTransition(async () => {
@@ -513,7 +516,7 @@ export function EditInvoiceButton({
 
         <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-hairline bg-surface shrink-0">
           <div className="font-serif italic text-muted text-xs">
-            {lines.filter((l) => Number(l.amount) > 0 && l.description.trim()).length} valid line(s) · Total RM {fmtRm(total)}
+            {lines.filter((l) => Number(l.amount) > 0).length} valid line(s) · Total RM {fmtRm(total)}
           </div>
           <div className="flex items-center gap-3">
             <button
