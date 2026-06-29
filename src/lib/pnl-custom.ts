@@ -115,30 +115,43 @@ export function buildCustomPnlRows(data: MonthlyPnlAccounts, layout: ReportLayou
   const assigned = new Set<string>()
   const rows: MatrixRow[] = []
 
-  // Gross Profit (Revenue − COGS) slots in right after the category that carries
-  // COGS — or, failing that, after the revenue category. It's keyed off each
-  // account's COA type, so it stays correct no matter how the layout groups
-  // accounts. (% column shows it as gross margin automatically.)
+  // Gross Profit = Revenue − COGS, where "COGS" is whatever the user dropped
+  // into the COGS category — NOT just COA cost-type accounts. So we run a tally
+  // of the category subtotals down to (and including) the COGS line and snapshot
+  // it there. The COGS line is the default 'cost' category if present, else the
+  // first category carrying a COA cost-type account, else the revenue line.
+  // (% column renders it as gross margin automatically.)
+  const cogsId = layout.categories.find((c) => c.id === 'cost')?.id
   let grossInsertAt = -1
+  let grossValues: number[] | null = null
+  const running = new Array(n).fill(0)
 
   for (const cat of layout.categories) {
     const accs = cat.accounts.map((c) => byCode.get(c)).filter((a): a is PnlAccount => !!a)
     accs.forEach((a) => assigned.add(a.code))
+    const sub = colSum(accs.map((a) => a.values), n)
     rows.push(...buildHierarchyRows(accs, cat.id, 1))
-    rows.push({ key: `cat:${cat.id}`, label: cat.name, depth: 0, kind: 'subtotal', tone: 'auto', values: colSum(accs.map((a) => a.values), n) })
-    if (accs.some((a) => a.defaultCategory === 'cost')) grossInsertAt = rows.length
-    else if (grossInsertAt === -1 && accs.some((a) => a.defaultCategory === 'revenue')) grossInsertAt = rows.length
+    rows.push({ key: `cat:${cat.id}`, label: cat.name, depth: 0, kind: 'subtotal', tone: 'auto', values: sub })
+    for (let i = 0; i < n; i++) running[i] = r2(running[i] + (sub[i] ?? 0))
+
+    const isCogsLine = cogsId ? cat.id === cogsId : accs.some((a) => a.defaultCategory === 'cost')
+    if (isCogsLine) {
+      grossInsertAt = rows.length
+      grossValues = [...running]
+    } else if (grossInsertAt === -1 && accs.some((a) => a.defaultCategory === 'revenue')) {
+      grossInsertAt = rows.length
+      grossValues = [...running]
+    }
   }
 
-  if (grossInsertAt >= 0) {
-    const gp = data.accounts.filter((a) => a.defaultCategory === 'revenue' || a.defaultCategory === 'cost')
+  if (grossInsertAt >= 0 && grossValues) {
     rows.splice(grossInsertAt, 0, {
       key: 'GROSS_PROFIT',
       label: 'Gross Profit',
       depth: 0,
       kind: 'subtotal',
       tone: 'auto',
-      values: colSum(gp.map((a) => a.values), n),
+      values: grossValues,
     })
   }
 

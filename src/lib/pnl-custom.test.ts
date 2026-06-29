@@ -41,3 +41,21 @@ describe('buildCustomPnlRows — Gross Profit', () => {
     expect(net!.values[0]).toBe(500) // 1000 − 300 − 200
   })
 })
+
+describe('buildCustomPnlRows — Gross Profit follows the layout, not COA type', () => {
+  // The 9000 account is COA type 'expense', but the user dragged it into the
+  // COGS category — Gross Profit must subtract it too.
+  const movedLayout: ReportLayout = {
+    categories: [
+      { id: 'revenue', name: 'Revenue', accounts: ['5000'] },
+      { id: 'cost', name: 'Cost of Goods Sold', accounts: ['6000', '9000'] },
+      { id: 'expense', name: 'Expenses', accounts: [] },
+    ],
+  }
+  const rows = buildCustomPnlRows(data, movedLayout)
+
+  it('counts whatever sits in the COGS category, even expense-type accounts', () => {
+    const gp = rows.find((r) => r.key === 'GROSS_PROFIT')
+    expect(gp!.values[0]).toBe(500) // 1000 − 300 − 200 (salary now inside COGS)
+  })
+})
