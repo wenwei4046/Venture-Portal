@@ -24,23 +24,30 @@
  * imported verbatim, including statutory + gross + net; the system does NOT
  * recompute on import. The earlier 2026-04-26 "never write basic" rule is
  * superseded):
- *   col  1 Code          → matches hr_staff_costs.employee_code (primary match)
- *   col  2 Emp. Name     → matches hr_staff_costs.employee_name (fallback fuzzy)
- *   col  3 Tot. Sal      → basic_salary (per-month figure, verbatim)
- *   col  4 OT Amt        → ot_amount (+ Shift col 5 + Rest/PH col 6 folded in —
- *                          hourly-work earnings; schema has no separate columns)
- *   col  7 Allowance Add → non_statutory_allowance
- *   col  8 No Pay        → parsed for display; NOT converted to leave days —
- *                          the file's gross/net already reflect it
- *   col  9 Bonus         → commission_amount
- *   col 10 Gross         → gross (verbatim)
- *   col 12/13 EPF ER/EE  → epf_er / epf_ee (verbatim)
- *   col 15/16 SOCSO      → socso_er / socso_ee (verbatim)
- *   col 18/19 EIS        → eis_er / eis_ee (verbatim)
- *   col 23 PCB           → pcb (verbatim)
- *   col 25 NettWgs       → net (verbatim)
- *   (col 11 Ded / 21 HRDF / 22 Zakat / 24 CP38 — parsed but no schema column;
- *    HRDF is an employer levy outside payslips, the others are zero in HV data.)
+ *   Code          → matches hr_staff_costs.employee_code (primary match)
+ *   Emp. Name     → matches hr_staff_costs.employee_name (fallback fuzzy)
+ *   Tot. Sal      → basic_salary (per-month figure, verbatim)
+ *   OT Amt        → ot_amount (+ Shift + Rest/PH Amount folded in —
+ *                   hourly-work earnings; schema has no separate columns)
+ *   Allowance Add → non_statutory_allowance
+ *   No Pay        → parsed for display; NOT converted to leave days —
+ *                   the file's gross/net already reflect it
+ *   Bonus         → commission_amount
+ *   Gross         → gross (verbatim)
+ *   EPF ER/EE     → epf_er / epf_ee (verbatim)
+ *   SOCSO ER/EE   → socso_er / socso_ee (verbatim)
+ *   EIS ER/EE     → eis_er / eis_ee (verbatim)
+ *   PCB           → pcb (verbatim)
+ *   NettWgs       → net (verbatim)
+ *   (Ded / SKBBK / HRDF / Zakat / CP38 — no schema column; HRDF is an employer
+ *    levy outside payslips, the others are zero or already inside net.)
+ *
+ * Columns are located BY HEADER NAME, not fixed position (fix 2026-07-02:
+ * the June 2026 export added a new SKBBK column which shifted PCB/NettWgs one
+ * position right — the old positional parser silently imported pcb=0 / net=0
+ * for the whole month). The statutory blocks all share the same field headers
+ * (Emplyr | Emp | Total), so those are mapped by triplet order, which InfoTech
+ * fixes as EPF → SOCSO → EIS.
  */
 
 import { read, utils, type WorkBook } from 'xlsx'
@@ -183,6 +190,72 @@ export function parseInfotechPayroll(
   }
 }
 
+/** Column indices resolved from the "No. | Code | Emp. Name | …" header row.
+ *  -1 = column absent in this file; num(row[-1]) safely yields 0. */
+interface ColumnMap {
+  code: number
+  name: number
+  basic: number
+  ot: number
+  shift: number
+  restPh: number
+  allow: number
+  noPay: number
+  bonus: number
+  gross: number
+  epfEr: number
+  epfEe: number
+  socsoEr: number
+  socsoEe: number
+  eisEr: number
+  eisEe: number
+  pcb: number
+  net: number
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildColumnMap(headerRow: any[]): ColumnMap {
+  const headers = headerRow.map((c) => cellStr(c).trim())
+  const at = (label: string, from = 0): number => {
+    const i = headers.findIndex((h, idx) => idx >= from && h === label)
+    return i
+  }
+
+  const shift = at('Shift')
+  // The Rest/PH block's field header is just "Amount" — take the first one
+  // after Shift ("CP38 Amount" never matches, comparison is exact).
+  const restPh = at('Amount', shift + 1)
+
+  // EPF / SOCSO / EIS all use the same field headers (Emplyr | Emp | Total).
+  // InfoTech's block order is fixed: 1st triplet EPF, 2nd SOCSO, 3rd EIS.
+  const emplyrs = headers
+    .map((h, i) => (h === 'Emplyr' ? i : -1))
+    .filter((i) => i >= 0)
+  const [epf = -1, socso = -1, eis = -1] = emplyrs
+  const ee = (er: number) => (er === -1 ? -1 : er + 1)
+
+  return {
+    code: at('Code'),
+    name: at('Emp. Name'),
+    basic: at('Tot. Sal'),
+    ot: at('OT Amt'),
+    shift,
+    restPh,
+    allow: at('Add'),
+    noPay: at('No Pay'),
+    bonus: at('Bonus'),
+    gross: at('Gross'),
+    epfEr: epf,
+    epfEe: ee(epf),
+    socsoEr: socso,
+    socsoEe: ee(socso),
+    eisEr: eis,
+    eisEe: ee(eis),
+    pcb: at('PCB'),
+    net: at('NettWgs'),
+  }
+}
+
 /** Pure parser over a 2-D grid — exported for unit tests. */
 export function parseInfotechGrid(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -192,7 +265,7 @@ export function parseInfotechGrid(
   const departments: string[] = []
   const skipped: Array<{ excelRow: number; reason: string }> = []
   let grossSum = 0
-  let dataStarted = false
+  let cols: ColumnMap | null = null
 
   for (let i = 0; i < grid.length; i++) {
     const row = grid[i] ?? []
@@ -207,9 +280,11 @@ export function parseInfotechGrid(
       continue
     }
 
-    // Field-name header row ("No. | Code | Emp. Name | ...")
+    // Field-name header row ("No. | Code | Emp. Name | ...") — resolve the
+    // column layout from it (repeats per page in some exports; re-resolving
+    // is harmless and tracks any mid-file drift).
     if (col0 === HEADER_MARKER && cellStr(row[1]) === 'Code') {
-      dataStarted = true
+      cols = buildColumnMap(row)
       continue
     }
 
@@ -219,7 +294,7 @@ export function parseInfotechGrid(
     }
 
     // Pre-data header rows
-    if (!dataStarted) continue
+    if (!cols) continue
 
     // Blank or meaningless row (col 0 not a row-number integer)
     const rowNo = Number(col0)
@@ -228,20 +303,20 @@ export function parseInfotechGrid(
       continue
     }
 
-    const code = cellStr(row[1]).trim()
-    const name = cellStr(row[2]).trim()
+    const code = cellStr(row[cols.code]).trim()
+    const name = cellStr(row[cols.name]).trim()
     if (!code && !name) {
       skipped.push({ excelRow, reason: 'missing both code and name' })
       continue
     }
 
-    const basic = num(row[3])
+    const basic = num(row[cols.basic])
     // OT + Shift + Rest/PH all land in ot_amount — hourly-work earnings with
     // no dedicated schema columns. Zero in HV data except OT itself.
-    const ot = num(row[4]) + num(row[5]) + num(row[6])
-    const allow = num(row[7])
-    const noPay = num(row[8]) // negative in file; store as positive magnitude
-    const gross = num(row[10])
+    const ot = num(row[cols.ot]) + num(row[cols.shift]) + num(row[cols.restPh])
+    const allow = num(row[cols.allow])
+    const noPay = num(row[cols.noPay]) // negative in file; store as positive magnitude
+    const gross = num(row[cols.gross])
 
     rows.push({
       employeeCode: code,
@@ -250,16 +325,16 @@ export function parseInfotechGrid(
       otAmount: ot,
       nonStatutoryAllowance: allow,
       noPayDeduction: Math.abs(noPay),
-      bonus: num(row[9]),
+      bonus: num(row[cols.bonus]),
       gross,
-      epfEr: num(row[12]),
-      epfEe: num(row[13]),
-      socsoEr: num(row[15]),
-      socsoEe: num(row[16]),
-      eisEr: num(row[18]),
-      eisEe: num(row[19]),
-      pcb: num(row[23]),
-      net: num(row[25]),
+      epfEr: num(row[cols.epfEr]),
+      epfEe: num(row[cols.epfEe]),
+      socsoEr: num(row[cols.socsoEr]),
+      socsoEe: num(row[cols.socsoEe]),
+      eisEr: num(row[cols.eisEr]),
+      eisEe: num(row[cols.eisEe]),
+      pcb: num(row[cols.pcb]),
+      net: num(row[cols.net]),
     })
     grossSum += gross
   }

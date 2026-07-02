@@ -101,6 +101,25 @@ describe('parseInfotechGrid', () => {
     })
   })
 
+  // Regression for the June 2026 import: InfoTech added a new SKBBK column
+  // after the EIS block, shifting HRDF/Zakat/PCB/CP38/NettWgs one position
+  // right. The old positional parser read Zakat as PCB and CP38 as NettWgs —
+  // every June row landed in the DB with pcb=0 and net=0.
+  it('reads PCB/NettWgs by header name when a new SKBBK column shifts the tail', () => {
+    const grid: (string | number | null)[][] = [
+      ['No.', 'Code', 'Emp. Name', 'Tot. Sal', 'OT Amt', 'Shift', 'Amount', 'Add', 'No Pay', 'Bonus', 'Gross', 'Ded', 'Emplyr', 'Emp', 'Total', 'Emplyr', 'Emp', 'Total', 'Emplyr', 'Emp', 'Total', 'SKBBK', 'HRDF', 'Zakat', 'PCB', 'CP38 Amount', 'NettWgs'],
+      ['Code :H-DO    Department:H - DIRECTOR OFFICE'],
+      [1, '  HV001', 'TAN MEI LING', 11000, 0, 0, 0, 0, 0, 0, 11000, 0, 1320, 1210, 2530, 34.9, 29.75, 64.65, 11.9, 11.9, 23.8, 10, 0, 0, 733.35, 0, 9005],
+    ]
+    const result = parseInfotechGrid(grid)
+    expect(result.rows).toHaveLength(1)
+    expect(result.rows[0].epfEe).toBe(1210)
+    expect(result.rows[0].socsoEe).toBe(29.75)
+    expect(result.rows[0].eisEe).toBe(11.9)
+    expect(result.rows[0].pcb).toBe(733.35)
+    expect(result.rows[0].net).toBe(9005)
+  })
+
   it('folds Shift and Rest/PH amounts into otAmount', () => {
     const grid: (string | number | null)[][] = [
       ['No.', 'Code', 'Emp. Name', 'Tot. Sal', 'OT Amt', 'Shift', 'Amount', 'Add', 'No Pay', 'Bonus', 'Gross'],
