@@ -29,6 +29,7 @@ export default async function PayslipPage({ params }: PageProps) {
       id, staff_id, period_month,
       basic_salary, statutory_allowance, non_statutory_allowance,
       ot_hours, ot_amount, commission_amount, unpaid_leave_days,
+      deduction_amount,
       prorata_days_worked, prorata_days_in_month,
       epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb,
       gross, net, status, statutory_overridden_at,
@@ -107,6 +108,9 @@ export default async function PayslipPage({ params }: PageProps) {
             <Line label="Commission" value={row.commission_amount} />
             {Number(row.unpaid_leave_days) > 0 && (
               <Line label={`Unpaid Leave (${row.unpaid_leave_days} days)`} value={0} muted />
+            )}
+            {Number(row.deduction_amount) > 0 && (
+              <Line label="Deduction" value={-Number(row.deduction_amount)} />
             )}
             <div className="border-t border-hairline pt-2 mt-2 flex justify-between">
               <span className="font-serif text-ink">Gross Pay</span>

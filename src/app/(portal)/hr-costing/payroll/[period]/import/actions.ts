@@ -119,7 +119,8 @@ export async function previewInfotechImport(
       staffId: matched.id,
       staffName: matched.employee_name,
       matchedBy,
-      gross: row.gross,
+      // Show what will be WRITTEN: our gross is after-deduction (file Gross − Ded)
+      gross: row.gross - row.deduction,
       net: row.net,
     }
     if (existing) toUpdate.push(target)
@@ -142,7 +143,13 @@ export async function previewInfotechImport(
  *     payslip statutory editor, so the grid shows these as file/manual values.
  *
  * unpaid_leave_days is reset to 0: the file's gross/net already reflect any
- * No Pay deduction, so converting it to days would double-count.
+ * No Pay amount, so converting it to days would double-count.
+ *
+ * deduction_amount is auto-detected from the file's "Ded" column (2026-07-02):
+ * InfoTech's Gross is BEFORE Ded while NettWgs is AFTER, but our schema's
+ * gross is after-deduction (so the run's CTC excludes withheld pay). Phase 1
+ * writes deduction_amount; phase 2 writes gross = file Gross − Ded and
+ * net = file NettWgs unchanged.
  */
 export async function applyInfotechImport(
   rows: InfotechRow[],
@@ -171,7 +178,7 @@ export async function applyInfotechImport(
         eis_er: row.eisEr,
         eis_ee: row.eisEe,
         pcb: row.pcb,
-        gross: row.gross,
+        gross: row.gross - row.deduction,
         net: row.net,
         ...overrideStamp,
       })
@@ -193,6 +200,7 @@ export async function applyInfotechImport(
       non_statutory_allowance: row.nonStatutoryAllowance,
       commission_amount: row.bonus,
       unpaid_leave_days: 0,
+      deduction_amount: row.deduction,
       source: 'imported',
       status: 'draft',
     })
@@ -218,6 +226,7 @@ export async function applyInfotechImport(
         non_statutory_allowance: row.nonStatutoryAllowance,
         commission_amount: row.bonus,
         unpaid_leave_days: 0,
+        deduction_amount: row.deduction,
         source: 'imported',
       })
       .eq('staff_id', item.staffId)

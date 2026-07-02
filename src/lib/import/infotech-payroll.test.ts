@@ -60,6 +60,7 @@ describe('parseInfotechGrid', () => {
       noPayDeduction: 0,
       bonus: 0,
       gross: 6679.96,
+      deduction: 0,
       epfEr: 650,
       epfEe: 550,
       // Grid truncated after EPF Total — missing cells parse as 0.
@@ -90,6 +91,7 @@ describe('parseInfotechGrid', () => {
       noPayDeduction: 0,
       bonus: 0,
       gross: 5000,
+      deduction: 0,
       epfEr: 624,
       epfEe: 528,
       socsoEr: 83.15,
@@ -118,6 +120,24 @@ describe('parseInfotechGrid', () => {
     expect(result.rows[0].eisEe).toBe(11.9)
     expect(result.rows[0].pcb).toBe(733.35)
     expect(result.rows[0].net).toBe(9005)
+  })
+
+  // Regression for LING HONG XIANG (June 2026): month-end joiner whose 5-day
+  // pro-rata (633.33) was fully withheld — file shows Gross 633.33, Ded 633.33,
+  // NettWgs 0. The Ded column must land in `deduction` so the import can write
+  // deduction_amount + gross = Gross − Ded (keeping his 633.33 out of the CTC
+  // total that Finance funds).
+  it('parses the Ded column into deduction (withheld pay)', () => {
+    const grid: (string | number | null)[][] = [
+      ['No.', 'Code', 'Emp. Name', 'Tot. Sal', 'OT Amt', 'Shift', 'Amount', 'Add', 'No Pay', 'Bonus', 'Gross', 'Ded', 'Emplyr', 'Emp', 'Total', 'Emplyr', 'Emp', 'Total', 'Emplyr', 'Emp', 'Total', 'HRDF', 'Zakat', 'PCB', 'CP38 Amount', 'NettWgs'],
+      ['Code :H-HR    Department:H - HUMAN RESOURCES'],
+      [1, '  HV026', 'LING HONG XIANG', 633.33, 0, 0, 0, 0, 0, 0, 633.33, 633.33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ]
+    const result = parseInfotechGrid(grid)
+    expect(result.rows).toHaveLength(1)
+    expect(result.rows[0].gross).toBe(633.33)
+    expect(result.rows[0].deduction).toBe(633.33)
+    expect(result.rows[0].net).toBe(0)
   })
 
   it('folds Shift and Rest/PH amounts into otAmount', () => {

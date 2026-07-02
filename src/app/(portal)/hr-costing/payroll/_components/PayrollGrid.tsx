@@ -19,6 +19,7 @@ export interface PayrollRowData {
   ot_amount: number
   commission_amount: number
   unpaid_leave_days: number
+  deduction_amount: number
   prorata_days_worked: number
   prorata_days_in_month: number
   epf_er: number
@@ -154,6 +155,7 @@ export default function PayrollGrid({ rows, period }: Props) {
               <th className="text-right py-4 pr-4 font-medium">OT</th>
               <th className="text-right py-4 pr-4 font-medium">Comm.</th>
               <th className="text-right py-4 pr-4 font-medium">Unpaid</th>
+              <th className="text-right py-4 pr-4 font-medium">Deduct</th>
               <th className="text-right py-4 pr-4 font-medium">EPF&nbsp;ER</th>
               <th className="text-right py-4 pr-4 font-medium">SOCSO&nbsp;ER</th>
               <th className="text-right py-4 pr-4 font-medium">EIS&nbsp;ER</th>

@@ -33,13 +33,18 @@
  *   No Pay        → parsed for display; NOT converted to leave days —
  *                   the file's gross/net already reflect it
  *   Bonus         → commission_amount
- *   Gross         → gross (verbatim)
+ *   Gross         → gross (verbatim; the import writes Gross − Ded, see below)
+ *   Ded           → deduction_amount (added 2026-07-02: withheld pay, e.g. a
+ *                   month-end joiner whose pro-rata is held to the next cycle.
+ *                   InfoTech's Gross is BEFORE Ded and NettWgs is AFTER; our
+ *                   schema's gross is after-deduction so CTC excludes it —
+ *                   the import therefore writes gross = Gross − Ded.)
  *   EPF ER/EE     → epf_er / epf_ee (verbatim)
  *   SOCSO ER/EE   → socso_er / socso_ee (verbatim)
  *   EIS ER/EE     → eis_er / eis_ee (verbatim)
  *   PCB           → pcb (verbatim)
- *   NettWgs       → net (verbatim)
- *   (Ded / SKBBK / HRDF / Zakat / CP38 — no schema column; HRDF is an employer
+ *   NettWgs       → net (verbatim — already reflects Ded)
+ *   (SKBBK / HRDF / Zakat / CP38 — no schema column; HRDF is an employer
  *    levy outside payslips, the others are zero or already inside net.)
  *
  * Columns are located BY HEADER NAME, not fixed position (fix 2026-07-02:
@@ -61,6 +66,8 @@ export interface InfotechRow {
   noPayDeduction: number // informational (negative in source, positive here)
   bonus: number
   gross: number
+  /** InfoTech "Ded" column — withheld pay, maps to deduction_amount. */
+  deduction: number
   epfEr: number
   epfEe: number
   socsoEr: number
@@ -203,6 +210,7 @@ interface ColumnMap {
   noPay: number
   bonus: number
   gross: number
+  ded: number
   epfEr: number
   epfEe: number
   socsoEr: number
@@ -245,6 +253,7 @@ function buildColumnMap(headerRow: any[]): ColumnMap {
     noPay: at('No Pay'),
     bonus: at('Bonus'),
     gross: at('Gross'),
+    ded: at('Ded'),
     epfEr: epf,
     epfEe: ee(epf),
     socsoEr: socso,
@@ -327,6 +336,7 @@ export function parseInfotechGrid(
       noPayDeduction: Math.abs(noPay),
       bonus: num(row[cols.bonus]),
       gross,
+      deduction: num(row[cols.ded]),
       epfEr: num(row[cols.epfEr]),
       epfEe: num(row[cols.epfEe]),
       socsoEr: num(row[cols.socsoEr]),

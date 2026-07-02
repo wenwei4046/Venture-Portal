@@ -1656,6 +1656,7 @@ export type Database = {
           commission_amount: number
           created_at: string
           created_by: string | null
+          deduction_amount: number
           eis_ee: number
           eis_er: number
           epf_ee: number
@@ -1686,6 +1687,7 @@ export type Database = {
           commission_amount?: number
           created_at?: string
           created_by?: string | null
+          deduction_amount?: number
           eis_ee?: number
           eis_er?: number
           epf_ee?: number
@@ -1716,6 +1718,7 @@ export type Database = {
           commission_amount?: number
           created_at?: string
           created_by?: string | null
+          deduction_amount?: number
           eis_ee?: number
           eis_er?: number
           epf_ee?: number

@@ -67,6 +67,7 @@ export interface PayrollRowUpdate {
   ot_amount?: number
   commission_amount?: number
   unpaid_leave_days?: number
+  deduction_amount?: number
 }
 
 /**
