@@ -36,6 +36,7 @@ export default function PayrollRow({
     commission_amount: row.commission_amount,
     unpaid_leave_days: row.unpaid_leave_days,
     deduction_amount: row.deduction_amount,
+    skbbk_amount: row.skbbk_amount,
   })
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -48,7 +49,8 @@ export default function PayrollRow({
     edit.ot_amount !== row.ot_amount ||
     edit.commission_amount !== row.commission_amount ||
     edit.unpaid_leave_days !== row.unpaid_leave_days ||
-    edit.deduction_amount !== row.deduction_amount
+    edit.deduction_amount !== row.deduction_amount ||
+    edit.skbbk_amount !== row.skbbk_amount
 
   function handleSave() {
     setError(null)
@@ -107,6 +109,7 @@ export default function PayrollRow({
         <td className="py-5 pr-4 text-right">{cell('commission_amount', edit.commission_amount)}</td>
         <td className="py-5 pr-4 text-right">{cell('unpaid_leave_days', edit.unpaid_leave_days, '0.5')}</td>
         <td className="py-5 pr-4 text-right">{cell('deduction_amount', edit.deduction_amount)}</td>
+        <td className="py-5 pr-4 text-right">{cell('skbbk_amount', edit.skbbk_amount)}</td>
         <td className="py-5 pr-4 text-right font-mono tabular text-graphite">{formatMoneyBare(row.epf_er)}</td>
         <td className="py-5 pr-4 text-right font-mono tabular text-graphite">{formatMoneyBare(row.socso_er)}</td>
         <td className="py-5 pr-4 text-right font-mono tabular text-graphite">{formatMoneyBare(row.eis_er)}</td>
@@ -144,7 +147,7 @@ export default function PayrollRow({
       </tr>
       {expanded && (
         <tr className="border-b border-hairline bg-surface-2/30">
-          <td colSpan={16} className="py-4 px-4">
+          <td colSpan={17} className="py-4 px-4">
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-8 gap-y-3 text-sm">
               <div>
                 <div className="text-xs uppercase tracking-wide text-muted font-sans">Pro-rata</div>

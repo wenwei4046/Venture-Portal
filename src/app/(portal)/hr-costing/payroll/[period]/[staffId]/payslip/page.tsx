@@ -29,7 +29,7 @@ export default async function PayslipPage({ params }: PageProps) {
       id, staff_id, period_month,
       basic_salary, statutory_allowance, non_statutory_allowance,
       ot_hours, ot_amount, commission_amount, unpaid_leave_days,
-      deduction_amount,
+      deduction_amount, skbbk_amount,
       prorata_days_worked, prorata_days_in_month,
       epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb,
       gross, net, status, statutory_overridden_at,
@@ -48,7 +48,9 @@ export default async function PayslipPage({ params }: PageProps) {
   const staff = (row as any).hr_staff_costs
   const deptName = staff?.departments?.name ?? '—'
 
-  const totalDeductions = Number(row.epf_ee) + Number(row.socso_ee) + Number(row.eis_ee) + Number(row.pcb)
+  const totalDeductions =
+    Number(row.epf_ee) + Number(row.socso_ee) + Number(row.eis_ee) + Number(row.pcb) +
+    Number(row.skbbk_amount ?? 0)
   const totalEr = Number(row.epf_er) + Number(row.socso_er) + Number(row.eis_er)
 
   const prorated = `${row.prorata_days_worked}/${row.prorata_days_in_month} days`
@@ -141,6 +143,12 @@ export default async function PayslipPage({ params }: PageProps) {
               <span className="font-serif">PCB ({staff.pcb_category})</span>
               <EditableStatLine payrollId={row.id} field="pcb" value={Number(row.pcb)} readOnly={row.status !== 'draft'} />
             </div>
+            {Number(row.skbbk_amount ?? 0) > 0 && (
+              <div className="flex items-baseline justify-between">
+                <span className="font-serif">SKBBK</span>
+                <span className="num">{formatMoney(Number(row.skbbk_amount))}</span>
+              </div>
+            )}
             <div className="border-t border-hairline pt-2 mt-2 flex justify-between">
               <span className="font-serif text-ink">Total Deductions</span>
               <span className="num text-num-ink font-semibold">{formatMoney(totalDeductions)}</span>

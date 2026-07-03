@@ -150,6 +150,10 @@ export async function previewInfotechImport(
  * gross is after-deduction (so the run's CTC excludes withheld pay). Phase 1
  * writes deduction_amount; phase 2 writes gross = file Gross − Ded and
  * net = file NettWgs unchanged.
+ *
+ * skbbk_amount is auto-detected from the file's "SKBBK" column (2026-07-03):
+ * a net-only employee deduction — NettWgs is already after it, so only the
+ * stored amount is new; gross/statutory are untouched.
  */
 export async function applyInfotechImport(
   rows: InfotechRow[],
@@ -201,6 +205,7 @@ export async function applyInfotechImport(
       commission_amount: row.bonus,
       unpaid_leave_days: 0,
       deduction_amount: row.deduction,
+      skbbk_amount: row.skbbk,
       source: 'imported',
       status: 'draft',
     })
@@ -227,6 +232,7 @@ export async function applyInfotechImport(
         commission_amount: row.bonus,
         unpaid_leave_days: 0,
         deduction_amount: row.deduction,
+        skbbk_amount: row.skbbk,
         source: 'imported',
       })
       .eq('staff_id', item.staffId)

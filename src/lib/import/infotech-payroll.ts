@@ -43,9 +43,13 @@
  *   SOCSO ER/EE   → socso_er / socso_ee (verbatim)
  *   EIS ER/EE     → eis_er / eis_ee (verbatim)
  *   PCB           → pcb (verbatim)
- *   NettWgs       → net (verbatim — already reflects Ded)
- *   (SKBBK / HRDF / Zakat / CP38 — no schema column; HRDF is an employer
- *    levy outside payslips, the others are zero or already inside net.)
+ *   NettWgs       → net (verbatim — already reflects Ded AND SKBBK)
+ *   SKBBK         → skbbk_amount (added 2026-07-03: net-only employee
+ *                   deduction — InfoTech's NettWgs is already after it, so
+ *                   gross/statutory are untouched; we store it so the grid
+ *                   and payslip can show the line.)
+ *   (HRDF / Zakat / CP38 — no schema column; HRDF is an employer levy
+ *    outside payslips, the others are zero or already inside net.)
  *
  * Columns are located BY HEADER NAME, not fixed position (fix 2026-07-02:
  * the June 2026 export added a new SKBBK column which shifted PCB/NettWgs one
@@ -68,6 +72,8 @@ export interface InfotechRow {
   gross: number
   /** InfoTech "Ded" column — withheld pay, maps to deduction_amount. */
   deduction: number
+  /** InfoTech "SKBBK" column — net-only employee deduction, maps to skbbk_amount. */
+  skbbk: number
   epfEr: number
   epfEe: number
   socsoEr: number
@@ -211,6 +217,7 @@ interface ColumnMap {
   bonus: number
   gross: number
   ded: number
+  skbbk: number
   epfEr: number
   epfEe: number
   socsoEr: number
@@ -254,6 +261,7 @@ function buildColumnMap(headerRow: any[]): ColumnMap {
     bonus: at('Bonus'),
     gross: at('Gross'),
     ded: at('Ded'),
+    skbbk: at('SKBBK'),
     epfEr: epf,
     epfEe: ee(epf),
     socsoEr: socso,
@@ -337,6 +345,7 @@ export function parseInfotechGrid(
       bonus: num(row[cols.bonus]),
       gross,
       deduction: num(row[cols.ded]),
+      skbbk: num(row[cols.skbbk]),
       epfEr: num(row[cols.epfEr]),
       epfEe: num(row[cols.epfEe]),
       socsoEr: num(row[cols.socsoEr]),

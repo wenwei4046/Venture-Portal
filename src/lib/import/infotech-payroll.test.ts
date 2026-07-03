@@ -61,6 +61,7 @@ describe('parseInfotechGrid', () => {
       bonus: 0,
       gross: 6679.96,
       deduction: 0,
+      skbbk: 0,
       epfEr: 650,
       epfEe: 550,
       // Grid truncated after EPF Total — missing cells parse as 0.
@@ -92,6 +93,7 @@ describe('parseInfotechGrid', () => {
       bonus: 0,
       gross: 5000,
       deduction: 0,
+      skbbk: 0,
       epfEr: 624,
       epfEe: 528,
       socsoEr: 83.15,
@@ -120,6 +122,14 @@ describe('parseInfotechGrid', () => {
     expect(result.rows[0].eisEe).toBe(11.9)
     expect(result.rows[0].pcb).toBe(733.35)
     expect(result.rows[0].net).toBe(9005)
+    // 2026-07-03: the SKBBK value itself now lands in skbbk (net-only
+    // employee deduction → skbbk_amount; NettWgs is already after it).
+    expect(result.rows[0].skbbk).toBe(10)
+  })
+
+  it('skbbk parses as 0 when the file has no SKBBK column (pre-June exports)', () => {
+    const result = parseInfotechGrid(CARRES_GRID)
+    result.rows.forEach(r => expect(r.skbbk).toBe(0))
   })
 
   // Regression for LING HONG XIANG (June 2026): month-end joiner whose 5-day
