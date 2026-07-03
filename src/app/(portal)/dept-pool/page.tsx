@@ -357,8 +357,8 @@ export default async function DeptPoolPage({
   // "Alliance = Director's slice; HL = everyone else's slice" convention
   // landing as intended. Drives a separate section below the main table.
   type BankInfo = { code: string; name: string; balance: number }
-  type PerBankRow = { segment: string; label: string; perBank: Record<string, number>; total: number }
-  let perBankBreakdown: { banks: BankInfo[]; rows: PerBankRow[]; totals: { perBank: Record<string, number>; grand: number } } | null = null
+  type PerBankRow = { segment: string; label: string; perBank: Record<string, number>; interBilling: number; total: number }
+  let perBankBreakdown: { banks: BankInfo[]; rows: PerBankRow[]; totals: { perBank: Record<string, number>; interBilling: number; grand: number } } | null = null
   if (user.role !== 'dept_manager') {
     const { data: bankRows } = await supabase
       .from('bank_accounts')
@@ -394,14 +394,27 @@ export default async function DeptPoolPage({
       // aggregates corporate + treasury (matches /venture-pool's filter and
       // dashboard hv_fund_balance per mig 273). Skip 'unallocated'.
       //
-      // NOTE: this table is GL-derived (journal_lines) only, so it deliberately
-      // does NOT include the 'Venture Office' pseudo-dept dept_pools overlay
-      // that ventureCash folds in above. That overlay is the netting-offset side
-      // of a dept→Venture inter-billing, which moved NO bank cash — so it has no
-      // per-bank column to land in, and adding it here would break the
-      // column-sums-to-bank-balance reconciliation. The overlay is a dept_pools
-      // ledger construct; it belongs only in the ledger-based "By department"
-      // Venture row, not in this bank-reconciliation view.
+      // The per-bank cells stay GL-derived (journal_lines) so each bank COLUMN
+      // still sums to that bank's balance. But inter-billing settles move cash
+      // allocation in the dept_pools ledger (paying dept inter_billing_out −X /
+      // Venture-Office np_in +X) WITHOUT any bank JE — so the pure-GL slice
+      // diverges from the "By department" pool balance by exactly that net.
+      // We surface it as an explicit 'Inter-billing' column: each row's Total
+      // then foots to the pool balance shown in "By department", while the
+      // inter-billing adjustments net to zero across departments so the bank
+      // columns (and grand total) still reconcile to the physical bank.
+      const nameToSeg: Record<string, string> = {
+        Marketing: 'marketing',
+        HR: 'hr',
+        Finance: 'finance',
+        'Director Office': 'director_office',
+        Director: 'director',
+      }
+      const segToBalance = new Map<string, number>()
+      for (const d of departments ?? []) {
+        const seg = nameToSeg[d.name as string]
+        if (seg) segToBalance.set(seg, balanceMap.get(d.id as string) ?? 0)
+      }
       const segLabels: Array<{ seg: string | string[]; label: string }> = [
         { seg: 'director',                       label: 'Director' },
         { seg: 'director_office',                label: 'Director Office' },
@@ -412,21 +425,33 @@ export default async function DeptPoolPage({
       ]
       const rows: PerBankRow[] = segLabels.map(({ seg, label }) => {
         const perBank: Record<string, number> = {}
-        let total = 0
+        let glTotal = 0
         const segs = Array.isArray(seg) ? seg : [seg]
         for (const b of banks) {
           const v = segs.reduce((s, sg) => s + (agg.get(sg)?.get(b.code) ?? 0), 0)
           perBank[b.code] = v
-          total += v
+          glTotal += v
         }
-        return { segment: Array.isArray(seg) ? seg.join('+') : seg, label, perBank, total }
+        const segKey = Array.isArray(seg) ? seg.join('+') : seg
+        // Pool balance from "By department": Venture = GL corporate/treasury
+        // slice + Venture-Office overlay (already in ventureCash.balance); the
+        // 5 real depts come from the dept_pool_balances view (balanceMap). The
+        // inter-billing adjustment is whatever the pool ledger carries that the
+        // bank GL slice does not.
+        const poolBalance = label === 'Venture (Office)'
+          ? (ventureCash?.balance ?? glTotal)
+          : (segToBalance.get(segKey) ?? glTotal)
+        const interBilling = Math.round((poolBalance - glTotal) * 100) / 100
+        return { segment: segKey, label, perBank, interBilling, total: poolBalance }
       })
-      const totals = { perBank: {} as Record<string, number>, grand: 0 }
+      const totals = { perBank: {} as Record<string, number>, interBilling: 0, grand: 0 }
       for (const b of banks) {
         const sum = rows.reduce((s, r) => s + (r.perBank[b.code] ?? 0), 0)
         totals.perBank[b.code] = sum
         totals.grand += sum
       }
+      totals.interBilling = Math.round(rows.reduce((s, r) => s + r.interBilling, 0) * 100) / 100
+      totals.grand = Math.round((totals.grand + totals.interBilling) * 100) / 100
       perBankBreakdown = { banks, rows, totals }
     }
   }
@@ -615,8 +640,11 @@ export default async function DeptPoolPage({
             </span>
           </div>
           <p className="font-serif italic text-muted text-xs mb-4 max-w-2xl">
-            Per-segment cash slice on each HV bank account. Sums down each
-            column = bank balance; sums across each row = department total.
+            Per-segment cash slice on each HV bank account. Sums down each bank
+            column = bank balance. The Inter-billing column carries internal
+            recharge transfers (paying dept −, receiving dept +) that moved no
+            bank cash, so each row&apos;s Total foots to the &ldquo;By
+            department&rdquo; pool balance.
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -628,6 +656,7 @@ export default async function DeptPoolPage({
                       {b.name} <span className="font-mono text-muted">({b.code})</span>
                     </th>
                   ))}
+                  <th className="text-right py-3 pr-4 font-medium">Inter-billing</th>
                   <th className="text-right py-3 pr-4 font-medium">Total</th>
                 </tr>
               </thead>
@@ -646,6 +675,9 @@ export default async function DeptPoolPage({
                         </td>
                       )
                     })}
+                    <td className={`py-3 pr-4 text-right font-mono tabular ${r.interBilling < 0 ? 'text-danger' : 'text-graphite'}`}>
+                      {r.interBilling === 0 ? '—' : formatMoney(r.interBilling)}
+                    </td>
                     <td className={`py-3 pr-4 text-right font-mono tabular font-semibold ${r.total < 0 ? 'text-danger' : 'text-ink'}`}>
                       {formatMoney(r.total)}
                     </td>
@@ -658,6 +690,9 @@ export default async function DeptPoolPage({
                       {formatMoney(perBankBreakdown!.totals.perBank[b.code] ?? 0)}
                     </td>
                   ))}
+                  <td className="py-3 pr-4 text-right font-mono tabular font-semibold text-graphite">
+                    {perBankBreakdown.totals.interBilling === 0 ? '—' : formatMoney(perBankBreakdown.totals.interBilling)}
+                  </td>
                   <td className="py-3 pr-4 text-right font-mono tabular font-semibold text-num-ink">
                     {formatMoney(perBankBreakdown.totals.grand)}
                   </td>
