@@ -207,7 +207,7 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
                     <div className="font-mono text-xs text-muted">{comp.short_code}</div>
                   </td>
                   {(['basic', 'kpi', 'allowance'] as const).map(field => (
-                    <td key={field} className="py-3 pr-4">
+                    <td key={field} className="py-3 pr-4 text-right">
                       <input
                         type="number"
                         step="0.01"
