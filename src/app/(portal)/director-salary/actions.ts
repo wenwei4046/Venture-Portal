@@ -72,9 +72,30 @@ export async function batchSaveCTC(period: string, records: BatchCTCInput[]) {
 
   await assertPeriodOpen(supabase, periodNorm)
 
-  const rows = records
-    .filter(r => r.basic > 0 || r.kpi > 0 || r.allowance > 0)
-    .map(r => ({
+  // An all-zero row is an explicit "this company has no CTC this month" —
+  // delete its rows instead of silently skipping them (pre-2026-07-03 the
+  // skip made a wrongly-entered company permanent: RLS blocked DELETE and
+  // zeros never reached the server).
+  const keep = records.filter(r => r.basic > 0 || r.kpi > 0 || r.allowance > 0)
+  const clearedCompanyIds = records
+    .filter(r => r.basic <= 0 && r.kpi <= 0 && r.allowance <= 0)
+    .map(r => r.companyId)
+
+  if (keep.length === 0 && clearedCompanyIds.length === 0) {
+    throw new Error('No CTC data to save')
+  }
+
+  if (clearedCompanyIds.length > 0) {
+    const { error: delErr } = await supabase
+      .from('director_ctc')
+      .delete()
+      .eq('period_month', periodNorm)
+      .in('company_id', clearedCompanyIds)
+    if (delErr) throw new Error(`Failed to clear CTC rows: ${delErr.message}`)
+  }
+
+  if (keep.length > 0) {
+    const rows = keep.map(r => ({
       director_id: r.directorId,
       company_id: r.companyId,
       period_month: periodNorm,
@@ -84,16 +105,15 @@ export async function batchSaveCTC(period: string, records: BatchCTCInput[]) {
       created_by: user.id,
     }))
 
-  if (rows.length === 0) throw new Error('No CTC data to save')
+    const { error } = await supabase.from('director_ctc').upsert(rows, {
+      onConflict: 'director_id,company_id,period_month',
+    })
 
-  const { error } = await supabase.from('director_ctc').upsert(rows, {
-    onConflict: 'director_id,company_id,period_month',
-  })
-
-  if (error) throw new Error(`Failed to save CTC batch: ${error.message}`)
+    if (error) throw new Error(`Failed to save CTC batch: ${error.message}`)
+  }
 
   revalidatePath('/director-salary')
-  return { saved: rows.length }
+  return { saved: keep.length, cleared: clearedCompanyIds.length }
 }
 
 // ─── Calculate Director Salary ─────────────────────────────────────
@@ -126,7 +146,42 @@ export async function calculateDirectorSalary(
     .eq('period_month', periodNorm)
 
   if (ctcErr) throw new Error(`Failed to fetch CTC: ${ctcErr.message}`)
-  if (!ctcRows || ctcRows.length === 0) throw new Error('No CTC data for this period. Please enter CTC first.')
+
+  // No CTC at all = HR cleared the month. Don't error out and strand the
+  // previous calculation — wipe it via the same RPC a recalc uses (deletes
+  // draft payouts + this period's 25% accumulation; refuses if anything is
+  // already confirmed/paid). 2026-07-03: clearing the grid used to leave the
+  // stale Per-Director Payouts on screen forever.
+  if (!ctcRows || ctcRows.length === 0) {
+    const { data: clearResult, error: clearErr } = await supabase.rpc(
+      'save_director_salary_results',
+      {
+        p_data: {
+          period_month: periodNorm,
+          pool: {
+            total_ctc_in: 0,
+            total_pool: 0,
+            basic_ratio: 0,
+            kpi_ratio: 0,
+            allowance_ratio: 0,
+          },
+          total_saving: 0,
+          total_statutory_surplus: 0,
+          payouts: [],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
+      },
+    )
+    if (clearErr) throw new Error(`Failed to clear old calculation: ${clearErr.message}`)
+
+    const cr = clearResult as { success: boolean; error?: string }
+    if (!cr.success) throw new Error(cr.error ?? 'Failed to clear old calculation')
+
+    revalidatePath('/director-salary')
+    revalidatePath('/dashboard')
+
+    return { success: true, saved: 0, skipped: 0, advanceTotal: 0, period: periodNorm }
+  }
 
   // 2. Fetch directors
   const { data: directors, error: dirErr } = await supabase

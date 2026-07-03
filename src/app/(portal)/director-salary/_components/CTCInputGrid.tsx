@@ -147,19 +147,18 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
     setStatus('idle')
     setSavedCount(0)
 
-    // Save all company entries under the pool director
+    // Save all company entries under the pool director. Zero rows are sent
+    // too — the server treats an all-zero company as "clear this company's
+    // CTC for the period" (deletes the stale rows instead of skipping them).
     const records: BatchCTCInput[] = []
     for (const comp of companies) {
-      const basic = getValue(comp.id, 'basic')
-      const kpi = getValue(comp.id, 'kpi')
-      const allowance = getValue(comp.id, 'allowance')
-      if (basic > 0 || kpi > 0 || allowance > 0) {
-        records.push({
-          directorId: poolDirectorId,
-          companyId: comp.id,
-          basic, kpi, allowance,
-        })
-      }
+      records.push({
+        directorId: poolDirectorId,
+        companyId: comp.id,
+        basic: getValue(comp.id, 'basic'),
+        kpi: getValue(comp.id, 'kpi'),
+        allowance: getValue(comp.id, 'allowance'),
+      })
     }
 
     startTransition(async () => {
