@@ -509,7 +509,8 @@ export async function listPayableFundSources(
       .select('fund_source_id, source_type, from_company_id, from_director_id, from_department_id, original_amount, cost_rate, lock_in_months, outstanding, monthly_payment, total_principal_paid'),
     supabase.from('fund_sources').select('id, status, from_freetext_name'),
     supabase.from('companies').select('id, name, short_code'),
-    supabase.from('departments').select('id, name'),
+    // is_internal=false — the 'Venture Office' pseudo-dept is not a fund source.
+    supabase.from('departments').select('id, name').eq('is_internal', false),
     supabase.from('directors').select('id, name'),
     fetchAllRows((lo, hi) => supabase
       .from('fund_source_repayments')

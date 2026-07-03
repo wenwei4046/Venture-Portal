@@ -105,7 +105,9 @@ export async function fetchGlRefs(supabase: SupabaseClient): Promise<GlRefs> {
         .from('invoices')
         .select('id, invoice_no, description, company_id, billable_to_department_id, billable_to_freetext_name'),
       supabase.from('companies').select('id, name, short_code'),
-      supabase.from('departments').select('id, name'),
+      // is_internal=false — the 'Venture Office' pseudo-dept is never a billable
+      // party; keep it out of the id→name resolver too.
+      supabase.from('departments').select('id, name').eq('is_internal', false),
       supabase.from('payment_vouchers').select('id, payee_name'),
     ])
   if (iErr) throw new Error(`fetchGlRefs invoices: ${iErr.message}`)

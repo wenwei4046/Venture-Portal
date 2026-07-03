@@ -52,10 +52,14 @@ export default async function DeptPoolPage({
 
   const period = getPeriodMonth()
 
-  // Load departments
+  // Load departments. Filter is_internal=false so the hidden 'Venture Office'
+  // pseudo-department (departments.is_internal=true) never renders as a 6th
+  // real department in the "By department" list. Its ledger is instead folded
+  // into the Venture (Office) row below (see ventureCash).
   const { data: departments } = await supabase
     .from('departments')
     .select('id, name')
+    .eq('is_internal', false)
     .order('name')
 
   // Dept Manager sees only their own dept
@@ -232,6 +236,24 @@ export default async function DeptPoolPage({
     (balances ?? []).map((b) => [b.department_id as string, Number(b.balance)])
   )
 
+  // Resolve the hidden 'Venture Office' pseudo-department. Its dept_pools
+  // ledger is an OVERLAY on the GL-derived Venture (Office) cash figure — see
+  // the three-way distinction documented on ventureCash below. We pull its
+  // balance + In/Out out of the real-dept maps so it is neither rendered as a
+  // 6th department nor double-counted in the grand total; it is folded into
+  // ventureCash instead.
+  const { data: ventureOfficeDept } = await supabase
+    .from('departments')
+    .select('id')
+    .eq('is_internal', true)
+    .eq('name', 'Venture Office')
+    .maybeSingle()
+  const ventureOfficeId = ventureOfficeDept?.id as string | undefined
+  // The pseudo-dept's own view balance (folded into ventureCash below). Remove
+  // it from balanceMap so the totalDeployed sum-over-real-depts excludes it.
+  const ventureOfficeBalance = ventureOfficeId ? (balanceMap.get(ventureOfficeId) ?? 0) : 0
+  if (ventureOfficeId) balanceMap.delete(ventureOfficeId)
+
   // This-month In / Out per dept. Only Marketing runs on P&L semantics
   // (revenue - staff cost - expenses); the other 4 pools are pure ledger
   // movement so we show credits in / debits out directly from dept_pools.
@@ -275,11 +297,22 @@ export default async function DeptPoolPage({
     }
   }
 
-  // Venture (= Office / corporate + treasury) cash movements = real cash
-  // impact of every journal entry tagged segment IN ('corporate','treasury')
-  // on a HV bank account. corporate covers generic HV expenses + historical
-  // OFFICE manual_jv; treasury covers fund_source / loan / repayment activity
-  // (auto-tagged by derive_journal_segment, mig 217).
+  // Venture (Office) cash — a THREE-WAY composite. Keep these distinct:
+  //   1. venture_pool ledger (adjustPool VENTURE_POOL, dept_pool_balances /
+  //      operating_pools) — feeds the ACCRUAL / treasury P&L view, NOT this
+  //      cash page. Never summed here.
+  //   2. GL corporate/treasury cash slice — real cash impact of every journal
+  //      entry tagged segment IN ('corporate','treasury') on a HV bank account
+  //      (computed as vIn/vOut below). corporate covers generic HV expenses +
+  //      historical OFFICE manual_jv; treasury covers fund_source / loan /
+  //      repayment activity (auto-tagged by derive_journal_segment, mig 217).
+  //   3. The 'Venture Office' pseudo-department dept_pools overlay — np_in rows
+  //      written at dept→Venture inter-billing settle time (payments/actions.ts)
+  //      so the paying dept's −X is offset by Venture +X and the cash-page total
+  //      still ties to the physical bank. Folded into ventureCash here.
+  // ventureCash = (2) + (3): both the "By department" Venture (Office) row AND
+  // the "Per-bank breakdown" Venture (Office) total therefore include the
+  // pseudo-dept overlay.
   let ventureCash: { balance: number; in_amt: number; out_amt: number } | null = null
   if (user.role !== 'dept_manager') {
     const { data: bankCodes } = await supabase
@@ -305,7 +338,18 @@ export default async function DeptPoolPage({
         vOut += Number(r.credit ?? 0)
       }
     }
-    ventureCash = { balance: vIn - vOut, in_amt: vIn, out_amt: vOut }
+    // Fold in the 'Venture Office' pseudo-dept overlay (item 3 above). Its
+    // In/Out come from dept_pools (via inOutByDept), its balance from the
+    // dept_pool_balances view (ventureOfficeBalance, already pulled out of the
+    // real-dept balanceMap).
+    const voInOut = ventureOfficeId
+      ? inOutByDept.get(ventureOfficeId) ?? { in_amt: 0, out_amt: 0 }
+      : { in_amt: 0, out_amt: 0 }
+    ventureCash = {
+      balance: vIn - vOut + ventureOfficeBalance,
+      in_amt: vIn + voInOut.in_amt,
+      out_amt: vOut + voInOut.out_amt,
+    }
   }
 
   // Per-bank × per-segment breakdown (cash basis only). Pulls the full
@@ -349,6 +393,15 @@ export default async function DeptPoolPage({
       // Build display rows. 5 dept segments individually, and Venture (Office)
       // aggregates corporate + treasury (matches /venture-pool's filter and
       // dashboard hv_fund_balance per mig 273). Skip 'unallocated'.
+      //
+      // NOTE: this table is GL-derived (journal_lines) only, so it deliberately
+      // does NOT include the 'Venture Office' pseudo-dept dept_pools overlay
+      // that ventureCash folds in above. That overlay is the netting-offset side
+      // of a dept→Venture inter-billing, which moved NO bank cash — so it has no
+      // per-bank column to land in, and adding it here would break the
+      // column-sums-to-bank-balance reconciliation. The overlay is a dept_pools
+      // ledger construct; it belongs only in the ledger-based "By department"
+      // Venture row, not in this bank-reconciliation view.
       const segLabels: Array<{ seg: string | string[]; label: string }> = [
         { seg: 'director',                       label: 'Director' },
         { seg: 'director_office',                label: 'Director Office' },
@@ -378,11 +431,15 @@ export default async function DeptPoolPage({
     }
   }
 
-  // Total cash = sum of dept balances + Venture (corporate segment from GL).
-  // Director and Office are independent segments post the 2026-05-26 re-import
-  // (Director got a top-up FROM Office via cross-segment cleanup JE, so Office
-  // can be negative while Director > natural GL). Total ties bank-recon when
-  // all 6 segments' allocations sum to the physical bank balance.
+  // Total cash = sum of REAL dept balances + Venture (GL corporate/treasury
+  // slice + Venture Office pseudo-dept overlay). balanceMap has already had the
+  // pseudo-dept removed, and ventureCash.balance now carries its overlay, so
+  // the pseudo-dept balance is counted exactly once. For a dept→Venture
+  // inter-billing the paying dept is −X (inter_billing_out) and Venture Office
+  // is +X (np_in overlay), netting to zero — so the total still ties to the
+  // physical bank. Director and Office are independent segments post the
+  // 2026-05-26 re-import (Director got a top-up FROM Office via cross-segment
+  // cleanup JE, so Office can be negative while Director > natural GL).
   const totalDeployed =
     Array.from(balanceMap.values()).reduce((acc, b) => acc + b, 0) +
     (ventureCash?.balance ?? 0)

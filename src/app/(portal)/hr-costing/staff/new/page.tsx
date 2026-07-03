@@ -7,9 +7,12 @@ export default async function NewStaffPage() {
   await requireRole(['principal', 'hr'])
   const supabase = await createClient()
 
+  // is_internal=false excludes the hidden 'Venture Office' pseudo-department —
+  // staff can't be assigned to it.
   const { data: departments } = await supabase
     .from('departments')
     .select('id, name')
+    .eq('is_internal', false)
     .order('name')
 
   return (

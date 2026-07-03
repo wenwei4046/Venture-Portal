@@ -51,7 +51,8 @@ export default async function FundInPage({ searchParams }: Props) {
       .order('effective_date', { ascending: false }),
     supabase.from('companies').select('id, name, short_code'),
     supabase.from('directors').select('id, name, code'),
-    supabase.from('departments').select('id, name'),
+    // is_internal=false — the 'Venture Office' pseudo-dept is not a fund source.
+    supabase.from('departments').select('id, name').eq('is_internal', false),
   ])
 
   const sources = (fundSources ?? []) as FundSourceRow[]

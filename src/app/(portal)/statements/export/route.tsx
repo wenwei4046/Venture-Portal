@@ -75,10 +75,12 @@ export async function GET(req: Request) {
     .select('id, name, short_code')
     .eq('is_active', true)
 
-  // Fetch departments for dept_pool mapping
+  // Fetch departments for dept_pool mapping. is_internal=false excludes the
+  // 'Venture Office' pseudo-dept (never a statement counterparty).
   const { data: departments } = await supabase
     .from('departments')
     .select('id, name')
+    .eq('is_internal', false)
 
   const companyMap = new Map(
     (companies ?? []).map((c) => [c.id, { name: c.name as string, code: c.short_code as string }]),

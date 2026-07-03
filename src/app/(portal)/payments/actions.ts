@@ -386,6 +386,53 @@ export async function createPaymentVoucher(formData: FormData) {
     if (targetPool) {
       await adjustPool(supabase, targetPool, 'in', r2(amount), `PV ${voucherNo}: ${description}`, user.id, null, nowIso)
     }
+    // Venture (Office) cash overlay for dept→Venture inter-billing.
+    //
+    // When a REAL dept is billed by Venture (billing_mode='venture_attribution',
+    // or any mode mapping to VENTURE_POOL) and settles via netting, the paying
+    // dept is debited with an inter_billing_out row below, but the receiving
+    // credit landed via adjustPool(VENTURE_POOL,'in',…) into the venture_pool
+    // TREASURY/accrual ledger — NOT into a cash-page pool. So the Dept Pool →
+    // Cash page showed the paying dept −X with no offsetting +X anywhere, and
+    // its grand total under-stated the physical bank by X.
+    //
+    // Fix: ALSO write a dept_pools np_in against the hidden 'Venture Office'
+    // pseudo-department (departments.is_internal=true). The Cash page folds
+    // this pseudo-dept's ledger balance into its "Venture (Office)" row, so
+    // paying dept −X and Venture Office +X net to zero and the total ties to
+    // the bank again. The adjustPool(VENTURE_POOL,…) above is KEPT untouched
+    // (it feeds the accrual / treasury P&L view). No GL/JE is posted here and
+    // the bank cache is not touched — this is a pure cash-page overlay row.
+    if (interBilling && targetPool === 'venture_pool') {
+      const { data: ventureOffice, error: voErr } = await supabase
+        .from('departments')
+        .select('id')
+        .eq('is_internal', true)
+        .eq('name', 'Venture Office')
+        .maybeSingle()
+      // Fail loud — the pseudo-dept must exist (seeded by migration). Silently
+      // skipping would recreate the un-offset paying-dept debit this fix targets.
+      if (voErr || !ventureOffice?.id) {
+        throw new Error(
+          `Venture (Office) cash offset: 'Venture Office' pseudo-department not found (PV ${voucherNo})${voErr ? `: ${voErr.message}` : ''}`,
+        )
+      }
+      const ventureOfficeRow = {
+        department_id: ventureOffice.id,
+        transaction_type: 'np_in',
+        amount: r2(amount),
+        description: `PV ${voucherNo}: Venture (Office) cash offset — inter-billing ${description}`,
+        created_by: user.id,
+      }
+      const { error: voInsertErr } = await supabase
+        .from('dept_pools')
+        .insert(ventureOfficeRow as never)
+      if (voInsertErr) {
+        throw new Error(
+          `Venture (Office) cash offset dept_pools insert failed (PV ${voucherNo}): ${voInsertErr.message}`,
+        )
+      }
+    }
     // Inter-billing: mirror the dept_pools ledger for the paying side. The
     // /dept-pool views read In/Out figures from dept_pools.transaction_type,
     // NOT from payment_voucher_sources, so without this row the paying

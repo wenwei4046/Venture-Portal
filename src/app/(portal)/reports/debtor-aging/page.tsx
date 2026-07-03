@@ -25,7 +25,9 @@ export default async function DebtorAgingPage() {
         .range(lo, hi),
     ),
     fetchAllRows((lo, hi) => supabase.from('companies').select('id, name').range(lo, hi)),
-    fetchAllRows((lo, hi) => supabase.from('departments').select('id, name').range(lo, hi)),
+    // is_internal=false — exclude the 'Venture Office' pseudo-dept from the
+    // id→name resolver (never a debtor).
+    fetchAllRows((lo, hi) => supabase.from('departments').select('id, name').eq('is_internal', false).range(lo, hi)),
   ])
 
   const companyMap = new Map((companies ?? []).map((c) => [c.id as string, c.name as string]))

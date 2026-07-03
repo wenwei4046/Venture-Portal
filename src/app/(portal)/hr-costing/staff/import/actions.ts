@@ -83,7 +83,8 @@ export async function previewInfotechStaffImport(
       .from('hr_staff_costs')
       .select('id, employee_code, employee_name, department_id, designation, basic_salary, hire_date, nric, bank_name, bank_account_no')
       .not('employee_code', 'is', null),
-    supabase.from('departments').select('id, name'),
+    // is_internal=false — the 'Venture Office' pseudo-dept is not a staff dept.
+    supabase.from('departments').select('id, name').eq('is_internal', false),
   ])
 
   const existingByCode = new Map(
@@ -201,6 +202,7 @@ export async function applyInfotechStaffImport(
   const { data: departments } = await supabase
     .from('departments')
     .select('id, name')
+    .eq('is_internal', false)
   const deptByName = new Map(
     (departments ?? []).map(d => [d.name.toLowerCase(), d.id]),
   )

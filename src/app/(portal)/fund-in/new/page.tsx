@@ -17,7 +17,8 @@ export default async function NewFundInPage() {
       .select('*')
       .eq('is_active', true)
       .order('short_code'),
-    supabase.from('departments').select('id, name').order('name'),
+    // is_internal=false — the 'Venture Office' pseudo-dept is not a fund source.
+    supabase.from('departments').select('id, name').eq('is_internal', false).order('name'),
     supabase
       .from('chart_of_accounts')
       .select('code, name, type, parent_code, is_active')

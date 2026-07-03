@@ -1,0 +1,28 @@
+-- Venture (Office) cash overlay — RLS verdict for the dept_pools np_in insert
+-- against the hidden 'Venture Office' pseudo-department.
+--
+-- The Settle flow (src/app/(portal)/payments/actions.ts) now inserts an extra
+-- dept_pools row when a REAL dept settles a Venture (receiver = VENTURE_POOL)
+-- inter-billing via netting:
+--     { department_id: <Venture Office pseudo-dept>, transaction_type: 'np_in',
+--       amount, ... }
+-- This insert runs as the Finance user (createPaymentVoucher requireRole
+-- ['finance']).
+--
+-- VERDICT: NO POLICY CHANGE NEEDED.
+--
+-- The existing Finance np_in policy is:
+--     dept_pools_finance_insert:
+--       WITH CHECK ((current_user_role() = 'finance'::user_role)
+--                   AND (transaction_type = 'np_in'::dept_pool_txn_type))
+-- It gates ONLY on role = finance AND transaction_type = 'np_in'. It does NOT
+-- restrict department_id. The pseudo-dept np_in insert therefore satisfies the
+-- WITH CHECK exactly as-is — no department_id predicate can reject it.
+--
+-- (Verified against pg_policies on 2026-07-03. The dept_manager insert policy
+-- IS department-scoped, but that path is irrelevant here — the overlay row is
+-- always written by Finance, never a dept_manager.)
+--
+-- This migration is intentionally a no-op comment record so the decision is
+-- captured in the migration history. No DDL is executed.
+SELECT 1;

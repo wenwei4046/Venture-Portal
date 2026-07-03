@@ -104,7 +104,8 @@ export async function GET(req: Request) {
 
   const [{ data: companies }, { data: departments }, { data: coaRows }] = await Promise.all([
     supabase.from('companies').select('id, name, short_code'),
-    supabase.from('departments').select('id, name'),
+    // is_internal=false — the 'Venture Office' pseudo-dept is never a billable party.
+    supabase.from('departments').select('id, name').eq('is_internal', false),
     supabase.from('chart_of_accounts').select('code, name'),
   ])
   const companyMap = new Map(

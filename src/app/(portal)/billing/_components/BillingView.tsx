@@ -69,7 +69,9 @@ export default async function BillingView({ searchParams }: Props) {
       .gte('created_at', periodStart)
       .lte('created_at', periodEnd)
       .order('created_at', { ascending: false }),
-    supabase.from('departments').select('id, name').order('name'),
+    // is_internal=false — the 'Venture Office' pseudo-dept must not appear in
+    // the invoice "bill to" department picker (it is not a billable dept).
+    supabase.from('departments').select('id, name').eq('is_internal', false).order('name'),
     // Post-mig 238: payment_categories is gone. Pull every active leaf
     // account from chart_of_accounts so the invoice "category" picker can
     // route the credit side anywhere — revenue (5000s), other_income (9000)
