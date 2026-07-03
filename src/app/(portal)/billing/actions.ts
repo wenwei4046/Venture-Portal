@@ -427,6 +427,55 @@ export async function fetchDirectorCtcByCompany(
   }))
 }
 
+// ─── Staff allocation per company for a dept (invoice auto-fill) ─────────────
+//
+// 2026-07-03: same idea as fetchDirectorCtcByCompany but for shared-services
+// staff. HR enters per-employee % splits (/hr-costing/allocation); the RPC
+// aggregates employer cost × pct per dept × company. Aggregate-only — no
+// staff names or salaries. Used to pre-populate the per-sub amount rows when
+// Finance opens Create Invoice with an *_attribution mode.
+
+export interface StaffAllocationCompanyRow {
+  companyId: string
+  shortCode: string
+  name: string
+  amount: number
+}
+
+const MODE_TO_DEPT: Partial<Record<CreateInvoiceMode, string>> = {
+  hr_attribution: 'HR',
+  finance_attribution: 'Finance',
+  director_office_attribution: 'Director Office',
+}
+
+export async function fetchStaffAllocationByCompany(
+  periodMonth: string,
+  mode: CreateInvoiceMode,
+): Promise<StaffAllocationCompanyRow[]> {
+  await requireRole(['principal', 'finance', 'hr'])
+  const supabase = await createClient()
+
+  const deptName = MODE_TO_DEPT[mode]
+  if (!deptName) return []
+
+  const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
+
+  const { data, error } = await supabase.rpc('get_staff_billing_allocation', {
+    p_period_month: period,
+  })
+
+  if (error) throw new Error(`Failed to fetch staff allocation: ${error.message}`)
+
+  return (data ?? [])
+    .filter((r) => r.department_name === deptName)
+    .map((r) => ({
+      companyId: r.company_id,
+      shortCode: r.company_short_code,
+      name: r.company_name,
+      amount: Number(r.amount),
+    }))
+}
+
 // ─── Generate monthly invoices for a period (Finance) ────────────────────────
 
 export async function generateMonthlyInvoices(

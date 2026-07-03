@@ -195,6 +195,33 @@ export default async function BillingView({ searchParams }: Props) {
   const financeFromPayroll = payrollSubmitted ? Number(payrollRun?.finance_opex_total ?? 0) : 0
   const directorOfficeFromPayroll = payrollSubmitted ? Number(payrollRun?.director_office_total ?? 0) : 0
 
+  // Staff billing allocation (2026-07-03): HR splits each employee's employer
+  // cost across subsidiaries by % (/hr-costing/allocation). The RPC returns
+  // dept × company aggregates only — no names, no individual salaries — so
+  // Finance can read it. Amounts reconcile against the dept OPEX cards: the
+  // gap between a dept's OPEX total and its allocated sum is HV's own share.
+  const { data: staffAllocRows, error: staffAllocError } = await supabase.rpc(
+    'get_staff_billing_allocation',
+    { p_period_month: period },
+  )
+  if (staffAllocError) {
+    console.error('get_staff_billing_allocation failed:', staffAllocError.message)
+  }
+  const allocByDept = new Map<
+    string,
+    Array<{ company_id: string; company_short_code: string; company_name: string; amount: number }>
+  >()
+  for (const r of staffAllocRows ?? []) {
+    const list = allocByDept.get(r.department_name) ?? []
+    list.push({
+      company_id: r.company_id,
+      company_short_code: r.company_short_code,
+      company_name: r.company_name,
+      amount: Number(r.amount),
+    })
+    allocByDept.set(r.department_name, list)
+  }
+
   // Director salary is decoupled from the staff run (mig 278/279) — Finance
   // reads the Director Payroll Submission snapshot. Legacy runs (pre-278)
   // still carry director_salary_total, so fall back to that.
@@ -431,6 +458,82 @@ export default async function BillingView({ searchParams }: Props) {
                 </tr>
               </tbody>
             </table>
+          </div>
+        </section>
+      )}
+
+      {/* Staff Billing Allocation — per-employee % splits entered by HR
+          (/hr-costing/allocation), aggregated per dept × subsidiary. These are
+          the amounts to bill each company for shared-services staff; the
+          unallocated remainder stays with HV and is not billed. */}
+      {allocByDept.size > 0 && (
+        <section className="mb-12">
+          <div className="sect-head">
+            <h2>Staff Billing Allocation</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">
+              {allocByDept.size} DEPARTMENT{allocByDept.size === 1 ? '' : 'S'}
+            </span>
+          </div>
+          <div className="font-mono text-xs text-muted mb-4">
+            Per-staff % splits from HR · employer cost basis (gross + EPF/SOCSO/EIS ER) ·
+            unallocated share stays with HV
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {[...allocByDept.entries()].map(([deptName, rows]) => {
+              const billed = rows.reduce((s, r) => s + r.amount, 0)
+              const deptOpex =
+                deptName === 'HR'
+                  ? hrFromPayroll
+                  : deptName === 'Finance'
+                    ? financeFromPayroll
+                    : deptName === 'Director Office'
+                      ? directorOfficeFromPayroll
+                      : deptName === 'Marketing'
+                        ? marketingFromPayroll
+                        : null
+              const hvShare =
+                deptOpex !== null ? Math.round((deptOpex - billed) * 100) / 100 : null
+              return (
+                <div key={deptName} className="overflow-x-auto">
+                  <table className="ledger-table">
+                    <thead>
+                      <tr>
+                        <th>{deptName}</th>
+                        <th className="right">Bill Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r) => (
+                        <tr key={r.company_id}>
+                          <td>
+                            <div className="font-serif text-[15px] text-ink">
+                              {r.company_short_code}
+                            </div>
+                            <div className="font-mono text-[11px] text-graphite mt-0.5">
+                              {r.company_name}
+                            </div>
+                          </td>
+                          <td className="num">{formatMoney(r.amount)}</td>
+                        </tr>
+                      ))}
+                      <tr>
+                        <td className="font-serif italic text-accent">Billable total</td>
+                        <td className="num font-semibold">{formatMoney(billed)}</td>
+                      </tr>
+                      {hvShare !== null && hvShare > 0 && (
+                        <tr>
+                          <td className="font-serif italic text-graphite">
+                            HV own share (not billed)
+                          </td>
+                          <td className="num text-graphite">{formatMoney(hvShare)}</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            })}
           </div>
         </section>
       )}

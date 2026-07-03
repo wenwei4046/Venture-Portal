@@ -403,6 +403,13 @@ export default async function PayrollGridPage({ params }: PageProps) {
           {phase === 'drafting' && (
             <CopyFromLastMonthButton period={period} />
           )}
+          <Link
+            href={`/hr-costing/allocation/${period}`}
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
+            title="Split each employee's cost across subsidiaries for billing"
+          >
+            Billing Allocation
+          </Link>
         </div>
         <MoreActionsDropdown
           actions={[

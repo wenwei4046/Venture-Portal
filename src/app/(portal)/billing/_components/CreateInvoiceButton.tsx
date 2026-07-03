@@ -6,6 +6,7 @@ import dayjs from 'dayjs'
 import {
   createManualInvoice,
   fetchDirectorCtcByCompany,
+  fetchStaffAllocationByCompany,
   type BillableToKind,
   type CreateInvoiceMode,
 } from '../actions'
@@ -215,12 +216,18 @@ export default function CreateInvoiceButton({
   // director_attribution as the FIRST pool entry. We trigger off the first
   // pool row's mode + period, and only when there's exactly one pool row
   // (otherwise auto-fill semantics get muddy).
+  // 2026-07-03: hr/finance/director_office_attribution auto-fill the same way
+  // from HR's per-staff billing allocation (get_staff_billing_allocation).
   useEffect(() => {
     if (!open) return
     if (billableType !== 'subsidiary') return
     if (poolRows.length !== 1) return
     const firstMode = poolRows[0].mode
-    if (firstMode !== 'director_attribution') {
+    const isStaffAllocMode =
+      firstMode === 'hr_attribution' ||
+      firstMode === 'finance_attribution' ||
+      firstMode === 'director_office_attribution'
+    if (firstMode !== 'director_attribution' && !isStaffAllocMode) {
       setAutoFillNote(null)
       return
     }
@@ -229,12 +236,52 @@ export default function CreateInvoiceButton({
     autoFilledKey.current = key
 
     const periodIso = dayjs(period + '-01').format('YYYY-MM-DD')
+    const monthLabel = dayjs(period + '-01').format('MMM YYYY')
+
+    if (isStaffAllocMode) {
+      setAutoFillNote('Loading staff billing allocation from HR…')
+      fetchStaffAllocationByCompany(periodIso, firstMode)
+        .then((allocRows) => {
+          if (allocRows.length === 0) {
+            setAutoFillNote(
+              `No staff billing allocation entered by HR for ${monthLabel}. Enter amounts manually.`,
+            )
+            return
+          }
+          setSubRows(
+            allocRows.map((r) => ({
+              uid: crypto.randomUUID(),
+              companyId: r.companyId,
+              amount: r.amount.toFixed(2),
+            })),
+          )
+          setAutoFillNote(
+            `Auto-filled ${allocRows.length} subsidiary ${allocRows.length === 1 ? 'row' : 'rows'} from HR's staff billing allocation for ${monthLabel}. Edit amounts as needed.`,
+          )
+          if (!description.trim()) {
+            const deptLabel =
+              firstMode === 'hr_attribution'
+                ? 'HR'
+                : firstMode === 'finance_attribution'
+                  ? 'Finance'
+                  : 'Director Office'
+            setDescription(
+              `${deptLabel} staff cost allocation — ${dayjs(period + '-01').format('MMMM YYYY')}`,
+            )
+          }
+        })
+        .catch((err: unknown) => {
+          setAutoFillNote(`Auto-fill failed: ${err instanceof Error ? err.message : String(err)}`)
+        })
+      return
+    }
+
     setAutoFillNote('Loading director CTC from HR…')
     fetchDirectorCtcByCompany(periodIso)
       .then((ctcRows) => {
         if (ctcRows.length === 0) {
           setAutoFillNote(
-            `No director CTC entered by HR for ${dayjs(period + '-01').format('MMM YYYY')}. Enter amounts manually.`,
+            `No director CTC entered by HR for ${monthLabel}. Enter amounts manually.`,
           )
           return
         }
@@ -246,7 +293,7 @@ export default function CreateInvoiceButton({
           })),
         )
         setAutoFillNote(
-          `Auto-filled ${ctcRows.length} subsidiary ${ctcRows.length === 1 ? 'row' : 'rows'} from HR's director CTC for ${dayjs(period + '-01').format('MMM YYYY')}. Edit amounts as needed.`,
+          `Auto-filled ${ctcRows.length} subsidiary ${ctcRows.length === 1 ? 'row' : 'rows'} from HR's director CTC for ${monthLabel}. Edit amounts as needed.`,
         )
         if (!description.trim()) {
           setDescription(`Director salary CTC — ${dayjs(period + '-01').format('MMMM YYYY')}`)

@@ -7,6 +7,9 @@ interface Props {
   /** Appended to the period URL — e.g. '/import' keeps you on the import
    *  page while switching months. Defaults to the grid. */
   suffix?: string
+  /** Route prefix the picker navigates within. Defaults to the payroll grid;
+   *  the allocation editor passes its own. */
+  basePath?: string
 }
 
 function shiftMonth(ym: string, delta: number): string {
@@ -15,13 +18,17 @@ function shiftMonth(ym: string, delta: number): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
 }
 
-export default function PeriodPicker({ period, suffix = '' }: Props) {
+export default function PeriodPicker({
+  period,
+  suffix = '',
+  basePath = '/hr-costing/payroll',
+}: Props) {
   const router = useRouter()
   const ym = period.slice(0, 7)
 
   const go = (v: string) => {
     if (/^\d{4}-\d{2}$/.test(v)) {
-      router.push(`/hr-costing/payroll/${v}-01${suffix}`)
+      router.push(`${basePath}/${v}-01${suffix}`)
     }
   }
 

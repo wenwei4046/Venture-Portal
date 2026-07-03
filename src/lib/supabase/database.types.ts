@@ -4275,6 +4275,18 @@ export type Database = {
           required_amount: number
         }[]
       }
+      get_staff_billing_allocation: {
+        Args: { p_period_month: string }
+        Returns: {
+          department_id: string
+          department_name: string
+          company_id: string
+          company_name: string
+          company_short_code: string
+          staff_count: number
+          amount: number
+        }[]
+      }
       get_submitted_hr_summary: {
         Args: { p_period: string }
         Returns: {
