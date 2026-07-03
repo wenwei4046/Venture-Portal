@@ -108,6 +108,9 @@ export default async function PrintPayoutPage({ params, searchParams }: Props) {
             <tr><td>- SOCSO (ER+EE)</td><td className="negative">-{formatMoneyBare(n(payout.payroll_socso_er) + n(payout.payroll_socso_ee))}</td></tr>
             <tr><td>- EIS (ER+EE)</td><td className="negative">-{formatMoneyBare(n(payout.payroll_eis_er) + n(payout.payroll_eis_ee))}</td></tr>
             <tr><td>- PCB</td><td className="negative">-{formatMoneyBare(n(payout.payroll_pcb))}</td></tr>
+            {n(payout.payroll_skbbk) > 0 && (
+              <tr><td>- SKBBK</td><td className="negative">-{formatMoneyBare(n(payout.payroll_skbbk))}</td></tr>
+            )}
             <tr className="separator total">
               <td>Net Take Home</td>
               <td>{formatMoney(n(payout.payroll_net))}</td>

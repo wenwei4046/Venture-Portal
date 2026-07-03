@@ -11,6 +11,7 @@ type StatField =
   | 'payroll_socso_ee'
   | 'payroll_eis_er'
   | 'payroll_eis_ee'
+  | 'payroll_skbbk'
   | 'invoice_epf_er'
   | 'invoice_socso_er'
   | 'invoice_eis_er'

@@ -1091,6 +1091,7 @@ export type Database = {
           payroll_gross: number | null
           payroll_net: number | null
           payroll_pcb: number | null
+          payroll_skbbk: number
           payroll_socso_ee: number | null
           payroll_socso_er: number | null
           period_month: string
@@ -1131,6 +1132,7 @@ export type Database = {
           payroll_gross?: number | null
           payroll_net?: number | null
           payroll_pcb?: number | null
+          payroll_skbbk?: number
           payroll_socso_ee?: number | null
           payroll_socso_er?: number | null
           period_month: string
@@ -1171,6 +1173,7 @@ export type Database = {
           payroll_gross?: number | null
           payroll_net?: number | null
           payroll_pcb?: number | null
+          payroll_skbbk?: number
           payroll_socso_ee?: number | null
           payroll_socso_er?: number | null
           period_month?: string
@@ -3491,6 +3494,35 @@ export type Database = {
           },
         ]
       }
+      report_layouts: {
+        Row: {
+          layout: Json
+          report_key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          layout?: Json
+          report_key: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          layout?: Json
+          report_key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_layouts_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_contracts: {
         Row: {
           amount: number | null
@@ -4109,12 +4141,20 @@ export type Database = {
           out_staff_cost: number
         }[]
       }
+      cancel_dept_payment_request: {
+        Args: { p_reason?: string; p_request_id: string }
+        Returns: undefined
+      }
       cancel_loan_and_approval:
         | { Args: { p_loan_id: string }; Returns: undefined }
         | {
             Args: { p_cancel_reason?: string; p_loan_id: string }
             Returns: undefined
           }
+      change_account_type: {
+        Args: { p_new_type: string; p_old: string }
+        Returns: Json
+      }
       coa_is_header: { Args: { p_code: string }; Returns: boolean }
       compute_commission: {
         Args: { p_period: string; p_staff_id: string }
@@ -4122,6 +4162,7 @@ export type Database = {
       }
       create_loan_with_approval: {
         Args: {
+          p_bank_account_id?: string
           p_base_rate: number
           p_company_id: string
           p_company_name?: string
@@ -4139,6 +4180,7 @@ export type Database = {
         Args: {
           p_description: string
           p_lines: Json
+          p_segment?: string
           p_transaction_date: string
         }
         Returns: string
@@ -4158,6 +4200,10 @@ export type Database = {
         Returns: undefined
       }
       dept_pool_gl_code: { Args: { p_dept_name: string }; Returns: string }
+      dept_request_pv_rejected: {
+        Args: { p_voucher_id: string }
+        Returns: undefined
+      }
       dept_to_segment: {
         Args: { p_dept_name: string }
         Returns: Database["public"]["Enums"]["gl_segment"]
@@ -4165,6 +4211,10 @@ export type Database = {
       derive_journal_segment: {
         Args: { p_reference_id: string; p_reference_type: string }
         Returns: Database["public"]["Enums"]["gl_segment"]
+      }
+      execute_fund_source_cancel: {
+        Args: { p_fund_source_id: string }
+        Returns: string
       }
       execute_loan_cancel: { Args: { p_loan_id: string }; Returns: string }
       format_invoice_no: { Args: { p_period: string }; Returns: string }
@@ -4284,18 +4334,18 @@ export type Database = {
       get_staff_billing_allocation: {
         Args: { p_period_month: string }
         Returns: {
-          department_id: string
-          department_name: string
-          company_id: string | null
+          allowance_amount: number
+          amount: number
+          company_id: string
           company_name: string
           company_short_code: string
-          staff_count: number
-          amount: number
-          salary_amount: number
-          allowance_amount: number
-          epf_amount: number
-          socso_amount: number
+          department_id: string
+          department_name: string
           eis_amount: number
+          epf_amount: number
+          salary_amount: number
+          socso_amount: number
+          staff_count: number
         }[]
       }
       get_submitted_hr_summary: {
@@ -4311,6 +4361,10 @@ export type Database = {
       }
       hr_dashboard_summary: { Args: { p_period?: string }; Returns: Json }
       is_period_locked: { Args: { p_date: string }; Returns: boolean }
+      jv_apply_bank_cache: {
+        Args: { p_entry_id: string; p_sign: number }
+        Returns: undefined
+      }
       log_data_access: {
         Args: {
           p_action?: string
@@ -4401,6 +4455,10 @@ export type Database = {
         Args: { p_approver: string; p_reason: string; p_run_id: string }
         Returns: undefined
       }
+      rename_account_code: {
+        Args: { p_new: string; p_old: string }
+        Returns: Json
+      }
       reopen_director_salary: {
         Args: { p_period: string; p_user_id: string }
         Returns: undefined
@@ -4412,6 +4470,10 @@ export type Database = {
       request_loan_cancel: {
         Args: { p_loan_id: string; p_reason?: string }
         Returns: string
+      }
+      reverse_voucher_pool_rows: {
+        Args: { p_voucher_no: string }
+        Returns: number
       }
       save_director_salary_results: { Args: { p_data: Json }; Returns: Json }
       submit_dept_payment_request: {
@@ -4448,6 +4510,7 @@ export type Database = {
           p_description: string
           p_entry_id: string
           p_lines: Json
+          p_segment?: string
           p_transaction_date: string
         }
         Returns: undefined
@@ -4516,7 +4579,14 @@ export type Database = {
         | "pending_principal_pv"
         | "completed"
         | "cancelled"
-      dept_pool_txn_type: "np_in" | "expense_out" | "inter_billing_out"
+      dept_pool_txn_type:
+        | "np_in"
+        | "expense_out"
+        | "inter_billing_out"
+        | "void_in"
+        | "void_out"
+        | "jv_in"
+        | "jv_out"
       director_status: "active" | "inactive"
       epf_part: "A" | "C" | "E" | "F"
       fund_source_status:
@@ -4791,7 +4861,15 @@ export const Constants = {
         "completed",
         "cancelled",
       ],
-      dept_pool_txn_type: ["np_in", "expense_out", "inter_billing_out"],
+      dept_pool_txn_type: [
+        "np_in",
+        "expense_out",
+        "inter_billing_out",
+        "void_in",
+        "void_out",
+        "jv_in",
+        "jv_out",
+      ],
       director_status: ["active", "inactive"],
       epf_part: ["A", "C", "E", "F"],
       fund_source_status: [

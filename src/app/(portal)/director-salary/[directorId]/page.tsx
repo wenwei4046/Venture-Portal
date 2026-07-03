@@ -85,6 +85,7 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
   const totalDeductions = Number(payout.payroll_epf_er ?? 0) + Number(payout.payroll_epf_ee ?? 0)
     + Number(payout.payroll_socso_er ?? 0) + Number(payout.payroll_socso_ee ?? 0)
     + Number(payout.payroll_eis_er ?? 0) + Number(payout.payroll_eis_ee ?? 0)
+    + Number(payout.payroll_skbbk ?? 0)
 
   const n = (v: number | null) => Number(v ?? 0)
 
@@ -213,6 +214,10 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
               <div className="flex items-baseline justify-between">
                 <span className="font-serif italic text-sm text-graphite">EIS EE</span>
                 <EditableDeduction payoutId={payout.id} field="payroll_eis_ee" value={n(payout.payroll_eis_ee)} kind="payroll" readOnly={payout.status !== 'draft'} />
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="font-serif italic text-sm text-graphite">SKBBK <span className="text-muted">(EE, net-only)</span></span>
+                <EditableDeduction payoutId={payout.id} field="payroll_skbbk" value={n(payout.payroll_skbbk)} kind="payroll" readOnly={payout.status !== 'draft'} />
               </div>
               {payout.status === 'draft' && isOverridden ? (
                 <div className="pt-2">

@@ -414,7 +414,7 @@ export async function updatePCB(payoutId: string, pcbAmount: number) {
   // Fetch current payout to recalculate net
   const { data: payout, error: fetchErr } = await supabase
     .from('director_payouts')
-    .select('payroll_gross, payroll_epf_er, payroll_epf_ee, payroll_socso_er, payroll_socso_ee, payroll_eis_er, payroll_eis_ee, status')
+    .select('payroll_gross, payroll_epf_er, payroll_epf_ee, payroll_socso_er, payroll_socso_ee, payroll_eis_er, payroll_eis_ee, payroll_skbbk, status')
     .eq('id', payoutId)
     .single()
 
@@ -424,6 +424,7 @@ export async function updatePCB(payoutId: string, pcbAmount: number) {
   const totalDeductions = Number(payout.payroll_epf_er ?? 0) + Number(payout.payroll_epf_ee ?? 0)
     + Number(payout.payroll_socso_er ?? 0) + Number(payout.payroll_socso_ee ?? 0)
     + Number(payout.payroll_eis_er ?? 0) + Number(payout.payroll_eis_ee ?? 0)
+    + Number(payout.payroll_skbbk ?? 0)
   const payrollNet = Number(payout.payroll_gross ?? 0) - totalDeductions - pcbAmount
 
   const { error } = await supabase
@@ -452,6 +453,9 @@ const PAYROLL_STAT_FIELDS = [
   'payroll_socso_ee',
   'payroll_eis_er',
   'payroll_eis_ee',
+  // SKBBK: net-only employee deduction, manual entry (no lookup table).
+  // Rides the same override path so HR keys it inline like the others.
+  'payroll_skbbk',
 ] as const
 const INVOICE_STAT_FIELDS = [
   'invoice_epf_er',
@@ -471,6 +475,7 @@ function recomputePayrollNet(row: {
   payroll_eis_er: number | null
   payroll_eis_ee: number | null
   payroll_pcb: number | null
+  payroll_skbbk: number | null
 }): number {
   const gross = Number(row.payroll_gross ?? 0)
   const deductions =
@@ -478,7 +483,8 @@ function recomputePayrollNet(row: {
     Number(row.payroll_socso_er ?? 0) + Number(row.payroll_socso_ee ?? 0) +
     Number(row.payroll_eis_er ?? 0) + Number(row.payroll_eis_ee ?? 0)
   const pcb = Number(row.payroll_pcb ?? 0)
-  return Math.round((gross - deductions - pcb) * 100) / 100
+  const skbbk = Number(row.payroll_skbbk ?? 0)
+  return Math.round((gross - deductions - pcb - skbbk) * 100) / 100
 }
 
 export async function updateDirectorStatutory(payoutId: string, fields: DirectorStatutoryUpdate) {
@@ -503,7 +509,7 @@ export async function updateDirectorStatutory(payoutId: string, fields: Director
   const { data: row, error: fetchErr } = await supabase
     .from('director_payouts')
     .select(
-      'id, status, payroll_gross, payroll_epf_er, payroll_epf_ee, payroll_socso_er, payroll_socso_ee, payroll_eis_er, payroll_eis_ee, payroll_pcb',
+      'id, status, payroll_gross, payroll_epf_er, payroll_epf_ee, payroll_socso_er, payroll_socso_ee, payroll_eis_er, payroll_eis_ee, payroll_pcb, payroll_skbbk',
     )
     .eq('id', payoutId)
     .single()
@@ -536,7 +542,7 @@ export async function resetDirectorStatutoryToLookup(payoutId: string) {
   const { data: row, error: fetchErr } = await supabase
     .from('director_payouts')
     .select(
-      'id, status, payroll_bk, invoice_bk, payroll_gross, payroll_pcb',
+      'id, status, payroll_bk, invoice_bk, payroll_gross, payroll_pcb, payroll_skbbk',
     )
     .eq('id', payoutId)
     .single()
@@ -573,6 +579,8 @@ export async function resetDirectorStatutoryToLookup(payoutId: string) {
     payroll_eis_er: payrollEisEr,
     payroll_eis_ee: payrollEisEe,
     payroll_pcb: row.payroll_pcb,
+    // SKBBK is manual (no lookup) — reset keeps it, net recompute includes it.
+    payroll_skbbk: row.payroll_skbbk,
   }
   const payrollNet = recomputePayrollNet(merged)
 

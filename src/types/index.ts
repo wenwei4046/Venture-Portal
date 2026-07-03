@@ -311,6 +311,7 @@ export interface DirectorPayout {
   payroll_eis_er: number
   payroll_eis_ee: number
   payroll_pcb: number
+  payroll_skbbk: number
   payroll_net: number
   invoice_base: number
   invoice_bk: number

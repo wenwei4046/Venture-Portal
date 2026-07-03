@@ -36,7 +36,7 @@ export default async function DirectorReportPage({ params }: PageProps) {
       .eq('period_month', run.period_month),
     supabase
       .from('director_payouts')
-      .select('id, gross_amount, saving_amount, advance_amount, advance_repaid, advance_balance, payroll_gross, payroll_epf_er, payroll_epf_ee, payroll_socso_er, payroll_socso_ee, payroll_eis_er, payroll_eis_ee, payroll_pcb, payroll_net, invoice_base, invoice_epf_er, invoice_socso_er, invoice_eis_er, invoice_total, statutory_surplus, calculation_snapshot, directors(name, code)')
+      .select('id, gross_amount, saving_amount, advance_amount, advance_repaid, advance_balance, payroll_gross, payroll_epf_er, payroll_epf_ee, payroll_socso_er, payroll_socso_ee, payroll_eis_er, payroll_eis_ee, payroll_pcb, payroll_skbbk, payroll_net, invoice_base, invoice_epf_er, invoice_socso_er, invoice_eis_er, invoice_total, statutory_surplus, calculation_snapshot, directors(name, code)')
       .eq('period_month', run.period_month)
       .order('created_at'),
   ])
@@ -279,6 +279,7 @@ function FormulaBreakdown({ payout }: { payout: any }) {
   const eisEr = Number(payout.payroll_eis_er ?? 0)
   const eisEe = Number(payout.payroll_eis_ee ?? 0)
   const pcb = Number(payout.payroll_pcb ?? 0)
+  const skbbk = Number(payout.payroll_skbbk ?? 0)
   const payrollNet = Number(payout.payroll_net ?? 0)
   const invoiceEpfEr = Number(payout.invoice_epf_er ?? 0)
   const invoiceSocsoEr = Number(payout.invoice_socso_er ?? 0)
@@ -317,6 +318,7 @@ function FormulaBreakdown({ payout }: { payout: any }) {
         <Row label={`− SOCSO (ER ${formatMoney(socsoEr)} + EE ${formatMoney(socsoEe)})`} value={-(socsoEr + socsoEe)} />
         <Row label={`− EIS (ER ${formatMoney(eisEr)} + EE ${formatMoney(eisEe)})`} value={-(eisEr + eisEe)} />
         <Row label="− PCB" value={-pcb} />
+        {skbbk > 0 && <Row label="− SKBBK" value={-skbbk} />}
         {advanceRepaid > 0 && (
           <Row label="− Advance repaid (carry-forward)" value={-advanceRepaid} />
         )}
