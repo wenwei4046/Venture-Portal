@@ -133,3 +133,72 @@ export function buildAllocationInvoiceLines(
     { description: `EIS ${suffix}`, amount: components.eis },
   ].filter((l) => l.amount > 0)
 }
+
+// ─── Consolidated payroll invoice (2026-07-03) ───────────────────────────────
+//
+// One invoice per subsidiary combining HR + Finance + Director Office. Each dept
+// contributes its 5 component lines, and every line carries its own `segment`
+// so the invoice's GL / pool / P&L attribution routes PER LINE, not by the
+// invoice-level billing_mode (see invoice_lines.segment migration). Descriptions
+// omit the "(HR)" dept suffix — the department is shown as a group header on the
+// document and carried in `segment` for routing (confirmed with user 2026-07-03).
+
+/** gl_segment values that map to a real billing department. */
+export type PayrollSegment = 'hr' | 'finance' | 'director_office'
+
+export interface DeptComponentGroup {
+  /** Display label for the group header, e.g. "HR", "Finance", "Director Office". */
+  deptLabel: string
+  /** gl_segment written to each of this group's invoice_lines. */
+  segment: PayrollSegment
+  components: AllocationComponents
+}
+
+export interface ConsolidatedInvoiceLine {
+  description: string
+  amount: number
+  segment: PayrollSegment
+  /** Group header this line belongs under (for preview / PDF grouping). */
+  deptLabel: string
+}
+
+const PAYROLL_COMPONENTS: Array<[keyof AllocationComponents, string]> = [
+  ['salary', 'Salary'],
+  ['allowance', 'Allowance'],
+  ['epf', 'EPF'],
+  ['socso', 'SOCSO'],
+  ['eis', 'EIS'],
+]
+
+/** Segment → group-header label used on the consolidated document. */
+export const PAYROLL_SEGMENT_LABEL: Record<PayrollSegment, string> = {
+  hr: 'HR',
+  finance: 'Finance',
+  director_office: 'Director Office',
+}
+
+/**
+ * Flatten dept component groups into the ordered line list for one subsidiary's
+ * consolidated invoice. Zero-amount components are dropped; a group whose
+ * components are all zero produces no lines. Each line keeps its `segment`.
+ */
+export function buildConsolidatedInvoiceLines(
+  groups: DeptComponentGroup[],
+  periodShort: string,
+): ConsolidatedInvoiceLine[] {
+  const out: ConsolidatedInvoiceLine[] = []
+  for (const g of groups) {
+    for (const [key, label] of PAYROLL_COMPONENTS) {
+      const amount = g.components[key]
+      if (amount > 0) {
+        out.push({
+          description: `${label} - ${periodShort}`,
+          amount,
+          segment: g.segment,
+          deptLabel: g.deptLabel,
+        })
+      }
+    }
+  }
+  return out
+}

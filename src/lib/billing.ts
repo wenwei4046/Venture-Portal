@@ -134,6 +134,11 @@ export function fallbackRevenueGlCode(billingMode: string | null): string {
     case 'finance_attribution':
     case 'director_office_attribution':
     case 'director_attribution':
+    // A consolidated payroll invoice mixes those same salary-recharge depts, so
+    // any line without an explicit category also defaults to Salary Income. Real
+    // routing is per-line via invoice_lines.segment (issue splits the JE by
+    // segment); this only decides the revenue ACCOUNT, not the segment.
+    case 'payroll_consolidated':
       return '5020'
     default:
       return '5000'

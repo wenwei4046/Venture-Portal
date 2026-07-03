@@ -122,10 +122,10 @@ export async function GET(req: Request) {
   const invoiceIds = invoices.map((inv) => inv.id as string)
   const { data: allLines } = await supabase
     .from('invoice_lines')
-    .select('invoice_id, line_no, description, amount, category_code')
+    .select('invoice_id, line_no, description, amount, category_code, segment')
     .in('invoice_id', invoiceIds)
     .order('line_no')
-  const linesByInvoice = new Map<string, Array<{ line_no: number; description: string | null; amount: number; category_code: string | null }>>()
+  const linesByInvoice = new Map<string, Array<{ line_no: number; description: string | null; amount: number; category_code: string | null; segment: string | null }>>()
   for (const ln of allLines ?? []) {
     const arr = linesByInvoice.get(ln.invoice_id as string) ?? []
     arr.push({
@@ -133,6 +133,7 @@ export async function GET(req: Request) {
       description: (ln.description as string | null) ?? null,
       amount: Number(ln.amount),
       category_code: (ln.category_code as string | null) ?? null,
+      segment: (ln.segment as string | null) ?? null,
     })
     linesByInvoice.set(ln.invoice_id as string, arr)
   }
@@ -168,6 +169,7 @@ export async function GET(req: Request) {
             category_label: ln.category_code
               ? `${ln.category_code} · ${coaMap.get(ln.category_code) ?? ''}`.trim()
               : null,
+            segment: ln.segment,
           }))
         : undefined,
     }

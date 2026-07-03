@@ -77,6 +77,18 @@ export interface InvoiceLineData {
   description: string | null
   amount: number
   category_label: string | null
+  // Per-line P&L segment (consolidated payroll invoices). When present, lines
+  // render grouped by department with a subtotal per group.
+  segment?: string | null
+}
+
+// gl_segment → group header on a consolidated payroll invoice.
+const SEGMENT_LABEL: Record<string, string> = {
+  hr: 'HR',
+  finance: 'Finance',
+  director_office: 'Director Office',
+  director: 'Director',
+  marketing: 'Marketing',
 }
 
 export interface InvoiceDocData {
@@ -121,8 +133,30 @@ function formatBillingMode(m: string): string {
   }
 }
 
+function groupLinesBySegment(
+  lines: InvoiceLineData[],
+): Array<{ label: string; lines: InvoiceLineData[]; subtotal: number }> {
+  const order: string[] = []
+  const map = new Map<string, InvoiceLineData[]>()
+  for (const ln of lines) {
+    const seg = ln.segment ?? ''
+    if (!map.has(seg)) {
+      map.set(seg, [])
+      order.push(seg)
+    }
+    map.get(seg)!.push(ln)
+  }
+  return order.map((seg) => {
+    const grp = map.get(seg)!
+    const subtotal = Math.round(grp.reduce((s, l) => s + l.amount, 0) * 100) / 100
+    return { label: SEGMENT_LABEL[seg] ?? seg, lines: grp, subtotal }
+  })
+}
+
 function InvoicePage({ inv }: { inv: InvoiceDocData }) {
   const generatedAt = dayjs().format('YYYY-MM-DD HH:mm')
+  const segmented = !!inv.lines && inv.lines.some((l) => l.segment)
+  const lineGroups = segmented && inv.lines ? groupLinesBySegment(inv.lines) : null
   return (
     <Page size="A4" style={styles.page}>
       <View style={styles.letterhead}>
@@ -190,14 +224,50 @@ function InvoicePage({ inv }: { inv: InvoiceDocData }) {
               <Text style={[styles.amountLabel, { fontFamily: 'Helvetica-Bold', fontSize: 8.5 }]}>DESCRIPTION</Text>
               <Text style={[styles.amountValue, { fontFamily: 'Helvetica-Bold', fontSize: 8.5, textAlign: 'right' }]}>AMOUNT (RM)</Text>
             </View>
-            {inv.lines.map((ln) => (
-              <View key={ln.line_no} style={[styles.amountRow, { borderBottom: '0.5pt solid #ddd' }]}>
-                <View style={{ flex: 1, paddingLeft: 4 }}>
-                  <Text style={{ fontSize: 10 }}>{ln.description ?? '—'}</Text>
-                </View>
-                <Text style={styles.amountValue}>{fmtMoney(ln.amount)}</Text>
-              </View>
-            ))}
+            {lineGroups
+              ? lineGroups.map((grp) => (
+                  <View key={grp.label} wrap={false}>
+                    <View style={[styles.amountRow, { paddingVertical: 4, backgroundColor: '#f6f1e6' }]}>
+                      <Text
+                        style={{
+                          flex: 1,
+                          paddingLeft: 4,
+                          fontFamily: 'Helvetica-Bold',
+                          fontSize: 8.5,
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.5,
+                          color: '#555',
+                        }}
+                      >
+                        {grp.label}
+                      </Text>
+                    </View>
+                    {grp.lines.map((ln) => (
+                      <View key={ln.line_no} style={[styles.amountRow, { borderBottom: '0.5pt solid #eee' }]}>
+                        <View style={{ flex: 1, paddingLeft: 12 }}>
+                          <Text style={{ fontSize: 10 }}>{ln.description ?? '—'}</Text>
+                        </View>
+                        <Text style={styles.amountValue}>{fmtMoney(ln.amount)}</Text>
+                      </View>
+                    ))}
+                    <View style={[styles.amountRow, { borderBottom: '0.5pt solid #ccc', paddingVertical: 4 }]}>
+                      <Text style={{ flex: 1, paddingLeft: 4, fontFamily: 'Helvetica-Bold', fontSize: 9 }}>
+                        {grp.label} subtotal
+                      </Text>
+                      <Text style={[styles.amountValue, { fontFamily: 'Courier-Bold' }]}>
+                        {fmtMoney(grp.subtotal)}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              : inv.lines.map((ln) => (
+                  <View key={ln.line_no} style={[styles.amountRow, { borderBottom: '0.5pt solid #ddd' }]}>
+                    <View style={{ flex: 1, paddingLeft: 4 }}>
+                      <Text style={{ fontSize: 10 }}>{ln.description ?? '—'}</Text>
+                    </View>
+                    <Text style={styles.amountValue}>{fmtMoney(ln.amount)}</Text>
+                  </View>
+                ))}
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>TOTAL (RM)</Text>
               <Text style={styles.totalValue}>{fmtMoney(inv.total_amount)}</Text>

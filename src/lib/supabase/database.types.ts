@@ -2061,6 +2061,7 @@ export type Database = {
           id: string
           invoice_id: string
           line_no: number
+          segment: Database["public"]["Enums"]["gl_segment"] | null
         }
         Insert: {
           amount: number
@@ -2070,6 +2071,7 @@ export type Database = {
           id?: string
           invoice_id: string
           line_no: number
+          segment?: Database["public"]["Enums"]["gl_segment"] | null
         }
         Update: {
           amount?: number
@@ -2079,6 +2081,7 @@ export type Database = {
           id?: string
           invoice_id?: string
           line_no?: number
+          segment?: Database["public"]["Enums"]["gl_segment"] | null
         }
         Relationships: [
           {
@@ -4561,6 +4564,7 @@ export type Database = {
         | "hr_attribution"
         | "finance_attribution"
         | "venture_attribution"
+        | "payroll_consolidated"
       cash_flow_category: "operating" | "investing" | "financing"
       claim_status: "pending" | "approved" | "rejected" | "paid"
       claim_type: "project" | "benefit"
@@ -4840,6 +4844,7 @@ export const Constants = {
         "hr_attribution",
         "finance_attribution",
         "venture_attribution",
+        "payroll_consolidated",
       ],
       cash_flow_category: ["operating", "investing", "financing"],
       claim_status: ["pending", "approved", "rejected", "paid"],

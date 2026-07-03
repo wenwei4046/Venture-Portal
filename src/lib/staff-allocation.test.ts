@@ -5,7 +5,10 @@ import {
   allocationPreview,
   periodShortLabel,
   buildAllocationInvoiceLines,
+  buildConsolidatedInvoiceLines,
+  PAYROLL_SEGMENT_LABEL,
   type AllocationRow,
+  type DeptComponentGroup,
 } from './staff-allocation'
 
 describe('validateAllocationRows', () => {
@@ -170,5 +173,66 @@ describe('allocationPreview', () => {
     expect(p.lines.map((l) => l.amount)).toEqual([6218.03, 4352.62, 1865.4])
     expect(p.billedTotal).toBe(12436.05)
     expect(p.hvAmount).toBe(0)
+  })
+})
+
+describe('buildConsolidatedInvoiceLines', () => {
+  const hr: DeptComponentGroup = {
+    deptLabel: 'HR',
+    segment: 'hr',
+    components: { salary: 8850, allowance: 647.5, epf: 1062, socso: 104.15, eis: 11.9 },
+  }
+  const finance: DeptComponentGroup = {
+    deptLabel: 'Finance',
+    segment: 'finance',
+    components: { salary: 8130, allowance: 288.23, epf: 1042.9, socso: 137.55, eis: 15.72 },
+  }
+  const directorOffice: DeptComponentGroup = {
+    deptLabel: 'Director Office',
+    segment: 'director_office',
+    components: { salary: 1200.65, allowance: 43.66, epf: 144.08, socso: 20.81, eis: 2.38 },
+  }
+
+  it('emits 5 lines per department in order, each tagged with its segment', () => {
+    const lines = buildConsolidatedInvoiceLines([hr, finance, directorOffice], "Jun'26")
+    expect(lines).toHaveLength(15)
+    expect(lines.slice(0, 5).every((l) => l.segment === 'hr')).toBe(true)
+    expect(lines.slice(5, 10).every((l) => l.segment === 'finance')).toBe(true)
+    expect(lines.slice(10, 15).every((l) => l.segment === 'director_office')).toBe(true)
+    expect(lines[0].description).toBe("Salary - Jun'26")
+    expect(lines[0].deptLabel).toBe('HR')
+  })
+
+  it('per-segment subtotals tie to the group sums and the grand total (HOUZS Century Jun 2026)', () => {
+    const lines = buildConsolidatedInvoiceLines([hr, finance, directorOffice], "Jun'26")
+    const sumSeg = (seg: string) =>
+      Math.round(lines.filter((l) => l.segment === seg).reduce((s, l) => s + l.amount, 0) * 100) / 100
+    expect(sumSeg('hr')).toBe(10675.55)
+    expect(sumSeg('finance')).toBe(9614.4)
+    expect(sumSeg('director_office')).toBe(1411.58)
+    expect(Math.round(lines.reduce((s, l) => s + l.amount, 0) * 100) / 100).toBe(21701.53)
+  })
+
+  it('drops zero components and skips all-zero groups', () => {
+    const partial: DeptComponentGroup = {
+      deptLabel: 'HR',
+      segment: 'hr',
+      components: { salary: 500, allowance: 0, epf: 60, socso: 0, eis: 0 },
+    }
+    const empty: DeptComponentGroup = {
+      deptLabel: 'Finance',
+      segment: 'finance',
+      components: { salary: 0, allowance: 0, epf: 0, socso: 0, eis: 0 },
+    }
+    const lines = buildConsolidatedInvoiceLines([partial, empty], "Jun'26")
+    expect(lines).toHaveLength(2)
+    expect(lines.map((l) => l.description)).toEqual(["Salary - Jun'26", "EPF - Jun'26"])
+    expect(lines.every((l) => l.segment === 'hr')).toBe(true)
+  })
+
+  it('maps every payroll segment to a group-header label', () => {
+    expect(PAYROLL_SEGMENT_LABEL.hr).toBe('HR')
+    expect(PAYROLL_SEGMENT_LABEL.finance).toBe('Finance')
+    expect(PAYROLL_SEGMENT_LABEL.director_office).toBe('Director Office')
   })
 })

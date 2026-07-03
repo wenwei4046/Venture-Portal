@@ -11,6 +11,13 @@ import { adjustPool } from '@/lib/voucher-paid-helpers'
 import { validateConsolidation, poolAttributions, segmentForBillingMode } from '@/lib/invoice-settlement'
 import { deptNameToSegment, fallbackRevenueGlCode, invoiceJeDate } from '@/lib/billing'
 import { INVOICE_BILLING_MODE_TO_POOL } from '@/lib/cfo-reports'
+import {
+  buildConsolidatedInvoiceLines,
+  periodShortLabel,
+  PAYROLL_SEGMENT_LABEL,
+  type DeptComponentGroup,
+  type PayrollSegment,
+} from '@/lib/staff-allocation'
 
 // Mig 200/P1-6a: invoice billing_mode → revenue GL code mapping.
 // 2026-06-11: fallback now lives in lib/billing.ts (fallbackRevenueGlCode) —
@@ -1211,6 +1218,193 @@ export async function settleInvoicesConsolidated(payload: {
 
 // ─── Approve / Issue Invoice (Finance — draft → issued) ────────────────────
 
+// ─── Consolidated payroll invoice (2026-07-03) ───────────────────────────────
+// One draft invoice per subsidiary combining HR + Finance + Director Office.
+// Each line carries its own gl_segment (invoice_lines.segment) so issue /
+// settlement / P&L route PER LINE, not by the invoice-level billing_mode.
+// The HV own-share row (company_id IS NULL) is never billed.
+
+interface AllocationRpcRow {
+  department_name: string
+  company_id: string | null
+  company_name: string
+  company_short_code: string
+  salary_amount: number | string
+  allowance_amount: number | string
+  epf_amount: number | string
+  socso_amount: number | string
+  eis_amount: number | string
+}
+
+const PAYROLL_DEPT_TO_SEGMENT: Record<string, PayrollSegment> = {
+  HR: 'hr',
+  Finance: 'finance',
+  'Director Office': 'director_office',
+}
+const PAYROLL_DEPT_ORDER: PayrollSegment[] = ['hr', 'finance', 'director_office']
+
+export interface ConsolidatedCompanyPreview {
+  companyId: string
+  shortCode: string
+  name: string
+  groups: DeptComponentGroup[]
+  total: number
+}
+
+function groupPayrollAllocation(rows: AllocationRpcRow[]): ConsolidatedCompanyPreview[] {
+  const byCompany = new Map<string, ConsolidatedCompanyPreview>()
+  for (const r of rows) {
+    if (!r.company_id) continue // HV own-share — never billed
+    const seg = PAYROLL_DEPT_TO_SEGMENT[r.department_name]
+    if (!seg) continue // only the three payroll depts
+    let entry = byCompany.get(r.company_id)
+    if (!entry) {
+      entry = { companyId: r.company_id, shortCode: r.company_short_code, name: r.company_name, groups: [], total: 0 }
+      byCompany.set(r.company_id, entry)
+    }
+    entry.groups.push({
+      deptLabel: PAYROLL_SEGMENT_LABEL[seg],
+      segment: seg,
+      components: {
+        salary: Number(r.salary_amount ?? 0),
+        allowance: Number(r.allowance_amount ?? 0),
+        epf: Number(r.epf_amount ?? 0),
+        socso: Number(r.socso_amount ?? 0),
+        eis: Number(r.eis_amount ?? 0),
+      },
+    })
+  }
+  const out = [...byCompany.values()]
+  for (const c of out) {
+    c.groups.sort(
+      (a, b) => PAYROLL_DEPT_ORDER.indexOf(a.segment) - PAYROLL_DEPT_ORDER.indexOf(b.segment),
+    )
+    const grand = c.groups.reduce((s, g) => {
+      const k = g.components
+      return s + k.salary + k.allowance + k.epf + k.socso + k.eis
+    }, 0)
+    c.total = Math.round(grand * 100) / 100
+  }
+  out.sort((a, b) => a.shortCode.localeCompare(b.shortCode))
+  return out
+}
+
+/** Preview for the review modal: what one consolidated invoice per subsidiary
+ *  will contain for the given period. Reads live HR allocation; no writes. */
+export async function fetchConsolidatedPayrollPreview(
+  periodMonth: string,
+): Promise<ConsolidatedCompanyPreview[]> {
+  await requireRole(['finance', 'principal'])
+  const supabase = await createClient()
+  const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
+  const { data, error } = await supabase.rpc('get_staff_billing_allocation', {
+    p_period_month: period,
+  })
+  if (error) throw new Error(`Failed to load payroll allocation: ${error.message}`)
+  return groupPayrollAllocation((data ?? []) as unknown as AllocationRpcRow[])
+}
+
+/** Generate one DRAFT consolidated invoice per subsidiary for the period.
+ *  Amounts come server-side from get_staff_billing_allocation (authoritative);
+ *  `categoryCode` is the user-chosen revenue category applied to every line
+ *  (default 5020 in the UI). Idempotent — clears existing drafts first. */
+export async function generateConsolidatedPayrollInvoices(
+  periodMonth: string,
+  categoryCode: string | null,
+): Promise<{ generated: number; companies: string[] }> {
+  const user = await requireRole(['finance'])
+  const supabase = await createClient()
+  const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
+  await assertPeriodOpen(supabase, period)
+
+  const { data, error } = await supabase.rpc('get_staff_billing_allocation', {
+    p_period_month: period,
+  })
+  if (error) throw new Error(`Failed to load payroll allocation: ${error.message}`)
+  const companies = groupPayrollAllocation((data ?? []) as unknown as AllocationRpcRow[])
+
+  // Idempotent: clear existing DRAFT consolidated invoices (+ their lines) for
+  // this period so re-running regenerates cleanly. Issued/paid are untouched.
+  const { data: existing } = await supabase
+    .from('invoices')
+    .select('id')
+    .eq('period_month', period)
+    .eq('billing_mode', 'payroll_consolidated')
+    .eq('status', 'draft')
+  const existingIds = (existing ?? []).map((r) => r.id as string)
+  if (existingIds.length > 0) {
+    await supabase.from('invoice_lines').delete().in('invoice_id', existingIds)
+    await supabase.from('invoices').delete().in('id', existingIds).eq('status', 'draft')
+  }
+
+  const periodShort = periodShortLabel(period)
+  const invoiceDate = dayjs(period).endOf('month').format('YYYY-MM-DD')
+  const category = categoryCode && categoryCode.trim() ? categoryCode.trim() : null
+
+  const generatedCompanies: string[] = []
+  for (const c of companies) {
+    const lines = buildConsolidatedInvoiceLines(c.groups, periodShort)
+    if (lines.length === 0) continue
+    const total = Math.round(lines.reduce((s, l) => s + l.amount, 0) * 100) / 100
+
+    const { data: invoiceNo, error: mintErr } = await supabase.rpc('mint_invoice_no', {
+      p_period: period,
+    })
+    if (mintErr || !invoiceNo) {
+      throw new Error(`Failed to mint invoice number: ${mintErr?.message ?? 'unknown'}`)
+    }
+
+    const { data: created, error: invErr } = await supabase
+      .from('invoices')
+      .insert({
+        invoice_no: invoiceNo as string,
+        period_month: period,
+        billing_mode: 'payroll_consolidated',
+        // Header category NULL — issue fans out per line (each line carries the
+        // chosen category + its own segment).
+        category_code: null,
+        base_amount: total,
+        total_amount: total,
+        status: 'draft',
+        invoice_date: invoiceDate,
+        due_date: null,
+        description: `Payroll cost share — ${periodShort}`,
+        created_by: user.id,
+        billable_to_type: 'subsidiary',
+        company_id: c.companyId,
+      })
+      .select('id')
+      .single()
+    if (invErr || !created) {
+      throw new Error(
+        `Failed to create consolidated invoice for ${c.shortCode}: ${invErr?.message ?? 'unknown'}`,
+      )
+    }
+
+    const { error: linesErr } = await supabase.from('invoice_lines').insert(
+      lines.map((l, i) => ({
+        invoice_id: created.id,
+        line_no: i + 1,
+        description: l.description,
+        amount: l.amount,
+        category_code: category,
+        segment: l.segment,
+      })),
+    )
+    if (linesErr) {
+      await supabase.from('invoices').delete().eq('id', created.id).eq('status', 'draft')
+      throw new Error(
+        `Failed to insert lines for ${c.shortCode} (rolled back): ${linesErr.message}`,
+      )
+    }
+    generatedCompanies.push(c.shortCode)
+  }
+
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+  return { generated: generatedCompanies.length, companies: generatedCompanies }
+}
+
 export async function approveInvoice(formData: FormData) {
   const user = await requireRole(['finance'])
   const supabase = await createClient()
@@ -1225,6 +1419,17 @@ export async function approveInvoice(formData: FormData) {
     .single()
   if (!inv) throw new Error('Invoice not found')
   if (inv.status !== 'draft') throw new Error(`Invoice is already ${inv.status}`)
+
+  // Phase-1 guard (2026-07-03): consolidated payroll invoices carry per-line
+  // segments and must post ONE AR-accrual JE PER department segment. That
+  // per-segment issue path is Phase 2 — until it lands, issuing here would post
+  // a single mis-segmented JE. Block it loudly so a draft can be reviewed but
+  // never wrongly issued. Remove this guard when Step 4 (per-segment issue) ships.
+  if (inv.billing_mode === 'payroll_consolidated') {
+    throw new Error(
+      'Consolidated payroll invoice cannot be issued yet — per-department GL posting is still being built. You can review/edit the draft; issuing will be enabled shortly.',
+    )
+  }
 
   await assertPeriodOpen(supabase, inv.period_month)
 
@@ -1369,17 +1574,24 @@ export async function approveInvoicesForPeriod(formData: FormData) {
   await assertPeriodOpen(supabase, period)
 
   // Pull draft rows up-front so we can post AR accrual JEs after the bulk update.
+  // Phase-1 guard (2026-07-03): EXCLUDE consolidated payroll invoices — their
+  // per-line-segment issue path (one AR JE per department) is Phase 2. Bulk-
+  // issuing them here would post a single mis-segmented JE, so they stay draft
+  // and must be issued individually once Step 4 ships. Remove both .neq filters
+  // when the per-segment issue path lands.
   const { data: draftInvoices } = await supabase
     .from('invoices')
     .select('id, invoice_no, invoice_date, total_amount, billing_mode, category_code, billable_to_type, billable_to_department_id')
     .eq('period_month', period)
     .eq('status', 'draft')
+    .neq('billing_mode', 'payroll_consolidated')
 
   const { error, count } = await supabase
     .from('invoices')
     .update({ status: 'issued' }, { count: 'exact' })
     .eq('period_month', period)
     .eq('status', 'draft')
+    .neq('billing_mode', 'payroll_consolidated')
 
   if (error) throw new Error(`Failed to bulk issue invoices: ${error.message}`)
 
