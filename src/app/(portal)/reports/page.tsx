@@ -42,6 +42,11 @@ const reports = [
     title: 'Claims Summary',
     description: 'Benefit and pool claims by status and amount.',
   },
+  {
+    href: '/reports/debtor-aging',
+    title: 'Debtor Aging',
+    description: 'Invoices billed but not yet collected, bucketed by days past due.',
+  },
 ]
 
 export default async function ReportsPage() {

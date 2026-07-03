@@ -162,6 +162,7 @@ const navEntries: NavEntry[] = [
       { href: '/reports/trial-balance', label: 'Trial Balance', visible: canAccessReports },
       { href: '/reports/fund-summary', label: 'Fund Summary', visible: canAccessReports },
       { href: '/reports/claims', label: 'Claims Report', visible: canAccessReports },
+      { href: '/reports/debtor-aging', label: 'Debtor Aging', visible: canAccessReports },
     ],
   },
   { href: '/reconciliation', label: 'Reconciliation', section: 'Reports & Admin', notPaths: ['/reconciliation/journal-entries'], visible: canAccessTreasury },
