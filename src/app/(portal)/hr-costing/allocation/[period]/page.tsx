@@ -71,6 +71,14 @@ export default async function AllocationPage({ params }: PageProps) {
   const staffWithAlloc = staff.filter((s) => s.rows.length > 0).length
   const readOnly = user.role !== 'hr' // RLS: writes are HR-only
 
+  const totalCost = staff.reduce((s, r) => s + r.employerCost, 0)
+  const billedTotal = staff.reduce(
+    (s, r) =>
+      s + r.rows.reduce((a, row) => a + Math.round(r.employerCost * row.pct) / 100, 0),
+    0,
+  )
+  const hvTotal = Math.round((totalCost - billedTotal) * 100) / 100
+
   return (
     <div>
       <Link
@@ -120,13 +128,13 @@ export default async function AllocationPage({ params }: PageProps) {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-10 border-y border-hairline py-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10 border-y border-hairline py-6">
             <div>
               <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
                 Total Employer Cost
               </div>
               <div className="num text-num-ink text-xl tracking-[-0.01em] mt-1">
-                {formatMoney(staff.reduce((s, r) => s + r.employerCost, 0))}
+                {formatMoney(totalCost)}
               </div>
             </div>
             <div>
@@ -141,19 +149,13 @@ export default async function AllocationPage({ params }: PageProps) {
               <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
                 Billed to Subsidiaries
               </div>
-              <div className="num text-graphite text-md mt-1">
-                {formatMoney(
-                  staff.reduce(
-                    (s, r) =>
-                      s +
-                      r.rows.reduce(
-                        (a, row) => a + Math.round(r.employerCost * row.pct) / 100,
-                        0,
-                      ),
-                    0,
-                  ),
-                )}
+              <div className="num text-graphite text-md mt-1">{formatMoney(billedTotal)}</div>
+            </div>
+            <div>
+              <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
+                HV — Venture Own Share
               </div>
+              <div className="num text-graphite text-md mt-1">{formatMoney(hvTotal)}</div>
             </div>
           </div>
 

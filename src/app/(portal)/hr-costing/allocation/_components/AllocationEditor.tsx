@@ -155,17 +155,18 @@ function StaffCard({
         </div>
       </div>
 
-      {rows.length === 0 ? (
-        <p className="font-serif italic text-muted text-sm mt-3">
-          Not allocated — 100% stays with HV.
-        </p>
-      ) : (
-        <div className="mt-3 space-y-2">
+      <div className="mt-3 space-y-2">
           {rows.map((r) => {
+            // Prefer the preview's line amount (it carries the last-line
+            // rounding adjustment on a full 100% split); fall back to the
+            // naive per-row figure while the form is mid-edit.
+            const previewAmt =
+              preview?.lines.find((l) => l.companyId === r.companyId)?.amount ?? null
             const amt =
-              r.companyId && Number.isFinite(Number(r.pct)) && Number(r.pct) > 0
+              previewAmt ??
+              (r.companyId && Number.isFinite(Number(r.pct)) && Number(r.pct) > 0
                 ? Math.round(staff.employerCost * Number(r.pct)) / 100
-                : null
+                : null)
             return (
               <div key={r.uid} className="flex items-center gap-2 flex-wrap">
                 <select
@@ -215,21 +216,35 @@ function StaffCard({
               </div>
             )
           })}
+
+          {/* HOUZS Venture own share — always visible, auto = 100% − subsidiary
+              rows. Not stored, not billed; Finance sees the same figure on the
+              Billing page. */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="px-3 py-1.5 bg-surface-2/60 border border-dashed border-hairline rounded-md text-sm font-serif italic text-graphite min-w-[180px]">
+              HV — HOUZS Venture
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-24 px-3 py-1.5 bg-surface-2/60 border border-dashed border-hairline rounded-md text-sm font-mono text-graphite text-right">
+                {remainder !== null ? remainder.toFixed(2) : '—'}
+              </div>
+              <span className="font-mono text-xs text-muted">%</span>
+            </div>
+            <span className="num text-sm text-graphite min-w-[100px]">
+              {preview ? formatMoney(preview.hvAmount) : '—'}
+            </span>
+            <span className="font-mono text-[11px] text-muted">
+              auto · own share · not billed
+            </span>
+          </div>
         </div>
-      )}
 
       <div className="flex items-center justify-between gap-4 flex-wrap mt-3 pt-3 border-t border-hairline">
         <div className="font-mono text-xs text-muted">
-          {remainder !== null && (
+          {preview && (
             <>
-              HV keeps <span className="text-ink">{remainder.toFixed(2)}%</span>
-              {preview && (
-                <>
-                  {' '}
-                  (<span className="num">{formatMoney(preview.hvAmount)}</span>) · billed{' '}
-                  <span className="num">{formatMoney(preview.billedTotal)}</span>
-                </>
-              )}
+              Billed to subsidiaries{' '}
+              <span className="num text-ink">{formatMoney(preview.billedTotal)}</span>
             </>
           )}
           {error && <span className="text-danger ml-2">{error}</span>}

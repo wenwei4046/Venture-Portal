@@ -440,6 +440,12 @@ export interface StaffAllocationCompanyRow {
   shortCode: string
   name: string
   amount: number
+  /** Invoice line components (user sample 2026-07-03) — sum equals amount. */
+  salary: number
+  allowance: number
+  epf: number
+  socso: number
+  eis: number
 }
 
 const MODE_TO_DEPT: Partial<Record<CreateInvoiceMode, string>> = {
@@ -467,12 +473,19 @@ export async function fetchStaffAllocationByCompany(
   if (error) throw new Error(`Failed to fetch staff allocation: ${error.message}`)
 
   return (data ?? [])
-    .filter((r) => r.department_name === deptName)
+    // company_id NULL = the HV own-share row (dept total − billed). It is
+    // display-only on the Billing page — never something Finance invoices.
+    .filter((r) => r.department_name === deptName && r.company_id !== null)
     .map((r) => ({
-      companyId: r.company_id,
+      companyId: r.company_id as string,
       shortCode: r.company_short_code,
       name: r.company_name,
       amount: Number(r.amount),
+      salary: Number(r.salary_amount),
+      allowance: Number(r.allowance_amount),
+      epf: Number(r.epf_amount),
+      socso: Number(r.socso_amount),
+      eis: Number(r.eis_amount),
     }))
 }
 

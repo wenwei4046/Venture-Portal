@@ -1674,6 +1674,7 @@ export type Database = {
           period_month: string
           prorata_days_in_month: number
           prorata_days_worked: number
+          skbbk_amount: number
           socso_ee: number
           socso_er: number
           source: Database["public"]["Enums"]["hr_monthly_payroll_source"]
@@ -1705,6 +1706,7 @@ export type Database = {
           period_month: string
           prorata_days_in_month?: number
           prorata_days_worked?: number
+          skbbk_amount?: number
           socso_ee?: number
           socso_er?: number
           source?: Database["public"]["Enums"]["hr_monthly_payroll_source"]
@@ -1736,6 +1738,7 @@ export type Database = {
           period_month?: string
           prorata_days_in_month?: number
           prorata_days_worked?: number
+          skbbk_amount?: number
           socso_ee?: number
           socso_er?: number
           source?: Database["public"]["Enums"]["hr_monthly_payroll_source"]
@@ -4283,11 +4286,16 @@ export type Database = {
         Returns: {
           department_id: string
           department_name: string
-          company_id: string
+          company_id: string | null
           company_name: string
           company_short_code: string
           staff_count: number
           amount: number
+          salary_amount: number
+          allowance_amount: number
+          epf_amount: number
+          socso_amount: number
+          eis_amount: number
         }[]
       }
       get_submitted_hr_summary: {

@@ -211,7 +211,17 @@ export default async function BillingView({ searchParams }: Props) {
   }
   const allocByDept = new Map<
     string,
-    Array<{ company_id: string; company_short_code: string; company_name: string; amount: number }>
+    Array<{
+      company_id: string | null // NULL = the HV own-share row
+      company_short_code: string
+      company_name: string
+      amount: number
+      salary: number
+      allowance: number
+      epf: number
+      socso: number
+      eis: number
+    }>
   >()
   for (const r of staffAllocRows ?? []) {
     const list = allocByDept.get(r.department_name) ?? []
@@ -220,6 +230,11 @@ export default async function BillingView({ searchParams }: Props) {
       company_short_code: r.company_short_code,
       company_name: r.company_name,
       amount: Number(r.amount),
+      salary: Number(r.salary_amount),
+      allowance: Number(r.allowance_amount),
+      epf: Number(r.epf_amount),
+      socso: Number(r.socso_amount),
+      eis: Number(r.eis_amount),
     })
     allocByDept.set(r.department_name, list)
   }
@@ -479,34 +494,30 @@ export default async function BillingView({ searchParams }: Props) {
           </div>
           <div className="font-mono text-xs text-muted mb-4">
             Per-staff % splits from HR · employer cost basis (gross + EPF/SOCSO/EIS ER) ·
-            unallocated share stays with HV
+            components sum to the total · unallocated share stays with HV
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-8">
             {[...allocByDept.entries()].map(([deptName, rows]) => {
-              const billed = rows.reduce((s, r) => s + r.amount, 0)
-              const deptOpex =
-                deptName === 'HR'
-                  ? hrFromPayroll
-                  : deptName === 'Finance'
-                    ? financeFromPayroll
-                    : deptName === 'Director Office'
-                      ? directorOfficeFromPayroll
-                      : deptName === 'Marketing'
-                        ? marketingFromPayroll
-                        : null
-              const hvShare =
-                deptOpex !== null ? Math.round((deptOpex - billed) * 100) / 100 : null
+              const companyRows = rows.filter((r) => r.company_id !== null)
+              const hvRow = rows.find((r) => r.company_id === null)
+              const sum = (pick: (r: (typeof rows)[number]) => number) =>
+                Math.round(companyRows.reduce((s, r) => s + pick(r), 0) * 100) / 100
               return (
                 <div key={deptName} className="overflow-x-auto">
                   <table className="ledger-table">
                     <thead>
                       <tr>
                         <th>{deptName}</th>
-                        <th className="right">Bill Amount</th>
+                        <th className="right">Salary</th>
+                        <th className="right">Allowance</th>
+                        <th className="right">EPF</th>
+                        <th className="right">SOCSO</th>
+                        <th className="right">EIS</th>
+                        <th className="right">Total</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {rows.map((r) => (
+                      {companyRows.map((r) => (
                         <tr key={r.company_id}>
                           <td>
                             <div className="font-serif text-[15px] text-ink">
@@ -516,19 +527,39 @@ export default async function BillingView({ searchParams }: Props) {
                               {r.company_name}
                             </div>
                           </td>
-                          <td className="num">{formatMoney(r.amount)}</td>
+                          <td className="num">{formatMoney(r.salary)}</td>
+                          <td className="num">{formatMoney(r.allowance)}</td>
+                          <td className="num">{formatMoney(r.epf)}</td>
+                          <td className="num">{formatMoney(r.socso)}</td>
+                          <td className="num">{formatMoney(r.eis)}</td>
+                          <td className="num font-semibold">{formatMoney(r.amount)}</td>
                         </tr>
                       ))}
                       <tr>
                         <td className="font-serif italic text-accent">Billable total</td>
-                        <td className="num font-semibold">{formatMoney(billed)}</td>
+                        <td className="num">{formatMoney(sum((r) => r.salary))}</td>
+                        <td className="num">{formatMoney(sum((r) => r.allowance))}</td>
+                        <td className="num">{formatMoney(sum((r) => r.epf))}</td>
+                        <td className="num">{formatMoney(sum((r) => r.socso))}</td>
+                        <td className="num">{formatMoney(sum((r) => r.eis))}</td>
+                        <td className="num font-semibold">{formatMoney(sum((r) => r.amount))}</td>
                       </tr>
-                      {hvShare !== null && hvShare > 0 && (
+                      {hvRow && (
                         <tr>
-                          <td className="font-serif italic text-graphite">
-                            HV own share (not billed)
+                          <td>
+                            <div className="font-serif italic text-graphite">
+                              HV — HOUZS Venture
+                            </div>
+                            <div className="font-mono text-[11px] text-muted mt-0.5">
+                              own share · not billed
+                            </div>
                           </td>
-                          <td className="num text-graphite">{formatMoney(hvShare)}</td>
+                          <td className="num text-graphite">{formatMoney(hvRow.salary)}</td>
+                          <td className="num text-graphite">{formatMoney(hvRow.allowance)}</td>
+                          <td className="num text-graphite">{formatMoney(hvRow.epf)}</td>
+                          <td className="num text-graphite">{formatMoney(hvRow.socso)}</td>
+                          <td className="num text-graphite">{formatMoney(hvRow.eis)}</td>
+                          <td className="num text-graphite">{formatMoney(hvRow.amount)}</td>
                         </tr>
                       )}
                     </tbody>

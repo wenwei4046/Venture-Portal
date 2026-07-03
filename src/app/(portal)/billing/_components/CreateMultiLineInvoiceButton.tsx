@@ -1,13 +1,15 @@
 'use client'
 
-import { useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import {
   createMultiLineInvoice,
+  fetchStaffAllocationByCompany,
   type BillableToKind,
   type CreateInvoiceMode,
 } from '../actions'
+import { buildAllocationInvoiceLines, periodShortLabel } from '@/lib/staff-allocation'
 import AccountPicker, { type AccountOption } from '@/components/AccountPicker'
 import type { AccountType } from '@/lib/coa'
 
@@ -98,6 +100,8 @@ export default function CreateMultiLineInvoiceButton({
   const [headerDescription, setHeaderDescription] = useState('')
   const [referenceNo, setReferenceNo] = useState('')
   const [lines, setLines] = useState<LineRow[]>([newLine()])
+  const [autoFillNote, setAutoFillNote] = useState<string | null>(null)
+  const autoFilledKey = useRef<string | null>(null)
 
   const modalContentRef = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
@@ -123,6 +127,66 @@ export default function CreateMultiLineInvoiceButton({
     [lines],
   )
 
+  // Auto-fill the 5-line component breakdown (Salary / Allowance / EPF /
+  // SOCSO / EIS — user sample 2026-07-03) from HR's staff billing allocation
+  // when billing a subsidiary in one of the staff-attribution modes.
+  useEffect(() => {
+    if (!open) return
+    if (billableType !== 'subsidiary' || !companyId) return
+    const isStaffAllocMode =
+      billingMode === 'hr_attribution' ||
+      billingMode === 'finance_attribution' ||
+      billingMode === 'director_office_attribution'
+    if (!isStaffAllocMode) {
+      setAutoFillNote(null)
+      return
+    }
+    const key = `${billingMode}|${companyId}|${period}`
+    if (autoFilledKey.current === key) return
+    autoFilledKey.current = key
+
+    const periodIso = dayjs(period + '-01').format('YYYY-MM-DD')
+    const monthLabel = dayjs(period + '-01').format('MMM YYYY')
+    setAutoFillNote('Loading staff billing allocation from HR…')
+    fetchStaffAllocationByCompany(periodIso, billingMode)
+      .then((rows) => {
+        const row = rows.find((r) => r.companyId === companyId)
+        if (!row) {
+          setAutoFillNote(
+            `No staff billing allocation for this subsidiary in ${monthLabel}. Enter lines manually.`,
+          )
+          return
+        }
+        const deptLabel =
+          billingMode === 'hr_attribution'
+            ? 'HR'
+            : billingMode === 'finance_attribution'
+              ? 'Finance'
+              : 'Director Office'
+        const shortLabel = periodShortLabel(periodIso)
+        const drafts = buildAllocationInvoiceLines(
+          { salary: row.salary, allowance: row.allowance, epf: row.epf, socso: row.socso, eis: row.eis },
+          shortLabel,
+          deptLabel,
+        )
+        setLines(
+          drafts.map((d) => ({
+            uid: crypto.randomUUID(),
+            description: d.description,
+            amount: d.amount.toFixed(2),
+            categoryCode: '',
+          })),
+        )
+        setHeaderDescription((prev) => prev.trim() || `Salary - ${deptLabel} - ${shortLabel}`)
+        setAutoFillNote(
+          `Auto-filled ${drafts.length} lines (total RM ${fmt(row.amount)}) from HR's staff billing allocation for ${monthLabel}. Edit as needed.`,
+        )
+      })
+      .catch((err: unknown) => {
+        setAutoFillNote(`Auto-fill failed: ${err instanceof Error ? err.message : String(err)}`)
+      })
+  }, [open, billableType, companyId, billingMode, period])
+
   function reset() {
     setBillableType('subsidiary')
     setCompanyId('')
@@ -139,6 +203,8 @@ export default function CreateMultiLineInvoiceButton({
     setReferenceNo('')
     setLines([newLine()])
     setError(null)
+    setAutoFillNote(null)
+    autoFilledKey.current = null
   }
 
   function updateLine(uid: string, patch: Partial<LineRow>) {
@@ -383,6 +449,10 @@ export default function CreateMultiLineInvoiceButton({
                     {lines.length} {lines.length === 1 ? 'line' : 'lines'} · Total RM {fmt(total)}
                   </span>
                 </div>
+
+                {autoFillNote && (
+                  <p className="font-serif italic text-accent text-xs mb-2">{autoFillNote}</p>
+                )}
 
                 <div className="space-y-3">
                   {lines.map((l, idx) => (

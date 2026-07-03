@@ -3,6 +3,8 @@ import {
   validateAllocationRows,
   hvRemainderPct,
   allocationPreview,
+  periodShortLabel,
+  buildAllocationInvoiceLines,
   type AllocationRow,
 } from './staff-allocation'
 
@@ -120,5 +122,53 @@ describe('allocationPreview', () => {
     const p = allocationPreview(6265.25, [])
     expect(p.billedTotal).toBe(0)
     expect(p.hvAmount).toBe(6265.25)
+  })
+
+  it("periodShortLabel renders May'26 style for both YYYY-MM and full dates", () => {
+    expect(periodShortLabel('2026-05-01')).toBe("May'26")
+    expect(periodShortLabel('2026-06')).toBe("Jun'26")
+  })
+
+  it('buildAllocationInvoiceLines reproduces the sample invoice (HR × Carres May)', () => {
+    const lines = buildAllocationInvoiceLines(
+      { salary: 2580.0, allowance: 295.5, epf: 309.6, socso: 31.25, eis: 3.57 },
+      "May'26",
+      'HR',
+    )
+    expect(lines).toEqual([
+      { description: "Salary - May'26 (HR)", amount: 2580.0 },
+      { description: "Allowance - May'26 (HR)", amount: 295.5 },
+      { description: "EPF - May'26 (HR)", amount: 309.6 },
+      { description: "SOCSO - May'26 (HR)", amount: 31.25 },
+      { description: "EIS - May'26 (HR)", amount: 3.57 },
+    ])
+    const total = Math.round(lines.reduce((s, l) => s + l.amount, 0) * 100) / 100
+    expect(total).toBe(3219.92)
+  })
+
+  it('buildAllocationInvoiceLines skips zero components', () => {
+    const lines = buildAllocationInvoiceLines(
+      { salary: 2523.02, allowance: 0, epf: 100.55, socso: 12.65, eis: 0 },
+      "Jun'26",
+      'Finance',
+    )
+    expect(lines.map((l) => l.description)).toEqual([
+      "Salary - Jun'26 (Finance)",
+      "EPF - Jun'26 (Finance)",
+      "SOCSO - Jun'26 (Finance)",
+    ])
+  })
+
+  it('full 100% split: rounding overshoot comes off the last line, HV never negative', () => {
+    // 50/35/15 of 12,436.05 rounds to 6,218.03 + 4,352.62 + 1,865.41 = 12,436.06
+    // (1 sen over cost). The last line absorbs it; HV shows 0, not (0.01).
+    const p = allocationPreview(12436.05, [
+      { companyId: 'hc', pct: 50 },
+      { companyId: 'conts', pct: 35 },
+      { companyId: 'car', pct: 15 },
+    ])
+    expect(p.lines.map((l) => l.amount)).toEqual([6218.03, 4352.62, 1865.4])
+    expect(p.billedTotal).toBe(12436.05)
+    expect(p.hvAmount).toBe(0)
   })
 })
