@@ -84,6 +84,8 @@ function formatBillingMode(mode: string): string {
       return 'Director OPEX'
     case 'non_billable':
       return 'Non-billable'
+    case 'payroll_consolidated':
+      return 'Payroll (consolidated)'
     default:
       return mode
   }

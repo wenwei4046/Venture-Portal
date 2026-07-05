@@ -23,6 +23,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import dayjs from 'dayjs'
 import { poolLabel, comparePools } from './pools'
 import { fetchAllRows } from './paginate'
+import { lineAttributions, segmentToPoolKey } from './invoice-settlement'
 import type { AccountType, CashFlowCategory } from './coa'
 import { CASH_FLOW_CATEGORIES } from './coa'
 import type { Database } from './supabase/database.types'
@@ -837,23 +838,80 @@ async function gatherInvoices(
     : { data: [] as { id: string; short_code: string }[] }
   const shortCodeById = new Map((companies ?? []).map((c) => [c.id as string, c.short_code as string]))
 
+  // Consolidated payroll invoices route revenue PER LINE (each line's segment →
+  // its own dept pool), so the P&L must expand them into one row per department
+  // instead of attributing the whole invoice to a single pool.
+  const consolidatedIds = invoices
+    .filter((i) => (i.billing_mode as string) === 'payroll_consolidated')
+    .map((i) => i.id as string)
+  const clinesByInvoice = new Map<
+    string,
+    Array<{ amount: number; segment: string | null; category_code: string | null }>
+  >()
+  if (consolidatedIds.length > 0) {
+    const cLines = await fetchAllRows((lo, hi) => supabase
+      .from('invoice_lines')
+      .select('invoice_id, amount, segment, category_code')
+      .in('invoice_id', consolidatedIds)
+      .order('id', { ascending: true })
+      .range(lo, hi))
+    for (const ln of cLines ?? []) {
+      const arr = clinesByInvoice.get(ln.invoice_id as string) ?? []
+      arr.push({
+        amount: Number(ln.amount),
+        segment: (ln.segment as string | null) ?? null,
+        category_code: (ln.category_code as string | null) ?? null,
+      })
+      clinesByInvoice.set(ln.invoice_id as string, arr)
+    }
+  }
+
   const catCodes = Array.from(
-    new Set(invoices.map((i) => i.category_code as string | null).filter((c): c is string => !!c)),
+    new Set(
+      [
+        ...invoices.map((i) => i.category_code as string | null),
+        ...[...clinesByInvoice.values()].flat().map((l) => l.category_code),
+      ].filter((c): c is string => !!c),
+    ),
   )
   const { data: coa } = catCodes.length
     ? await supabase.from('chart_of_accounts').select('code, name').in('code', catCodes)
     : { data: [] as { code: string; name: string }[] }
   const coaNameByCode = new Map((coa ?? []).map((c) => [c.code as string, c.name as string]))
 
-  return invoices.map((inv) => ({
-    invoiceNo: (inv.invoice_no as string) ?? '—',
-    description: ((inv.description as string | null) ?? '').trim(),
-    companyShortCode: shortCodeById.get(inv.company_id as string) ?? '—',
-    pool: invoicePoolForBillingMode(inv.billing_mode as string | null),
-    amount: Number(inv.total_amount ?? 0),
-    categoryCode: (inv.category_code as string | null) ?? '',
-    categoryName: coaNameByCode.get((inv.category_code as string | null) ?? '') ?? 'Uncategorised revenue',
-  }))
+  return invoices.flatMap((inv): RawInvoiceRow[] => {
+    const base = {
+      invoiceNo: (inv.invoice_no as string) ?? '—',
+      description: ((inv.description as string | null) ?? '').trim(),
+      companyShortCode: shortCodeById.get(inv.company_id as string) ?? '—',
+    }
+    if ((inv.billing_mode as string) === 'payroll_consolidated') {
+      const lines = clinesByInvoice.get(inv.id as string) ?? []
+      const catForSeg = new Map<string, string>()
+      for (const l of lines) {
+        if (l.segment && l.category_code && !catForSeg.has(l.segment)) catForSeg.set(l.segment, l.category_code)
+      }
+      return lineAttributions(lines, inv.billing_mode as string).map((g) => {
+        const cat = catForSeg.get(g.segment) ?? (inv.category_code as string | null) ?? ''
+        return {
+          ...base,
+          pool: segmentToPoolKey(g.segment),
+          amount: g.amount,
+          categoryCode: cat,
+          categoryName: coaNameByCode.get(cat) ?? 'Uncategorised revenue',
+        }
+      })
+    }
+    return [
+      {
+        ...base,
+        pool: invoicePoolForBillingMode(inv.billing_mode as string | null),
+        amount: Number(inv.total_amount ?? 0),
+        categoryCode: (inv.category_code as string | null) ?? '',
+        categoryName: coaNameByCode.get((inv.category_code as string | null) ?? '') ?? 'Uncategorised revenue',
+      },
+    ]
+  })
 }
 
 // Treasury revenue/expense from journal_lines. The unified COA seed

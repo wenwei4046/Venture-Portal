@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { payeeKey, validateConsolidation, poolAttributions, segmentForBillingMode, type SettleableInvoice } from './invoice-settlement'
+import { payeeKey, validateConsolidation, poolAttributions, segmentForBillingMode, segmentToPoolKey, lineAttributions, type SettleableInvoice } from './invoice-settlement'
 
 function inv(over: Partial<SettleableInvoice>): SettleableInvoice {
   return {
@@ -126,5 +126,74 @@ describe('segmentForBillingMode', () => {
   it('falls back to corporate for venture_attribution and unknown modes', () => {
     expect(segmentForBillingMode('venture_attribution')).toBe('corporate')
     expect(segmentForBillingMode('weird')).toBe('corporate')
+  })
+})
+
+describe('segmentToPoolKey', () => {
+  it('maps each dept segment to its pool (inverse of billing_mode→pool)', () => {
+    expect(segmentToPoolKey('hr')).toBe('dept_pool_hr')
+    expect(segmentToPoolKey('finance')).toBe('dept_pool_finance')
+    expect(segmentToPoolKey('director_office')).toBe('dept_pool_director_office')
+    expect(segmentToPoolKey('director')).toBe('dept_pool_director')
+    expect(segmentToPoolKey('marketing')).toBe('dept_pool_marketing')
+  })
+  it('falls back to venture_pool for corporate/treasury/unknown', () => {
+    expect(segmentToPoolKey('corporate')).toBe('venture_pool')
+    expect(segmentToPoolKey('treasury')).toBe('venture_pool')
+    expect(segmentToPoolKey('weird')).toBe('venture_pool')
+  })
+})
+
+describe('lineAttributions', () => {
+  it('groups a consolidated payroll invoice per segment, summing in cents', () => {
+    // HOUZS Century, Jun 2026 (real figures): HR 10,675.55 / Finance 9,614.40 /
+    // Director Office 1,411.58 → 21,701.53.
+    const lines = [
+      { amount: 8850.0, segment: 'hr' },
+      { amount: 647.5, segment: 'hr' },
+      { amount: 1062.0, segment: 'hr' },
+      { amount: 104.15, segment: 'hr' },
+      { amount: 11.9, segment: 'hr' },
+      { amount: 8130.0, segment: 'finance' },
+      { amount: 288.23, segment: 'finance' },
+      { amount: 1042.9, segment: 'finance' },
+      { amount: 137.55, segment: 'finance' },
+      { amount: 15.72, segment: 'finance' },
+      { amount: 1200.65, segment: 'director_office' },
+      { amount: 43.66, segment: 'director_office' },
+      { amount: 144.08, segment: 'director_office' },
+      { amount: 20.81, segment: 'director_office' },
+      { amount: 2.38, segment: 'director_office' },
+    ]
+    const groups = lineAttributions(lines, 'payroll_consolidated')
+    expect(groups).toEqual([
+      { segment: 'hr', pool: 'dept_pool_hr', amount: 10675.55 },
+      { segment: 'finance', pool: 'dept_pool_finance', amount: 9614.4 },
+      { segment: 'director_office', pool: 'dept_pool_director_office', amount: 1411.58 },
+    ])
+    const total = groups.reduce((s, g) => s + g.amount, 0)
+    expect(Math.round(total * 100) / 100).toBe(21701.53)
+  })
+
+  it('falls back to the invoice billing_mode segment when a line has no segment', () => {
+    const lines = [
+      { amount: 100, segment: null },
+      { amount: 50, segment: null },
+    ]
+    // hr_attribution → segment hr → pool dept_pool_hr; single group == total.
+    expect(lineAttributions(lines, 'hr_attribution')).toEqual([
+      { segment: 'hr', pool: 'dept_pool_hr', amount: 150 },
+    ])
+  })
+
+  it('a legacy single-mode invoice collapses to exactly one group == its total', () => {
+    const lines = [
+      { amount: 2580.0, segment: null },
+      { amount: 295.5, segment: null },
+      { amount: 3.57, segment: null },
+    ]
+    const groups = lineAttributions(lines, 'marketing_project')
+    expect(groups).toHaveLength(1)
+    expect(groups[0]).toEqual({ segment: 'marketing', pool: 'dept_pool_marketing', amount: 2879.07 })
   })
 })

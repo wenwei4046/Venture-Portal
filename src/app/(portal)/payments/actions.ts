@@ -98,6 +98,15 @@ export async function createPaymentVoucher(formData: FormData) {
       throw new Error('Invoice is not open for payment (already paid, via netting, or does not exist)')
     }
     settleBillingMode = (openInv as { billing_mode: string | null }).billing_mode ?? null
+    // Consolidated payroll invoices carry per-line gl_segments and must settle
+    // through createBillingReceipt (billing/actions.ts), which splits cash +
+    // GL per department. This single-voucher path credits ONE pool/segment, so
+    // it would collapse all three departments into corporate — block it.
+    if (settleBillingMode === 'payroll_consolidated') {
+      throw new Error(
+        'Consolidated payroll invoices settle via the billing receipt flow (Settle on the billing list), which splits the payment across HR / Finance / Director Office. Use that instead.',
+      )
+    }
     const { data: existingVoucher } = await supabase
       .from('payment_vouchers')
       .select('id, voucher_no')

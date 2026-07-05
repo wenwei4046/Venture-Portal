@@ -100,3 +100,57 @@ const BILLING_MODE_TO_SEGMENT: Record<string, string> = {
 export function segmentForBillingMode(mode: string): string {
   return BILLING_MODE_TO_SEGMENT[mode] ?? 'corporate'
 }
+
+// Inverse of the billing_mode→pool routing, keyed by gl_segment. Which dept
+// pool a segment's revenue/cash credits. Mirrors INVOICE_BILLING_MODE_TO_POOL
+// so a consolidated payroll invoice's per-line segments settle to the same
+// pools the equivalent single-mode invoices would.
+const SEGMENT_TO_POOL: Record<string, string> = {
+  hr: 'dept_pool_hr',
+  finance: 'dept_pool_finance',
+  director_office: 'dept_pool_director_office',
+  director: 'dept_pool_director',
+  marketing: 'dept_pool_marketing',
+}
+
+export function segmentToPoolKey(segment: string): string {
+  return SEGMENT_TO_POOL[segment] ?? 'venture_pool'
+}
+
+export interface SegmentedLine {
+  amount: number | string
+  segment: string | null
+}
+
+export interface SegmentAttribution {
+  segment: string
+  pool: string
+  amount: number
+}
+
+/** Group a consolidated invoice's lines by gl_segment, summing amounts in
+ *  integer cents (no float drift). Lines with no segment fall back to the
+ *  invoice-level billing_mode's segment, so a legacy single-mode invoice
+ *  collapses to exactly one group == its whole total. Preserves first-seen
+ *  segment order. Each group carries the dept pool its cash/revenue routes to. */
+export function lineAttributions(
+  lines: SegmentedLine[],
+  invoiceBillingMode: string,
+): SegmentAttribution[] {
+  const fallbackSeg = segmentForBillingMode(invoiceBillingMode)
+  const order: string[] = []
+  const cents = new Map<string, number>()
+  for (const ln of lines) {
+    const seg = ln.segment ?? fallbackSeg
+    if (!cents.has(seg)) {
+      cents.set(seg, 0)
+      order.push(seg)
+    }
+    cents.set(seg, cents.get(seg)! + Math.round(Number(ln.amount) * 100))
+  }
+  return order.map((seg) => ({
+    segment: seg,
+    pool: segmentToPoolKey(seg),
+    amount: cents.get(seg)! / 100,
+  }))
+}

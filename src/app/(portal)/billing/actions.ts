@@ -8,7 +8,7 @@ import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { postJournalEntry } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
-import { validateConsolidation, poolAttributions, segmentForBillingMode } from '@/lib/invoice-settlement'
+import { validateConsolidation, poolAttributions, segmentForBillingMode, lineAttributions } from '@/lib/invoice-settlement'
 import { deptNameToSegment, fallbackRevenueGlCode, invoiceJeDate } from '@/lib/billing'
 import { INVOICE_BILLING_MODE_TO_POOL } from '@/lib/cfo-reports'
 import {
@@ -1136,20 +1136,44 @@ export async function settleInvoicesConsolidated(payload: {
     throw new Error(`Receipt ${voucherNo} created but bank balance update failed: ${bumpErr.message}`)
   }
 
-  // Pool credit — attribute EACH invoice to its OWN dept pool by billing_mode.
-  // A consolidated receipt can span departments (same company can have e.g. a
-  // marketing_project invoice + a venture_attribution invoice), so the cash
-  // must be split per invoice — NOT lumped under one pool. (Earlier bug:
-  // everything went to venture_pool / "Office".)
-  const attributions = poolAttributions(
-    invoices.map((i) => ({
-      id: i.id,
-      invoice_no: i.invoice_no,
-      billing_mode: i.billing_mode,
-      total_amount: i.total_amount,
-    })),
-    INVOICE_BILLING_MODE_TO_POOL,
-  )
+  // Consolidated payroll invoices route PER LINE (each line's gl_segment), not
+  // by the invoice-level billing_mode. Fetch their lines so both the pool credit
+  // and the GL split below can expand them per department.
+  const consolidatedIds = invoices
+    .filter((i) => i.billing_mode === 'payroll_consolidated')
+    .map((i) => i.id)
+  const linesByInvoice = new Map<string, Array<{ amount: number; segment: string | null }>>()
+  if (consolidatedIds.length > 0) {
+    const { data: cLines } = await supabase
+      .from('invoice_lines')
+      .select('invoice_id, amount, segment')
+      .in('invoice_id', consolidatedIds)
+    for (const ln of cLines ?? []) {
+      const arr = linesByInvoice.get(ln.invoice_id as string) ?? []
+      arr.push({ amount: Number(ln.amount), segment: (ln.segment as string | null) ?? null })
+      linesByInvoice.set(ln.invoice_id as string, arr)
+    }
+  }
+
+  // Pool credit — attribute EACH invoice to its OWN dept pool. A consolidated
+  // receipt can span departments (a consolidated payroll invoice alone spans
+  // HR/Finance/Director Office), so cash is split per invoice-line-segment (or
+  // per invoice billing_mode for single-mode invoices) — NEVER lumped under one
+  // pool. (Earlier bug: everything went to venture_pool / "Office".)
+  const attributions = invoices.flatMap((i) => {
+    if (i.billing_mode === 'payroll_consolidated') {
+      const invNo = i.invoice_no ?? i.id.slice(0, 8)
+      return lineAttributions(linesByInvoice.get(i.id) ?? [], i.billing_mode).map((g) => ({
+        pool: g.pool,
+        amount: g.amount,
+        invoiceNo: `${invNo} (${g.segment})`,
+      }))
+    }
+    return poolAttributions(
+      [{ id: i.id, invoice_no: i.invoice_no, billing_mode: i.billing_mode, total_amount: i.total_amount }],
+      INVOICE_BILLING_MODE_TO_POOL,
+    )
+  })
   for (const a of attributions) {
     await adjustPool(
       supabase,
@@ -1165,11 +1189,18 @@ export async function settleInvoicesConsolidated(payload: {
 
   // GL: Dr Bank / Cr 3030, SPLIT per department segment so the GL-derived
   // Venture figure (corporate+treasury bank) doesn't absorb dept settlements.
-  // Group invoice amounts by segmentForBillingMode(billing_mode); one JE/segment.
+  // Group by segment: consolidated invoices split per line-segment; others by
+  // segmentForBillingMode(billing_mode). One JE per segment.
   const bySegment = new Map<string, number>()
   for (const inv of invoices) {
-    const seg = segmentForBillingMode(inv.billing_mode)
-    bySegment.set(seg, Math.round(((bySegment.get(seg) ?? 0) + Number(inv.total_amount)) * 100) / 100)
+    if (inv.billing_mode === 'payroll_consolidated') {
+      for (const g of lineAttributions(linesByInvoice.get(inv.id) ?? [], inv.billing_mode)) {
+        bySegment.set(g.segment, Math.round(((bySegment.get(g.segment) ?? 0) + g.amount) * 100) / 100)
+      }
+    } else {
+      const seg = segmentForBillingMode(inv.billing_mode)
+      bySegment.set(seg, Math.round(((bySegment.get(seg) ?? 0) + Number(inv.total_amount)) * 100) / 100)
+    }
   }
   for (const [seg, segAmount] of bySegment) {
     if (segAmount <= 0) continue
@@ -1420,17 +1451,6 @@ export async function approveInvoice(formData: FormData) {
   if (!inv) throw new Error('Invoice not found')
   if (inv.status !== 'draft') throw new Error(`Invoice is already ${inv.status}`)
 
-  // Phase-1 guard (2026-07-03): consolidated payroll invoices carry per-line
-  // segments and must post ONE AR-accrual JE PER department segment. That
-  // per-segment issue path is Phase 2 — until it lands, issuing here would post
-  // a single mis-segmented JE. Block it loudly so a draft can be reviewed but
-  // never wrongly issued. Remove this guard when Step 4 (per-segment issue) ships.
-  if (inv.billing_mode === 'payroll_consolidated') {
-    throw new Error(
-      'Consolidated payroll invoice cannot be issued yet — per-department GL posting is still being built. You can review/edit the draft; issuing will be enabled shortly.',
-    )
-  }
-
   await assertPeriodOpen(supabase, inv.period_month)
 
   const { error } = await supabase
@@ -1453,49 +1473,81 @@ export async function approveInvoice(formData: FormData) {
     // legacy single-line path when no lines exist.
     const { data: invoiceLines } = await supabase
       .from('invoice_lines')
-      .select('line_no, description, amount, category_code')
+      .select('line_no, description, amount, category_code, segment')
       .eq('invoice_id', inv.id)
       .order('line_no')
+    // transaction_date = the INVOICE date (user 2026-06-11): revenue belongs to
+    // the month printed on the invoice, not the day Finance clicked Issue.
+    // invoiceJeDate falls back to period month-end, then today.
+    const jeDate = invoiceJeDate(
+      (inv as { invoice_date?: string | null }).invoice_date,
+      inv.period_month,
+      dayjs().format('YYYY-MM-DD'),
+    )
+    // Consolidated payroll invoice: each line carries its own gl_segment, so
+    // post ONE AR-accrual JE PER segment (Dr 3030 dept-subtotal / Cr revenue per
+    // line, segment FORCED) — each department's revenue lands in its own P&L,
+    // mirroring how the payroll payment PV splits into per-dept JEs.
+    const isConsolidated =
+      inv.billing_mode === 'payroll_consolidated' ||
+      (!!invoiceLines && invoiceLines.some((l) => (l as { segment?: string | null }).segment))
     try {
-      // transaction_date = the INVOICE date (user 2026-06-11): revenue belongs
-      // to the month printed on the invoice, not the day Finance clicked
-      // Issue — a May-31 invoice issued June 4 must land in May's P&L.
-      // invoiceJeDate falls back to period month-end, then today.
-      const jeLines: Array<{ accountCode: string; debit?: number; credit?: number; description: string }> = [
-        { accountCode: '3030', debit: amount, description: `AR — invoice ${inv.invoice_no ?? ''}`.trim() },
-      ]
-      if (invoiceLines && invoiceLines.length > 0) {
-        // Per-line Cr. Each line's category_code resolves through the same
-        // fallback logic as the single-line path.
+      if (isConsolidated && invoiceLines && invoiceLines.length > 0) {
+        const order: string[] = []
+        const bySeg = new Map<string, typeof invoiceLines>()
         for (const ln of invoiceLines) {
-          const code = await resolveRevenueGlCode(supabase, ln.category_code, inv.billing_mode)
-          jeLines.push({
-            accountCode: code,
-            credit: Number(ln.amount),
-            description: ln.description ?? 'Line item',
+          const seg = (ln as { segment?: string | null }).segment ?? segmentForBillingMode(inv.billing_mode)
+          if (!bySeg.has(seg)) {
+            bySeg.set(seg, [])
+            order.push(seg)
+          }
+          bySeg.get(seg)!.push(ln)
+        }
+        for (const seg of order) {
+          const segLines = bySeg.get(seg)!
+          const subtotal = Math.round(segLines.reduce((s, l) => s + Number(l.amount), 0) * 100) / 100
+          const jeLines: Array<{ accountCode: string; debit?: number; credit?: number; description: string }> = [
+            { accountCode: '3030', debit: subtotal, description: `AR — invoice ${inv.invoice_no ?? ''} (${seg})`.trim() },
+          ]
+          for (const ln of segLines) {
+            const code = await resolveRevenueGlCode(supabase, ln.category_code, inv.billing_mode)
+            jeLines.push({ accountCode: code, credit: Number(ln.amount), description: ln.description ?? 'Line item' })
+          }
+          await postJournalEntry(supabase, {
+            transactionDate: jeDate,
+            segment: seg,
+            description: `Invoice ${inv.invoice_no ?? inv.id} issued — ${seg}`,
+            referenceType: 'invoice',
+            referenceId: inv.id,
+            createdBy: user.id,
+            lines: jeLines,
           })
         }
       } else {
-        // Single-line / legacy invoice: one Cr for the full amount.
-        const revenueCode = await resolveRevenueGlCode(supabase, inv.category_code, inv.billing_mode)
-        jeLines.push({
-          accountCode: revenueCode,
-          credit: amount,
-          description: 'Service billing revenue recognised',
+        // Legacy / single-mode invoice: one JE. Per-line Cr when lines exist
+        // (mig 275), else a single Cr for the full amount. Segment is derived
+        // downstream from the invoice's billing_mode.
+        const jeLines: Array<{ accountCode: string; debit?: number; credit?: number; description: string }> = [
+          { accountCode: '3030', debit: amount, description: `AR — invoice ${inv.invoice_no ?? ''}`.trim() },
+        ]
+        if (invoiceLines && invoiceLines.length > 0) {
+          for (const ln of invoiceLines) {
+            const code = await resolveRevenueGlCode(supabase, ln.category_code, inv.billing_mode)
+            jeLines.push({ accountCode: code, credit: Number(ln.amount), description: ln.description ?? 'Line item' })
+          }
+        } else {
+          const revenueCode = await resolveRevenueGlCode(supabase, inv.category_code, inv.billing_mode)
+          jeLines.push({ accountCode: revenueCode, credit: amount, description: 'Service billing revenue recognised' })
+        }
+        await postJournalEntry(supabase, {
+          transactionDate: jeDate,
+          description: `Invoice ${inv.invoice_no ?? inv.id} issued`,
+          referenceType: 'invoice',
+          referenceId: inv.id,
+          createdBy: user.id,
+          lines: jeLines,
         })
       }
-      await postJournalEntry(supabase, {
-        transactionDate: invoiceJeDate(
-          (inv as { invoice_date?: string | null }).invoice_date,
-          inv.period_month,
-          dayjs().format('YYYY-MM-DD'),
-        ),
-        description: `Invoice ${inv.invoice_no ?? inv.id} issued`,
-        referenceType: 'invoice',
-        referenceId: inv.id,
-        createdBy: user.id,
-        lines: jeLines,
-      })
     } catch (jeErr) {
       const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
       throw new Error(`Invoice issued but AR accrual JE failed: ${msg}`)
@@ -1574,24 +1626,19 @@ export async function approveInvoicesForPeriod(formData: FormData) {
   await assertPeriodOpen(supabase, period)
 
   // Pull draft rows up-front so we can post AR accrual JEs after the bulk update.
-  // Phase-1 guard (2026-07-03): EXCLUDE consolidated payroll invoices — their
-  // per-line-segment issue path (one AR JE per department) is Phase 2. Bulk-
-  // issuing them here would post a single mis-segmented JE, so they stay draft
-  // and must be issued individually once Step 4 ships. Remove both .neq filters
-  // when the per-segment issue path lands.
+  // Consolidated payroll invoices post ONE AR JE PER department segment (handled
+  // in the loop below); everything else posts a single JE.
   const { data: draftInvoices } = await supabase
     .from('invoices')
     .select('id, invoice_no, invoice_date, total_amount, billing_mode, category_code, billable_to_type, billable_to_department_id')
     .eq('period_month', period)
     .eq('status', 'draft')
-    .neq('billing_mode', 'payroll_consolidated')
 
   const { error, count } = await supabase
     .from('invoices')
     .update({ status: 'issued' }, { count: 'exact' })
     .eq('period_month', period)
     .eq('status', 'draft')
-    .neq('billing_mode', 'payroll_consolidated')
 
   if (error) throw new Error(`Failed to bulk issue invoices: ${error.message}`)
 
@@ -1607,6 +1654,54 @@ export async function approveInvoicesForPeriod(formData: FormData) {
       period,
       todayStr,
     )
+
+    // Consolidated payroll invoice: one AR JE PER department segment (Dr 3030
+    // dept-subtotal / Cr revenue per line, segment forced). These are always
+    // subsidiary invoices, never dept_pool inter-billing, so skip the rest.
+    if (row.billing_mode === 'payroll_consolidated') {
+      const { data: rowLines } = await supabase
+        .from('invoice_lines')
+        .select('description, amount, category_code, segment')
+        .eq('invoice_id', row.id)
+        .order('line_no')
+      const order: string[] = []
+      const bySeg = new Map<string, NonNullable<typeof rowLines>>()
+      for (const ln of rowLines ?? []) {
+        const seg = (ln.segment as string | null) ?? segmentForBillingMode(row.billing_mode)
+        if (!bySeg.has(seg)) {
+          bySeg.set(seg, [])
+          order.push(seg)
+        }
+        bySeg.get(seg)!.push(ln)
+      }
+      for (const seg of order) {
+        const segLines = bySeg.get(seg)!
+        const subtotal = Math.round(segLines.reduce((s, l) => s + Number(l.amount), 0) * 100) / 100
+        const jeLines: Array<{ accountCode: string; debit?: number; credit?: number; description: string }> = [
+          { accountCode: '3030', debit: subtotal, description: `AR — invoice ${row.invoice_no ?? ''} (${seg})`.trim() },
+        ]
+        for (const ln of segLines) {
+          const code = await resolveRevenueGlCode(supabase, ln.category_code, row.billing_mode)
+          jeLines.push({ accountCode: code, credit: Number(ln.amount), description: ln.description ?? 'Line item' })
+        }
+        try {
+          await postJournalEntry(supabase, {
+            transactionDate: txnDate,
+            segment: seg,
+            description: `Invoice ${row.invoice_no ?? row.id} issued (bulk) — ${seg}`,
+            referenceType: 'invoice',
+            referenceId: row.id,
+            createdBy: user.id,
+            lines: jeLines,
+          })
+        } catch (jeErr) {
+          const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
+          throw new Error(`Bulk issue: per-segment JE failed for invoice ${row.invoice_no ?? row.id} (${seg}): ${msg}`)
+        }
+      }
+      continue
+    }
+
     const revenueCode = await resolveRevenueGlCode(supabase, row.category_code, row.billing_mode)
     try {
       await postJournalEntry(supabase, {

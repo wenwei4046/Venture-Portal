@@ -129,6 +129,7 @@ function formatBillingMode(m: string): string {
     case 'finance_attribution':         return 'Finance OPEX'
     case 'venture_attribution':         return 'Venture (HV) OPEX'
     case 'non_billable':                return 'Non-billable'
+    case 'payroll_consolidated':        return 'Payroll (consolidated)'
     default:                            return m
   }
 }
