@@ -12,6 +12,7 @@ export interface RawInvoice {
   invoiceDate: string | null
   dueDate: string | null
   amount: number
+  description?: string | null
 }
 
 export type AgingBucket = 'this_month' | 'm1' | 'm2' | 'm3' | 'm4' | 'm5_plus'

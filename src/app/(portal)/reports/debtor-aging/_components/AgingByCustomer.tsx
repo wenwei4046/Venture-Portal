@@ -95,7 +95,7 @@ export default function AgingByCustomer({ byPayer, invoices, totals }: Props) {
                   {isOpen &&
                     rows.map((inv) => (
                       <tr key={inv.id} className="text-xs">
-                        <td className="whitespace-nowrap">
+                        <td>
                           <span className="inline-block w-4" />
                           <a
                             href={`/billing/invoice-doc?id=${inv.id}`}
@@ -109,6 +109,9 @@ export default function AgingByCustomer({ byPayer, invoices, totals }: Props) {
                           <span className="text-muted ml-2 font-mono">
                             {inv.invoiceDate ? dayjs(inv.invoiceDate).format('DD/MM/YY') : '—'}
                           </span>
+                          {inv.description ? (
+                            <span className="text-graphite ml-2">{inv.description}</span>
+                          ) : null}
                         </td>
                         {AGING_BUCKETS.map((b) => (
                           <td key={b.key} className="num">

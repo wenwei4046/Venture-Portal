@@ -73,7 +73,7 @@ export async function GET(req: Request) {
         rows.push([`${p.payer} (${p.count})`, '', ...bucketKeys.map((k) => p.buckets[k] || ''), p.total])
         for (const inv of invByPayer.get(p.payer) ?? []) {
           rows.push([
-            `    ${inv.invoiceNo}`,
+            `    ${inv.invoiceNo}${inv.description ? ` — ${inv.description}` : ''}`,
             inv.invoiceDate ? dayjs(inv.invoiceDate).format('YYYY-MM-DD') : '',
             ...bucketKeys.map((k) => (inv.bucket === k ? inv.amount : '')),
             inv.amount,
@@ -85,16 +85,16 @@ export async function GET(req: Request) {
         sheetName: 'Debtor Aging (detail)',
         headerRow: detailHeader,
         rows,
-        columnWidths: [26, 12, 11, 11, 11, 11, 11, 11, 13],
+        columnWidths: [48, 12, 11, 11, 11, 11, 11, 11, 13],
       })
       return exportXlsxResponse({ filename, buffer })
     }
 
     const cols = [
-      { label: 'Customer / Invoice', width: 130, align: 'left' as const },
-      { label: 'Inv date', width: 62, align: 'left' as const },
-      ...AGING_BUCKETS.map((b) => ({ label: b.label, width: 68, align: 'right' as const })),
-      { label: 'Total', width: 78, align: 'right' as const },
+      { label: 'Customer / Invoice', width: 200, align: 'left' as const },
+      { label: 'Inv date', width: 56, align: 'left' as const },
+      ...AGING_BUCKETS.map((b) => ({ label: b.label, width: 58, align: 'right' as const })),
+      { label: 'Total', width: 72, align: 'right' as const },
     ]
     const rows: (string | number | null)[][] = []
     const rowKinds: PdfRowKind[] = []
@@ -103,7 +103,7 @@ export async function GET(req: Request) {
       rowKinds.push('group')
       for (const inv of invByPayer.get(p.payer) ?? []) {
         rows.push([
-          `   ${inv.invoiceNo}`,
+          `   ${inv.invoiceNo}${inv.description ? ` — ${inv.description}` : ''}`,
           inv.invoiceDate ? dayjs(inv.invoiceDate).format('YYYY-MM-DD') : '—',
           ...bucketKeys.map((k) => (inv.bucket === k ? formatMoneyBare(inv.amount) : '')),
           formatMoneyBare(inv.amount),
