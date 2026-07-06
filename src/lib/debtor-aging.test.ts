@@ -13,7 +13,7 @@ describe('bucketForMonthsOld', () => {
 })
 
 function inv(over: Partial<RawInvoice>): RawInvoice {
-  return { invoiceNo: 'X', payer: 'Carres', invoiceDate: '2026-07-01', dueDate: null, amount: 100, ...over }
+  return { id: over.invoiceNo ?? 'X', invoiceNo: 'X', payer: 'Carres', invoiceDate: '2026-07-01', dueDate: null, amount: 100, ...over }
 }
 
 describe('buildDebtorAging', () => {

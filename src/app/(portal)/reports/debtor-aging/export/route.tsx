@@ -14,7 +14,7 @@ async function loadAging() {
     fetchAllRows((lo, hi) =>
       supabase
         .from('invoices')
-        .select('invoice_no, invoice_date, due_date, total_amount, company_id, billable_to_department_id, billable_to_freetext_name')
+        .select('id, invoice_no, invoice_date, due_date, total_amount, company_id, billable_to_department_id, billable_to_freetext_name')
         .eq('status', 'issued')
         .order('id', { ascending: true })
         .range(lo, hi),
@@ -26,6 +26,7 @@ async function loadAging() {
   const companyMap = new Map((companies ?? []).map((c) => [c.id as string, c.name as string]))
   const deptMap = new Map((departments ?? []).map((d) => [d.id as string, d.name as string]))
   const raw: RawInvoice[] = (invoices ?? []).map((i) => ({
+    id: i.id as string,
     invoiceNo: (i.invoice_no as string | null) ?? '—',
     payer:
       (i.company_id ? companyMap.get(i.company_id as string) : null) ??
@@ -43,33 +44,85 @@ const m = (v: number) => (v ? formatMoneyBare(v) : '—')
 
 export async function GET(req: Request) {
   await requireRole(['principal', 'finance'])
-  const format = new URL(req.url).searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
+  const params = new URL(req.url).searchParams
+  const format = params.get('format') === 'pdf' ? 'pdf' : 'xlsx'
+  // view: 'detail' (one row per invoice) or 'summary' (aging matrix by customer).
+  // Explicit ?view= wins; else keep the historic default (xlsx→detail, pdf→summary).
+  const viewParam = params.get('view')
+  const view = viewParam === 'summary' ? 'summary' : viewParam === 'detail' ? 'detail' : format === 'pdf' ? 'summary' : 'detail'
+
   const aging = await loadAging()
   const asOf = dayjs(aging.asOf).format('D MMM YYYY')
-  const filename = `debtor-aging-${dayjs(aging.asOf).format('YYYYMMDD')}`
+  const filename = `debtor-aging-${view}-${dayjs(aging.asOf).format('YYYYMMDD')}`
 
-  if (format === 'xlsx') {
-    // Detail sheet — actionable, one row per unpaid invoice, most overdue first.
-    const rows = aging.invoices.map((inv) => [
+  // ── Detail: one row per unpaid invoice, oldest first ──────────────────────
+  if (view === 'detail') {
+    const detailHeader = ['Invoice', 'Customer', 'Invoice date', 'Due date', 'Months old', 'Bucket', 'Amount (RM)']
+    if (format === 'xlsx') {
+      const rows = aging.invoices.map((inv) => [
+        inv.invoiceNo,
+        inv.payer,
+        inv.invoiceDate ? dayjs(inv.invoiceDate).format('YYYY-MM-DD') : '',
+        inv.dueDate ? dayjs(inv.dueDate).format('YYYY-MM-DD') : '',
+        inv.monthsOld,
+        AGING_BUCKETS.find((b) => b.key === inv.bucket)?.label ?? '',
+        inv.amount,
+      ])
+      rows.push(['', 'TOTAL', '', '', '', '', aging.totals.total])
+      const buffer = buildXlsxBuffer({
+        sheetName: 'Debtor Aging (detail)',
+        headerRow: detailHeader,
+        rows,
+        columnWidths: [20, 24, 13, 13, 13, 14, 14],
+      })
+      return exportXlsxResponse({ filename, buffer })
+    }
+    const cols = [
+      { label: 'Invoice', width: 95, align: 'left' as const },
+      { label: 'Customer', width: 120, align: 'left' as const },
+      { label: 'Invoice date', width: 80, align: 'left' as const },
+      { label: 'Due date', width: 80, align: 'left' as const },
+      { label: 'Months', width: 55, align: 'right' as const },
+      { label: 'Bucket', width: 80, align: 'left' as const },
+      { label: 'Amount', width: 90, align: 'right' as const },
+    ]
+    const rows: (string | number | null)[][] = aging.invoices.map((inv) => [
       inv.invoiceNo,
       inv.payer,
-      inv.invoiceDate ? dayjs(inv.invoiceDate).format('YYYY-MM-DD') : '',
-      inv.dueDate ? dayjs(inv.dueDate).format('YYYY-MM-DD') : '',
-      inv.monthsOld,
+      inv.invoiceDate ? dayjs(inv.invoiceDate).format('YYYY-MM-DD') : '—',
+      inv.dueDate ? dayjs(inv.dueDate).format('YYYY-MM-DD') : '—',
+      inv.monthsOld || '—',
       AGING_BUCKETS.find((b) => b.key === inv.bucket)?.label ?? '',
-      inv.amount,
+      formatMoneyBare(inv.amount),
     ])
-    rows.push(['', 'TOTAL', '', '', '', '', aging.totals.total])
+    rows.push(['', 'TOTAL', '', '', '', '', formatMoneyBare(aging.totals.total)])
+    return exportPdfResponse({
+      filename,
+      element: (
+        <PdfDocument title="Debtor Aging — Detail" subtitle="Unpaid invoices, oldest first · all amounts RM" periodLabel={`As of ${asOf}`} orientation="landscape">
+          <PdfTable columns={cols} rows={rows} />
+        </PdfDocument>
+      ),
+    })
+  }
+
+  // ── Summary: aging matrix by customer ─────────────────────────────────────
+  const summaryHeader = ['Customer', ...AGING_BUCKETS.map((b) => b.label), 'Total (RM)']
+  if (format === 'xlsx') {
+    const rows = aging.byPayer.map((p) => [
+      p.payer,
+      ...AGING_BUCKETS.map((b) => p.buckets[b.key as AgingBucket]),
+      p.total,
+    ])
+    rows.push(['TOTAL', ...AGING_BUCKETS.map((b) => aging.totals.buckets[b.key as AgingBucket]), aging.totals.total])
     const buffer = buildXlsxBuffer({
-      sheetName: 'Debtor Aging',
-      headerRow: ['Invoice', 'Customer', 'Invoice date', 'Due date', 'Months old', 'Bucket', 'Amount (RM)'],
+      sheetName: 'Debtor Aging (summary)',
+      headerRow: summaryHeader,
       rows,
-      columnWidths: [20, 24, 13, 13, 13, 14, 14],
+      columnWidths: [24, 14, 14, 14, 14, 16],
     })
     return exportXlsxResponse({ filename, buffer })
   }
-
-  // PDF — the classic aging matrix by customer.
   const cols = [
     { label: 'Customer', width: 150, align: 'left' as const },
     ...AGING_BUCKETS.map((b) => ({ label: b.label, width: 95, align: 'right' as const })),
@@ -85,11 +138,10 @@ export async function GET(req: Request) {
     ...AGING_BUCKETS.map((b) => m(aging.totals.buckets[b.key as AgingBucket])),
     formatMoneyBare(aging.totals.total),
   ])
-
   return exportPdfResponse({
     filename,
     element: (
-      <PdfDocument title="Debtor Aging" subtitle="Invoices billed, not yet collected · all amounts RM" periodLabel={`As of ${asOf}`} orientation="landscape">
+      <PdfDocument title="Debtor Aging — Summary" subtitle="By customer · Invoices billed, not yet collected · all amounts RM" periodLabel={`As of ${asOf}`} orientation="landscape">
         <PdfTable columns={cols} rows={rows} />
       </PdfDocument>
     ),

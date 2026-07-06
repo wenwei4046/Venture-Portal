@@ -19,7 +19,7 @@ export default async function DebtorAgingPage() {
     fetchAllRows((lo, hi) =>
       supabase
         .from('invoices')
-        .select('invoice_no, invoice_date, due_date, total_amount, company_id, billable_to_department_id, billable_to_freetext_name')
+        .select('id, invoice_no, invoice_date, due_date, total_amount, company_id, billable_to_department_id, billable_to_freetext_name')
         .eq('status', 'issued')
         .order('id', { ascending: true })
         .range(lo, hi),
@@ -34,6 +34,7 @@ export default async function DebtorAgingPage() {
   const deptMap = new Map((departments ?? []).map((d) => [d.id as string, d.name as string]))
 
   const raw: RawInvoice[] = (invoices ?? []).map((i) => ({
+    id: i.id as string,
     invoiceNo: (i.invoice_no as string | null) ?? '—',
     payer:
       (i.company_id ? companyMap.get(i.company_id as string) : null) ??
@@ -64,19 +65,26 @@ export default async function DebtorAgingPage() {
             Invoices billed out but not yet collected · as of {dayjs(today).format('D MMM YYYY')}
           </p>
         </div>
-        <div className="flex gap-2 shrink-0">
-          <a
-            href="/reports/debtor-aging/export?format=xlsx"
-            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-          >
-            Excel
-          </a>
-          <a
-            href="/reports/debtor-aging/export?format=pdf"
-            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-          >
-            PDF
-          </a>
+        <div className="flex flex-col gap-1.5 shrink-0 text-right">
+          {(['detail', 'summary'] as const).map((view) => (
+            <div key={view} className="flex gap-2 items-center justify-end">
+              <span className="text-[11px] font-mono uppercase tracking-wide text-muted w-14 text-right">
+                {view}
+              </span>
+              <a
+                href={`/reports/debtor-aging/export?format=xlsx&view=${view}`}
+                className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+              >
+                Excel
+              </a>
+              <a
+                href={`/reports/debtor-aging/export?format=pdf&view=${view}`}
+                className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+              >
+                PDF
+              </a>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -147,8 +155,18 @@ export default async function DebtorAgingPage() {
               </thead>
               <tbody>
                 {aging.invoices.map((inv) => (
-                  <tr key={inv.invoiceNo}>
-                    <td className="font-mono text-xs">{inv.invoiceNo}</td>
+                  <tr key={inv.id}>
+                    <td className="font-mono text-xs">
+                      <a
+                        href={`/billing/invoice-doc?id=${inv.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-accent hover:underline"
+                        title="Open invoice PDF"
+                      >
+                        {inv.invoiceNo}
+                      </a>
+                    </td>
                     <td className="font-sans">{inv.payer}</td>
                     <td className="font-mono text-xs text-graphite">{inv.invoiceDate ? dayjs(inv.invoiceDate).format('DD/MM/YYYY') : '—'}</td>
                     <td className="font-mono text-xs text-graphite">{inv.dueDate ? dayjs(inv.dueDate).format('DD/MM/YYYY') : '—'}</td>

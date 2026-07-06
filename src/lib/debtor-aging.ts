@@ -6,6 +6,7 @@
 import dayjs from 'dayjs'
 
 export interface RawInvoice {
+  id: string
   invoiceNo: string
   payer: string
   invoiceDate: string | null
