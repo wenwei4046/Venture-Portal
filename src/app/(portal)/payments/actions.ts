@@ -8,7 +8,7 @@ import { requireRole } from '@/lib/auth'
 import { postJournalEntry, r2 } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
 import { ACCOUNT_TYPES, type AccountType } from '@/lib/coa'
-import { segmentForBillingMode } from '@/lib/invoice-settlement'
+import { segmentForBillingMode, lineAttributions, type SegmentAttribution } from '@/lib/invoice-settlement'
 
 // ─── Create payment voucher (Finance) ────────────────────────────────────────
 
@@ -87,6 +87,9 @@ export async function createPaymentVoucher(formData: FormData) {
     throw new Error('Billing payment requires a linked invoice')
   }
   let settleBillingMode: string | null = null
+  // Consolidated payroll invoices carry per-line gl_segments; when set, the
+  // credit branch splits the pool credit + GL per department.
+  let consolidatedGroups: SegmentAttribution[] | null = null
   if (voucherType === 'billing_payment' && invoiceId) {
     const { data: openInv } = await supabase
       .from('invoices')
@@ -98,14 +101,29 @@ export async function createPaymentVoucher(formData: FormData) {
       throw new Error('Invoice is not open for payment (already paid, via netting, or does not exist)')
     }
     settleBillingMode = (openInv as { billing_mode: string | null }).billing_mode ?? null
-    // Consolidated payroll invoices carry per-line gl_segments and must settle
-    // through createBillingReceipt (billing/actions.ts), which splits cash +
-    // GL per department. This single-voucher path credits ONE pool/segment, so
-    // it would collapse all three departments into corporate — block it.
+    // Consolidated payroll invoices carry per-line gl_segments. Load them and
+    // group per department so the credit branch below splits the receiving
+    // pool credit AND the GL per segment (HR / Finance / Director Office),
+    // instead of collapsing everything into one venture/corporate pool.
     if (settleBillingMode === 'payroll_consolidated') {
-      throw new Error(
-        'Consolidated payroll invoices settle via the billing receipt flow (Settle on the billing list), which splits the payment across HR / Finance / Director Office. Use that instead.',
+      const { data: consolLines } = await supabase
+        .from('invoice_lines')
+        .select('amount, segment')
+        .eq('invoice_id', invoiceId)
+      const groups = lineAttributions(
+        (consolLines ?? []).map((l) => ({ amount: Number(l.amount), segment: (l.segment as string | null) ?? null })),
+        settleBillingMode,
       )
+      if (groups.length === 0) {
+        throw new Error('Consolidated payroll invoice has no lines to settle')
+      }
+      const groupSum = Math.round(groups.reduce((s, g) => s + g.amount, 0) * 100) / 100
+      if (Math.abs(groupSum - amount) > 0.01) {
+        throw new Error(
+          `Consolidated payroll invoices must be settled in full (invoice lines total RM ${groupSum.toFixed(2)}, voucher amount RM ${amount.toFixed(2)})`,
+        )
+      }
+      consolidatedGroups = groups
     }
     const { data: existingVoucher } = await supabase
       .from('payment_vouchers')
@@ -285,7 +303,7 @@ export async function createPaymentVoucher(formData: FormData) {
         })),
       )
     }
-  } else if (direction === 'credit' && targetPool) {
+  } else if (direction === 'credit' && (targetPool || consolidatedGroups)) {
     // Every PV source row must carry an account — reports route lines by the
     // referenced chart_of_accounts.type. A NULL account_code would crash the
     // P&L / Cash Flow render (see src/lib/cfo-reports.ts:gatherPvSources).
@@ -293,15 +311,15 @@ export async function createPaymentVoucher(formData: FormData) {
       throw new Error('Account is required on inbound (credit) vouchers')
     }
     // role defaults to 'primary' at the DB level (mig 254); no need to set
-    // it explicitly here.
+    // it explicitly here. Consolidated payroll: one source row PER department
+    // pool so cash-flow attribution matches the dept_pools + GL split; the
+    // per-segment amounts sum to the voucher total (trigger-checked).
+    const creditRows = consolidatedGroups
+      ? consolidatedGroups.map((g) => ({ voucher_id: data.id, pool: g.pool, amount: g.amount, account_code: accountCode }))
+      : [{ voucher_id: data.id, pool: targetPool as string, amount, account_code: accountCode }]
     const { error: primaryInsertErr } = await supabase
       .from('payment_voucher_sources')
-      .insert({
-        voucher_id: data.id,
-        pool: targetPool,
-        amount,
-        account_code: accountCode,
-      })
+      .insert(creditRows)
     if (primaryInsertErr) {
       throw new Error(`Failed to insert credit voucher source row: ${primaryInsertErr.message}`)
     }
@@ -392,7 +410,13 @@ export async function createPaymentVoucher(formData: FormData) {
     }
     // Pool balance: add to target pool (the receiving side — e.g. Marketing
     // pool gets the revenue regardless of how the paying side settled).
-    if (targetPool) {
+    // Consolidated payroll: split the receiving credit across each department's
+    // pool (HR / Finance / Director Office) per the invoice lines' segments.
+    if (consolidatedGroups) {
+      for (const g of consolidatedGroups) {
+        await adjustPool(supabase, g.pool, 'in', r2(g.amount), `PV ${voucherNo}: ${description} [${g.segment}]`, user.id, null, nowIso)
+      }
+    } else if (targetPool) {
       await adjustPool(supabase, targetPool, 'in', r2(amount), `PV ${voucherNo}: ${description}`, user.id, null, nowIso)
     }
     // Venture (Office) cash overlay for dept→Venture inter-billing.
@@ -499,24 +523,44 @@ export async function createPaymentVoucher(formData: FormData) {
         const glAccountCode = bankAccountId
           ? ((await supabase.from('bank_accounts').select('gl_account_code').eq('id', bankAccountId).single()).data?.gl_account_code ?? '3000')
           : '3000'
-        await postJournalEntry(supabase, {
-          transactionDate: paymentDateStr,
-          description: `PV ${voucherNo}: ${description}`,
-          referenceType: 'payment_voucher',
-          referenceId: data.id,
-          ...(invoiceId && settleBillingMode
-            ? { segment: segmentForBillingMode(settleBillingMode) }
-            : {}),
-          lines: [
-            { accountCode: glAccountCode, debit: r2(amount), description: `Bank deposit — ${voucherNo}` },
-            // The form's account picker drives the GL credit (user decision
-            // 2026-06-03 / fixed 2026-06-11): a receipt against a non-3030
-            // receivable (e.g. 3071 Other Debtor) credits THAT account —
-            // hardcoding 3030 made AR absorb every receipt.
-            { accountCode: accountCode ?? '3030', credit: r2(amount), description: `Payment received — ${payeeName}` },
-          ],
-          createdBy: user.id,
-        })
+        if (consolidatedGroups) {
+          // Consolidated payroll: one bank-in JE PER department segment, so the
+          // per-bank cash slice + AR clearing attribute to HR / Finance /
+          // Director Office (not a single collapsed corporate JE).
+          for (const g of consolidatedGroups) {
+            await postJournalEntry(supabase, {
+              transactionDate: paymentDateStr,
+              description: `PV ${voucherNo}: ${description} [${g.segment}]`,
+              referenceType: 'payment_voucher',
+              referenceId: data.id,
+              segment: g.segment,
+              lines: [
+                { accountCode: glAccountCode, debit: r2(g.amount), description: `Bank deposit — ${voucherNo} (${g.segment})` },
+                { accountCode: accountCode ?? '3030', credit: r2(g.amount), description: `Payment received — ${payeeName} (${g.segment})` },
+              ],
+              createdBy: user.id,
+            })
+          }
+        } else {
+          await postJournalEntry(supabase, {
+            transactionDate: paymentDateStr,
+            description: `PV ${voucherNo}: ${description}`,
+            referenceType: 'payment_voucher',
+            referenceId: data.id,
+            ...(invoiceId && settleBillingMode
+              ? { segment: segmentForBillingMode(settleBillingMode) }
+              : {}),
+            lines: [
+              { accountCode: glAccountCode, debit: r2(amount), description: `Bank deposit — ${voucherNo}` },
+              // The form's account picker drives the GL credit (user decision
+              // 2026-06-03 / fixed 2026-06-11): a receipt against a non-3030
+              // receivable (e.g. 3071 Other Debtor) credits THAT account —
+              // hardcoding 3030 made AR absorb every receipt.
+              { accountCode: accountCode ?? '3030', credit: r2(amount), description: `Payment received — ${payeeName}` },
+            ],
+            createdBy: user.id,
+          })
+        }
       } catch (jeErr) {
         // Fail loud (2026-06-11 audit): a swallowed JE leaves the receipt's
         // cash missing from the GL.
