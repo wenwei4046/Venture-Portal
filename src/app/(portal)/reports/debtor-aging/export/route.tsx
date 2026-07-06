@@ -8,6 +8,9 @@ import { buildXlsxBuffer } from '@/lib/export/excel'
 import { PdfDocument, PdfTable, type PdfRowKind } from '@/lib/export/pdf'
 import { buildDebtorAging, AGING_BUCKETS, type RawInvoice, type AgingBucket } from '@/lib/debtor-aging'
 
+// Always generate fresh from live invoice data; never statically cache.
+export const dynamic = 'force-dynamic'
+
 async function loadAging() {
   const supabase = await createClient()
   const [invoices, companies, departments] = await Promise.all([

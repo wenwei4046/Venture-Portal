@@ -9,6 +9,8 @@ export function exportXlsxResponse(args: {
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="${args.filename}.xlsx"`,
+      // Exports reflect live data — never let the browser/CDN serve a stale copy.
+      'Cache-Control': 'no-store, max-age=0',
     },
   })
 }
@@ -22,6 +24,8 @@ export async function exportPdfResponse(args: {
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${args.filename}.pdf"`,
+      // Exports reflect live data — never let the browser/CDN serve a stale copy.
+      'Cache-Control': 'no-store, max-age=0',
     },
   })
 }
