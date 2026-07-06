@@ -11,6 +11,7 @@ export const POOL_LABEL: Record<string, string> = {
   dept_pool_finance: 'Finance',
   dept_pool_director_office: 'Director Office',
   dept_pool_director: 'Director Pool',
+  dept_pool_venture_office: 'Venture (Office)',
   operating_fund: 'Operating Fund',
 }
 
@@ -22,6 +23,7 @@ export const KNOWN_POOLS: string[] = [
   'dept_pool_finance',
   'dept_pool_director_office',
   'dept_pool_director',
+  'dept_pool_venture_office',
   'invoice_payout_pool',
   'operating_fund',
 ]

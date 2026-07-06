@@ -436,7 +436,20 @@ export async function createPaymentVoucher(formData: FormData) {
     // the bank again. The adjustPool(VENTURE_POOL,…) above is KEPT untouched
     // (it feeds the accrual / treasury P&L view). No GL/JE is posted here and
     // the bank cache is not touched — this is a pure cash-page overlay row.
-    if (interBilling && targetPool === 'venture_pool') {
+    //
+    // GUARD (own-share 2026-07): this overlay is ONLY for "real dept pays
+    // Venture". For the REVERSED own-share invoice (Venture Office is the PAYER,
+    // depts are the receivers), the paying-side inter_billing_out below already
+    // debits Venture Office, and the depts get np_in via consolidatedGroups — so
+    // this overlay must NOT fire (it would credit Venture as a receiver and
+    // double-book). Suppress when Venture Office is the payer or when the
+    // per-segment consolidated credit already ran.
+    if (
+      interBilling &&
+      targetPool === 'venture_pool' &&
+      interBilling.payingPool !== 'dept_pool_venture_office' &&
+      !consolidatedGroups
+    ) {
       const { data: ventureOffice, error: voErr } = await supabase
         .from('departments')
         .select('id')

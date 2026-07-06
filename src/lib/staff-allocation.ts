@@ -143,8 +143,15 @@ export function buildAllocationInvoiceLines(
 // omit the "(HR)" dept suffix — the department is shown as a group header on the
 // document and carried in `segment` for routing (confirmed with user 2026-07-03).
 
-/** gl_segment values that map to a real billing department. */
-export type PayrollSegment = 'hr' | 'finance' | 'director_office'
+/** gl_segment values for the staff-attribution departments (the ones that
+ *  split payroll across subsidiaries + an HV own-share). Marketing is a direct
+ *  cost centre — deliberately NOT here, so it's excluded from own-share
+ *  inter-billing (user 2026-07). */
+export type PayrollSegment = 'hr' | 'finance' | 'director_office' | 'director'
+
+/** The staff-attribution segments eligible for own-share → Venture (Office)
+ *  inter-billing (excludes marketing). */
+export const OWN_SHARE_SEGMENTS: readonly PayrollSegment[] = ['hr', 'finance', 'director_office', 'director']
 
 export interface DeptComponentGroup {
   /** Display label for the group header, e.g. "HR", "Finance", "Director Office". */
@@ -175,6 +182,7 @@ export const PAYROLL_SEGMENT_LABEL: Record<PayrollSegment, string> = {
   hr: 'HR',
   finance: 'Finance',
   director_office: 'Director Office',
+  director: 'Director',
 }
 
 /**

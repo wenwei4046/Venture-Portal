@@ -16,6 +16,7 @@ import InvoicesList from './InvoicesList'
 import CreateInvoiceButton from './CreateInvoiceButton'
 import CreateMultiLineInvoiceButton from './CreateMultiLineInvoiceButton'
 import GenerateConsolidatedInvoicesButton from './GenerateConsolidatedInvoicesButton'
+import GenerateOwnShareInvoiceButton from './GenerateOwnShareInvoiceButton'
 
 interface Props {
   searchParams: Promise<{ period?: string }>
@@ -295,6 +296,10 @@ export default async function BillingView({ searchParams }: Props) {
           {user.role === 'finance' && (
             <>
               <GenerateConsolidatedInvoicesButton
+                currentPeriod={period}
+                categories={categoryList}
+              />
+              <GenerateOwnShareInvoiceButton
                 currentPeriod={period}
                 categories={categoryList}
               />

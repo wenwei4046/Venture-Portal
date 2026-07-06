@@ -15,6 +15,7 @@ import {
   buildConsolidatedInvoiceLines,
   periodShortLabel,
   PAYROLL_SEGMENT_LABEL,
+  OWN_SHARE_SEGMENTS,
   type DeptComponentGroup,
   type PayrollSegment,
 } from '@/lib/staff-allocation'
@@ -1436,6 +1437,182 @@ export async function generateConsolidatedPayrollInvoices(
   return { generated: generatedCompanies.length, companies: generatedCompanies }
 }
 
+// ─── Own-share inter-billing to Venture (Office) (2026-07) ───────────────────
+// The HV own-share of each staff-attribution dept's payroll (the portion NOT
+// billed to any subsidiary) is inter-billed to the internal "Venture Office"
+// pseudo-dept: each dept RECOVERS its own-share, Venture (Office) BEARS it.
+// ONE consolidated invoice, billable_to_type='dept_pool' → Venture Office,
+// billing_mode='payroll_consolidated', per-dept segment lines. Direction is the
+// reverse of the subsidiary consolidated invoice (Venture Office pays, depts
+// receive). Marketing is a direct cost centre and is excluded (its segment is
+// not in OWN_SHARE_SEGMENTS). Source: get_staff_own_share_allocation RPC, which
+// (unlike get_staff_billing_allocation) emits every dept's residual, including
+// depts that are 100% HV-absorbed.
+
+interface OwnShareRpcRow {
+  department_name: string
+  staff_count: number
+  amount: number | string
+  salary_amount: number | string
+  allowance_amount: number | string
+  epf_amount: number | string
+  socso_amount: number | string
+  eis_amount: number | string
+}
+
+const OWN_SHARE_ORDER: PayrollSegment[] = ['hr', 'finance', 'director_office', 'director']
+
+function groupOwnShareAllocation(rows: OwnShareRpcRow[]): DeptComponentGroup[] {
+  const groups: DeptComponentGroup[] = []
+  for (const r of rows) {
+    const seg = deptNameToSegment(r.department_name)
+    // Only the staff-attribution depts (hr/finance/director_office/director) —
+    // excludes Marketing (a direct cost centre) and anything unmapped.
+    if (!seg || !OWN_SHARE_SEGMENTS.includes(seg as PayrollSegment)) continue
+    groups.push({
+      deptLabel: PAYROLL_SEGMENT_LABEL[seg as PayrollSegment],
+      segment: seg as PayrollSegment,
+      components: {
+        salary: Number(r.salary_amount ?? 0),
+        allowance: Number(r.allowance_amount ?? 0),
+        epf: Number(r.epf_amount ?? 0),
+        socso: Number(r.socso_amount ?? 0),
+        eis: Number(r.eis_amount ?? 0),
+      },
+    })
+  }
+  groups.sort((a, b) => OWN_SHARE_ORDER.indexOf(a.segment) - OWN_SHARE_ORDER.indexOf(b.segment))
+  return groups
+}
+
+export interface OwnShareInvoicePreview {
+  groups: DeptComponentGroup[]
+  total: number
+}
+
+/** Preview for the own-share review modal: the single Venture (Office) invoice's
+ *  per-dept groups + grand total. Reads live own-share allocation; no writes. */
+export async function fetchOwnShareInvoicePreview(periodMonth: string): Promise<OwnShareInvoicePreview> {
+  await requireRole(['finance', 'principal'])
+  const supabase = await createClient()
+  const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
+  const { data, error } = await supabase.rpc('get_staff_own_share_allocation' as never, { p_period_month: period } as never)
+  if (error) throw new Error(`Failed to load own-share allocation: ${error.message}`)
+  const groups = groupOwnShareAllocation((data ?? []) as unknown as OwnShareRpcRow[])
+  const total = Math.round(
+    groups.reduce((s, g) => {
+      const k = g.components
+      return s + k.salary + k.allowance + k.epf + k.socso + k.eis
+    }, 0) * 100,
+  ) / 100
+  return { groups, total }
+}
+
+/** Generate ONE draft own-share invoice for the period, billed to Venture
+ *  (Office). Amounts come server-side from get_staff_own_share_allocation;
+ *  `categoryCode` (default 5020) applies to every line. Idempotent — clears the
+ *  period's existing Venture-Office own-share draft first. */
+export async function generateOwnShareInvoice(
+  periodMonth: string,
+  categoryCode: string | null,
+): Promise<{ generated: number; total: number }> {
+  const user = await requireRole(['finance'])
+  const supabase = await createClient()
+  const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
+  await assertPeriodOpen(supabase, period)
+
+  const { data, error } = await supabase.rpc('get_staff_own_share_allocation' as never, { p_period_month: period } as never)
+  if (error) throw new Error(`Failed to load own-share allocation: ${error.message}`)
+  const groups = groupOwnShareAllocation((data ?? []) as unknown as OwnShareRpcRow[])
+
+  const { data: ventureOffice, error: voErr } = await supabase
+    .from('departments')
+    .select('id')
+    .eq('is_internal', true)
+    .eq('name', 'Venture Office')
+    .maybeSingle()
+  if (voErr || !ventureOffice?.id) {
+    throw new Error(`'Venture Office' pseudo-department not found${voErr ? `: ${voErr.message}` : ''}`)
+  }
+  const ventureOfficeId = ventureOffice.id as string
+
+  // Idempotent: clear the period's existing DRAFT own-share invoice (dept_pool →
+  // Venture Office). Filter tightly so the SUBSIDIARY consolidated drafts (same
+  // billing_mode + period, but billable_to_type='subsidiary') are NOT clobbered.
+  const { data: existing } = await supabase
+    .from('invoices')
+    .select('id')
+    .eq('period_month', period)
+    .eq('billing_mode', 'payroll_consolidated')
+    .eq('billable_to_type', 'dept_pool')
+    .eq('billable_to_department_id', ventureOfficeId)
+    .eq('status', 'draft')
+  const existingIds = (existing ?? []).map((r) => r.id as string)
+  if (existingIds.length > 0) {
+    await supabase.from('invoice_lines').delete().in('invoice_id', existingIds)
+    await supabase.from('invoices').delete().in('id', existingIds).eq('status', 'draft')
+  }
+
+  const periodShort = periodShortLabel(period)
+  const lines = buildConsolidatedInvoiceLines(groups, periodShort)
+  if (lines.length === 0) {
+    revalidatePath('/billing')
+    revalidatePath('/statements')
+    return { generated: 0, total: 0 }
+  }
+  const total = Math.round(lines.reduce((s, l) => s + l.amount, 0) * 100) / 100
+  const invoiceDate = dayjs(period).endOf('month').format('YYYY-MM-DD')
+  const category = categoryCode && categoryCode.trim() ? categoryCode.trim() : null
+
+  const { data: invoiceNo, error: mintErr } = await supabase.rpc('mint_invoice_no', { p_period: period })
+  if (mintErr || !invoiceNo) {
+    throw new Error(`Failed to mint invoice number: ${mintErr?.message ?? 'unknown'}`)
+  }
+
+  const { data: created, error: invErr } = await supabase
+    .from('invoices')
+    .insert({
+      invoice_no: invoiceNo as string,
+      period_month: period,
+      billing_mode: 'payroll_consolidated',
+      category_code: null,
+      base_amount: total,
+      total_amount: total,
+      status: 'draft',
+      invoice_date: invoiceDate,
+      due_date: null,
+      description: `HV own-share payroll — ${periodShort}`,
+      created_by: user.id,
+      billable_to_type: 'dept_pool',
+      billable_to_department_id: ventureOfficeId,
+      company_id: null,
+    })
+    .select('id')
+    .single()
+  if (invErr || !created) {
+    throw new Error(`Failed to create own-share invoice: ${invErr?.message ?? 'unknown'}`)
+  }
+
+  const { error: linesErr } = await supabase.from('invoice_lines').insert(
+    lines.map((l, i) => ({
+      invoice_id: created.id,
+      line_no: i + 1,
+      description: l.description,
+      amount: l.amount,
+      category_code: category,
+      segment: l.segment,
+    })),
+  )
+  if (linesErr) {
+    await supabase.from('invoices').delete().eq('id', created.id).eq('status', 'draft')
+    throw new Error(`Failed to insert own-share lines (rolled back): ${linesErr.message}`)
+  }
+
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+  return { generated: 1, total }
+}
+
 export async function approveInvoice(formData: FormData) {
   const user = await requireRole(['finance'])
   const supabase = await createClient()
@@ -1593,8 +1770,11 @@ export async function approveInvoice(formData: FormData) {
             dayjs().format('YYYY-MM-DD'),
           ),
           // The EXPENSE belongs to the PAYING dept's P&L, not the
-          // invoice's billing_mode segment (user 2026-06-11).
-          segment: deptNameToSegment(payingDept.name),
+          // invoice's billing_mode segment (user 2026-06-11). The internal
+          // 'Venture Office' pseudo-dept isn't in deptNameToSegment → its
+          // overhead belongs to 'corporate' (the cash-page Venture (Office)
+          // slice), so fall back to corporate (own-share inter-billing 2026-07).
+          segment: deptNameToSegment(payingDept.name) ?? 'corporate',
           description: `Invoice ${inv.invoice_no ?? inv.id} issued — inter-billing expense (${payingDept.name})`,
           referenceType: 'invoice',
           referenceId: inv.id,
@@ -1656,8 +1836,10 @@ export async function approveInvoicesForPeriod(formData: FormData) {
     )
 
     // Consolidated payroll invoice: one AR JE PER department segment (Dr 3030
-    // dept-subtotal / Cr revenue per line, segment forced). These are always
-    // subsidiary invoices, never dept_pool inter-billing, so skip the rest.
+    // dept-subtotal / Cr revenue per line, segment forced). Subsidiary ones stop
+    // here; the own-share variant (billable_to_type='dept_pool' → Venture Office)
+    // must ALSO fall through to the inter-billing expense JE below, so we do NOT
+    // `continue` — we skip only the single-JE revenue block via the else.
     if (row.billing_mode === 'payroll_consolidated') {
       const { data: rowLines } = await supabase
         .from('invoice_lines')
@@ -1699,25 +1881,24 @@ export async function approveInvoicesForPeriod(formData: FormData) {
           throw new Error(`Bulk issue: per-segment JE failed for invoice ${row.invoice_no ?? row.id} (${seg}): ${msg}`)
         }
       }
-      continue
-    }
-
-    const revenueCode = await resolveRevenueGlCode(supabase, row.category_code, row.billing_mode)
-    try {
-      await postJournalEntry(supabase, {
-        transactionDate: txnDate,
-        description: `Invoice ${row.invoice_no ?? row.id} issued (bulk)`,
-        referenceType: 'invoice',
-        referenceId: row.id,
-        createdBy: user.id,
-        lines: [
-          { accountCode: '3030', debit: amount, description: `AR — invoice ${row.invoice_no ?? ''}`.trim() },
-          { accountCode: revenueCode, credit: amount, description: 'Service billing revenue recognised' },
-        ],
-      })
-    } catch (jeErr) {
-      const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
-      throw new Error(`Bulk issue: JE post failed for invoice ${row.invoice_no ?? row.id}: ${msg}`)
+    } else {
+      const revenueCode = await resolveRevenueGlCode(supabase, row.category_code, row.billing_mode)
+      try {
+        await postJournalEntry(supabase, {
+          transactionDate: txnDate,
+          description: `Invoice ${row.invoice_no ?? row.id} issued (bulk)`,
+          referenceType: 'invoice',
+          referenceId: row.id,
+          createdBy: user.id,
+          lines: [
+            { accountCode: '3030', debit: amount, description: `AR — invoice ${row.invoice_no ?? ''}`.trim() },
+            { accountCode: revenueCode, credit: amount, description: 'Service billing revenue recognised' },
+          ],
+        })
+      } catch (jeErr) {
+        const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
+        throw new Error(`Bulk issue: JE post failed for invoice ${row.invoice_no ?? row.id}: ${msg}`)
+      }
     }
 
     // Inter-billing: expense JE at invoice issue — see approveInvoice for details.
@@ -1750,8 +1931,9 @@ export async function approveInvoicesForPeriod(formData: FormData) {
       try {
         await postJournalEntry(supabase, {
           transactionDate: txnDate,
-          // The EXPENSE belongs to the PAYING dept's P&L (user 2026-06-11).
-          segment: deptNameToSegment(payingDept.name),
+          // The EXPENSE belongs to the PAYING dept's P&L (user 2026-06-11);
+          // 'Venture Office' → corporate (own-share inter-billing 2026-07).
+          segment: deptNameToSegment(payingDept.name) ?? 'corporate',
           description: `Invoice ${row.invoice_no ?? row.id} issued (bulk) — inter-billing expense (${payingDept.name})`,
           referenceType: 'invoice',
           referenceId: row.id,
