@@ -5,7 +5,7 @@ import { fetchAllRows } from '@/lib/paginate'
 import { formatMoneyBare } from '@/lib/utils'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildXlsxBuffer } from '@/lib/export/excel'
-import { PdfDocument, PdfTable } from '@/lib/export/pdf'
+import { PdfDocument, PdfTable, type PdfRowKind } from '@/lib/export/pdf'
 import { buildDebtorAging, AGING_BUCKETS, type RawInvoice, type AgingBucket } from '@/lib/debtor-aging'
 
 async function loadAging() {
@@ -97,8 +97,10 @@ export async function GET(req: Request) {
       { label: 'Total', width: 78, align: 'right' as const },
     ]
     const rows: (string | number | null)[][] = []
+    const rowKinds: PdfRowKind[] = []
     for (const p of aging.byPayer) {
       rows.push([`${p.payer} (${p.count})`, '', ...bucketKeys.map((k) => m(p.buckets[k])), formatMoneyBare(p.total)])
+      rowKinds.push('group')
       for (const inv of invByPayer.get(p.payer) ?? []) {
         rows.push([
           `   ${inv.invoiceNo}`,
@@ -106,14 +108,16 @@ export async function GET(req: Request) {
           ...bucketKeys.map((k) => (inv.bucket === k ? formatMoneyBare(inv.amount) : '')),
           formatMoneyBare(inv.amount),
         ])
+        rowKinds.push('detail')
       }
     }
     rows.push(['TOTAL', '', ...bucketKeys.map((k) => m(aging.totals.buckets[k])), formatMoneyBare(aging.totals.total)])
+    rowKinds.push('total')
     return exportPdfResponse({
       filename,
       element: (
         <PdfDocument title="Debtor Aging — Detail" subtitle="By customer · each invoice in its aging column · all amounts RM" periodLabel={`As of ${asOf}`} orientation="landscape">
-          <PdfTable columns={cols} rows={rows} />
+          <PdfTable columns={cols} rows={rows} rowKinds={rowKinds} />
         </PdfDocument>
       ),
     })

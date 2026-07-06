@@ -135,12 +135,19 @@ export function PdfSectionHead({ label }: { label: string }): React.ReactElement
   return <Text style={styles.sectionHead}>{label}</Text>
 }
 
+// Per-row kind for grouped tables. 'group' = a shaded, bold header/subtotal row
+// (e.g. a customer); 'detail' = a plain white sub-row under it; 'total' = the
+// heavy grand-total row. When rowKinds is omitted the table falls back to plain
+// zebra striping.
+export type PdfRowKind = 'group' | 'detail' | 'total'
+
 export function PdfTable({
-  columns, rows, numberFormat = 'plain',
+  columns, rows, numberFormat = 'plain', rowKinds,
 }: {
   columns: PdfColumn[]
   rows: (string | number | null)[][]
   numberFormat?: 'money' | 'plain'
+  rowKinds?: PdfRowKind[]
 }): React.ReactElement {
   return (
     <View style={styles.table}>
@@ -151,32 +158,49 @@ export function PdfTable({
           </View>
         ))}
       </View>
-      {rows.map((row, ri) => (
-        <View key={ri} style={[styles.row, ri % 2 === 1 ? styles.rowAlt : {}]}>
-          {columns.map((c, ci) => {
-            const v = row[ci]
-            let text: string
-            if (v === null || v === undefined) {
-              text = ''
-            } else if (typeof v === 'number') {
-              text = numberFormat === 'money' ? fmtMoney(v) : v.toLocaleString('en-MY')
-            } else {
-              text = String(v)
-            }
-            return (
-              <View key={ci} style={{ width: c.width, padding: 4 }}>
-                <Text style={{
-                  fontSize: 9,
-                  textAlign: c.align ?? 'left',
-                  ...(typeof v === 'number' ? { fontFamily: 'Courier' } : {}),
-                }}>
-                  {text}
-                </Text>
-              </View>
-            )
-          })}
-        </View>
-      ))}
+      {rows.map((row, ri) => {
+        const kind = rowKinds?.[ri]
+        const rowStyle =
+          kind === 'group'
+            ? { backgroundColor: '#e3e6ea', borderBottom: '0.5pt solid #b0b4ba' }
+            : kind === 'total'
+              ? { backgroundColor: '#d3d7dc', borderTop: '0.75pt solid #9aa0a6' }
+              : kind === 'detail'
+                ? {} // white — sub-item, so the shaded group rows stand out
+                : ri % 2 === 1
+                  ? styles.rowAlt
+                  : {}
+        const emphasize = kind === 'group' || kind === 'total'
+        return (
+          <View key={ri} style={[styles.row, rowStyle]}>
+            {columns.map((c, ci) => {
+              const v = row[ci]
+              let text: string
+              if (v === null || v === undefined) {
+                text = ''
+              } else if (typeof v === 'number') {
+                text = numberFormat === 'money' ? fmtMoney(v) : v.toLocaleString('en-MY')
+              } else {
+                text = String(v)
+              }
+              const isNum = typeof v === 'number'
+              return (
+                <View key={ci} style={{ width: c.width, padding: 4 }}>
+                  <Text style={{
+                    fontSize: 9,
+                    textAlign: c.align ?? 'left',
+                    fontFamily: isNum
+                      ? (emphasize ? 'Courier-Bold' : 'Courier')
+                      : (emphasize ? 'Helvetica-Bold' : 'Helvetica'),
+                  }}>
+                    {text}
+                  </Text>
+                </View>
+              )
+            })}
+          </View>
+        )
+      })}
     </View>
   )
 }
