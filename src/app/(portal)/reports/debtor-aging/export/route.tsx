@@ -55,14 +55,14 @@ export async function GET(req: Request) {
       inv.payer,
       inv.invoiceDate ? dayjs(inv.invoiceDate).format('YYYY-MM-DD') : '',
       inv.dueDate ? dayjs(inv.dueDate).format('YYYY-MM-DD') : '',
-      inv.daysOverdue,
+      inv.monthsOld,
       AGING_BUCKETS.find((b) => b.key === inv.bucket)?.label ?? '',
       inv.amount,
     ])
     rows.push(['', 'TOTAL', '', '', '', '', aging.totals.total])
     const buffer = buildXlsxBuffer({
       sheetName: 'Debtor Aging',
-      headerRow: ['Invoice', 'Customer', 'Invoice date', 'Due date', 'Days overdue', 'Bucket', 'Amount (RM)'],
+      headerRow: ['Invoice', 'Customer', 'Invoice date', 'Due date', 'Months old', 'Bucket', 'Amount (RM)'],
       rows,
       columnWidths: [20, 24, 13, 13, 13, 14, 14],
     })

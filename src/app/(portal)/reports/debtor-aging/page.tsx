@@ -86,7 +86,7 @@ export default async function DebtorAgingPage() {
         <div className="text-num-ink tabular tracking-[-0.01em] text-4xl mt-1">{formatMoney(aging.totals.total)}</div>
         <div className="font-sans text-xs text-muted mt-1">
           {aging.totals.count} unpaid invoice{aging.totals.count === 1 ? '' : 's'} ·{' '}
-          {formatMoney(aging.totals.buckets.d1_30 + aging.totals.buckets.d31_60 + aging.totals.buckets.d61_90 + aging.totals.buckets.d90_plus)} overdue
+          {formatMoney(aging.totals.buckets.m1 + aging.totals.buckets.m2 + aging.totals.buckets.m3_plus)} over a month old
         </div>
       </div>
 
@@ -140,7 +140,7 @@ export default async function DebtorAgingPage() {
                   <th>Customer</th>
                   <th>Invoice date</th>
                   <th>Due date</th>
-                  <th className="num">Days overdue</th>
+                  <th className="num">Months old</th>
                   <th>Bucket</th>
                   <th className="num">Amount</th>
                 </tr>
@@ -153,8 +153,8 @@ export default async function DebtorAgingPage() {
                     <td className="font-mono text-xs text-graphite">{inv.invoiceDate ? dayjs(inv.invoiceDate).format('DD/MM/YYYY') : '—'}</td>
                     <td className="font-mono text-xs text-graphite">{inv.dueDate ? dayjs(inv.dueDate).format('DD/MM/YYYY') : '—'}</td>
                     <td className="num">
-                      {inv.daysOverdue > 0
-                        ? <span className={inv.daysOverdue > 90 ? 'text-danger' : inv.daysOverdue > 30 ? 'text-alert' : 'text-ink'}>{inv.daysOverdue}</span>
+                      {inv.monthsOld > 0
+                        ? <span className={inv.monthsOld >= 3 ? 'text-danger' : inv.monthsOld === 2 ? 'text-alert' : 'text-ink'}>{inv.monthsOld}</span>
                         : <span className="text-muted">—</span>}
                     </td>
                     <td className="font-sans text-xs text-graphite">

@@ -1,55 +1,83 @@
 import { describe, it, expect } from 'vitest'
-import { buildDebtorAging, bucketForDaysOverdue, type RawInvoice } from './debtor-aging'
+import { buildDebtorAging, bucketForMonthsOld, type RawInvoice } from './debtor-aging'
 
-describe('bucketForDaysOverdue', () => {
-  it('maps day counts to the right bucket (boundaries inclusive)', () => {
-    expect(bucketForDaysOverdue(-5)).toBe('not_due')
-    expect(bucketForDaysOverdue(0)).toBe('not_due')
-    expect(bucketForDaysOverdue(1)).toBe('d1_30')
-    expect(bucketForDaysOverdue(30)).toBe('d1_30')
-    expect(bucketForDaysOverdue(31)).toBe('d31_60')
-    expect(bucketForDaysOverdue(60)).toBe('d31_60')
-    expect(bucketForDaysOverdue(90)).toBe('d61_90')
-    expect(bucketForDaysOverdue(91)).toBe('d90_plus')
+describe('bucketForMonthsOld', () => {
+  it('buckets by whole months old (this month = 0)', () => {
+    expect(bucketForMonthsOld(-1)).toBe('this_month')
+    expect(bucketForMonthsOld(0)).toBe('this_month')
+    expect(bucketForMonthsOld(1)).toBe('m1')
+    expect(bucketForMonthsOld(2)).toBe('m2')
+    expect(bucketForMonthsOld(3)).toBe('m3_plus')
+    expect(bucketForMonthsOld(12)).toBe('m3_plus')
   })
 })
 
+function inv(over: Partial<RawInvoice>): RawInvoice {
+  return { invoiceNo: 'X', payer: 'Carres', invoiceDate: '2026-07-01', dueDate: null, amount: 100, ...over }
+}
+
 describe('buildDebtorAging', () => {
-  const asOf = '2026-07-03'
-  const raw: RawInvoice[] = [
-    { invoiceNo: 'A-1', payer: 'Carres', invoiceDate: '2026-06-29', dueDate: '2026-07-07', amount: 100 }, // not due
-    { invoiceNo: 'A-2', payer: 'Carres', invoiceDate: '2026-06-01', dueDate: '2026-06-20', amount: 50 }, // 13 overdue → 1-30
-    { invoiceNo: 'B-1', payer: '2990', invoiceDate: '2026-03-01', dueDate: '2026-03-15', amount: 200 }, // 110 overdue → 90+
-    { invoiceNo: 'C-1', payer: 'Rygis', invoiceDate: '2026-06-15', dueDate: null, amount: 30 }, // no due date → age by invoice date (18d) → 1-30
-  ]
+  const asOf = '2026-07-06'
 
-  const out = buildDebtorAging(raw, asOf)
-
-  it('grand total = sum of all outstanding', () => {
-    expect(out.totals.total).toBe(380)
-    expect(out.totals.count).toBe(4)
-  })
-
-  it('buckets each invoice by days past due (due date, or invoice date fallback)', () => {
+  it('ages by INVOICE date in calendar months, ignoring due date', () => {
+    const out = buildDebtorAging(
+      [
+        inv({ invoiceNo: 'A-1', invoiceDate: '2026-07-05' }), // this month
+        inv({ invoiceNo: 'A-2', invoiceDate: '2026-06-10' }), // 1 month
+        inv({ invoiceNo: 'A-3', invoiceDate: '2026-05-28' }), // 2 months
+        inv({ invoiceNo: 'A-4', invoiceDate: '2026-03-15' }), // 3+ months
+        // Due date is long overdue but the invoice is THIS month → still this_month.
+        inv({ invoiceNo: 'A-5', invoiceDate: '2026-07-02', dueDate: '2026-01-01' }),
+      ],
+      asOf,
+    )
     const byNo = Object.fromEntries(out.invoices.map((i) => [i.invoiceNo, i]))
-    expect(byNo['A-1'].bucket).toBe('not_due')
-    expect(byNo['A-2'].bucket).toBe('d1_30')
-    expect(byNo['B-1'].bucket).toBe('d90_plus')
-    expect(byNo['C-1'].bucket).toBe('d1_30') // fell back to invoice date
-    expect(byNo['C-1'].daysOverdue).toBe(18)
+    expect(byNo['A-1'].bucket).toBe('this_month')
+    expect(byNo['A-1'].monthsOld).toBe(0)
+    expect(byNo['A-2'].bucket).toBe('m1')
+    expect(byNo['A-2'].monthsOld).toBe(1)
+    expect(byNo['A-3'].bucket).toBe('m2')
+    expect(byNo['A-4'].bucket).toBe('m3_plus')
+    expect(byNo['A-4'].monthsOld).toBe(4)
+    expect(byNo['A-5'].bucket).toBe('this_month') // due date ignored
   })
 
-  it('groups by payer, largest outstanding first', () => {
-    // totals: 2990=200, Carres=150, Rygis=30 → sorted desc
-    expect(out.byPayer.map((p) => p.payer)).toEqual(['2990', 'Carres', 'Rygis'])
+  it('treats a missing invoice date as this month', () => {
+    const out = buildDebtorAging([inv({ invoiceNo: 'N', invoiceDate: null })], asOf)
+    expect(out.invoices[0].bucket).toBe('this_month')
+    expect(out.invoices[0].monthsOld).toBe(0)
+  })
+
+  it('aggregates per payer and per bucket; buckets sum to the total', () => {
+    const out = buildDebtorAging(
+      [
+        inv({ payer: 'Carres', invoiceDate: '2026-07-01', amount: 100 }),
+        inv({ payer: 'Carres', invoiceDate: '2026-06-01', amount: 50 }),
+        inv({ payer: '2990', invoiceDate: '2026-05-01', amount: 25.5 }),
+      ],
+      asOf,
+    )
     const carres = out.byPayer.find((p) => p.payer === 'Carres')!
+    expect(carres.buckets.this_month).toBe(100)
+    expect(carres.buckets.m1).toBe(50)
     expect(carres.total).toBe(150)
-    expect(carres.buckets.not_due).toBe(100)
-    expect(carres.buckets.d1_30).toBe(50)
+    expect(carres.count).toBe(2)
+
+    const b = out.totals.buckets
+    expect(b.this_month + b.m1 + b.m2 + b.m3_plus).toBe(out.totals.total)
+    expect(out.totals.total).toBe(175.5)
+    expect(out.totals.count).toBe(3)
   })
 
-  it('bucket column totals reconcile to the grand total', () => {
-    const b = out.totals.buckets
-    expect(b.not_due + b.d1_30 + b.d31_60 + b.d61_90 + b.d90_plus).toBe(out.totals.total)
+  it('sorts invoices oldest first and payers by largest outstanding', () => {
+    const out = buildDebtorAging(
+      [
+        inv({ invoiceNo: 'new', payer: 'Small', invoiceDate: '2026-07-01', amount: 10 }),
+        inv({ invoiceNo: 'old', payer: 'Big', invoiceDate: '2026-04-01', amount: 999 }),
+      ],
+      asOf,
+    )
+    expect(out.invoices[0].invoiceNo).toBe('old') // oldest first
+    expect(out.byPayer[0].payer).toBe('Big') // largest first
   })
 })

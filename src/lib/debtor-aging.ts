@@ -1,6 +1,7 @@
-// Debtor aging: outstanding (issued, not-yet-paid) invoices bucketed by how far
-// past their due date they are, as of a given day. Pure + deterministic so it
-// unit-tests cleanly — the page/export pass in the invoices and "today".
+// Debtor aging: outstanding (issued, not-yet-paid) invoices bucketed by how many
+// calendar months old they are BY INVOICE DATE, as of a given day. Pure +
+// deterministic so it unit-tests cleanly — the page/export pass in the invoices
+// and "today". (User 2026-07: age by invoice date, not due date.)
 
 import dayjs from 'dayjs'
 
@@ -12,18 +13,17 @@ export interface RawInvoice {
   amount: number
 }
 
-export type AgingBucket = 'not_due' | 'd1_30' | 'd31_60' | 'd61_90' | 'd90_plus'
+export type AgingBucket = 'this_month' | 'm1' | 'm2' | 'm3_plus'
 
 export const AGING_BUCKETS: { key: AgingBucket; label: string }[] = [
-  { key: 'not_due', label: 'Not yet due' },
-  { key: 'd1_30', label: '1–30 days' },
-  { key: 'd31_60', label: '31–60 days' },
-  { key: 'd61_90', label: '61–90 days' },
-  { key: 'd90_plus', label: '90+ days' },
+  { key: 'this_month', label: 'This month' },
+  { key: 'm1', label: '1 month' },
+  { key: 'm2', label: '2 months' },
+  { key: 'm3_plus', label: '3+ months' },
 ]
 
 export interface AgingInvoice extends RawInvoice {
-  daysOverdue: number // 0 when not yet due
+  monthsOld: number // whole calendar months since the invoice month (0 = this month)
   bucket: AgingBucket
 }
 
@@ -36,36 +36,37 @@ export interface AgingPayerRow {
 
 export interface DebtorAging {
   asOf: string
-  invoices: AgingInvoice[] // most overdue first
+  invoices: AgingInvoice[] // oldest first
   byPayer: AgingPayerRow[] // largest outstanding first
   totals: { buckets: Record<AgingBucket, number>; total: number; count: number }
 }
 
-export function bucketForDaysOverdue(days: number): AgingBucket {
-  if (days <= 0) return 'not_due'
-  if (days <= 30) return 'd1_30'
-  if (days <= 60) return 'd31_60'
-  if (days <= 90) return 'd61_90'
-  return 'd90_plus'
+export function bucketForMonthsOld(months: number): AgingBucket {
+  if (months <= 0) return 'this_month'
+  if (months === 1) return 'm1'
+  if (months === 2) return 'm2'
+  return 'm3_plus'
 }
 
 const r2 = (n: number): number => Math.round(n * 100) / 100
 const emptyBuckets = (): Record<AgingBucket, number> => ({
-  not_due: 0,
-  d1_30: 0,
-  d31_60: 0,
-  d61_90: 0,
-  d90_plus: 0,
+  this_month: 0,
+  m1: 0,
+  m2: 0,
+  m3_plus: 0,
 })
 
 export function buildDebtorAging(raw: RawInvoice[], asOfISO: string): DebtorAging {
-  const asOf = dayjs(asOfISO)
+  const asOfMonth = dayjs(asOfISO).startOf('month')
 
   const invoices: AgingInvoice[] = raw.map((r) => {
-    // Age by due date; fall back to the invoice date when no due date is set.
-    const ref = r.dueDate || r.invoiceDate
-    const days = ref ? asOf.diff(dayjs(ref), 'day') : 0
-    return { ...r, daysOverdue: Math.max(0, days), bucket: bucketForDaysOverdue(days) }
+    // Age by INVOICE date, in whole calendar months (this month = 0). A missing
+    // invoice date is treated as current month.
+    const months = r.invoiceDate
+      ? asOfMonth.diff(dayjs(r.invoiceDate).startOf('month'), 'month')
+      : 0
+    const monthsOld = Math.max(0, months)
+    return { ...r, monthsOld, bucket: bucketForMonthsOld(monthsOld) }
   })
 
   const map = new Map<string, AgingPayerRow>()
@@ -86,7 +87,7 @@ export function buildDebtorAging(raw: RawInvoice[], asOfISO: string): DebtorAgin
   }
 
   const byPayer = [...map.values()].sort((a, b) => b.total - a.total)
-  invoices.sort((a, b) => b.daysOverdue - a.daysOverdue)
+  invoices.sort((a, b) => b.monthsOld - a.monthsOld)
 
   return { asOf: asOfISO, invoices, byPayer, totals }
 }
