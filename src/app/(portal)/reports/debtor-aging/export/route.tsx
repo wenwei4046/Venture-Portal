@@ -119,14 +119,14 @@ export async function GET(req: Request) {
       sheetName: 'Debtor Aging (summary)',
       headerRow: summaryHeader,
       rows,
-      columnWidths: [24, 14, 14, 14, 14, 16],
+      columnWidths: [24, 12, 12, 12, 12, 12, 12, 15],
     })
     return exportXlsxResponse({ filename, buffer })
   }
   const cols = [
-    { label: 'Customer', width: 150, align: 'left' as const },
-    ...AGING_BUCKETS.map((b) => ({ label: b.label, width: 95, align: 'right' as const })),
-    { label: 'Total', width: 105, align: 'right' as const },
+    { label: 'Customer', width: 130, align: 'left' as const },
+    ...AGING_BUCKETS.map((b) => ({ label: b.label, width: 78, align: 'right' as const })),
+    { label: 'Total', width: 95, align: 'right' as const },
   ]
   const rows: (string | number | null)[][] = aging.byPayer.map((p) => [
     p.payer,

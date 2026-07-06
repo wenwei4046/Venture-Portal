@@ -4,12 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { formatMoney } from '@/lib/utils'
-import { buildDebtorAging, AGING_BUCKETS, type RawInvoice, type AgingBucket } from '@/lib/debtor-aging'
+import { buildDebtorAging, type RawInvoice } from '@/lib/debtor-aging'
+import AgingByCustomer from './_components/AgingByCustomer'
 
 export const dynamic = 'force-dynamic'
-
-const money = (v: number) =>
-  v ? <span className="num">{formatMoney(v)}</span> : <span className="num text-muted">—</span>
 
 export default async function DebtorAgingPage() {
   await requireRole(['principal', 'finance'])
@@ -94,7 +92,7 @@ export default async function DebtorAgingPage() {
         <div className="text-num-ink tabular tracking-[-0.01em] text-4xl mt-1">{formatMoney(aging.totals.total)}</div>
         <div className="font-sans text-xs text-muted mt-1">
           {aging.totals.count} unpaid invoice{aging.totals.count === 1 ? '' : 's'} ·{' '}
-          {formatMoney(aging.totals.buckets.m1 + aging.totals.buckets.m2 + aging.totals.buckets.m3_plus)} over a month old
+          {formatMoney(Math.round((aging.totals.total - aging.totals.buckets.this_month) * 100) / 100)} over a month old
         </div>
       </div>
 
@@ -102,88 +100,11 @@ export default async function DebtorAgingPage() {
         <p className="font-serif italic text-graphite">Nothing outstanding — every issued invoice has been collected. 🎉</p>
       ) : (
         <>
-          {/* By payer */}
-          <h2 className="font-serif text-lg text-ink mb-3">By customer</h2>
-          <div className="overflow-x-auto mb-10">
-            <table className="ledger-table">
-              <thead>
-                <tr>
-                  <th>Customer</th>
-                  {AGING_BUCKETS.map((b) => (
-                    <th key={b.key} className="num">{b.label}</th>
-                  ))}
-                  <th className="num">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {aging.byPayer.map((p) => (
-                  <tr key={p.payer}>
-                    <td className="font-sans text-ink">
-                      {p.payer} <span className="text-muted text-xs">· {p.count}</span>
-                    </td>
-                    {AGING_BUCKETS.map((b) => (
-                      <td key={b.key} className="num">{money(p.buckets[b.key as AgingBucket])}</td>
-                    ))}
-                    <td className="num font-semibold">{formatMoney(p.total)}</td>
-                  </tr>
-                ))}
-                <tr className="border-t-2 border-hairline bg-surface-2">
-                  <td className="font-serif italic text-ink font-semibold">Total</td>
-                  {AGING_BUCKETS.map((b) => (
-                    <td key={b.key} className="num font-semibold">{money(aging.totals.buckets[b.key as AgingBucket])}</td>
-                  ))}
-                  <td className="num font-semibold text-num-ink">{formatMoney(aging.totals.total)}</td>
-                </tr>
-              </tbody>
-            </table>
+          <div className="flex items-baseline justify-between mb-3">
+            <h2 className="font-serif text-lg text-ink">By customer</h2>
+            <span className="font-serif italic text-muted text-xs">Click a customer to see its invoices</span>
           </div>
-
-          {/* Detail */}
-          <h2 className="font-serif text-lg text-ink mb-3">Invoice detail</h2>
-          <div className="overflow-x-auto">
-            <table className="ledger-table">
-              <thead>
-                <tr>
-                  <th>Invoice</th>
-                  <th>Customer</th>
-                  <th>Invoice date</th>
-                  <th>Due date</th>
-                  <th className="num">Months old</th>
-                  <th>Bucket</th>
-                  <th className="num">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {aging.invoices.map((inv) => (
-                  <tr key={inv.id}>
-                    <td className="font-mono text-xs">
-                      <a
-                        href={`/billing/invoice-doc?id=${inv.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-accent hover:underline"
-                        title="Open invoice PDF"
-                      >
-                        {inv.invoiceNo}
-                      </a>
-                    </td>
-                    <td className="font-sans">{inv.payer}</td>
-                    <td className="font-mono text-xs text-graphite">{inv.invoiceDate ? dayjs(inv.invoiceDate).format('DD/MM/YYYY') : '—'}</td>
-                    <td className="font-mono text-xs text-graphite">{inv.dueDate ? dayjs(inv.dueDate).format('DD/MM/YYYY') : '—'}</td>
-                    <td className="num">
-                      {inv.monthsOld > 0
-                        ? <span className={inv.monthsOld >= 3 ? 'text-danger' : inv.monthsOld === 2 ? 'text-alert' : 'text-ink'}>{inv.monthsOld}</span>
-                        : <span className="text-muted">—</span>}
-                    </td>
-                    <td className="font-sans text-xs text-graphite">
-                      {AGING_BUCKETS.find((b) => b.key === inv.bucket)?.label}
-                    </td>
-                    <td className="num">{formatMoney(inv.amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <AgingByCustomer byPayer={aging.byPayer} invoices={aging.invoices} totals={aging.totals} />
         </>
       )}
     </div>

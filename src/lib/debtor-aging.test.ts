@@ -7,8 +7,10 @@ describe('bucketForMonthsOld', () => {
     expect(bucketForMonthsOld(0)).toBe('this_month')
     expect(bucketForMonthsOld(1)).toBe('m1')
     expect(bucketForMonthsOld(2)).toBe('m2')
-    expect(bucketForMonthsOld(3)).toBe('m3_plus')
-    expect(bucketForMonthsOld(12)).toBe('m3_plus')
+    expect(bucketForMonthsOld(3)).toBe('m3')
+    expect(bucketForMonthsOld(4)).toBe('m4')
+    expect(bucketForMonthsOld(5)).toBe('m5_plus')
+    expect(bucketForMonthsOld(12)).toBe('m5_plus')
   })
 })
 
@@ -25,7 +27,7 @@ describe('buildDebtorAging', () => {
         inv({ invoiceNo: 'A-1', invoiceDate: '2026-07-05' }), // this month
         inv({ invoiceNo: 'A-2', invoiceDate: '2026-06-10' }), // 1 month
         inv({ invoiceNo: 'A-3', invoiceDate: '2026-05-28' }), // 2 months
-        inv({ invoiceNo: 'A-4', invoiceDate: '2026-03-15' }), // 3+ months
+        inv({ invoiceNo: 'A-4', invoiceDate: '2026-03-15' }), // 4 months
         // Due date is long overdue but the invoice is THIS month → still this_month.
         inv({ invoiceNo: 'A-5', invoiceDate: '2026-07-02', dueDate: '2026-01-01' }),
       ],
@@ -37,7 +39,7 @@ describe('buildDebtorAging', () => {
     expect(byNo['A-2'].bucket).toBe('m1')
     expect(byNo['A-2'].monthsOld).toBe(1)
     expect(byNo['A-3'].bucket).toBe('m2')
-    expect(byNo['A-4'].bucket).toBe('m3_plus')
+    expect(byNo['A-4'].bucket).toBe('m4')
     expect(byNo['A-4'].monthsOld).toBe(4)
     expect(byNo['A-5'].bucket).toBe('this_month') // due date ignored
   })
@@ -64,7 +66,7 @@ describe('buildDebtorAging', () => {
     expect(carres.count).toBe(2)
 
     const b = out.totals.buckets
-    expect(b.this_month + b.m1 + b.m2 + b.m3_plus).toBe(out.totals.total)
+    expect(b.this_month + b.m1 + b.m2 + b.m3 + b.m4 + b.m5_plus).toBe(out.totals.total)
     expect(out.totals.total).toBe(175.5)
     expect(out.totals.count).toBe(3)
   })

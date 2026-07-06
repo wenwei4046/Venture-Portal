@@ -14,13 +14,15 @@ export interface RawInvoice {
   amount: number
 }
 
-export type AgingBucket = 'this_month' | 'm1' | 'm2' | 'm3_plus'
+export type AgingBucket = 'this_month' | 'm1' | 'm2' | 'm3' | 'm4' | 'm5_plus'
 
 export const AGING_BUCKETS: { key: AgingBucket; label: string }[] = [
-  { key: 'this_month', label: 'This month' },
+  { key: 'this_month', label: 'Current' },
   { key: 'm1', label: '1 month' },
   { key: 'm2', label: '2 months' },
-  { key: 'm3_plus', label: '3+ months' },
+  { key: 'm3', label: '3 months' },
+  { key: 'm4', label: '4 months' },
+  { key: 'm5_plus', label: '5 & over' },
 ]
 
 export interface AgingInvoice extends RawInvoice {
@@ -46,7 +48,9 @@ export function bucketForMonthsOld(months: number): AgingBucket {
   if (months <= 0) return 'this_month'
   if (months === 1) return 'm1'
   if (months === 2) return 'm2'
-  return 'm3_plus'
+  if (months === 3) return 'm3'
+  if (months === 4) return 'm4'
+  return 'm5_plus'
 }
 
 const r2 = (n: number): number => Math.round(n * 100) / 100
@@ -54,7 +58,9 @@ const emptyBuckets = (): Record<AgingBucket, number> => ({
   this_month: 0,
   m1: 0,
   m2: 0,
-  m3_plus: 0,
+  m3: 0,
+  m4: 0,
+  m5_plus: 0,
 })
 
 export function buildDebtorAging(raw: RawInvoice[], asOfISO: string): DebtorAging {
