@@ -14,7 +14,7 @@ async function loadAging() {
     fetchAllRows((lo, hi) =>
       supabase
         .from('invoices')
-        .select('id, invoice_no, invoice_date, due_date, total_amount, company_id, billable_to_department_id, billable_to_freetext_name')
+        .select('id, invoice_no, invoice_date, due_date, total_amount, description, company_id, billable_to_department_id, billable_to_freetext_name')
         .eq('status', 'issued')
         .order('id', { ascending: true })
         .range(lo, hi),
@@ -36,6 +36,7 @@ async function loadAging() {
     invoiceDate: (i.invoice_date as string | null) ?? null,
     dueDate: (i.due_date as string | null) ?? null,
     amount: Number(i.total_amount),
+    description: (i.description as string | null) ?? null,
   }))
   return buildDebtorAging(raw, dayjs().format('YYYY-MM-DD'))
 }
