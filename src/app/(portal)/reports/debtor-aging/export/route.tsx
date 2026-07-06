@@ -55,51 +55,64 @@ export async function GET(req: Request) {
   const asOf = dayjs(aging.asOf).format('D MMM YYYY')
   const filename = `debtor-aging-${view}-${dayjs(aging.asOf).format('YYYYMMDD')}`
 
-  // ── Detail: one row per unpaid invoice, oldest first ──────────────────────
+  // ── Detail: master-detail matrix — per customer, a subtotal row then its
+  //    invoices, each invoice's amount dropped into its aging column ──────────
   if (view === 'detail') {
-    const detailHeader = ['Invoice', 'Customer', 'Invoice date', 'Due date', 'Months old', 'Bucket', 'Amount (RM)']
+    const bucketKeys = AGING_BUCKETS.map((b) => b.key as AgingBucket)
+    const invByPayer = new Map<string, typeof aging.invoices>()
+    for (const inv of aging.invoices) {
+      const arr = invByPayer.get(inv.payer) ?? []
+      arr.push(inv)
+      invByPayer.set(inv.payer, arr)
+    }
+    const detailHeader = ['Customer / Invoice', 'Inv date', ...AGING_BUCKETS.map((b) => b.label), 'Total (RM)']
+
     if (format === 'xlsx') {
-      const rows = aging.invoices.map((inv) => [
-        inv.invoiceNo,
-        inv.payer,
-        inv.invoiceDate ? dayjs(inv.invoiceDate).format('YYYY-MM-DD') : '',
-        inv.dueDate ? dayjs(inv.dueDate).format('YYYY-MM-DD') : '',
-        inv.monthsOld,
-        AGING_BUCKETS.find((b) => b.key === inv.bucket)?.label ?? '',
-        inv.amount,
-      ])
-      rows.push(['', 'TOTAL', '', '', '', '', aging.totals.total])
+      const rows: (string | number)[][] = []
+      for (const p of aging.byPayer) {
+        rows.push([`${p.payer} (${p.count})`, '', ...bucketKeys.map((k) => p.buckets[k] || ''), p.total])
+        for (const inv of invByPayer.get(p.payer) ?? []) {
+          rows.push([
+            `    ${inv.invoiceNo}`,
+            inv.invoiceDate ? dayjs(inv.invoiceDate).format('YYYY-MM-DD') : '',
+            ...bucketKeys.map((k) => (inv.bucket === k ? inv.amount : '')),
+            inv.amount,
+          ])
+        }
+      }
+      rows.push(['TOTAL', '', ...bucketKeys.map((k) => aging.totals.buckets[k] || ''), aging.totals.total])
       const buffer = buildXlsxBuffer({
         sheetName: 'Debtor Aging (detail)',
         headerRow: detailHeader,
         rows,
-        columnWidths: [20, 24, 13, 13, 13, 14, 14],
+        columnWidths: [26, 12, 11, 11, 11, 11, 11, 11, 13],
       })
       return exportXlsxResponse({ filename, buffer })
     }
+
     const cols = [
-      { label: 'Invoice', width: 95, align: 'left' as const },
-      { label: 'Customer', width: 120, align: 'left' as const },
-      { label: 'Invoice date', width: 80, align: 'left' as const },
-      { label: 'Due date', width: 80, align: 'left' as const },
-      { label: 'Months', width: 55, align: 'right' as const },
-      { label: 'Bucket', width: 80, align: 'left' as const },
-      { label: 'Amount', width: 90, align: 'right' as const },
+      { label: 'Customer / Invoice', width: 130, align: 'left' as const },
+      { label: 'Inv date', width: 62, align: 'left' as const },
+      ...AGING_BUCKETS.map((b) => ({ label: b.label, width: 68, align: 'right' as const })),
+      { label: 'Total', width: 78, align: 'right' as const },
     ]
-    const rows: (string | number | null)[][] = aging.invoices.map((inv) => [
-      inv.invoiceNo,
-      inv.payer,
-      inv.invoiceDate ? dayjs(inv.invoiceDate).format('YYYY-MM-DD') : '—',
-      inv.dueDate ? dayjs(inv.dueDate).format('YYYY-MM-DD') : '—',
-      inv.monthsOld || '—',
-      AGING_BUCKETS.find((b) => b.key === inv.bucket)?.label ?? '',
-      formatMoneyBare(inv.amount),
-    ])
-    rows.push(['', 'TOTAL', '', '', '', '', formatMoneyBare(aging.totals.total)])
+    const rows: (string | number | null)[][] = []
+    for (const p of aging.byPayer) {
+      rows.push([`${p.payer} (${p.count})`, '', ...bucketKeys.map((k) => m(p.buckets[k])), formatMoneyBare(p.total)])
+      for (const inv of invByPayer.get(p.payer) ?? []) {
+        rows.push([
+          `   ${inv.invoiceNo}`,
+          inv.invoiceDate ? dayjs(inv.invoiceDate).format('YYYY-MM-DD') : '—',
+          ...bucketKeys.map((k) => (inv.bucket === k ? formatMoneyBare(inv.amount) : '')),
+          formatMoneyBare(inv.amount),
+        ])
+      }
+    }
+    rows.push(['TOTAL', '', ...bucketKeys.map((k) => m(aging.totals.buckets[k])), formatMoneyBare(aging.totals.total)])
     return exportPdfResponse({
       filename,
       element: (
-        <PdfDocument title="Debtor Aging — Detail" subtitle="Unpaid invoices, oldest first · all amounts RM" periodLabel={`As of ${asOf}`} orientation="landscape">
+        <PdfDocument title="Debtor Aging — Detail" subtitle="By customer · each invoice in its aging column · all amounts RM" periodLabel={`As of ${asOf}`} orientation="landscape">
           <PdfTable columns={cols} rows={rows} />
         </PdfDocument>
       ),
