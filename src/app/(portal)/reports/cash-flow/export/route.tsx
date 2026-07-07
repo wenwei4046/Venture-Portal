@@ -25,11 +25,9 @@ export async function GET(req: Request) {
   const [lines, accounts, { data: banks }] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
-    supabase.from('bank_accounts').select('gl_account_code'),
+    supabase.rpc('bank_gl_codes' as never), // codes only; dept_managers can't read bank_accounts
   ])
-  const bankCodes = new Set(
-    (banks ?? []).map((b) => b.gl_account_code as string | null).filter((c): c is string => !!c),
-  )
+  const bankCodes = new Set((banks ?? []) as unknown as string[])
 
   const cf = buildCashFlow(
     lines,

@@ -44,12 +44,12 @@ export default async function CashFlowPage({ searchParams }: Props) {
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
     fetchGlRefs(supabase),
-    supabase.from('bank_accounts').select('gl_account_code'),
+    // bank GL codes via RPC (dept_managers are RLS-blocked from bank_accounts) —
+    // codes only, no balances.
+    supabase.rpc('bank_gl_codes' as never),
   ])
   const lines = applyGlRefs(rawLines, glRefs)
-  const bankCodes = new Set(
-    (banks ?? []).map((b) => b.gl_account_code as string | null).filter((c): c is string => !!c),
-  )
+  const bankCodes = new Set((banks ?? []) as unknown as string[])
 
   const cf = buildCashFlow(
     lines,
