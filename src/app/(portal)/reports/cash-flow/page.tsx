@@ -28,14 +28,17 @@ interface Props {
 }
 
 export default async function CashFlowPage({ searchParams }: Props) {
-  await requireRole(['principal', 'finance'])
+  const user = await requireRole(['principal', 'finance', 'dept_manager'])
   const supabase = await createClient()
 
   const params = await searchParams
   const period = params.period ?? dayjs().format('YYYY-MM')
   // Comparison is OPT-IN (user 2026-06-11): default is a clean single-month view.
   const compare = params.compare ?? ''
-  const segment = params.segment ?? ''
+  // Dept managers see ONLY their own segment (RLS on journal_lines) — force the
+  // filter empty + hide the picker (a hand-typed ?segment= returns empty).
+  const isDeptMgr = user.role === 'dept_manager'
+  const segment = isDeptMgr ? '' : (params.segment ?? '')
 
   const [rawLines, accounts, glRefs, { data: banks }] = await Promise.all([
     fetchAllJournalLines(supabase),
@@ -91,7 +94,7 @@ export default async function CashFlowPage({ searchParams }: Props) {
         period={period}
         compare={compare}
         segment={segment}
-        segments={REPORT_SEGMENTS}
+        segments={isDeptMgr ? [] : REPORT_SEGMENTS}
         blocks={blocks}
         currentLabel={dayjs(`${period}-01`).format('MMM YYYY')}
         compareLabel={compare ? dayjs(`${compare}-01`).format('MMM YYYY') : ''}

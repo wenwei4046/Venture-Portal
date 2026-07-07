@@ -47,7 +47,8 @@ async function loadAging() {
 const m = (v: number) => (v ? formatMoneyBare(v) : '—')
 
 export async function GET(req: Request) {
-  await requireRole(['principal', 'finance'])
+  // dept_manager may export their own segment's aging (RLS scopes invoices).
+  await requireRole(['principal', 'finance', 'dept_manager'])
   const params = new URL(req.url).searchParams
   const format = params.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   // view: 'detail' (one row per invoice) or 'summary' (aging matrix by customer).

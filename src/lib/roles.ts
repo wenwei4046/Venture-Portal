@@ -46,6 +46,15 @@ export function canAccessReports(role: UserRole): boolean {
   return role === 'principal' || role === 'finance'
 }
 
+// Segment-scoped reports (P&L, Cash Flow, Debtor Aging) a dept_manager may see
+// for THEIR OWN department only — RLS restricts every row to their segment, so
+// even a hand-typed ?segment= returns empty. Whole-company reports (balance
+// sheet, trial balance, ledger, fund summary) stay principal/finance via
+// canAccessReports. (2026-07: give Marketing their own department reports.)
+export function canAccessDeptReports(role: UserRole): boolean {
+  return role === 'principal' || role === 'finance' || role === 'dept_manager'
+}
+
 export function canAccessClaims(role: UserRole): boolean {
   return role === 'principal' || role === 'finance' || role === 'hr' || role === 'dept_manager'
 }

@@ -21,14 +21,18 @@ interface Props {
 }
 
 export default async function IncomeStatementPage({ searchParams }: Props) {
-  await requireRole(['principal', 'finance'])
+  const user = await requireRole(['principal', 'finance', 'dept_manager'])
   const supabase = await createClient()
 
   const params = await searchParams
   const period = params.period ?? dayjs().format('YYYY-MM')
   // Comparison is OPT-IN (user 2026-06-11): default is a clean single-month view.
   const compare = params.compare ?? ''
-  const segment = params.segment ?? ''
+  // Dept managers see ONLY their own segment (RLS-enforced on journal_lines);
+  // force the filter empty + hide the segment picker so the report is theirs
+  // and a hand-typed ?segment= can't select another dept (it just returns empty).
+  const isDeptMgr = user.role === 'dept_manager'
+  const segment = isDeptMgr ? '' : (params.segment ?? '')
 
   const [rawLines, accounts, glRefs] = await Promise.all([
     fetchAllJournalLines(supabase),
@@ -73,7 +77,7 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
         period={period}
         compare={compare}
         segment={segment}
-        segments={REPORT_SEGMENTS}
+        segments={isDeptMgr ? [] : REPORT_SEGMENTS}
         blocks={blocks}
         pctBase={{ current: pnl.revenue.current, previous: pnl.revenue.previous }}
         currentLabel={dayjs(`${period}-01`).format('MMM YYYY')}

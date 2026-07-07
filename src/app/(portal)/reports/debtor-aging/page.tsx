@@ -10,7 +10,8 @@ import AgingByCustomer from './_components/AgingByCustomer'
 export const dynamic = 'force-dynamic'
 
 export default async function DebtorAgingPage() {
-  await requireRole(['principal', 'finance'])
+  // dept_manager sees only their own segment's invoices (RLS on invoices).
+  await requireRole(['principal', 'finance', 'dept_manager'])
   const supabase = await createClient()
 
   const [invoices, companies, departments] = await Promise.all([

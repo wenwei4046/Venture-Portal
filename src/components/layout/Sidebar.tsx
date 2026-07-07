@@ -14,6 +14,7 @@ import {
   canAccessClaims,
   canAccessHRCosting,
   canAccessReports,
+  canAccessDeptReports,
   canAccessSettings,
   canAccessCategories,
   canApprove,
@@ -152,17 +153,19 @@ const navEntries: NavEntry[] = [
   {
     label: 'Reports',
     section: 'Reports & Admin',
-    visible: canAccessReports,
+    // dept_manager sees the group for their own-department reports (P&L / Cash
+    // Flow / Debtor Aging); the whole-company reports below stay principal/finance.
+    visible: canAccessDeptReports,
     children: [
-      { href: '/reports/income-statement', label: 'P&L', visible: canAccessReports },
+      { href: '/reports/income-statement', label: 'P&L', visible: canAccessDeptReports },
       { href: '/reports/monthly-pnl', label: 'Monthly P&L', visible: canAccessReports },
-      { href: '/reports/cash-flow', label: 'Cash Flow', visible: canAccessReports },
+      { href: '/reports/cash-flow', label: 'Cash Flow', visible: canAccessDeptReports },
       { href: '/reports/monthly-cash-flow', label: 'Monthly Cash Flow', visible: canAccessReports },
       { href: '/reports/balance-sheet', label: 'Balance Sheet', visible: canAccessReports },
       { href: '/reports/trial-balance', label: 'Trial Balance', visible: canAccessReports },
       { href: '/reports/fund-summary', label: 'Fund Summary', visible: canAccessReports },
       { href: '/reports/claims', label: 'Claims Report', visible: canAccessReports },
-      { href: '/reports/debtor-aging', label: 'Debtor Aging', visible: canAccessReports },
+      { href: '/reports/debtor-aging', label: 'Debtor Aging', visible: canAccessDeptReports },
     ],
   },
   { href: '/reconciliation', label: 'Reconciliation', section: 'Reports & Admin', notPaths: ['/reconciliation/journal-entries'], visible: canAccessTreasury },
