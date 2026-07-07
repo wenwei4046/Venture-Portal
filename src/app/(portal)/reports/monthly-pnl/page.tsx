@@ -16,12 +16,14 @@ interface Props {
 }
 
 export default async function MonthlyPnlPage({ searchParams }: Props) {
-  await requireRole(['principal', 'finance'])
+  const user = await requireRole(['principal', 'finance', 'dept_manager'])
   const supabase = await createClient()
 
   const params = await searchParams
   const period = /^\d{4}-\d{2}$/.test(params.period ?? '') ? params.period! : dayjs().format('YYYY-MM')
-  const segment = params.segment ?? ''
+  // Dept managers see ONLY their own segment (RLS) — force empty + hide picker.
+  const isDeptMgr = user.role === 'dept_manager'
+  const segment = isDeptMgr ? '' : (params.segment ?? '')
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))
 
@@ -55,12 +57,15 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Link
-            href="/reports/monthly-pnl/layout"
-            className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white rounded-md text-xs font-sans transition-colors"
-          >
-            Edit layout
-          </Link>
+          {/* Edit layout edits the SHARED company P&L layout — hide from dept managers. */}
+          {!isDeptMgr && (
+            <Link
+              href="/reports/monthly-pnl/layout"
+              className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white rounded-md text-xs font-sans transition-colors"
+            >
+              Edit layout
+            </Link>
+          )}
           <a
             href={`/reports/monthly-pnl/export?format=xlsx&period=${period}${segment ? `&segment=${segment}` : ''}`}
             className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
@@ -84,7 +89,7 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
       </p>
 
       <div className="flex gap-8 items-start">
-        <MonthlyReportControls period={period} segment={segment} />
+        <MonthlyReportControls period={period} segment={segment} hideSegment={isDeptMgr} />
         <div className="min-w-0 flex-1">
           <MonthlyMatrix columns={data.columns} rows={rows} pctBaseByColumn={data.salesByColumn} />
         </div>

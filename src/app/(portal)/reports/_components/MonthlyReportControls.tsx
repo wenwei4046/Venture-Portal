@@ -9,9 +9,12 @@ import { REPORT_SEGMENTS } from './report-segments'
 export default function MonthlyReportControls({
   period,
   segment,
+  hideSegment = false,
 }: {
   period: string
   segment: string
+  // Dept managers are locked to their own segment (RLS) — hide the picker.
+  hideSegment?: boolean
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -39,6 +42,7 @@ export default function MonthlyReportControls({
         />
       </div>
 
+      {!hideSegment && (
       <div>
         <div className="text-xs uppercase tracking-wide text-muted font-sans mb-2">Segment</div>
         <div className="space-y-0.5">
@@ -64,6 +68,7 @@ export default function MonthlyReportControls({
           })}
         </div>
       </div>
+      )}
     </aside>
   )
 }

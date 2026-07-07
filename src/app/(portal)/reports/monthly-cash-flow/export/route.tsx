@@ -15,7 +15,8 @@ import { buildMatrixXlsx } from '@/lib/export/monthly-matrix-export'
 import { MatrixPdf } from '@/lib/export/matrix-pdf'
 
 export async function GET(req: Request) {
-  await requireRole(['principal', 'finance'])
+  // dept_manager may export their own segment (RLS scopes journal_lines).
+  await requireRole(['principal', 'finance', 'dept_manager'])
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   const periodRaw = url.searchParams.get('period') ?? ''
