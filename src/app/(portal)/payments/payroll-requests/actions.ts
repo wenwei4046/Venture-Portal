@@ -7,30 +7,33 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 
 /**
- * Stage E — Finance generates a Payment Voucher against a submitted
- * payroll_payment_request.
+ * Stage E — Finance generates a payroll funding Payment Voucher against a
+ * payroll_payment_request. Supports PARTIAL funding across several PVs.
  *
- * Task 3: Finance now allocates the payroll total across up to 5 Department
- * Pools (HR / Finance / Director Office / Marketing + a spare slot) in the
- * Generate PV form. Each pool contribution writes one payment_voucher_sources
- * row; the sum is validated to equal request.amount here and again by the
- * pvs_sum_matches_voucher trigger on approval.
+ * Finance types how much each Department Pool contributes THIS round; each pool
+ * contribution writes one payment_voucher_sources row and the PV amount = this
+ * round's sum (validated == sources by the pvs_sum_matches_voucher trigger).
  *
  * The PV is created in 'pending_approval' status with:
  *   - voucher_type = 'payroll_bank_transfer'
  *   - direction = 'debit'
- *   - amount = request.amount (locked)
- *   - bank_account_id = source bank picked by Finance
- *   - payment_voucher_sources = up to 5 rows (one per Dept Pool allocation)
+ *   - amount = this round's allocation (may be < the request total)
+ *   - bank_account_id = source bank picked by Finance (carried for the
+ *     voucher_requires_bank CHECK; NOT debited — Stage-E is an accrual)
+ *   - payment_date = Finance's chosen date (drives the GL date at approval)
  *
  * Pre-checks before insert:
- *   - Source bank balance ≥ request.amount (same check runs again on approval)
- *   - Sum of source allocations == request.amount
- *   - Each source pool has enough balance (operating_pools trigger would also
- *     reject at approval; the UI check gives Finance an early error)
+ *   - This round's sum is positive and ≤ the request's OUTSTANDING remainder
+ *     (request total − already-committed non-voided funding PVs)
+ *   - NO bank-balance check: the funding PV never moves this bank's cash
+ *     (Dr 9030 / Cr 4020, mig 20260619); cash leaves at Stage-G disbursement.
+ *   - NO pool-sufficiency check: a short pool is allowed to go negative
+ *     (预支 / overdraw), auto-permitted at approval for payroll_bank_transfer.
  *
- * On success: redirect to /payments/[voucherId] so Finance can review before
- * submitting to Principal.
+ * The request stays fundable (submitted / pv_generated) until the CUMULATIVE
+ * paid reaches the total, when the completion trigger flips it to 'completed'.
+ *
+ * On success: redirect to /payments/[voucherId].
  */
 export interface PayrollPoolSource {
   pool: string
@@ -41,6 +44,7 @@ export async function generatePvFromRequest(
   requestId: string,
   sourceBankId: string,
   sources: PayrollPoolSource[],
+  paymentDate: string,
 ): Promise<string> {
   const user = await requireRole(['finance'])
   const supabase = await createClient()
@@ -56,6 +60,12 @@ export async function generatePvFromRequest(
     if (!(s.amount > 0)) throw new Error(`Allocation for ${s.pool} must be positive`)
   }
 
+  // Payment date drives the voucher + (at approval) the GL posting date. Default
+  // today; the approval RPC period-lock guards the chosen month.
+  const payDate = /^\d{4}-\d{2}-\d{2}$/.test(paymentDate ?? '')
+    ? paymentDate
+    : dayjs().format('YYYY-MM-DD')
+
   // ── Read the request + its linked payroll_run for period context ──────────
   const { data: req, error: reqErr } = await supabase
     .from('payroll_payment_requests')
@@ -67,9 +77,9 @@ export async function generatePvFromRequest(
 
   if (reqErr) throw new Error(`Failed to read request: ${reqErr.message}`)
   if (!req) throw new Error('Payment request not found')
-  if (req.status !== 'submitted') {
+  if (req.status !== 'submitted' && req.status !== 'pv_generated') {
     throw new Error(
-      `Cannot generate PV — request status is ${req.status}. Only 'submitted' requests can be picked up.`,
+      `Cannot generate PV — request status is ${req.status}. Only open requests can be funded.`,
     )
   }
 
@@ -77,45 +87,61 @@ export async function generatePvFromRequest(
   const periodMonth = (req.payroll_runs as any).period_month as string
   const amount = Number(req.amount)
 
-  // ── Validate source allocation sum matches request total ──────────────────
+  // ── Partial funding: this round funds some/all of the OUTSTANDING remainder ──
+  // Committed = sum of amounts on prior non-voided funding PVs for this request.
+  const { data: priorPvs, error: priorErr } = await supabase
+    .from('payment_vouchers')
+    .select('amount')
+    .eq('reference_type', 'payroll_payment_request')
+    .eq('reference_id', requestId)
+    .neq('status', 'voided')
+  if (priorErr) throw new Error(`Failed to read prior funding PVs: ${priorErr.message}`)
+
+  const committedCents = (priorPvs ?? []).reduce(
+    (acc, p) => acc + Math.round(Number(p.amount) * 100),
+    0,
+  )
+  const amountCents = Math.round(amount * 100)
+  const remainingCents = amountCents - committedCents
+
   const allocatedSum = sources.reduce((acc, s) => acc + s.amount, 0)
   const allocatedCents = Math.round(allocatedSum * 100)
-  const amountCents = Math.round(amount * 100)
-  if (allocatedCents !== amountCents) {
+  const roundAmount = Number((allocatedCents / 100).toFixed(2))
+  const isPartial = allocatedCents < amountCents
+
+  if (allocatedCents <= 0) {
+    throw new Error('This round must fund a positive amount')
+  }
+  if (allocatedCents > remainingCents) {
     throw new Error(
-      `Source allocation RM ${allocatedSum.toFixed(2)} does not match payroll total RM ${amount.toFixed(2)}`,
+      `This round funds RM ${allocatedSum.toFixed(2)} but only RM ${(remainingCents / 100).toFixed(2)} ` +
+        `is still outstanding on this payroll.`,
     )
   }
 
   // ── Validate + sufficient-balance check on the source bank ────────────────
   const { data: bank, error: bankErr } = await supabase
     .from('bank_accounts')
-    .select('id, bank_name, current_balance, status')
+    .select('id, bank_name, status')
     .eq('id', sourceBankId)
     .maybeSingle()
 
   if (bankErr) throw new Error(`Failed to read bank: ${bankErr.message}`)
   if (!bank) throw new Error('Source bank not found')
   if (bank.status !== 'active') throw new Error(`Bank ${bank.bank_name} is not active`)
-
-  const balance = Number(bank.current_balance)
-  if (balance < amount) {
-    throw new Error(
-      `Insufficient balance in ${bank.bank_name}: RM ${balance.toFixed(2)} available, ` +
-        `payroll needs RM ${amount.toFixed(2)}. ` +
-        `Top up the bank before generating the payment voucher.`,
-    )
-  }
+  // No balance check here: the payroll funding PV is an accrual (Dr 9030 salary
+  // expense / Cr 4020 Salary Payable, mig 20260619) — it never moves this bank's
+  // cash. Real cash leaves at Stage-G disbursement from the Alliance HR account,
+  // which IS balance-checked there.
 
   // ── Generate voucher number matching the existing HV-PV-YYYYMM-NNNN pattern
-  const voucherPeriod = dayjs().format('YYYYMM')
+  const voucherPeriod = dayjs(payDate).format('YYYYMM')
   const { count } = await supabase
     .from('payment_vouchers')
     .select('*', { count: 'exact', head: true })
   const seq = (count ?? 0) + 1
   const voucherNo = `HV-PV-${voucherPeriod}-${String(seq).padStart(4, '0')}`
 
-  const todayStr = dayjs().format('YYYY-MM-DD')
   const periodLabel = dayjs(periodMonth).format('MMM YYYY')
 
   // ── Insert the PV (pending_approval so Principal sees it immediately) ─────
@@ -126,13 +152,13 @@ export async function generatePvFromRequest(
       voucher_type: 'payroll_bank_transfer',
       direction: 'debit',
       status: 'pending_approval',
-      amount,
+      amount: roundAmount,
       currency: 'MYR',
       bank_account_id: sourceBankId,
       payee_name: 'HOUZS Venture — HR Pool (Alliance Bank)',
-      description: `Payroll bank transfer — ${periodLabel}`,
+      description: `Payroll bank transfer — ${periodLabel}${isPartial ? ' (partial)' : ''}`,
       payment_method: 'bank_transfer',
-      payment_date: todayStr,
+      payment_date: payDate,
       reference_type: 'payroll_payment_request',
       reference_id: requestId,
       created_by: user.id,
@@ -175,7 +201,7 @@ export async function generatePvFromRequest(
       source_bank_id: sourceBankId,
     })
     .eq('id', requestId)
-    .eq('status', 'submitted')
+    .in('status', ['submitted', 'pv_generated'])
 
   if (linkErr) {
     // The PV is already created at this point; surface the linking error but
@@ -200,8 +226,8 @@ export async function generatePvFromRequest(
       reference_id: voucher.id,
       reference_table: 'payment_vouchers',
       submitted_by: user.id,
-      description: `${voucher.voucher_no}: Payroll bank transfer — ${periodLabel}`,
-      amount,
+      description: `${voucher.voucher_no}: Payroll bank transfer — ${periodLabel}${isPartial ? ' (partial)' : ''}`,
+      amount: roundAmount,
       status: 'pending',
       workflow_state: 'submitted',
     })

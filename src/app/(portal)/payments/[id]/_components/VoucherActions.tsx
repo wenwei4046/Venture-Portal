@@ -19,6 +19,7 @@ interface Props {
   /** Reverse a PAID outgoing payment (debit). Optional. */
   reversePaidPayment?: (formData: FormData) => Promise<void>
   direction?: string
+  voucherType?: string
 }
 
 export default function VoucherActions({
@@ -35,11 +36,18 @@ export default function VoucherActions({
   voidPaidReceipt,
   reversePaidPayment,
   direction,
+  voucherType,
 }: Props) {
   const [isPending, startTransition] = useTransition()
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [confirmAction, setConfirmAction] = useState<'approve' | null>(null)
   const [notes, setNotes] = useState('')
+
+  // A payroll funding PV is a no-cash accrual (Dr 9030 / Cr 4020): it draws the
+  // dept pools and books the salary expense but does NOT charge the source bank,
+  // so bank balance never gates its approval. Cash leaves at Stage-G disbursement.
+  const isNoCashPayroll = voucherType === 'payroll_bank_transfer'
+  const bankShortBlocks = !isNoCashPayroll && bankBalance !== null && bankBalance < amount
 
   async function handleAction(action: (fd: FormData) => Promise<void>, extraFields?: Record<string, string>) {
     setMessage(null)
@@ -156,7 +164,15 @@ export default function VoucherActions({
           {isPrincipal && !confirmAction ? (
             <div>
               {/* Bank balance info for Principal */}
-              {bankBalance !== null && bankName ? (
+              {isNoCashPayroll ? (
+                <div className="mb-4 p-3 rounded-md text-sm bg-surface border border-hairline">
+                  <span className="font-serif italic text-graphite">
+                    Payroll funding — books the salary expense and draws the department pools;
+                    the bank is <em>not</em> charged now (cash leaves when staff are paid). Short
+                    pools go negative (预支) — that&apos;s allowed.
+                  </span>
+                </div>
+              ) : bankBalance !== null && bankName ? (
                 <div className={`mb-4 p-3 rounded-md text-sm ${bankBalance < amount ? 'bg-danger-bg border border-danger' : 'bg-surface border border-hairline'}`}>
                   <span className="font-serif text-graphite">{bankName} balance: </span>
                   <span className={`font-mono tabular font-medium ${bankBalance < amount ? 'text-danger' : 'text-ledger'}`}>
@@ -173,11 +189,11 @@ export default function VoucherActions({
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="button"
-                  disabled={bankBalance !== null && bankBalance < amount}
+                  disabled={bankShortBlocks}
                   onClick={() => setConfirmAction('approve')}
                   className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {bankBalance !== null && bankBalance < amount ? 'Insufficient balance' : 'Approve'}
+                  {bankShortBlocks ? 'Insufficient balance' : 'Approve'}
                 </button>
               </div>
             </div>

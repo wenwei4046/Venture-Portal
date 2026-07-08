@@ -313,6 +313,7 @@ export default async function PaymentDetailPage({ params }: Props) {
         voidPaidReceipt={voidPaidReceipt}
         reversePaidPayment={reversePaidPayment}
         direction={voucher.direction}
+        voucherType={voucher.voucher_type}
       />
     </div>
   )
