@@ -61,6 +61,7 @@ function r2(n: number): number {
 }
 
 export default function ScheduleView({
+  monthLabel,
   collectRows,
   collectNoTerm,
   collectNoTermOutstanding,
@@ -74,6 +75,7 @@ export default function ScheduleView({
   repayCompound,
   repayCompoundTotals,
 }: {
+  monthLabel: string
   collectRows: SchedRow[]
   collectNoTerm: NoTermRow[]
   collectNoTermOutstanding: number
@@ -111,11 +113,11 @@ export default function ScheduleView({
           lg breakpoint (not sm): below ~1024px the figures stack instead. */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <div>
-          <div className="font-serif italic text-accent text-sm mb-1">To collect · this month</div>
+          <div className="font-serif italic text-accent text-sm mb-1">To collect · {monthLabel}</div>
           <div className="font-serif text-3xl text-num-ink tabular tracking-[-0.01em] text-ledger">{formatMoney(collectTot)}</div>
         </div>
         <div>
-          <div className="font-serif italic text-accent text-sm mb-1">To repay · this month</div>
+          <div className="font-serif italic text-accent text-sm mb-1">To repay · {monthLabel}</div>
           <div className="font-serif text-3xl text-num-ink tabular tracking-[-0.01em]"><span className="neg">{formatMoney(-repayTot)}</span></div>
         </div>
         <div>
@@ -130,7 +132,7 @@ export default function ScheduleView({
       <div className="border-b border-hairline mb-6">
         <nav className="flex gap-6" aria-label="Schedule tabs">
           <TabButton
-            label="Due this month"
+            label={`Due · ${monthLabel}`}
             isActive={tab === 'scheduled'}
             onClick={() => setTab('scheduled')}
           />
@@ -165,8 +167,8 @@ export default function ScheduleView({
 
           {/* Side-by-side on wide screens: collect left, repay right */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-10">
-            <ScheduleSection title="To collect — scheduled loans" rows={collectVisible} tone="credit" />
-            <ScheduleSection title="To repay — scheduled fund sources" rows={repayVisible} tone="debit" />
+            <ScheduleSection title="To collect — scheduled loans" rows={collectVisible} tone="credit" monthLabel={monthLabel} />
+            <ScheduleSection title="To repay — scheduled fund sources" rows={repayVisible} tone="debit" monthLabel={monthLabel} />
           </div>
         </>
       ) : (
@@ -246,7 +248,7 @@ function SourceChip({ source }: { source?: string | null }) {
   )
 }
 
-function ScheduleSection({ title, rows, tone }: { title: string; rows: SchedRow[]; tone: 'credit' | 'debit' }) {
+function ScheduleSection({ title, rows, tone, monthLabel }: { title: string; rows: SchedRow[]; tone: 'credit' | 'debit'; monthLabel: string }) {
   const principal = rows.reduce((s, r) => r2(s + r.principalDue), 0)
   const interest = rows.reduce((s, r) => r2(s + r.interestDue), 0)
   const total = rows.reduce((s, r) => r2(s + r.totalDue), 0)
@@ -258,7 +260,7 @@ function ScheduleSection({ title, rows, tone }: { title: string; rows: SchedRow[
         <span className={`count ${tone === 'credit' ? 'text-ledger' : 'text-danger'}`}>{formatMoney(total)}</span>
       </div>
       {rows.length === 0 ? (
-        <p className="font-serif italic text-muted text-sm">Nothing due this month.</p>
+        <p className="font-serif italic text-muted text-sm">Nothing due in {monthLabel}.</p>
       ) : (
         <table className="ledger-table">
           <thead>
@@ -277,7 +279,7 @@ function ScheduleSection({ title, rows, tone }: { title: string; rows: SchedRow[
                     {r.counterparty}
                     <SourceChip source={r.source} />
                     {r.compound ? <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5">Compound</span> : null}
-                    {r.done ? <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-ledger border border-hairline rounded px-1.5 py-0.5">Paid this month</span> : null}
+                    {r.done ? <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-ledger border border-hairline rounded px-1.5 py-0.5">Paid in {monthLabel}</span> : null}
                     {r.pending ? <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-alert border border-hairline rounded px-1.5 py-0.5">Pending PV</span> : null}
                   </div>
                   <div className="font-mono text-xs text-muted">{r.detail}</div>

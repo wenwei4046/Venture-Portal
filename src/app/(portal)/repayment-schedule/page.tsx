@@ -7,6 +7,7 @@ import { loanMonthlyInstallment, isLoanUnscheduled, isBeforeFirstInstallment, co
 import { fundingSourceFromTerms } from '@/lib/utils'
 import { listPayableFundSources } from '../fund-in/actions'
 import ScheduleView, { type SchedRow, type NoTermRow, type CompoundRow } from './_components/ScheduleView'
+import MonthNav from './_components/MonthNav'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,11 +15,23 @@ function r2(n: number): number {
   return Math.round(n * 100) / 100
 }
 
-export default async function RepaymentSchedulePage() {
+export default async function RepaymentSchedulePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string }>
+}) {
   await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
-  const currentYM = dayjs().format('YYYY-MM')
+  // Which month's schedule to show — default to the current month; ?month=YYYY-MM
+  // lets Finance look back at a past month. The flat installment amounts are the
+  // same every month; the "done / settled / this-month interest" figures come
+  // from repayment dates in the selected month, so past months read correctly.
+  const { month } = await searchParams
+  const nowYM = dayjs().format('YYYY-MM')
+  const currentYM = /^\d{4}-\d{2}$/.test(month ?? '') ? month! : nowYM
+  const isCurrentMonth = currentYM === nowYM
+  const monthLabel = dayjs(`${currentYM}-01`).format('MMM YYYY')
 
   // ── 应收 (loans) + repayment history (for done-this-month + compounding) ──
   const [{ data: loans }, { data: loanOut }, { data: companies }, { data: loanReps }] = await Promise.all([
@@ -296,9 +309,10 @@ export default async function RepaymentSchedulePage() {
 
       <div className="page-head">
         <div>
-          <div className="page-eyebrow"><em>I.</em> TREASURY · DUE THIS MONTH · {dayjs().format('MMMM YYYY').toUpperCase()}</div>
+          <div className="page-eyebrow"><em>I.</em> TREASURY · {isCurrentMonth ? 'DUE THIS MONTH' : 'SCHEDULE FOR'} · {dayjs(`${currentYM}-01`).format('MMMM YYYY').toUpperCase()}</div>
           <h1 className="page-title">Repayment Schedule</h1>
         </div>
+        <MonthNav month={currentYM} isCurrent={isCurrentMonth} />
       </div>
 
       <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
@@ -307,6 +321,7 @@ export default async function RepaymentSchedulePage() {
       </p>
 
       <ScheduleView
+        monthLabel={monthLabel}
         collectRows={collectRows}
         collectNoTerm={collectNoTerm}
         collectNoTermOutstanding={collectNoTermOutstanding}
