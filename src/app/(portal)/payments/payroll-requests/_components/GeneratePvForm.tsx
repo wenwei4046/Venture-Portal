@@ -165,11 +165,11 @@ export default function GeneratePvForm({
           <thead>
             <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans bg-surface">
               <th className="text-left py-2 px-3 font-medium">Department Pool</th>
+              <th className="text-right py-2 px-3 font-medium">Bank balance</th>
               <th className="text-right py-2 px-3 font-medium">Required</th>
               {committedTotal > 0.005 ? (
                 <th className="text-right py-2 px-3 font-medium">Funded</th>
               ) : null}
-              <th className="text-right py-2 px-3 font-medium">Balance</th>
               <th className="text-right py-2 px-3 font-medium">Fund now</th>
             </tr>
           </thead>
@@ -195,14 +195,6 @@ export default function GeneratePvForm({
                       ) : null}
                     </div>
                   </td>
-                  <td className="py-2 px-3 text-right font-mono tabular text-graphite">
-                    {fmt(row.required)}
-                  </td>
-                  {committedTotal > 0.005 ? (
-                    <td className="py-2 px-3 text-right font-mono tabular text-ledger">
-                      {fmt(row.committed)}
-                    </td>
-                  ) : null}
                   <td
                     className={
                       'py-2 px-3 text-right font-mono tabular ' +
@@ -211,6 +203,14 @@ export default function GeneratePvForm({
                   >
                     {fmt(row.pool_balance)}
                   </td>
+                  <td className="py-2 px-3 text-right font-mono tabular text-graphite">
+                    {fmt(row.required)}
+                  </td>
+                  {committedTotal > 0.005 ? (
+                    <td className="py-2 px-3 text-right font-mono tabular text-ledger">
+                      {fmt(row.committed)}
+                    </td>
+                  ) : null}
                   <td className="py-2 px-3 text-right">
                     <input
                       type="text"
@@ -230,6 +230,7 @@ export default function GeneratePvForm({
             })}
             <tr className="bg-surface/40">
               <td className="py-2 px-3 font-serif italic text-accent">Funding now</td>
+              <td className="py-2 px-3"></td>
               <td className="py-2 px-3 text-right font-mono tabular text-muted">
                 {fmt(amount)}
               </td>
@@ -238,7 +239,6 @@ export default function GeneratePvForm({
                   {fmt(committedTotal)}
                 </td>
               ) : null}
-              <td className="py-2 px-3"></td>
               <td className="py-2 px-3 text-right font-mono tabular font-semibold text-ink">
                 {fmt(summary.sumInput)}
               </td>
