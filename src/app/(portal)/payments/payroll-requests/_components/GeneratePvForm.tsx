@@ -113,9 +113,10 @@ export default function GeneratePvForm({
       try {
         await generatePvFromRequest(requestId, bankId, sources, payDate)
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Generate failed'
-        if (msg.includes('NEXT_REDIRECT')) return
-        setError(msg)
+        // A successful generate ends in redirect() → NEXT_REDIRECT. Re-throw it so
+        // Next performs the navigation (swallowing it leaves the spinner stuck).
+        if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) throw err
+        setError(err instanceof Error ? err.message : 'Generate failed')
       }
     })
   }
