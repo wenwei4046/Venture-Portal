@@ -8,6 +8,7 @@ import {
   defaultCashFlowLayout,
   type CashFlowLayout,
 } from '@/lib/cash-flow-custom'
+import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
 import { readReportLayout } from '@/lib/report-layouts'
 import { segmentFilterFor } from '../../_components/report-segments'
 import { exportPdfResponse, exportXlsxResponse } from '@/lib/export/response'
@@ -33,7 +34,8 @@ export async function GET(req: Request) {
     readReportLayout(supabase, 'cash_flow'),
   ])
   const bankCodes = new Set((banks ?? []) as unknown as string[])
-  const data = buildCashFlowAccounts(lines, accounts, bankCodes, { year, throughMonth, segment: segmentFilterFor(segment) })
+  const ib = await fetchInterBillingCashFlow(supabase, bankCodes)
+  const data = buildCashFlowAccounts([...lines, ...ib.lines], [...accounts, ib.account], bankCodes, { year, throughMonth, segment: segmentFilterFor(segment) })
   const saved = (savedRaw ?? null) as CashFlowLayout | null
   const layout = saved && Array.isArray(saved.categories) && saved.categories.length > 0
     ? saved

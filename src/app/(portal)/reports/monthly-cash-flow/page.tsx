@@ -9,6 +9,7 @@ import {
   defaultCashFlowLayout,
   type CashFlowLayout,
 } from '@/lib/cash-flow-custom'
+import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
 import { readReportLayout } from '@/lib/report-layouts'
 import { segmentFilterFor } from '../_components/report-segments'
 import MonthlyMatrix from '../_components/MonthlyMatrix'
@@ -41,8 +42,9 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
     readReportLayout(supabase, 'cash_flow'),
   ])
   const bankCodes = new Set((banks ?? []) as unknown as string[])
+  const ib = await fetchInterBillingCashFlow(supabase, bankCodes)
 
-  const data = buildCashFlowAccounts(lines, accounts, bankCodes, {
+  const data = buildCashFlowAccounts([...lines, ...ib.lines], [...accounts, ib.account], bankCodes, {
     year,
     throughMonth,
     segment: segmentFilterFor(segment),

@@ -17,6 +17,7 @@ import {
   monthPeriod,
 } from '@/lib/gl-reports'
 import { cashFlowBlocks } from '@/lib/gl-report-blocks'
+import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
 import GlReportView from '../_components/GlReportView'
 import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
 import ExportLinks from '../_components/ExportLinks'
@@ -48,12 +49,15 @@ export default async function CashFlowPage({ searchParams }: Props) {
     // codes only, no balances.
     supabase.rpc('bank_gl_codes' as never),
   ])
-  const lines = applyGlRefs(rawLines, glRefs)
   const bankCodes = new Set((banks ?? []) as unknown as string[])
+  // Fold inter-billing settles (dept_pools-only, no GL) in as synthetic transfer
+  // lines so each segment's closing cash ties to its Dept Pool balance.
+  const ib = await fetchInterBillingCashFlow(supabase, bankCodes)
+  const lines = [...applyGlRefs(rawLines, glRefs), ...ib.lines]
 
   const cf = buildCashFlow(
     lines,
-    accounts,
+    [...accounts, ib.account],
     {
       current: monthPeriod(period),
       previous: monthPeriod(compare || period),

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { buildCashFlow, fetchAllJournalLines, fetchCoaAccounts, monthPeriod } from '@/lib/gl-reports'
 import { cashFlowBlocks } from '@/lib/gl-report-blocks'
+import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
 import { glStatementExportResponse } from '@/lib/export/gl-statement'
 import { segmentFilterFor } from '../../_components/report-segments'
 
@@ -28,10 +29,11 @@ export async function GET(req: Request) {
     supabase.rpc('bank_gl_codes' as never), // codes only; dept_managers can't read bank_accounts
   ])
   const bankCodes = new Set((banks ?? []) as unknown as string[])
+  const ib = await fetchInterBillingCashFlow(supabase, bankCodes)
 
   const cf = buildCashFlow(
-    lines,
-    accounts,
+    [...lines, ...ib.lines],
+    [...accounts, ib.account],
     {
       current: monthPeriod(period),
       previous: monthPeriod(compare || period),
