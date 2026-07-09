@@ -9,7 +9,7 @@ import {
   defaultCashFlowLayout,
   type CashFlowLayout,
 } from '@/lib/cash-flow-custom'
-import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
+import { fetchInterBillingCashFlow, ensureInterBillCategory } from '@/lib/inter-billing-cash-flow'
 import { readReportLayout } from '@/lib/report-layouts'
 import { segmentFilterFor } from '../_components/report-segments'
 import MonthlyMatrix from '../_components/MonthlyMatrix'
@@ -55,7 +55,7 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
     ? saved
     : defaultCashFlowLayout(data.accounts)
 
-  const rows = buildCustomCashFlowRows(data, layout)
+  const rows = buildCustomCashFlowRows(data, ensureInterBillCategory(layout))
 
   return (
     <div>

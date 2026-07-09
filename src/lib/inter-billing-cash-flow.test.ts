@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { buildCashFlow, type GlLine, type CoaAccount } from './gl-reports'
 import {
   buildInterBillingCashFlowLines,
+  ensureInterBillCategory,
   interBillTransferAccount,
   INTERBILL_TRANSFER_CODE,
   type TransferSide,
@@ -96,5 +97,34 @@ describe('inter-billing + own-share folded into buildCashFlow', () => {
     const before = cf(base, undefined).closingCash.current
     const after = cf([...base, ...ib], undefined).closingCash.current
     expect(after).toBe(before)
+  })
+})
+
+describe('ensureInterBillCategory', () => {
+  it('files the transfer account into the Financing category (so it is not "Unassigned")', () => {
+    const layout = {
+      categories: [
+        { id: 'operating', name: 'Operating Activities', accounts: ['3030'] },
+        { id: 'financing', name: 'Financing Activities', accounts: ['1900'] },
+      ],
+    }
+    const out = ensureInterBillCategory(layout)
+    const fin = out.categories.find((c) => c.id === 'financing')!
+    expect(fin.accounts).toContain(INTERBILL_TRANSFER_CODE)
+    expect(layout.categories[1].accounts).not.toContain(INTERBILL_TRANSFER_CODE) // original untouched
+  })
+
+  it('matches a renamed financing category by name, and is idempotent', () => {
+    const layout = { categories: [{ id: 'x', name: 'Financing / treasury', accounts: [] as string[] }] }
+    const once = ensureInterBillCategory(layout)
+    const twice = ensureInterBillCategory(once)
+    expect(once.categories[0].accounts.filter((a) => a === INTERBILL_TRANSFER_CODE)).toHaveLength(1)
+    expect(twice.categories[0].accounts.filter((a) => a === INTERBILL_TRANSFER_CODE)).toHaveLength(1)
+  })
+
+  it('creates a Financing category when none exists', () => {
+    const out = ensureInterBillCategory({ categories: [{ id: 'operating', name: 'Operating', accounts: [] }] })
+    const fin = out.categories.find((c) => c.accounts.includes(INTERBILL_TRANSFER_CODE))!
+    expect(fin.name).toMatch(/financing/i)
   })
 })

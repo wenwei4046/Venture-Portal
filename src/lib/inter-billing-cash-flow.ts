@@ -24,6 +24,7 @@
 // to/from the in-house bank" financing line.
 
 import type { CoaAccount, GlLine } from './gl-reports'
+import type { CashFlowLayout } from './cash-flow-custom'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /** Pseudo account code for the synthetic Financing transfer legs. */
@@ -36,6 +37,22 @@ export const interBillTransferAccount: CoaAccount = {
   type: 'equity', // unused for cash flow — cash_flow_category drives categorisation
   parent_code: null,
   cash_flow_category: 'financing',
+}
+
+/**
+ * Slot the synthetic transfer account into a custom cash-flow layout's Financing
+ * category, so the monthly (custom-layout) report files it under Financing
+ * Activities instead of the red "Unassigned" bucket (a saved layout can't know a
+ * synthetic code). Applied at render time — never mutates the stored layout.
+ */
+export function ensureInterBillCategory(layout: CashFlowLayout): CashFlowLayout {
+  const code = INTERBILL_TRANSFER_CODE
+  if (layout.categories.some((c) => c.accounts.includes(code))) return layout
+  const cats = layout.categories.map((c) => ({ ...c, accounts: [...c.accounts] }))
+  const fin = cats.find((c) => c.id === 'financing') ?? cats.find((c) => /financing/i.test(c.name))
+  if (fin) fin.accounts.push(code)
+  else cats.push({ id: 'financing', name: 'Financing Activities', accounts: [code] })
+  return { categories: cats }
 }
 
 // Dept name → GL segment. Venture Office (the internal-bank hub) is 'corporate'.

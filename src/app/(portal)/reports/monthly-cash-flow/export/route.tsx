@@ -8,7 +8,7 @@ import {
   defaultCashFlowLayout,
   type CashFlowLayout,
 } from '@/lib/cash-flow-custom'
-import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
+import { fetchInterBillingCashFlow, ensureInterBillCategory } from '@/lib/inter-billing-cash-flow'
 import { readReportLayout } from '@/lib/report-layouts'
 import { segmentFilterFor } from '../../_components/report-segments'
 import { exportPdfResponse, exportXlsxResponse } from '@/lib/export/response'
@@ -40,7 +40,7 @@ export async function GET(req: Request) {
   const layout = saved && Array.isArray(saved.categories) && saved.categories.length > 0
     ? saved
     : defaultCashFlowLayout(data.accounts)
-  const matrix = { columns: data.columns, rows: buildCustomCashFlowRows(data, layout) }
+  const matrix = { columns: data.columns, rows: buildCustomCashFlowRows(data, ensureInterBillCategory(layout)) }
 
   const filename = `monthly-cash-flow-${period}${segment ? `-${segment}` : ''}`
   if (format === 'pdf') {
