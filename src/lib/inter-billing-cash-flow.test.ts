@@ -4,6 +4,7 @@ import {
   buildInterBillingCashFlowLines,
   interBillTransferAccount,
   INTERBILL_TRANSFER_CODE,
+  type TransferSide,
 } from './inter-billing-cash-flow'
 
 const CUR = { from: '2026-07-01', to: '2026-07-31' }
@@ -34,61 +35,66 @@ function ln(p: Partial<GlLine>): GlLine {
   }
 }
 
-// Base GL: Marketing received RM 100 cash into Hong Leong.
+// Base GL: Marketing +100, Director Office +50 cash into Hong Leong.
 const base: GlLine[] = [
-  ln({ entry_id: 'e1', account_code: '3000', debit: 100, segment: 'marketing' }),
-  ln({ entry_id: 'e1', account_code: '5000', credit: 100, segment: 'marketing' }),
+  ln({ entry_id: 'm1', account_code: '3000', debit: 100, segment: 'marketing' }),
+  ln({ entry_id: 'm1', account_code: '5000', credit: 100, segment: 'marketing' }),
+  ln({ entry_id: 'd1', account_code: '3000', debit: 50, segment: 'director_office' }),
+  ln({ entry_id: 'd1', account_code: '5000', credit: 50, segment: 'director_office' }),
 ]
 
-// Marketing paid RM 30 inter-billing to Venture (Office).
-const ib = buildInterBillingCashFlowLines([{ deptName: 'Marketing', amount: 30, date: '2026-07-05' }], '3000')
+// Marketing pays 30 to Venture (Office) [inter-billing]; Venture pays 8 back to
+// Director Office [own-share].
+const sides: TransferSide[] = [
+  { deptName: 'Marketing', amount: 30, date: '2026-07-05', direction: 'out' },
+  { deptName: 'Venture Office', amount: 30, date: '2026-07-05', direction: 'in' },
+  { deptName: 'Venture Office', amount: 8, date: '2026-07-06', direction: 'out' },
+  { deptName: 'Director Office', amount: 8, date: '2026-07-06', direction: 'in' },
+]
+const ib = buildInterBillingCashFlowLines(sides, '3000')
+
+const cf = (lines: GlLine[], seg: string | string[] | undefined) =>
+  buildCashFlow(lines, accounts, { current: CUR, previous: NONE, segment: seg }, bankCodes)
 
 describe('buildInterBillingCashFlowLines', () => {
-  it('emits a paired paying (marketing) + receiving (corporate) transfer', () => {
-    expect(ib).toHaveLength(4)
-    const payBank = ib.find((l) => l.segment === 'marketing' && l.account_code === '3000')!
-    const payXfer = ib.find((l) => l.segment === 'marketing' && l.account_code === INTERBILL_TRANSFER_CODE)!
-    const recBank = ib.find((l) => l.segment === 'corporate' && l.account_code === '3000')!
-    const recXfer = ib.find((l) => l.segment === 'corporate' && l.account_code === INTERBILL_TRANSFER_CODE)!
-    expect(payBank.credit).toBe(30) // cash OUT of Marketing
-    expect(payXfer.debit).toBe(30)
-    expect(recBank.debit).toBe(30) // cash INTO Venture (Office)
-    expect(recXfer.credit).toBe(30)
+  it('maps out/in to bank credit/debit on the right segment', () => {
+    const mktOut = ib.find((l) => l.segment === 'marketing' && l.account_code === '3000')!
+    expect(mktOut.credit).toBe(30) // cash OUT of Marketing
+    const doIn = ib.find((l) => l.segment === 'director_office' && l.account_code === '3000')!
+    expect(doIn.debit).toBe(8) // cash INTO Director Office
+    // Venture (Office) → corporate carries both a −30 receive... wait, it RECEIVES 30 and PAYS 8
+    const corpBank = ib.filter((l) => l.segment === 'corporate' && l.account_code === '3000')
+    expect(corpBank.reduce((s, l) => s + l.debit - l.credit, 0)).toBe(22) // +30 in − 8 out
   })
 
   it('skips unknown departments and non-positive amounts', () => {
-    expect(buildInterBillingCashFlowLines([{ deptName: 'Nope', amount: 10, date: '2026-07-01' }], '3000')).toHaveLength(0)
-    expect(buildInterBillingCashFlowLines([{ deptName: 'HR', amount: 0, date: '2026-07-01' }], '3000')).toHaveLength(0)
+    expect(buildInterBillingCashFlowLines([{ deptName: 'Nope', amount: 10, date: '2026-07-01', direction: 'out' }], '3000')).toHaveLength(0)
+    expect(buildInterBillingCashFlowLines([{ deptName: 'HR', amount: 0, date: '2026-07-01', direction: 'in' }], '3000')).toHaveLength(0)
   })
 })
 
-describe('inter-billing folded into buildCashFlow', () => {
-  const mkt = (lines: GlLine[]) =>
-    buildCashFlow(lines, accounts, { current: CUR, previous: NONE, segment: ['marketing'] }, bankCodes)
-
-  it("Marketing closing cash drops by the inter-billing it paid", () => {
-    expect(mkt(base).closingCash.current).toBe(100)
-    const after = mkt([...base, ...ib])
+describe('inter-billing + own-share folded into buildCashFlow', () => {
+  it('paying segment (Marketing) closing cash drops by what it paid', () => {
+    expect(cf(base, ['marketing']).closingCash.current).toBe(100)
+    const after = cf([...base, ...ib], ['marketing'])
     expect(after.closingCash.current).toBe(70) // 100 − 30
-    expect(after.check.current).toBe(0) // opening + net change still reconciles
-    // the transfer shows as a Financing line
-    const fin = after.financing.nodes.find((n) => n.code === INTERBILL_TRANSFER_CODE)
-    expect(fin?.current).toBe(-30)
+    expect(after.check.current).toBe(0)
+    expect(after.financing.nodes.find((n) => n.code === INTERBILL_TRANSFER_CODE)?.current).toBe(-30)
   })
 
-  it('Venture (Office) closing cash rises by the same amount', () => {
-    const venture = buildCashFlow(
-      [...base, ...ib],
-      accounts,
-      { current: CUR, previous: NONE, segment: ['corporate', 'treasury'] },
-      bankCodes,
-    )
-    expect(venture.closingCash.current).toBe(30)
+  it('own-share receiver (Director Office) closing cash rises by what it got back', () => {
+    expect(cf(base, ['director_office']).closingCash.current).toBe(50)
+    expect(cf([...base, ...ib], ['director_office']).closingCash.current).toBe(58) // 50 + 8
   })
 
-  it('consolidated (all segments) closing cash is unchanged — the two sides net to zero', () => {
-    const before = buildCashFlow(base, accounts, { current: CUR, previous: NONE, segment: undefined }, bankCodes)
-    const after = buildCashFlow([...base, ...ib], accounts, { current: CUR, previous: NONE, segment: undefined }, bankCodes)
-    expect(after.closingCash.current).toBe(before.closingCash.current)
+  it('Venture (Office) nets receive − pay', () => {
+    // corporate has no base cash here → 0 + 30 (from Marketing) − 8 (to Director Office)
+    expect(cf([...base, ...ib], ['corporate', 'treasury']).closingCash.current).toBe(22)
+  })
+
+  it('consolidated (all segments) closing cash is unchanged — every transfer nets to zero', () => {
+    const before = cf(base, undefined).closingCash.current
+    const after = cf([...base, ...ib], undefined).closingCash.current
+    expect(after).toBe(before)
   })
 })

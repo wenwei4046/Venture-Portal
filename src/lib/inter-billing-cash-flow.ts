@@ -1,22 +1,27 @@
-// Inter-billing → cash-flow bridge.
+// Inter-billing / own-share → cash-flow bridge.
 //
-// Inter-billing recharges (a dept paying its share of a shared cost to Venture
-// (Office)) settle ONLY in the dept_pools management ledger — a conceptual cash
-// transfer within the Hong Leong bank, with NO GL journal entry (there is no real
-// bank movement; HV's cash is commingled). So the GL-driven Cash Flow, read from
-// journal_lines, can't see it — a segment's closing cash comes out equal to its
-// raw GL bank slice, which is HIGHER than its Dept Pool balance by exactly the
-// inter-billing it paid out.
+// Internal cost reallocations between a department and Venture (Office) settle
+// ONLY in the dept_pools management ledger — a conceptual cash transfer within
+// the Hong Leong bank, with NO GL journal entry (there is no real bank movement;
+// HV's cash is commingled). So the GL-driven Cash Flow, read from journal_lines,
+// can't see them — a segment's closing cash comes out equal to its raw GL bank
+// slice, diverging from its Dept Pool balance by the net it reallocated.
+//
+// Every reallocation is recorded as a PAIR sharing one `HV-OR-…` PV reference:
+//   payer   : dept_pools `inter_billing_out`  (−, its slice down)
+//   receiver: dept_pools `np_in`              (+, its slice up)
+// Both directions occur — a dept paying Venture (Office) its share (inter-billing)
+// AND Venture (Office) paying a dept back its own share (own-share). So the PAYER
+// is always the `inter_billing_out` row (which may be a real dept OR Venture
+// Office), and the RECEIVER is the `np_in` row carrying the same PV ref.
 //
 // To make each segment's Cash Flow tie to its Dept Pool, we feed SYNTHETIC lines
-// into buildCashFlow — for every inter_billing_out settle, a paired transfer:
-//   paying dept  : Cr bank (cash out) + Dr "Inter-billing" (Financing)
-//   Venture Office: Dr bank (cash in) + Cr "Inter-billing" (Financing)
-// These exist only in the report computation (never the GL), and the two sides
-// net to zero, so the consolidated (all-segments) Cash Flow is unchanged while
-// each single-segment view now closes at its Dept Pool balance. This mirrors how
-// an in-house-bank participant's cash flow carries a "transfer to/from the
-// in-house bank" financing line.
+// into buildCashFlow — for each side, a bank leg + a Financing "Inter-billing"
+// leg. These exist only in the report computation (never the GL); payer and
+// receiver net to zero, so the consolidated (all-segments) Cash Flow is unchanged
+// while each single-segment view now closes at its Dept Pool balance. This
+// mirrors how an in-house-bank participant's cash flow carries a "transfer
+// to/from the in-house bank" financing line.
 
 import type { CoaAccount, GlLine } from './gl-reports'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -33,21 +38,27 @@ export const interBillTransferAccount: CoaAccount = {
   cash_flow_category: 'financing',
 }
 
-// Paying departments → their GL segment. Venture Office (the receiver) is always
-// 'corporate' in the GL/segment world.
+// Dept name → GL segment. Venture Office (the internal-bank hub) is 'corporate'.
 const DEPT_TO_SEGMENT: Record<string, string> = {
   Marketing: 'marketing',
   HR: 'hr',
   Finance: 'finance',
   'Director Office': 'director_office',
   Director: 'director',
+  'Venture Office': 'corporate',
 }
-const VENTURE_SEGMENT = 'corporate'
 
-export interface InterBillRow {
+const PVREF = /HV-OR-\d+-\d+/
+
+function round2(n: number): number {
+  return Math.round((Number(n) || 0) * 100) / 100
+}
+
+export interface TransferSide {
   deptName: string
   amount: number
   date: string // YYYY-MM-DD (settle date)
+  direction: 'out' | 'in'
 }
 
 function mkLine(
@@ -76,39 +87,48 @@ function mkLine(
 }
 
 /**
- * Pure: turn dept_pools inter_billing_out rows into synthetic cash-flow lines.
- * `bankCode` is the bank the transfer conceptually rides (primary / Hong Leong).
+ * Pure: turn reallocation sides into synthetic cash-flow lines. Each side is a
+ * self-balancing 2-leg entry (bank + Financing transfer) tagged its segment;
+ * 'out' drops that segment's cash, 'in' raises it.
  */
-export function buildInterBillingCashFlowLines(rows: InterBillRow[], bankCode: string): GlLine[] {
+export function buildInterBillingCashFlowLines(sides: TransferSide[], bankCode: string): GlLine[] {
   const lines: GlLine[] = []
   let i = 0
-  for (const row of rows) {
-    const seg = DEPT_TO_SEGMENT[row.deptName]
-    const amt = Math.round((Number(row.amount) || 0) * 100) / 100
-    const date = (row.date ?? '').slice(0, 10)
+  for (const s of sides) {
+    const seg = DEPT_TO_SEGMENT[s.deptName]
+    const amt = round2(s.amount)
+    const date = (s.date ?? '').slice(0, 10)
     if (!seg || !(amt > 0) || !date) continue
-    const payId = `ibx-pay-${i}`
-    const recId = `ibx-rec-${i}`
-    i++
-    // Paying dept: cash OUT of its slice.
-    lines.push(
-      mkLine(payId, bankCode, 0, amt, date, seg, `Inter-billing to Venture (Office)`),
-      mkLine(payId, INTERBILL_TRANSFER_CODE, amt, 0, date, seg, `Inter-billing paid — ${row.deptName}`),
-    )
-    // Venture (Office): cash INTO its slice.
-    lines.push(
-      mkLine(recId, bankCode, amt, 0, date, VENTURE_SEGMENT, `Inter-billing from ${row.deptName}`),
-      mkLine(recId, INTERBILL_TRANSFER_CODE, 0, amt, date, VENTURE_SEGMENT, `Inter-billing received — ${row.deptName}`),
-    )
+    const id = `ibx-${s.direction}-${i++}`
+    if (s.direction === 'out') {
+      lines.push(
+        mkLine(id, bankCode, 0, amt, date, seg, 'Inter-billing transfer out'),
+        mkLine(id, INTERBILL_TRANSFER_CODE, amt, 0, date, seg, `Inter-billing paid — ${s.deptName}`),
+      )
+    } else {
+      lines.push(
+        mkLine(id, bankCode, amt, 0, date, seg, 'Inter-billing transfer in'),
+        mkLine(id, INTERBILL_TRANSFER_CODE, 0, amt, date, seg, `Inter-billing received — ${s.deptName}`),
+      )
+    }
   }
   return lines
 }
 
+interface PoolRow {
+  amount: number | null
+  created_at: string | null
+  description: string | null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  departments: any
+}
+
 /**
- * Fetch inter_billing_out settles and return synthetic cash-flow lines + the
- * pseudo account to add to the COA list. Resilient: on any read error (e.g. a
- * dept_manager RLS-blocked from dept_pools) it returns no lines, so the Cash
- * Flow still renders (just un-adjusted, as before).
+ * Fetch reallocation settles and return synthetic cash-flow lines + the pseudo
+ * account. Payer = every `inter_billing_out`; receiver = the `np_in` carrying the
+ * same `HV-OR-…` PV ref (which excludes ordinary external receipts). Resilient:
+ * on any read error (e.g. a dept_manager RLS-blocked from dept_pools) it returns
+ * no lines, so the Cash Flow still renders (just un-adjusted, as before).
  */
 export async function fetchInterBillingCashFlow(
   supabase: SupabaseClient,
@@ -118,18 +138,50 @@ export async function fetchInterBillingCashFlow(
     ? '3000'
     : (bankCodes.values().next().value ?? '3000')
   try {
-    const { data, error } = await supabase
-      .from('dept_pools')
-      .select('amount, created_at, departments!inner(name)')
-      .eq('transaction_type', 'inter_billing_out')
-    if (error) throw error
-    const rows: InterBillRow[] = (data ?? []).map((r) => ({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      deptName: ((r.departments as any)?.name as string) ?? '',
-      amount: Number(r.amount ?? 0),
-      date: String(r.created_at ?? '').slice(0, 10),
-    }))
-    return { lines: buildInterBillingCashFlowLines(rows, bankCode), account: interBillTransferAccount }
+    const [payRes, recRes] = await Promise.all([
+      supabase
+        .from('dept_pools')
+        .select('amount, created_at, description, departments!inner(name)')
+        .eq('transaction_type', 'inter_billing_out'),
+      supabase
+        .from('dept_pools')
+        .select('amount, created_at, description, departments!inner(name)')
+        .eq('transaction_type', 'np_in')
+        .like('description', 'PV HV-OR-%'),
+    ])
+    if (payRes.error) throw payRes.error
+    if (recRes.error) throw recRes.error
+
+    const payRows = (payRes.data ?? []) as unknown as PoolRow[]
+    const recRows = (recRes.data ?? []) as unknown as PoolRow[]
+
+    const pvref = (d: string | null): string | null => d?.match(PVREF)?.[0] ?? null
+    const payerPvrefs = new Set(payRows.map((r) => pvref(r.description)).filter(Boolean) as string[])
+
+    const sides: TransferSide[] = []
+    for (const r of payRows) {
+      sides.push({
+        deptName: (r.departments?.name as string) ?? '',
+        amount: Number(r.amount ?? 0),
+        date: String(r.created_at ?? '').slice(0, 10),
+        direction: 'out',
+      })
+    }
+    // Receivers: only np_in whose PV ref matches a payer (a reallocation, not a
+    // real external receipt — those never share a PV with an inter_billing_out).
+    for (const r of recRows) {
+      const ref = pvref(r.description)
+      if (ref && payerPvrefs.has(ref)) {
+        sides.push({
+          deptName: (r.departments?.name as string) ?? '',
+          amount: Number(r.amount ?? 0),
+          date: String(r.created_at ?? '').slice(0, 10),
+          direction: 'in',
+        })
+      }
+    }
+
+    return { lines: buildInterBillingCashFlowLines(sides, bankCode), account: interBillTransferAccount }
   } catch {
     return { lines: [], account: interBillTransferAccount }
   }
