@@ -135,12 +135,32 @@ export function buildCustomCashFlowRows(
 ): MatrixRow[] {
   const nCols = data.columns.length
   const byCode = new Map(data.accounts.map((a) => [a.code, a]))
-  const assigned = new Set<string>()
   const rows: MatrixRow[] = []
 
+  // Auto-file un-placed cash-flow accounts into the category whose id matches
+  // their accounting default (operating / investing / financing), so a newly-seen
+  // or synthetic account doesn't fall into the red "Unassigned" bucket. Only an
+  // account whose default category has no matching category stays Unassigned.
+  const placed = new Set(layout.categories.flatMap((c) => c.accounts))
+  const catIds = new Set(layout.categories.map((c) => c.id))
+  const autoByCat = new Map<string, CashFlowAccount[]>()
+  const orphans: CashFlowAccount[] = []
+  for (const a of data.accounts) {
+    if (placed.has(a.code)) continue
+    if (catIds.has(a.defaultCategory)) {
+      const arr = autoByCat.get(a.defaultCategory) ?? []
+      arr.push(a)
+      autoByCat.set(a.defaultCategory, arr)
+    } else {
+      orphans.push(a)
+    }
+  }
+
   for (const cat of layout.categories) {
-    const catAccounts = cat.accounts.map((code) => byCode.get(code)).filter((a): a is CashFlowAccount => !!a)
-    catAccounts.forEach((a) => assigned.add(a.code))
+    const listed = cat.accounts
+      .map((code) => byCode.get(code))
+      .filter((a): a is CashFlowAccount => !!a)
+    const catAccounts = [...listed, ...(autoByCat.get(cat.id) ?? [])]
     rows.push(...buildHierarchyRows(catAccounts, cat.id, 1))
     rows.push({
       key: `cat:${cat.id}`,
@@ -152,17 +172,16 @@ export function buildCustomCashFlowRows(
     })
   }
 
-  // Anything not placed in a category → Unassigned (so no account silently drops).
-  const leftovers = data.accounts.filter((a) => !assigned.has(a.code))
-  if (leftovers.length > 0) {
-    rows.push(...buildHierarchyRows(leftovers, 'unassigned', 1))
+  // Only reached if a default category has no matching layout category.
+  if (orphans.length > 0) {
+    rows.push(...buildHierarchyRows(orphans, 'unassigned', 1))
     rows.push({
       key: 'cat:unassigned',
       label: 'Unassigned',
       depth: 0,
       kind: 'subtotal',
       tone: 'danger',
-      values: colSum(leftovers.map((a) => a.values), nCols),
+      values: colSum(orphans.map((a) => a.values), nCols),
     })
   }
 
