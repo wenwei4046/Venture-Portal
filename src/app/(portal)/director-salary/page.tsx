@@ -17,6 +17,14 @@ interface ByCompanyRow {
   company_id: string
   company_name: string
   company_short_code: string
+  // Component breakdown (2026-07-13). Optional: submissions snapshotted
+  // before the breakdown existed only carry total_ctc — render '—' then.
+  basic?: number | null
+  kpi?: number | null
+  allowance?: number | null
+  epf_er?: number | null
+  socso_er?: number | null
+  eis_er?: number | null
   total_ctc: number
 }
 
@@ -149,7 +157,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
 
               <div className="lg:col-span-5 space-y-3">
                 <div className="flex items-baseline justify-between">
-                  <span className="font-serif italic text-sm text-graphite">Total Payroll {fullyPaid ? '(95% · Fully Paid)' : '(75%)'}</span>
+                  <span className="font-serif italic text-sm text-graphite">Total Payroll {fullyPaid ? '(100% · Fully Paid)' : '(75%)'}</span>
                   <span className="font-mono tabular text-sm font-medium text-num-ink">{formatMoney(Number(summary.out_total_payroll_gross))}</span>
                 </div>
                 <div className="flex items-baseline justify-between">
@@ -157,7 +165,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
                   <span className="font-mono tabular text-sm font-medium text-num-ink">{formatMoney(Number(summary.out_total_invoice))}</span>
                 </div>
                 <div className="flex items-baseline justify-between">
-                  <span className="font-serif italic text-sm text-graphite">Total 5% Saving</span>
+                  <span className="font-serif italic text-sm text-graphite">Total Saving {fullyPaid ? '(none · Fully Paid)' : '(5%)'}</span>
                   <span className="font-mono tabular text-sm font-medium text-ledger">{formatMoney(Number(summary.out_total_saving))}</span>
                 </div>
                 <div className="flex items-baseline justify-between">
@@ -194,6 +202,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
                 basic: Number(r.basic),
                 kpi: Number(r.kpi),
                 allowance: Number(r.allowance),
+                heads: Number(r.heads ?? 1),
                 employer_epf: r.employer_epf ? Number(r.employer_epf) : null,
                 employer_socso: r.employer_socso ? Number(r.employer_socso) : null,
                 employer_eis: r.employer_eis ? Number(r.employer_eis) : null,
@@ -230,7 +239,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
                       <th>Director</th>
                       <th className="right">Gross</th>
                       <th className="right">Saving</th>
-                      <th className="right">Payroll {fullyPaid ? '(95%)' : '(75%)'}</th>
+                      <th className="right">Payroll {fullyPaid ? '(100%)' : '(75%)'}</th>
                       <th className="right">Invoice {fullyPaid ? '(—)' : '(25%)'}</th>
                       <th className="right">Net</th>
                       <th className="right"></th>
@@ -277,6 +286,12 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
           liveTotals={liveTotals}
           liveByCompany={((liveByCompany as ByCompanyRow[] | null) ?? []).map(r => ({
             ...r,
+            basic: r.basic == null ? null : Number(r.basic),
+            kpi: r.kpi == null ? null : Number(r.kpi),
+            allowance: r.allowance == null ? null : Number(r.allowance),
+            epf_er: r.epf_er == null ? null : Number(r.epf_er),
+            socso_er: r.socso_er == null ? null : Number(r.socso_er),
+            eis_er: r.eis_er == null ? null : Number(r.eis_er),
             total_ctc: Number(r.total_ctc),
           }))}
         />
@@ -306,6 +321,14 @@ function TabLink({
       {children}
     </Link>
   )
+}
+
+// Sum a component column for the totals row — '—' when no row carries the
+// breakdown (legacy snapshots written before the component fields existed).
+function sumOrDash(rows: ByCompanyRow[], pick: (r: ByCompanyRow) => number | null | undefined) {
+  const vals = rows.map(pick).filter((v): v is number => v != null)
+  if (vals.length === 0) return '—'
+  return formatMoney(vals.reduce((s, v) => s + v, 0))
 }
 
 // ─── Director Payroll Submission tab ─────────────────────────────────────────
@@ -347,6 +370,12 @@ function SubmissionTab({
   const byCompany: ByCompanyRow[] = submitted
     ? ((submission.by_company as ByCompanyRow[] | null) ?? []).map(r => ({
         ...r,
+        basic: r.basic == null ? null : Number(r.basic),
+        kpi: r.kpi == null ? null : Number(r.kpi),
+        allowance: r.allowance == null ? null : Number(r.allowance),
+        epf_er: r.epf_er == null ? null : Number(r.epf_er),
+        socso_er: r.socso_er == null ? null : Number(r.socso_er),
+        eis_er: r.eis_er == null ? null : Number(r.eis_er),
         total_ctc: Number(r.total_ctc),
       }))
     : liveByCompany
@@ -418,7 +447,7 @@ function SubmissionTab({
             <div className="num text-num-ink text-xl tracking-[-0.01em] mt-1">{formatMoney(totals.gross)}</div>
           </div>
           <div>
-            <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Payroll {fullyPaid ? '(95% · Fully Paid)' : '(75%)'}</div>
+            <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Payroll {fullyPaid ? '(100% · Fully Paid)' : '(75%)'}</div>
             <div className="num text-graphite text-md mt-1">{formatMoney(totals.payrollGross)}</div>
           </div>
           <div>
@@ -426,7 +455,7 @@ function SubmissionTab({
             <div className="num text-graphite text-md mt-1">{formatMoney(totals.invoice)}</div>
           </div>
           <div>
-            <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Saving (5%)</div>
+            <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Saving {fullyPaid ? '(none)' : '(5%)'}</div>
             <div className="num text-graphite text-md mt-1">{formatMoney(totals.saving)}</div>
           </div>
           <div>
@@ -455,7 +484,13 @@ function SubmissionTab({
               <thead>
                 <tr>
                   <th>Subsidiary</th>
-                  <th className="right">CTC Contribution</th>
+                  <th className="right">Basic</th>
+                  <th className="right">KPI</th>
+                  <th className="right">Allowance</th>
+                  <th className="right">EPF ER</th>
+                  <th className="right">SOCSO ER</th>
+                  <th className="right">EIS ER</th>
+                  <th className="right">Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -465,11 +500,23 @@ function SubmissionTab({
                       <div className="font-serif text-[15px] text-ink">{r.company_short_code}</div>
                       <div className="font-mono text-[11px] text-graphite mt-0.5">{r.company_name}</div>
                     </td>
-                    <td className="num">{formatMoney(r.total_ctc)}</td>
+                    <td className="num">{r.basic == null ? '—' : formatMoney(r.basic)}</td>
+                    <td className="num">{r.kpi == null ? '—' : formatMoney(r.kpi)}</td>
+                    <td className="num">{r.allowance == null ? '—' : formatMoney(r.allowance)}</td>
+                    <td className="num">{r.epf_er == null ? '—' : formatMoney(r.epf_er)}</td>
+                    <td className="num">{r.socso_er == null ? '—' : formatMoney(r.socso_er)}</td>
+                    <td className="num">{r.eis_er == null ? '—' : formatMoney(r.eis_er)}</td>
+                    <td className="num font-semibold">{formatMoney(r.total_ctc)}</td>
                   </tr>
                 ))}
                 <tr>
                   <td className="font-serif italic text-accent">Total</td>
+                  <td className="num font-semibold">{sumOrDash(byCompany, r => r.basic)}</td>
+                  <td className="num font-semibold">{sumOrDash(byCompany, r => r.kpi)}</td>
+                  <td className="num font-semibold">{sumOrDash(byCompany, r => r.allowance)}</td>
+                  <td className="num font-semibold">{sumOrDash(byCompany, r => r.epf_er)}</td>
+                  <td className="num font-semibold">{sumOrDash(byCompany, r => r.socso_er)}</td>
+                  <td className="num font-semibold">{sumOrDash(byCompany, r => r.eis_er)}</td>
                   <td className="num font-semibold">{formatMoney(byCompanyTotal)}</td>
                 </tr>
               </tbody>

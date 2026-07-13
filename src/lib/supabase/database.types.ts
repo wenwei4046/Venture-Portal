@@ -1002,6 +1002,7 @@ export type Database = {
           employer_eis: number | null
           employer_epf: number | null
           employer_socso: number | null
+          heads: number
           id: string
           kpi: number
           period_month: string
@@ -1017,6 +1018,7 @@ export type Database = {
           employer_eis?: number | null
           employer_epf?: number | null
           employer_socso?: number | null
+          heads?: number
           id?: string
           kpi?: number
           period_month: string
@@ -1032,6 +1034,7 @@ export type Database = {
           employer_eis?: number | null
           employer_epf?: number | null
           employer_socso?: number | null
+          heads?: number
           id?: string
           kpi?: number
           period_month?: string
@@ -4099,6 +4102,7 @@ export type Database = {
           voucher_no: string
         }[]
       }
+      bank_gl_codes: { Args: never; Returns: string[] }
       billing_mode_to_segment: {
         Args: { p_mode: string }
         Returns: Database["public"]["Enums"]["gl_segment"]
@@ -4197,6 +4201,10 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      current_user_segment: {
+        Args: never
+        Returns: Database["public"]["Enums"]["gl_segment"]
+      }
       dashboard_summary: { Args: never; Returns: Json }
       delete_manual_journal_voucher: {
         Args: { p_entry_id: string }
@@ -4274,9 +4282,15 @@ export type Database = {
       get_director_ctc_by_company: {
         Args: { p_period_month: string }
         Returns: {
+          allowance: number
+          basic: number
           company_id: string
           company_name: string
           company_short_code: string
+          eis_er: number
+          epf_er: number
+          kpi: number
+          socso_er: number
           total_ctc: number
         }[]
       }
@@ -4342,6 +4356,20 @@ export type Database = {
           company_id: string
           company_name: string
           company_short_code: string
+          department_id: string
+          department_name: string
+          eis_amount: number
+          epf_amount: number
+          salary_amount: number
+          socso_amount: number
+          staff_count: number
+        }[]
+      }
+      get_staff_own_share_allocation: {
+        Args: { p_period_month: string }
+        Returns: {
+          allowance_amount: number
+          amount: number
           department_id: string
           department_name: string
           eis_amount: number

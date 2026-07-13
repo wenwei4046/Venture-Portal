@@ -54,12 +54,14 @@ export interface StatutoryLookup {
 }
 
 /**
- * Payout mode (user 2026-06-04, R5):
- *  - 'split'      — classic 75% payroll / 25% invoice split (default)
- *  - 'fully_paid' — only the 5% saving is deducted; the remaining 95%
- *    (post advance-offset) is paid as ONE standard payroll. No invoice
- *    portion, nothing accumulates into invoice_payout_pool. Statutory is
- *    computed on the Basic+KPI share only; Allowance carries no statutory.
+ * Payout mode (user 2026-06-04 R5; fully_paid redefined 2026-07-13):
+ *  - 'split'      — classic 75% payroll / 25% invoice split (default),
+ *    with the 5% saving deducted on the whole gross first.
+ *  - 'fully_paid' — staff-style payout: NO saving, no 75/25. 100% of the
+ *    gross (post advance-offset) is paid as ONE standard payroll. No
+ *    invoice portion, nothing accumulates into invoice_payout_pool.
+ *    Statutory is computed on the Basic+KPI share only; Allowance carries
+ *    no statutory.
  */
 export type PayoutMode = 'split' | 'fully_paid'
 
@@ -146,8 +148,11 @@ export function calculateDirectorPayout(
   // Step 4: Gross
   const grossAmount = r2(pool.totalPool * director.weightage / totalWeightage)
 
-  // Step 5: 5% Saving (applied on whole gross)
-  const savingAmount = r2(grossAmount * savingRate)
+  // Step 5: 5% Saving (applied on whole gross).
+  // fully_paid (redefined 2026-07-13): NO saving at all — the director is
+  // paid like a normal staff payslip, so 100% of gross flows on.
+  const fullyPaid = mode === 'fully_paid'
+  const savingAmount = fullyPaid ? 0 : r2(grossAmount * savingRate)
   const afterSaving = r2(grossAmount - savingAmount)
 
   // Step 6: Decompose after-saving into BK (basic+kpi) and Allowance portions
@@ -165,7 +170,6 @@ export function calculateDirectorPayout(
   // Step 8: split by mode.
   //   split      → 75% payroll / 25% invoice
   //   fully_paid → 100% of afterOffset as one standard payroll, no invoice
-  const fullyPaid = mode === 'fully_paid'
   const payrollCalc = fullyPaid ? afterOffset : r2(afterOffset * 0.75)
   const invoiceBase = fullyPaid ? 0 : r2(afterOffset * 0.25)
 

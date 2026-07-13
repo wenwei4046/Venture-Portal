@@ -62,6 +62,8 @@ export interface BatchCTCInput {
   basic: number
   kpi: number
   allowance: number
+  /** Directors this company's CTC covers — ER statutory = heads × lookup(B+K ÷ heads). */
+  heads: number
 }
 
 export async function batchSaveCTC(period: string, records: BatchCTCInput[]) {
@@ -102,6 +104,7 @@ export async function batchSaveCTC(period: string, records: BatchCTCInput[]) {
       basic: r.basic,
       kpi: r.kpi,
       allowance: r.allowance,
+      heads: Math.max(1, Math.round(r.heads ?? 1)),
       created_by: user.id,
     }))
 
@@ -243,8 +246,9 @@ export async function calculateDirectorSalary(
     const openingAdvanceBalance = Number(openingBalRaw ?? 0)
 
     // Provisional post-offset afterSaving for statutory lookup keys.
+    // fully_paid = staff-style: no saving deducted (mirrors salary.ts Step 5).
     const grossAmount = pool.totalPool * dirConfig.weightage / totalWeightage
-    const savingAmount = grossAmount * savingRate
+    const savingAmount = fullyPaid ? 0 : grossAmount * savingRate
     const afterSaving = grossAmount - savingAmount
     const allowanceShare = afterSaving * pool.allowanceRatio
     const advanceRepaidProvisional = Math.min(openingAdvanceBalance, allowanceShare)

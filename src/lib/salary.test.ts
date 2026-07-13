@@ -271,10 +271,11 @@ describe('salary.ts — edge cases', () => {
   })
 })
 
-// ─── Fully Paid mode (mig 281, user 2026-06-04 R5) ──────────────────
-// Only the 5% saving is deducted; the remaining 95% (post advance-offset)
-// pays as ONE standard payroll. Invoice side fully zeroed — nothing
-// accumulates into invoice_payout_pool. Statutory still keyed on B+K only.
+// ─── Fully Paid mode (mig 281 R5; redefined 2026-07-13) ─────────────
+// Staff-style payout: NO saving, no 75/25 — 100% of gross (post
+// advance-offset) pays as ONE standard payroll. Invoice side fully
+// zeroed — nothing accumulates into invoice_payout_pool. Statutory
+// still keyed on B+K only.
 
 describe('salary.ts — fully_paid mode', () => {
   const pool = calculatePool(testCTCRecords)
@@ -298,14 +299,14 @@ describe('salary.ts — fully_paid mode', () => {
       payrollStat, poisonInvoiceStat, 0, 0, 'fully_paid'
     )
 
-    // Saving unchanged: 5% on whole gross
+    // No saving at all — staff-style: 100% of gross flows to payroll
     expect(payout.grossAmount).toBeCloseTo(17829.94, 0)
-    expect(payout.savingAmount).toBeCloseTo(891.50, 0)
-    expect(payout.afterSaving).toBeCloseTo(16938.44, 0)
+    expect(payout.savingAmount).toBe(0)
+    expect(payout.afterSaving).toBeCloseTo(17829.94, 0)
 
-    // 95% of gross == afterSaving → all of it is payroll (no advance offset here)
-    expect(payout.payrollCalc).toBeCloseTo(16938.44, 1)
-    expect(payout.payrollGross).toBeCloseTo(16938.44, 1) // above min 14400 → no top-up
+    // 100% of gross is payroll (no advance offset here)
+    expect(payout.payrollCalc).toBeCloseTo(17829.94, 1)
+    expect(payout.payrollGross).toBeCloseTo(17829.94, 1) // above min 14400 → no top-up
     expect(payout.advanceAmount).toBe(0)
 
     // Invoice side fully zeroed despite poisoned lookup values
@@ -357,8 +358,9 @@ describe('salary.ts — fully_paid mode', () => {
     )
     expect(payout.advanceRepaid).toBeGreaterThan(0)
     expect(payout.advanceRepaid).toBeLessThanOrEqual(openingBalance)
-    // payroll = afterSaving − advanceRepaid (100% of after-offset)
-    expect(payout.payrollCalc).toBeCloseTo(payout.afterSaving - payout.advanceRepaid, 1)
+    // payroll = gross − advanceRepaid (no saving, 100% of after-offset)
+    expect(payout.savingAmount).toBe(0)
+    expect(payout.payrollCalc).toBeCloseTo(payout.grossAmount - payout.advanceRepaid, 1)
   })
 
   it('defaults to split mode when mode arg omitted (back-compat)', () => {

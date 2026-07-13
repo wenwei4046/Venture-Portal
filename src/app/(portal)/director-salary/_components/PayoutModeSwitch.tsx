@@ -13,12 +13,12 @@ interface Props {
 }
 
 /**
- * "Fully Paid" toggle (user 2026-06-04, R5). Recalculates the period in the
- * other mode:
- *  - fully_paid: only the 5% saving is deducted; the remaining 95% is paid
- *    as ONE standard payroll (75%+25% together). Basic+KPI with statutory,
- *    Allowance without. Nothing accumulates into the Invoice Pool.
- *  - split: classic 75% payroll / 25% invoice.
+ * "Fully Paid" toggle (user 2026-06-04 R5; redefined 2026-07-13). Recalculates
+ * the period in the other mode:
+ *  - fully_paid: staff-style payout — NO saving, no 75/25. 100% of gross is
+ *    paid as ONE standard payroll (Basic+KPI with statutory, Allowance
+ *    without). Nothing accumulates into the Invoice Pool.
+ *  - split: classic 5% saving, then 75% payroll / 25% invoice.
  */
 export default function PayoutModeSwitch({ period, currentMode, locked }: Props) {
   const router = useRouter()
@@ -50,7 +50,7 @@ export default function PayoutModeSwitch({ period, currentMode, locked }: Props)
         <span className="font-mono text-[10px] uppercase tracking-wider text-graphite">
           Mode:{' '}
           <em className={`not-italic ${currentMode === 'fully_paid' ? 'text-accent' : 'text-ledger'}`}>
-            {currentMode === 'fully_paid' ? 'FULLY PAID (95% one payroll)' : 'SPLIT 75 / 25'}
+            {currentMode === 'fully_paid' ? 'FULLY PAID (100% one payroll · no saving)' : 'SPLIT 75 / 25'}
           </em>
         </span>
         {!locked && !confirming && (
@@ -70,8 +70,8 @@ export default function PayoutModeSwitch({ period, currentMode, locked }: Props)
         <div className="flex items-center gap-2 bg-surface border border-accent-border rounded-md px-3 py-2 mt-1">
           <span className="font-serif italic text-graphite text-xs max-w-sm">
             {targetMode === 'fully_paid'
-              ? 'Recalculate this month as Fully Paid? Only the 5% saving is deducted — the remaining 95% pays out as one standard payroll (B+K with statutory, Allowance without). Nothing goes to the Invoice Pool.'
-              : 'Recalculate this month with the standard 75% payroll / 25% invoice split?'}
+              ? 'Recalculate this month as Fully Paid? No saving, no 75/25 — 100% of gross pays out as one standard payroll like a staff payslip (B+K with statutory, Allowance without). Nothing goes to the Invoice Pool.'
+              : 'Recalculate this month with the classic 5% saving + 75% payroll / 25% invoice split?'}
           </span>
           <button
             onClick={handleConfirm}

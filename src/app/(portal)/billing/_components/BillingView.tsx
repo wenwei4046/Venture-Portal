@@ -257,19 +257,35 @@ export default async function BillingView({ searchParams }: Props) {
       : 0
   const directorCostReady =
     directorSubmitted || (payrollSubmitted && Number(payrollRun?.director_salary_total ?? 0) > 0)
-  const directorByCompany: Array<{
+  interface DirectorByCompanyRow {
     company_id: string
     company_name: string
     company_short_code: string
+    // Component breakdown (2026-07-13) — legacy snapshots only carry total_ctc.
+    basic?: number | null
+    kpi?: number | null
+    allowance?: number | null
+    epf_er?: number | null
+    socso_er?: number | null
+    eis_er?: number | null
     total_ctc: number
-  }> = directorSubmitted
-    ? (((directorSubmission?.by_company ?? []) as unknown) as Array<{
-        company_id: string
-        company_name: string
-        company_short_code: string
-        total_ctc: number
-      }>).map(r => ({ ...r, total_ctc: Number(r.total_ctc) }))
+  }
+  const directorByCompany: DirectorByCompanyRow[] = directorSubmitted
+    ? (((directorSubmission?.by_company ?? []) as unknown) as DirectorByCompanyRow[]).map(r => ({
+        ...r,
+        basic: r.basic == null ? null : Number(r.basic),
+        kpi: r.kpi == null ? null : Number(r.kpi),
+        allowance: r.allowance == null ? null : Number(r.allowance),
+        epf_er: r.epf_er == null ? null : Number(r.epf_er),
+        socso_er: r.socso_er == null ? null : Number(r.socso_er),
+        eis_er: r.eis_er == null ? null : Number(r.eis_er),
+        total_ctc: Number(r.total_ctc),
+      }))
     : []
+  const directorSumOrDash = (pick: (r: DirectorByCompanyRow) => number | null | undefined) => {
+    const vals = directorByCompany.map(pick).filter((v): v is number => v != null)
+    return vals.length === 0 ? '—' : formatMoney(vals.reduce((s, v) => s + v, 0))
+  }
 
   const companyList = companies ?? []
   const companyMap = new Map(
@@ -464,7 +480,13 @@ export default async function BillingView({ searchParams }: Props) {
               <thead>
                 <tr>
                   <th>Subsidiary</th>
-                  <th className="right">CTC Contribution</th>
+                  <th className="right">Basic</th>
+                  <th className="right">KPI</th>
+                  <th className="right">Allowance</th>
+                  <th className="right">EPF ER</th>
+                  <th className="right">SOCSO ER</th>
+                  <th className="right">EIS ER</th>
+                  <th className="right">Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -474,11 +496,23 @@ export default async function BillingView({ searchParams }: Props) {
                       <div className="font-serif text-[15px] text-ink">{r.company_short_code}</div>
                       <div className="font-mono text-[11px] text-graphite mt-0.5">{r.company_name}</div>
                     </td>
-                    <td className="num">{formatMoney(r.total_ctc)}</td>
+                    <td className="num">{r.basic == null ? '—' : formatMoney(r.basic)}</td>
+                    <td className="num">{r.kpi == null ? '—' : formatMoney(r.kpi)}</td>
+                    <td className="num">{r.allowance == null ? '—' : formatMoney(r.allowance)}</td>
+                    <td className="num">{r.epf_er == null ? '—' : formatMoney(r.epf_er)}</td>
+                    <td className="num">{r.socso_er == null ? '—' : formatMoney(r.socso_er)}</td>
+                    <td className="num">{r.eis_er == null ? '—' : formatMoney(r.eis_er)}</td>
+                    <td className="num font-semibold">{formatMoney(r.total_ctc)}</td>
                   </tr>
                 ))}
                 <tr>
                   <td className="font-serif italic text-accent">Total</td>
+                  <td className="num font-semibold">{directorSumOrDash(r => r.basic)}</td>
+                  <td className="num font-semibold">{directorSumOrDash(r => r.kpi)}</td>
+                  <td className="num font-semibold">{directorSumOrDash(r => r.allowance)}</td>
+                  <td className="num font-semibold">{directorSumOrDash(r => r.epf_er)}</td>
+                  <td className="num font-semibold">{directorSumOrDash(r => r.socso_er)}</td>
+                  <td className="num font-semibold">{directorSumOrDash(r => r.eis_er)}</td>
                   <td className="num font-semibold">
                     {formatMoney(directorByCompany.reduce((s, r) => s + r.total_ctc, 0))}
                   </td>
