@@ -9,6 +9,7 @@ import CreatePeriodButton from '../_components/CreatePeriodButton'
 import SubmitToFinanceButton from '../_components/SubmitToFinanceButton'
 import ReopenPayrollButton from '../_components/ReopenPayrollButton'
 import MoreActionsDropdown from '../_components/MoreActionsDropdown'
+import { deletePayrollPeriod } from '../actions'
 import PeriodPicker from '../_components/PeriodPicker'
 import RequestPayrollPaymentButton, {
   type RequestState,
@@ -413,6 +414,18 @@ export default async function PayrollGridPage({ params }: PageProps) {
           </Link>
         </div>
         <MoreActionsDropdown
+          dangerAction={
+            phase === 'drafting' && gridRows.length > 0
+              ? {
+                  label: `Delete this month (${gridRows.length} rows)`,
+                  confirmText:
+                    `Delete ALL ${gridRows.length} draft payroll rows for ${formatPeriodLabel(period)}? ` +
+                    `This wipes the whole month — use it for test/wrongly-created periods. ` +
+                    `Re-create via Import InfoTech or Create Period.`,
+                  action: deletePayrollPeriod.bind(null, period),
+                }
+              : undefined
+          }
           actions={[
             {
               label: 'Bank CSV (Alliance Bank)',

@@ -235,6 +235,49 @@ export async function deletePayrollRows(
 }
 
 /**
+ * Delete the ENTIRE month's payroll — every draft row for the period.
+ * For wiping test/wrongly-created months before anything downstream exists.
+ *
+ * Blocked when a live (non-rejected) payroll_run exists: the month has been
+ * submitted to Finance and its total is referenced by billing/payment flows —
+ * reopen the run first, then delete. Only draft rows are removed, so any
+ * submitted/paid rows (which can only exist under a live run anyway) survive.
+ */
+export async function deletePayrollPeriod(period: string): Promise<{ deleted: number }> {
+  await requireRole(['hr', 'principal'])
+  const supabase = await createClient()
+
+  await assertPeriodOpen(supabase, period)
+
+  const { data: run, error: runErr } = await supabase
+    .from('payroll_runs')
+    .select('id, status')
+    .eq('period_month', period)
+    .neq('status', 'rejected')
+    .maybeSingle()
+  if (runErr) throw new Error(`Failed to check payroll run: ${runErr.message}`)
+  if (run) {
+    throw new Error(
+      `Cannot delete this month — its payroll run is already ${run.status}. Reopen the run first, then delete.`,
+    )
+  }
+
+  const { error, count } = await supabase
+    .from('hr_monthly_payroll')
+    .delete({ count: 'exact' })
+    .eq('period_month', period)
+    .eq('status', 'draft')
+
+  if (error) throw new Error(`Failed to delete payroll month: ${error.message}`)
+
+  revalidatePath(`/hr-costing/payroll/${period}`)
+  revalidatePath('/hr-costing/payroll')
+  revalidatePath('/dashboard')
+
+  return { deleted: count ?? 0 }
+}
+
+/**
  * Create rows for every active staff in the given period.
  * Idempotent — relies on uq_monthly_payroll_staff_period to skip existing.
  * Same behavior as migration 126 backfill, now callable from the UI.

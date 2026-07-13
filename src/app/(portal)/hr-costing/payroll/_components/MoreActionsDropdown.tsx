@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface Action {
   label: string
@@ -8,12 +9,25 @@ interface Action {
   title?: string
 }
 
-interface Props {
-  actions: Action[]
+interface DangerAction {
+  label: string
+  /** window.confirm text shown before running. */
+  confirmText: string
+  /** Bound server action (e.g. deletePayrollPeriod.bind(null, period)). */
+  action: () => Promise<{ deleted: number }>
 }
 
-export default function MoreActionsDropdown({ actions }: Props) {
+interface Props {
+  actions: Action[]
+  /** Optional destructive item rendered last, separated by a hairline. */
+  dangerAction?: DangerAction
+}
+
+export default function MoreActionsDropdown({ actions, dangerAction }: Props) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -34,6 +48,21 @@ export default function MoreActionsDropdown({ actions }: Props) {
       document.removeEventListener('keydown', onKey)
     }
   }, [open])
+
+  function handleDanger() {
+    if (!dangerAction) return
+    if (!window.confirm(dangerAction.confirmText)) return
+    setError(null)
+    startTransition(async () => {
+      try {
+        await dangerAction.action()
+        setOpen(false)
+        router.refresh()
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Action failed')
+      }
+    })
+  }
 
   return (
     <div ref={ref} className="relative">
@@ -64,6 +93,23 @@ export default function MoreActionsDropdown({ actions }: Props) {
               {a.label}
             </a>
           ))}
+          {dangerAction ? (
+            <>
+              <div className="border-t border-hairline my-1" />
+              <button
+                type="button"
+                role="menuitem"
+                onClick={handleDanger}
+                disabled={isPending}
+                className="block w-full text-left px-4 py-2 font-serif italic text-sm text-danger hover:bg-surface-2 transition-colors disabled:opacity-50"
+              >
+                {isPending ? 'Deleting…' : dangerAction.label}
+              </button>
+              {error ? (
+                <p className="px-4 py-2 text-xs font-sans text-danger">{error}</p>
+              ) : null}
+            </>
+          ) : null}
         </div>
       ) : null}
     </div>
