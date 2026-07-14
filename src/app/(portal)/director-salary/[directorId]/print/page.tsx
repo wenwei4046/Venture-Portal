@@ -73,9 +73,20 @@ export default async function PrintPayoutPage({ params, searchParams }: Props) {
             font-family: Georgia, serif; font-style: italic; font-size: 14px;
           }
           .print-btn:hover { background: #B54A22; }
+          .back-btn {
+            position: fixed; top: 20px; left: 20px;
+            background: #F3ECDD; color: #1C160F; border: 1px solid #C6B99E;
+            padding: 10px 20px; border-radius: 6px; cursor: pointer;
+            font-family: Georgia, serif; font-style: italic; font-size: 14px;
+            text-decoration: none;
+          }
+          .back-btn:hover { background: #EAE1CC; }
         `}</style>
       </head>
       <body>
+        <a href={`/director-salary/${directorId}?period=${period}`} className="back-btn no-print">
+          ← Back to Payout
+        </a>
         <PrintButton />
 
         <div className="header">

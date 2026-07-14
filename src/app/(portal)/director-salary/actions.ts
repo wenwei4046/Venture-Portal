@@ -62,8 +62,6 @@ export interface BatchCTCInput {
   basic: number
   kpi: number
   allowance: number
-  /** Directors this company's CTC covers — ER statutory = heads × lookup(B+K ÷ heads). */
-  heads: number
 }
 
 export async function batchSaveCTC(period: string, records: BatchCTCInput[]) {
@@ -97,6 +95,16 @@ export async function batchSaveCTC(period: string, records: BatchCTCInput[]) {
   }
 
   if (keep.length > 0) {
+    // Heads is a company rule (companies.director_heads, e.g. HC = 2), not a
+    // grid input — stamp it server-side so SOCSO/EIS per-person caps always
+    // apply regardless of what the client sends.
+    const { data: headRows, error: headErr } = await supabase
+      .from('companies')
+      .select('id, director_heads')
+      .in('id', keep.map(r => r.companyId))
+    if (headErr) throw new Error(`Failed to read company heads: ${headErr.message}`)
+    const headsByCompany = new Map((headRows ?? []).map(c => [c.id, Math.max(1, Number(c.director_heads ?? 1))]))
+
     const rows = keep.map(r => ({
       director_id: r.directorId,
       company_id: r.companyId,
@@ -104,7 +112,7 @@ export async function batchSaveCTC(period: string, records: BatchCTCInput[]) {
       basic: r.basic,
       kpi: r.kpi,
       allowance: r.allowance,
-      heads: Math.max(1, Math.round(r.heads ?? 1)),
+      heads: headsByCompany.get(r.companyId) ?? 1,
       created_by: user.id,
     }))
 

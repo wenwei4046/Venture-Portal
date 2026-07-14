@@ -17,6 +17,8 @@ interface Company {
   id: string
   name: string
   short_code: string
+  /** Company rule (companies.director_heads): directors this CTC covers — HC = 2. */
+  director_heads: number
 }
 
 interface ExistingCTC {
@@ -25,7 +27,6 @@ interface ExistingCTC {
   basic: number
   kpi: number
   allowance: number
-  heads: number
   employer_epf: number | null
   employer_socso: number | null
   employer_eis: number | null
@@ -68,16 +69,6 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
     return map
   })
 
-  // Heads per company — how many directors that company's CTC covers.
-  // SOCSO/EIS cap per person, so ER statutory = heads × lookup(B+K ÷ heads).
-  const [headsByCompany, setHeadsByCompany] = useState<Record<string, number>>(() => {
-    const map: Record<string, number> = {}
-    for (const ctc of existingCTC) {
-      map[ctc.company_id] = Math.max(map[ctc.company_id] ?? 1, ctc.heads || 1)
-    }
-    return map
-  })
-
   // Seed ER breakdowns from saved rows so initial render matches DB.
   const [erByCompany, setErByCompany] = useState<Record<string, ERBreakdown>>(() => {
     const map: Record<string, ERBreakdown> = {}
@@ -107,14 +98,6 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
     setStatus('idle')
   }
 
-  function getHeads(compId: string) {
-    return Math.max(1, headsByCompany[compId] ?? 1)
-  }
-
-  function setHeads(compId: string, val: number) {
-    setHeadsByCompany(prev => ({ ...prev, [compId]: Math.max(1, Math.round(val) || 1) }))
-    setStatus('idle')
-  }
 
   // Debounced live statutory lookup: when basic or kpi changes, fetch ER from
   // lookup_epf/socso/eis and update erByCompany. Uses same RPCs the DB trigger
@@ -133,8 +116,9 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
           continue
         }
         // Per-head lookup: SOCSO/EIS cap per person, so a 2-director company
-        // contributes 2 caps. Mirrors compute_director_ctc_total in the DB.
-        const heads = Math.max(1, headsByCompany[comp.id] ?? 1)
+        // contributes 2 caps. Heads is a company rule (companies.director_heads,
+        // HC = 2) — mirrors what batchSaveCTC stamps + the DB trigger computes.
+        const heads = Math.max(1, comp.director_heads ?? 1)
         const bkPerHead = bk / heads
         const [epfRes, socsoRes, eisRes] = await Promise.all([
           supabase.rpc('lookup_epf', { p_wages: bkPerHead }),
@@ -150,7 +134,7 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
     }, 300)
 
     return () => clearTimeout(handle)
-  }, [values, headsByCompany, companies])
+  }, [values, companies])
 
   // Totals
   const companyRows = companies.map(c => ({
@@ -182,7 +166,6 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
         basic: getValue(comp.id, 'basic'),
         kpi: getValue(comp.id, 'kpi'),
         allowance: getValue(comp.id, 'allowance'),
-        heads: getHeads(comp.id),
       })
     }
 
@@ -213,7 +196,6 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
               <th className="text-right py-3 pr-4 font-medium">Basic</th>
               <th className="text-right py-3 pr-4 font-medium">KPI</th>
               <th className="text-right py-3 pr-4 font-medium">Allowance</th>
-              <th className="text-right py-3 pr-4 font-medium" title="Directors this company's CTC covers — SOCSO/EIS cap per person">Heads</th>
               <th className="text-right py-3 pr-4 font-medium">ER Statutory</th>
               <th className="text-right py-3 pr-4 font-medium">Total</th>
             </tr>
@@ -245,17 +227,6 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
                       />
                     </td>
                   ))}
-                  <td className="py-3 pr-4 text-right">
-                    <input
-                      type="number"
-                      step="1"
-                      min="1"
-                      value={getHeads(comp.id)}
-                      onChange={e => setHeads(comp.id, parseInt(e.target.value, 10) || 1)}
-                      title="Directors this company's CTC covers"
-                      className="w-14 px-2 py-1.5 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink text-right focus:outline-none focus:border-accent-border"
-                    />
-                  </td>
                   <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
                     {er.total > 0 ? (
                       <span className="relative inline-block group cursor-help border-b border-dashed border-hairline">
@@ -290,7 +261,6 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
               <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">
                 {formatMoneyBare(totalAllow)}
               </td>
-              <td className="py-3 pr-4" />
               <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite font-semibold">
                 {formatMoneyBare(totalER)}
               </td>

@@ -47,7 +47,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
     { data: liveByCompany },
   ] = await Promise.all([
     supabase.from('directors').select('id, name, code, weightage, min_payout').eq('status', 'active').order('code'),
-    supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('name'),
+    supabase.from('companies').select('id, name, short_code, director_heads').eq('is_active', true).order('name'),
     supabase.from('director_ctc').select('*').eq('period_month', period),
     supabase.from('director_payouts').select('*').eq('period_month', period).order('gross_amount', { ascending: false }),
     supabase.rpc('get_director_payout_summary', { p_period: period }),
@@ -182,7 +182,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
 
           {/* CTC Input Section */}
           <section className="mb-16">
-            <h2 className="font-serif text-2xl text-ink mb-1">CTC Input</h2>
+            <h2 className="font-serif text-2xl text-ink mb-1">Pool Breakdown (Billing)</h2>
 
             <CTCInputGrid
               mode={payoutMode}
@@ -195,6 +195,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
                 id: c.id,
                 name: c.name,
                 short_code: c.short_code,
+                director_heads: Number(c.director_heads ?? 1),
               }))}
               existingCTC={(ctcRows ?? []).map(r => ({
                 director_id: r.director_id,
@@ -202,7 +203,6 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
                 basic: Number(r.basic),
                 kpi: Number(r.kpi),
                 allowance: Number(r.allowance),
-                heads: Number(r.heads ?? 1),
                 employer_epf: r.employer_epf ? Number(r.employer_epf) : null,
                 employer_socso: r.employer_socso ? Number(r.employer_socso) : null,
                 employer_eis: r.employer_eis ? Number(r.employer_eis) : null,
