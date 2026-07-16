@@ -9,7 +9,7 @@ import { assertPeriodOpen } from '@/lib/period-lock'
 // ─── Submit HR cost summary for a period (HR) ────────────────────────────────
 
 export async function submitHRCostSummary(formData: FormData) {
-  const user = await requireRole(['hr'])
+  const user = await requireRole(['hr', 'principal'])
   const supabase = await createClient()
 
   const rawPeriod = (formData.get('period_month') as string) ?? ''
@@ -86,7 +86,7 @@ export async function submitHRCostSummary(formData: FormData) {
 // movement here — billing already consumes the snapshot.
 
 export async function executeHrCosting(formData: FormData) {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''

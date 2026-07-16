@@ -4,6 +4,18 @@ Overview
 9 Modules + Settings + Approval (横切)
 Permission Types: 看 (Read), 写 (Write), 批 (Approve), 设定 (Configure)
 ---
+⚡ AMENDMENT 2026-07-16 — Unified Portal (one login, all tabs)
+Principal 现在拥有全模块的完整写权限(write parity):下表中标 "✅ 写" 给 Finance / HR
+而 Principal 标 ❌ 的格子,一律视为 Principal 也 ✅ 写。落地在三层:
+1. RLS 写 policy 全部加入 'principal'(migration `20260716092818_principal_full_access`)
+2. SECURITY DEFINER RPC 的 role check(create_loan_with_approval、generate_invoices_from_request、
+   generate_pv_for_dept_request、reject_invoice_request、request_loan_cancel)放行 principal
+3. Server Actions / 页面 requireRole + 页面按钮 gate 全部含 principal
+Sidebar 对 Principal 显示全部 tab(HR Costing group、OPEX 带 dept 切换等)。
+Principal 提交的审批仍走 Approvals queue(self-approve 允许 — Principal 是 owner,queue 留审计轨迹)。
+Dept Manager 的 request 提交 flow(dept expense / invoice request)仍是 dm-only — Principal 是审批方。
+Finance / HR / Dept Manager 之间的可见性隔离(个人薪资、Director Pool 等)完全不变。
+---
 ROLE SUMMARY
 Role	一句话	典型用户
 Principal	看全局、定规则、批东西	Loo (Chairman)

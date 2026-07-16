@@ -57,7 +57,7 @@ export default async function OverduePage() {
   }
   const activePeriods = Array.from(activeByPeriod.keys()).sort().reverse()
 
-  const canFinanceAct = user.role === 'finance'
+  const canFinanceAct = user.role === 'finance' || user.role === 'principal'
 
   return (
     <div>

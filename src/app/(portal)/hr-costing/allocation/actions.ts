@@ -13,14 +13,14 @@ import { validateAllocationRows, type AllocationRow } from '@/lib/staff-allocati
 // (staff, period) then insert the new ones. Percentages arrive as 0–100 form
 // values and are stored as 0–1 fractions (hr_staff_allocation.allocation_pct,
 // DECIMAL(7,6)). The unallocated remainder is HV's own share — not stored,
-// never billed. RLS: writes are HR-only; Principal views read-only.
+// never billed. RLS: writes are HR + Principal (unified portal 2026-07-16).
 
 export async function saveStaffAllocation(
   staffId: string,
   periodMonth: string,
   rows: AllocationRow[],
 ): Promise<void> {
-  const user = await requireRole(['hr'])
+  const user = await requireRole(['hr', 'principal'])
   const supabase = await createClient()
 
   if (!staffId) throw new Error('Staff id is required')
@@ -63,7 +63,7 @@ export async function saveStaffAllocation(
 export async function copyAllocationsFromLastMonth(periodMonth: string): Promise<{
   copiedStaff: number
 }> {
-  const user = await requireRole(['hr'])
+  const user = await requireRole(['hr', 'principal'])
   const supabase = await createClient()
 
   const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')

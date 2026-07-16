@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
@@ -17,15 +18,37 @@ interface PayrollRow {
   employee_name: string | null
 }
 
-export default async function OpexPage() {
-  const user = await requireRole(['dept_manager'])
-  if (!user.department_id) notFound()
+interface Props {
+  searchParams: Promise<{ dept?: string }>
+}
 
+export default async function OpexPage({ searchParams }: Props) {
+  const user = await requireRole(['dept_manager', 'principal'])
   const supabase = await createClient()
+
+  // Dept Manager is pinned to their own department; Principal picks any
+  // department via ?dept= (unified portal 2026-07-16). Venture Office is the
+  // internal pool dept — no payroll, excluded like the dashboard does.
+  let deptId = user.department_id
+  let allDepts: { id: string; name: string }[] = []
+  if (user.role === 'principal') {
+    const { data: deptRows } = await supabase
+      .from('departments')
+      .select('id, name')
+      .neq('name', 'Venture Office')
+      .order('name')
+    allDepts = (deptRows ?? []) as { id: string; name: string }[]
+    const { dept: deptParam } = await searchParams
+    deptId = allDepts.some((d) => d.id === deptParam)
+      ? (deptParam as string)
+      : allDepts[0]?.id ?? null
+  }
+  if (!deptId) notFound()
+
   const { data: dept } = await supabase
     .from('departments')
     .select('name')
-    .eq('id', user.department_id)
+    .eq('id', deptId)
     .single()
   if (!dept) notFound()
 
@@ -35,7 +58,7 @@ export default async function OpexPage() {
   // RPC bypasses RLS with internal role check (own-dept for dept_manager).
   // See migration 20260101000172_get_dept_opex_rows.sql.
   const { data: rowsRaw } = await supabase.rpc('get_dept_opex_rows', {
-    p_dept_id: user.department_id,
+    p_dept_id: deptId,
     p_period_start: trendStart,
     p_period_end: period,
   })
@@ -107,6 +130,24 @@ export default async function OpexPage() {
           </p>
         </div>
       </div>
+
+      {allDepts.length > 0 ? (
+        <div className="flex flex-wrap gap-2 mb-8">
+          {allDepts.map((d) => (
+            <Link
+              key={d.id}
+              href={`/opex?dept=${d.id}`}
+              className={
+                d.id === deptId
+                  ? 'border border-accent-border bg-accent-bg text-accent font-serif italic text-sm px-3 py-1 rounded-md'
+                  : 'border border-hairline bg-surface text-graphite hover:text-ink hover:bg-surface-2 font-sans text-sm px-3 py-1 rounded-md transition-colors'
+              }
+            >
+              {d.name}
+            </Link>
+          ))}
+        </div>
+      ) : null}
 
       <section className="border border-hairline rounded-md bg-surface p-6 mb-10">
         <h2 className="font-serif italic text-ink text-md mb-1">12-month trend</h2>

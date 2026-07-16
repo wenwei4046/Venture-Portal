@@ -41,7 +41,7 @@ export default async function StatementDetailPage({ params }: Props) {
   const invoiceLines = lineList.filter((l) => l.line_type === 'invoice')
   const contraLines = lineList.filter((l) => l.line_type === 'contra')
 
-  const canFinanceAct = user.role === 'finance'
+  const canFinanceAct = user.role === 'finance' || user.role === 'principal'
   const isDraft = statement.status === 'draft'
   const isIssued = statement.status === 'issued'
 

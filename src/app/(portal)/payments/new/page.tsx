@@ -24,7 +24,7 @@ interface Props {
 }
 
 export default async function NewPaymentPage({ searchParams }: Props) {
-  await requireRole(['finance'])
+  await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const { invoice_id: invoiceId, preset, mode } = await searchParams

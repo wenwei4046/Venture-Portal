@@ -13,7 +13,7 @@ import { segmentForBillingMode, lineAttributions, type SegmentAttribution } from
 // ─── Create payment voucher (Finance) ────────────────────────────────────────
 
 export async function createPaymentVoucher(formData: FormData) {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const voucherType = formData.get('voucher_type') as string
@@ -662,7 +662,7 @@ export async function createPaymentVoucher(formData: FormData) {
 // ─── Submit for approval (Finance) ───────────────────────────────────────────
 
 export async function submitForApproval(formData: FormData) {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -768,7 +768,7 @@ export async function approveVoucher(formData: FormData) {
 // Transaction-specific links (invoice/loan/fund_source/repayment_breakdown) are
 // deliberately NOT copied — a copy is a new expense, not a re-run of a repayment.
 export async function copyPaymentVoucher(formData: FormData): Promise<void> {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const sourceId = (formData.get('voucher_id') as string) ?? ''
@@ -1047,7 +1047,7 @@ export async function updatePaymentVoucher(formData: FormData) {
 // ─── Void voucher (Finance, only draft/pending) ─────────────────────────────
 
 export async function voidVoucher(formData: FormData) {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const id = formData.get('id') as string

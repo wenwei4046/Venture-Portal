@@ -80,7 +80,8 @@ export default async function LoanDetailPage({ params }: Props) {
     ? dayjs(loan.disbursement_date).add(tenureMonths, 'month')
     : null
 
-  const canRecordRepayment = user.role === 'finance' && loan.status === 'active'
+  const isFinanceSide = user.role === 'finance' || user.role === 'principal'
+  const canRecordRepayment = isFinanceSide && loan.status === 'active'
   // Item 3: Finance can cancel pending OR active loans. Active cancellation
   // requires Principal approval downstream and is blocked when repayments
   // already exist (RPC guards this too).
@@ -88,7 +89,7 @@ export default async function LoanDetailPage({ params }: Props) {
   const isActive = loan.status === 'active'
   const noRepayments = repaymentList.length === 0
   const canCancelLoan =
-    user.role === 'finance' &&
+    isFinanceSide &&
     (isPendingApproval || (isActive && noRepayments))
 
   return (
@@ -283,7 +284,7 @@ export default async function LoanDetailPage({ params }: Props) {
             </p>
           </form>
         ) : null}
-        {isActive && !noRepayments && user.role === 'finance' ? (
+        {isActive && !noRepayments && isFinanceSide ? (
           <p className="text-xs text-muted mt-3 italic font-serif">
             Cannot cancel — {repaymentList.length} repayment
             {repaymentList.length === 1 ? '' : 's'} recorded. Reverse those first.

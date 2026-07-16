@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default async function EditContractPage({ params }: Props) {
-  await requireRole(['finance'])
+  await requireRole(['finance', 'principal'])
   const supabase = await createClient()
   const { id } = await params
 

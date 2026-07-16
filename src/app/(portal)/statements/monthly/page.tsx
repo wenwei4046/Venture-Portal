@@ -37,7 +37,7 @@ export default async function MonthlyStatementsPage() {
   const issuedCount = statementList.filter((s) => s.status === 'issued').length
   const paidCount = statementList.filter((s) => s.status === 'paid').length
 
-  const canGenerate = user.role === 'finance'
+  const canGenerate = user.role === 'finance' || user.role === 'principal'
 
   return (
     <div>

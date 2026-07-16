@@ -110,7 +110,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
   const isMatured = source.status === 'matured'
   const isRepaid = source.status === 'repaid'
   const isPending = source.status === 'pending_approval'
-  const canFinanceEdit = user.role === 'finance'
+  const canFinanceEdit = user.role === 'finance' || user.role === 'principal'
 
   const maturityDays = source.maturity_date
     ? dayjs(source.maturity_date).diff(dayjs(), 'day')

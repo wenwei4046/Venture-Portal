@@ -9,7 +9,7 @@ export async function generateDeptRequestPv(args: {
   payFromAccountId: string
   paymentMethod: string
 }) {
-  await requireRole(['finance'])
+  await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   if (!args.payFromAccountId) throw new Error('Bank account is required')

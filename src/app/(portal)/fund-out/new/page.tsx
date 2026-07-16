@@ -7,7 +7,7 @@ import { bsAccountsForDisbursement } from '@/lib/loan-disbursement'
 import NewLoanForm from '../_components/NewLoanForm'
 
 export default async function NewLoanPage() {
-  await requireRole(['finance'])
+  await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const [

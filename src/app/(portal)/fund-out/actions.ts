@@ -21,7 +21,7 @@ import type { Json } from '@/lib/supabase/database.types'
 export type CreateLoanResult = { error: string } | undefined
 
 export async function createLoan(formData: FormData): Promise<CreateLoanResult> {
-  await requireRole(['finance'])
+  await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const companyId = (formData.get('company_id') as string) ?? ''
@@ -177,7 +177,7 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
 // ─── Record repayment (Finance) ───────────────────────────────────────────────
 
 export async function recordRepayment(formData: FormData) {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const loanId = (formData.get('loan_id') as string) ?? ''
@@ -337,7 +337,7 @@ export async function recordRepayment(formData: FormData) {
 // proven recordRepayment logic (one call per non-zero type). Mirrors the
 // outgoing payment form's "this is a loan repayment" option.
 export async function recordLoanRepaymentReceived(formData: FormData) {
-  await requireRole(['finance'])
+  await requireRole(['finance', 'principal'])
   const loanId = (formData.get('loan_id') as string) ?? ''
   const paymentDate = (formData.get('payment_date') as string) ?? ''
   const bankAccountId = (formData.get('bank_account_id') as string) || ''
@@ -428,7 +428,7 @@ export async function amendLoan(formData: FormData): Promise<{ error: string } |
 //                        and reverses the bank/venture-pool/JE side.
 
 export async function cancelLoan(formData: FormData) {
-  await requireRole(['finance'])
+  await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
