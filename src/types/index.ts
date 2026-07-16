@@ -11,6 +11,9 @@ export interface User {
   is_active: boolean
   created_at: string
   updated_at: string
+  // Set only while a Principal is masked by the view-as switcher: `role`
+  // carries the masked role driving gates/UI, `actualRole` the real one.
+  actualRole?: UserRole
 }
 
 export interface Company {
