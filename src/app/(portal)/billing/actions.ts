@@ -86,7 +86,7 @@ export type CreateInvoiceMode = (typeof CREATE_INVOICE_MODES)[number]
 export type BillableToKind = 'subsidiary' | 'director' | 'dept_pool' | 'freetext'
 
 export async function createManualInvoice(formData: FormData): Promise<void> {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   // Item 5: 4-way billable target. Subsidiary still uses the existing
@@ -189,7 +189,7 @@ export interface InvoiceLineInput {
 // invoice (header + line items + who-to-bill + mode) as a fresh draft, then
 // edit the amount / description via the inline Edit modal before issuing.
 export async function copyInvoice(formData: FormData): Promise<void> {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const sourceId = (formData.get('invoice_id') as string) ?? ''
@@ -283,7 +283,7 @@ export async function createMultiLineInvoice(
     lines: InvoiceLineInput[]
   },
 ): Promise<{ id: string; invoice_no: string | null }> {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   if (!['subsidiary', 'director', 'dept_pool', 'freetext'].includes(payload.billableType)) {
@@ -502,7 +502,7 @@ export async function fetchStaffAllocationByCompany(
 export async function generateMonthlyInvoices(
   formData: FormData
 ): Promise<GenerateInvoicesResult> {
-  await requireRole(['finance'])
+  await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const rawPeriod = (formData.get('period_month') as string) ?? ''
@@ -548,7 +548,7 @@ export async function generateMonthlyInvoices(
 // ─── Create marketing project contract (Finance) ────────────────────────────
 
 export async function createContract(formData: FormData) {
-  const user = await requireRole(['finance', 'dept_manager'])
+  const user = await requireRole(['finance', 'dept_manager', 'principal'])
   const supabase = await createClient()
 
   const companyId = (formData.get('company_id') as string) ?? ''
@@ -625,7 +625,7 @@ export async function createContract(formData: FormData) {
 // ─── Update marketing project contract (Finance) ────────────────────────────
 
 export async function updateContract(formData: FormData) {
-  await requireRole(['finance'])
+  await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -663,7 +663,7 @@ export async function updateContract(formData: FormData) {
 // ─── Credit Notes (Finance creates, Principal approves) ─────────────────────
 
 export async function createCreditNote(formData: FormData) {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const invoiceId = (formData.get('invoice_id') as string) ?? ''
@@ -736,7 +736,7 @@ export async function createCreditNote(formData: FormData) {
 // ─── Delete draft invoice (Finance — soft to recover from mistakes) ───────
 
 export async function deleteDraftInvoice(formData: FormData): Promise<void> {
-  await requireRole(['finance'])
+  await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const id = String(formData.get('id') ?? '').trim()
@@ -773,7 +773,7 @@ export async function deleteDraftInvoice(formData: FormData): Promise<void> {
 // them = delete + recreate. Per user request 2026-05-27.
 
 export async function updateDraftInvoice(formData: FormData): Promise<void> {
-  await requireRole(['finance'])
+  await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const id = String(formData.get('id') ?? '').trim()
@@ -918,7 +918,7 @@ export async function updateDraftInvoiceFull(payload: {
   freetextEmail?: string
   lines: InvoiceLineInput[]
 }): Promise<void> {
-  await requireRole(['finance'])
+  await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   if (!payload.id) throw new Error('Invoice id is required')
@@ -1030,7 +1030,7 @@ export async function settleInvoicesConsolidated(payload: {
   bankAccountId: string
   paymentDate: string // YYYY-MM-DD
 }): Promise<{ voucherId: string; voucherNo: string; settledCount: number; total: number }> {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   if (!payload.invoiceIds?.length) throw new Error('No invoices selected')
@@ -1344,7 +1344,7 @@ export async function generateConsolidatedPayrollInvoices(
   periodMonth: string,
   categoryCode: string | null,
 ): Promise<{ generated: number; companies: string[] }> {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
   const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
   await assertPeriodOpen(supabase, period)
@@ -1516,7 +1516,7 @@ export async function generateOwnShareInvoice(
   periodMonth: string,
   categoryCode: string | null,
 ): Promise<{ generated: number; total: number }> {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
   const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
   await assertPeriodOpen(supabase, period)
@@ -1614,7 +1614,7 @@ export async function generateOwnShareInvoice(
 }
 
 export async function approveInvoice(formData: FormData) {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -1796,7 +1796,7 @@ export async function approveInvoice(formData: FormData) {
 }
 
 export async function approveInvoicesForPeriod(formData: FormData) {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const rawPeriod = (formData.get('period_month') as string) ?? ''

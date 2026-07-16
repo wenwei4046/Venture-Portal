@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import ContractForm from '../../_components/ContractForm'
 
 export default async function NewContractPage() {
-  const user = await requireRole(['finance', 'dept_manager'])
+  const user = await requireRole(['finance', 'dept_manager', 'principal'])
   const supabase = await createClient()
 
   // Dept Manager restriction: must be Marketing's manager (it's the only

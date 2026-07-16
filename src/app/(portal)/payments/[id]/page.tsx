@@ -81,7 +81,9 @@ export default async function PaymentDetailPage({ params }: Props) {
   }
 
   const isPrincipal = user.role === 'principal'
-  const isFinance = user.role === 'finance'
+  // Unified portal (2026-07-16): Principal gets the Finance-side voucher
+  // actions too (copy / mark paid / void).
+  const isFinance = user.role === 'finance' || isPrincipal
 
   // Post-mig 238: PVS rows reference chart_of_accounts directly via account_code
   // (the COA `code` IS the GL). Pool + account name both come from the sources

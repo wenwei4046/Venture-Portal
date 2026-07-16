@@ -326,7 +326,7 @@ export async function createPayrollPeriod(period: string): Promise<{ created: nu
  *   - there's already an active request (UNIQUE partial index raises 23505)
  */
 export async function requestPayrollPayment(runId: string): Promise<string> {
-  const user = await requireRole(['hr'])
+  const user = await requireRole(['hr', 'principal'])
   const supabase = await createClient()
 
   const { data: run, error: readErr } = await supabase
@@ -384,7 +384,7 @@ export async function cancelPayrollPaymentRequest(
   requestId: string,
   reason: string,
 ): Promise<void> {
-  const user = await requireRole(['hr'])
+  const user = await requireRole(['hr', 'principal'])
   const supabase = await createClient()
 
   const trimmed = reason.trim()

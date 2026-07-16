@@ -16,7 +16,7 @@ import {
 // ─── Generate monthly statements (Finance) ───────────────────────────────────
 
 export async function generateStatements(formData: FormData) {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const periodMonth = (formData.get('period_month') as string) ?? ''
@@ -225,7 +225,7 @@ export async function generateStatements(formData: FormData) {
 // Issuing or marking paid MUST NOT write to any pool ledger.
 
 export async function issueStatement(formData: FormData) {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -264,7 +264,7 @@ export async function issueStatement(formData: FormData) {
 // DO NOT add any hv_fund / dept_pool / invoice_payout_pool writes here.
 
 export async function markStatementPaid(formData: FormData) {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''

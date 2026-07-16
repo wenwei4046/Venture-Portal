@@ -73,6 +73,7 @@ function isGroup(entry: NavEntry): entry is NavGroup {
 }
 
 const isHR = (role: UserRole) => role === 'hr'
+const isHRorPrincipal = (role: UserRole) => role === 'hr' || role === 'principal'
 const isPrincipalOrFinance = (role: UserRole) =>
   role === 'principal' || role === 'finance'
 
@@ -84,9 +85,8 @@ const navEntries: NavEntry[] = [
   { href: '/approvals', label: 'Approvals', section: 'Daily Operations', visible: canApprove },
   // /payments/new is Receipt's own entry below — keep Payments off it.
   { href: '/payments', label: 'Payments', section: 'Daily Operations', notPaths: ['/payments/new'], visible: canAccessTreasury },
-  // Receive-money form (settle invoice / record loan repayment / open an OR).
-  // The page is requireRole(['finance']) — hidden from Principal until that
-  // gate is opened up.
+  // Receive-money form (settle invoice / record loan repayment / open an OR)
+  // lives at /payments/new?mode=receipt — Finance + Principal.
   // Receipt ledger (2026-06-12): credit vouchers (HV-OR-*) only, same
   // tabs/filters as Payments; its Create receipt button opens the
   // credit-locked form at /payments/new?mode=receipt.
@@ -94,26 +94,29 @@ const navEntries: NavEntry[] = [
   // /statements IS the invoices landing (Phase 7 Step 11 merge); the monthly
   // statements list lives at /statements/monthly (inside Fund In / Out below).
   { href: '/statements', label: 'Invoice', section: 'Daily Operations', exact: true, visible: canAccessTreasury },
+  // HR Costing group covers all monthly sub-pages. HR's daily workspace;
+  // Principal gets the same group since the unified portal (2026-07-16) —
+  // replaces the old flat /hr-costing link under Departments.
+  {
+    label: 'HR Costing',
+    section: 'Daily Operations',
+    visible: isHRorPrincipal,
+    children: [
+      { href: '/hr-costing', label: 'Overview', exact: true, visible: isHRorPrincipal },
+      { href: '/hr-costing/payroll', label: 'Payroll', visible: isHRorPrincipal },
+      { href: '/hr-costing/payment', label: 'Payment', visible: isHRorPrincipal },
+      { href: '/hr-costing/staff', label: 'Staff', visible: isHRorPrincipal },
+    ],
+  },
+  // HR reaches Director Salary here; Principal reaches it via the Director
+  // group under Departments.
+  { href: '/director-salary', label: 'Director Salary', section: 'Daily Operations', visible: isHR },
   // ── Fund In / Out (its own section, flat — user 2026-06-10) ──
   { href: '/fund-in', label: 'Fund IN', section: 'Fund In / Out', visible: canAccessTreasury },
   { href: '/fund-out', label: 'Fund OUT', section: 'Fund In / Out', visible: canAccessTreasury },
   { href: '/overdue', label: 'Overdue', section: 'Fund In / Out', visible: canAccessTreasury },
   { href: '/repayment-schedule', label: 'Repayment Schedule', section: 'Fund In / Out', visible: canAccessTreasury },
   { href: '/statements/monthly', label: 'Statements', section: 'Fund In / Out', visible: canAccessTreasury },
-  // HR sees HR Costing as an expandable group covering all monthly sub-pages.
-  // Principal sees a flat /hr-costing link in the Departments section below.
-  {
-    label: 'HR Costing',
-    section: 'Daily Operations',
-    visible: isHR,
-    children: [
-      { href: '/hr-costing', label: 'Overview', exact: true, visible: isHR },
-      { href: '/hr-costing/payroll', label: 'Payroll', visible: isHR },
-      { href: '/hr-costing/payment', label: 'Payment', visible: isHR },
-      { href: '/hr-costing/staff', label: 'Staff', visible: isHR },
-    ],
-  },
-  { href: '/director-salary', label: 'Director Salary', section: 'Daily Operations', visible: isHR },
 
   // ── Departments ──
   {
@@ -129,14 +132,14 @@ const navEntries: NavEntry[] = [
   // Dept Pool because users navigate between "department view" and "HV view"
   // when reasoning about money flow. Not under Treasury — Loo grouped it here.
   { href: '/venture-pool', label: 'Venture Pool', section: 'Departments', visible: canAccessVenturePool },
-  // OPEX is a dept_manager-only view of their own department's payroll
-  // breakdown (per-employee Basic / KPI / Allowance / ER statutory).
-  { href: '/opex', label: 'OPEX', section: 'Departments', visible: (r) => r === 'dept_manager' },
+  // OPEX shows a department's payroll breakdown (per-employee Basic / KPI /
+  // Allowance / ER statutory). Dept Manager sees own dept only; Principal
+  // picks any dept via the in-page switcher.
+  { href: '/opex', label: 'OPEX', section: 'Departments', visible: (r) => r === 'dept_manager' || r === 'principal' },
   // Marketing dept_manager can create service contracts for their dept
   // (mig 207 RLS). The page self-gates on Marketing dept — other dept_managers
   // clicking this would hit notFound().
   { href: '/billing/contracts/new', label: 'New Contract', section: 'Departments', visible: (r) => r === 'dept_manager' },
-  { href: '/hr-costing', label: 'HR Costing', section: 'Departments', visible: (r) => r === 'principal' },
   {
     label: 'Director',
     section: 'Departments',

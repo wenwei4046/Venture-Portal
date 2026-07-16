@@ -72,7 +72,7 @@ interface CreateFundSourceInput {
 const VALID_TYPES: FundSourceType[] = ['subsidiary', 'director_loan', 'department_pool', 'outsource']
 
 export async function createFundSource(formData: FormData) {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const raw: CreateFundSourceInput = {
@@ -278,7 +278,7 @@ export async function createFundSource(formData: FormData) {
 export type FundSourceActionResult = { error: string } | undefined
 
 export async function updateFundSource(formData: FormData): Promise<FundSourceActionResult> {
-  await requireRole(['finance'])
+  await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -397,7 +397,7 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
 // ─── Cancel Fund Source (requires Principal approval) ────────────────────────
 
 export async function cancelFundSource(formData: FormData) {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -438,7 +438,7 @@ export async function cancelFundSource(formData: FormData) {
 }
 
 export async function markFundSourceMatured(formData: FormData) {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const id = formData.get('id') as string

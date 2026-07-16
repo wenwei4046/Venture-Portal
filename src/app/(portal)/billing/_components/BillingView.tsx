@@ -33,6 +33,9 @@ interface DeptSummary {
 
 export default async function BillingView({ searchParams }: Props) {
   const user = await requireRole(['principal', 'finance'])
+  // Unified portal (2026-07-16): Principal creates/generates invoices and
+  // contracts with the same buttons Finance sees.
+  const canFinanceCreate = user.role === 'finance' || user.role === 'principal'
   const supabase = await createClient()
 
   const { period: rawPeriod } = await searchParams
@@ -309,7 +312,7 @@ export default async function BillingView({ searchParams }: Props) {
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <PeriodSelector currentPeriod={period} />
-          {user.role === 'finance' && (
+          {canFinanceCreate && (
             <>
               <GenerateConsolidatedInvoicesButton
                 currentPeriod={period}
@@ -401,7 +404,7 @@ export default async function BillingView({ searchParams }: Props) {
           invoiceCount={hrInvoiceCount}
           invoiceMode="hr_attribution"
           payrollSubmitted={payrollSubmitted}
-          canCreate={user.role === 'finance'}
+          canCreate={canFinanceCreate}
           companies={companyList}
           currentPeriod={period}
           categories={categoryList}
@@ -413,7 +416,7 @@ export default async function BillingView({ searchParams }: Props) {
           invoiceCount={financeInvoiceCount}
           invoiceMode="finance_attribution"
           payrollSubmitted={payrollSubmitted}
-          canCreate={user.role === 'finance'}
+          canCreate={canFinanceCreate}
           companies={companyList}
           currentPeriod={period}
           categories={categoryList}
@@ -425,7 +428,7 @@ export default async function BillingView({ searchParams }: Props) {
           invoiceCount={directorOfficeInvoiceCount}
           invoiceMode="director_office_attribution"
           payrollSubmitted={payrollSubmitted}
-          canCreate={user.role === 'finance'}
+          canCreate={canFinanceCreate}
           companies={companyList}
           currentPeriod={period}
           categories={categoryList}
@@ -438,7 +441,7 @@ export default async function BillingView({ searchParams }: Props) {
           invoiceMode="director_attribution"
           payrollSubmitted={directorCostReady}
           awaitingNote="awaiting Director Salary submission"
-          canCreate={user.role === 'finance'}
+          canCreate={canFinanceCreate}
           companies={companyList}
           currentPeriod={period}
           categories={categoryList}
@@ -450,7 +453,7 @@ export default async function BillingView({ searchParams }: Props) {
           invoiceCount={marketingInvoiceCount}
           invoiceMode="marketing_project"
           payrollSubmitted={payrollSubmitted}
-          canCreate={user.role === 'finance'}
+          canCreate={canFinanceCreate}
           companies={companyList}
           currentPeriod={period}
           categories={categoryList}
@@ -621,9 +624,9 @@ export default async function BillingView({ searchParams }: Props) {
         contracts={(marketingContracts ?? [])
           .filter((c): c is typeof c & { company_id: string } => c.company_id !== null)}
         companyMap={companyMap}
-        canCreate={user.role === 'finance'}
+        canCreate={canFinanceCreate}
         headerAction={
-          user.role === 'finance' ? (
+          canFinanceCreate ? (
             <GenerateInvoicesButton
               currentPeriod={period}
               modes={['marketing_project']}
@@ -642,7 +645,7 @@ export default async function BillingView({ searchParams }: Props) {
           reference_table: t.reference_table,
         }))}
         period={period}
-        canAdd={user.role === 'finance'}
+        canAdd={canFinanceCreate}
       />
     </div>
   )

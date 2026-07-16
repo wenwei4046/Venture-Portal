@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import ContractForm from '../../../billing/_components/ContractForm'
 
 export default async function NewContractFromDeptPool() {
-  const user = await requireRole(['dept_manager', 'finance'])
+  const user = await requireRole(['dept_manager', 'finance', 'principal'])
   const supabase = await createClient()
 
   const { data: companies } = await supabase

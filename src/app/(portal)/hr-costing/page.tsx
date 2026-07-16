@@ -77,7 +77,7 @@ export default async function HRCostingPage() {
     }
   )
 
-  const canSubmit = user.role === 'hr'
+  const canSubmit = user.role === 'hr' || user.role === 'principal'
   const canExecute = user.role === 'finance' || user.role === 'principal'
 
   return (

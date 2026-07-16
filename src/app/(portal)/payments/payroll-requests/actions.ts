@@ -46,7 +46,7 @@ export async function generatePvFromRequest(
   sources: PayrollPoolSource[],
   paymentDate: string,
 ): Promise<string> {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   if (!Array.isArray(sources) || sources.length === 0) {
@@ -258,7 +258,7 @@ export async function financeCancelRequest(
   requestId: string,
   reason: string,
 ): Promise<void> {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const trimmed = reason.trim()

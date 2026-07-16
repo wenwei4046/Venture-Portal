@@ -7,7 +7,7 @@ import { requireRole } from '@/lib/auth'
 // ─── Request invoice pool release (Finance) ─────────────────────────────────
 
 export async function requestRelease(formData: FormData) {
-  const user = await requireRole(['finance'])
+  const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
   const amountRaw = (formData.get('amount') as string) ?? '0'

@@ -200,7 +200,7 @@ export default async function VoucherLedger({
               ) : null}
             </Link>
           ) : null}
-          {user.role === 'finance' ? (
+          {user.role === 'finance' || user.role === 'principal' ? (
             isReceipts ? (
               <>
                 <Link

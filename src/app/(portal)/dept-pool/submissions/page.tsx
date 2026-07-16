@@ -101,7 +101,7 @@ export default async function PastMonthSubmissionsPage() {
                     <span className="num text-num-ink text-xl tracking-[-0.01em]">
                       {formatMoney(total)}
                     </span>
-                    {user.role === 'finance' && sub.execution_state === 'approved_for_execution' && (
+                    {(user.role === 'finance' || user.role === 'principal') && sub.execution_state === 'approved_for_execution' && (
                       <form action={executeHrCosting}>
                         <input type="hidden" name="id" value={sub.id} />
                         <button
