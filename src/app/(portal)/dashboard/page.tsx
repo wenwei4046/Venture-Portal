@@ -114,7 +114,15 @@ export default async function DashboardPage() {
   const user = await requireAuth()
   const supabase = await createClient()
 
-  const { data: raw, error } = await supabase.rpc('dashboard_summary')
+  // HR / Dept Manager dashboards branch on the APP-LAYER role (user.role) so
+  // the Principal's view-as mask is honoured — dashboard_summary()'s own gate
+  // keys off current_user_role(), the real DB role, so a masked Principal
+  // would otherwise always land on the treasury dashboard.
+  const roleDashboard = user.role === 'hr' || user.role === 'dept_manager'
+
+  const { data: raw, error } = roleDashboard
+    ? { data: null, error: null }
+    : await supabase.rpc('dashboard_summary')
   if (error) {
     return (
       <div className="py-16 text-center">
@@ -124,12 +132,10 @@ export default async function DashboardPage() {
     )
   }
 
-  // RPC returns { error: 'Access denied' } for HR/dept_manager (not a Supabase error)
-  if (raw && typeof raw === 'object' && 'error' in raw && (raw as Record<string, unknown>).error === 'Access denied') {
-    // Determine role for role-specific dashboard
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-    const { data: currentUser } = await supabase.from('users').select('role, name').eq('id', authUser?.id ?? '').single()
-    const userRole = currentUser?.role
+  // The RPC also returns { error: 'Access denied' } for a real HR/dept_manager
+  // session (not a Supabase error) — kept as a belt-and-braces fallback.
+  if (roleDashboard || (raw && typeof raw === 'object' && 'error' in raw && (raw as Record<string, unknown>).error === 'Access denied')) {
+    const userRole = user.role
 
     if (userRole === 'hr') {
       // HR Dashboard — data overview. Under the post-mig-278 flow HR's job is
@@ -677,8 +683,10 @@ export default async function DashboardPage() {
   const hasAnyData =
     summary.total_pool > 0 || summary.loans_outstanding > 0
 
-  const isPrincipal = summary.role === 'principal'
-  const isFinance = summary.role === 'finance'
+  // App-layer role, not summary.role: a Principal masked as Finance must get
+  // the Finance dashboard (the RPC reports the real DB role).
+  const isPrincipal = user.role === 'principal'
+  const isFinance = user.role === 'finance'
   const pendingApprovals = summary.pending_approvals ?? []
   const pendingCount = summary.pending_approvals_count ?? 0
   const subsidiaries = summary.subsidiaries ?? []
