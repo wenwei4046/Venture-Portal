@@ -1,13 +1,24 @@
+// Director Salary — v2 flow (2026-07-17): the calculation engine
+// (75/25 split · 5% saving · advance) is retired. Two lines now run
+// straight through to Finance:
+//   1. Pool Breakdown (Billing)  — HR keys CTC per subsidiary → Save
+//   2. Director Payroll (InfoTech) — actual run imported verbatim
+// Submit (Submission tab) snapshots BOTH: payroll totals from the InfoTech
+// table + the per-subsidiary CTC split for billing.
+
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import dayjs from 'dayjs'
 import Link from 'next/link'
 import CTCInputGrid from './_components/CTCInputGrid'
-import PayoutModeSwitch from './_components/PayoutModeSwitch'
 import SubmitDirectorSalaryButton from './_components/SubmitDirectorSalaryButton'
 import ReopenDirectorSalaryButton from './_components/ReopenDirectorSalaryButton'
-import type { PayoutMode } from '@/lib/salary'
+import DirectorPayrollActualGrid, {
+  DirectorPayrollEmptyState,
+  type DirectorPayrollRowData,
+} from './_components/DirectorPayrollActualGrid'
+import DirectorPeriodPicker from './_components/DirectorPeriodPicker'
 
 interface Props {
   searchParams: Promise<{ period?: string; tab?: string }>
@@ -41,51 +52,68 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
     { data: directors },
     { data: companies },
     { data: ctcRows },
-    { data: payouts },
-    { data: payoutSummary },
     { data: submission },
     { data: liveByCompany },
+    { data: actualPayrollRows },
   ] = await Promise.all([
     supabase.from('directors').select('id, name, code, weightage, min_payout').eq('status', 'active').order('code'),
     supabase.from('companies').select('id, name, short_code, director_heads').eq('is_active', true).order('name'),
     supabase.from('director_ctc').select('*').eq('period_month', period),
-    supabase.from('director_payouts').select('*').eq('period_month', period).order('gross_amount', { ascending: false }),
-    supabase.rpc('get_director_payout_summary', { p_period: period }),
     supabase
       .from('director_salary_submissions')
       .select('*')
       .eq('period_month', period)
       .maybeSingle(),
     supabase.rpc('get_director_ctc_by_company', { p_period_month: period }),
+    supabase
+      .from('director_monthly_payroll')
+      .select('*')
+      .eq('period_month', period)
+      .order('employee_name'),
   ])
 
-  const hasPayouts = (payouts?.length ?? 0) > 0
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const summary = (payoutSummary as any)?.[0] ?? null
-  const hasSummaryData = summary && summary.out_payout_count > 0
+  // Director actual payroll (InfoTech import) — verbatim rows + director code.
+  const actualRows: DirectorPayrollRowData[] = (actualPayrollRows ?? []).map(r => ({
+    id: r.id,
+    director_id: r.director_id,
+    director_code: directors?.find(d => d.id === r.director_id)?.code ?? null,
+    employee_code: r.employee_code,
+    employee_name: r.employee_name,
+    dept_name: r.dept_name,
+    basic_salary: Number(r.basic_salary),
+    statutory_allowance: Number(r.statutory_allowance),
+    non_statutory_allowance: Number(r.non_statutory_allowance),
+    ot_amount: Number(r.ot_amount),
+    commission_amount: Number(r.commission_amount),
+    no_pay_amount: Number(r.no_pay_amount),
+    deduction_amount: Number(r.deduction_amount),
+    skbbk_amount: Number(r.skbbk_amount),
+    epf_er: Number(r.epf_er),
+    epf_ee: Number(r.epf_ee),
+    socso_er: Number(r.socso_er),
+    socso_ee: Number(r.socso_ee),
+    eis_er: Number(r.eis_er),
+    eis_ee: Number(r.eis_ee),
+    pcb: Number(r.pcb),
+    gross: Number(r.gross),
+    net: Number(r.net),
+    source: r.source,
+  }))
+  const hasActualPayroll = actualRows.length > 0
+  const hasCtc = (ctcRows?.length ?? 0) > 0
 
-  // All payouts of a period share one mode (one calculation run).
-  const payoutMode: PayoutMode =
-    (payouts?.[0]?.payout_mode as PayoutMode | undefined) ?? 'split'
-  const fullyPaid = payoutMode === 'fully_paid'
-  const allDraft = (payouts ?? []).every(p => p.status === 'draft')
-
-  // Live preview totals for the Submission tab — computed from director_payouts
-  // EXACTLY the way submit_director_salary_to_finance computes the snapshot,
-  // so what HR previews is what Finance will receive (transparency rule).
-  const liveTotals = hasPayouts
-    ? (payouts ?? []).reduce(
-        (acc, p) => ({
-          gross: acc.gross + Number(p.gross_amount ?? 0),
-          payrollGross: acc.payrollGross + Number(p.payroll_gross ?? 0),
-          payrollNet: acc.payrollNet + Number(p.payroll_net ?? 0),
-          statutoryEr:
-            acc.statutoryEr +
-            Number(p.payroll_epf_er ?? 0) +
-            Number(p.payroll_socso_er ?? 0) +
-            Number(p.payroll_eis_er ?? 0),
-          invoice: acc.invoice + Number(p.invoice_total ?? 0),
-          saving: acc.saving + Number(p.saving_amount ?? 0),
+  // Live preview totals for the Submission tab — computed from the InfoTech
+  // table EXACTLY the way submit_director_salary_to_finance v2 computes the
+  // snapshot, so what HR previews is what Finance receives.
+  const liveTotals = hasActualPayroll
+    ? actualRows.reduce(
+        (acc, r) => ({
+          gross: acc.gross + r.gross,
+          payrollGross: acc.payrollGross + r.gross,
+          payrollNet: acc.payrollNet + r.net,
+          statutoryEr: acc.statutoryEr + r.epf_er + r.socso_er + r.eis_er,
+          invoice: 0,
+          saving: 0,
           directors: acc.directors + 1,
         }),
         { gross: 0, payrollGross: 0, payrollNet: 0, statutoryEr: 0, invoice: 0, saving: 0, directors: 0 },
@@ -105,18 +133,11 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
           </div>
           <h1 className="page-title">Director Salary</h1>
         </div>
-        <div className="flex items-center gap-3">
-          <label className="font-sans text-xs uppercase tracking-wide text-muted">Period</label>
-          <form>
-            <input
-              type="month"
-              name="period"
-              defaultValue={dayjs(period).format('YYYY-MM')}
-              className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
-            />
-            {tab === 'submission' && <input type="hidden" name="tab" value="submission" />}
-          </form>
-        </div>
+        <DirectorPeriodPicker
+          period={period}
+          basePath="/director-salary"
+          extraQuery={tab === 'submission' ? '&tab=submission' : ''}
+        />
       </div>
 
       {/* Tabs — Calculation | Director Payroll Submission */}
@@ -134,58 +155,17 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
 
       {tab === 'calculation' ? (
         <>
-          {/* Hero section — Pool summary */}
-          {(hasPayouts || hasSummaryData) && summary && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
-              <div className="lg:col-span-7">
-                <div className="font-serif italic text-accent text-base mb-1">
-                  Salary Pool — {periodLabel}
-                </div>
-                <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
-                  {formatMoney(Number(summary.out_pool_total ?? 0))}
-                </div>
-                <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
-                  {summary.out_payout_count} DIRECTORS ·{' '}
-                  <em className={`font-serif text-sm not-italic ${
-                    summary.out_status === 'draft' ? 'text-alert' :
-                    summary.out_status === 'confirmed' ? 'text-ledger' : 'text-graphite'
-                  }`}>
-                    {summary.out_status.toUpperCase()}
-                  </em>
-                </div>
-              </div>
-
-              <div className="lg:col-span-5 space-y-3">
-                <div className="flex items-baseline justify-between">
-                  <span className="font-serif italic text-sm text-graphite">Total Payroll {fullyPaid ? '(100% · Fully Paid)' : '(75%)'}</span>
-                  <span className="font-mono tabular text-sm font-medium text-num-ink">{formatMoney(Number(summary.out_total_payroll_gross))}</span>
-                </div>
-                <div className="flex items-baseline justify-between">
-                  <span className="font-serif italic text-sm text-graphite">Total Invoice {fullyPaid ? '(— none)' : '(25%)'}</span>
-                  <span className="font-mono tabular text-sm font-medium text-num-ink">{formatMoney(Number(summary.out_total_invoice))}</span>
-                </div>
-                <div className="flex items-baseline justify-between">
-                  <span className="font-serif italic text-sm text-graphite">Total Saving {fullyPaid ? '(none · Fully Paid)' : '(5%)'}</span>
-                  <span className="font-mono tabular text-sm font-medium text-ledger">{formatMoney(Number(summary.out_total_saving))}</span>
-                </div>
-                <div className="flex items-baseline justify-between">
-                  <span className="font-serif italic text-sm text-graphite">Total Advance</span>
-                  <span className="font-mono tabular text-sm font-medium text-alert">{formatMoney(Number(summary.out_total_advance))}</span>
-                </div>
-                <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
-                  <span className="font-serif italic text-sm text-graphite">Net to Directors</span>
-                  <span className="font-mono tabular text-md font-medium text-num-ink font-semibold">{formatMoney(Number(summary.out_total_payroll_net))}</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* CTC Input Section */}
+          {/* CTC Input Section — billing side */}
           <section className="mb-16">
             <h2 className="font-serif text-2xl text-ink mb-1">Pool Breakdown (Billing)</h2>
+            <p className="font-serif italic text-graphite text-sm mb-4">
+              What Finance bills each subsidiary · Save here, then submit on the{' '}
+              <Link href={tabHref('submission')} className="text-accent hover:text-accent-hover not-italic">
+                Submission tab →
+              </Link>
+            </p>
 
             <CTCInputGrid
-              mode={payoutMode}
               directors={(directors ?? []).map(d => ({
                 id: d.id,
                 code: d.code,
@@ -212,78 +192,45 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
             />
           </section>
 
-          {/* Per-Director Payouts Table */}
-          {hasPayouts && (
-            <section className="mb-16">
-              <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-3 mb-6">
-                <div>
-                  <h2 className="font-serif text-2xl text-ink mb-1">Per-Director Payouts</h2>
+          {/* Director Payroll (InfoTech actual) — payroll side */}
+          <section className="mb-16">
+            <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-3 mb-6">
+              <div>
+                <h2 className="font-serif text-2xl text-ink mb-1">Director Payroll (InfoTech)</h2>
+                <p className="font-serif italic text-graphite text-sm">
+                  Actual payroll run imported from InfoTech ·{' '}
                   <Link
                     href={tabHref('submission')}
-                    className="font-serif italic text-sm text-accent hover:text-accent-hover"
+                    className="text-accent hover:text-accent-hover not-italic"
                   >
                     {submission ? 'View submission →' : 'Submit to Finance →'}
                   </Link>
-                </div>
-                <PayoutModeSwitch
-                  period={period}
-                  currentMode={payoutMode}
-                  locked={!allDraft}
-                />
+                </p>
               </div>
+              <Link
+                href={`/director-salary/import?period=${dayjs(period).format('YYYY-MM')}`}
+                className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors shrink-0"
+              >
+                Import InfoTech →
+              </Link>
+            </div>
 
-              <div className="overflow-x-auto">
-                <table className="ledger-table">
-                  <thead>
-                    <tr>
-                      <th>Director</th>
-                      <th className="right">Gross</th>
-                      <th className="right">Saving</th>
-                      <th className="right">Payroll {fullyPaid ? '(100%)' : '(75%)'}</th>
-                      <th className="right">Invoice {fullyPaid ? '(—)' : '(25%)'}</th>
-                      <th className="right">Net</th>
-                      <th className="right"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {payouts?.map(p => {
-                      const dir = directors?.find(d => d.id === p.director_id)
-                      return (
-                        <tr key={p.id}>
-                          <td>
-                            <div className="font-serif text-[15px] text-ink">{dir?.code ?? '?'}</div>
-                            <div className="font-mono text-[11px] text-graphite mt-0.5">{dir?.name}</div>
-                          </td>
-                          <td className="num">{formatMoney(p.gross_amount ?? 0)}</td>
-                          <td className="num neg">{formatMoney(-(p.saving_amount ?? 0))}</td>
-                          <td className="num">{formatMoney(p.payroll_gross ?? 0)}</td>
-                          <td className="num">{formatMoney(p.invoice_total ?? 0)}</td>
-                          <td className="num font-semibold">{formatMoney(p.payroll_net ?? 0)}</td>
-                          <td className="right">
-                            <Link
-                              href={`/director-salary/${p.director_id}?period=${period}`}
-                              className="text-sm text-accent hover:text-accent-hover font-serif italic"
-                            >
-                              Detail
-                            </Link>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )}
+            {actualRows.length === 0 ? (
+              <DirectorPayrollEmptyState period={period} />
+            ) : (
+              <DirectorPayrollActualGrid rows={actualRows} period={period} />
+            )}
+          </section>
         </>
       ) : (
         <SubmissionTab
           period={period}
           periodLabel={periodLabel}
           submission={submission}
-          fullyPaid={fullyPaid}
-          hasPayouts={hasPayouts}
+          hasActualPayroll={hasActualPayroll}
+          hasCtc={hasCtc}
           liveTotals={liveTotals}
+          payrollRows={actualRows}
           liveByCompany={((liveByCompany as ByCompanyRow[] | null) ?? []).map(r => ({
             ...r,
             basic: r.basic == null ? null : Number(r.basic),
@@ -332,9 +279,10 @@ function sumOrDash(rows: ByCompanyRow[], pick: (r: ByCompanyRow) => number | nul
 }
 
 // ─── Director Payroll Submission tab ─────────────────────────────────────────
-// Transparency rule: every total the submit RPC writes is shown by-source on
-// this page BEFORE submitting (payout totals from director_payouts, the
-// per-subsidiary split from director_ctc). Missing source → disabled button.
+// v2: payroll totals come from director_monthly_payroll (InfoTech actuals);
+// the per-subsidiary split still comes from director_ctc. Both must exist
+// before Submit is enabled. Transparency rule: every total the RPC writes is
+// previewed here by-source BEFORE submitting.
 interface SubmissionTotals {
   gross: number
   payrollGross: number
@@ -349,21 +297,36 @@ function SubmissionTab({
   period,
   periodLabel,
   submission,
-  fullyPaid,
-  hasPayouts,
+  hasActualPayroll,
+  hasCtc,
   liveTotals,
+  payrollRows,
   liveByCompany,
 }: {
   period: string
   periodLabel: string
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   submission: any
-  fullyPaid: boolean
-  hasPayouts: boolean
+  hasActualPayroll: boolean
+  hasCtc: boolean
   liveTotals: SubmissionTotals | null
+  payrollRows: DirectorPayrollRowData[]
   liveByCompany: ByCompanyRow[]
 }) {
   const submitted = !!submission
+
+  // Per-director payroll detail comes from the live InfoTech table (the
+  // snapshot itself is aggregate-only — Finance never sees per-director
+  // figures). If the live rows drift from the submitted totals, flag it.
+  const livePayrollTotals = payrollRows.reduce(
+    (acc, r) => ({
+      gross: acc.gross + r.gross,
+      net: acc.net + r.net,
+      er: acc.er + r.epf_er + r.socso_er + r.eis_er,
+      pcb: acc.pcb + r.pcb,
+    }),
+    { gross: 0, net: 0, er: 0, pcb: 0 },
+  )
 
   // Submitted → render the snapshot; not yet → live preview of what would be
   // submitted right now.
@@ -393,6 +356,10 @@ function SubmissionTab({
       }
     : liveTotals
 
+  const missing: string[] = []
+  if (!hasActualPayroll) missing.push('Import the InfoTech director payroll')
+  if (!hasCtc) missing.push('Save the Pool Breakdown (Billing)')
+
   return (
     <div>
       {/* Status + CTA strip */}
@@ -416,9 +383,9 @@ function SubmissionTab({
             <>
               <div className="font-serif text-2xl text-ink">Not submitted yet</div>
               <div className="font-mono text-xs text-muted mt-1">
-                {hasPayouts
-                  ? 'Preview below — submitting makes these figures visible to Finance immediately (no approval round-trip)'
-                  : 'Calculate director salary on the Calculation tab first'}
+                {missing.length === 0
+                  ? 'Preview below — submitting sends the InfoTech payroll totals + per-subsidiary CTC split to Finance immediately'
+                  : `To submit: ${missing.join(' · ')}`}
               </div>
             </>
           )}
@@ -430,40 +397,109 @@ function SubmissionTab({
             <SubmitDirectorSalaryButton
               period={period}
               totalGross={totals?.gross ?? 0}
-              disabled={!hasPayouts}
-              disabledHint={
-                hasPayouts ? undefined : 'Save & Calculate on the Calculation tab first'
-              }
+              disabled={missing.length > 0}
+              disabledHint={missing.length > 0 ? missing.join(' · ') : undefined}
             />
           )}
         </div>
       </div>
 
-      {/* Totals strip — what Finance receives */}
+      {/* Totals strip — payroll side (InfoTech actuals) */}
       {totals && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mb-12 border-y border-hairline py-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12 border-y border-hairline py-6">
           <div>
-            <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total Gross (Pool)</div>
+            <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total Gross (InfoTech)</div>
             <div className="num text-num-ink text-xl tracking-[-0.01em] mt-1">{formatMoney(totals.gross)}</div>
-          </div>
-          <div>
-            <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Payroll {fullyPaid ? '(100% · Fully Paid)' : '(75%)'}</div>
-            <div className="num text-graphite text-md mt-1">{formatMoney(totals.payrollGross)}</div>
-          </div>
-          <div>
-            <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Invoice {fullyPaid ? '(— none)' : '(25%)'}</div>
-            <div className="num text-graphite text-md mt-1">{formatMoney(totals.invoice)}</div>
-          </div>
-          <div>
-            <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Saving {fullyPaid ? '(none)' : '(5%)'}</div>
-            <div className="num text-graphite text-md mt-1">{formatMoney(totals.saving)}</div>
           </div>
           <div>
             <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Net to Directors</div>
             <div className="num text-num-ink text-md mt-1 font-semibold">{formatMoney(totals.payrollNet)}</div>
           </div>
+          <div>
+            <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Employer Statutory</div>
+            <div className="num text-graphite text-md mt-1">{formatMoney(totals.statutoryEr)}</div>
+          </div>
+          <div>
+            <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Directors</div>
+            <div className="num text-graphite text-md mt-1">{totals.directors}</div>
+          </div>
         </div>
       )}
+
+      {/* Director Payroll (InfoTech) — per-director detail. Shown here for
+          HR/Principal; the snapshot Finance receives stays aggregate-only. */}
+      <section className="mb-16">
+        <div className="sect-head">
+          <h2>Director Payroll (InfoTech)</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">
+            {payrollRows.length} DIRECTOR{payrollRows.length === 1 ? '' : 'S'}
+          </span>
+        </div>
+        {payrollRows.length === 0 ? (
+          <p className="font-serif italic text-graphite text-sm">
+            No InfoTech payroll imported for this period yet — import on the Calculation tab.
+          </p>
+        ) : (
+          <>
+            {submitted && totals &&
+              (Math.abs(livePayrollTotals.gross - totals.gross) > 0.01 ||
+                Math.abs(livePayrollTotals.net - totals.payrollNet) > 0.01) && (
+                <div className="mb-4 rounded-md border border-alert bg-alert-bg px-3 py-2">
+                  <p className="font-serif italic text-alert text-sm">
+                    ⚠ The InfoTech figures changed after this submission — Reopen for edits and
+                    submit again so Finance sees the current numbers.
+                  </p>
+                </div>
+              )}
+            <div className="overflow-x-auto">
+              <table className="ledger-table">
+                <thead>
+                  <tr>
+                    <th>Director</th>
+                    <th className="right">Gross</th>
+                    <th className="right">EPF ER</th>
+                    <th className="right">SOCSO+EIS ER</th>
+                    <th className="right">PCB</th>
+                    <th className="right">Net</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payrollRows.map(r => (
+                    <tr key={r.id}>
+                      <td>
+                        <div className="font-serif text-[15px] text-ink">{r.director_code ?? r.employee_name}</div>
+                        <div className="font-mono text-[11px] text-graphite mt-0.5">{r.employee_name}</div>
+                      </td>
+                      <td className="num">{formatMoney(r.gross)}</td>
+                      <td className="num">{formatMoney(r.epf_er)}</td>
+                      <td className="num">{formatMoney(r.socso_er + r.eis_er)}</td>
+                      <td className="num">{formatMoney(r.pcb)}</td>
+                      <td className="num font-semibold">{formatMoney(r.net)}</td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td className="font-serif italic text-accent">Total</td>
+                    <td className="num font-semibold">{formatMoney(livePayrollTotals.gross)}</td>
+                    <td className="num font-semibold">
+                      {formatMoney(payrollRows.reduce((s, r) => s + r.epf_er, 0))}
+                    </td>
+                    <td className="num font-semibold">
+                      {formatMoney(payrollRows.reduce((s, r) => s + r.socso_er + r.eis_er, 0))}
+                    </td>
+                    <td className="num font-semibold">{formatMoney(livePayrollTotals.pcb)}</td>
+                    <td className="num font-semibold">{formatMoney(livePayrollTotals.net)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="font-sans text-xs text-muted mt-3">
+              Per-director detail is visible to HR and Principal only — Finance receives the
+              aggregate totals above, never individual salaries.
+            </p>
+          </>
+        )}
+      </section>
 
       {/* Per-subsidiary contribution — what Finance bills each company */}
       <section className="mb-16">
@@ -476,7 +512,7 @@ function SubmissionTab({
         </div>
         {byCompany.length === 0 ? (
           <p className="font-serif italic text-graphite text-sm">
-            No CTC entered for this period yet — fill the CTC grid on the Calculation tab.
+            No CTC entered for this period yet — fill the Pool Breakdown grid on the Calculation tab.
           </p>
         ) : (
           <div className="overflow-x-auto">

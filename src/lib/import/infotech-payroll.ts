@@ -64,6 +64,8 @@ import { read, utils, type WorkBook } from 'xlsx'
 export interface InfotechRow {
   employeeCode: string
   employeeName: string
+  /** Department section the row sat under ("Department:XX" header), '' if none. */
+  department: string
   basicSalary: number
   otAmount: number
   nonStatutoryAllowance: number
@@ -283,6 +285,7 @@ export function parseInfotechGrid(
   const skipped: Array<{ excelRow: number; reason: string }> = []
   let grossSum = 0
   let cols: ColumnMap | null = null
+  let currentDept = ''
 
   for (let i = 0; i < grid.length; i++) {
     const row = grid[i] ?? []
@@ -293,7 +296,10 @@ export function parseInfotechGrid(
     // Department section header — "Code :CR-BD  Department:CR - BUSINESS DEVELOPMENT"
     if (col0.includes(DEPT_SECTION_MARKER)) {
       const match = /Department:\s*(.+?)$/.exec(col0)
-      if (match) departments.push(match[1].trim())
+      if (match) {
+        currentDept = match[1].trim()
+        departments.push(currentDept)
+      }
       continue
     }
 
@@ -338,6 +344,7 @@ export function parseInfotechGrid(
     rows.push({
       employeeCode: code,
       employeeName: name,
+      department: currentDept,
       basicSalary: basic,
       otAmount: ot,
       nonStatutoryAllowance: allow,

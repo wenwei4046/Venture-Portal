@@ -330,6 +330,35 @@ director_payouts (
     UNIQUE (director_id, period_month)
 )
 ```
+4.4b director_monthly_payroll  (mig 20260717100000)
+```sql
+-- Director 实际 payroll（InfoTech 导入，verbatim 存档，无重算 trigger）。
+-- 与 director_payouts（engine 计算）对账。RLS: Principal + HR only, full CRUD.
+director_monthly_payroll (
+    id              uuid PK DEFAULT gen_random_uuid()
+    period_month    date NOT NULL                    -- 每月1号
+    director_id     uuid FK → directors NULL          -- 按名字 fuzzy match；未匹配 = NULL
+    employee_code   text DEFAULT ''
+    employee_name   text NOT NULL
+    dept_name       text DEFAULT ''                  -- 文件里的 department section
+
+    -- 输入项（verbatim，可 inline 编辑）
+    basic_salary / statutory_allowance / non_statutory_allowance
+    ot_amount / commission_amount / no_pay_amount
+    deduction_amount / skbbk_amount                   decimal(15,2) DEFAULT 0
+
+    -- Statutory + 结果（verbatim，无重算）
+    epf_er / epf_ee / socso_er / socso_ee / eis_er / eis_ee
+    pcb / gross / net                                 decimal(15,2) DEFAULT 0
+                                                      -- gross = 文件 Gross − Ded
+
+    source          text ('imported'|'manual') DEFAULT 'imported'
+    created_by      uuid FK → users
+    created_at / updated_at timestamptz
+
+    UNIQUE (period_month, employee_name)              -- re-import 覆盖 key
+)
+```
 4.5 hv_operating_fund
 ```sql
 hv_operating_fund (

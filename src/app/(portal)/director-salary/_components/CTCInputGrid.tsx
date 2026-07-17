@@ -2,8 +2,7 @@
 
 import { useState, useTransition, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { batchSaveCTC, calculateDirectorSalary, type BatchCTCInput } from '../actions'
-import type { PayoutMode } from '@/lib/salary'
+import { batchSaveCTC, type BatchCTCInput } from '../actions'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 
@@ -38,8 +37,6 @@ interface Props {
   companies: Company[]
   existingCTC: ExistingCTC[]
   period: string
-  /** Recalculate in this mode (preserves the current Fully Paid choice). */
-  mode?: PayoutMode
 }
 
 interface ERBreakdown {
@@ -49,12 +46,11 @@ interface ERBreakdown {
   total: number
 }
 
-export default function CTCInputGrid({ directors, companies, existingCTC, period, mode = 'split' }: Props) {
+export default function CTCInputGrid({ directors, companies, existingCTC, period }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const [status, setStatus] = useState<'idle' | 'saving' | 'calculating' | 'done'>('idle')
-  const [savedCount, setSavedCount] = useState(0)
+  const [status, setStatus] = useState<'idle' | 'saving' | 'done'>('idle')
 
   // Aggregate existing CTC by company (sum across all directors)
   const [values, setValues] = useState<Record<string, { basic: number; kpi: number; allowance: number }>>(() => {
@@ -153,7 +149,6 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
   function handleSave() {
     setError(null)
     setStatus('idle')
-    setSavedCount(0)
 
     // Save all company entries under the pool director. Zero rows are sent
     // too — the server treats an all-zero company as "clear this company's
@@ -173,10 +168,10 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
       try {
         setStatus('saving')
         await batchSaveCTC(period, records)
-        setStatus('calculating')
-        const res = await calculateDirectorSalary(period, mode)
-        setSavedCount(res.saved)
         setStatus('done')
+        // Staff-payroll-style flow: after saving, land on the Submission tab
+        // where the Submit to Finance button is.
+        router.push(`/director-salary?period=${period.slice(0, 7)}&tab=submission`)
         router.refresh()
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
@@ -279,13 +274,11 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
           disabled={isPending}
           className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {status === 'saving' ? 'Saving...' :
-           status === 'calculating' ? 'Calculating...' :
-           'Save & Calculate'}
+          {status === 'saving' ? 'Saving...' : 'Save'}
         </button>
         {status === 'done' && (
           <span className="text-sm font-serif italic text-ledger">
-            Saved & calculated — {savedCount} director payouts updated.
+            Saved — submit to Finance on the Submission tab.
           </span>
         )}
         {error && <span className="text-sm font-serif italic text-danger">{error}</span>}

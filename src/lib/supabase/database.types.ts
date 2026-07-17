@@ -1067,6 +1067,111 @@ export type Database = {
           },
         ]
       }
+      director_monthly_payroll: {
+        Row: {
+          basic_salary: number
+          commission_amount: number
+          created_at: string
+          created_by: string | null
+          deduction_amount: number
+          dept_name: string
+          director_id: string | null
+          eis_ee: number
+          eis_er: number
+          employee_code: string
+          employee_name: string
+          epf_ee: number
+          epf_er: number
+          gross: number
+          id: string
+          net: number
+          no_pay_amount: number
+          non_statutory_allowance: number
+          ot_amount: number
+          pcb: number
+          period_month: string
+          skbbk_amount: number
+          socso_ee: number
+          socso_er: number
+          source: string
+          statutory_allowance: number
+          updated_at: string
+        }
+        Insert: {
+          basic_salary?: number
+          commission_amount?: number
+          created_at?: string
+          created_by?: string | null
+          deduction_amount?: number
+          dept_name?: string
+          director_id?: string | null
+          eis_ee?: number
+          eis_er?: number
+          employee_code?: string
+          employee_name: string
+          epf_ee?: number
+          epf_er?: number
+          gross?: number
+          id?: string
+          net?: number
+          no_pay_amount?: number
+          non_statutory_allowance?: number
+          ot_amount?: number
+          pcb?: number
+          period_month: string
+          skbbk_amount?: number
+          socso_ee?: number
+          socso_er?: number
+          source?: string
+          statutory_allowance?: number
+          updated_at?: string
+        }
+        Update: {
+          basic_salary?: number
+          commission_amount?: number
+          created_at?: string
+          created_by?: string | null
+          deduction_amount?: number
+          dept_name?: string
+          director_id?: string | null
+          eis_ee?: number
+          eis_er?: number
+          employee_code?: string
+          employee_name?: string
+          epf_ee?: number
+          epf_er?: number
+          gross?: number
+          id?: string
+          net?: number
+          no_pay_amount?: number
+          non_statutory_allowance?: number
+          ot_amount?: number
+          pcb?: number
+          period_month?: string
+          skbbk_amount?: number
+          socso_ee?: number
+          socso_er?: number
+          source?: string
+          statutory_allowance?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "director_monthly_payroll_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "director_monthly_payroll_director_id_fkey"
+            columns: ["director_id"]
+            isOneToOne: false
+            referencedRelation: "directors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       director_payouts: {
         Row: {
           advance_amount: number

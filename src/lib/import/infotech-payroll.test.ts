@@ -54,6 +54,7 @@ describe('parseInfotechGrid', () => {
     expect(ang).toEqual({
       employeeCode: 'CR002',
       employeeName: 'ANG KHAI HERNG',
+      department: 'CR - BUSINESS DEVELOPMENT',
       basicSalary: 5000,
       otAmount: 0,
       nonStatutoryAllowance: 1679.96,
@@ -86,6 +87,7 @@ describe('parseInfotechGrid', () => {
     expect(result.rows[0]).toEqual({
       employeeCode: 'HV007',
       employeeName: 'CHOW WAI MAN',
+      department: 'H - DIRECTOR OFFICE',
       basicSalary: 4800,
       otAmount: 0,
       nonStatutoryAllowance: 200,
