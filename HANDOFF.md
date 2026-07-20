@@ -62,18 +62,26 @@ build). **RECONCILED at session end: Σ6 segments 134,947.80 == bank caches == G
    column, so June rows had `skbbk_amount=0` while net was already after-SKBBK. Backfilled by
    direct SQL (17 rows, 532.35), then **SKBBK added as a 4th one-click statutory voucher**
    (mig `20260720110000`, KWSP/PERKESO/LHDN/SKBBK, explicit CASE per body).
-5. ⚠️ **June payroll was RE-IMPORTED at 2026-07-20 07:42:50** (all 19 rows, one bulk op,
-   post-fix importer — identity `net = gross − EE stat − PCB − SKBBK` holds on every row).
-   New per-dept cash need vs the completed funding 95,390.70:
-   DO 6,466.25 (=funded, exact) · HR 21,351.10 (=funded, exact) ·
-   Finance 24,191.99 (funded 23,882.01, **short 309.98**) ·
-   Marketing 42,609.69 (funded 43,691.34, **over 1,081.65**) · total 94,619.03 → net
-   over-accrual **771.67**. Run/request still approved/completed at the OLD total (stale).
-   **Plan (after Stage-G + statutory clear 4020 at the new numbers):** one adjusting JE per
-   affected segment to true `9030/4020` to actual — Marketing Dr 4020 / Cr 9030 1,081.65;
-   Finance Dr 9030 / Cr 4020 309.98. Confirm with user the 07:42 re-import is FINAL first.
-   Statutory PV dry-run at the new numbers: KWSP 17,962.00 · PERKESO 1,829.90 ·
-   LHDN 2,973.25 · SKBBK 532.35.
+5. ⚠️⚠️ **INCIDENT (self-inflicted, restore IN PROGRESS)**: the skbbk_amount backfill UPDATE
+   fired `trg_hr_monthly_payroll_compute` — its UPDATE-OF list INCLUDES `skbbk_amount` — and
+   `compute_hr_monthly_payroll()` re-derived prorata gross + table-lookup EPF/SOCSO/EIS/PCB +
+   net on the 17 touched rows, CLOBBERING the InfoTech-imported verbatim figures (e.g. NUR AIN
+   gross 2,523.02→2,800.00; THIEN 1,516.67→657.22; CHEW PCB 276.35→361.85). The 2 untouched
+   rows (RACHAEL, LING) still carry their 2026-07-02 import stamps — that's the proof it was
+   the backfill, NOT a user re-import (an earlier note here claimed a "07:42 re-import" and a
+   Finance/Marketing funding delta of 771.67 — both were artifacts of the recompute, RETRACTED).
+   **Restore path (agreed with user):** all 19 June rows flipped to `draft` (import's
+   writeVerbatim only updates draft rows) → user RE-UPLOADS the June InfoTech file at
+   /hr-costing/payroll/2026-06-01/import (phase-2 writes verbatim figures incl. SKBBK) →
+   flip rows back to `submitted` → verify net 72,384.40 + statutory 22,473.95 + SKBBK 532.35
+   == funding 95,390.70 EXACTLY (no true-up JE needed). Run stays `approved`, request stays
+   `completed` throughout.
+   **⚠️ LESSON for any future direct SQL on hr_monthly_payroll:** updating ANY of
+   basic_salary / statutory_allowance / non_statutory_allowance / ot_hours / ot_amount /
+   commission_amount / unpaid_leave_days / deduction_amount / skbbk_amount / period_month /
+   staff_id re-fires the compute trigger and wipes imported figures. Write only the
+   verbatim columns (epf_*/socso_*/eis_*/pcb/gross/net — NOT in the trigger list), or
+   mirror the importer's two-phase pattern.
 - NOTE: batch approve RPCs would decrement a bank for a grouped payroll_bank_transfer without
   crediting Alliance — impossible today (funding PVs are never grouped), noted only.
 - `database.types.ts` NOT regenerated for the new RPC (same `as any` escape hatch as
