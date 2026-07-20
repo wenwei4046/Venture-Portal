@@ -70,21 +70,24 @@ build). **RECONCILED at session end: Σ6 segments 134,947.80 == bank caches == G
    rows (RACHAEL, LING) still carry their 2026-07-02 import stamps — that's the proof it was
    the backfill, NOT a user re-import (an earlier note here claimed a "07:42 re-import" and a
    Finance/Marketing funding delta of 771.67 — both were artifacts of the recompute, RETRACTED).
-   **Restore path (UPDATED — user is FINANCE, not HR; the InfoTech file lives with the HR
-   colleague; user directive: 不要碰其他部门的资料):** rows were briefly flipped to draft
-   then RESTORED to `submitted` (pre-incident state). Await user's routing decision:
-   (a) HR colleague re-uploads the June InfoTech file at /hr-costing/payroll → June →
-   Import (flip rows to draft just before, back to submitted after), OR (b) records-based
-   restore: 14 rows are exactly reconstructable from this session's transcript; NUR AIN /
-   BOON (gross changed 2,523.02→2,800.00 / 3,770.00→3,900.00) + ≥1 more Marketing row
-   (orig Marketing er_sum 5,145.95 doesn't tie to assumed-unchanged rows, gap ~239.50,
-   suspect KHO's prorated basis) need HR to read a few payslip figures. Verify target
-   after either path: net 72,384.40 + statutory 22,473.95 + SKBBK 532.35 == funding
-   95,390.70 EXACTLY (no true-up JE needed). Run stays `approved`, request `completed`
-   throughout. Original per-row figures captured in this session: gross/net/EE-total for
-   all 17 + full statutory detail for CHEW WEE HO · SIA JONAS · THIEN YEE MUN ·
-   CHOW WAI MAN; per-dept originals: DO er 766.25/ee 765.90 · Fin er 2,937.45/ee 2,638.10 ·
-   HR er 2,356.10/ee 3,246.50 · Mkt er 5,145.95/ee 4,617.70.
+   **✅ RESTORED (same day)** — user provided the original InfoTech file
+   (`PayrollSummary_020726094208AM200.xlsx`, the 02-Jul export). Parsed with the SAME
+   header-name logic as `lib/import/infotech-payroll.ts` (scratchpad script); the parse
+   tied to every pre-incident aggregate captured in-session (all four dept er/ee sums to
+   the cent), then all 17 rows were restored by direct SQL writing ONLY the trigger-safe
+   verbatim columns (epf_*/socso_*/eis_*/pcb/gross/net — NOT in the compute trigger's
+   UPDATE-OF list). Rows stayed `submitted`; LING/RACHAEL untouched throughout.
+   Verified after: identity holds on all 19 rows; net 72,384.40 + statutory 22,473.95 +
+   SKBBK 532.35 = **95,390.70 == funding**, and **每个部门 exactly = its funded share**
+   (DO 6,466.25 · Fin 23,882.01 · HR 21,351.10 · Mkt 43,691.34 — all diff 0.00). No
+   true-up JE needed, ever — the original request was exact.
+   Notable: the recompute had ALSO silently shifted LOW / LIAN / JOSIAH / KHO's SOCSO/EIS/
+   EPF (InfoTech's statutory base includes OT/commission; the portal trigger's
+   `v_statutory_wages` = prorated basic + stat allowance only) — so imported files and the
+   trigger genuinely disagree on more than proration; VERBATIM restore was the only
+   correct option. Statutory PV dry-run at restored figures: KWSP 18,496.00 ·
+   PERKESO 1,880.40 · LHDN 2,097.55 · SKBBK 532.35 (Σ 23,006.30; + nets 72,384.40 =
+   95,390.70 ✓).
    **⚠️ LESSON for any future direct SQL on hr_monthly_payroll:** updating ANY of
    basic_salary / statutory_allowance / non_statutory_allowance / ot_hours / ot_amount /
    commission_amount / unpaid_leave_days / deduction_amount / skbbk_amount / period_month /
