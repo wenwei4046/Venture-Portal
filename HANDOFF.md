@@ -54,10 +54,19 @@ build). **RECONCILED at session end: Σ6 segments 134,947.80 == bank caches == G
   rolls back. First delete attempt no-oped; re-ran with inline commit and verified.
 
 ### June cycle — what still has to happen (in order)
-1. **Physical HL→Alliance transfer** for June payroll (~RM 94,858 total need; Alliance
-   currently 45,738.77 incl. the pending-approval Century deposit). Record it as an
-   **internal_transfer PV** (skips pools, per-segment GL) — the new funding-PV transfer only
-   applies from July's cycle onward (June's two funding PVs were consumed under old code).
+1. ~~Physical HL→Alliance transfer~~ → **PARTIALLY DONE + RECORDED** (user confirmed
+   2026-07-20: the RM 84,818.28 for PV-0100 WAS physically transferred at the bank; the
+   10,572.42 for PV-0115 was NOT). Direct-SQL data correction (recorded here): PV-0100
+   retrofitted with the new-rules staging legs — 4 per-dept JEs Dr 3010 / Cr 3000 dated its
+   payment date 2026-07-07 (Mkt 38,545.39 / Fin 20,944.56 / HR 19,628.33 / DO 5,700.00) +
+   caches HL −84,818.28 / Alliance +84,818.28. Verified: HL cache=GL=4,390.75, Alliance
+   cache=GL=130,557.05 (== what net banking should show), TB 0.00; per-segment Alliance
+   slices: Mkt 39,437.19 · Fin 21,454.76 · HR 19,943.73 · DO 5,825.90 · Director 44,355.47.
+   **⚠️ PV-0115's 10,572.42 transfer still pending** — HL only holds 4,390.75, so it needs
+   a cash inflow first; when the user transfers it, retrofit PV-0115 the same way.
+   Note: PV-0109 (42,802.20, internal_transfer, 2026-07-09) was DIRECTOR money staged to
+   Alliance — unrelated to staff payroll. Alliance PV-0109-era money belongs to Director;
+   until 0115's transfer, June payouts borrow ~10,572.42 of it (预支, self-heals).
 2. HR runs **Stage-G** (hr-costing/payment → create disbursement batch) → Principal approves
    batch → each dept pool drains its own staff nets; Alliance pays.
 3. Finance generates **statutory PVs** (payroll-requests page), sets payment dates, Principal
