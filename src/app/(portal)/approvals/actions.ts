@@ -532,6 +532,20 @@ export async function rejectRequest(formData: FormData) {
         `Rejection recorded but loan cancel failed: ${loanError.message}`
       )
     }
+  } else if (approval.request_type === 'new_fund_source') {
+    // Mirror the new_loan branch — without this the fund source stays
+    // pending_approval forever after its approval request is rejected.
+    const { error: fsError } = await supabase
+      .from('fund_sources')
+      .update({ status: 'cancelled' })
+      .eq('id', approval.reference_id)
+      .eq('status', 'pending_approval')
+
+    if (fsError) {
+      throw new Error(
+        `Rejection recorded but fund source cancel failed: ${fsError.message}`
+      )
+    }
   } else if (approval.request_type === 'payment_voucher') {
     // Phase 4: void the linked payment voucher on rejection
     await supabase
@@ -554,6 +568,7 @@ export async function rejectRequest(formData: FormData) {
   }
 
   revalidatePath('/approvals')
+  revalidatePath('/fund-in')
   revalidatePath('/fund-out')
   revalidatePath('/payments')
   revalidatePath('/dashboard')

@@ -62,9 +62,14 @@ the `is_primary` bank and posted the GL debit to its code, so every deposit land
   fully regenerated.
 
 ### Open items / next
-- Pending fund source **HOUZS Century RM 45,156.32** (effective 15 Jul) predates the bank field →
-  Details shows "Primary bank (not specified)" and it will land in **Hong Leong** on approval.
-  It's still `pending_approval`, so it can now be **edited to Alliance** before Principal approves.
+- ~~Pending fund source **HOUZS Century RM 45,156.32**~~ → RESOLVED (2026-07-20, later same day):
+  user had RE-CREATED it with "Receive into bank = Alliance" (fs `c7302f6b`) instead of editing,
+  leaving the original bank-less row (`2531a80b`) as a pending DUPLICATE — approving both would
+  have double-counted the deposit. Old row cancelled + its approval rejected via direct SQL
+  (notes on both rows record why). The Alliance-routed one remains `pending_approval` for
+  Principal. **Bundled code fix:** `rejectRequest` had NO `new_fund_source` branch — rejecting a
+  fund-source approval left the fund_sources row stuck `pending_approval` forever. Now cancels it
+  (mirrors the `new_loan` branch) + reject revalidates `/fund-in` too (`approvals/actions.ts`).
 - Other Debtor (3071) outstanding is **RM 378.73** after recording the RM 162.21 receipt for
   I-000058 (Office Rental May'26) into Hong Leong — `JE-202607-0224`, segment `corporate`.
 - Banks: Hong Leong `3000` (primary), Alliance `3010`.
