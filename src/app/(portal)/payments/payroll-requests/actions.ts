@@ -181,8 +181,11 @@ export async function generatePvFromRequest(
   }
 
   // ── Insert source pool allocations (up to 5 rows) ─────────────────────────
-  // Post-mig 238: PVS rows must reference chart_of_accounts via account_code.
-  // Payroll bank transfers post to Salary Expense (9030).
+  // Mig 20260720160000: the funding PV is a PURE fund transfer (no expense —
+  // Finance books the month-end accrual JVs). account_code 3010 = the Alliance
+  // destination: the credit_dest_bank_on_bank_transfer trigger credits that
+  // bank at approval (same mechanism as internal_transfer), and the PV detail
+  // shows the rows as bank staging rather than Salary Expense.
   const { error: srcErr } = await supabase
     .from('payment_voucher_sources')
     .insert(
@@ -190,7 +193,7 @@ export async function generatePvFromRequest(
         voucher_id: voucher.id,
         pool: s.pool,
         amount: s.amount,
-        account_code: '9030',
+        account_code: '3010',
       })),
     )
 

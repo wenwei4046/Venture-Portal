@@ -4,7 +4,41 @@
 > 2026-07-20C (FINAL custody model) is FIRST — it SUPERSEDES the intermediate 2026-07-20B
 > redesign below (kept for history). Then 2026-07-20A, then the older checkpoints.
 
-## Session 2026-07-20C — FINAL payroll model: HR CUSTODY (mig `20260720140000`, deployed + applied)
+## Session 2026-07-20D — accrual convention locked: pure-transfer funding + 4070-74 clearing (mig `20260720160000`)
+
+Discovery: Finance ALREADY books the monthly payroll accrual manually — five per-segment JVs
+on 2026-06-30 (`JE-202606-0226..0230`, incl. DIRECTOR), their convention:
+**Dr 9030 basic + 9084 allowance + 9081/9082/9083 ER contributions / Cr 4070 net · 4071 EPF ·
+4072 SOCSO(+SKBBK — user: SKBBK stays in 4072) · 4073 EIS · 4074 PCB.** Staff dept totals tie
+the funding to the cent; the system's auto-accrual (Dr 9030/Cr 4020 at funding) was therefore
+DOUBLE-COUNTING June P&L. User rulings: funding = "fund transfer purpose 罢了" (no expense);
+SKBBK → 4072; director actuals 以用户手工 JV 为准 (JV: net 45,144.35 / EPF 13,961.00 /
+PCB 8,691.35 — DIFFERS from the engine's director_payouts: 38,129.40 / 11,408.00 / 7,431.80).
+
+- **approve_single_voucher**: payroll_bank_transfer posts ONLY the hr-segment staging JE
+  (Dr 3010/Cr source). No accrual. Dest (Alliance) cache credit now via
+  `credit_dest_bank_on_bank_transfer` — funding PVS rows carry account_code **3010**
+  (generatePvFromRequest changed 9030→3010; PV detail shows bank staging, not Salary Expense).
+  Pool drains + FULL-round HR custody credit + bank guard unchanged.
+- **Disbursement PVs** (staff AND director): account **4070** (was 4020/9030).
+- **Statutory PVs**: five schemes now cover STAFF + DIRECTORS in one payment each —
+  KWSP→**4071** · SOCSO→**4072** · EIS→**4073** · LHDN→**4074** · SKBBK→**4072**; two PVS
+  rows per PV (staff share dept_pool_hr, director share dept_pool_director).
+- **June dedup (direct SQL, recorded)**: deleted the 8 auto-accrual JEs (July-dated,
+  Dr 9030/Cr 4020) after re-pointing PV-0100's backlink to its staging JE (PV-0115 → NULL);
+  funding PVS account_code → 3010. Verified: 4020 balance **0**, July payroll expense **0**,
+  June salary expense (9030+9081-84) = **163,818.20** == the 5 manual JVs exactly
+  (staff 95,390.70 + director 68,427.50), TB 0.00, Σpools+venture = banks = 138,287.61.
+- ⚠️ BEFORE June payouts/statutory: **director_payouts must be updated to the user's JV
+  numbers** (owner: HR/Principal via the Director Salary actual grid — Finance must not
+  write it, dept-data boundary). Until then the PVs would generate from engine numbers and
+  4070/4071/4074 would not clear to zero. Also investigate later WHY the engine differs
+  (allowance 3,079.30 not modelled, EPF basis, PCB table?).
+- Alliance cash for the full June cycle at the user's numbers = 163,818.20 total out;
+  after PV-0115's pending 10,572.42 transfer Alliance ≈ 141,129.47 → still ~22,689 short
+  (director side) — one more HL→Alliance top-up when director numbers are final.
+
+## Session 2026-07-20C — payroll model: HR CUSTODY (mig `20260720140000`, deployed + applied)
 
 After running both models the user ruled: **"payroll request 就是扣各个部门的 fund 去 HR 的
 Alliance"** — the ORIGINAL custody flow was right all along; only its bug (HR's own share
