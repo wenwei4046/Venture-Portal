@@ -57,10 +57,23 @@ build). **RECONCILED at session end: Σ6 segments 134,947.80 == bank caches == G
    batch → each dept pool drains its own staff nets; Alliance pays.
 3. Finance generates **statutory PVs** (payroll-requests page), sets payment dates, Principal
    approves — drains dept pools per dept statutory (22,473.95 total for June).
-4. ⚠️ **532.35 over-accrual flag**: request/accrual total 95,390.70 vs actual staff cash need
-   94,858.35 (net 72,384.40 + statutory 22,473.95). After steps 2-3, `4020` will hold a
-   532.35 credit residual → needs a small reversing JE or ruling (source of the diff not yet
-   traced; payroll_runs.total_amount vs hr_monthly_payroll drifted somewhere).
+4. ~~532.35 over-accrual flag~~ → **RESOLVED (user): it's SKBBK** — a net-only employee
+   deduction InfoTech's June export introduced. The pre-2026-07-03 importer dropped the
+   column, so June rows had `skbbk_amount=0` while net was already after-SKBBK. Backfilled by
+   direct SQL (17 rows, 532.35), then **SKBBK added as a 4th one-click statutory voucher**
+   (mig `20260720110000`, KWSP/PERKESO/LHDN/SKBBK, explicit CASE per body).
+5. ⚠️ **June payroll was RE-IMPORTED at 2026-07-20 07:42:50** (all 19 rows, one bulk op,
+   post-fix importer — identity `net = gross − EE stat − PCB − SKBBK` holds on every row).
+   New per-dept cash need vs the completed funding 95,390.70:
+   DO 6,466.25 (=funded, exact) · HR 21,351.10 (=funded, exact) ·
+   Finance 24,191.99 (funded 23,882.01, **short 309.98**) ·
+   Marketing 42,609.69 (funded 43,691.34, **over 1,081.65**) · total 94,619.03 → net
+   over-accrual **771.67**. Run/request still approved/completed at the OLD total (stale).
+   **Plan (after Stage-G + statutory clear 4020 at the new numbers):** one adjusting JE per
+   affected segment to true `9030/4020` to actual — Marketing Dr 4020 / Cr 9030 1,081.65;
+   Finance Dr 9030 / Cr 4020 309.98. Confirm with user the 07:42 re-import is FINAL first.
+   Statutory PV dry-run at the new numbers: KWSP 17,962.00 · PERKESO 1,829.90 ·
+   LHDN 2,973.25 · SKBBK 532.35.
 - NOTE: batch approve RPCs would decrement a bank for a grouped payroll_bank_transfer without
   crediting Alliance — impossible today (funding PVs are never grouped), noted only.
 - `database.types.ts` NOT regenerated for the new RPC (same `as any` escape hatch as

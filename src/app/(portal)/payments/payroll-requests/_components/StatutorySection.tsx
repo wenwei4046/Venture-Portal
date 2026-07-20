@@ -27,9 +27,9 @@ function fmt(n: number): string {
 }
 
 /**
- * Mig 20260720 — one-click KWSP / PERKESO / LHDN vouchers per funded payroll
- * period, split per staff department pool. payment_date is left empty on
- * purpose (payment timing is uncertain) — Finance sets it on the pending PV
+ * Mig 20260720 — one-click KWSP / PERKESO / LHDN / SKBBK vouchers per funded
+ * payroll period, split per staff department pool. payment_date is left empty
+ * on purpose (payment timing is uncertain) — Finance sets it on the pending PV
  * before Principal approves.
  */
 export default function StatutorySection({ periods, banks }: Props) {
@@ -58,7 +58,7 @@ export default function StatutorySection({ periods, banks }: Props) {
     <section className="mb-12">
       <div className="flex items-baseline justify-between mb-4">
         <h2 className="font-serif text-2xl text-ink">Statutory payments</h2>
-        <span className="font-mono text-xs text-muted">KWSP · PERKESO · LHDN</span>
+        <span className="font-mono text-xs text-muted">KWSP · PERKESO · LHDN · SKBBK</span>
       </div>
       <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
         {periods.map(p => {
