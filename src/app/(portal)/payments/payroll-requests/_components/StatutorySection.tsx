@@ -27,14 +27,14 @@ function fmt(n: number): string {
 }
 
 /**
- * Mig 20260720 — one-click KWSP / PERKESO / LHDN / SKBBK vouchers per funded
- * payroll period, split per staff department pool. payment_date is left empty
- * on purpose (payment timing is uncertain) — Finance sets it on the pending PV
- * before Principal approves.
+ * Mig 20260720130000 — one-click statutory vouchers per funded payroll period:
+ * FIVE PVs, one per scheme (KWSP / SOCSO / EIS / LHDN / SKBBK), each a single
+ * payment to its body with the amount split per staff department pool inside.
+ * payment_date is left empty on purpose (payment timing is uncertain) —
+ * Finance sets it on each pending PV before Principal approves.
  */
 export default function StatutorySection({ periods, banks }: Props) {
   const [bankId, setBankId] = useState<string>(banks[0]?.id ?? '')
-  const [splitByDept, setSplitByDept] = useState(false)
   const [busyPeriod, setBusyPeriod] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -46,7 +46,9 @@ export default function StatutorySection({ periods, banks }: Props) {
     setBusyPeriod(period)
     startTransition(async () => {
       try {
-        await generateStatutoryVouchers(period, bankId, splitByDept)
+        // One PV per scheme (KWSP / SOCSO / EIS / LHDN / SKBBK) — user practice
+        // 2026-07-20: each body gets exactly one payment covering all depts.
+        await generateStatutoryVouchers(period, bankId)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Generate failed')
       } finally {
@@ -59,7 +61,7 @@ export default function StatutorySection({ periods, banks }: Props) {
     <section className="mb-12">
       <div className="flex items-baseline justify-between mb-4">
         <h2 className="font-serif text-2xl text-ink">Statutory payments</h2>
-        <span className="font-mono text-xs text-muted">KWSP · PERKESO · LHDN · SKBBK</span>
+        <span className="font-mono text-xs text-muted">KWSP · SOCSO · EIS · LHDN · SKBBK</span>
       </div>
       <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
         {periods.map(p => {
@@ -91,16 +93,6 @@ export default function StatutorySection({ periods, banks }: Props) {
                         </option>
                       ))}
                     </select>
-                    <label className="flex items-center gap-1.5 font-sans text-xs text-graphite cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={splitByDept}
-                        onChange={e => setSplitByDept(e.target.checked)}
-                        disabled={isPending}
-                        className="accent-[var(--accent)]"
-                      />
-                      one PV per department
-                    </label>
                     <button
                       onClick={() => handleGenerate(p.period_month)}
                       disabled={isPending || !bankId}
