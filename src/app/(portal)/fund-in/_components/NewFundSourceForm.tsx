@@ -18,6 +18,8 @@ interface Props {
   departments: Department[]
   /** Liability / equity accounts the fund-in can be tagged with (mig 247). */
   liabilityAccounts: AccountOption[]
+  /** Active HV banks — which one receives the deposit (primary listed first). */
+  banks: { id: string; bank_name: string; account_number: string; is_primary: boolean }[]
 }
 
 const SOURCE_TYPES: { value: FundSourceType; label: string; hint: string }[] = [
@@ -27,7 +29,7 @@ const SOURCE_TYPES: { value: FundSourceType; label: string; hint: string }[] = [
   { value: 'outsource', label: 'Outsource', hint: 'External party — bank, vendor, individual investor (free text)' },
 ]
 
-export default function NewFundSourceForm({ companies, departments, liabilityAccounts }: Props) {
+export default function NewFundSourceForm({ companies, departments, liabilityAccounts, banks }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [sourceType, setSourceType] = useState<FundSourceType>('subsidiary')
@@ -189,6 +191,38 @@ export default function NewFundSourceForm({ companies, departments, liabilityAcc
           Tracks who HV owes individually on the Balance Sheet. Leave blank to
           fall back to the umbrella &quot;4000 Fund Sources Payable&quot;. Pick a child
           sub-account (e.g. &quot;4001 — Lim Wei Siang&quot;) for a per-party balance.
+        </p>
+      </div>
+
+      {/* ───────── Receiving bank (mig 20260708100000) ───────── */}
+      <div className="mb-6">
+        <label
+          htmlFor="bank_account_id"
+          className="block text-sm font-sans font-medium text-graphite mb-1.5"
+        >
+          Receive into bank
+        </label>
+        <select
+          id="bank_account_id"
+          name="bank_account_id"
+          defaultValue={banks.find((b) => b.is_primary)?.id ?? banks[0]?.id ?? ''}
+          disabled={isPending}
+          className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border disabled:opacity-60"
+        >
+          {banks.length === 0 ? (
+            <option value="">No active banks</option>
+          ) : (
+            banks.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.bank_name} — {b.account_number}
+                {b.is_primary ? ' (primary)' : ''}
+              </option>
+            ))
+          )}
+        </select>
+        <p className="font-serif italic text-muted text-xs mt-1.5">
+          Which HV account the money lands in. Applied when Principal approves —
+          that bank&apos;s balance and its GL cash account are the ones that move.
         </p>
       </div>
 

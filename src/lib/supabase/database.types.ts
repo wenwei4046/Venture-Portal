@@ -1559,6 +1559,7 @@ export type Database = {
         Row: {
           account_code: string | null
           amount: number
+          bank_account_id: string | null
           capital_type: string
           compound_interest: boolean
           cost_rate: number
@@ -1586,6 +1587,7 @@ export type Database = {
         Insert: {
           account_code?: string | null
           amount: number
+          bank_account_id?: string | null
           capital_type?: string
           compound_interest?: boolean
           cost_rate: number
@@ -1613,6 +1615,7 @@ export type Database = {
         Update: {
           account_code?: string | null
           amount?: number
+          bank_account_id?: string | null
           capital_type?: string
           compound_interest?: boolean
           cost_rate?: number

@@ -90,6 +90,8 @@ export async function createFundSource(formData: FormData) {
   // Optional today (falls back to 4000 Fund Sources Payable at approval time)
   // so legacy data + transitional UI keep working.
   const accountCode = ((formData.get('account_code') as string) ?? '').trim() || null
+  // Which HV bank receives the deposit. NULL = primary (approval falls back).
+  const bankAccountId = ((formData.get('bank_account_id') as string) ?? '').trim() || null
 
   if (!VALID_TYPES.includes(raw.source_type)) {
     throw new Error('Invalid source type')
@@ -173,6 +175,7 @@ export async function createFundSource(formData: FormData) {
     effective_date: raw.effective_date,
     repayment_date: raw.repayment_date || null,
     account_code: accountCode,
+    bank_account_id: bankAccountId,
     // Mig 12 trigger auto-fills maturity_date from effective_date + lock_in_months
     // when a lock-in exists. With no fixed term both stay null; the user-entered
     // repayment_date (when present) seeds maturity so the detail page matches.

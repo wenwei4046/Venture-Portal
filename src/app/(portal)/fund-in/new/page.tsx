@@ -11,7 +11,7 @@ export default async function NewFundInPage() {
   const supabase = await createClient()
 
   // Item 4: directors no longer needed — director_loan + outsource use free text.
-  const [{ data: companyRows }, { data: deptRows }, { data: acctRows }] = await Promise.all([
+  const [{ data: companyRows }, { data: deptRows }, { data: acctRows }, { data: bankRows }] = await Promise.all([
     supabase
       .from('companies')
       .select('*')
@@ -25,6 +25,12 @@ export default async function NewFundInPage() {
       .eq('is_active', true)
       .in('type', ['liability', 'equity'])
       .order('code'),
+    // Which HV bank receives the deposit (primary first = the default).
+    supabase
+      .from('bank_accounts')
+      .select('id, bank_name, account_number, is_primary')
+      .eq('status', 'active')
+      .order('is_primary', { ascending: false }),
   ])
 
   const companies = (companyRows ?? []) as Company[]
@@ -58,6 +64,12 @@ export default async function NewFundInPage() {
         companies={companies}
         departments={departments}
         liabilityAccounts={liabilityAccounts}
+        banks={(bankRows ?? []).map((b) => ({
+          id: b.id as string,
+          bank_name: b.bank_name as string,
+          account_number: (b.account_number as string) ?? '',
+          is_primary: !!b.is_primary,
+        }))}
       />
     </div>
   )

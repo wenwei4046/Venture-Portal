@@ -163,7 +163,7 @@ async function performApproval(
     // (expense_out) so the dept pool balance reflects the transfer to HV.
     const { data: fundSource, error: fsFetchError } = await supabase
       .from('fund_sources')
-      .select('id, amount, source_type, from_company_id, from_director_id, from_department_id, effective_date, account_code')
+      .select('id, amount, source_type, from_company_id, from_director_id, from_department_id, effective_date, account_code, bank_account_id')
       .eq('id', approval.reference_id)
       .eq('status', 'pending_approval')
       .single()
@@ -242,18 +242,25 @@ async function performApproval(
       throw new Error(`Approval recorded but venture_pool fund_in failed: ${vpError.message}`)
     }
 
-    // Bump primary bank account balance
-    const { data: primaryBank } = await supabase
-      .from('bank_accounts')
-      .select('id, current_balance, gl_account_code')
-      .eq('is_primary', true)
-      .eq('status', 'active')
-      .single()
-    if (primaryBank) {
+    // Credit the bank Finance picked on the Fund IN form (mig 20260708100000);
+    // fall back to the primary active bank for legacy / unpicked rows.
+    const { data: targetBank } = fundSource.bank_account_id
+      ? await supabase
+          .from('bank_accounts')
+          .select('id, current_balance, gl_account_code')
+          .eq('id', fundSource.bank_account_id)
+          .maybeSingle()
+      : await supabase
+          .from('bank_accounts')
+          .select('id, current_balance, gl_account_code')
+          .eq('is_primary', true)
+          .eq('status', 'active')
+          .maybeSingle()
+    if (targetBank) {
       await supabase
         .from('bank_accounts')
-        .update({ current_balance: Number(primaryBank.current_balance) + Number(fundSource.amount) })
-        .eq('id', primaryBank.id)
+        .update({ current_balance: Number(targetBank.current_balance) + Number(fundSource.amount) })
+        .eq('id', targetBank.id)
     }
 
     // Mig 197/P0-3: post fund source activation JE (dr Bank / cr Fund Sources Payable).
@@ -272,7 +279,7 @@ async function performApproval(
         referenceId: fundSource.id,
         createdBy: user.id,
         lines: [
-          { accountCode: primaryBank?.gl_account_code ?? '3000', debit: Number(fundSource.amount), description: 'Bank — fund source received' },
+          { accountCode: targetBank?.gl_account_code ?? '3000', debit: Number(fundSource.amount), description: 'Bank — fund source received' },
           { accountCode: liabilityCode, credit: Number(fundSource.amount), description: `Fund source payable — ${fundSource.source_type}` },
         ],
       })
