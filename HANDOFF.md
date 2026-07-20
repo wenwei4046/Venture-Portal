@@ -26,10 +26,15 @@ build). **RECONCILED at session end: Σ6 segments 134,947.80 == bank caches == G
 - **Stage-G disbursement**: each staff PV drains the **staff's own dept pool** (was
   dept_pool_hr for all); directors unchanged (dept_pool_director). GL side already resolved
   per staff dept via `derive_journal_segment` — pools now match it.
-- **Statutory**: NEW RPC `create_payroll_statutory_vouchers(period, bank)` — one-click
-  KWSP / PERKESO(SOCSO+EIS) / LHDN(PCB) PVs, PVS split per staff dept pool (acct 4020),
+- **Statutory**: NEW RPC `create_payroll_statutory_vouchers(period, bank, split_by_dept)` —
+  one-click KWSP / PERKESO(SOCSO+EIS) / LHDN(PCB) / SKBBK PVs (acct 4020),
   **payment_date NULL** (几时付款不确定 — Finance edits the pending PV, GL date follows).
-  UI: "Statutory payments" section on /payments/payroll-requests (recent completed periods).
+  `split_by_dept=false` (default): one PV per body, PVS split per dept pool inside;
+  `true` ("one PV per department" checkbox, mig `20260720120000`): one PV per
+  body × department, each independently dated/approved (user: 缴款可能分不同 PV、
+  不同日期、不同部门). Bank picker defaults to Alliance (GL 3010 first) — the funding
+  staged the statutory share there. UI: "Statutory payments" section on
+  /payments/payroll-requests (recent completed periods).
 - **Overdraw**: auto-allowed (预支) for reference_type `payroll_disbursement` /
   `payroll_statutory` in ALL THREE approve RPCs — batch RPCs previously NEVER set the GUC,
   so June's Stage-G batch would have been blocked on the first short pool.

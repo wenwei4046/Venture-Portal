@@ -34,6 +34,7 @@ function fmt(n: number): string {
  */
 export default function StatutorySection({ periods, banks }: Props) {
   const [bankId, setBankId] = useState<string>(banks[0]?.id ?? '')
+  const [splitByDept, setSplitByDept] = useState(false)
   const [busyPeriod, setBusyPeriod] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -45,7 +46,7 @@ export default function StatutorySection({ periods, banks }: Props) {
     setBusyPeriod(period)
     startTransition(async () => {
       try {
-        await generateStatutoryVouchers(period, bankId)
+        await generateStatutoryVouchers(period, bankId, splitByDept)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Generate failed')
       } finally {
@@ -77,7 +78,7 @@ export default function StatutorySection({ periods, banks }: Props) {
                   </div>
                 </div>
                 {generated ? null : (
-                  <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-3 shrink-0 flex-wrap">
                     <select
                       value={bankId}
                       onChange={e => setBankId(e.target.value)}
@@ -90,6 +91,16 @@ export default function StatutorySection({ periods, banks }: Props) {
                         </option>
                       ))}
                     </select>
+                    <label className="flex items-center gap-1.5 font-sans text-xs text-graphite cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={splitByDept}
+                        onChange={e => setSplitByDept(e.target.checked)}
+                        disabled={isPending}
+                        className="accent-[var(--accent)]"
+                      />
+                      one PV per department
+                    </label>
                     <button
                       onClick={() => handleGenerate(p.period_month)}
                       disabled={isPending || !bankId}
