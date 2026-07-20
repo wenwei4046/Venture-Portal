@@ -6,6 +6,9 @@ import RequestPayrollPaymentButton, {
   type RequestState,
 } from '../payroll/_components/RequestPayrollPaymentButton'
 import CreateDisbursementButton from './_components/CreateDisbursementButton'
+import StatutorySection, {
+  type StatutoryPeriod,
+} from '../../payments/payroll-requests/_components/StatutorySection'
 
 interface DeptBreakdown {
   dept_name: string
@@ -144,6 +147,29 @@ export default async function HRPaymentPage() {
       .maybeSingle()
     disbursementGroupId = approvalRow?.group_id ?? null
   }
+
+  // ── Statutory PVs for this run (mig 20260720150000: HR can generate them
+  // here too; the RPC auto-picks the Alliance bank — no picker needed).
+  const { data: statutoryPvsRaw } = run
+    ? await supabase
+        .from('payment_vouchers')
+        .select('id, voucher_no, payee_name, amount, status')
+        .eq('reference_type', 'payroll_statutory')
+        .eq('reference_id', run.id)
+        .neq('status', 'voided')
+    : { data: [] }
+  const statutoryPeriods: StatutoryPeriod[] = [
+    {
+      period_month: period,
+      pvs: (statutoryPvsRaw ?? []).map(v => ({
+        id: v.id as string,
+        voucher_no: v.voucher_no,
+        payee_name: v.payee_name,
+        amount: Number(v.amount ?? 0),
+        status: v.status as string,
+      })),
+    },
+  ]
 
   // No Principal costing approval since mig 278 — Submit to Finance lands the
   // run directly in 'approved', so there is no 'submitted'/'rejected' run state
@@ -349,7 +375,7 @@ export default async function HRPaymentPage() {
             <div className="mb-4">
               <em className="font-serif italic text-ledger text-lg">✓ Funding complete — cash staged in Alliance</em>
               <p className="font-serif italic text-graphite text-sm mt-1">
-                Ready to disburse to staff. Each voucher draws from the employee&apos;s own department pool.
+                Ready to disburse to staff. Vouchers draw from the HR custody pool.
               </p>
             </div>
 
@@ -383,6 +409,15 @@ export default async function HRPaymentPage() {
                 </span>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Statutory payments — HR can generate the five scheme PVs here too
+            (KWSP / SOCSO / EIS / LHDN / SKBBK), paid from Alliance out of the
+            HR custody pool. Shown once the funding is complete. */}
+        {phase === 'funded' && (
+          <div className="mt-8">
+            <StatutorySection periods={statutoryPeriods} banks={[]} />
           </div>
         )}
       </div>

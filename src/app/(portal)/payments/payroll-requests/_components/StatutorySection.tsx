@@ -19,6 +19,8 @@ export interface StatutoryPeriod {
 
 interface Props {
   periods: StatutoryPeriod[]
+  /** Bank options for Finance's picker. Empty = no picker (HR side) — the RPC
+   *  auto-picks the Alliance payroll bank. */
   banks: Bank[]
 }
 
@@ -48,7 +50,8 @@ export default function StatutorySection({ periods, banks }: Props) {
       try {
         // One PV per scheme (KWSP / SOCSO / EIS / LHDN / SKBBK) — user practice
         // 2026-07-20: each body gets exactly one payment covering all depts.
-        await generateStatutoryVouchers(period, bankId)
+        // Without a picker (HR side) the RPC auto-picks the Alliance bank.
+        await generateStatutoryVouchers(period, bankId || undefined)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Generate failed')
       } finally {
@@ -81,21 +84,27 @@ export default function StatutorySection({ periods, banks }: Props) {
                 </div>
                 {generated ? null : (
                   <div className="flex items-center gap-3 shrink-0 flex-wrap">
-                    <select
-                      value={bankId}
-                      onChange={e => setBankId(e.target.value)}
-                      disabled={isPending}
-                      className="bg-paper border border-hairline rounded-md px-2 py-1 text-xs font-sans text-ink focus:outline-none focus:border-accent-border"
-                    >
-                      {banks.map(b => (
-                        <option key={b.id} value={b.id}>
-                          {b.bank_name} · RM {fmt(b.current_balance)}
-                        </option>
-                      ))}
-                    </select>
+                    {banks.length > 0 ? (
+                      <select
+                        value={bankId}
+                        onChange={e => setBankId(e.target.value)}
+                        disabled={isPending}
+                        className="bg-paper border border-hairline rounded-md px-2 py-1 text-xs font-sans text-ink focus:outline-none focus:border-accent-border"
+                      >
+                        {banks.map(b => (
+                          <option key={b.id} value={b.id}>
+                            {b.bank_name} · RM {fmt(b.current_balance)}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="font-serif italic text-muted text-xs">
+                        paid from the Alliance payroll bank
+                      </span>
+                    )}
                     <button
                       onClick={() => handleGenerate(p.period_month)}
-                      disabled={isPending || !bankId}
+                      disabled={isPending || (banks.length > 0 && !bankId)}
                       className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-1.5 rounded-md disabled:opacity-50 transition-colors"
                     >
                       {isPending && busyPeriod === p.period_month

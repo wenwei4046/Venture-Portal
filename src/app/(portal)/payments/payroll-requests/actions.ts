@@ -322,21 +322,23 @@ export interface StatutoryResult {
 
 export async function generateStatutoryVouchers(
   period: string,
-  bankAccountId: string,
+  bankAccountId?: string,
 ): Promise<StatutoryResult> {
-  await requireRole(['finance', 'principal'])
+  // HR generates from hr-costing → Payment (no bank picker — the RPC
+  // auto-picks Alliance); Finance from /payments/payroll-requests.
+  await requireRole(['hr', 'finance', 'principal'])
   const supabase = await createClient()
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(period)) throw new Error('Invalid period')
-  if (!bankAccountId) throw new Error('Pick the bank the statutory payments go out from')
 
-  // RPC final shape: mig 20260720140000 (custody model) — five PVs, each one
-  // payment to its scheme, drained from dept_pool_hr. database.types.ts not
-  // regenerated (same escape hatch as create_payroll_disbursement_vouchers).
+  // RPC final shape: mig 20260720150000 (custody model) — five PVs, each one
+  // payment to its scheme, drained from dept_pool_hr; NULL bank auto-picks
+  // Alliance (GL 3010). database.types.ts not regenerated (same escape hatch
+  // as create_payroll_disbursement_vouchers).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase.rpc as any)(
     'create_payroll_statutory_vouchers',
-    { p_period: period, p_bank_account_id: bankAccountId },
+    { p_period: period, p_bank_account_id: bankAccountId ?? null },
   )
 
   if (error) throw new Error(error.message)
