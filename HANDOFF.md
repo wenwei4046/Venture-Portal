@@ -1,6 +1,78 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-06-19 · merge)
+# HOUZS Venture Portal — Session Handoff (checkpoint 2026-07-20 · payroll funding + cash-flow tie-out)
 
 > Context-window handoff. Read this first to continue. User communicates in 华语 (Mandarin).
+> 2026-07-20 checkpoint is FIRST. Earlier checkpoints (2026-06-19 merge, 2026-06-04, 2026-06-11)
+> are preserved unchanged below it.
+
+## Session 2026-07-20 — payroll partial funding · Cash Flow ↔ Dept Pool tie-out · Fund IN bank routing
+
+**Everything below is DEPLOYED to `main` (HEAD `64ec536`) and applied to the live DB via MCP.**
+Gates green at HEAD: `npx tsc --noEmit` (filter `loan-disbursement.test`), `npm run test:ci`
+(376 passing), `rm -rf .next && npx next build`.
+
+### 1. Payroll funding — partial rounds + dept-pool overdraw + payment date (mig `20260708000000`)
+Finance was dead-locked on Payroll Requests → Generate PV when a pool (or the bank) looked short.
+- **Stage-E funding PV is an ACCRUAL, not cash** (`Dr 9030 / Cr 4020`, mig 20260619) — it never
+  moves the source bank's cash, so the old bank-balance block was stale and is **removed**
+  (server action + the Approve button's disable). Cash leaves at Stage-G disbursement (Alliance).
+- **Overdraw = 预支**: a short dept pool just goes **negative** (plain negative cash, **NOT** a
+  booked inter-co loan). `approve_single_voucher` now auto-allows overdraw for
+  `payroll_bank_transfer` (applied by string-transforming the LIVE function so all other
+  branches stayed byte-identical — see the migration's `DO $mig$` block).
+- **Partial funding**: a request can be funded across several PVs; round sum ≤ outstanding
+  remainder. Completion trigger re-keyed from the single `pv_id` to `reference_id` + **cumulative
+  paid**. Disbursement still needs the request `completed` (fully funded).
+- Payment-date picker (drives the GL date at approval, period-lock guarded).
+- Files: `payments/payroll-requests/{actions.ts,page.tsx,_components/GeneratePvForm.tsx}`,
+  `lib/payroll-funding.ts` (+test), `payments/[id]/_components/VoucherActions.tsx`.
+- ⚠️ **Gotcha fixed**: a client `catch` around a redirecting Server Action must **re-throw**
+  `NEXT_REDIRECT` (see `approvals/[id]/_components/ApprovalActions.tsx`). Returning instead
+  swallows the redirect — the PV was created but the spinner hung forever.
+
+### 2. Cash Flow ↔ Dept Pool tie-out (`lib/inter-billing-cash-flow.ts`)
+Per-segment Cash Flow closing ≠ Dept Pool balance. Root cause: **inter-billing AND own-share
+settle only in the `dept_pools` ledger, with NO GL journal entry** (conceptual transfer inside
+Hong Leong; HV's cash is commingled), so the GL-driven report can't see them.
+- Fix: feed **synthetic transfer lines** into `buildCashFlow` (bank leg + a Financing
+  "Inter-billing" leg per side) on **all 4 surfaces** (cash-flow page/export, monthly page/export).
+- **Payer = every `inter_billing_out`; receiver = the `np_in` sharing the same `HV-OR-…` PV ref.**
+  Both directions occur — own-share runs **Venture Office → a dept**, so the receiver is NOT
+  always Venture Office, and the payer may BE Venture Office. Don't hard-code either side.
+- Sides net to zero ⇒ consolidated Cash Flow unchanged; **all 6 segments now tie** to Dept Pool.
+- Monthly (saved-layout) report: `buildCustomCashFlowRows` now **auto-files un-placed accounts by
+  their default category** (operating/investing/financing), so the red **"Unassigned"** bucket is
+  effectively gone. Also a data fix: the missing inter-company "Amount due" accounts
+  (`3052/3056/3057/3058/4053/4057/4100/4200`) were added to the saved Financing layout in
+  `report_layouts`.
+
+### 3. Journal Entries search
+`/reconciliation/journal-entries` got an instant client-side filter (voucher / description /
+segment / date / amount) — `_components/JvList.tsx`.
+
+### 4. Fund IN bank routing (mig `20260708100000`)
+Fund OUT (new loan) already had "Pay from bank"; **Fund IN had none** — approval always bumped
+the `is_primary` bank and posted the GL debit to its code, so every deposit landed in Hong Leong.
+- `fund_sources.bank_account_id` (nullable; **NULL = primary fallback**, so legacy rows are safe).
+- "Receive into bank" picker on **both** the create and edit forms; captured in
+  `createFundSource` / `updateFundSource`; approval credits the picked bank for **both** the
+  balance bump and the GL debit leg (`approvals/actions.ts`, `targetBank`).
+- Fund-source detail page gained a **Details** section (source type, from, receive-into bank,
+  BS sub-account, rate + simple/compound, period, effective / expected-repayment / maturity).
+- NOTE: `database.types.ts` was hand-patched for the new column (Row/Insert/Update) rather than
+  fully regenerated.
+
+### Open items / next
+- Pending fund source **HOUZS Century RM 45,156.32** (effective 15 Jul) predates the bank field →
+  Details shows "Primary bank (not specified)" and it will land in **Hong Leong** on approval.
+  It's still `pending_approval`, so it can now be **edited to Alliance** before Principal approves.
+- Other Debtor (3071) outstanding is **RM 378.73** after recording the RM 162.21 receipt for
+  I-000058 (Office Rental May'26) into Hong Leong — `JE-202607-0224`, segment `corporate`.
+- Banks: Hong Leong `3000` (primary), Alliance `3010`.
+
+---
+
+# (Previous checkpoint) HOUZS Venture Portal — Session Handoff (checkpoint 2026-06-19 · merge)
+
 > 2026-06-19: branch `feat/hr-simplify-direct-submit` merged on top of the 2026-06-11 main state.
 > The HR-simplification session log (2026-06-04) is preserved immediately below, followed by
 > the full 2026-06-11 main handoff.
