@@ -1,15 +1,15 @@
 // Pure helpers for the partial payroll-funding flow (Payroll Requests → Generate PV).
 //
 // A payroll_payment_request can be funded across SEVERAL PVs. Each round,
-// Finance types how much each department contributes this time. Mig 20260720:
-// funding no longer touches dept pools at all (it books the per-dept accrual
-// and stages cash Hong Leong → Alliance); pools are drained at Stage-G payout,
-// where a short pool auto-overdraws (预支). The hard rules at funding are
-// arithmetic: a round can't fund a department beyond what it still owes, the
-// round total can't exceed the request's outstanding remainder, and the round
-// must fit in the source bank (checked in the action/UI, re-checked at
-// approval). overdrawRows is kept for callers that want a pool heads-up but no
-// longer gates anything at funding time.
+// Finance types how much each department contributes this time. Mig
+// 20260720140000 (custody model): approval deducts each department's typed
+// share immediately (a short pool goes NEGATIVE — 预支, a warning not a
+// block), parks the full round in the HR custody pool, and moves the cash
+// Hong Leong → Alliance. Payouts + statutory later drain only the HR pool.
+// The hard rules at funding are arithmetic: a round can't fund a department
+// beyond what it still owes, the round total can't exceed the request's
+// outstanding remainder, and the round must fit in the source bank (checked
+// in the action/UI, re-checked at approval).
 //
 // Extracted from the Server Action so the math is unit-tested without pulling in
 // next/cache + Supabase SSR cookies.

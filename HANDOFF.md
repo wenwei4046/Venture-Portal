@@ -1,8 +1,65 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-07-20B · payroll flow redesign)
+# HOUZS Venture Portal — Session Handoff (checkpoint 2026-07-20C · payroll = HR-custody FINAL)
 
 > Context-window handoff. Read this first to continue. User communicates in 华语 (Mandarin).
-> 2026-07-20B (payroll redesign) is FIRST, then 2026-07-20A. Earlier checkpoints
-> (2026-06-19 merge, 2026-06-04, 2026-06-11) are preserved unchanged below.
+> 2026-07-20C (FINAL custody model) is FIRST — it SUPERSEDES the intermediate 2026-07-20B
+> redesign below (kept for history). Then 2026-07-20A, then the older checkpoints.
+
+## Session 2026-07-20C — FINAL payroll model: HR CUSTODY (mig `20260720140000`, deployed + applied)
+
+After running both models the user ruled: **"payroll request 就是扣各个部门的 fund 去 HR 的
+Alliance"** — the ORIGINAL custody flow was right all along; only its bug (HR's own share
+leaking) needed fixing. This supersedes 20B's pools-drain-at-payout model. Gates green;
+live DB migrated; June data re-aligned; invariant Σpools + GL(corp/treasury) == banks holds
+(verified 144,141.94 − 5,854.33 = 138,287.61 == bank caches; TB 0.00).
+
+### Final flow (as-built)
+1. **Funding PV approval** (`payroll_bank_transfer`, partial rounds, amounts typed by
+   Finance per dept — manual adjustment preserved):
+   - Dr 9030 / Cr 4020 per dept segment (P&L per dept) — unchanged;
+   - **drains each source dept pool by its typed share** (short pool → negative, 预支,
+     GUC auto-set for payroll_bank_transfer);
+   - **credits dept_pool_hr with the FULL round** (`PV %s: payroll fund → HR custody`)
+     — includes HR's own share, THE bug-fix vs the old fan-out;
+   - source bank guarded + debited, Alliance (GL 3010) credited;
+   - ONE staging JE per round, **segment='hr'** (Dr 3010 / Cr 3000) — per-bank table
+     shows HR's Alliance slice swelling and each dept's row shrinking via pool balance.
+2. **Stage-G staff payouts** (one PV per employee, HR creates batch, Principal one-click):
+   drain `dept_pool_hr` only; `derive_journal_segment` now maps payroll_disbursement →
+   staff rows 'hr', director rows 'director' (was staff-dept / 'director_office').
+3. **Statutory**: FIVE ungrouped PVs — KWSP / PERKESO (SOCSO) / PERKESO (EIS) / LHDN /
+   SKBBK — each ONE payment to its scheme, single PVS row `dept_pool_hr` acct 4020,
+   payment_date NULL for Finance (2-arg RPC again; the split-by-dept variant and its
+   UI checkbox are GONE — user voided the 16-PV experiment). June amounts: KWSP 18,496.00 ·
+   SOCSO 1,596.60 · EIS 283.80 · LHDN 2,097.55 · SKBBK 532.35.
+4. Directors unchanged (dept_pool_director; 4 PVs June, 38,129.40; staged via PV-0109).
+- HR pool balance = the payroll war chest; hr-costing/payment hero shows it again
+  ("HR Pool · payroll custody"). It SWELLS between funding and payday BY DESIGN (user
+  accepted after the 白话 explanation); after June's full payout it lands back at ~315.42.
+
+### June data re-alignment (direct SQL, recorded for audit)
+- Re-inserted the 8 funding `expense_out` drains (dept typed shares, with approval_ids —
+  `expense_has_approval` CHECK requires them; overdraw GUC needed for Marketing) + 2
+  custody `np_in` (84,818.28 / 10,572.42 FULL rounds → HR).
+- PV-0100's four staging JEs re-tagged segment→'hr' (custody pot, not per-dept slices).
+- Pools after: HR **95,706.12** (pot 95,390.70 + own 315.42) · Finance 510.21 ·
+  Marketing **−24,659.54 (预支)** · DO 125.89 · Director 68,197.26 · VO 4,262.
+- Banks during verify: 138,287.61 (a live Carres receipt OR-0125 +3,339.81 landed
+  mid-check — user activity, correctly recorded).
+
+### June remaining steps
+1. HL→Alliance transfer for **PV-0115's 10,572.42 still physically pending** (HL holds
+   ~7.7k; needs inflow). Retrofit its staging JE + caches when the user confirms, same as
+   PV-0100's (whose 84,818.28 IS transferred + recorded).
+2. HR creates disbursement batch (18 staff PVs, 72,384.40) → Principal approves batch.
+3. Finance generates the 5 statutory PVs (bank picker defaults Alliance), sets dates →
+   Principal approves. After everything: HR pool ≈ 315.42, 4020 → 0, Alliance drains by
+   133,520.10 total (incl. directors); approve the last ~RM 3k of vouchers only after
+   0115's transfer or Alliance cache blocks them.
+- ⚠️ Known follow-up (queue if user cares): per-segment Cash Flow report doesn't bridge
+  the custody pool rows (funding expense_out / custody np_in are dept_pools-only, like
+  inter-billing before the 20A bridge) — dept per-segment CF vs pool will diverge by the
+  payroll flows for July+ months until a bridge like `inter-billing-cash-flow.ts` covers
+  `PV HV-PV-%` custody pairs. The dept-pool page itself stays tied (fold-into-HL logic).
 
 ## Session 2026-07-20B — payroll money-flow REDESIGN (mig `20260720100000`, deployed + applied)
 

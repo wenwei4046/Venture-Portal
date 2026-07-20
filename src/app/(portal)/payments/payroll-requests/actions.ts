@@ -10,14 +10,15 @@ import { requireRole } from '@/lib/auth'
  * Stage E — Finance generates a payroll funding Payment Voucher against a
  * payroll_payment_request. Supports PARTIAL funding across several PVs.
  *
- * Mig 20260720 semantics (user ruling): the funding PV is a Hong Leong →
- * Alliance STAGING TRANSFER plus the per-dept salary accrual. On Principal's
- * approval it:
+ * Mig 20260720140000 semantics (custody model, user ruling): funding = each
+ * department hands its contribution to HR. On Principal's approval it:
  *   - books Dr 9030 / Cr 4020 per source pool (segment-tagged accrual);
- *   - debits the source bank and credits the Alliance payroll bank (GL 3010),
- *     with a per-pool transfer JE so each dept's per-bank slice follows;
- *   - touches NO dept pool — cash changing banks doesn't change whose it is.
- * Dept pools are drained at Stage-G payout, each department for its own staff.
+ *   - DEDUCTS each source dept pool by its typed share (short pools go
+ *     negative — 预支, auto-allowed) and parks the FULL round in the HR
+ *     custody pool;
+ *   - debits the source bank and credits the Alliance payroll bank (GL 3010)
+ *     with one hr-segment staging JE.
+ * Stage-G payouts + statutory PVs later drain ONLY the HR custody pool.
  *
  * Finance types how much each department contributes THIS round; each pool
  * contribution writes one payment_voucher_sources row and the PV amount = this
@@ -322,7 +323,6 @@ export interface StatutoryResult {
 export async function generateStatutoryVouchers(
   period: string,
   bankAccountId: string,
-  splitByDept = false,
 ): Promise<StatutoryResult> {
   await requireRole(['finance', 'principal'])
   const supabase = await createClient()
@@ -330,13 +330,13 @@ export async function generateStatutoryVouchers(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(period)) throw new Error('Invalid period')
   if (!bankAccountId) throw new Error('Pick the bank the statutory payments go out from')
 
-  // RPC added in mig 20260720100000 (+ p_split_by_dept, mig 20260720120000);
-  // database.types.ts not regenerated (same escape hatch as
-  // create_payroll_disbursement_vouchers).
+  // RPC final shape: mig 20260720140000 (custody model) — five PVs, each one
+  // payment to its scheme, drained from dept_pool_hr. database.types.ts not
+  // regenerated (same escape hatch as create_payroll_disbursement_vouchers).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase.rpc as any)(
     'create_payroll_statutory_vouchers',
-    { p_period: period, p_bank_account_id: bankAccountId, p_split_by_dept: splitByDept },
+    { p_period: period, p_bank_account_id: bankAccountId },
   )
 
   if (error) throw new Error(error.message)

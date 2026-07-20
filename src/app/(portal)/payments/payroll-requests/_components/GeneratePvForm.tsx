@@ -89,11 +89,13 @@ export default function GeneratePvForm({
     [lines, amount, committedTotal],
   )
 
+  const overdrawKeys = new Set(summary.overdrawRows.map(r => r.pool_key))
   const overCommitKeys = new Set(summary.overCommitRows.map(r => r.pool_key))
 
-  // Mig 20260720: the funding PV moves real cash (HL → Alliance staging), so
-  // this round must fit inside the source bank. Dept pools are NOT touched at
-  // funding — pool overdraw only matters at Stage-G payout now.
+  // Mig 20260720140000 (custody model): approval deducts each department's
+  // typed contribution immediately (a short pool goes negative — 预支, a
+  // warning not a block) and moves the round's cash to Alliance, parked in the
+  // HR custody pool. The round must also fit inside the source bank.
   const selectedBank = banks.find(b => b.id === bankId)
   const bankShort =
     !!selectedBank && summary.sumInput > selectedBank.current_balance + 0.005
@@ -162,8 +164,8 @@ export default function GeneratePvForm({
           />
         </label>
         <span className="font-serif italic text-muted text-xs">
-          approval books each department&apos;s salary cost and moves this round&apos;s cash
-          to the Alliance payroll account — department pools are only charged at payout
+          approval deducts each department&apos;s contribution, parks the round in the
+          HR custody pool, and moves the cash to the Alliance payroll account
         </span>
       </div>
 
@@ -195,6 +197,11 @@ export default function GeneratePvForm({
                     <div className="font-serif text-ink">{poolLabel(row.pool_key)}</div>
                     <div className="font-mono text-[10px] text-muted uppercase tracking-wider">
                       {row.dept_name}
+                      {overdrawKeys.has(row.pool_key) ? (
+                        <span className="text-alert ml-1 normal-case tracking-normal">
+                          · 预支 pool goes negative
+                        </span>
+                      ) : null}
                     </div>
                   </td>
                   <td
@@ -223,7 +230,7 @@ export default function GeneratePvForm({
                       className={
                         'w-28 bg-paper border rounded-md px-2 py-1 text-right font-mono tabular text-sm text-ink ' +
                         'focus:outline-none focus:border-accent-border ' +
-                        (overCommit ? 'border-danger' : 'border-hairline')
+                        (overCommit ? 'border-danger' : overdrawKeys.has(row.pool_key) ? 'border-alert' : 'border-hairline')
                       }
                     />
                   </td>
@@ -272,6 +279,12 @@ export default function GeneratePvForm({
       {summary.sumInput > summary.remainingBefore + 0.005 ? (
         <div className="font-serif italic text-danger text-xs">
           This round (RM {fmt(summary.sumInput)}) exceeds the outstanding RM {fmt(summary.remainingBefore)}.
+        </div>
+      ) : null}
+      {summary.overCommitRows.length === 0 && summary.overdrawRows.length > 0 ? (
+        <div className="font-serif italic text-alert text-xs">
+          {summary.overdrawRows.map(r => poolLabel(r.pool_key)).join(', ')} will go negative (预支) —
+          allowed; the pool is topped up later by billing.
         </div>
       ) : null}
       {bankShort && selectedBank ? (

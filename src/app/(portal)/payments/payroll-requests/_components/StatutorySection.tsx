@@ -76,7 +76,7 @@ export default function StatutorySection({ periods, banks }: Props) {
                   <div className="font-serif italic text-graphite text-sm mt-0.5">
                     {generated
                       ? 'Statutory vouchers generated — set the payment date on each PV before approval.'
-                      : 'Split per staff department pool; payment date left blank for you to set.'}
+                      : 'Five PVs, one per scheme, paid from the HR custody pool; payment dates left blank for you to set.'}
                   </div>
                 </div>
                 {generated ? null : (

@@ -20,22 +20,18 @@ export default async function HRPaymentPage() {
 
   const period = getPeriodMonth()
 
-  const [{ data: run }, { data: payoutBank }, { data: payrollRows }, { data: directorRows }] = await Promise.all([
+  const [{ data: run }, { data: hrDept }, { data: payrollRows }, { data: directorRows }] = await Promise.all([
     supabase
       .from('payroll_runs')
       .select('id, status, total_amount')
       .eq('period_month', period)
       .neq('status', 'rejected')
       .maybeSingle(),
-    // Mig 20260720: payroll cash is staged in the Alliance payroll bank
-    // (GL 3010) by the funding PVs; dept pools only move at payout. The hero
-    // therefore shows the staged cash, not HR's own dept pool.
     supabase
-      .from('bank_accounts')
-      .select('bank_name, current_balance')
-      .eq('status', 'active')
-      .eq('gl_account_code', '3010')
-      .maybeSingle(),
+      .from('departments')
+      .select('id')
+      .eq('name', 'HR')
+      .single(),
     supabase
       .from('hr_monthly_payroll')
       .select('id, net, gross, status, hr_staff_costs(employee_name, departments(name))')
@@ -46,7 +42,17 @@ export default async function HRPaymentPage() {
       .eq('period_month', period),
   ])
 
-  const poolBal = Number(payoutBank?.current_balance ?? 0)
+  // Mig 20260720140000 (custody model): funding parks every department's
+  // contribution in HR's pool, so its balance IS the payroll war chest —
+  // it swells at funding and drains back to HR's own money after payouts.
+  const { data: poolRow } = hrDept
+    ? await supabase
+        .from('dept_pool_balances')
+        .select('balance')
+        .eq('department_id', hrDept.id)
+        .maybeSingle()
+    : { data: null }
+  const poolBal = Number(poolRow?.balance ?? 0)
   const rows = payrollRows ?? []
   const dRows = (directorRows ?? []).filter(d => Number(d.payroll_net ?? 0) > 0)
   const staffNet = rows.reduce((s, r) => s + Number(r.net), 0)
@@ -200,7 +206,7 @@ export default async function HRPaymentPage() {
         </div>
       </div>
 
-      {/* Hero — Total Amount + Alliance payroll bank (staged cash) */}
+      {/* Hero — Total Amount + HR Pool (payroll custody) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10 pb-10 border-b border-hairline">
         <div>
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide mb-2">
@@ -217,7 +223,7 @@ export default async function HRPaymentPage() {
         </div>
         <div>
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide mb-2">
-            Alliance payroll bank
+            HR Pool · payroll custody
           </div>
           <div
             className={`font-serif text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${
@@ -227,7 +233,7 @@ export default async function HRPaymentPage() {
             {formatMoney(poolBal)}
           </div>
           <div className="font-mono text-xs text-muted mt-2">
-            Cash staged for payroll · GL 3010
+            Departments&apos; contributions held here until payout
           </div>
         </div>
       </div>
