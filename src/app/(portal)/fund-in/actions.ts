@@ -297,6 +297,8 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
   // which translates to NULL (approval will fall back to 4000).
   const rawAccountCode = (formData.get('account_code') as string) ?? ''
   const accountCode = rawAccountCode.trim() === '' ? null : rawAccountCode.trim()
+  // Which HV bank receives the deposit. NULL = primary (approval falls back).
+  const editBankAccountId = ((formData.get('bank_account_id') as string) ?? '').trim() || null
 
   if (isNaN(amount) || amount <= 0) return { error: 'Amount must be greater than 0' }
   if (isNaN(costRatePercent) || costRatePercent < 0 || costRatePercent >= 100) {
@@ -346,6 +348,7 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
       maturity_date: repaymentDate,
       notes,
       account_code: accountCode,
+      bank_account_id: editBankAccountId,
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)

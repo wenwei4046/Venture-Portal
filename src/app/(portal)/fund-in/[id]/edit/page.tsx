@@ -16,7 +16,7 @@ export default async function EditFundSourcePage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
 
-  const [{ data: source, error }, { data: acctRows }] = await Promise.all([
+  const [{ data: source, error }, { data: acctRows }, { data: bankRows }] = await Promise.all([
     supabase.from('fund_sources').select('*').eq('id', id).single(),
     supabase
       .from('chart_of_accounts')
@@ -24,6 +24,12 @@ export default async function EditFundSourcePage({ params }: Props) {
       .eq('is_active', true)
       .in('type', ['liability', 'equity'])
       .order('code'),
+    // Which HV bank receives the deposit (primary first = the default).
+    supabase
+      .from('bank_accounts')
+      .select('id, bank_name, account_number, is_primary')
+      .eq('status', 'active')
+      .order('is_primary', { ascending: false }),
   ])
 
   if (error || !source) notFound()
@@ -111,8 +117,15 @@ export default async function EditFundSourcePage({ params }: Props) {
           repayment_date: (source.repayment_date as string | null) ?? source.effective_date as string,
           notes: source.notes ?? '',
           account_code: (source as { account_code: string | null }).account_code ?? null,
+          bank_account_id: (source as { bank_account_id: string | null }).bank_account_id ?? null,
         }}
         liabilityAccounts={liabilityAccounts}
+        banks={(bankRows ?? []).map((b) => ({
+          id: b.id as string,
+          bank_name: b.bank_name as string,
+          account_number: (b.account_number as string) ?? '',
+          is_primary: !!b.is_primary,
+        }))}
       />
     </div>
   )

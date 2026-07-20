@@ -18,11 +18,14 @@ interface Props {
     repayment_date: string
     notes: string
     account_code: string | null
+    bank_account_id: string | null
   }
   liabilityAccounts: AccountOption[]
+  /** Active HV banks — which one receives the deposit (primary listed first). */
+  banks: { id: string; bank_name: string; account_number: string; is_primary: boolean }[]
 }
 
-export default function EditFundSourceForm({ id, typeLabel, fromLabel, initial, liabilityAccounts }: Props) {
+export default function EditFundSourceForm({ id, typeLabel, fromLabel, initial, liabilityAccounts, banks }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [repaymentDate, setRepaymentDate] = useState<string>(initial.repayment_date)
@@ -96,6 +99,38 @@ export default function EditFundSourceForm({ id, typeLabel, fromLabel, initial, 
         />
         <p className="font-serif italic text-muted text-xs mt-1.5">
           Leave blank to fall back to the umbrella &quot;4000 Fund Sources Payable&quot;.
+        </p>
+      </div>
+
+      {/* ───────── Receiving bank (mig 20260708100000) ───────── */}
+      <div className="mb-6">
+        <label
+          htmlFor="bank_account_id"
+          className="block text-sm font-sans font-medium text-graphite mb-1.5"
+        >
+          Receive into bank
+        </label>
+        <select
+          id="bank_account_id"
+          name="bank_account_id"
+          defaultValue={initial.bank_account_id ?? banks.find((b) => b.is_primary)?.id ?? banks[0]?.id ?? ''}
+          disabled={isPending}
+          className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border disabled:opacity-60"
+        >
+          {banks.length === 0 ? (
+            <option value="">No active banks</option>
+          ) : (
+            banks.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.bank_name} — {b.account_number}
+                {b.is_primary ? ' (primary)' : ''}
+              </option>
+            ))
+          )}
+        </select>
+        <p className="font-serif italic text-muted text-xs mt-1.5">
+          Which HV account the money lands in. Applied when Principal approves —
+          that bank&apos;s balance and its GL cash account are the ones that move.
         </p>
       </div>
 
