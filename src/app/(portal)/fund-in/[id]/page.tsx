@@ -106,6 +106,29 @@ export default async function FundSourceDetailPage({ params }: Props) {
     if (u) repaidByName = u.name ?? u.email
   }
 
+  // Receiving bank (mig 20260708100000). NULL = falls back to the primary bank
+  // at approval, so say so rather than showing a blank.
+  let bankLabel: string | null = null
+  if (source.bank_account_id) {
+    const { data: b } = await supabase
+      .from('bank_accounts')
+      .select('bank_name, account_number')
+      .eq('id', source.bank_account_id)
+      .maybeSingle()
+    if (b) bankLabel = `${b.bank_name} — ${b.account_number}`
+  }
+
+  // Liability sub-account (mig 247). NULL falls back to the umbrella 4000.
+  let accountLabel: string | null = null
+  if (source.account_code) {
+    const { data: a } = await supabase
+      .from('chart_of_accounts')
+      .select('code, name')
+      .eq('code', source.account_code)
+      .maybeSingle()
+    accountLabel = a ? `${a.code} — ${a.name}` : source.account_code
+  }
+
   const isActive = source.status === 'active'
   const isMatured = source.status === 'matured'
   const isRepaid = source.status === 'repaid'
@@ -249,6 +272,47 @@ export default async function FundSourceDetailPage({ params }: Props) {
           ) : null}
         </div>
       </div>
+
+      {/* ───────── Details ───────── */}
+      <section className="mb-12">
+        <div className="sect-head">
+          <h2>Details</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">TERMS &amp; ROUTING</span>
+        </div>
+        <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-5 max-w-4xl">
+          <Detail
+            label="Source type"
+            value={SOURCE_TYPE_LABELS[source.source_type] ?? source.source_type}
+          />
+          <Detail label="From" value={fromLabel} sub={fromSubLabel} />
+          <Detail
+            label="Receive into bank"
+            value={bankLabel ?? 'Primary bank (not specified)'}
+          />
+          <Detail
+            label="Amount due to (BS account)"
+            value={accountLabel ?? '4000 — Fund Sources Payable (default)'}
+          />
+          <Detail
+            label="Interest rate"
+            value={`${(Number(source.cost_rate) * 100).toFixed(3)}% /mo · ${source.compound_interest ? 'compound' : 'simple'}`}
+          />
+          <Detail
+            label="Repayment period"
+            value={source.lock_in_months ? `${source.lock_in_months} months` : 'No fixed term'}
+          />
+          <Detail label="Effective date" value={formatDate(source.effective_date)} />
+          <Detail
+            label="Expected repayment"
+            value={source.repayment_date ? formatDate(source.repayment_date) : '—'}
+          />
+          <Detail
+            label="Maturity date"
+            value={source.maturity_date ? formatDate(source.maturity_date) : '—'}
+          />
+        </dl>
+      </section>
 
       {/* ───────── Notes ───────── */}
       {source.notes ? (
@@ -402,6 +466,20 @@ export default async function FundSourceDetailPage({ params }: Props) {
           </ConfirmButton>
         </section>
       ) : null}
+    </div>
+  )
+}
+
+function Detail({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div>
+      <dt className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-muted mb-1">
+        {label}
+      </dt>
+      <dd className="font-serif text-md text-ink">
+        {value}
+        {sub ? <span className="font-mono text-[11px] text-graphite ml-2">{sub}</span> : null}
+      </dd>
     </div>
   )
 }
