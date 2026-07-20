@@ -70,12 +70,21 @@ build). **RECONCILED at session end: Σ6 segments 134,947.80 == bank caches == G
    rows (RACHAEL, LING) still carry their 2026-07-02 import stamps — that's the proof it was
    the backfill, NOT a user re-import (an earlier note here claimed a "07:42 re-import" and a
    Finance/Marketing funding delta of 771.67 — both were artifacts of the recompute, RETRACTED).
-   **Restore path (agreed with user):** all 19 June rows flipped to `draft` (import's
-   writeVerbatim only updates draft rows) → user RE-UPLOADS the June InfoTech file at
-   /hr-costing/payroll/2026-06-01/import (phase-2 writes verbatim figures incl. SKBBK) →
-   flip rows back to `submitted` → verify net 72,384.40 + statutory 22,473.95 + SKBBK 532.35
-   == funding 95,390.70 EXACTLY (no true-up JE needed). Run stays `approved`, request stays
-   `completed` throughout.
+   **Restore path (UPDATED — user is FINANCE, not HR; the InfoTech file lives with the HR
+   colleague; user directive: 不要碰其他部门的资料):** rows were briefly flipped to draft
+   then RESTORED to `submitted` (pre-incident state). Await user's routing decision:
+   (a) HR colleague re-uploads the June InfoTech file at /hr-costing/payroll → June →
+   Import (flip rows to draft just before, back to submitted after), OR (b) records-based
+   restore: 14 rows are exactly reconstructable from this session's transcript; NUR AIN /
+   BOON (gross changed 2,523.02→2,800.00 / 3,770.00→3,900.00) + ≥1 more Marketing row
+   (orig Marketing er_sum 5,145.95 doesn't tie to assumed-unchanged rows, gap ~239.50,
+   suspect KHO's prorated basis) need HR to read a few payslip figures. Verify target
+   after either path: net 72,384.40 + statutory 22,473.95 + SKBBK 532.35 == funding
+   95,390.70 EXACTLY (no true-up JE needed). Run stays `approved`, request `completed`
+   throughout. Original per-row figures captured in this session: gross/net/EE-total for
+   all 17 + full statutory detail for CHEW WEE HO · SIA JONAS · THIEN YEE MUN ·
+   CHOW WAI MAN; per-dept originals: DO er 766.25/ee 765.90 · Fin er 2,937.45/ee 2,638.10 ·
+   HR er 2,356.10/ee 3,246.50 · Mkt er 5,145.95/ee 4,617.70.
    **⚠️ LESSON for any future direct SQL on hr_monthly_payroll:** updating ANY of
    basic_salary / statutory_allowance / non_statutory_allowance / ot_hours / ot_amount /
    commission_amount / unpaid_leave_days / deduction_amount / skbbk_amount / period_month /
