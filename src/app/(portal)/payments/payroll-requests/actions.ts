@@ -10,25 +10,24 @@ import { requireRole } from '@/lib/auth'
  * Stage E — Finance generates a payroll funding Payment Voucher against a
  * payroll_payment_request. Supports PARTIAL funding across several PVs.
  *
- * Finance types how much each Department Pool contributes THIS round; each pool
+ * Mig 20260720 semantics (user ruling): the funding PV is a Hong Leong →
+ * Alliance STAGING TRANSFER plus the per-dept salary accrual. On Principal's
+ * approval it:
+ *   - books Dr 9030 / Cr 4020 per source pool (segment-tagged accrual);
+ *   - debits the source bank and credits the Alliance payroll bank (GL 3010),
+ *     with a per-pool transfer JE so each dept's per-bank slice follows;
+ *   - touches NO dept pool — cash changing banks doesn't change whose it is.
+ * Dept pools are drained at Stage-G payout, each department for its own staff.
+ *
+ * Finance types how much each department contributes THIS round; each pool
  * contribution writes one payment_voucher_sources row and the PV amount = this
  * round's sum (validated == sources by the pvs_sum_matches_voucher trigger).
- *
- * The PV is created in 'pending_approval' status with:
- *   - voucher_type = 'payroll_bank_transfer'
- *   - direction = 'debit'
- *   - amount = this round's allocation (may be < the request total)
- *   - bank_account_id = source bank picked by Finance (carried for the
- *     voucher_requires_bank CHECK; NOT debited — Stage-E is an accrual)
- *   - payment_date = Finance's chosen date (drives the GL date at approval)
  *
  * Pre-checks before insert:
  *   - This round's sum is positive and ≤ the request's OUTSTANDING remainder
  *     (request total − already-committed non-voided funding PVs)
- *   - NO bank-balance check: the funding PV never moves this bank's cash
- *     (Dr 9030 / Cr 4020, mig 20260619); cash leaves at Stage-G disbursement.
- *   - NO pool-sufficiency check: a short pool is allowed to go negative
- *     (预支 / overdraw), auto-permitted at approval for payroll_bank_transfer.
+ *   - Source bank must cover this round (real cash moves at approval now);
+ *     partial rounds keep a thin Hong Leong workable.
  *
  * The request stays fundable (submitted / pv_generated) until the CUMULATIVE
  * paid reaches the total, when the completion trigger flips it to 'completed'.
@@ -122,17 +121,27 @@ export async function generatePvFromRequest(
   // ── Validate + sufficient-balance check on the source bank ────────────────
   const { data: bank, error: bankErr } = await supabase
     .from('bank_accounts')
-    .select('id, bank_name, status')
+    .select('id, bank_name, status, current_balance, gl_account_code')
     .eq('id', sourceBankId)
     .maybeSingle()
 
   if (bankErr) throw new Error(`Failed to read bank: ${bankErr.message}`)
   if (!bank) throw new Error('Source bank not found')
   if (bank.status !== 'active') throw new Error(`Bank ${bank.bank_name} is not active`)
-  // No balance check here: the payroll funding PV is an accrual (Dr 9030 salary
-  // expense / Cr 4020 Salary Payable, mig 20260619) — it never moves this bank's
-  // cash. Real cash leaves at Stage-G disbursement from the Alliance HR account,
-  // which IS balance-checked there.
+  if (bank.gl_account_code === '3010') {
+    throw new Error(
+      `${bank.bank_name} is the Alliance payroll destination — pick the bank the cash comes FROM.`,
+    )
+  }
+  // Mig 20260720: the funding PV moves real cash at approval (HL → Alliance
+  // staging transfer), so this round must fit in the source bank. Approval
+  // re-checks with a row lock; this early check just fails fast for Finance.
+  if (Number(bank.current_balance ?? 0) < roundAmount) {
+    throw new Error(
+      `${bank.bank_name} holds RM ${Number(bank.current_balance ?? 0).toFixed(2)} but this round needs ` +
+        `RM ${roundAmount.toFixed(2)}. Fund a smaller round now and the rest when cash arrives.`,
+    )
+  }
 
   // ── Generate voucher number matching the existing HV-PV-YYYYMM-NNNN pattern
   const voucherPeriod = dayjs(payDate).format('YYYYMM')
@@ -155,7 +164,7 @@ export async function generatePvFromRequest(
       amount: roundAmount,
       currency: 'MYR',
       bank_account_id: sourceBankId,
-      payee_name: 'HOUZS Venture — HR Pool (Alliance Bank)',
+      payee_name: 'HOUZS Venture — Payroll staging (Alliance Bank)',
       description: `Payroll bank transfer — ${periodLabel}${isPartial ? ' (partial)' : ''}`,
       payment_method: 'bank_transfer',
       payment_date: payDate,
@@ -295,4 +304,45 @@ export async function financeCancelRequest(
   revalidatePath('/payments/payroll-requests')
   revalidatePath('/hr-costing/payroll')
   revalidatePath('/dashboard')
+}
+
+/**
+ * Mig 20260720 — one-click statutory vouchers (KWSP / PERKESO / LHDN) for a
+ * payroll period, split per staff department pool (each dept pays its own
+ * people's statutory). Created as pending approvals with payment_date NULL:
+ * the actual payment date is uncertain, so Finance edits it on the PV before
+ * Principal approves (the GL date follows the payment date, mig 20260611).
+ */
+export interface StatutoryResult {
+  count: number
+  total: number
+  vouchers: { id: string; voucher_no: string; payee: string; amount: number }[]
+}
+
+export async function generateStatutoryVouchers(
+  period: string,
+  bankAccountId: string,
+): Promise<StatutoryResult> {
+  await requireRole(['finance', 'principal'])
+  const supabase = await createClient()
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(period)) throw new Error('Invalid period')
+  if (!bankAccountId) throw new Error('Pick the bank the statutory payments go out from')
+
+  // RPC added in mig 20260720100000; database.types.ts not regenerated (same
+  // escape hatch as create_payroll_disbursement_vouchers).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.rpc as any)(
+    'create_payroll_statutory_vouchers',
+    { p_period: period, p_bank_account_id: bankAccountId },
+  )
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/payments')
+  revalidatePath('/payments/payroll-requests')
+  revalidatePath('/approvals')
+  revalidatePath('/dashboard')
+
+  return data as unknown as StatutoryResult
 }

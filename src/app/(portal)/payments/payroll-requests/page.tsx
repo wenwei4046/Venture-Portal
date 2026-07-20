@@ -5,6 +5,7 @@ import { requireRole } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import { round2 } from '@/lib/payroll-funding'
 import GeneratePvForm, { type PoolBreakdownRow } from './_components/GeneratePvForm'
+import StatutorySection, { type StatutoryPeriod } from './_components/StatutorySection'
 
 interface RequestRow {
   id: string
@@ -126,6 +127,40 @@ export default async function PayrollRequestsPage() {
   ])
   const breakdownByRequest = new Map(breakdownResults.map(r => [r.id, r.rows]))
   const fundingByRequest = new Map(fundingResults.map(r => [r.id, r.info]))
+
+  // ── Statutory payments (mig 20260720) — recent COMPLETED payroll periods.
+  // One-click KWSP/PERKESO/LHDN vouchers, split per staff dept pool.
+  const { data: completedReqs } = await supabase
+    .from('payroll_payment_requests')
+    .select('payroll_run_id, payroll_runs (period_month)')
+    .eq('status', 'completed')
+    .order('requested_at', { ascending: false })
+    .limit(3)
+  const statutoryRuns = (completedReqs ?? []).map(r => ({
+    runId: r.payroll_run_id as string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    period: ((r.payroll_runs as any)?.period_month ?? '') as string,
+  })).filter(r => r.period)
+  const { data: statutoryPvsRaw } = statutoryRuns.length
+    ? await supabase
+        .from('payment_vouchers')
+        .select('id, voucher_no, payee_name, amount, status, reference_id')
+        .eq('reference_type', 'payroll_statutory')
+        .in('reference_id', statutoryRuns.map(r => r.runId))
+        .neq('status', 'voided')
+    : { data: [] }
+  const statutoryPeriods: StatutoryPeriod[] = statutoryRuns.map(r => ({
+    period_month: r.period,
+    pvs: (statutoryPvsRaw ?? [])
+      .filter(v => v.reference_id === r.runId)
+      .map(v => ({
+        id: v.id as string,
+        voucher_no: v.voucher_no,
+        payee_name: v.payee_name,
+        amount: Number(v.amount ?? 0),
+        status: v.status as string,
+      })),
+  }))
 
   // A request is still "fundable" while its committed total is below the request
   // total; otherwise it's fully committed and just awaiting Principal's approval.
@@ -269,6 +304,9 @@ export default async function PayrollRequestsPage() {
           </div>
         </section>
       ) : null}
+
+      {/* ── Statutory payments (KWSP / PERKESO / LHDN) per funded period ─── */}
+      <StatutorySection periods={statutoryPeriods} banks={bankOptions} />
     </div>
   )
 }

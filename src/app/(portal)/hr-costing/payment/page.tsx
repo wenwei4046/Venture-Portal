@@ -20,18 +20,22 @@ export default async function HRPaymentPage() {
 
   const period = getPeriodMonth()
 
-  const [{ data: run }, { data: hrDept }, { data: payrollRows }, { data: directorRows }] = await Promise.all([
+  const [{ data: run }, { data: payoutBank }, { data: payrollRows }, { data: directorRows }] = await Promise.all([
     supabase
       .from('payroll_runs')
       .select('id, status, total_amount')
       .eq('period_month', period)
       .neq('status', 'rejected')
       .maybeSingle(),
+    // Mig 20260720: payroll cash is staged in the Alliance payroll bank
+    // (GL 3010) by the funding PVs; dept pools only move at payout. The hero
+    // therefore shows the staged cash, not HR's own dept pool.
     supabase
-      .from('departments')
-      .select('id')
-      .eq('name', 'HR')
-      .single(),
+      .from('bank_accounts')
+      .select('bank_name, current_balance')
+      .eq('status', 'active')
+      .eq('gl_account_code', '3010')
+      .maybeSingle(),
     supabase
       .from('hr_monthly_payroll')
       .select('id, net, gross, status, hr_staff_costs(employee_name, departments(name))')
@@ -42,14 +46,7 @@ export default async function HRPaymentPage() {
       .eq('period_month', period),
   ])
 
-  const { data: poolRow } = hrDept
-    ? await supabase
-        .from('dept_pool_balances')
-        .select('balance')
-        .eq('department_id', hrDept.id)
-        .maybeSingle()
-    : { data: null }
-  const poolBal = Number(poolRow?.balance ?? 0)
+  const poolBal = Number(payoutBank?.current_balance ?? 0)
   const rows = payrollRows ?? []
   const dRows = (directorRows ?? []).filter(d => Number(d.payroll_net ?? 0) > 0)
   const staffNet = rows.reduce((s, r) => s + Number(r.net), 0)
@@ -203,7 +200,7 @@ export default async function HRPaymentPage() {
         </div>
       </div>
 
-      {/* Hero — Total Amount + HR Pool balance */}
+      {/* Hero — Total Amount + Alliance payroll bank (staged cash) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10 pb-10 border-b border-hairline">
         <div>
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide mb-2">
@@ -220,7 +217,7 @@ export default async function HRPaymentPage() {
         </div>
         <div>
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide mb-2">
-            HR Pool balance
+            Alliance payroll bank
           </div>
           <div
             className={`font-serif text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${
@@ -230,7 +227,7 @@ export default async function HRPaymentPage() {
             {formatMoney(poolBal)}
           </div>
           <div className="font-mono text-xs text-muted mt-2">
-            Isolated salary disbursement account
+            Cash staged for payroll · GL 3010
           </div>
         </div>
       </div>
@@ -322,12 +319,14 @@ export default async function HRPaymentPage() {
                   <>
                     No active funding request — the previous one was cancelled. Re-file the{' '}
                     <strong className="num text-num-ink">RM {formatMoneyBare(totalAmount)}</strong> request below.
-                    Finance generates the Payment Voucher; Principal approves it and the money moves into the HR Pool.
+                    Finance generates the Payment Voucher; Principal approves it, which books each department&apos;s
+                    salary cost and moves the cash into the Alliance payroll account.
                   </>
                 ) : (
                   <>
                     The funding request for <strong className="num text-num-ink">RM {formatMoneyBare(totalAmount)}</strong> is filed automatically when you submit the payroll.
-                    Finance generates the Payment Voucher; Principal approves it and the money moves from the HV operating account into the HR Pool.
+                    Finance generates the Payment Voucher; Principal approves it, which books each department&apos;s
+                    salary cost and moves the cash from Hong Leong into the Alliance payroll account.
                   </>
                 )}
               </p>
@@ -342,9 +341,9 @@ export default async function HRPaymentPage() {
         {phase === 'funded' && (
           <div className="border border-ledger/40 bg-surface rounded-md p-8">
             <div className="mb-4">
-              <em className="font-serif italic text-ledger text-lg">✓ HR Pool funded</em>
+              <em className="font-serif italic text-ledger text-lg">✓ Funding complete — cash staged in Alliance</em>
               <p className="font-serif italic text-graphite text-sm mt-1">
-                Ready to disburse to staff.
+                Ready to disburse to staff. Each voucher draws from the employee&apos;s own department pool.
               </p>
             </div>
 

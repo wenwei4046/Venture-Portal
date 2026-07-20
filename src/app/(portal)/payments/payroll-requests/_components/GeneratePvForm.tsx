@@ -89,10 +89,17 @@ export default function GeneratePvForm({
     [lines, amount, committedTotal],
   )
 
-  const overdrawKeys = new Set(summary.overdrawRows.map(r => r.pool_key))
   const overCommitKeys = new Set(summary.overCommitRows.map(r => r.pool_key))
 
-  const canSubmit = summary.canSubmit && !!bankId && /^\d{4}-\d{2}-\d{2}$/.test(payDate)
+  // Mig 20260720: the funding PV moves real cash (HL → Alliance staging), so
+  // this round must fit inside the source bank. Dept pools are NOT touched at
+  // funding — pool overdraw only matters at Stage-G payout now.
+  const selectedBank = banks.find(b => b.id === bankId)
+  const bankShort =
+    !!selectedBank && summary.sumInput > selectedBank.current_balance + 0.005
+
+  const canSubmit =
+    summary.canSubmit && !!bankId && !bankShort && /^\d{4}-\d{2}-\d{2}$/.test(payDate)
 
   function updateAmount(key: string, raw: string) {
     const clean = raw.replace(/[^\d.]/g, '')
@@ -155,7 +162,8 @@ export default function GeneratePvForm({
           />
         </label>
         <span className="font-serif italic text-muted text-xs">
-          funding is an accrual — the bank isn&apos;t charged until staff are paid
+          approval books each department&apos;s salary cost and moves this round&apos;s cash
+          to the Alliance payroll account — department pools are only charged at payout
         </span>
       </div>
 
@@ -165,7 +173,7 @@ export default function GeneratePvForm({
           <thead>
             <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans bg-surface">
               <th className="text-left py-2 px-3 font-medium">Department Pool</th>
-              <th className="text-right py-2 px-3 font-medium">Bank balance</th>
+              <th className="text-right py-2 px-3 font-medium">Pool balance</th>
               <th className="text-right py-2 px-3 font-medium">Required</th>
               {committedTotal > 0.005 ? (
                 <th className="text-right py-2 px-3 font-medium">Funded</th>
@@ -177,7 +185,6 @@ export default function GeneratePvForm({
             {lines.map(row => {
               const remainingDept = deptRemaining(row)
               const done = remainingDept < 0.005
-              const overdraw = overdrawKeys.has(row.pool_key)
               const overCommit = overCommitKeys.has(row.pool_key)
               return (
                 <tr
@@ -188,11 +195,6 @@ export default function GeneratePvForm({
                     <div className="font-serif text-ink">{poolLabel(row.pool_key)}</div>
                     <div className="font-mono text-[10px] text-muted uppercase tracking-wider">
                       {row.dept_name}
-                      {overdraw ? (
-                        <span className="text-alert ml-1 normal-case tracking-normal">
-                          · 预支 pool goes negative
-                        </span>
-                      ) : null}
                     </div>
                   </td>
                   <td
@@ -221,7 +223,7 @@ export default function GeneratePvForm({
                       className={
                         'w-28 bg-paper border rounded-md px-2 py-1 text-right font-mono tabular text-sm text-ink ' +
                         'focus:outline-none focus:border-accent-border ' +
-                        (overCommit ? 'border-danger' : overdraw ? 'border-alert' : 'border-hairline')
+                        (overCommit ? 'border-danger' : 'border-hairline')
                       }
                     />
                   </td>
@@ -272,10 +274,10 @@ export default function GeneratePvForm({
           This round (RM {fmt(summary.sumInput)}) exceeds the outstanding RM {fmt(summary.remainingBefore)}.
         </div>
       ) : null}
-      {summary.overCommitRows.length === 0 && summary.overdrawRows.length > 0 ? (
-        <div className="font-serif italic text-alert text-xs">
-          {summary.overdrawRows.map(r => poolLabel(r.pool_key)).join(', ')} will go negative (预支) —
-          allowed; the pool is topped up later by billing.
+      {bankShort && selectedBank ? (
+        <div className="font-serif italic text-danger text-xs">
+          {selectedBank.bank_name} holds RM {fmt(selectedBank.current_balance)} but this round moves RM{' '}
+          {fmt(summary.sumInput)} to Alliance — fund a smaller round now and the rest when cash arrives.
         </div>
       ) : null}
       {error ? <div className="font-serif italic text-danger text-xs">{error}</div> : null}

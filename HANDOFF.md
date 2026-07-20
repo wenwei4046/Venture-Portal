@@ -1,10 +1,80 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-07-20 · payroll funding + cash-flow tie-out)
+# HOUZS Venture Portal — Session Handoff (checkpoint 2026-07-20B · payroll flow redesign)
 
 > Context-window handoff. Read this first to continue. User communicates in 华语 (Mandarin).
-> 2026-07-20 checkpoint is FIRST. Earlier checkpoints (2026-06-19 merge, 2026-06-04, 2026-06-11)
-> are preserved unchanged below it.
+> 2026-07-20B (payroll redesign) is FIRST, then 2026-07-20A. Earlier checkpoints
+> (2026-06-19 merge, 2026-06-04, 2026-06-11) are preserved unchanged below.
 
-## Session 2026-07-20 — payroll partial funding · Cash Flow ↔ Dept Pool tie-out · Fund IN bank routing
+## Session 2026-07-20B — payroll money-flow REDESIGN (mig `20260720100000`, deployed + applied)
+
+User spotted HR pool at RM 74,355.02 ("HR 不可能那么多 fund") — correct instinct. Root cause +
+redesign, all DEPLOYED and the live DB migrated + data-corrected. Gates green (tsc / 376 tests /
+build). **RECONCILED at session end: Σ6 segments 134,947.80 == bank caches == GL; TB 0.00.**
+
+### Root cause (June was the FIRST real run of the new payroll cycle)
+- Stage-E funding approval drained ALL 4 dept pools (`expense_out`), then trigger
+  `fan_out_payroll_bank_transfer` parked only the NON-HR sum (74,039.60) into HR's pool —
+  **HR's own 21,351.10 vanished from the pool system** (live: pools+Venture 113,596.70 vs
+  banks 134,947.80; the dept-pool page's footer "Bank balance" is a COLUMN SUM, so the leak
+  was invisible on-page).
+- Stage-G would then drain dept_pool_hr for EVERY employee (~94,858) against a 74k pot —
+  HR would have landed ~−20.5k (double-drain of HR's own share).
+
+### New model (user ruling: "凑钱只是换银行,各部门扣各部门")
+- **Funding PV approval** = per-dept salary accrual (Dr 9030/Cr 4020, unchanged) **+ real
+  HL→Alliance staging transfer**: source bank guarded+debited, Alliance (GL `3010`) credited,
+  one transfer JE per pool slice (Dr 3010/Cr source, segment-tagged). **NO dept-pool writes.**
+- **Stage-G disbursement**: each staff PV drains the **staff's own dept pool** (was
+  dept_pool_hr for all); directors unchanged (dept_pool_director). GL side already resolved
+  per staff dept via `derive_journal_segment` — pools now match it.
+- **Statutory**: NEW RPC `create_payroll_statutory_vouchers(period, bank)` — one-click
+  KWSP / PERKESO(SOCSO+EIS) / LHDN(PCB) PVs, PVS split per staff dept pool (acct 4020),
+  **payment_date NULL** (几时付款不确定 — Finance edits the pending PV, GL date follows).
+  UI: "Statutory payments" section on /payments/payroll-requests (recent completed periods).
+- **Overdraw**: auto-allowed (预支) for reference_type `payroll_disbursement` /
+  `payroll_statutory` in ALL THREE approve RPCs — batch RPCs previously NEVER set the GUC,
+  so June's Stage-G batch would have been blocked on the first short pool.
+- Funding UI: Generate-PV form re-gained a **source-bank balance check** (client+server;
+  approval re-checks with row lock); pool-overdraw warnings removed from funding (obsolete);
+  hr-costing/payment hero now shows the **Alliance payroll bank** balance, not HR pool.
+- `fan_out_payroll_bank_transfer` trigger + function DROPPED.
+
+### Data corrections (direct SQL, recorded here for audit — NOT in migrations)
+- Deleted the 2 `np_in` "Payroll consolidation" rows (74,039.60 → HR) + the 8 funding
+  `expense_out` rows (95,390.70 across Mkt/Fin/DO/HR) for PV-0100/0115, and the 2
+  `dept_transfer` JEs `JE-202607-0247`/`JE-202607-0263` (+8 lines, 1030-1060 accounts only).
+  The 8 per-dept accrual JEs (Dr 9030/Cr 4020) REMAIN — correct under the new model.
+- Post-cleanup pools: HR 21,666.52 · Finance 24,392.22 · Marketing 19,031.80 · DO 6,592.14 ·
+  Director 68,197.26 (unchanged) · VO overlay 4,262. All == their GL expectations.
+- ⚠️ MCP lesson RECONFIRMED: a `begin;`-only batch (no `commit;` in the SAME call) silently
+  rolls back. First delete attempt no-oped; re-ran with inline commit and verified.
+
+### June cycle — what still has to happen (in order)
+1. **Physical HL→Alliance transfer** for June payroll (~RM 94,858 total need; Alliance
+   currently 45,738.77 incl. the pending-approval Century deposit). Record it as an
+   **internal_transfer PV** (skips pools, per-segment GL) — the new funding-PV transfer only
+   applies from July's cycle onward (June's two funding PVs were consumed under old code).
+2. HR runs **Stage-G** (hr-costing/payment → create disbursement batch) → Principal approves
+   batch → each dept pool drains its own staff nets; Alliance pays.
+3. Finance generates **statutory PVs** (payroll-requests page), sets payment dates, Principal
+   approves — drains dept pools per dept statutory (22,473.95 total for June).
+4. ⚠️ **532.35 over-accrual flag**: request/accrual total 95,390.70 vs actual staff cash need
+   94,858.35 (net 72,384.40 + statutory 22,473.95). After steps 2-3, `4020` will hold a
+   532.35 credit residual → needs a small reversing JE or ruling (source of the diff not yet
+   traced; payroll_runs.total_amount vs hr_monthly_payroll drifted somewhere).
+- NOTE: batch approve RPCs would decrement a bank for a grouped payroll_bank_transfer without
+  crediting Alliance — impossible today (funding PVs are never grouped), noted only.
+- `database.types.ts` NOT regenerated for the new RPC (same `as any` escape hatch as
+  create_payroll_disbursement_vouchers).
+
+### Also this session (2026-07-20B, before the payroll work)
+- HOUZS Century RM 45,156.32 duplicate fund source cleaned (kept Alliance-routed `c7302f6b`,
+  still pending Principal); `rejectRequest` gained the missing `new_fund_source` cancel
+  branch (commit `6efb420`). Century deposit approval STILL PENDING user confirmation.
+
+## Session 2026-07-20A — payroll partial funding · Cash Flow ↔ Dept Pool tie-out · Fund IN bank routing
+> ⚠️ Superseded in part by 2026-07-20B above: Stage-E is no longer accrual-only (it now also
+> moves cash HL→Alliance), funding no longer touches dept pools, and the funding-time
+> overdraw exemption is moot. The Cash Flow bridge + Fund IN routing notes below still stand.
 
 **Everything below is DEPLOYED to `main` (HEAD `64ec536`) and applied to the live DB via MCP.**
 Gates green at HEAD: `npx tsc --noEmit` (filter `loan-disbursement.test`), `npm run test:ci`
