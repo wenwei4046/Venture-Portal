@@ -182,7 +182,7 @@ export async function fetchInterBillingCashFlow(
     ? '3000'
     : (bankCodes.values().next().value ?? '3000')
   try {
-    const [payRes, recRes, custodyRes, fundRes] = await Promise.all([
+    const [payRes, recRes, custodyRes, fundRes, voidedRes] = await Promise.all([
       supabase
         .from('dept_pools')
         .select('amount, created_at, description, departments!inner(name)')
@@ -205,22 +205,37 @@ export async function fetchInterBillingCashFlow(
         .select('amount, created_at, description, departments!inner(name)')
         .eq('transaction_type', 'expense_out')
         .like('description', 'PV HV-PV-%: Payroll bank transfer%'),
+      // Voiding a paid voucher REVERSES its pool rows with new void_in/void_out
+      // rows — the originals stay for audit. Skip both sides of any voided
+      // voucher's round, otherwise the bridge counts the original leg while the
+      // reversal leg never matches (found live with voided HV-PV-202607-0115).
+      supabase.from('payment_vouchers').select('voucher_no').eq('status', 'voided'),
     ])
     if (payRes.error) throw payRes.error
     if (recRes.error) throw recRes.error
     if (custodyRes.error) throw custodyRes.error
     if (fundRes.error) throw fundRes.error
+    if (voidedRes.error) throw voidedRes.error
 
     const payRows = (payRes.data ?? []) as unknown as PoolRow[]
     const recRows = (recRes.data ?? []) as unknown as PoolRow[]
     const custodyRows = (custodyRes.data ?? []) as unknown as PoolRow[]
     const fundRows = (fundRes.data ?? []) as unknown as PoolRow[]
+    const voided = new Set(
+      ((voidedRes.data ?? []) as { voucher_no: string | null }[])
+        .map((v) => v.voucher_no)
+        .filter(Boolean) as string[],
+    )
 
     const pvref = (d: string | null): string | null => d?.match(PVREF)?.[0] ?? null
-    const payerPvrefs = new Set(payRows.map((r) => pvref(r.description)).filter(Boolean) as string[])
+    const payerPvrefs = new Set(
+      payRows.map((r) => pvref(r.description)).filter((ref) => ref && !voided.has(ref)) as string[],
+    )
 
     const sides: TransferSide[] = []
     for (const r of payRows) {
+      const ref = pvref(r.description)
+      if (ref && voided.has(ref)) continue
       sides.push({
         deptName: (r.departments?.name as string) ?? '',
         amount: Number(r.amount ?? 0),
@@ -228,8 +243,7 @@ export async function fetchInterBillingCashFlow(
         direction: 'out',
       })
     }
-    // Receivers: only np_in whose PV ref matches a payer (a reallocation, not a
-    // real external receipt — those never share a PV with an inter_billing_out).
+    // Receivers: only np_in whose PV ref matches a (non-voided) payer.
     for (const r of recRows) {
       const ref = pvref(r.description)
       if (ref && payerPvrefs.has(ref)) {
@@ -244,9 +258,14 @@ export async function fetchInterBillingCashFlow(
 
     // Payroll custody: pair funding drains to custody receipts by the funding
     // PV ref, so only true custody rounds bridge (any similarly-worded drain
-    // without a custody twin is left alone).
+    // without a custody twin is left alone). Voided rounds are skipped on both
+    // sides — their pool effect is already nulled by the void_in/void_out rows.
     const pvrefPv = (d: string | null): string | null => d?.match(PVREF_PV)?.[0] ?? null
-    const custodyRefs = new Set(custodyRows.map((r) => pvrefPv(r.description)).filter(Boolean) as string[])
+    const custodyRefs = new Set(
+      custodyRows
+        .map((r) => pvrefPv(r.description))
+        .filter((ref) => ref && !voided.has(ref)) as string[],
+    )
     for (const r of fundRows) {
       const ref = pvrefPv(r.description)
       if (ref && custodyRefs.has(ref)) {
@@ -260,6 +279,8 @@ export async function fetchInterBillingCashFlow(
       }
     }
     for (const r of custodyRows) {
+      const ref = pvrefPv(r.description)
+      if (!ref || voided.has(ref)) continue
       sides.push({
         deptName: (r.departments?.name as string) ?? '',
         amount: Number(r.amount ?? 0),

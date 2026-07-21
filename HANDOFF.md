@@ -4,6 +4,28 @@
 > 2026-07-20C (FINAL custody model) is FIRST — it SUPERSEDES the intermediate 2026-07-20B
 > redesign below (kept for history). Then 2026-07-20A, then the older checkpoints.
 
+## Session 2026-07-21B — self-audit findings + fixes (mig `20260721010000`)
+
+User asked for a bug sweep over the day's overhaul. Invariants all green (TB 0.00, Σpools +
+GL(corp/treasury) == banks == 138,287.61, zero unbalanced JEs). Two real defects found+fixed:
+1. **Cash-flow bridge void contamination** — voiding a paid PV REVERSES its pool rows with
+   void_in/void_out rows but keeps the ORIGINALS; both bridge matchers (inter-billing AND
+   the new payroll custody) counted the originals while the void rows never match → voided
+   HV-PV-202607-0115's round (and one historical voided receipt with inter_billing rows)
+   leaked phantom transfers into per-segment Cash Flow. Fix: the bridge now loads voided
+   voucher_nos and skips any pool row whose `PV <ref>:` belongs to one (both flavours).
+2. **approve_voucher_batch had NO bank-balance guard** — it decremented the cache
+   unconditionally; a grouped approval (exactly the June staff batch scenario) could drive
+   Alliance silently negative. Guard added matching approve_single_voucher
+   (mig `20260721010000`). Note: approve_voucher_batch_partial already had a BETTER guard
+   (per-bank jsonb pre-aggregation) — only the full-batch RPC was exposed.
+Pre-existing item REPORTED, not touched: **4070 Accrual-Salary carries a legacy residual** —
+balance 113,756.20 vs June outstanding 117,528.75 (their month-end JVs); history (Jan-Mar
+opening-era credits, Apr-Jun mixed) nets −3,772.55, so after June's full payout 4070 will
+land at −3,772.55 instead of 0 → needs a Finance ruling/reclass someday. Same class of
+history exists on 4071-4074 (balances 31,641.00 / 4,689.85 / 739.00 / 10,788.90 include
+pre-June months).
+
 ## Session 2026-07-21 — HR is the payroll payments operator (mig `20260721000000`)
 
 User clarified real practice: HR (not Finance) makes the salary/KWSP/PCB/SOCSO payments, staff
