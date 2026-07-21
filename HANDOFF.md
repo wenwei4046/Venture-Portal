@@ -4,6 +4,27 @@
 > 2026-07-20C (FINAL custody model) is FIRST — it SUPERSEDES the intermediate 2026-07-20B
 > redesign below (kept for history). Then 2026-07-20A, then the older checkpoints.
 
+## Session 2026-07-21 — HR is the payroll payments operator (mig `20260721000000`)
+
+User clarified real practice: HR (not Finance) makes the salary/KWSP/PCB/SOCSO payments, staff
+and directors may be paid on DIFFERENT days, and statutory bodies are paid ONE AT A TIME.
+- `create_payroll_disbursement_vouchers(period, scope, payment_date)` — scope 'staff' |
+  'directors'; each scope = its OWN batch/approval-group/date; per-scope dedupe (staff can
+  run while directors wait, e.g. while director actuals are still being keyed).
+- `create_payroll_statutory_vouchers(period, scheme, payment_date?, bank?)` — ONE scheme per
+  call (KWSP/SOCSO/EIS/PCB/SKBBK), per-scheme dedupe (void one, regenerate just it).
+- NEW `set_payroll_pv_payment_date(voucher, date)` — hr/finance/principal; pending
+  payroll_disbursement/payroll_statutory only (dates are HR's knowledge; /payments editing
+  stays Finance-gated).
+- HR Payment page rebuilt: Staff batch card + Director batch card (own date pickers) +
+  statutory 5-row table (staff/director split per scheme, generate + date + save-date per
+  row, voucher links). Also gained a MONTH SELECTOR (?period= + arrows) — the page was
+  pinned to the calendar month while cycles finish the following month.
+- Finance's payroll-requests statutory section → READ-ONLY (links + dates); its generate
+  action removed. Finance's payroll role = funding rounds + month-end JVs only.
+- Live-safety during the signature swap: generators are gated on funding completed; June's
+  request is NOT completed (round 2 voided), so nothing could call mid-deploy.
+
 ## Session 2026-07-20D — accrual convention locked: pure-transfer funding + 4070-74 clearing (mig `20260720160000`)
 
 Discovery: Finance ALREADY books the monthly payroll accrual manually — five per-segment JVs

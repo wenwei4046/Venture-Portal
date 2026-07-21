@@ -71,15 +71,7 @@ export default async function PayrollRequestsPage() {
     id: b.id,
     bank_name: b.bank_name,
     current_balance: Number(b.current_balance ?? 0),
-    gl_account_code: (b.gl_account_code ?? null) as string | null,
   }))
-
-  // Statutory payments draw from the Alliance payroll bank (GL 3010) — the
-  // funding staged the statutory share there — so default the picker to it.
-  // The funding form keeps the primary-first order (its source is Hong Leong).
-  const statutoryBankOptions = [...bankOptions].sort((a, b) =>
-    (a.gl_account_code === '3010' ? 0 : 1) - (b.gl_account_code === '3010' ? 0 : 1),
-  )
 
   // Per-request: dept breakdown (required + current pool balance) + what's already
   // been funded across prior non-voided funding PVs (partial-funding support).
@@ -152,7 +144,7 @@ export default async function PayrollRequestsPage() {
   const { data: statutoryPvsRaw } = statutoryRuns.length
     ? await supabase
         .from('payment_vouchers')
-        .select('id, voucher_no, payee_name, amount, status, reference_id')
+        .select('id, voucher_no, payee_name, amount, status, payment_date, reference_id')
         .eq('reference_type', 'payroll_statutory')
         .in('reference_id', statutoryRuns.map(r => r.runId))
         .neq('status', 'voided')
@@ -167,6 +159,7 @@ export default async function PayrollRequestsPage() {
         payee_name: v.payee_name,
         amount: Number(v.amount ?? 0),
         status: v.status as string,
+        payment_date: (v.payment_date ?? null) as string | null,
       })),
   }))
 
@@ -313,8 +306,8 @@ export default async function PayrollRequestsPage() {
         </section>
       ) : null}
 
-      {/* ── Statutory payments (KWSP / PERKESO / LHDN / SKBBK) per funded period ─── */}
-      <StatutorySection periods={statutoryPeriods} banks={statutoryBankOptions} />
+      {/* ── Statutory payments — read-only for Finance (HR generates/dates them) ─── */}
+      <StatutorySection periods={statutoryPeriods} />
     </div>
   )
 }

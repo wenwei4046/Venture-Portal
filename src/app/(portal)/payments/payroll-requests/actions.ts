@@ -310,46 +310,6 @@ export async function financeCancelRequest(
   revalidatePath('/dashboard')
 }
 
-/**
- * Mig 20260720 — one-click statutory vouchers (KWSP / PERKESO / LHDN) for a
- * payroll period, split per staff department pool (each dept pays its own
- * people's statutory). Created as pending approvals with payment_date NULL:
- * the actual payment date is uncertain, so Finance edits it on the PV before
- * Principal approves (the GL date follows the payment date, mig 20260611).
- */
-export interface StatutoryResult {
-  count: number
-  total: number
-  vouchers: { id: string; voucher_no: string; payee: string; amount: number }[]
-}
-
-export async function generateStatutoryVouchers(
-  period: string,
-  bankAccountId?: string,
-): Promise<StatutoryResult> {
-  // HR generates from hr-costing → Payment (no bank picker — the RPC
-  // auto-picks Alliance); Finance from /payments/payroll-requests.
-  await requireRole(['hr', 'finance', 'principal'])
-  const supabase = await createClient()
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(period)) throw new Error('Invalid period')
-
-  // RPC final shape: mig 20260720150000 (custody model) — five PVs, each one
-  // payment to its scheme, drained from dept_pool_hr; NULL bank auto-picks
-  // Alliance (GL 3010). database.types.ts not regenerated (same escape hatch
-  // as create_payroll_disbursement_vouchers).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.rpc as any)(
-    'create_payroll_statutory_vouchers',
-    { p_period: period, p_bank_account_id: bankAccountId ?? null },
-  )
-
-  if (error) throw new Error(error.message)
-
-  revalidatePath('/payments')
-  revalidatePath('/payments/payroll-requests')
-  revalidatePath('/approvals')
-  revalidatePath('/dashboard')
-
-  return data as unknown as StatutoryResult
-}
+// Statutory voucher generation moved to HR (hr-costing/payment/actions.ts,
+// mig 20260721000000) — HR makes those payments in practice, one institution
+// per voucher with HR's own dates. This page's statutory section is read-only.

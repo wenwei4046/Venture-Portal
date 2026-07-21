@@ -7,9 +7,7 @@ import RequestPayrollPaymentButton, {
   type RequestState,
 } from '../payroll/_components/RequestPayrollPaymentButton'
 import CreateDisbursementButton from './_components/CreateDisbursementButton'
-import StatutorySection, {
-  type StatutoryPeriod,
-} from '../../payments/payroll-requests/_components/StatutorySection'
+import StatutoryTable, { type StatutoryRow } from './_components/StatutoryTable'
 
 interface DeptBreakdown {
   dept_name: string
@@ -50,11 +48,15 @@ export default async function HRPaymentPage({
       .single(),
     supabase
       .from('hr_monthly_payroll')
-      .select('id, net, gross, status, hr_staff_costs(employee_name, departments(name))')
+      .select(
+        'id, net, gross, status, epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb, skbbk_amount, hr_staff_costs(employee_name, departments(name))',
+      )
       .eq('period_month', period),
     supabase
       .from('director_payouts')
-      .select('id, payroll_net, payroll_gross, directors(name)')
+      .select(
+        'id, payroll_net, payroll_gross, payroll_epf_er, payroll_epf_ee, payroll_socso_er, payroll_socso_ee, payroll_eis_er, payroll_eis_ee, payroll_pcb, payroll_skbbk, directors(name)',
+      )
       .eq('period_month', period),
   ])
 
@@ -137,30 +139,26 @@ export default async function HRPaymentPage({
         .maybeSingle()
     : { data: null }
 
-  // ── Disbursement voucher state — check if batch already generated ─────────
-  // reference_id on a disbursement voucher is either an hr_monthly_payroll.id
-  // or a director_payouts.id depending on the row type. Rejected + voided
-  // vouchers keep their audit trail but don't block a retry, so they're
-  // filtered out here in sync with the RPC's dedupe logic.
-  const payrollIds = [
-    ...rows.map(r => r.id as string),
-    ...dRows.map(d => d.id as string),
-  ]
-  const { data: disbursementVouchers } = payrollIds.length
+  // ── Disbursement voucher state — PER SCOPE (mig 20260721000000): staff and
+  // director batches are generated/approved/paid independently. reference_id
+  // on a disbursement voucher is an hr_monthly_payroll.id (staff) or a
+  // director_payouts.id (directors); voided vouchers don't block a retry.
+  const staffIds = rows.map(r => r.id as string)
+  const directorIds = dRows.map(d => d.id as string)
+  const { data: disbursementVouchers } = staffIds.length + directorIds.length
     ? await supabase
         .from('payment_vouchers')
         .select('id, reference_id, status')
         .eq('reference_type', 'payroll_disbursement')
-        .in('reference_id', payrollIds)
+        .in('reference_id', [...staffIds, ...directorIds])
         .in('status', ['draft', 'pending_approval', 'approved', 'paid'])
     : { data: null }
-  const disbursementCount = disbursementVouchers?.length ?? 0
-  const alreadyDisbursed = disbursementCount > 0
+  const staffIdSet = new Set(staffIds)
+  const staffVouchers = (disbursementVouchers ?? []).filter(v => staffIdSet.has(v.reference_id as string))
+  const directorVouchers = (disbursementVouchers ?? []).filter(v => !staffIdSet.has(v.reference_id as string))
 
-  // Find the approval group_id for the batch
-  let disbursementGroupId: string | null = null
-  if (alreadyDisbursed && disbursementVouchers && disbursementVouchers.length > 0) {
-    const voucherIds = disbursementVouchers.map(v => v.id as string)
+  const groupIdFor = async (voucherIds: string[]): Promise<string | null> => {
+    if (voucherIds.length === 0) return null
     const { data: approvalRow } = await supabase
       .from('approval_requests')
       .select('group_id')
@@ -169,31 +167,53 @@ export default async function HRPaymentPage({
       .not('group_id', 'is', null)
       .limit(1)
       .maybeSingle()
-    disbursementGroupId = approvalRow?.group_id ?? null
+    return approvalRow?.group_id ?? null
   }
+  const staffGroupId = await groupIdFor(staffVouchers.map(v => v.id as string))
+  const directorGroupId = await groupIdFor(directorVouchers.map(v => v.id as string))
+  const alreadyDisbursed = staffVouchers.length > 0 || directorVouchers.length > 0
 
-  // ── Statutory PVs for this run (mig 20260720150000: HR can generate them
-  // here too; the RPC auto-picks the Alliance bank — no picker needed).
+  // ── Statutory rows (mig 20260721000000): one row per institution, staff +
+  // director amounts, matched to any existing non-voided voucher by payee.
   const { data: statutoryPvsRaw } = run
     ? await supabase
         .from('payment_vouchers')
-        .select('id, voucher_no, payee_name, amount, status')
+        .select('id, voucher_no, payee_name, status, payment_date')
         .eq('reference_type', 'payroll_statutory')
         .eq('reference_id', run.id)
         .neq('status', 'voided')
     : { data: [] }
-  const statutoryPeriods: StatutoryPeriod[] = [
-    {
-      period_month: period,
-      pvs: (statutoryPvsRaw ?? []).map(v => ({
-        id: v.id as string,
-        voucher_no: v.voucher_no,
-        payee_name: v.payee_name,
-        amount: Number(v.amount ?? 0),
-        status: v.status as string,
-      })),
-    },
+
+  const staffSum = (f: (r: (typeof rows)[number]) => number) =>
+    rows.reduce((s, r) => s + f(r), 0)
+  const dirSum = (f: (d: (typeof dRows)[number]) => number) =>
+    dRows.reduce((s, d) => s + f(d), 0)
+  const n = (v: unknown) => Number(v ?? 0)
+
+  const SCHEMES: Array<{ scheme: StatutoryRow['scheme']; payee: string; staff: number; directors: number }> = [
+    { scheme: 'KWSP', payee: 'KWSP', staff: staffSum(r => n(r.epf_er) + n(r.epf_ee)), directors: dirSum(d => n(d.payroll_epf_er) + n(d.payroll_epf_ee)) },
+    { scheme: 'SOCSO', payee: 'PERKESO (SOCSO)', staff: staffSum(r => n(r.socso_er) + n(r.socso_ee)), directors: dirSum(d => n(d.payroll_socso_er) + n(d.payroll_socso_ee)) },
+    { scheme: 'EIS', payee: 'PERKESO (EIS)', staff: staffSum(r => n(r.eis_er) + n(r.eis_ee)), directors: dirSum(d => n(d.payroll_eis_er) + n(d.payroll_eis_ee)) },
+    { scheme: 'PCB', payee: 'LHDN', staff: staffSum(r => n(r.pcb)), directors: dirSum(d => n(d.payroll_pcb)) },
+    { scheme: 'SKBBK', payee: 'SKBBK', staff: staffSum(r => n(r.skbbk_amount)), directors: dirSum(d => n(d.payroll_skbbk)) },
   ]
+  const statutoryRows: StatutoryRow[] = SCHEMES.map(s => {
+    const pv = (statutoryPvsRaw ?? []).find(v => v.payee_name === s.payee) ?? null
+    return {
+      scheme: s.scheme,
+      payee: s.payee,
+      staff: Math.round(s.staff * 100) / 100,
+      directors: Math.round(s.directors * 100) / 100,
+      pv: pv
+        ? {
+            id: pv.id as string,
+            voucher_no: pv.voucher_no,
+            status: pv.status as string,
+            payment_date: (pv.payment_date ?? null) as string | null,
+          }
+        : null,
+    }
+  })
 
   // No Principal costing approval since mig 278 — Submit to Finance lands the
   // run directly in 'approved', so there is no 'submitted'/'rejected' run state
@@ -435,20 +455,35 @@ export default async function HRPaymentPage({
             </div>
 
             <div className="mt-6 pt-6 border-t border-hairline">
-              <h3 className="font-serif text-md text-ink mb-1">Pay staff</h3>
+              <h3 className="font-serif text-md text-ink mb-1">Pay salaries</h3>
               <p className="font-serif italic text-graphite text-sm mb-5">
-                Generate individual payment vouchers (one per staff, sent to
-                Principal for approval as a batch), then download the Alliance
-                Bank file for the actual bank transfer.
+                Staff and directors are separate batches — each with its own
+                payment date and its own Principal approval, so they can be
+                paid on different days.
               </p>
 
+              <div className="mb-4">
+                <CreateDisbursementButton
+                  period={period}
+                  scope="staff"
+                  label="Staff batch"
+                  total={staffNet}
+                  count={rows.filter(r => Number(r.net) > 0).length}
+                  alreadyGenerated={staffVouchers.length > 0}
+                  groupId={staffGroupId}
+                  defaultDate={period.slice(0, 8) + '28'}
+                />
+              </div>
               <div className="mb-5">
                 <CreateDisbursementButton
                   period={period}
-                  totalNet={totalNet}
-                  staffCount={staffCount}
-                  alreadyGenerated={alreadyDisbursed}
-                  groupId={disbursementGroupId}
+                  scope="directors"
+                  label="Director batch"
+                  total={directorNet}
+                  count={dRows.length}
+                  alreadyGenerated={directorVouchers.length > 0}
+                  groupId={directorGroupId}
+                  defaultDate={period.slice(0, 8) + '28'}
                 />
               </div>
 
@@ -464,15 +499,15 @@ export default async function HRPaymentPage({
                 </span>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* Statutory payments — HR can generate the five scheme PVs here too
-            (KWSP / SOCSO / EIS / LHDN / SKBBK), paid from Alliance out of the
-            HR custody pool. Shown once the funding is complete. */}
-        {phase === 'funded' && (
-          <div className="mt-8">
-            <StatutorySection periods={statutoryPeriods} banks={[]} />
+            <div className="mt-6 pt-6 border-t border-hairline">
+              <h3 className="font-serif text-md text-ink mb-1">Statutory payments</h3>
+              <p className="font-serif italic text-graphite text-sm mb-4">
+                One institution at a time — generate each voucher when you are
+                ready to pay that body, with its own payment date.
+              </p>
+              <StatutoryTable period={period} rows={statutoryRows} />
+            </div>
           </div>
         )}
       </div>
