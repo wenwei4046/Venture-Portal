@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney, formatMoneyBare, getPeriodMonth } from '@/lib/utils'
@@ -17,11 +18,23 @@ interface DeptBreakdown {
   total_gross: number
 }
 
-export default async function HRPaymentPage() {
+export default async function HRPaymentPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string }>
+}) {
   await requireRole(['principal', 'hr'])
   const supabase = await createClient()
 
-  const period = getPeriodMonth()
+  // Month selector (2026-07-21, user request): ?period=YYYY-MM-01 — a payroll
+  // cycle often finishes in the FOLLOWING calendar month (June's payout runs
+  // in July), so the page can't be pinned to the current month.
+  const { period: periodParam } = await searchParams
+  const period = /^\d{4}-\d{2}-01$/.test(periodParam ?? '')
+    ? (periodParam as string)
+    : getPeriodMonth()
+  const prevPeriod = dayjs(period).subtract(1, 'month').format('YYYY-MM-01')
+  const nextPeriod = dayjs(period).add(1, 'month').format('YYYY-MM-01')
 
   const [{ data: run }, { data: hrDept }, { data: payrollRows }, { data: directorRows }] = await Promise.all([
     supabase
@@ -44,6 +57,17 @@ export default async function HRPaymentPage() {
       .select('id, payroll_net, payroll_gross, directors(name)')
       .eq('period_month', period),
   ])
+
+  // Latest cycle anywhere — powers the "View the <month> cycle →" hint when
+  // the selected month is empty (e.g. it's July but June is still in flight).
+  const { data: latestRun } = await supabase
+    .from('payroll_runs')
+    .select('period_month')
+    .neq('status', 'rejected')
+    .order('period_month', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const latestRunPeriod = (latestRun?.period_month ?? null) as string | null
 
   // Mig 20260720140000 (custody model): funding parks every department's
   // contribution in HR's pool, so its balance IS the payroll war chest —
@@ -230,6 +254,27 @@ export default async function HRPaymentPage() {
           </div>
           <h1 className="page-title">Payment</h1>
         </div>
+        {/* Month selector — a payroll cycle often completes in the FOLLOWING
+            calendar month, so HR must be able to walk back to it. */}
+        <div className="flex items-center gap-2 shrink-0">
+          <Link
+            href={`/hr-costing/payment?period=${prevPeriod}`}
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-mono text-sm px-3 py-1.5 rounded-md transition-colors"
+            aria-label="Previous month"
+          >
+            ←
+          </Link>
+          <span className="font-serif italic text-graphite text-sm w-32 text-center">
+            {dayjs(period).format('MMMM YYYY')}
+          </span>
+          <Link
+            href={`/hr-costing/payment?period=${nextPeriod}`}
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-mono text-sm px-3 py-1.5 rounded-md transition-colors"
+            aria-label="Next month"
+          >
+            →
+          </Link>
+        </div>
       </div>
 
       {/* Hero — Total Amount + HR Pool (payroll custody) */}
@@ -312,12 +357,22 @@ export default async function HRPaymentPage() {
             <p className="font-serif italic text-graphite text-lg mb-4">
               No payroll imported for this month yet.
             </p>
-            <Link
-              href="/hr-costing/payroll"
-              className="inline-block bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-            >
-              Go to Payroll →
-            </Link>
+            <div className="flex items-center justify-center gap-3 flex-wrap">
+              <Link
+                href="/hr-costing/payroll"
+                className="inline-block bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+              >
+                Go to Payroll →
+              </Link>
+              {latestRunPeriod && latestRunPeriod !== period ? (
+                <Link
+                  href={`/hr-costing/payment?period=${latestRunPeriod}`}
+                  className="inline-block bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+                >
+                  View the {dayjs(latestRunPeriod).format('MMMM YYYY')} cycle →
+                </Link>
+              ) : null}
+            </div>
           </div>
         )}
 
