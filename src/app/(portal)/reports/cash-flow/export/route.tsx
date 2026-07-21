@@ -33,7 +33,7 @@ export async function GET(req: Request) {
 
   const cf = buildCashFlow(
     [...lines, ...ib.lines],
-    [...accounts, ib.account],
+    [...accounts, ib.account, ib.payrollAccount],
     {
       current: monthPeriod(period),
       previous: monthPeriod(compare || period),

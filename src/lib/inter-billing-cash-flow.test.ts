@@ -4,7 +4,9 @@ import {
   buildInterBillingCashFlowLines,
   ensureInterBillCategory,
   interBillTransferAccount,
+  payrollCustodyAccount,
   INTERBILL_TRANSFER_CODE,
+  PAYROLL_XFER_CODE,
   type TransferSide,
 } from './inter-billing-cash-flow'
 
@@ -16,6 +18,7 @@ const accounts: CoaAccount[] = [
   { code: '3000', name: 'Hong Leong', type: 'asset', parent_code: null, cash_flow_category: null },
   { code: '5000', name: 'Revenue', type: 'revenue', parent_code: null, cash_flow_category: 'operating' },
   interBillTransferAccount,
+  payrollCustodyAccount,
 ]
 
 function ln(p: Partial<GlLine>): GlLine {
@@ -100,6 +103,39 @@ describe('inter-billing + own-share folded into buildCashFlow', () => {
   })
 })
 
+describe('payroll custody bridge (mig 20260721)', () => {
+  // June-style round: Marketing 38,545.39 + HR's own 19,628.33 (plus the two
+  // small depts, omitted) → HR custody receives the FULL round.
+  const pySides: TransferSide[] = [
+    { deptName: 'Marketing', amount: 40, date: '2026-07-07', direction: 'out', kind: 'payroll' },
+    { deptName: 'HR', amount: 20, date: '2026-07-07', direction: 'out', kind: 'payroll' },
+    { deptName: 'HR', amount: 60, date: '2026-07-07', direction: 'in', kind: 'payroll' },
+  ]
+  const py = buildInterBillingCashFlowLines(pySides, '3000')
+
+  it('uses the payroll pseudo account, not the inter-billing one', () => {
+    expect(py.some((l) => l.account_code === PAYROLL_XFER_CODE)).toBe(true)
+    expect(py.some((l) => l.account_code === INTERBILL_TRANSFER_CODE)).toBe(false)
+  })
+
+  it('payer segment closing cash drops by its contribution', () => {
+    const after = cf([...base, ...py], ['marketing'])
+    expect(after.closingCash.current).toBe(60) // 100 − 40
+    expect(after.financing.nodes.find((n) => n.code === PAYROLL_XFER_CODE)?.current).toBe(-40)
+  })
+
+  it('HR nets custody-in minus its own contribution', () => {
+    // HR has no base cash here → 0 − 20 own + 60 custody = +40
+    expect(cf([...base, ...py], ['hr']).closingCash.current).toBe(40)
+  })
+
+  it('consolidated closing cash unchanged — custody nets to zero', () => {
+    const before = cf(base, undefined).closingCash.current
+    const after = cf([...base, ...py], undefined).closingCash.current
+    expect(after).toBe(before)
+  })
+})
+
 describe('ensureInterBillCategory', () => {
   it('files the transfer account into the Financing category (so it is not "Unassigned")', () => {
     const layout = {
@@ -111,6 +147,7 @@ describe('ensureInterBillCategory', () => {
     const out = ensureInterBillCategory(layout)
     const fin = out.categories.find((c) => c.id === 'financing')!
     expect(fin.accounts).toContain(INTERBILL_TRANSFER_CODE)
+    expect(fin.accounts).toContain(PAYROLL_XFER_CODE)
     expect(layout.categories[1].accounts).not.toContain(INTERBILL_TRANSFER_CODE) // original untouched
   })
 
@@ -120,6 +157,7 @@ describe('ensureInterBillCategory', () => {
     const twice = ensureInterBillCategory(once)
     expect(once.categories[0].accounts.filter((a) => a === INTERBILL_TRANSFER_CODE)).toHaveLength(1)
     expect(twice.categories[0].accounts.filter((a) => a === INTERBILL_TRANSFER_CODE)).toHaveLength(1)
+    expect(twice.categories[0].accounts.filter((a) => a === PAYROLL_XFER_CODE)).toHaveLength(1)
   })
 
   it('creates a Financing category when none exists', () => {

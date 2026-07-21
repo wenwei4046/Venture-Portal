@@ -24,6 +24,14 @@ and directors may be paid on DIFFERENT days, and statutory bodies are paid ONE A
   action removed. Finance's payroll role = funding rounds + month-end JVs only.
 - Live-safety during the signature swap: generators are gated on funding completed; June's
   request is NOT completed (round 2 voided), so nothing could call mid-deploy.
+- **Payroll custody CASH-FLOW BRIDGE added** (closes the 20C known follow-up): the funding
+  reallocation (dept expense_out → HR custody np_in, dept_pools-only) now feeds synthetic
+  lines into all four Cash Flow surfaces via `inter-billing-cash-flow.ts` — new pseudo
+  Financing account `PY-XFER` "Payroll custody (internal transfer)"; payers matched to
+  custody receipts by the funding PV ref (custody marker "payroll fund → HR custody").
+  Each dept's per-segment Cash Flow now shows "Transfer to HR payroll custody" out, HR
+  shows the custody in; consolidated unchanged; monthly custom layout files PY-XFER under
+  Financing via ensureInterBillCategory. 4 new tests (380 total).
 
 ## Session 2026-07-20D — accrual convention locked: pure-transfer funding + 4070-74 clearing (mig `20260720160000`)
 

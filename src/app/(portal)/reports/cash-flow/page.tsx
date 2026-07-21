@@ -57,7 +57,7 @@ export default async function CashFlowPage({ searchParams }: Props) {
 
   const cf = buildCashFlow(
     lines,
-    [...accounts, ib.account],
+    [...accounts, ib.account, ib.payrollAccount],
     {
       current: monthPeriod(period),
       previous: monthPeriod(compare || period),

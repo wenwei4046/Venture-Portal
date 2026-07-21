@@ -35,7 +35,7 @@ export async function GET(req: Request) {
   ])
   const bankCodes = new Set((banks ?? []) as unknown as string[])
   const ib = await fetchInterBillingCashFlow(supabase, bankCodes)
-  const data = buildCashFlowAccounts([...lines, ...ib.lines], [...accounts, ib.account], bankCodes, { year, throughMonth, segment: segmentFilterFor(segment) })
+  const data = buildCashFlowAccounts([...lines, ...ib.lines], [...accounts, ib.account, ib.payrollAccount], bankCodes, { year, throughMonth, segment: segmentFilterFor(segment) })
   const saved = (savedRaw ?? null) as CashFlowLayout | null
   const layout = saved && Array.isArray(saved.categories) && saved.categories.length > 0
     ? saved

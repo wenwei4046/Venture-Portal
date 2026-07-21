@@ -39,6 +39,20 @@ export const interBillTransferAccount: CoaAccount = {
   cash_flow_category: 'financing',
 }
 
+/** Mig 20260721: payroll funding is a dept_pools-only reallocation too — each
+ *  department hands its contribution to HR custody with NO per-dept GL bank
+ *  line (only one hr-segment staging JE). Same bridge treatment, its own
+ *  Financing line so the report reads "transfer to HR payroll custody". */
+export const PAYROLL_XFER_CODE = 'PY-XFER'
+
+export const payrollCustodyAccount: CoaAccount = {
+  code: PAYROLL_XFER_CODE,
+  name: 'Payroll custody (internal transfer)',
+  type: 'equity',
+  parent_code: null,
+  cash_flow_category: 'financing',
+}
+
 /**
  * Slot the synthetic transfer account into a custom cash-flow layout's Financing
  * category, so the monthly (custom-layout) report files it under Financing
@@ -46,12 +60,15 @@ export const interBillTransferAccount: CoaAccount = {
  * synthetic code). Applied at render time — never mutates the stored layout.
  */
 export function ensureInterBillCategory(layout: CashFlowLayout): CashFlowLayout {
-  const code = INTERBILL_TRANSFER_CODE
-  if (layout.categories.some((c) => c.accounts.includes(code))) return layout
+  const codes = [INTERBILL_TRANSFER_CODE, PAYROLL_XFER_CODE]
+  const missing = codes.filter(
+    (code) => !layout.categories.some((c) => c.accounts.includes(code)),
+  )
+  if (missing.length === 0) return layout
   const cats = layout.categories.map((c) => ({ ...c, accounts: [...c.accounts] }))
   const fin = cats.find((c) => c.id === 'financing') ?? cats.find((c) => /financing/i.test(c.name))
-  if (fin) fin.accounts.push(code)
-  else cats.push({ id: 'financing', name: 'Financing Activities', accounts: [code] })
+  if (fin) fin.accounts.push(...missing)
+  else cats.push({ id: 'financing', name: 'Financing Activities', accounts: [...missing] })
   return { categories: cats }
 }
 
@@ -66,6 +83,7 @@ const DEPT_TO_SEGMENT: Record<string, string> = {
 }
 
 const PVREF = /HV-OR-\d+-\d+/
+const PVREF_PV = /HV-PV-\d+-\d+/
 
 function round2(n: number): number {
   return Math.round((Number(n) || 0) * 100) / 100
@@ -76,6 +94,9 @@ export interface TransferSide {
   amount: number
   date: string // YYYY-MM-DD (settle date)
   direction: 'out' | 'in'
+  /** Which internal-transfer flavour this side belongs to (drives the pseudo
+   *  Financing account + line labels). Default: 'interbill'. */
+  kind?: 'interbill' | 'payroll'
 }
 
 function mkLine(
@@ -116,16 +137,22 @@ export function buildInterBillingCashFlowLines(sides: TransferSide[], bankCode: 
     const amt = round2(s.amount)
     const date = (s.date ?? '').slice(0, 10)
     if (!seg || !(amt > 0) || !date) continue
-    const id = `ibx-${s.direction}-${i++}`
+    const payroll = s.kind === 'payroll'
+    const xferCode = payroll ? PAYROLL_XFER_CODE : INTERBILL_TRANSFER_CODE
+    const id = `${payroll ? 'pyx' : 'ibx'}-${s.direction}-${i++}`
     if (s.direction === 'out') {
       lines.push(
-        mkLine(id, bankCode, 0, amt, date, seg, 'Inter-billing transfer out'),
-        mkLine(id, INTERBILL_TRANSFER_CODE, amt, 0, date, seg, `Inter-billing paid — ${s.deptName}`),
+        mkLine(id, bankCode, 0, amt, date, seg,
+          payroll ? 'Transfer to HR payroll custody' : 'Inter-billing transfer out'),
+        mkLine(id, xferCode, amt, 0, date, seg,
+          payroll ? `Payroll custody paid in — ${s.deptName}` : `Inter-billing paid — ${s.deptName}`),
       )
     } else {
       lines.push(
-        mkLine(id, bankCode, amt, 0, date, seg, 'Inter-billing transfer in'),
-        mkLine(id, INTERBILL_TRANSFER_CODE, 0, amt, date, seg, `Inter-billing received — ${s.deptName}`),
+        mkLine(id, bankCode, amt, 0, date, seg,
+          payroll ? 'Payroll custody received' : 'Inter-billing transfer in'),
+        mkLine(id, xferCode, 0, amt, date, seg,
+          payroll ? `Payroll custody received — ${s.deptName}` : `Inter-billing received — ${s.deptName}`),
       )
     }
   }
@@ -150,12 +177,12 @@ interface PoolRow {
 export async function fetchInterBillingCashFlow(
   supabase: SupabaseClient,
   bankCodes: ReadonlySet<string>,
-): Promise<{ lines: GlLine[]; account: CoaAccount }> {
+): Promise<{ lines: GlLine[]; account: CoaAccount; payrollAccount: CoaAccount }> {
   const bankCode = bankCodes.has('3000')
     ? '3000'
     : (bankCodes.values().next().value ?? '3000')
   try {
-    const [payRes, recRes] = await Promise.all([
+    const [payRes, recRes, custodyRes, fundRes] = await Promise.all([
       supabase
         .from('dept_pools')
         .select('amount, created_at, description, departments!inner(name)')
@@ -165,12 +192,29 @@ export async function fetchInterBillingCashFlow(
         .select('amount, created_at, description, departments!inner(name)')
         .eq('transaction_type', 'np_in')
         .like('description', 'PV HV-OR-%'),
+      // Payroll custody receipts — the funding PV parks the FULL round in HR's
+      // pool; unique marker written by approve_single_voucher.
+      supabase
+        .from('dept_pools')
+        .select('amount, created_at, description, departments!inner(name)')
+        .eq('transaction_type', 'np_in')
+        .like('description', '%payroll fund → HR custody%'),
+      // Payroll funding drains — each department's typed contribution.
+      supabase
+        .from('dept_pools')
+        .select('amount, created_at, description, departments!inner(name)')
+        .eq('transaction_type', 'expense_out')
+        .like('description', 'PV HV-PV-%: Payroll bank transfer%'),
     ])
     if (payRes.error) throw payRes.error
     if (recRes.error) throw recRes.error
+    if (custodyRes.error) throw custodyRes.error
+    if (fundRes.error) throw fundRes.error
 
     const payRows = (payRes.data ?? []) as unknown as PoolRow[]
     const recRows = (recRes.data ?? []) as unknown as PoolRow[]
+    const custodyRows = (custodyRes.data ?? []) as unknown as PoolRow[]
+    const fundRows = (fundRes.data ?? []) as unknown as PoolRow[]
 
     const pvref = (d: string | null): string | null => d?.match(PVREF)?.[0] ?? null
     const payerPvrefs = new Set(payRows.map((r) => pvref(r.description)).filter(Boolean) as string[])
@@ -198,8 +242,39 @@ export async function fetchInterBillingCashFlow(
       }
     }
 
-    return { lines: buildInterBillingCashFlowLines(sides, bankCode), account: interBillTransferAccount }
+    // Payroll custody: pair funding drains to custody receipts by the funding
+    // PV ref, so only true custody rounds bridge (any similarly-worded drain
+    // without a custody twin is left alone).
+    const pvrefPv = (d: string | null): string | null => d?.match(PVREF_PV)?.[0] ?? null
+    const custodyRefs = new Set(custodyRows.map((r) => pvrefPv(r.description)).filter(Boolean) as string[])
+    for (const r of fundRows) {
+      const ref = pvrefPv(r.description)
+      if (ref && custodyRefs.has(ref)) {
+        sides.push({
+          deptName: (r.departments?.name as string) ?? '',
+          amount: Number(r.amount ?? 0),
+          date: String(r.created_at ?? '').slice(0, 10),
+          direction: 'out',
+          kind: 'payroll',
+        })
+      }
+    }
+    for (const r of custodyRows) {
+      sides.push({
+        deptName: (r.departments?.name as string) ?? '',
+        amount: Number(r.amount ?? 0),
+        date: String(r.created_at ?? '').slice(0, 10),
+        direction: 'in',
+        kind: 'payroll',
+      })
+    }
+
+    return {
+      lines: buildInterBillingCashFlowLines(sides, bankCode),
+      account: interBillTransferAccount,
+      payrollAccount: payrollCustodyAccount,
+    }
   } catch {
-    return { lines: [], account: interBillTransferAccount }
+    return { lines: [], account: interBillTransferAccount, payrollAccount: payrollCustodyAccount }
   }
 }

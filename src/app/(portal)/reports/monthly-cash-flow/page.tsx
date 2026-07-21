@@ -44,7 +44,7 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
   const bankCodes = new Set((banks ?? []) as unknown as string[])
   const ib = await fetchInterBillingCashFlow(supabase, bankCodes)
 
-  const data = buildCashFlowAccounts([...lines, ...ib.lines], [...accounts, ib.account], bankCodes, {
+  const data = buildCashFlowAccounts([...lines, ...ib.lines], [...accounts, ib.account, ib.payrollAccount], bankCodes, {
     year,
     throughMonth,
     segment: segmentFilterFor(segment),
