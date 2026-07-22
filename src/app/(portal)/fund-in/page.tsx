@@ -5,6 +5,7 @@ import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import FundSourceTabs from './_components/FundSourceTabs'
+import FundSourcesTable from './_components/FundSourcesTable'
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
   subsidiary: 'Subsidiary',
@@ -219,111 +220,29 @@ export default async function FundInPage({ searchParams }: Props) {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="ledger-table">
-                <thead>
-                  <tr>
-                    <th>Type</th>
-                    <th>From</th>
-                    <th className="right">Date</th>
-                    <th className="right">Amount</th>
-                    <th className="right">Outstanding</th>
-                    <th className="right">Rate</th>
-                    <th className="right">Lock-in</th>
-                    <th className="right">Maturity</th>
-                    <th>Status</th>
-                    <th className="right"></th>
-                  </tr>
-                </thead>
-                <tbody className="row-stagger">
-                  {filtered.map((source, i) => (
-                    <tr
-                      key={source.id}
-                      style={{ '--i': i } as React.CSSProperties}
-                    >
-                      <td className="font-serif italic text-graphite">
-                        {SOURCE_TYPE_LABELS[source.source_type] ?? source.source_type}
-                      </td>
-                      <td className="font-serif text-[15px] text-ink">
-                        {getFromLabel(source)}
-                      </td>
-                      <td className="num">
-                        {dayjs(source.effective_date).format('D MMM YYYY')}
-                      </td>
-                      <td className="num">
-                        {formatMoney(Number(source.amount))}
-                      </td>
-                      <td className="num">
-                        {source.status === 'active' || source.status === 'matured'
-                          ? formatMoney(outstandingMap.get(source.id) ?? Number(source.amount))
-                          : <span className="text-muted">—</span>}
-                      </td>
-                      <td className="num">
-                        {(Number(source.cost_rate) * 100).toFixed(3)}%
-                      </td>
-                      <td className="num">
-                        {source.lock_in_months ? `${source.lock_in_months} mo` : <span className="text-muted">—</span>}
-                      </td>
-                      <td className="num">
-                        {source.maturity_date
-                          ? dayjs(source.maturity_date).format('D MMM YYYY')
-                          : <span className="text-muted">—</span>}
-                      </td>
-                      <td>
-                        <StatusLabel status={source.status} maturityDate={source.maturity_date} />
-                      </td>
-                      <td className="right">
-                        <Link
-                          href={`/fund-in/${source.id}`}
-                          className="text-sm text-accent hover:text-accent-hover font-serif italic"
-                        >
-                          View
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <FundSourcesTable
+                rows={filtered.map((source) => ({
+                  id: source.id,
+                  typeLabel: SOURCE_TYPE_LABELS[source.source_type] ?? source.source_type,
+                  fromLabel: getFromLabel(source),
+                  effectiveDate: source.effective_date,
+                  amount: Number(source.amount),
+                  outstanding:
+                    source.status === 'active' || source.status === 'matured'
+                      ? outstandingMap.get(source.id) ?? Number(source.amount)
+                      : null,
+                  costRate: Number(source.cost_rate),
+                  lockInMonths: source.lock_in_months,
+                  maturityDate: source.maturity_date,
+                  status: source.status,
+                }))}
+              />
             </div>
           )}
         </section>
       )}
     </div>
   )
-}
-
-function StatusLabel({
-  status,
-  maturityDate,
-}: {
-  status: FundSourceRow['status']
-  maturityDate: string | null
-}) {
-  if (status === 'pending_approval') {
-    return <em className="font-serif text-alert text-sm">pending approval</em>
-  }
-  if (status === 'active') {
-    if (maturityDate) {
-      const days = dayjs(maturityDate).diff(dayjs(), 'day')
-      if (days >= 0 && days <= 30) {
-        return (
-          <em className="font-serif text-alert text-sm">
-            matures in {days}d
-          </em>
-        )
-      }
-      if (days < 0) {
-        return <em className="font-serif text-alert text-sm">past maturity</em>
-      }
-    }
-    return <em className="font-serif text-graphite text-sm">active</em>
-  }
-  if (status === 'matured') {
-    return <em className="font-serif text-alert text-sm">matured</em>
-  }
-  if (status === 'repaid') {
-    return <em className="font-serif text-ledger text-sm">repaid</em>
-  }
-  return <em className="font-serif text-muted text-sm">cancelled</em>
 }
 
 function EmptyState() {
