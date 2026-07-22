@@ -34,7 +34,11 @@ import DashboardViews from './DashboardViews'
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
 export const fmt = (v: number) =>
-  v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  // Normalize -0 / sub-cent negatives so ledgers never show "RM -0.00"
+  (Math.abs(v) < 0.005 ? 0 : v).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 export const fmtRM = (v: number) => `RM ${fmt(v)}`
 /** Signed money: negatives as red "-RM x" like the HTML tool. */
 export function Money({ v, dash = '—' }: { v: number; dash?: string }) {

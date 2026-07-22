@@ -873,20 +873,29 @@ function FlowBox({ label, value, tone = 'ink' }: { label: string; value: string;
   )
 }
 
-function FlowStream({ title, rows }: { title: string; rows: [string, string, boolean?][] }) {
+type FlowRow = [string, string, boolean?, ('danger' | 'ledger' | 'alert' | 'muted')?]
+
+function FlowStream({ title, rows }: { title: string; rows: FlowRow[] }) {
+  const toneCls = { danger: 'text-danger', ledger: 'text-ledger', alert: 'text-alert', muted: 'text-graphite' }
   return (
     <div className="border border-hairline rounded-md overflow-hidden mb-4">
       <div className="px-4 py-2 bg-surface border-b border-hairline font-serif italic text-sm text-accent">{title}</div>
       <div>
-        {rows.map(([label, value, bold], i) => (
-          <div
-            key={i}
-            className={`flex justify-between items-center px-4 py-2 border-b border-hairline last:border-0 text-[13px] ${bold ? 'font-medium bg-surface' : ''}`}
-          >
-            <span className="font-serif text-ink">{label}</span>
-            <span className="font-mono tabular text-ink">{value}</span>
-          </div>
-        ))}
+        {rows.map(([label, value, bold, tone], i) =>
+          tone === 'muted' && !value ? (
+            <div key={i} className="px-4 py-1 font-mono text-[10px] text-graphite border-b border-hairline last:border-0">
+              {label}
+            </div>
+          ) : (
+            <div
+              key={i}
+              className={`flex justify-between items-center px-4 py-2 border-b border-hairline last:border-0 text-[13px] ${bold ? 'font-medium bg-surface' : ''}`}
+            >
+              <span className={`font-serif ${tone ? toneCls[tone] : 'text-ink'}`}>{label}</span>
+              <span className={`font-mono tabular ${tone ? toneCls[tone] : 'text-ink'}`}>{value}</span>
+            </div>
+          ),
+        )}
       </div>
     </div>
   )
@@ -1033,18 +1042,81 @@ function FlowView(p: DashProps) {
           ]}
         />
       )}
+      {/* Stream 3: Advance Tracking — ported verbatim from the HTML flow view */}
       <FlowStream
-        title="💵 Total Pay"
+        title="⚠️ Advance Tracking 预支追踪"
         rows={[
-          [`${settings.gbPct}% Gross Balance (Sal+KPI)`, fmtRM(d.salKpiGB)],
-          [`${settings.gbPct}% Allowance`, fmtRM(d.allowGB)],
-          ...(d.billingUserInput > 0
-            ? ([['25% Billing Invoice (keyed, incl. billing)', fmtRM(d.billingUserInput)]] as [string, string, boolean?][])
+          [m.fullPayout ? 'Balance (100% after Saving)' : `Total Pay (${settings.gbPct}% Gross Balance)`, fmtRM(d.totalPay)],
+          ['Fixed Salary', fmtRM(d.dirFixed)],
+          [
+            m.fullPayout
+              ? d.vrKpi < 0
+                ? 'Shortfall (需 Advance Top-up)'
+                : d.vrKpi > 0
+                  ? 'Exceed Fixed (算 KPI)'
+                  : 'Balance = Fixed'
+              : 'Vr KPI (Total Pay − Fixed)',
+            `${d.vrKpi < 0 ? '-' : d.vrKpi > 0 ? '+' : ''}RM ${fmt(Math.abs(d.vrKpi))}`,
+            true,
+            d.vrKpi < 0 ? 'danger' : d.vrKpi > 0 ? 'ledger' : undefined,
+          ],
+          ...(!m.fullPayout && d.advanceOffset > 0
+            ? ([['Less: Vr KPI Offset Advance (抵消预支)', `- RM ${fmt(d.advanceOffset)}`, false, 'ledger']] as FlowRow[])
             : []),
-          ['= Total Pay', fmtRM(d.totalPay), true],
-          [`Vr KPI (vs Fixed RM ${fmt(d.dirFixed)})`, `${d.vrKpi < 0 ? '-' : '+'}RM ${fmt(Math.abs(d.vrKpi))}`],
+          ...(m.fullPayout && d.advThisMonth < 0
+            ? ([['+ Advance This Month (公司 top-up 到 Fixed)', `+ RM ${fmt(Math.abs(d.advThisMonth))}`, false, 'danger']] as FlowRow[])
+            : []),
+          ...(d.advStatAmount > 0
+            ? ([['+ Advance Statutory (自己填) → Accum. Advance', `+ RM ${fmt(d.advStatAmount)}`, false, 'danger']] as FlowRow[])
+            : []),
+          ...(d.allowStatAmount > 0
+            ? ([['+ 75% Allow Statutory (自己填) → Accum. Advance', `+ RM ${fmt(d.allowStatAmount)}`, false, 'alert']] as FlowRow[])
+            : []),
+          ...(totalAdvBox > 0
+            ? ([[
+                `Total Advance (Adv${d.advStatAmount > 0 ? ' + Adv Stat' : ''}${d.allowStatAmount > 0 ? ' + Allow Stat' : ''})`,
+                fmtRM(totalAdvBox),
+                true,
+                'danger',
+              ]] as FlowRow[])
+            : []),
         ]}
       />
+      {/* Stream 4: Billing Invoice Detail — ported verbatim from the HTML flow view */}
+      {!m.fullPayout && (
+        <FlowStream
+          title="📄 25% Billing Invoice + Statutory Detail"
+          rows={[
+            ['── Salary + KPI ──', '', false, 'muted'],
+            ['25% Billing Invoice (Salary Pay)', fmtRM(d.salKpiBillInv)],
+            ['25% Statutory (Sal+KPI 自己填)', fmtRM(statSalVal)],
+            ['── Allowance ──', '', false, 'muted'],
+            ['25% Billing Invoice (Allowance)', d.allowGross > 0 ? fmtRM(d.allowBillInv) : '-'],
+            ...(sas ? ([['25% Statutory (Allow 自己填)', fmtRM(statAlVal)]] as FlowRow[]) : []),
+            ['Total 25% Billing Invoice', fmtRM(total25), true, 'ledger'],
+            ...(m.billingDeductAdv && totalAdvBox > 0
+              ? ([
+                  [
+                    `(-) Total Advance Deduct${totalAdvBox > total25 ? ' (capped at billing)' : ''}`,
+                    `- RM ${fmt(Math.min(totalAdvBox, total25))}`,
+                    false,
+                    'danger',
+                  ],
+                  ...(totalAdvBox > total25
+                    ? ([['⚠️ Remaining Advance → Accum. Advance', fmtRM(r2(totalAdvBox - total25)), false, 'danger']] as FlowRow[])
+                    : []),
+                  ['Net 25% Billing (After Deduct Advance)', fmtRM(r2(Math.max(0, total25 - totalAdvBox))), true, 'alert'],
+                ] as FlowRow[])
+              : []),
+            [
+              '→ Payout as Allowance（算进 Total Pay）',
+              m.includeBilling ? fmtRM(r2(statSalVal + statAlVal)) : '不算进 (Separate)',
+              false,
+              m.includeBilling ? 'ledger' : 'muted',
+            ],
+          ]}
+        />
+      )}
     </div>
   )
 }
