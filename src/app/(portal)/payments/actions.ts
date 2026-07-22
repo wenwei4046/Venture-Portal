@@ -1375,6 +1375,20 @@ export async function reversePaidPayment(formData: FormData) {
     .eq('status', 'paid')
   if (updErr) throw new Error(`Failed to void voucher: ${updErr.message}`)
 
+  // Reset any dangling approval / payroll funding request via SECURITY DEFINER
+  // RPC (mig 20260722100000) — a reversed funding PV otherwise leaves its
+  // payroll_payment_requests row stuck at pv_generated and the HR Payment page
+  // showing "awaiting Principal" for a dead voucher.
+  const { error: closeErr } = await supabase.rpc(
+    'close_approvals_for_voided_voucher' as never,
+    { p_voucher_id: id } as never,
+  )
+  if (closeErr) {
+    throw new Error(
+      `Voucher voided, but resetting its approval/funding request failed: ${closeErr.message}`,
+    )
+  }
+
   revalidatePath(`/payments/${id}`)
   revalidatePath('/payments')
   revalidatePath('/billing')
@@ -1382,6 +1396,7 @@ export async function reversePaidPayment(formData: FormData) {
   revalidatePath('/dashboard')
   revalidatePath('/dept-pool')
   revalidatePath('/venture-pool')
+  revalidatePath('/hr-costing/payment')
   redirect('/payments')
 }
 
