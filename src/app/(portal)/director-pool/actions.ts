@@ -243,14 +243,29 @@ export interface ImportResult {
   contraEvents: number
 }
 
+export type ImportOutcome = ({ ok: true } & ImportResult) | { ok: false; error: string }
+
 /**
  * Replaces ALL existing calculator data with the uploaded JSON. Month names
  * (Jan..Dec) map to first-of-month dates in the given year; companies map by
  * position (the HTML tool's fixed company order = dp_companies sort order);
  * directors map by code.
+ *
+ * Returns failures as { ok: false, error } instead of throwing — production
+ * masks thrown server-action messages, which makes import errors undebuggable.
  */
-export async function importDpJson(jsonText: string, year: number): Promise<ImportResult> {
+export async function importDpJson(jsonText: string, year: number): Promise<ImportOutcome> {
   await requireRole(['principal', 'hr'])
+  try {
+    const result = await runImport(jsonText, year)
+    revalidatePath(PATH)
+    return { ok: true, ...result }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Import failed' }
+  }
+}
+
+async function runImport(jsonText: string, year: number): Promise<ImportResult> {
   const supabase = await createClient()
 
   let parsed: LegacyJson
@@ -348,7 +363,10 @@ export async function importDpJson(jsonText: string, year: number): Promise<Impo
     const directorId = dirByCode.get(code)
     if (!monthId || !directorId) return
     const mk = `${monthId}|${directorId}`
-    if (!merged.has(mk)) merged.set(mk, { month_id: monthId, director_id: directorId })
+    // is_contra_override must be present on EVERY row: a bulk insert with
+    // heterogeneous rows null-fills missing columns (bypassing the DB
+    // default) and violates the NOT NULL constraint.
+    if (!merged.has(mk)) merged.set(mk, { month_id: monthId, director_id: directorId, is_contra_override: false })
     const row = merged.get(mk)!
     if (field === 'is_contra_override') row.is_contra_override = Boolean(value)
     else row[field] = Number(value)
@@ -401,7 +419,6 @@ export async function importDpJson(jsonText: string, year: number): Promise<Impo
     }
   }
 
-  revalidatePath(PATH)
   return { months: monthCount, directorInputs: dirInputRows.length, contraEvents: contraCount }
 }
 

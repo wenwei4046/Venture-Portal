@@ -67,6 +67,10 @@ export default function ImportWizard() {
     setError('')
     try {
       const result = await importDpJson(jsonText, year)
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
       alert(
         `✅ Imported successfully!\n\n${result.months} month(s) · ${result.directorInputs} keyed input row(s) · ${result.contraEvents} contra event(s)`,
       )
