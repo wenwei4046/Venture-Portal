@@ -44,6 +44,7 @@ export default async function FundInPage({ searchParams }: Props) {
     { data: companies },
     { data: directors },
     { data: departments },
+    { data: outstandingRows },
   ] = await Promise.all([
     supabase
       .from('fund_sources')
@@ -53,6 +54,7 @@ export default async function FundInPage({ searchParams }: Props) {
     supabase.from('directors').select('id, name, code'),
     // is_internal=false — the 'Venture Office' pseudo-dept is not a fund source.
     supabase.from('departments').select('id, name').eq('is_internal', false),
+    supabase.from('fund_source_outstanding').select('fund_source_id, outstanding'),
   ])
 
   const sources = (fundSources ?? []) as FundSourceRow[]
@@ -64,6 +66,11 @@ export default async function FundInPage({ searchParams }: Props) {
   )
   const deptMap = new Map(
     (departments ?? []).map((d) => [d.id, d.name])
+  )
+  const outstandingMap = new Map(
+    ((outstandingRows ?? []) as { fund_source_id: string; outstanding: number }[]).map(
+      (o) => [o.fund_source_id, Number(o.outstanding)]
+    )
   )
 
   // Active sources for hero metrics (always based on active, regardless of tab)
@@ -217,7 +224,9 @@ export default async function FundInPage({ searchParams }: Props) {
                   <tr>
                     <th>Type</th>
                     <th>From</th>
+                    <th className="right">Date</th>
                     <th className="right">Amount</th>
+                    <th className="right">Outstanding</th>
                     <th className="right">Rate</th>
                     <th className="right">Lock-in</th>
                     <th className="right">Maturity</th>
@@ -238,7 +247,15 @@ export default async function FundInPage({ searchParams }: Props) {
                         {getFromLabel(source)}
                       </td>
                       <td className="num">
+                        {dayjs(source.effective_date).format('D MMM YYYY')}
+                      </td>
+                      <td className="num">
                         {formatMoney(Number(source.amount))}
+                      </td>
+                      <td className="num">
+                        {source.status === 'active' || source.status === 'matured'
+                          ? formatMoney(outstandingMap.get(source.id) ?? Number(source.amount))
+                          : <span className="text-muted">—</span>}
                       </td>
                       <td className="num">
                         {(Number(source.cost_rate) * 100).toFixed(3)}%

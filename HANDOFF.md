@@ -35,7 +35,17 @@
    remove badge) via new setLoanFundingSource action. Rates/tenure/dates stay
    Principal-only. STILL PENDING (user-side): fill sources for the July loans — Carres
    10k, The Cont 10k + 80k, 2990 60k, CMI 55,540.08, Hookka 98k — user can now DIY.
-3. **Parallel session merged**: while this session recovered, ANOTHER session pushed
+3. **List columns (user request)**: Fund IN table + Date (effective_date) + Outstanding
+   (fund_source_outstanding view; shown for active/matured, — otherwise). Fund OUT table:
+   "Created" column → "Disbursed" (disbursement_date; created_at stays in the small line
+   under the company name; default sort now disbursedAt). LoanRow.disbursedAt is OPTIONAL
+   on purpose — the stray `fund-out/page - Copy.tsx` (user's snapshot file, off-limits,
+   see below) imports LoansTable and must keep type-checking. Both lists confirmed to
+   default to the ACTIVE tab (settled items live under repaid/fully-repaid/All tabs).
+   NOTE: user directive 2026-07-22 — repo contains `... - Copy` snapshot files
+   (design-import/, src/app pages/actions) that are the user's own copies; NEVER delete/
+   edit/clean them, and stage commits with explicit paths (no `git add -A`).
+4. **Parallel session merged**: while this session recovered, ANOTHER session pushed
    Director Pool v2 to main (4 commits, `7624312..3d5e10d`: standalone Salary Pool
    calculator port + Save/Clear + Flow view fixes; migrations `20260717130000_director_
    pool_calculator` + `20260721100000_dp_hr_access` — assume both applied to live DB;

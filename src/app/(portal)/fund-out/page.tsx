@@ -177,6 +177,7 @@ export default async function FundOutPage({ searchParams }: Props) {
                     companyName: company?.name ?? '—',
                     companyCode: company?.code ?? '',
                     createdAt: loan.created_at as string,
+                    disbursedAt: loan.disbursement_date,
                     principal: Number(loan.principal),
                     outstanding: Number(out?.outstanding ?? loan.principal),
                     effectiveRate: Number(loan.effective_rate),

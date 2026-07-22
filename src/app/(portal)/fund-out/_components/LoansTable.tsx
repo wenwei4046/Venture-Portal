@@ -10,6 +10,10 @@ export interface LoanRow {
   companyName: string
   companyCode: string
   createdAt: string
+  /** 放款日 — the business date money went out (loans.disbursement_date).
+   *  Optional so the stray `page - Copy.tsx` snapshot (user's file, off-limits)
+   *  still type-checks; absent → renders — and sorts by createdAt. */
+  disbursedAt?: string | null
   principal: number
   outstanding: number
   effectiveRate: number
@@ -32,7 +36,7 @@ export default function LoansTable({ rows }: { rows: LoanRow[] }) {
     <SortableTable<LoanRow>
       rows={rows}
       getRowKey={(l) => l.id}
-      defaultSort={{ key: 'createdAt', dir: 'desc' }}
+      defaultSort={{ key: 'disbursedAt', dir: 'desc' }}
       searchKeys={['companyName', 'companyCode']}
       searchPlaceholder="Search company name / code…"
       columns={[
@@ -88,11 +92,14 @@ export default function LoansTable({ rows }: { rows: LoanRow[] }) {
           sortValue: (l) => l.status,
         },
         {
-          key: 'createdAt',
-          label: 'Created',
+          // 放款日 (business date), not record-creation date — created_at still
+          // shows in the small line under the company name.
+          key: 'disbursedAt',
+          label: 'Disbursed',
           align: 'right',
-          render: (l) => dayjs(l.createdAt).format('D MMM'),
-          sortValue: (l) => new Date(l.createdAt),
+          render: (l) =>
+            l.disbursedAt ? dayjs(l.disbursedAt).format('D MMM YYYY') : <span className="text-muted">—</span>,
+          sortValue: (l) => new Date(l.disbursedAt ?? l.createdAt),
           cellClassName: 'text-graphite text-xs',
         },
         {
