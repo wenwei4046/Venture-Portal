@@ -35,7 +35,11 @@
    remove badge) via new setLoanFundingSource action. Rates/tenure/dates stay
    Principal-only. STILL PENDING (user-side): fill sources for the July loans — Carres
    10k, The Cont 10k + 80k, 2990 60k, CMI 55,540.08, Hookka 98k — user can now DIY.
-3. **List columns (user request)**: Fund IN table + Date (effective_date) + Outstanding
+3. **List columns + search (user requests)**: Fund IN list rebuilt on SortableTable
+   (new _components/FundSourcesTable.tsx — search box over From/Type, click-sort all
+   columns, facet filters on Type/Status; StatusLabel moved in there; page.tsx now just
+   maps rows). Confirmed for user: both lists default to the ACTIVE tab — settled items
+   sit under Repaid/Fully-repaid/All, not gone. Fund IN table + Date (effective_date) + Outstanding
    (fund_source_outstanding view; shown for active/matured, — otherwise). Fund OUT table:
    "Created" column → "Disbursed" (disbursement_date; created_at stays in the small line
    under the company name; default sort now disbursedAt). LoanRow.disbursedAt is OPTIONAL
