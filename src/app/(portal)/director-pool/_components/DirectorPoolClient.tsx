@@ -4,7 +4,7 @@
 // tool: local state is the working copy (instant recalc on every keystroke,
 // same UX as the original), every commit persists through a server action.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   calcAll,
@@ -22,6 +22,7 @@ import {
   addDpMonth,
   updateDpMonth,
   deleteDpMonth,
+  clearDpMonthData,
   upsertDpInput,
   upsertDpDirectorInput,
   performDpContra,
@@ -155,8 +156,53 @@ export default function DirectorPoolClient({ data }: { data: DirectorPoolData })
     data.months.length ? data.months[data.months.length - 1].id : '__all__',
   )
 
-  // Server revalidation (contra / import / another session) → resync working copy
+  // ── Manual save (user request 2026-07-22): edits stay LOCAL until 💾 Save.
+  // Every change registers a persistence thunk keyed by target — last write
+  // wins per field; Save runs the queue in insertion order.
+  const pendingRef = useRef(new Map<string, () => Promise<unknown>>())
+  const [pendingCount, setPendingCount] = useState(0)
+  const [saving, setSaving] = useState(false)
+  const queue = (key: string, thunk: () => Promise<unknown>) => {
+    pendingRef.current.set(key, thunk)
+    setPendingCount(pendingRef.current.size)
+  }
+  const purgeQueue = (predicate: (key: string) => boolean) => {
+    for (const key of [...pendingRef.current.keys()]) {
+      if (predicate(key)) pendingRef.current.delete(key)
+    }
+    setPendingCount(pendingRef.current.size)
+  }
+  const saveAll = async () => {
+    if (saving || !pendingRef.current.size) return
+    setSaving(true)
+    for (const [key, thunk] of [...pendingRef.current.entries()]) {
+      try {
+        await thunk()
+        pendingRef.current.delete(key)
+        setPendingCount(pendingRef.current.size)
+      } catch (e) {
+        setSaving(false)
+        alertErr(e)
+        return
+      }
+    }
+    setSaving(false)
+  }
+
+  // Warn before leaving with unsaved changes
   useEffect(() => {
+    if (!pendingCount) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [pendingCount])
+
+  // Server revalidation (contra / import / another session) → resync working
+  // copy — but never clobber unsaved local edits.
+  useEffect(() => {
+    if (pendingRef.current.size > 0) return
     setSettings(data.settings)
     setDirectors(data.directors)
     setMonths(data.months)
@@ -200,11 +246,15 @@ export default function DirectorPoolClient({ data }: { data: DirectorPoolData })
 
   const commitSetting = (patch: Partial<typeof settings>) => {
     setSettings((s) => ({ ...s, ...patch }))
-    saveDpSettings(patch).catch(alertErr)
+    for (const [field, value] of Object.entries(patch)) {
+      queue(`settings:${field}`, () =>
+        saveDpSettings({ [field]: value } as Parameters<typeof saveDpSettings>[0]),
+      )
+    }
   }
   const commitWeight = (id: string, weight: number) => {
     setDirectors((ds) => ds.map((d) => (d.id === id ? { ...d, weight } : d)))
-    saveDpDirectorWeight(id, weight).catch(alertErr)
+    queue(`weight:${id}`, () => saveDpDirectorWeight(id, weight))
   }
   const handleAddMonth = async () => {
     const last = sortedMonths[sortedMonths.length - 1]
@@ -239,7 +289,7 @@ export default function DirectorPoolClient({ data }: { data: DirectorPoolData })
     if (!/^\d{4}-\d{2}/.test(iso)) return
     const first = `${iso.slice(0, 7)}-01`
     setMonths((ms) => ms.map((m) => (m.id === monthId ? { ...m, month: first } : m)))
-    updateDpMonth(monthId, { month: first }).catch(alertErr)
+    queue(`mdate:${monthId}`, () => updateDpMonth(monthId, { month: first }))
   }
   const handleFlag = (
     monthId: string,
@@ -263,7 +313,7 @@ export default function DirectorPoolClient({ data }: { data: DirectorPoolData })
         : flag === 'includeBilling'
           ? { include_billing: value }
           : { billing_deduct_adv: value }
-    updateDpMonth(monthId, patch).catch(alertErr)
+    queue(`flag:${monthId}:${flag}`, () => updateDpMonth(monthId, patch))
   }
   const handleDeleteMonth = (monthId: string) => {
     if (!confirm('Remove this month? All its inputs will be deleted.')) return
@@ -275,10 +325,33 @@ export default function DirectorPoolClient({ data }: { data: DirectorPoolData })
       })
       return copy
     })
+    purgeQueue((k) => k.includes(monthId))
     const remaining = sortedMonths.filter((m) => m.id !== monthId)
     setActiveMonthId(remaining.length ? remaining[remaining.length - 1].id : null)
     if (resultMonth === monthId) setResultMonth(remaining.length ? remaining[remaining.length - 1].id : '__all__')
     deleteDpMonth(monthId).catch(alertErr)
+  }
+  const handleClearMonth = (monthId: string) => {
+    const m = sortedMonths.find((x) => x.id === monthId)
+    if (!m) return
+    if (!confirm('Clear ALL numbers for this month (company inputs + keyed statutory / withdrawals / overrides)?\n月份本身保留，记得按 💾 Save 才会生效。')) return
+    setMonths((ms) =>
+      ms.map((x) =>
+        x.id === monthId
+          ? { ...x, cos: x.cos.map((c) => ({ ...c, salary: 0, kpi: 0, allowance: 0 })) }
+          : x,
+      ),
+    )
+    setDirInputs((di) => {
+      const copy = { ...di }
+      Object.keys(copy).forEach((k) => {
+        if (k.startsWith(`${monthId}_`)) delete copy[k]
+      })
+      return copy
+    })
+    // Drop superseded edits for this month, then queue one clear
+    purgeQueue((k) => k.includes(monthId) && !k.startsWith('flag:') && !k.startsWith('mdate:'))
+    queue(`clear:${monthId}`, () => clearDpMonthData(monthId))
   }
   const commitCo = (monthId: string, companyId: string, field: 'salary' | 'kpi' | 'allowance', v: number | null) => {
     const value = v ?? 0
@@ -289,7 +362,7 @@ export default function DirectorPoolClient({ data }: { data: DirectorPoolData })
           : m,
       ),
     )
-    upsertDpInput(monthId, companyId, field, value).catch(alertErr)
+    queue(`co:${monthId}:${companyId}:${field}`, () => upsertDpInput(monthId, companyId, field, value))
   }
   const commitDirInput = (
     monthId: string,
@@ -317,9 +390,15 @@ export default function DirectorPoolClient({ data }: { data: DirectorPoolData })
         advOverrideAccum: 'adv_override_accum',
       } as const
     )[field]
-    upsertDpDirectorInput(monthId, directorId, dbField, value).catch(alertErr)
+    queue(`di:${monthId}:${directorId}:${field}`, () =>
+      upsertDpDirectorInput(monthId, directorId, dbField, value),
+    )
   }
   const doContra = async () => {
+    if (pendingRef.current.size > 0) {
+      alert('有未保存的修改 — 请先按 💾 Save，再做 Contra（Contra 是按数据库里已保存的数字算的）。')
+      return
+    }
     if (!confirm('Contra accumulated 25% Billing against accumulated Advance for all directors?')) return
     try {
       const summary = await performDpContra()
@@ -336,6 +415,10 @@ export default function DirectorPoolClient({ data }: { data: DirectorPoolData })
     }
   }
   const doResetContra = async () => {
+    if (pendingRef.current.size > 0) {
+      alert('有未保存的修改 — 请先按 💾 Save，再 Reset Contra。')
+      return
+    }
     if (!confirm('Clear all contra data? Manual advance overrides are kept.')) return
     try {
       await resetDpContra()
@@ -373,8 +456,8 @@ export default function DirectorPoolClient({ data }: { data: DirectorPoolData })
 
   return (
     <div>
-      {/* Main tabs */}
-      <div className="flex gap-2 mb-6">
+      {/* Main tabs + manual save */}
+      <div className="flex flex-wrap gap-2 mb-6 items-center">
         {(
           [
             ['calc', 'Calculator'],
@@ -394,6 +477,23 @@ export default function DirectorPoolClient({ data }: { data: DirectorPoolData })
             {label}
           </button>
         ))}
+        <div className="ml-auto flex items-center gap-3">
+          {pendingCount > 0 && (
+            <span className="font-mono text-xs text-alert">● {pendingCount} 项未保存</span>
+          )}
+          <button
+            type="button"
+            onClick={saveAll}
+            disabled={pendingCount === 0 || saving}
+            className={`px-5 py-2 rounded-md border text-sm font-medium transition-colors ${
+              pendingCount > 0 && !saving
+                ? 'border-accent text-paper bg-accent hover:opacity-90'
+                : 'border-hairline text-graphite bg-surface opacity-50 cursor-not-allowed'
+            }`}
+          >
+            {saving ? 'Saving…' : '💾 Save'}
+          </button>
+        </div>
       </div>
 
       {mainTab === 'calc' ? (
@@ -419,6 +519,7 @@ export default function DirectorPoolClient({ data }: { data: DirectorPoolData })
           onMonthDate={handleMonthDate}
           onFlag={handleFlag}
           onDeleteMonth={handleDeleteMonth}
+          onClearMonth={handleClearMonth}
           onCo={commitCo}
           onDirInput={commitDirInput}
         />
@@ -465,6 +566,7 @@ interface CalcProps {
   onMonthDate: (id: string, iso: string) => void
   onFlag: (id: string, flag: 'fullPayout' | 'includeBilling' | 'billingDeductAdv', v: boolean) => void
   onDeleteMonth: (id: string) => void
+  onClearMonth: (id: string) => void
   onCo: (monthId: string, companyId: string, field: 'salary' | 'kpi' | 'allowance', v: number | null) => void
   onDirInput: (
     monthId: string,
@@ -592,13 +694,22 @@ function CalculatorTab(p: CalcProps) {
           ＋ Add Month
         </button>
         {m && (
-          <button
-            type="button"
-            onClick={() => p.onDeleteMonth(m.id)}
-            className="ml-auto px-3 py-1 rounded border border-hairline text-xs text-graphite hover:text-danger hover:border-danger transition-colors"
-          >
-            Remove This Month
-          </button>
+          <div className="ml-auto flex gap-2">
+            <button
+              type="button"
+              onClick={() => p.onClearMonth(m.id)}
+              className="px-3 py-1 rounded border border-hairline text-xs text-graphite hover:text-alert hover:border-alert transition-colors"
+            >
+              🧹 Clear This Month
+            </button>
+            <button
+              type="button"
+              onClick={() => p.onDeleteMonth(m.id)}
+              className="px-3 py-1 rounded border border-hairline text-xs text-graphite hover:text-danger hover:border-danger transition-colors"
+            >
+              Remove This Month
+            </button>
+          </div>
         )}
       </div>
 

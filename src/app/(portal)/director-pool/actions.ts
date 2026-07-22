@@ -82,6 +82,17 @@ export async function deleteDpMonth(monthId: string): Promise<void> {
   revalidatePath(PATH)
 }
 
+/** Clears one month's NUMBERS (company inputs + keyed director inputs) but keeps the month row. */
+export async function clearDpMonthData(monthId: string): Promise<void> {
+  await requireRole(['principal', 'hr'])
+  const supabase = await createClient()
+  const { error: iErr } = await supabase.from('dp_inputs').delete().eq('month_id', monthId)
+  if (iErr) throw new Error(`Failed to clear inputs: ${iErr.message}`)
+  const { error: dErr } = await supabase.from('dp_director_inputs').delete().eq('month_id', monthId)
+  if (dErr) throw new Error(`Failed to clear director inputs: ${dErr.message}`)
+  revalidatePath(PATH)
+}
+
 export async function upsertDpInput(
   monthId: string,
   companyId: string,
