@@ -26,6 +26,12 @@
    PENDING (needs user input): July loans created without a source have no badge — Carres
    10k, The Cont 10k + 80k, 2990 60k, CMI 55,540.08, Hookka 98k. Either user amends each
    via the Amend form, or supply the sources and patch repayment_terms by SQL.
+3. **Parallel session merged**: while this session recovered, ANOTHER session pushed
+   Director Pool v2 to main (4 commits, `7624312..3d5e10d`: standalone Salary Pool
+   calculator port + Save/Clear + Flow view fixes; migrations `20260717130000_director_
+   pool_calculator` + `20260721100000_dp_hr_access` — assume both applied to live DB;
+   roles.ts + database.types.ts changed; +20 tests → suite now 400). This session's work
+   was rebased on top; no file overlap.
 
 ## Session 2026-07-21B — self-audit findings + fixes (mig `20260721010000`)
 
