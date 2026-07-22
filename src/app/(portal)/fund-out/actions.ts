@@ -432,6 +432,39 @@ export async function amendLoan(formData: FormData): Promise<{ error: string } |
   redirect(`/fund-out/${loanId}`)
 }
 
+// ─── 资金来源 (Finance self-service, mig 20260722000000) ─────────────────────
+// Unlike amendLoan (Principal-only, whole-terms edit), this may be called by
+// Finance too: the set_loan_funding_source RPC rewrites ONLY the
+// `· 资金来源: X` segment inside repayment_terms — rates, tenure, dates and
+// the rest of the terms text are untouchable through this path. Empty value
+// removes the segment (badge disappears).
+export async function setLoanFundingSource(
+  formData: FormData
+): Promise<{ error: string } | undefined> {
+  await requireRole(['finance', 'principal'])
+  const supabase = await createClient()
+
+  const loanId = (formData.get('loan_id') as string) ?? ''
+  if (!loanId) return { error: 'Loan id is required' }
+  // `·` is the segment delimiter the badge parser splits on — strip it here
+  // too so what the user sees submitted matches what the RPC stores.
+  const source = ((formData.get('funding_source') as string) ?? '')
+    .replace(/[·\r\n]+/g, ' ')
+    .trim()
+  if (source.length > 60) return { error: '资金来源最多 60 个字' }
+
+  const { error } = await supabase.rpc('set_loan_funding_source' as never, {
+    p_loan_id: loanId,
+    p_source: source,
+  } as never)
+  if (error) return { error: `保存失败: ${error.message}` }
+
+  revalidatePath(`/fund-out/${loanId}`)
+  revalidatePath('/fund-out')
+  revalidatePath('/repayment-schedule')
+  return undefined
+}
+
 // ─── Cancel loan (Finance) ───────────────────────────────────────────────────
 // Two paths depending on current loan status:
 //  - pending_approval → cancel directly via cancel_loan_and_approval (mig 17/107)

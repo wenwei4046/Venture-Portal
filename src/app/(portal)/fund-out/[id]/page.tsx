@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { cancelLoan } from '../actions'
 import RepaymentForm from '../_components/RepaymentForm'
+import FundingSourceEditor from './_components/FundingSourceEditor'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -301,6 +302,11 @@ export default async function LoanDetailPage({ params }: Props) {
             </p>
           </div>
         ) : null}
+
+        <FundingSourceEditor
+          loanId={loan.id}
+          repaymentTerms={(loan.repayment_terms as string | null) ?? null}
+        />
       </section>
 
       {/* ───────── Repayment history ───────── */}

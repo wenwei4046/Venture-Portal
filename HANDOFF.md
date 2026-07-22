@@ -23,9 +23,18 @@
    logic; `fundingSourceFromTerms()` (lib/utils) parses it back for the SC badge on the
    loans list + repayment schedule. Amend form hint documents the same convention (its
    free-text terms box already lets Finance add/edit the suffix on existing loans).
-   PENDING (needs user input): July loans created without a source have no badge — Carres
-   10k, The Cont 10k + 80k, 2990 60k, CMI 55,540.08, Hookka 98k. Either user amends each
-   via the Amend form, or supply the sources and patch repayment_terms by SQL.
+   User then chose "办法3" (self-service): the Amend form turned out Principal-ONLY
+   (amendLoan + /edit page both requireRole(['principal']), active loans only), so Finance
+   couldn't edit old loans at all. Added mig `20260722000000_loan_funding_source_rpc`:
+   `terms_with_funding_source(terms, source)` (IMMUTABLE segment rewrite — drops any
+   existing 资金来源 segment incl full-width colon, preserves 未定还款/[LO#…] markers
+   verbatim, appends canonical `· 资金来源: X`, NULL when empty; 7 edge cases verified by
+   live SELECT) + `set_loan_funding_source(p_loan_id, p_source)` SECURITY DEFINER RPC
+   (finance/principal via current_user_role(), strips `·`/newlines, max 60 chars, any loan
+   status). UI: FundingSourceEditor on the loan detail page (inline input + 保存, empty =
+   remove badge) via new setLoanFundingSource action. Rates/tenure/dates stay
+   Principal-only. STILL PENDING (user-side): fill sources for the July loans — Carres
+   10k, The Cont 10k + 80k, 2990 60k, CMI 55,540.08, Hookka 98k — user can now DIY.
 3. **Parallel session merged**: while this session recovered, ANOTHER session pushed
    Director Pool v2 to main (4 commits, `7624312..3d5e10d`: standalone Salary Pool
    calculator port + Save/Clear + Flow view fixes; migrations `20260717130000_director_
