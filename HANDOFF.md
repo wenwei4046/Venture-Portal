@@ -1,8 +1,31 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-07-20C · payroll = HR-custody FINAL)
+# HOUZS Venture Portal — Session Handoff (checkpoint 2026-07-22 · project MOVED to local Desktop)
 
 > Context-window handoff. Read this first to continue. User communicates in 华语 (Mandarin).
-> 2026-07-20C (FINAL custody model) is FIRST — it SUPERSEDES the intermediate 2026-07-20B
-> redesign below (kept for history). Then 2026-07-20A, then the older checkpoints.
+> **PROJECT PATH since 2026-07-22: `C:\Users\User\Desktop\Claude\Venture\Venture-Portal`** —
+> user un-synced OneDrive's Desktop backup; Windows relocated the real files to the local
+> Desktop. The old `C:\Users\User\OneDrive\Desktop\Claude\...` tree is a DEAD dir skeleton
+> (user may delete it). Payroll model: 2026-07-20C (FINAL custody model) SUPERSEDES the
+> intermediate 2026-07-20B redesign below (kept for history).
+
+## Session 2026-07-22 — OneDrive un-sync recovery + fund-out 资金来源 field
+
+1. **Recovery**: full project found at the new Desktop path (Known Folder Move). git HEAD
+   `5fc3d31` = last push, fsck clean, `.env.local` intact. The move had staged 276 tracked
+   files as deleted → `git checkout -- .`; node_modules half-broken → `npm ci`. All gates
+   green after reinstall (tsc clean · 380 tests · build OK). Silver lining: the OneDrive
+   `.next`-lock quirk (EINVAL during build while dev server runs) is gone.
+   NOTE: the bound `mcp__supabase__*` MCP server lost its config in the move — DB access is
+   via the account-level Supabase MCP server (execute_sql/apply_migration with
+   `project_id: "gixpptmfuryskbwkmiwz"`).
+2. **fund-out 资金来源 (user request)**: New Loan form now has a dedicated "资金来源 ·
+   Funding source" input (NewLoanForm). createLoan sanitises it (strips `·`, the parser's
+   delimiter) and appends `· 资金来源: {x}` to repayment_terms AFTER the 未定还款 prefix
+   logic; `fundingSourceFromTerms()` (lib/utils) parses it back for the SC badge on the
+   loans list + repayment schedule. Amend form hint documents the same convention (its
+   free-text terms box already lets Finance add/edit the suffix on existing loans).
+   PENDING (needs user input): July loans created without a source have no badge — Carres
+   10k, The Cont 10k + 80k, 2990 60k, CMI 55,540.08, Hookka 98k. Either user amends each
+   via the Amend form, or supply the sources and patch repayment_terms by SQL.
 
 ## Session 2026-07-21B — self-audit findings + fixes (mig `20260721010000`)
 

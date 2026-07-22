@@ -93,6 +93,7 @@ export default function LoanAmendForm({
         />
         <p className="font-serif italic text-muted text-xs mt-1.5">
           含「未定」或「无还款方式」→ 系统会当作「无固定期限」(不计入本月应收)。保留 [LO#…] 标记方便追溯。
+          加「· 资金来源: XXX」会在放款列表显示 SC 徽章。
         </p>
       </div>
 

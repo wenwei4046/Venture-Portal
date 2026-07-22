@@ -294,6 +294,28 @@ export default function NewLoanForm({ companies, baseRate, bsAccounts, banks }: 
         />
       </div>
 
+      {/* ───────── 资金来源 · Funding source ───────── */}
+      <div className="mb-6">
+        <label
+          htmlFor="funding_source"
+          className="block text-sm font-sans font-medium text-graphite mb-1.5"
+        >
+          资金来源 · Funding source{' '}
+          <span className="text-muted font-normal">(optional)</span>
+        </label>
+        <input
+          id="funding_source"
+          name="funding_source"
+          type="text"
+          maxLength={60}
+          className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
+          placeholder="e.g. WL-KING / HC-58k / 2990"
+        />
+        <p className="font-serif italic text-muted text-xs mt-1.5">
+          这笔放款的钱从哪里来。会以 SC 徽章显示在放款列表和还款时间表上。
+        </p>
+      </div>
+
       {/* ───────── 利滚利 · Compound interest (settable at creation) ───────── */}
       <div className="mb-6">
         <label className="flex items-center gap-2">

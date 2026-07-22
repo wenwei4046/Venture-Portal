@@ -59,6 +59,18 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
       : '利滚利挂账(未定还款) · 利息从放款日起算'
   }
 
+  // 资金来源 rides inside repayment_terms as a `· 资金来源: X` suffix —
+  // fundingSourceFromTerms() parses it back out for the SC badge. `·` is the
+  // segment delimiter of that parser, so it can't appear in the value.
+  const fundingSource = ((formData.get('funding_source') as string) ?? '')
+    .replace(/[·\r\n]+/g, ' ')
+    .trim()
+  if (fundingSource) {
+    repaymentTerms = repaymentTerms.trim()
+      ? `${repaymentTerms.trim()} · 资金来源: ${fundingSource}`
+      : `资金来源: ${fundingSource}`
+  }
+
   // Surface period-lock conflicts at creation time rather than at approval
   // time — the auto-generated disbursement PV will be dated loanStartDate
   // and would otherwise fail on approval if its period is locked. Mirrors
