@@ -1061,26 +1061,19 @@ export async function voidVoucher(formData: FormData) {
 
   if (error) throw new Error(`Failed to void voucher: ${error.message}`)
 
-  // Also reject linked approval if pending
-  const { data: approvalReq } = await supabase
-    .from('approval_requests')
-    .select('id')
-    .eq('reference_id', id)
-    .eq('reference_table', 'payment_vouchers')
-    .eq('status', 'pending')
-    .single()
-
-  if (approvalReq) {
-    await supabase
-      .from('approval_requests')
-      .update({
-        status: 'rejected',
-        workflow_state: 'rejected',
-        approved_by: user.id,
-        approved_at: new Date().toISOString(),
-        notes: 'Voided by Finance',
-      })
-      .eq('id', approvalReq.id)
+  // Reject the linked pending approval(s) via SECURITY DEFINER RPC — the old
+  // inline update ran under the caller's RLS: Finance isn't allowed to update
+  // approval_requests, PostgREST reported success with 0 rows, and voided PVs
+  // stayed PENDING in Principal's queue (mig 20260721020000; 17 live orphans
+  // cleaned 2026-07-21). Fail loud, never silently.
+  const { error: closeErr } = await supabase.rpc(
+    'close_approvals_for_voided_voucher' as never,
+    { p_voucher_id: id } as never,
+  )
+  if (closeErr) {
+    throw new Error(
+      `Voucher voided, but clearing its approval from the queue failed: ${closeErr.message}`,
+    )
   }
 
   void user

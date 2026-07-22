@@ -19,6 +19,14 @@ GL(corp/treasury) == banks == 138,287.61, zero unbalanced JEs). Two real defects
    Alliance silently negative. Guard added matching approve_single_voucher
    (mig `20260721010000`). Note: approve_voucher_batch_partial already had a BETTER guard
    (per-bank jsonb pre-aggregation) — only the full-batch RPC was exposed.
+3. **Voided PVs left PENDING approvals in Principal's queue** (user-spotted) — voidVoucher's
+   inline approval rejection ran under the caller's RLS; Finance can't update
+   approval_requests, PostgREST returned success-with-0-rows unchecked → 17 live orphans
+   (the 16 voided statutory PVs + one from 2026-07-15). Cleaned by direct SQL; NEW
+   SECURITY DEFINER RPC `close_approvals_for_voided_voucher` (mig `20260721020000`)
+   verifies the voucher is voided then rejects its pending approvals; voidVoucher now
+   calls it and FAILS LOUD. (Approving an orphan was money-safe — approve RPC raises on
+   non-pending vouchers — but the queue filled with dead cards.)
 Pre-existing item REPORTED, not touched: **4070 Accrual-Salary carries a legacy residual** —
 balance 113,756.20 vs June outstanding 117,528.75 (their month-end JVs); history (Jan-Mar
 opening-era credits, Apr-Jun mixed) nets −3,772.55, so after June's full payout 4070 will
