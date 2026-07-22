@@ -74,13 +74,14 @@ describe('canAccessDirectorSalary', () => {
 })
 
 describe('canAccessDirectorPool', () => {
-  // Director Pool shows all-time accumulated balance. HR is intentionally
-  // excluded because HR only needs to see the current-month calculation
-  // (via /director-salary), not the accumulated running total.
-  it('allows principal and finance only', () => {
+  // Director Pool v2 is the standalone calculator with full per-director
+  // detail (weights, advances, savings) — Principal + HR (user decision
+  // 2026-07-21). Finance lost the old aggregate view when the ledger page
+  // was replaced (2026-07-17).
+  it('allows principal and hr only', () => {
     expect(canAccessDirectorPool('principal')).toBe(true)
-    expect(canAccessDirectorPool('finance')).toBe(true)
-    expect(canAccessDirectorPool('hr')).toBe(false)
+    expect(canAccessDirectorPool('finance')).toBe(false)
+    expect(canAccessDirectorPool('hr')).toBe(true)
     expect(canAccessDirectorPool('dept_manager')).toBe(false)
   })
 })

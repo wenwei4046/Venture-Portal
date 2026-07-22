@@ -1421,6 +1421,278 @@ export type Database = {
         }
         Relationships: []
       }
+      dp_companies: {
+        Row: {
+          id: string
+          is_active: boolean
+          name: string
+          sort: number
+        }
+        Insert: {
+          id?: string
+          is_active?: boolean
+          name: string
+          sort?: number
+        }
+        Update: {
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort?: number
+        }
+        Relationships: []
+      }
+      dp_contra: {
+        Row: {
+          amount: number
+          created_at: string
+          director_id: string
+          from_month_id: string
+          id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          director_id: string
+          from_month_id: string
+          id?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          director_id?: string
+          from_month_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dp_contra_director_id_fkey"
+            columns: ["director_id"]
+            isOneToOne: false
+            referencedRelation: "dp_directors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dp_contra_from_month_id_fkey"
+            columns: ["from_month_id"]
+            isOneToOne: false
+            referencedRelation: "dp_months"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dp_director_inputs: {
+        Row: {
+          adv_override_accum: number | null
+          adv_override_this: number | null
+          adv_stat: number | null
+          allow_billing_stat: number | null
+          allow_pay_stat: number | null
+          billing_stat: number | null
+          director_id: string
+          id: string
+          is_contra_override: boolean
+          month_id: string
+          saving_withdrawal: number | null
+        }
+        Insert: {
+          adv_override_accum?: number | null
+          adv_override_this?: number | null
+          adv_stat?: number | null
+          allow_billing_stat?: number | null
+          allow_pay_stat?: number | null
+          billing_stat?: number | null
+          director_id: string
+          id?: string
+          is_contra_override?: boolean
+          month_id: string
+          saving_withdrawal?: number | null
+        }
+        Update: {
+          adv_override_accum?: number | null
+          adv_override_this?: number | null
+          adv_stat?: number | null
+          allow_billing_stat?: number | null
+          allow_pay_stat?: number | null
+          billing_stat?: number | null
+          director_id?: string
+          id?: string
+          is_contra_override?: boolean
+          month_id?: string
+          saving_withdrawal?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dp_director_inputs_director_id_fkey"
+            columns: ["director_id"]
+            isOneToOne: false
+            referencedRelation: "dp_directors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dp_director_inputs_month_id_fkey"
+            columns: ["month_id"]
+            isOneToOne: false
+            referencedRelation: "dp_months"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dp_directors: {
+        Row: {
+          code: string
+          color: string
+          id: string
+          name: string
+          sort: number
+          weight: number
+        }
+        Insert: {
+          code: string
+          color?: string
+          id?: string
+          name: string
+          sort?: number
+          weight?: number
+        }
+        Update: {
+          code?: string
+          color?: string
+          id?: string
+          name?: string
+          sort?: number
+          weight?: number
+        }
+        Relationships: []
+      }
+      dp_fixed_overrides: {
+        Row: {
+          director_id: string
+          from_month: string
+          id: string
+          salary: number
+        }
+        Insert: {
+          director_id: string
+          from_month: string
+          id?: string
+          salary: number
+        }
+        Update: {
+          director_id?: string
+          from_month?: string
+          id?: string
+          salary?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dp_fixed_overrides_director_id_fkey"
+            columns: ["director_id"]
+            isOneToOne: false
+            referencedRelation: "dp_directors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dp_inputs: {
+        Row: {
+          allowance: number
+          company_id: string
+          id: string
+          kpi: number
+          month_id: string
+          salary: number
+        }
+        Insert: {
+          allowance?: number
+          company_id: string
+          id?: string
+          kpi?: number
+          month_id: string
+          salary?: number
+        }
+        Update: {
+          allowance?: number
+          company_id?: string
+          id?: string
+          kpi?: number
+          month_id?: string
+          salary?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dp_inputs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "dp_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dp_inputs_month_id_fkey"
+            columns: ["month_id"]
+            isOneToOne: false
+            referencedRelation: "dp_months"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dp_months: {
+        Row: {
+          billing_deduct_adv: boolean
+          created_at: string
+          full_payout: boolean
+          id: string
+          include_billing: boolean
+          month: string
+        }
+        Insert: {
+          billing_deduct_adv?: boolean
+          created_at?: string
+          full_payout?: boolean
+          id?: string
+          include_billing?: boolean
+          month: string
+        }
+        Update: {
+          billing_deduct_adv?: boolean
+          created_at?: string
+          full_payout?: boolean
+          id?: string
+          include_billing?: boolean
+          month?: string
+        }
+        Relationships: []
+      }
+      dp_settings: {
+        Row: {
+          allow_stat_until: string | null
+          billing_start_month: string | null
+          fixed_salary: number
+          gb_pct: number
+          id: number
+          saving_pct: number
+          updated_at: string
+        }
+        Insert: {
+          allow_stat_until?: string | null
+          billing_start_month?: string | null
+          fixed_salary?: number
+          gb_pct?: number
+          id?: number
+          saving_pct?: number
+          updated_at?: string
+        }
+        Update: {
+          allow_stat_until?: string | null
+          billing_start_month?: string | null
+          fixed_salary?: number
+          gb_pct?: number
+          id?: number
+          saving_pct?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       eis_act800_schedule: {
         Row: {
           created_at: string

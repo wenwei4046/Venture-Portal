@@ -93,8 +93,8 @@ TODOS.md — Phase 1.5 tech debt, Phase 2/3 prerequisites, compliance gates
 4 Roles
 Role	DB Value	Access
 Principal	`principal`	Everything + Approve + Settings
-Finance	`finance`	Treasury + Billing + Reports + Director Pool (aggregate buckets only) — no individual salary, no Director Salary module
-HR	`hr`	Staff costs + Director Salary + Claims — no Director Pool
+Finance	`finance`	Treasury + Billing + Reports — no individual salary, no Director Salary module, no Director Pool (v2 2026-07-21: calculator is Principal + HR only)
+HR	`hr`	Staff costs + Director Salary + Claims + Director Pool (v2 calculator, granted 2026-07-21)
 Dept Manager	`dept_manager`	Own department only
 Key Business Rules
 Treasury
@@ -119,8 +119,8 @@ Net amount = Invoice total - Contra total
 One statement per subsidiary per month
 Data Visibility
 Finance CANNOT see individual employee salaries — only department lump sum
-Finance CANNOT access the Director Salary module at all — they read Director Pool aggregate buckets (Saving / Invoice totals) instead. The per-director rollup inside Director Pool is gated to Principal only.
-HR CANNOT access Director Pool — their visibility ends at the current-month calculation in /director-salary
+Finance CANNOT access the Director Salary module or Director Pool at all. (Director Pool v2 2026-07-21: the old aggregate-bucket view Finance used was replaced by the standalone calculator — Principal + HR only.)
+HR CAN access Director Pool v2 (standalone calculator — full per-director detail; granted by user 2026-07-21)
 Only HR and Principal can see individual salary details
 Development Phases
 Phase 1 (✅ Shipped 2026-04-10): Treasury Core

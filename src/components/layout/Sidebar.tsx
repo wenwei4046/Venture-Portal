@@ -74,8 +74,6 @@ function isGroup(entry: NavEntry): entry is NavGroup {
 
 const isHR = (role: UserRole) => role === 'hr'
 const isHRorPrincipal = (role: UserRole) => role === 'hr' || role === 'principal'
-const isPrincipalOrFinance = (role: UserRole) =>
-  role === 'principal' || role === 'finance'
 
 // Layout per user spec 2026-06-10 (re-grouped from the original phase layout).
 const navEntries: NavEntry[] = [
@@ -143,7 +141,9 @@ const navEntries: NavEntry[] = [
   {
     label: 'Director',
     section: 'Departments',
-    visible: isPrincipalOrFinance,
+    // Group shows when any child is visible: Principal + HR (Director Pool v2
+    // dropped Finance's access, so Finance no longer sees the group at all).
+    visible: (r) => canAccessDirectorSalary(r) || canAccessDirectorPool(r),
     children: [
       { href: '/director-salary', label: 'Director Salary', visible: canAccessDirectorSalary },
       { href: '/director-pool', label: 'Director Pool', visible: canAccessDirectorPool },

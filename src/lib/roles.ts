@@ -22,11 +22,11 @@ export function canAccessDirectorSalary(role: UserRole): boolean {
 }
 
 export function canAccessDirectorPool(role: UserRole): boolean {
-  // Director Pool shows accumulated running balance — Principal + Finance.
-  // HR is excluded; their visibility ends at the current-month calculation
-  // in /director-salary. Finance sees aggregate buckets only — per-director
-  // detail is gated to Principal inside the page.
-  return role === 'principal' || role === 'finance'
+  // Director Pool v2 (2026-07-17) is the standalone calculator — full
+  // per-director detail (weights, advances, savings). Principal + HR
+  // (HR access granted by user 2026-07-21). Finance lost the old
+  // aggregate-bucket view when the ledger page was replaced.
+  return role === 'principal' || role === 'hr'
 }
 
 export function canAccessVenturePool(role: UserRole): boolean {
