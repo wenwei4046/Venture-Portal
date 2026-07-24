@@ -69,7 +69,20 @@
    prefer returned errors for user-triggered actions. SEPARATE pre-existing noise spotted
    in postgres logs: recurring `invalid input syntax for type uuid: "null"` (also fired
    2026-07-23, predates all of this) — some query passes literal 'null'; not yet traced.
-5. **Parallel session merged**: while this session recovered, ANOTHER session pushed
+5. **Receipts page shows ALL money in (user request)**: /receipts now merges two
+   synthetic row kinds into the OR ledger (VoucherLedger isReceipts branch):
+   direct loan repayments (`repayments` EXCLUDING rows whose notes start
+   'Auto-synced from voucher' — those are OR-driven and already listed as their
+   HV-OR; the approve RPCs stamp that prefix) and Fund IN capital
+   (fund_sources status active/matured/repaid, dated effective_date). Rows are
+   unnumbered, status 'received' (green), Category 'Loan repayment · type' /
+   'Fund IN · type', View links to /fund-out/{loan} & /fund-in/{id}
+   (VoucherRow gained optional href; VouchersTable defaultSort now Date desc so
+   unnumbered rows interleave; STATUS_STYLES + 'received'). They obey q/date/
+   min/max filters + All/Paid tabs; a voucher-type or pool filter hides them
+   (no such fields) — Category funnel narrows per kind. Hero Total received
+   now includes them with a breakdown line. NOT in /payments/export (voucher
+   query only) — flag if user asks.
    Director Pool v2 to main (4 commits, `7624312..3d5e10d`: standalone Salary Pool
    calculator port + Save/Clear + Flow view fixes; migrations `20260717130000_director_
    pool_calculator` + `20260721100000_dp_hr_access` — assume both applied to live DB;

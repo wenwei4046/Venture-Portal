@@ -21,6 +21,9 @@ export interface VoucherRow {
   poolLabel: string
   description: string | null
   paymentOrCreatedDate: string // ISO; client formats for display
+  /** Override for the View link — synthetic rows (loan repayments, fund-in
+   *  receipts on /receipts) point at their own module instead of /payments. */
+  href?: string
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -28,6 +31,7 @@ const STATUS_STYLES: Record<string, string> = {
   pending_approval: 'text-alert',
   approved: 'text-info',
   paid: 'text-ledger',
+  received: 'text-ledger',
   voided: 'text-muted',
 }
 
@@ -36,7 +40,9 @@ export default function VouchersTable({ rows }: { rows: VoucherRow[] }) {
     <SortableTable<VoucherRow>
       rows={rows}
       getRowKey={(v) => v.id}
-      defaultSort={{ key: 'voucher_no', dir: 'desc' }}
+      // Date (not voucher #) so unnumbered synthetic rows interleave
+      // chronologically with HV-* vouchers.
+      defaultSort={{ key: 'date', dir: 'desc' }}
       searchKeys={['voucher_no', 'payee_name', 'catLabel', 'poolLabel', 'description']}
       searchPlaceholder="Search voucher # / payee / category / description…"
       columns={[
@@ -124,7 +130,7 @@ export default function VouchersTable({ rows }: { rows: VoucherRow[] }) {
           align: 'right',
           render: (v) => (
             <Link
-              href={`/payments/${v.id}`}
+              href={v.href ?? `/payments/${v.id}`}
               className="text-sm text-accent hover:text-accent-hover font-serif italic"
             >
               View

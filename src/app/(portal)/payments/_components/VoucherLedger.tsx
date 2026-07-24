@@ -23,6 +23,19 @@ const POOL_LABELS: Record<string, string> = {
   invoice_payout_pool: 'Invoice Payout',
 }
 
+const FUND_SOURCE_TYPE_LABELS: Record<string, string> = {
+  subsidiary: 'Subsidiary',
+  director_loan: 'Director loan',
+  department_pool: 'Dept pool',
+  director_saving: 'Director saving',
+  outsource: 'Outsource',
+}
+
+// OR-driven loan repayments are auto-inserted into `repayments` with this
+// notes prefix by the approve RPCs — those already appear as their HV-OR
+// voucher, so the synthetic rows must skip them or the money shows twice.
+const AUTO_SYNCED_PREFIX = 'Auto-synced from voucher'
+
 export interface LedgerSearchParams {
   status?: string
   q?: string
@@ -101,8 +114,114 @@ export default async function VoucherLedger({
     }
   }
 
+  // ── Receipts side only: money received OUTSIDE the OR voucher flow ──
+  // 1. Direct loan repayments (recorded on the loan page — no OR exists).
+  // 2. Fund IN capital actually received (fund source approved; the module
+  //    never mints ORs). Both render as unnumbered "received" rows linking
+  //    back to their own module. User request 2026-07-24: "把收到repayment的
+  //    钱和fund in 的钱全部都显示在receipt这边".
+  const extraRows: VoucherRow[] = []
+  if (isReceipts) {
+    const [reps, { data: loans }, { data: comps }, { data: fsrcs }, { data: dirs }, { data: depts }] =
+      await Promise.all([
+        fetchAllRows((lo, hi) => supabase
+          .from('repayments')
+          .select('*')
+          .order('payment_date', { ascending: false })
+          .range(lo, hi)),
+        supabase.from('loans').select('id, company_id'),
+        supabase.from('companies').select('id, name, short_code'),
+        supabase.from('fund_sources').select('*').in('status', ['active', 'matured', 'repaid']),
+        supabase.from('directors').select('id, name, code'),
+        supabase.from('departments').select('id, name'),
+      ])
+
+    const compById = new Map((comps ?? []).map((c) => [c.id, c]))
+    const loanCompany = new Map((loans ?? []).map((l) => [l.id, compById.get(l.company_id)]))
+    const dirById = new Map((dirs ?? []).map((d) => [d.id, d]))
+    const deptById = new Map((depts ?? []).map((d) => [d.id, d]))
+
+    for (const r of (reps ?? []) as Array<{
+      id: string
+      loan_id: string
+      amount: number
+      payment_type: string
+      payment_date: string
+      notes: string | null
+    }>) {
+      if ((r.notes ?? '').startsWith(AUTO_SYNCED_PREFIX)) continue // shown as its OR
+      const c = loanCompany.get(r.loan_id)
+      extraRows.push({
+        id: `rpy-${r.id}`,
+        voucher_no: null,
+        direction: 'credit',
+        amount: Number(r.amount),
+        payee_name: c ? c.name : 'Loan borrower',
+        status: 'received',
+        catLabel: `Loan repayment · ${r.payment_type}`,
+        poolLabel: '—',
+        description: r.notes ?? `Loan ${r.payment_type} repayment${c ? ` — ${c.name}` : ''}`,
+        paymentOrCreatedDate: r.payment_date,
+        href: `/fund-out/${r.loan_id}`,
+      })
+    }
+
+    for (const s of (fsrcs ?? []) as Array<{
+      id: string
+      source_type: string
+      from_company_id: string | null
+      from_director_id: string | null
+      from_department_id: string | null
+      from_freetext_name: string | null
+      amount: number
+      effective_date: string
+      notes: string | null
+    }>) {
+      const from = s.from_company_id
+        ? (compById.get(s.from_company_id)?.name ?? '—')
+        : s.from_department_id
+          ? (deptById.get(s.from_department_id)?.name ?? '—')
+          : s.from_freetext_name
+            ? s.from_freetext_name
+            : s.from_director_id
+              ? (dirById.get(s.from_director_id)?.name ?? '—')
+              : '—'
+      extraRows.push({
+        id: `fin-${s.id}`,
+        voucher_no: null,
+        direction: 'credit',
+        amount: Number(s.amount),
+        payee_name: from,
+        status: 'received',
+        catLabel: `Fund IN · ${FUND_SOURCE_TYPE_LABELS[s.source_type] ?? s.source_type}`,
+        poolLabel: '—',
+        description: s.notes ?? `Capital received — ${FUND_SOURCE_TYPE_LABELS[s.source_type] ?? s.source_type}`,
+        paymentOrCreatedDate: s.effective_date,
+        href: `/fund-in/${s.id}`,
+      })
+    }
+  }
+
   const all = vouchers ?? []
   const tab = statusFilter ?? 'all'
+
+  // Synthetic rows obey the same URL filters as vouchers. They are settled
+  // money, so they surface under the All and Paid tabs; a voucher-type or
+  // pool filter excludes them (they have neither) — the table's Category
+  // funnel handles per-kind narrowing instead.
+  const extraFiltered = extraRows.filter((r) => {
+    if (tab !== 'all' && tab !== 'paid') return false
+    if (typeFilter || poolFilter) return false
+    if (fromFilter && dayjs(r.paymentOrCreatedDate).isBefore(dayjs(fromFilter), 'day')) return false
+    if (toFilter && dayjs(r.paymentOrCreatedDate).isAfter(dayjs(toFilter), 'day')) return false
+    if (minFilter !== null && r.amount < minFilter) return false
+    if (maxFilter !== null && r.amount > maxFilter) return false
+    if (qFilter) {
+      const hay = `${r.payee_name} ${r.description ?? ''} ${r.catLabel}`.toLowerCase()
+      if (!hay.includes(qFilter)) return false
+    }
+    return true
+  })
 
   // Apply all filters in-memory. Summary stats below use `all` (unfiltered
   // context), only the table uses `filtered`.
@@ -137,9 +256,13 @@ export default async function VoucherLedger({
     voided: all.filter((v) => v.status === 'voided').length,
   }
 
+  // Receipts: settled money = paid ORs + direct repayments + fund-in capital.
+  const extraTotal = extraRows.reduce((sum, r) => sum + r.amount, 0)
+  const nRepayments = extraRows.filter((r) => r.id.startsWith('rpy-')).length
+  const nFundIn = extraRows.filter((r) => r.id.startsWith('fin-')).length
   const totalPaid = all
     .filter((v) => v.status === 'paid')
-    .reduce((sum, v) => sum + Number(v.amount), 0)
+    .reduce((sum, v) => sum + Number(v.amount), 0) + extraTotal
 
   const pendingAmount = all
     .filter((v) => ['draft', 'pending_approval', 'approved'].includes(v.status))
@@ -236,7 +359,9 @@ export default async function VoucherLedger({
           </div>
           <div className="font-serif text-3xl text-num-ink tabular">{formatMoney(totalPaid)}</div>
           <div className="font-mono text-[11.5px] text-graphite mt-1.5 tracking-[0.02em] font-medium">
-            {counts.paid} {noun.toUpperCase()}{counts.paid === 1 ? '' : 'S'} EXECUTED
+            {isReceipts && extraRows.length > 0
+              ? `${counts.paid} RECEIPTS · ${nRepayments} LOAN RPY · ${nFundIn} FUND IN`
+              : `${counts.paid} ${noun.toUpperCase()}${counts.paid === 1 ? '' : 'S'} EXECUTED`}
           </div>
         </div>
         <div>
@@ -258,7 +383,7 @@ export default async function VoucherLedger({
       </div>
 
       {/* ───────── Tabs + list ───────── */}
-      {all.length === 0 ? (
+      {all.length === 0 && extraRows.length === 0 ? (
         <div className="py-16 text-center border border-hairline rounded-md bg-surface">
           <p className="font-serif italic text-graphite text-lg mb-4">
             No {isReceipts ? 'official receipts' : 'payment vouchers'} yet.
@@ -281,11 +406,12 @@ export default async function VoucherLedger({
           </Suspense>
 
           <p className="font-serif italic text-graphite text-sm mb-4">
-            {filtered.length} of {all.length} {noun}{all.length === 1 ? '' : 's'}
+            {filtered.length + extraFiltered.length} of {all.length + extraRows.length} {noun}
+            {all.length + extraRows.length === 1 ? '' : 's'}
             {tab !== 'all' ? ` · ${tab.replace('_', ' ')}` : ''}
           </p>
 
-          {filtered.length === 0 ? (
+          {filtered.length + extraFiltered.length === 0 ? (
             <div className="border border-hairline rounded-md bg-surface p-8 text-center">
               <p className="font-serif italic text-muted text-sm">
                 No {tab.replace('_', ' ')} {noun}s.
@@ -294,7 +420,7 @@ export default async function VoucherLedger({
           ) : (
             <div className="overflow-x-auto">
               <VouchersTable
-                rows={filtered.map<VoucherRow>((v) => {
+                rows={[...filtered.map<VoucherRow>((v) => {
                   const cats = categoriesByVoucher.get(v.id) ?? []
                   const catLabel = cats.length > 0 ? cats.join(' + ') : '—'
                   let poolLabel = '—'
@@ -322,7 +448,7 @@ export default async function VoucherLedger({
                     description: (v.description as string | null) ?? null,
                     paymentOrCreatedDate: (v.payment_date ?? v.created_at) as string,
                   }
-                })}
+                }), ...extraFiltered]}
               />
             </div>
           )}
