@@ -115,14 +115,14 @@ export default function AccountsSection({ accounts }: Props) {
     return m
   }, [accounts])
 
-  function sortForRender(rows: Account[]): Account[] {
-    // Build a quick lookup so we can splice children in right after their
-    // parent. Anything orphaned (parent_code points outside the visible set)
-    // gets rendered as a standalone leaf.
+  // Depth-first flatten so children land right after their parent at ANY
+  // depth (the old version only spliced in direct kids — a 3-level tree like
+  // 4000 → 4100 → 4101 silently DROPPED the grandchildren, user report
+  // 2026-07-24). `ancestors` lets the renderer hide a row when any ancestor
+  // is collapsed; `depth` drives indentation. Anything orphaned (parent_code
+  // outside the visible set) renders as a root.
+  function sortForRender(rows: Account[]): { acc: Account; depth: number; ancestors: string[] }[] {
     const byCode = new Map(rows.map((r) => [r.code, r]))
-    const roots = rows
-      .filter((r) => !r.parent_code || !byCode.has(r.parent_code))
-      .sort((a, b) => a.code.localeCompare(b.code))
     const childrenByParent = new Map<string, Account[]>()
     for (const r of rows) {
       if (r.parent_code && byCode.has(r.parent_code)) {
@@ -131,14 +131,21 @@ export default function AccountsSection({ accounts }: Props) {
         childrenByParent.set(r.parent_code, arr)
       }
     }
-    const out: Account[] = []
-    for (const root of roots) {
-      out.push(root)
-      const kids = (childrenByParent.get(root.code) ?? []).sort((a, b) =>
+    const roots = rows
+      .filter((r) => !r.parent_code || !byCode.has(r.parent_code))
+      .sort((a, b) => a.code.localeCompare(b.code))
+    const out: { acc: Account; depth: number; ancestors: string[] }[] = []
+    const seen = new Set<string>() // cycle guard (DB forbids cycles, but never loop forever)
+    const visit = (acc: Account, depth: number, ancestors: string[]) => {
+      if (seen.has(acc.code)) return
+      seen.add(acc.code)
+      out.push({ acc, depth, ancestors })
+      const kids = (childrenByParent.get(acc.code) ?? []).sort((a, b) =>
         a.code.localeCompare(b.code),
       )
-      out.push(...kids)
+      for (const kid of kids) visit(kid, depth + 1, [...ancestors, acc.code])
     }
+    for (const root of roots) visit(root, 0, [])
     return out
   }
 
@@ -320,11 +327,12 @@ export default function AccountsSection({ accounts }: Props) {
                           </td>
                         </tr>
                       ) : null}
-                      {sortedRows.map((acc) => {
+                      {sortedRows.map(({ acc, depth, ancestors }) => {
                         const isEditing = editing === acc.code
                         const isHeader = (childCounts.get(acc.code) ?? 0) > 0
-                        // Hide rows whose parent is currently collapsed.
-                        if (acc.parent_code && collapsed.has(acc.parent_code)) {
+                        // Hide rows with ANY collapsed ancestor (not just the
+                        // direct parent — collapsing 4000 must also hide 4101).
+                        if (ancestors.some((p) => collapsed.has(p))) {
                           return null
                         }
                         const isCollapsed = isHeader && collapsed.has(acc.code)
@@ -417,8 +425,13 @@ export default function AccountsSection({ accounts }: Props) {
                                   ) : (
                                     <span className="mr-1.5 inline-block w-3" aria-hidden />
                                   )}
-                                  {acc.parent_code ? (
-                                    <span className="text-muted pl-4">└ </span>
+                                  {depth > 0 ? (
+                                    <span
+                                      className="text-muted"
+                                      style={{ paddingLeft: depth * 16 }}
+                                    >
+                                      └{' '}
+                                    </span>
                                   ) : null}
                                   {acc.name}
                                   {isHeader ? (
