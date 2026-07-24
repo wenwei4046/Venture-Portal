@@ -96,8 +96,14 @@
    button on the voucher page for pending PVs (both roles; VoucherActions
    optional returnToDraft prop; action returnVoucherToDraft). Flow: Principal
    或 Finance 点退回 → Finance opens the draft PV → Submit for approval (new
-   card stamped submitted_by=finance) → Principal approves. Suggested (not
-   built): warn/block PV creation when logged in as principal.
+   card stamped submitted_by=finance) → Principal approves. FOLLOW-UP the same
+   day: user resubmitted from the PRINCIPAL session twice more (page's
+   isFinance = finance OR principal, so Principal also saw the Submit button;
+   DB showed 3 principal-submitted cards). Fixed: VoucherActions draft block
+   hides Submit for isPrincipal + shows an alert box explaining; PV-0111
+   returned to draft by support SQL (card closed, notes '(support: submitted
+   from Principal account again)'). Voucher was CREATED by Finance — only the
+   submits were from the Principal session (likely two logged-in windows).
    Director Pool v2 to main (4 commits, `7624312..3d5e10d`: standalone Salary Pool
    calculator port + Save/Clear + Flow view fixes; migrations `20260717130000_director_
    pool_calculator` + `20260721100000_dp_hr_access` — assume both applied to live DB;
