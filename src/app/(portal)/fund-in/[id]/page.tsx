@@ -5,8 +5,9 @@ import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatMoneyBare, formatDate } from '@/lib/utils'
 import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
-import { cancelFundSource, withdrawFundSource } from '../actions'
+import { cancelFundSource } from '../actions'
 import { ConfirmButton } from './_components/ConfirmButton'
+import WithdrawButton from './_components/WithdrawButton'
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
   subsidiary: 'Subsidiary',
@@ -446,14 +447,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
             >
               Edit fund source
             </Link>
-            <ConfirmButton
-              id={source.id}
-              action={withdrawFundSource}
-              confirmMessage={`撤回这笔 fund source?\n\n单会直接变 cancelled,Principal 队列里的审批卡也会一并消掉。钱还没进账,所以没有任何账要冲。想重新记就开一张新的。`}
-              className="text-sm text-muted hover:text-danger font-sans transition-colors border border-hairline px-4 py-2 rounded-md"
-            >
-              撤回 · Withdraw
-            </ConfirmButton>
+            <WithdrawButton id={source.id} />
           </div>
           <p className="text-xs text-muted mt-2 italic font-serif">
             Fix typos, wrong amount, wrong rate, or wrong dates while the request is still pending. Locks once Principal approves.

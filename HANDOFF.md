@@ -55,10 +55,20 @@
    `withdraw_pending_fund_source(p_fund_source_id)` SECURITY DEFINER — asserts
    pending_approval, flips to cancelled, closes its pending approval_requests card with
    Principal-reject-identical fields (Finance RLS can't update approval_requests inline —
-   the voided-PV silent-0-rows class). UI: 撤回 · Withdraw ConfirmButton next to Edit in
-   the pending Actions section (withdrawFundSource action). Pending = no money moved, so
-   nothing to reverse; mirrors Fund OUT's Finance-cancel-before-approve. User had 2 wrong
-   pending entries to withdraw with it.
+   the voided-PV silent-0-rows class). UI: 撤回 · Withdraw button next to Edit in the
+   pending Actions section. Pending = no money moved, so nothing to reverse; mirrors Fund
+   OUT's Finance-cancel-before-approve. User had 2 wrong pending entries to withdraw.
+   **v1 BUG (user hit it, crash page)**: v1 set approved_by = auth.uid() on the card —
+   but withdrawer IS the submitter, and CHECK no_self_approval forbids approved_by =
+   submitted_by → RPC raised, action THREW → app-wide error page; RPC rollback left both
+   sources safely pending. Fix mig `20260724010000`: approved_by stays NULL (constraint
+   allows; approved_has_metadata only binds status='approved'), notes = 'Withdrawn by
+   submitter before approval'. UX: action now RETURNS {error}; new WithdrawButton client
+   component (replaces ConfirmButton usage) shows it inline. LESSON for this codebase:
+   fund-in page-level actions that throw (cancelFundSource etc.) crash to the error page —
+   prefer returned errors for user-triggered actions. SEPARATE pre-existing noise spotted
+   in postgres logs: recurring `invalid input syntax for type uuid: "null"` (also fired
+   2026-07-23, predates all of this) — some query passes literal 'null'; not yet traced.
 5. **Parallel session merged**: while this session recovered, ANOTHER session pushed
    Director Pool v2 to main (4 commits, `7624312..3d5e10d`: standalone Salary Pool
    calculator port + Save/Clear + Flow view fixes; migrations `20260717130000_director_
