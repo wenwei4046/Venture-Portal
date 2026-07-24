@@ -87,9 +87,17 @@
    (type column 'loan repayment'/'fund in', status 'received') — page and
    export agree. ALSO: Principal accidentally submitted HV-PV-202607-0111
    (RM 320, W MEDIA PRODUCTION) — no_self_approval correctly blocks Principal
-   approving own submission; remedy = void it (either role can void pending)
-   and Finance re-creates. Suggested (not built): warn/block PV creation when
-   logged in as principal.
+   approving own submission. REMEDY BUILT (user request): mig `20260724020000`
+   `return_voucher_to_draft(p_voucher_id)` — pending_approval only, refuses
+   grouped cards (batch approvals must not fracture), flips PV → draft and
+   closes its pending card (rejected, approved_by NULL per no_self_approval,
+   notes 'Returned to draft for resubmission'). Nothing financial posts at
+   pending stage (verified 0 pool/JE rows for PV-0111). UI: 「退回 Draft」
+   button on the voucher page for pending PVs (both roles; VoucherActions
+   optional returnToDraft prop; action returnVoucherToDraft). Flow: Principal
+   或 Finance 点退回 → Finance opens the draft PV → Submit for approval (new
+   card stamped submitted_by=finance) → Principal approves. Suggested (not
+   built): warn/block PV creation when logged in as principal.
    Director Pool v2 to main (4 commits, `7624312..3d5e10d`: standalone Salary Pool
    calculator port + Save/Clear + Flow view fixes; migrations `20260717130000_director_
    pool_calculator` + `20260721100000_dp_hr_access` — assume both applied to live DB;

@@ -709,6 +709,30 @@ export async function submitForApproval(formData: FormData) {
   revalidatePath('/dashboard')
 }
 
+// ─── Return a PENDING voucher to draft (mig 20260724020000) ─────────────────
+// Escape hatch for a submission made with the wrong account (e.g. Principal
+// submitted → no_self_approval leaves nobody able to approve OR reject it).
+// The RPC flips the voucher back to draft and closes its pending approval
+// card; whoever then clicks Submit for approval becomes the new submitter.
+// Nothing financial has posted at pending stage, so this is bookkeeping-free.
+export async function returnVoucherToDraft(formData: FormData) {
+  await requireRole(['finance', 'principal'])
+  const supabase = await createClient()
+
+  const id = formData.get('id') as string
+  if (!id) throw new Error('Voucher id is required')
+
+  const { error } = await supabase.rpc('return_voucher_to_draft' as never, {
+    p_voucher_id: id,
+  } as never)
+  if (error) throw new Error(`退回 Draft 失败: ${error.message}`)
+
+  revalidatePath(`/payments/${id}`)
+  revalidatePath('/payments')
+  revalidatePath('/approvals')
+  revalidatePath('/dashboard')
+}
+
 // ─── Approve voucher (Principal — approve + execute in one step) ────────────
 // User directive 2026-04-19: approve = paid. The old 2-step flow (Principal
 // approves → Finance executes) was collapsed so Principal's one click moves

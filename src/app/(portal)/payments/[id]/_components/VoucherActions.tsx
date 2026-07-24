@@ -14,6 +14,9 @@ interface Props {
   submitForApproval: (formData: FormData) => Promise<void>
   approveVoucher: (formData: FormData) => Promise<void>
   voidVoucher: (formData: FormData) => Promise<void>
+  /** Pull a pending voucher back to draft (closes its approval card) so it
+   *  can be resubmitted — e.g. after submitting with the wrong account. */
+  returnToDraft?: (formData: FormData) => Promise<void>
   /** Reverse a PAID incoming receipt (credit). Optional — only wired for those. */
   voidPaidReceipt?: (formData: FormData) => Promise<void>
   /** Reverse a PAID outgoing payment (debit). Optional. */
@@ -33,6 +36,7 @@ export default function VoucherActions({
   submitForApproval,
   approveVoucher,
   voidVoucher,
+  returnToDraft,
   voidPaidReceipt,
   reversePaidPayment,
   direction,
@@ -252,6 +256,17 @@ export default function VoucherActions({
                 >
                   Edit
                 </Link>
+                {returnToDraft ? (
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => handleAction(returnToDraft)}
+                    className="border border-hairline text-graphite hover:text-ink hover:bg-surface text-sm font-serif italic px-4 py-2 rounded-md transition-colors disabled:opacity-50"
+                    title="单退回草稿、审批卡关掉,可重新 submit(交错账号时用)"
+                  >
+                    退回 Draft
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   disabled={isPending}
@@ -266,13 +281,24 @@ export default function VoucherActions({
 
           {/* Principal sees Edit alongside Approve, before they confirm */}
           {isPrincipal && !confirmAction ? (
-            <div className="mt-2">
+            <div className="mt-2 flex items-center gap-4">
               <Link
                 href={`/payments/${voucherId}/edit`}
                 className="text-sm text-graphite hover:text-accent font-serif italic"
               >
                 Edit voucher details
               </Link>
+              {returnToDraft ? (
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => handleAction(returnToDraft)}
+                  className="text-sm text-graphite hover:text-accent font-serif italic disabled:opacity-50"
+                  title="交错账号时用:单退回草稿,审批卡关掉,再用对的账号重新 submit"
+                >
+                  退回 Draft · Return to draft
+                </button>
+              ) : null}
             </div>
           ) : null}
         </>
