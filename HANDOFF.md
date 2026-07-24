@@ -25,10 +25,21 @@
    was CANCELLED by mig 20260722100000's void-reset (other session). Committed is counted
    per-request (payment_vouchers.reference_id = request id), so a re-filed request starts
    at 0/95,390.70 and either double-transfers or never completes → sections never unlock.
-   PROPOSED (user has NOT yet said do it): restore 37aa7f87 to 'pv_generated' (clear
-   cancelled_at/reason) → shows still-to-fund 10,572.42 → Finance funds remainder →
-   completion trigger fires → unlock. User is walking the flow read-only ("别做任何东西
-   先") — do NOT touch payroll data without their word.
+   DONE (user said 复活, 2026-07-24): 37aa7f87 restored to 'pv_generated', cancel fields
+   cleared, pv_id re-pointed at paid PV-0100, note appended; verified committed 84,818.28
+   / remaining 10,572.42. USER'S PLAN (their own hands, we only verify after): Finance
+   generates the 10,572.42 remainder PV (HL→Alliance) → Principal approves → request
+   auto-completes → HR page unlocks; then an OFFSETTING internal transfer
+   (Alliance→HL 10,572.42, 备注对冲) because HOUZS Century's deposit landed directly in
+   Alliance so no real bank movement is wanted — the two documents cancel in-system, NO
+   real bank transfers will be made (user decision; bank statement will have no matching
+   flows — remember at reconciliation). Going-forward rule set by user: external money
+   always lands in Hong Leong; Alliance receives payroll custody only. Also fixed today:
+   fund-source cancel refunds from RECEIVING bank (mig 20260724040000) after user caught
+   the HC 45,156.32 deposit was in Alliance while the executor hardcoded primary (HL);
+   HC deposit had been DOUBLE-activated (dupe approved in the same batch as the enum
+   crash) — the cancel card targeted the dupe (2f87e5ae), re-approved cleanly: banks
+   cache==GL both, TB 0.00, vp net single-counted.
 
 ## Session 2026-07-22 — OneDrive un-sync recovery + fund-out 资金来源 field
 
