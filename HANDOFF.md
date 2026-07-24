@@ -49,7 +49,17 @@
    NOTE: user directive 2026-07-22 — repo contains `... - Copy` snapshot files
    (design-import/, src/app pages/actions) that are the user's own copies; NEVER delete/
    edit/clean them, and stage commits with explicit paths (no `git add -A`).
-4. **Parallel session merged**: while this session recovered, ANOTHER session pushed
+4. **Fund IN 撤回 (2026-07-24, user request)**: Finance had NO way to kill a wrongly
+   submitted pending_approval fund source (detail page offered Edit only;
+   cancelFundSource requires status='active'). New mig `20260724000000`:
+   `withdraw_pending_fund_source(p_fund_source_id)` SECURITY DEFINER — asserts
+   pending_approval, flips to cancelled, closes its pending approval_requests card with
+   Principal-reject-identical fields (Finance RLS can't update approval_requests inline —
+   the voided-PV silent-0-rows class). UI: 撤回 · Withdraw ConfirmButton next to Edit in
+   the pending Actions section (withdrawFundSource action). Pending = no money moved, so
+   nothing to reverse; mirrors Fund OUT's Finance-cancel-before-approve. User had 2 wrong
+   pending entries to withdraw with it.
+5. **Parallel session merged**: while this session recovered, ANOTHER session pushed
    Director Pool v2 to main (4 commits, `7624312..3d5e10d`: standalone Salary Pool
    calculator port + Save/Clear + Flow view fixes; migrations `20260717130000_director_
    pool_calculator` + `20260721100000_dp_hr_access` — assume both applied to live DB;

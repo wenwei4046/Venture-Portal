@@ -5,7 +5,7 @@ import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatMoneyBare, formatDate } from '@/lib/utils'
 import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
-import { cancelFundSource } from '../actions'
+import { cancelFundSource, withdrawFundSource } from '../actions'
 import { ConfirmButton } from './_components/ConfirmButton'
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
@@ -439,14 +439,25 @@ export default async function FundSourceDetailPage({ params }: Props) {
             <span className="rule" aria-hidden />
             <span className="count">EDITABLE UNTIL PRINCIPAL APPROVES</span>
           </div>
-          <Link
-            href={`/fund-in/${source.id}/edit`}
-            className="text-sm text-accent hover:text-accent-hover font-serif italic border border-hairline px-4 py-2 rounded-md transition-colors inline-block"
-          >
-            Edit fund source
-          </Link>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Link
+              href={`/fund-in/${source.id}/edit`}
+              className="text-sm text-accent hover:text-accent-hover font-serif italic border border-hairline px-4 py-2 rounded-md transition-colors inline-block"
+            >
+              Edit fund source
+            </Link>
+            <ConfirmButton
+              id={source.id}
+              action={withdrawFundSource}
+              confirmMessage={`撤回这笔 fund source?\n\n单会直接变 cancelled,Principal 队列里的审批卡也会一并消掉。钱还没进账,所以没有任何账要冲。想重新记就开一张新的。`}
+              className="text-sm text-muted hover:text-danger font-sans transition-colors border border-hairline px-4 py-2 rounded-md"
+            >
+              撤回 · Withdraw
+            </ConfirmButton>
+          </div>
           <p className="text-xs text-muted mt-2 italic font-serif">
             Fix typos, wrong amount, wrong rate, or wrong dates while the request is still pending. Locks once Principal approves.
+            Submit 错了整笔不要的话,直接撤回 — 不用等 Principal。
           </p>
         </section>
       ) : canFinanceEdit && isActive ? (

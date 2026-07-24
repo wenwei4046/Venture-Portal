@@ -400,6 +400,30 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
   redirect(`/fund-in/${id}`)
 }
 
+// ─── Withdraw a PENDING fund source (Finance self-service) ───────────────────
+// A pending_approval source has moved no money, so the submitter may pull it
+// back without Principal: the withdraw_pending_fund_source RPC (SECURITY
+// DEFINER, mig 20260724000000) flips it to cancelled AND closes its pending
+// approval card in one transaction — Finance's own RLS can't touch
+// approval_requests, so this must not be done with inline updates.
+export async function withdrawFundSource(formData: FormData) {
+  await requireRole(['finance', 'principal'])
+  const supabase = await createClient()
+
+  const id = formData.get('id') as string
+  if (!id) throw new Error('Fund source id is required')
+
+  const { error } = await supabase.rpc('withdraw_pending_fund_source' as never, {
+    p_fund_source_id: id,
+  } as never)
+  if (error) throw new Error(`撤回失败: ${error.message}`)
+
+  revalidatePath('/fund-in')
+  revalidatePath(`/fund-in/${id}`)
+  revalidatePath('/approvals')
+  revalidatePath('/dashboard')
+}
+
 // ─── Cancel Fund Source (requires Principal approval) ────────────────────────
 
 export async function cancelFundSource(formData: FormData) {
