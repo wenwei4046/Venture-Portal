@@ -81,8 +81,15 @@
    unnumbered rows interleave; STATUS_STYLES + 'received'). They obey q/date/
    min/max filters + All/Paid tabs; a voucher-type or pool filter hides them
    (no such fields) — Category funnel narrows per kind. Hero Total received
-   now includes them with a breakdown line. NOT in /payments/export (voucher
-   query only) — flag if user asks.
+   now includes them with a breakdown line. Extras logic extracted to
+   lib/receipt-extras.ts (fetchReceiptExtras + filterReceiptExtras) and the
+   /payments/export route now appends them for direction=credit, date-sorted
+   (type column 'loan repayment'/'fund in', status 'received') — page and
+   export agree. ALSO: Principal accidentally submitted HV-PV-202607-0111
+   (RM 320, W MEDIA PRODUCTION) — no_self_approval correctly blocks Principal
+   approving own submission; remedy = void it (either role can void pending)
+   and Finance re-creates. Suggested (not built): warn/block PV creation when
+   logged in as principal.
    Director Pool v2 to main (4 commits, `7624312..3d5e10d`: standalone Salary Pool
    calculator port + Save/Clear + Flow view fixes; migrations `20260717130000_director_
    pool_calculator` + `20260721100000_dp_hr_access` — assume both applied to live DB;

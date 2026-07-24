@@ -3,6 +3,7 @@ import { Suspense } from 'react'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/paginate'
+import { fetchReceiptExtras, filterReceiptExtras } from '@/lib/receipt-extras'
 import { formatMoney } from '@/lib/utils'
 import PaymentTabs from './PaymentTabs'
 import PaymentFilters from './PaymentFilters'
@@ -23,18 +24,6 @@ const POOL_LABELS: Record<string, string> = {
   invoice_payout_pool: 'Invoice Payout',
 }
 
-const FUND_SOURCE_TYPE_LABELS: Record<string, string> = {
-  subsidiary: 'Subsidiary',
-  director_loan: 'Director loan',
-  department_pool: 'Dept pool',
-  director_saving: 'Director saving',
-  outsource: 'Outsource',
-}
-
-// OR-driven loan repayments are auto-inserted into `repayments` with this
-// notes prefix by the approve RPCs — those already appear as their HV-OR
-// voucher, so the synthetic rows must skip them or the money shows twice.
-const AUTO_SYNCED_PREFIX = 'Auto-synced from voucher'
 
 export interface LedgerSearchParams {
   status?: string
@@ -115,112 +104,16 @@ export default async function VoucherLedger({
   }
 
   // ── Receipts side only: money received OUTSIDE the OR voucher flow ──
-  // 1. Direct loan repayments (recorded on the loan page — no OR exists).
-  // 2. Fund IN capital actually received (fund source approved; the module
-  //    never mints ORs). Both render as unnumbered "received" rows linking
-  //    back to their own module. User request 2026-07-24: "把收到repayment的
-  //    钱和fund in 的钱全部都显示在receipt这边".
-  const extraRows: VoucherRow[] = []
-  if (isReceipts) {
-    const [reps, { data: loans }, { data: comps }, { data: fsrcs }, { data: dirs }, { data: depts }] =
-      await Promise.all([
-        fetchAllRows((lo, hi) => supabase
-          .from('repayments')
-          .select('*')
-          .order('payment_date', { ascending: false })
-          .range(lo, hi)),
-        supabase.from('loans').select('id, company_id'),
-        supabase.from('companies').select('id, name, short_code'),
-        supabase.from('fund_sources').select('*').in('status', ['active', 'matured', 'repaid']),
-        supabase.from('directors').select('id, name, code'),
-        supabase.from('departments').select('id, name'),
-      ])
-
-    const compById = new Map((comps ?? []).map((c) => [c.id, c]))
-    const loanCompany = new Map((loans ?? []).map((l) => [l.id, compById.get(l.company_id)]))
-    const dirById = new Map((dirs ?? []).map((d) => [d.id, d]))
-    const deptById = new Map((depts ?? []).map((d) => [d.id, d]))
-
-    for (const r of (reps ?? []) as Array<{
-      id: string
-      loan_id: string
-      amount: number
-      payment_type: string
-      payment_date: string
-      notes: string | null
-    }>) {
-      if ((r.notes ?? '').startsWith(AUTO_SYNCED_PREFIX)) continue // shown as its OR
-      const c = loanCompany.get(r.loan_id)
-      extraRows.push({
-        id: `rpy-${r.id}`,
-        voucher_no: null,
-        direction: 'credit',
-        amount: Number(r.amount),
-        payee_name: c ? c.name : 'Loan borrower',
-        status: 'received',
-        catLabel: `Loan repayment · ${r.payment_type}`,
-        poolLabel: '—',
-        description: r.notes ?? `Loan ${r.payment_type} repayment${c ? ` — ${c.name}` : ''}`,
-        paymentOrCreatedDate: r.payment_date,
-        href: `/fund-out/${r.loan_id}`,
-      })
-    }
-
-    for (const s of (fsrcs ?? []) as Array<{
-      id: string
-      source_type: string
-      from_company_id: string | null
-      from_director_id: string | null
-      from_department_id: string | null
-      from_freetext_name: string | null
-      amount: number
-      effective_date: string
-      notes: string | null
-    }>) {
-      const from = s.from_company_id
-        ? (compById.get(s.from_company_id)?.name ?? '—')
-        : s.from_department_id
-          ? (deptById.get(s.from_department_id)?.name ?? '—')
-          : s.from_freetext_name
-            ? s.from_freetext_name
-            : s.from_director_id
-              ? (dirById.get(s.from_director_id)?.name ?? '—')
-              : '—'
-      extraRows.push({
-        id: `fin-${s.id}`,
-        voucher_no: null,
-        direction: 'credit',
-        amount: Number(s.amount),
-        payee_name: from,
-        status: 'received',
-        catLabel: `Fund IN · ${FUND_SOURCE_TYPE_LABELS[s.source_type] ?? s.source_type}`,
-        poolLabel: '—',
-        description: s.notes ?? `Capital received — ${FUND_SOURCE_TYPE_LABELS[s.source_type] ?? s.source_type}`,
-        paymentOrCreatedDate: s.effective_date,
-        href: `/fund-in/${s.id}`,
-      })
-    }
-  }
+  // Direct loan repayments + Fund IN capital, deduped against OR-driven
+  // rows. Shared with /payments/export via lib/receipt-extras. User request
+  // 2026-07-24: "把收到repayment的钱和fund in 的钱全部都显示在receipt这边".
+  const extraRows: VoucherRow[] = isReceipts ? await fetchReceiptExtras(supabase) : []
 
   const all = vouchers ?? []
   const tab = statusFilter ?? 'all'
 
-  // Synthetic rows obey the same URL filters as vouchers. They are settled
-  // money, so they surface under the All and Paid tabs; a voucher-type or
-  // pool filter excludes them (they have neither) — the table's Category
-  // funnel handles per-kind narrowing instead.
-  const extraFiltered = extraRows.filter((r) => {
-    if (tab !== 'all' && tab !== 'paid') return false
-    if (typeFilter || poolFilter) return false
-    if (fromFilter && dayjs(r.paymentOrCreatedDate).isBefore(dayjs(fromFilter), 'day')) return false
-    if (toFilter && dayjs(r.paymentOrCreatedDate).isAfter(dayjs(toFilter), 'day')) return false
-    if (minFilter !== null && r.amount < minFilter) return false
-    if (maxFilter !== null && r.amount > maxFilter) return false
-    if (qFilter) {
-      const hay = `${r.payee_name} ${r.description ?? ''} ${r.catLabel}`.toLowerCase()
-      if (!hay.includes(qFilter)) return false
-    }
-    return true
+  const extraFiltered = filterReceiptExtras(extraRows, {
+    tab, typeFilter, poolFilter, fromFilter, toFilter, minFilter, maxFilter, qFilter,
   })
 
   // Apply all filters in-memory. Summary stats below use `all` (unfiltered

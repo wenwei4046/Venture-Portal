@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
+import { fetchReceiptExtras, filterReceiptExtras } from '@/lib/receipt-extras'
 import { buildVouchersXlsx } from './_format/xlsx'
 import { VouchersPdf } from './_format/pdf'
 import dayjs from 'dayjs'
@@ -115,8 +116,9 @@ export async function GET(req: Request) {
     return true
   })
 
-  // Transform to export format
-  const rows: VoucherExportRow[] = filtered.map((v) => {
+  // Transform to export format. Kept alongside a raw sort date so synthetic
+  // receipt rows (below) can interleave chronologically before formatting.
+  const dated: Array<{ raw: string; row: VoucherExportRow }> = filtered.map((v) => {
     const cats = categoriesByVoucher.get(v.id) ?? []
     const catLabel = cats.length > 0 ? cats.join(' + ') : '—'
 
@@ -134,18 +136,49 @@ export async function GET(req: Request) {
       }
     }
 
+    const raw = (v.payment_date ?? v.created_at) as string
     return {
-      voucher_no: v.voucher_no,
-      date: dayjs(v.payment_date ?? v.created_at).format('DD/MM/YYYY'),
-      direction: v.direction as 'credit' | 'debit',
-      type: v.voucher_type,
-      status: v.status,
-      payee_name: v.payee_name,
-      amount: Number(v.amount),
-      catLabel,
-      poolLabel,
+      raw,
+      row: {
+        voucher_no: v.voucher_no,
+        date: dayjs(raw).format('DD/MM/YYYY'),
+        direction: v.direction as 'credit' | 'debit',
+        type: v.voucher_type,
+        status: v.status,
+        payee_name: v.payee_name,
+        amount: Number(v.amount),
+        catLabel,
+        poolLabel,
+      },
     }
   })
+
+  // Receipts export mirrors the /receipts page: direct loan repayments +
+  // Fund IN capital ride along, deduped and filtered by the same rules.
+  if (directionFilter === 'credit') {
+    const extras = filterReceiptExtras(await fetchReceiptExtras(supabase), {
+      tab, typeFilter, poolFilter, fromFilter, toFilter, minFilter, maxFilter, qFilter,
+    })
+    for (const r of extras) {
+      dated.push({
+        raw: r.paymentOrCreatedDate,
+        row: {
+          voucher_no: null,
+          date: dayjs(r.paymentOrCreatedDate).format('DD/MM/YYYY'),
+          direction: 'credit',
+          type: r.id.startsWith('rpy-') ? 'loan repayment' : 'fund in',
+          status: 'received',
+          payee_name: r.payee_name,
+          amount: r.amount,
+          catLabel: r.catLabel,
+          poolLabel: r.poolLabel,
+        },
+      })
+    }
+    dated.sort((a, b) => new Date(b.raw).getTime() - new Date(a.raw).getTime())
+  }
+
+  const rows: VoucherExportRow[] = dated.map((d) => d.row)
 
   const filename = `payment-vouchers-${dayjs().format('YYYYMMDD')}`
 
