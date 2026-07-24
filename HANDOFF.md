@@ -7,6 +7,29 @@
 > (user may delete it). Payroll model: 2026-07-20C (FINAL custody model) SUPERSEDES the
 > intermediate 2026-07-20B redesign below (kept for history).
 
+## Session 2026-07-24B — fund-source-cancel enum bug + June funding deadlock found
+
+1. **execute_fund_source_cancel enum typo (user hit live)**: Principal batch-approved;
+   the HOUZS Century cancel card (RM 45,156.32, tier_change) died with `invalid input
+   value for enum fund_source_type: "dept_pool"` — the dept-pool guard compared against
+   'dept_pool' but the enum label is 'department_pool' (bug since mig 20260612050000;
+   EVERY cancel approval would die there). Guard sits BEFORE any write → zero financial
+   rows moved; only the card was consumed approved-without-effect (approvals action
+   records approval BEFORE calling the RPC — known ordering weakness, not fixed today).
+   Fixed by mig `20260724030000` (literal → 'department_pool', body otherwise identical);
+   card 783ab989 flipped back to pending by support SQL → Principal just re-approves.
+2. **June funding deadlock (diagnosed, awaiting user go-ahead)**: HR Payment page's
+   PV-making sections (staff/director batches + statutory table) unlock ONLY at
+   phase='funded' (request status 'completed' or run 'paid'); the create_* RPCs enforce
+   the same. June request 37aa7f87 (95,390.70, owns PAID PV-0100 84,818.28 + voided 0115)
+   was CANCELLED by mig 20260722100000's void-reset (other session). Committed is counted
+   per-request (payment_vouchers.reference_id = request id), so a re-filed request starts
+   at 0/95,390.70 and either double-transfers or never completes → sections never unlock.
+   PROPOSED (user has NOT yet said do it): restore 37aa7f87 to 'pv_generated' (clear
+   cancelled_at/reason) → shows still-to-fund 10,572.42 → Finance funds remainder →
+   completion trigger fires → unlock. User is walking the flow read-only ("别做任何东西
+   先") — do NOT touch payroll data without their word.
+
 ## Session 2026-07-22 — OneDrive un-sync recovery + fund-out 资金来源 field
 
 1. **Recovery**: full project found at the new Desktop path (Known Folder Move). git HEAD
