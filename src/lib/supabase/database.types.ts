@@ -1928,6 +1928,13 @@ export type Database = {
             referencedColumns: ["code"]
           },
           {
+            foreignKeyName: "fund_sources_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "fund_sources_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
@@ -4545,6 +4552,10 @@ export type Database = {
         Args: { p_new_type: string; p_old: string }
         Returns: Json
       }
+      close_approvals_for_voided_voucher: {
+        Args: { p_voucher_id: string }
+        Returns: number
+      }
       coa_is_header: { Args: { p_code: string }; Returns: boolean }
       compute_commission: {
         Args: { p_period: string; p_staff_id: string }
@@ -4576,7 +4587,16 @@ export type Database = {
         Returns: string
       }
       create_payroll_disbursement_vouchers: {
-        Args: { p_period: string }
+        Args: { p_payment_date: string; p_period: string; p_scope: string }
+        Returns: Json
+      }
+      create_payroll_statutory_vouchers: {
+        Args: {
+          p_bank_account_id?: string
+          p_payment_date?: string
+          p_period: string
+          p_scheme: string
+        }
         Returns: Json
       }
       current_user_department_id: { Args: never; Returns: string }
@@ -4730,6 +4750,10 @@ export type Database = {
           pool_key: string
           required_amount: number
         }[]
+      }
+      get_payroll_funding_paid: {
+        Args: { p_request_id: string }
+        Returns: number
       }
       get_staff_billing_allocation: {
         Args: { p_period_month: string }
@@ -4885,11 +4909,23 @@ export type Database = {
         Args: { p_loan_id: string; p_reason?: string }
         Returns: string
       }
+      return_voucher_to_draft: {
+        Args: { p_voucher_id: string }
+        Returns: undefined
+      }
       reverse_voucher_pool_rows: {
         Args: { p_voucher_no: string }
         Returns: number
       }
       save_director_salary_results: { Args: { p_data: Json }; Returns: Json }
+      set_loan_funding_source: {
+        Args: { p_loan_id: string; p_source: string }
+        Returns: undefined
+      }
+      set_payroll_pv_payment_date: {
+        Args: { p_payment_date: string; p_voucher_id: string }
+        Returns: undefined
+      }
       submit_dept_payment_request: {
         Args: {
           p_amount: number
@@ -4919,6 +4955,10 @@ export type Database = {
         Args: { p_period: string; p_user_id: string }
         Returns: string
       }
+      terms_with_funding_source: {
+        Args: { p_source: string; p_terms: string }
+        Returns: string
+      }
       update_manual_journal_voucher: {
         Args: {
           p_description: string
@@ -4927,6 +4967,10 @@ export type Database = {
           p_segment?: string
           p_transaction_date: string
         }
+        Returns: undefined
+      }
+      withdraw_pending_fund_source: {
+        Args: { p_fund_source_id: string }
         Returns: undefined
       }
     }

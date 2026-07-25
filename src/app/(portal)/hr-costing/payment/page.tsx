@@ -3,6 +3,7 @@ import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney, formatMoneyBare, getPeriodMonth } from '@/lib/utils'
+import { round2 } from '@/lib/payroll-funding'
 import RequestPayrollPaymentButton, {
   type RequestState,
 } from '../payroll/_components/RequestPayrollPaymentButton'
@@ -236,6 +237,18 @@ export default async function HRPaymentPage({
     else if (requestRow.status === 'completed') phase = 'funded'
   } else if (run.status === 'paid') phase = 'funded'
 
+  // Paid-so-far across this request's funding PVs — partial funding can split
+  // one request into several vouchers, some already paid while the rest wait
+  // for Principal, so the badge shows 已付/总额 instead of the request total.
+  // RPC (mig 20260725) because payment_vouchers SELECT is finance/principal-only.
+  let paidAmount = 0
+  if (requestRow?.status === 'pv_generated') {
+    const { data: paidSum } = await supabase.rpc('get_payroll_funding_paid', {
+      p_request_id: requestRow.id,
+    })
+    paidAmount = round2(Number(paidSum ?? 0))
+  }
+
   let requestState: RequestState = { kind: 'none' }
   if (requestRow) {
     if (requestRow.status === 'submitted') {
@@ -249,6 +262,7 @@ export default async function HRPaymentPage({
         kind: 'pv_generated',
         pvId: requestRow.pv_id ?? '',
         requestId: requestRow.id,
+        paidAmount,
       }
     } else if (requestRow.status === 'completed') {
       requestState = {

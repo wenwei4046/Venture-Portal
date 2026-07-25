@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
+import { round2 } from '@/lib/payroll-funding'
 import PayrollGrid, { type PayrollRowData } from '../_components/PayrollGrid'
 import CopyFromLastMonthButton from '../_components/CopyFromLastMonthButton'
 import CreatePeriodButton from '../_components/CreatePeriodButton'
@@ -274,6 +275,19 @@ export default async function PayrollGridPage({ params }: PageProps) {
   const showLegacyRejectedNote =
     phase === 'drafting' && !!lastRejected && lastRejected.rejection_reason !== REOPEN_MARKER
 
+  // Paid-so-far across this request's funding PVs. Partial funding (bank
+  // balance short of the full amount) splits one request into several
+  // vouchers — some may already be paid while the rest sit with Principal,
+  // so the badge shows 已付/总额 instead of just the request total. RPC
+  // (mig 20260725) because payment_vouchers SELECT is finance/principal-only.
+  let paidAmount = 0
+  if (activeRequest?.status === 'pv_generated') {
+    const { data: paidSum } = await supabase.rpc('get_payroll_funding_paid', {
+      p_request_id: activeRequest.id,
+    })
+    paidAmount = round2(Number(paidSum ?? 0))
+  }
+
   // Build RequestState prop for the button component
   let requestState: RequestState
   if (!activeRequest) {
@@ -289,6 +303,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
       kind: 'pv_generated',
       pvId: activeRequest.pv_id ?? '',
       requestId: activeRequest.id,
+      paidAmount,
     }
   } else if (activeRequest.status === 'completed') {
     requestState = {

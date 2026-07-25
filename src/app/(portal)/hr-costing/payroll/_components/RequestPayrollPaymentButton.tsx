@@ -7,7 +7,7 @@ import { requestPayrollPayment, cancelPayrollPaymentRequest } from '../actions'
 export type RequestState =
   | { kind: 'none' }
   | { kind: 'submitted'; requestId: string; requestedAt: string }
-  | { kind: 'pv_generated'; pvId: string; requestId: string }
+  | { kind: 'pv_generated'; pvId: string; requestId: string; paidAmount: number }
   | { kind: 'completed'; pvId: string; completedAt: string | null }
   | { kind: 'cancelled' }
 
@@ -171,7 +171,9 @@ export default function RequestPayrollPaymentButton({
             PV generated · awaiting Principal
           </em>
           <span className="font-mono text-xs text-muted ml-2">
-            RM {fmt(totalAmount)}
+            {state.paidAmount > 0
+              ? `已付 ${fmt(state.paidAmount)} / 总额 ${fmt(totalAmount)}`
+              : `RM ${fmt(totalAmount)}`}
           </span>
         </div>
       </div>
