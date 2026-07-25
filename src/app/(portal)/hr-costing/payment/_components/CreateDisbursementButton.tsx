@@ -13,6 +13,9 @@ interface Props {
   total: number
   count: number
   alreadyGenerated: boolean
+  /** Aggregate voucher status: pending → still with Principal; approval
+   *  executes payroll vouchers, so a fully-approved batch reads paid. */
+  batchState: 'pending' | 'approved' | 'paid' | null
   groupId: string | null
   defaultDate: string
 }
@@ -33,6 +36,7 @@ export default function CreateDisbursementButton({
   total,
   count,
   alreadyGenerated,
+  batchState,
   groupId,
   defaultDate,
 }: Props) {
@@ -56,14 +60,25 @@ export default function CreateDisbursementButton({
   }
 
   if (alreadyGenerated) {
+    const plural = count === 1 ? 'voucher' : 'vouchers'
     return (
       <div className="flex flex-wrap items-center gap-3">
-        <div className="bg-surface border border-ledger/40 rounded-md px-4 py-2">
-          <em className="font-serif italic text-ledger text-sm">
-            ✓ {label}: {count} voucher{count === 1 ? '' : 's'} generated
-          </em>
-          <span className="font-mono text-xs text-muted ml-2">RM {fmt(total)}</span>
-        </div>
+        {batchState === 'pending' ? (
+          <div className="bg-surface border border-accent-border rounded-md px-4 py-2">
+            <em className="font-serif italic text-accent text-sm">
+              {label}: {count} {plural} generated · awaiting Principal
+            </em>
+            <span className="font-mono text-xs text-muted ml-2">RM {fmt(total)}</span>
+          </div>
+        ) : (
+          <div className="bg-surface border border-ledger/40 rounded-md px-4 py-2">
+            <em className="font-serif italic text-ledger text-sm">
+              ✓ {label}: {count} {plural}{' '}
+              {batchState === 'paid' ? 'approved & paid' : 'approved'}
+            </em>
+            <span className="font-mono text-xs text-muted ml-2">RM {fmt(total)}</span>
+          </div>
+        )}
         {groupId && (
           <Link
             href={`/approvals?group_id=${groupId}`}

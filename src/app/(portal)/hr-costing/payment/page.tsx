@@ -174,6 +174,15 @@ export default async function HRPaymentPage({
   const directorGroupId = await groupIdFor(directorVouchers.map(v => v.id as string))
   const alreadyDisbursed = staffVouchers.length > 0 || directorVouchers.length > 0
 
+  // Batch display state: any voucher still with Principal → pending; approval
+  // executes payroll vouchers, so a fully-approved batch normally reads paid.
+  const batchState = (vs: { status: string }[]): 'pending' | 'approved' | 'paid' | null => {
+    if (vs.length === 0) return null
+    if (vs.some(v => v.status === 'pending_approval' || v.status === 'draft')) return 'pending'
+    if (vs.some(v => v.status === 'approved')) return 'approved'
+    return 'paid'
+  }
+
   // ── Statutory rows (mig 20260721000000): one row per institution, staff +
   // director amounts, matched to any existing non-voided voucher by payee.
   const { data: statutoryPvsRaw } = run
@@ -484,6 +493,7 @@ export default async function HRPaymentPage({
                   total={staffNet}
                   count={rows.filter(r => Number(r.net) > 0).length}
                   alreadyGenerated={staffVouchers.length > 0}
+                  batchState={batchState(staffVouchers)}
                   groupId={staffGroupId}
                   defaultDate={period.slice(0, 8) + '28'}
                 />
@@ -496,6 +506,7 @@ export default async function HRPaymentPage({
                   total={directorNet}
                   count={dRows.length}
                   alreadyGenerated={directorVouchers.length > 0}
+                  batchState={batchState(directorVouchers)}
                   groupId={directorGroupId}
                   defaultDate={period.slice(0, 8) + '28'}
                 />
