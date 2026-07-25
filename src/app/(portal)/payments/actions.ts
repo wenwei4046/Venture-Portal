@@ -12,7 +12,7 @@ import { segmentForBillingMode, lineAttributions, type SegmentAttribution } from
 
 // ─── Create payment voucher (Finance) ────────────────────────────────────────
 
-export async function createPaymentVoucher(formData: FormData) {
+async function createPaymentVoucherInner(formData: FormData) {
   const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
@@ -657,6 +657,27 @@ export async function createPaymentVoucher(formData: FormData) {
   revalidatePath('/payments')
   revalidatePath('/dashboard')
   redirect(`/payments/${data.id}`)
+}
+
+// Wrapper: every throw inside Inner (validation AND mid-flow fail-louds)
+// surfaces as a RETURNED message. In production Next.js strips thrown
+// server-action error text down to "An error occurred in the Server
+// Components render…", which left Finance staring at a useless red box
+// instead of e.g. "Description is required" (user hit this 2026-07-24 while
+// building the Alliance→HL payroll offset transfer). redirect() still works —
+// its NEXT_REDIRECT signal is rethrown untouched.
+export async function createPaymentVoucher(
+  formData: FormData
+): Promise<{ error: string } | undefined> {
+  try {
+    await createPaymentVoucherInner(formData)
+    return undefined
+  } catch (err) {
+    const digest = (err as { digest?: string })?.digest
+    if (typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT')) throw err
+    if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) throw err
+    return { error: err instanceof Error ? err.message : 'Unknown error' }
+  }
 }
 
 // ─── Submit for approval (Finance) ───────────────────────────────────────────

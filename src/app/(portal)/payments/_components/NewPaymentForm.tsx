@@ -289,7 +289,8 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
 
     startTransition(async () => {
       try {
-        await createPaymentVoucher(formData)
+        const result = await createPaymentVoucher(formData)
+        if (result?.error) setError(result.error)
       } catch (err) {
         if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) throw err
         setError(err instanceof Error ? err.message : 'Unknown error')
