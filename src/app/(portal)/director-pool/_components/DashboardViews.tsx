@@ -956,6 +956,24 @@ function FlowView(p: DashProps) {
             </button>
           ))}
         </div>
+        <div className="ml-auto flex gap-2">
+          <a
+            href={`/director-pool/print?month=${m.month}&director=${dir.code}`}
+            target="_blank"
+            rel="noreferrer"
+            className="px-3.5 py-1 rounded border border-hairline text-xs text-graphite hover:text-accent hover:border-accent transition-colors"
+          >
+            📄 PDF — {dir.code} ({m.name})
+          </a>
+          <a
+            href={`/director-pool/print?month=${m.month}`}
+            target="_blank"
+            rel="noreferrer"
+            className="px-3.5 py-1 rounded border border-hairline text-xs text-graphite hover:text-accent hover:border-accent transition-colors"
+          >
+            📄 PDF — All Directors
+          </a>
+        </div>
       </div>
 
       {/* Header */}

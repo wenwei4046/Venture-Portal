@@ -1,0 +1,339 @@
+// Director Pool — printable Flow report (browser Print → Save as PDF).
+// Port of the HTML tool's downloadPDF() individual-director report: one page
+// per director for the selected month — header, calculation-chain boxes,
+// accumulated ledger cards (with the same sub-notes) and the four streams.
+// ?month=YYYY-MM-DD picks the month (default latest); ?director=CODE prints
+// one director, omitted prints all four (page break between).
+
+import PrintButton from './PrintButton'
+import { requireRole } from '@/lib/auth'
+import { loadDirectorPoolData } from '@/lib/director-pool-data'
+import {
+  calcAll,
+  r2,
+  showAllowStat,
+  billingAccum,
+  savingAccum,
+  billingDeductAdjustment,
+  contraOffset,
+  type MonthResult,
+  type DirectorMonthResult,
+} from '@/lib/director-pool-engine'
+
+interface Props {
+  searchParams: Promise<{ month?: string; director?: string }>
+}
+
+const fmt = (v: number) =>
+  (Math.abs(v) < 0.005 ? 0 : v).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+
+export default async function DirectorPoolPrintPage({ searchParams }: Props) {
+  await requireRole(['principal', 'hr'])
+  const { month: rawMonth, director: rawDirector } = await searchParams
+
+  const data = await loadDirectorPoolData()
+  const results = calcAll(data.settings, data.directors, data.months, data.dirInputs, data.fixedOverrides)
+  if (!results.length) {
+    return <div style={{ padding: 40, fontFamily: 'serif' }}>No data entered yet.</div>
+  }
+
+  const m: MonthResult =
+    results.find((x) => x.month === rawMonth || x.month.slice(0, 7) === rawMonth) ??
+    results[results.length - 1]
+  const dirs = rawDirector
+    ? data.directors.filter((d) => d.code === rawDirector)
+    : data.directors
+  if (!dirs.length) {
+    return <div style={{ padding: 40, fontFamily: 'serif' }}>Director not found.</div>
+  }
+
+  const sas = showAllowStat(m.month, data.settings)
+  const uptoIdx = results.findIndex((x) => x.id === m.id)
+  const upto = results.slice(0, uptoIdx + 1)
+  const gb = data.settings.gbPct
+  const bi = r2(100 - gb)
+  const sv = data.settings.savingPct
+  const generated = new Date().toLocaleString('en-MY', { dateStyle: 'long', timeStyle: 'short' })
+
+  return (
+    <html lang="en-MY">
+      <head>
+        <title>Director Pool — Flow Report — {m.name}</title>
+        <style>{`
+          @media print {
+            body { margin: 0; padding: 10mm 12mm; }
+            .no-print { display: none; }
+            .dir-page { page-break-after: always; }
+            .dir-page:last-of-type { page-break-after: auto; }
+          }
+          * { box-sizing: border-box; }
+          body { font-family: 'Georgia', 'Times New Roman', serif; color: #1C160F; max-width: 860px; margin: 0 auto; padding: 24px; font-size: 12px; line-height: 1.5; }
+          .rpt-head { text-align: center; border-bottom: 1px solid #C6B99E; padding-bottom: 10px; margin-bottom: 14px; }
+          .rpt-head .co { font-size: 15px; font-weight: bold; letter-spacing: 2px; }
+          .rpt-head .sub { font-size: 11px; color: #5A4E40; margin-top: 2px; }
+          .dir-page { margin-bottom: 22px; }
+          .dhead { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid #C6B99E; border-radius: 6px; margin-bottom: 10px; background: #F4EEE2; }
+          .dhead .avatar { width: 32px; height: 32px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 15px; }
+          .dhead .nm { font-size: 14px; font-weight: bold; }
+          .dhead .meta { font-size: 10px; color: #5A4E40; }
+          .chain { display: flex; align-items: stretch; gap: 0; margin-bottom: 12px; }
+          .box { flex: 1; border: 1px solid #A79878; border-radius: 6px; padding: 7px 8px; text-align: center; min-width: 80px; }
+          .box.hl { border-width: 2px; border-color: #1C160F; }
+          .box .l { font-size: 8px; text-transform: uppercase; letter-spacing: .4px; color: #5A4E40; margin-bottom: 3px; font-weight: bold; }
+          .box .v { font-size: 12px; font-weight: bold; font-family: 'Courier New', monospace; }
+          .op { display: flex; align-items: center; padding: 0 4px; font-weight: bold; font-size: 14px; }
+          .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+          .cards.four { grid-template-columns: repeat(4, 1fr); }
+          .card { border: 1px solid #C6B99E; border-radius: 6px; padding: 8px 10px; }
+          .card .l { font-size: 9px; font-weight: bold; margin-bottom: 4px; }
+          .card .v { font-size: 14px; font-weight: bold; font-family: 'Courier New', monospace; }
+          .card .s { font-size: 8.5px; color: #5A4E40; margin-top: 3px; }
+          .streams { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+          .stream { border: 1px solid #C6B99E; border-radius: 6px; overflow: hidden; }
+          .stream .hd { padding: 5px 10px; font-size: 10.5px; font-weight: bold; background: #EAE1CE; border-bottom: 1px solid #C6B99E; }
+          .row { display: flex; justify-content: space-between; padding: 4px 10px; border-bottom: 1px solid #EAE1CE; font-size: 10.5px; }
+          .row:last-child { border-bottom: none; }
+          .row.b { font-weight: bold; background: #F4EEE2; }
+          .row .amt { font-family: 'Courier New', monospace; white-space: nowrap; padding-left: 8px; }
+          .row.sec { color: #85775F; font-size: 8.5px; padding: 2px 10px; }
+          .neg { color: #A3371A; }
+          .pos { color: #3D6B45; }
+          .warn { color: #9A6A00; }
+          .footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #C6B99E; font-size: 9px; color: #85775F; }
+          .print-btn { position: fixed; top: 16px; right: 16px; padding: 8px 16px; background: #1C160F; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+        `}</style>
+      </head>
+      <body>
+        <PrintButton />
+        <div className="rpt-head">
+          <div className="co">HOUZS VENTURE SDN BHD</div>
+          <div className="sub">
+            Director Pool — Flow Report · {m.name} {m.month.slice(0, 4)}
+            {m.fullPayout && ' · 💯 Full Payout'}
+            {m.includeBilling && ' · 📥 Incl. Billing'}
+          </div>
+        </div>
+
+        {dirs.map((dir) => {
+          const d = m.dirRes.find((x) => x.id === dir.id) as DirectorMonthResult | undefined
+          if (!d) return null
+          const inp = data.dirInputs[d.statKey] ?? {}
+          const statSalVal = m.fullPayout ? 0 : (inp.billingStat ?? 0)
+          const statAlVal = m.fullPayout || !sas ? 0 : (inp.allowBillingStat ?? 0)
+          const billingVal = r2(statSalVal + statAlVal)
+          const total25 = m.fullPayout ? 0 : r2(d.salKpiBillInv + statSalVal + d.allowBillInv + statAlVal)
+          const totalHRPayout = r2(d.totalPay + Math.abs(d.advThisMonth) - d.advanceOffset)
+          const totalAdvBox = r2(Math.abs(d.advThisMonth) + d.advStatAmount + d.allowStatAmount)
+
+          const advAdj = billingDeductAdjustment(d.id, m.id, results, data.dirInputs, data.settings)
+          const adjAccum = r2(d.accumulated + advAdj)
+          const accumBill = r2(
+            Math.max(0, billingAccum(d.id, m.id, results, data.dirInputs, data.settings) - contraOffset(d.id, m.id, results, data.contra)),
+          )
+          const accumSave = savingAccum(d.id, m.id, results, data.dirInputs)
+          const totalWd = r2(upto.reduce((s, rm) => s + (data.dirInputs[`${rm.id}_${d.id}`]?.savingWithdrawal ?? 0), 0))
+          const totAdvStat = r2(upto.reduce((s, rm) => s + (rm.dirRes.find((x) => x.id === d.id)?.advStatAmount ?? 0), 0))
+          const totAllowStat = r2(upto.reduce((s, rm) => s + (rm.dirRes.find((x) => x.id === d.id)?.allowStatAmount ?? 0), 0))
+          const totStatAll = r2(totAdvStat + totAllowStat)
+          const contraOff = contraOffset(d.id, m.id, results, data.contra)
+
+          return (
+            <div key={dir.id} className="dir-page">
+              {/* Director header */}
+              <div className="dhead">
+                <div className="avatar" style={{ backgroundColor: dir.color }}>{dir.code.charAt(0)}</div>
+                <div>
+                  <div className="nm">{dir.code}</div>
+                  <div className="meta">
+                    Weight: {d.weight}% · Fixed Salary: RM {fmt(d.dirFixed)}/month · {m.name}
+                    {m.fullPayout && ' (Full Payout)'}
+                    {m.includeBilling && ' (Incl. Billing)'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Calculation chain */}
+              <div className="chain">
+                <div className="box hl"><div className="l">Total Gross</div><div className="v">RM {fmt(r2(d.salKpiGross + d.allowGross))}</div></div>
+                <div className="op">−</div>
+                <div className="box"><div className="l">Total Saving ({sv}%)</div><div className="v">RM {fmt(d.totalSaving)}</div></div>
+                {m.fullPayout ? (
+                  <>
+                    {d.advThisMonth < 0 && (
+                      <>
+                        <div className="op">−</div>
+                        <div className="box"><div className="l">Advance This Month</div><div className="v neg">RM {fmt(Math.abs(d.advThisMonth))}</div></div>
+                      </>
+                    )}
+                    <div className="op">=</div>
+                    <div className="box hl"><div className="l">HR Payout Before Deduct Statutory</div><div className="v">RM {fmt(totalHRPayout)}</div></div>
+                  </>
+                ) : (
+                  <>
+                    <div className="op">−</div>
+                    <div className="box"><div className="l">{bi}% Billing Invoice</div><div className="v warn">RM {fmt(total25)}</div></div>
+                    <div className="op">=</div>
+                    <div className="box"><div className="l">{gb}% Gross Balance</div><div className="v">RM {fmt(r2(d.salKpiGB + d.allowGB))}</div></div>
+                    {m.includeBilling && billingVal > 0 && (
+                      <>
+                        <div className="op">+</div>
+                        <div className="box"><div className="l">{bi}% Billing + Statutory</div><div className="v">RM {fmt(billingVal)}</div></div>
+                      </>
+                    )}
+                    {d.advanceOffset > 0 ? (
+                      <>
+                        <div className="op">−</div>
+                        <div className="box"><div className="l">Vr KPI Offset Advance</div><div className="v neg">RM {fmt(d.advanceOffset)}</div></div>
+                      </>
+                    ) : d.advThisMonth < 0 ? (
+                      <>
+                        <div className="op">+</div>
+                        <div className="box"><div className="l">Advance This Month</div><div className="v neg">RM {fmt(Math.abs(d.advThisMonth))}</div></div>
+                      </>
+                    ) : null}
+                    <div className="op">=</div>
+                    <div className="box hl">
+                      <div className="l">HR Payout Before Deduct Statutory</div>
+                      <div className="v">RM {fmt(m.includeBilling && billingVal > 0 ? r2(d.salKpiGB + d.allowGB + billingVal) : totalHRPayout)}</div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Accumulated ledger cards */}
+              <div className={`cards${d.advanceSurplus > 0 ? ' four' : ''}`}>
+                <div className="card">
+                  <div className="l">⚠️ {dir.code} Accumulated Advance</div>
+                  <div className={`v${adjAccum < 0 ? ' neg' : ''}`}>{adjAccum < 0 ? '-' : ''}RM {fmt(Math.abs(adjAccum))}</div>
+                  <div className="s">
+                    As of {m.name}
+                    {advAdj > 0 && <> (billing deduct: +RM {fmt(advAdj)})</>}
+                    {totStatAll > 0 && (
+                      <> (incl. statutory RM {fmt(totStatAll)}{totAdvStat > 0 && totAllowStat > 0 ? ` : Adv RM ${fmt(totAdvStat)} + Allow RM ${fmt(totAllowStat)}` : ''})</>
+                    )}
+                    {d.prevAccum < 0 && adjAccum === 0 && <span className="pos"> · ✅ Advance cleared</span>}
+                  </div>
+                </div>
+                {d.advanceSurplus > 0 && (
+                  <div className="card">
+                    <div className="l pos">🎁 Vr KPI Surplus → Allowance</div>
+                    <div className="v pos">RM {fmt(d.advanceSurplus)}</div>
+                    <div className="s">Prev: -RM {fmt(Math.abs(d.prevAccum))} | Vr KPI: +RM {fmt(d.vrKpi)}</div>
+                  </div>
+                )}
+                <div className="card">
+                  <div className="l">📄 {dir.code} Accumulated 25% Billing + Statutory</div>
+                  <div className="v">RM {fmt(accumBill)}</div>
+                  <div className="s">
+                    As of {m.name}
+                    {contraOff > 0 && <span className="neg"> (after contra -RM {fmt(contraOff)})</span>}
+                  </div>
+                </div>
+                <div className="card">
+                  <div className="l">💰 {dir.code} Accumulated Saving</div>
+                  <div className="v">RM {fmt(accumSave)}</div>
+                  <div className="s">
+                    As of {m.name}
+                    {totalWd > 0 && <span className="neg"> (withdraw: -RM {fmt(totalWd)})</span>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Streams — 2×2 grid */}
+              <div className="streams">
+                <div className="stream">
+                  <div className="hd">💼 Salary + KPI Stream</div>
+                  <div className="row"><span>Gross (Sal+KPI Pool × Weight)</span><span className="amt">RM {fmt(d.salKpiGross)}</span></div>
+                  <div className="row"><span>Less: Saving ({sv}%)</span><span className="amt">- RM {fmt(d.salKpiSaving)}</span></div>
+                  <div className="row b"><span>= Balance ({r2(100 - sv)}%)</span><span className="amt">RM {fmt(d.salKpiBalance)}</span></div>
+                  {m.fullPayout ? (
+                    <div className="row"><span>💯 Full Payout (100%)</span><span className="amt">RM {fmt(d.salKpiGB)}</span></div>
+                  ) : (
+                    <>
+                      <div className="row"><span>{gb}% → Gross Balance</span><span className="amt">RM {fmt(d.salKpiGB)}</span></div>
+                      <div className="row"><span>{bi}% → Billing Invoice</span><span className="amt">RM {fmt(d.salKpiBillInv)}</span></div>
+                    </>
+                  )}
+                </div>
+                <div className="stream">
+                  <div className="hd">🎁 Allowance Stream</div>
+                  {d.allowGross > 0 ? (
+                    <>
+                      <div className="row"><span>Allowance Gross (Pool × Weight)</span><span className="amt">RM {fmt(d.allowGross)}</span></div>
+                      <div className="row"><span>Less: Saving ({sv}%)</span><span className="amt">- RM {fmt(d.allowSaving)}</span></div>
+                      <div className="row b"><span>= Allowance Balance ({r2(100 - sv)}%)</span><span className="amt">RM {fmt(d.allowBalance)}</span></div>
+                      {m.fullPayout ? (
+                        <div className="row"><span>💯 Full Payout (100%)</span><span className="amt">RM {fmt(d.allowGB)}</span></div>
+                      ) : (
+                        <>
+                          <div className="row"><span>{gb}% → Gross Balance</span><span className="amt">RM {fmt(d.allowGB)}</span></div>
+                          <div className="row"><span>{bi}% → Billing Invoice</span><span className="amt">RM {fmt(d.allowBillInv)}</span></div>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <div className="row"><span>No allowance data this month</span><span className="amt">-</span></div>
+                  )}
+                </div>
+                <div className="stream">
+                  <div className="hd">⚠️ Advance Tracking 预支追踪</div>
+                  <div className="row"><span>Total Pay</span><span className="amt">RM {fmt(d.totalPay)}</span></div>
+                  <div className="row"><span>Fixed Salary</span><span className="amt">RM {fmt(d.dirFixed)}</span></div>
+                  <div className="row b"><span>Vr KPI (Total Pay − Fixed)</span><span className={`amt${d.vrKpi < 0 ? ' neg' : d.vrKpi > 0 ? ' pos' : ''}`}>{d.vrKpi < 0 ? '-' : d.vrKpi > 0 ? '+' : ''}RM {fmt(Math.abs(d.vrKpi))}</span></div>
+                  {d.advanceOffset > 0 && (
+                    <div className="row pos"><span>Less: Vr KPI Offset Advance (抵消预支)</span><span className="amt">- RM {fmt(d.advanceOffset)}</span></div>
+                  )}
+                  {d.advStatAmount > 0 && (
+                    <div className="row neg"><span>+ Advance Statutory (自己填)</span><span className="amt">+ RM {fmt(d.advStatAmount)}</span></div>
+                  )}
+                  {d.allowStatAmount > 0 && (
+                    <div className="row warn"><span>+ 75% Allow Statutory (自己填)</span><span className="amt">+ RM {fmt(d.allowStatAmount)}</span></div>
+                  )}
+                  {totalAdvBox > 0 && (
+                    <div className="row b neg"><span>Total Advance</span><span className="amt">RM {fmt(totalAdvBox)}</span></div>
+                  )}
+                </div>
+                {!m.fullPayout ? (
+                  <div className="stream">
+                    <div className="hd">📄 25% Billing Invoice + Statutory</div>
+                    <div className="row sec"><span>── Salary + KPI ──</span></div>
+                    <div className="row"><span>{bi}% Invoice (Salary Pay)</span><span className="amt">RM {fmt(d.salKpiBillInv)}</span></div>
+                    <div className="row"><span>{bi}% Statutory (Sal+KPI 自己填)</span><span className="amt">RM {fmt(statSalVal)}</span></div>
+                    <div className="row sec"><span>── Allowance ──</span></div>
+                    <div className="row"><span>{bi}% Invoice (Allowance)</span><span className="amt">{d.allowGross > 0 ? `RM ${fmt(d.allowBillInv)}` : '-'}</span></div>
+                    {sas && (
+                      <div className="row"><span>{bi}% Statutory (Allow 自己填)</span><span className="amt">RM {fmt(statAlVal)}</span></div>
+                    )}
+                    <div className="row b pos"><span>Total {bi}% Billing Invoice</span><span className="amt">RM {fmt(total25)}</span></div>
+                    {m.billingDeductAdv && totalAdvBox > 0 && (
+                      <>
+                        <div className="row neg"><span>(-) Total Advance Deduct{totalAdvBox > total25 ? ' (capped at billing)' : ''}</span><span className="amt">- RM {fmt(Math.min(totalAdvBox, total25))}</span></div>
+                        {totalAdvBox > total25 && (
+                          <div className="row neg"><span>⚠️ Remaining → Accum. Advance</span><span className="amt">RM {fmt(r2(totalAdvBox - total25))}</span></div>
+                        )}
+                        <div className="row b warn"><span>Net {bi}% Billing</span><span className="amt">RM {fmt(r2(Math.max(0, total25 - totalAdvBox)))}</span></div>
+                      </>
+                    )}
+                    <div className="row b"><span>→ Payout as Allowance</span><span className="amt">{m.includeBilling ? `RM ${fmt(billingVal)}` : '不算进'}</span></div>
+                  </div>
+                ) : (
+                  <div className="stream">
+                    <div className="hd">📌 Notes</div>
+                    <div className="row"><span>💯 Full Payout month — 100% Balance paid out, no {gb}/{bi} split, no Billing Invoice.</span></div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+
+        <div className="footer">
+          Generated {generated} · HOUZS Venture Portal — Director Pool Calculator · Settings: Fixed RM {fmt(data.settings.fixedSalary)} / Saving {sv}% / Split {gb}/{bi}
+        </div>
+      </body>
+    </html>
+  )
+}
