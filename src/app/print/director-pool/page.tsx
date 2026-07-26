@@ -83,7 +83,7 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
         .dp-print .dhead .avatar { width: 32px; height: 32px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 15px; }
         .dp-print .dhead .nm { font-size: 14px; font-weight: bold; }
         .dp-print .dhead .meta { font-size: 10px; color: #5A4E40; }
-        .dp-print .chain { display: flex; align-items: stretch; gap: 0; margin-bottom: 12px; }
+        .dp-print .chain { display: flex; align-items: stretch; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
         .dp-print .box { flex: 1; border: 1px solid #A79878; border-radius: 6px; padding: 7px 8px; text-align: center; min-width: 80px; }
         .dp-print .box.hl { border-width: 2px; border-color: #1C160F; }
         .dp-print .box .l { font-size: 8px; text-transform: uppercase; letter-spacing: .4px; color: #5A4E40; margin-bottom: 3px; font-weight: bold; }
@@ -157,54 +157,27 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
                 </div>
               </div>
 
-              {/* Calculation chain */}
+              {/* Summary boxes — same set and values as the Flow view (user
+                  request 2026-07-26: no operators, mirror the screen exactly) */}
               <div className="chain">
                 <div className="box hl"><div className="l">Total Gross</div><div className="v">RM {fmt(r2(d.salKpiGross + d.allowGross))}</div></div>
-                <div className="op">−</div>
                 <div className="box"><div className="l">Total Saving ({sv}%)</div><div className="v">RM {fmt(d.totalSaving)}</div></div>
                 {m.fullPayout ? (
-                  <>
-                    {d.advThisMonth < 0 && (
-                      <>
-                        <div className="op">−</div>
-                        <div className="box"><div className="l">Advance This Month</div><div className="v neg">RM {fmt(Math.abs(d.advThisMonth))}</div></div>
-                      </>
-                    )}
-                    <div className="op">=</div>
-                    <div className="box hl"><div className="l">HR Payout Before Deduct Statutory</div><div className="v">RM {fmt(totalHRPayout)}</div></div>
-                  </>
+                  <div className="box"><div className="l">Balance (100%)</div><div className="v">RM {fmt(d.totalPay)}</div></div>
                 ) : (
                   <>
-                    <div className="op">−</div>
-                    {/* System-calculated 25% only (matches the HTML tool's PDF) — the
-                        chain must sum: Gross − Saving − billInv = GB */}
-                    <div className="box"><div className="l">{bi}% Billing Invoice</div><div className="v warn">RM {fmt(d.billInv)}</div></div>
-                    <div className="op">=</div>
+                    <div className="box"><div className="l">{bi}% Billing Invoice</div><div className="v warn">RM {fmt(total25)}</div></div>
                     <div className="box"><div className="l">{gb}% Gross Balance</div><div className="v">RM {fmt(r2(d.salKpiGB + d.allowGB))}</div></div>
-                    {m.includeBilling && billingVal > 0 && (
-                      <>
-                        <div className="op">+</div>
-                        <div className="box"><div className="l">{bi}% Billing + Statutory</div><div className="v">RM {fmt(billingVal)}</div></div>
-                      </>
-                    )}
-                    {d.advanceOffset > 0 ? (
-                      <>
-                        <div className="op">−</div>
-                        <div className="box"><div className="l">Vr KPI Offset Advance</div><div className="v neg">RM {fmt(d.advanceOffset)}</div></div>
-                      </>
-                    ) : d.advThisMonth < 0 ? (
-                      <>
-                        <div className="op">+</div>
-                        <div className="box"><div className="l">Advance This Month</div><div className="v neg">RM {fmt(Math.abs(d.advThisMonth))}</div></div>
-                      </>
-                    ) : null}
-                    <div className="op">=</div>
-                    <div className="box hl">
-                      <div className="l">HR Payout Before Deduct Statutory</div>
-                      <div className="v">RM {fmt(m.includeBilling && billingVal > 0 ? r2(d.salKpiGB + d.allowGB + billingVal) : totalHRPayout)}</div>
-                    </div>
                   </>
                 )}
+                {d.advanceOffset > 0 ? (
+                  <div className="box"><div className="l">Vr KPI Offset Advance</div><div className="v neg">RM {fmt(d.advanceOffset)}</div></div>
+                ) : totalAdvBox > 0 ? (
+                  <div className="box"><div className="l">Total Advance</div><div className="v neg">RM {fmt(totalAdvBox)}</div></div>
+                ) : d.vrKpi > 0 ? (
+                  <div className="box"><div className="l">Exceed (KPI)</div><div className="v pos">+ RM {fmt(d.vrKpi)}</div></div>
+                ) : null}
+                <div className="box hl"><div className="l">HR Payout Before Deduct Statutory</div><div className="v">RM {fmt(totalHRPayout)}</div></div>
               </div>
 
               {/* Accumulated ledger cards */}
