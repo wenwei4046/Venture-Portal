@@ -176,7 +176,9 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
                 ) : (
                   <>
                     <div className="op">−</div>
-                    <div className="box"><div className="l">{bi}% Billing Invoice</div><div className="v warn">RM {fmt(total25)}</div></div>
+                    {/* System-calculated 25% only (matches the HTML tool's PDF) — the
+                        chain must sum: Gross − Saving − billInv = GB */}
+                    <div className="box"><div className="l">{bi}% Billing Invoice</div><div className="v warn">RM {fmt(d.billInv)}</div></div>
                     <div className="op">=</div>
                     <div className="box"><div className="l">{gb}% Gross Balance</div><div className="v">RM {fmt(r2(d.salKpiGB + d.allowGB))}</div></div>
                     {m.includeBilling && billingVal > 0 && (
