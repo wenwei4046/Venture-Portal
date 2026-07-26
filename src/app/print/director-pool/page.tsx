@@ -177,7 +177,7 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
                 {d.advanceOffset > 0 ? (
                   <div className="box"><div className="l">Vr KPI Offset Advance</div><div className="v neg">RM {fmt(d.advanceOffset)}</div></div>
                 ) : d.advThisMonth < 0 ? (
-                  <div className="box"><div className="l">Advance This Month</div><div className="v neg">RM {fmt(Math.abs(d.advThisMonth))}</div></div>
+                  <div className="box"><div className="l">Advance</div><div className="v neg">RM {fmt(Math.abs(d.advThisMonth))}</div></div>
                 ) : d.vrKpi > 0 ? (
                   <div className="box"><div className="l">Exceed (KPI)</div><div className="v pos">+ RM {fmt(d.vrKpi)}</div></div>
                 ) : null}

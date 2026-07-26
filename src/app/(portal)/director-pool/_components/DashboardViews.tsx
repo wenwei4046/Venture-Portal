@@ -1013,7 +1013,7 @@ function FlowView(p: DashProps) {
         {d.advanceOffset > 0 ? (
           <FlowBox label="Vr KPI Offset Advance" value={fmtRM(d.advanceOffset)} tone="danger" />
         ) : d.advThisMonth < 0 ? (
-          <FlowBox label="Advance This Month" value={fmtRM(Math.abs(d.advThisMonth))} tone="danger" />
+          <FlowBox label="Advance" value={fmtRM(Math.abs(d.advThisMonth))} tone="danger" />
         ) : d.vrKpi > 0 ? (
           <FlowBox label="Exceed (KPI)" value={`+ ${fmtRM(d.vrKpi)}`} tone="ledger" />
         ) : null}
