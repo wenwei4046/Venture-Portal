@@ -863,12 +863,13 @@ function AllowStatView(p: DashProps) {
 
 // ── Flow ────────────────────────────────────────────────────────────────────
 
-function FlowBox({ label, value, tone = 'ink' }: { label: string; value: string; tone?: 'ink' | 'accent' | 'danger' | 'ledger' | 'alert' | 'info' }) {
-  const toneCls = { ink: 'text-ink', accent: 'text-accent', danger: 'text-danger', ledger: 'text-ledger', alert: 'text-alert', info: 'text-info' }[tone]
+function FlowBox({ label, value }: { label: string; value: string; tone?: 'ink' | 'accent' | 'danger' | 'ledger' | 'alert' | 'info' }) {
+  // User ruling 2026-07-26: the Flow view renders plain ink like the PDF —
+  // the tone prop is kept for call-site compatibility but no longer colours.
   return (
     <div className="border border-hairline rounded-md bg-surface px-4 py-3 text-center min-w-[130px] flex-1">
       <div className="font-mono text-[9px] uppercase tracking-[0.1em] text-graphite mb-1.5">{label}</div>
-      <div className={`font-serif text-base tabular ${toneCls}`}>{value}</div>
+      <div className="font-serif text-base tabular text-ink">{value}</div>
     </div>
   )
 }
@@ -876,7 +877,8 @@ function FlowBox({ label, value, tone = 'ink' }: { label: string; value: string;
 type FlowRow = [string, string, boolean?, ('danger' | 'ledger' | 'alert' | 'muted')?]
 
 function FlowStream({ title, rows }: { title: string; rows: FlowRow[] }) {
-  const toneCls = { danger: 'text-danger', ledger: 'text-ledger', alert: 'text-alert', muted: 'text-graphite' }
+  // Plain ink except the muted section separators — synced with the PDF
+  const toneCls = { danger: 'text-ink', ledger: 'text-ink', alert: 'text-ink', muted: 'text-graphite' }
   return (
     <div className="border border-hairline rounded-md overflow-hidden mb-4">
       <div className="px-4 py-2 bg-surface border-b border-hairline font-serif italic text-sm text-accent">{title}</div>
@@ -1020,10 +1022,10 @@ function FlowView(p: DashProps) {
 
       {/* Accumulated ledgers */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+        {/* Plain ink like the PDF (user ruling 2026-07-26) */}
         <Card
           label={`⚠️ ${dir.code} Accumulated Advance`}
-          value={<Money v={accumAdvAdj} dash="RM 0.00" />}
-          danger={accumAdvAdj < 0}
+          value={`${accumAdvAdj < 0 ? '-' : ''}RM ${fmt(Math.abs(accumAdvAdj))}`}
           sub={
             <>
               As of {m.name}
@@ -1037,7 +1039,7 @@ function FlowView(p: DashProps) {
                   )
                 </>
               )}
-              {d.prevAccum < 0 && accumAdvAdj === 0 && <span className="text-ledger"> · ✅ Advance cleared</span>}
+              {d.prevAccum < 0 && accumAdvAdj === 0 && <span> · ✅ Advance cleared</span>}
             </>
           }
         />
@@ -1055,7 +1057,7 @@ function FlowView(p: DashProps) {
             <>
               As of {m.name}
               {contraFromThisMonth && contraOffHere > 0 && (
-                <span className="text-danger"> (after contra -RM {fmt(contraOffHere)})</span>
+                <span> (after contra -RM {fmt(contraOffHere)})</span>
               )}
             </>
           }
@@ -1066,7 +1068,7 @@ function FlowView(p: DashProps) {
           sub={
             <>
               As of {m.name}
-              {monthWithdraw > 0 && <span className="text-danger"> (withdraw: -RM {fmt(monthWithdraw)})</span>}
+              {monthWithdraw > 0 && <span> (withdraw: -RM {fmt(monthWithdraw)})</span>}
             </>
           }
         />
