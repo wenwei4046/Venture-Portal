@@ -918,9 +918,20 @@ function FlowView(p: DashProps) {
   const totalHRPayout = r2(d.totalPay + Math.abs(d.advThisMonth) - d.advanceOffset)
   const totalAdvBox = r2(Math.abs(d.advThisMonth) + d.advStatAmount + d.allowStatAmount)
 
-  const accumAdvAdj = r2(d.accumulated + billingDeductAdjustment(d.id, m.id, results, dirInputs, settings))
+  const advAdj = billingDeductAdjustment(d.id, m.id, results, dirInputs, settings)
+  const accumAdvAdj = r2(d.accumulated + advAdj)
   const accumBill = r2(Math.max(0, billingAccum(d.id, m.id, results, dirInputs, settings) - contraOffset(d.id, m.id, results, contra)))
   const accumSave = savingAccum(d.id, m.id, results, dirInputs)
+
+  // Card sub-notes — same breakdowns as the HTML tool's flow cards
+  const uptoIdx = results.findIndex((x) => x.id === m.id)
+  const upto = results.slice(0, uptoIdx + 1)
+  const totalAdvStat = r2(upto.reduce((s, rm) => s + (rm.dirRes.find((x) => x.id === d.id)?.advStatAmount ?? 0), 0))
+  const totalAllowStat = r2(upto.reduce((s, rm) => s + (rm.dirRes.find((x) => x.id === d.id)?.allowStatAmount ?? 0), 0))
+  const totalStatAll = r2(totalAdvStat + totalAllowStat)
+  const contraFromThisMonth = contra.some((ev) => ev.directorId === d.id && ev.fromMonthId === m.id)
+  const contraOffHere = contraOffset(d.id, m.id, results, contra)
+  const monthWithdraw = inp.savingWithdrawal ?? 0
 
   return (
     <div>
@@ -996,6 +1007,16 @@ function FlowView(p: DashProps) {
           sub={
             <>
               As of {m.name}
+              {advAdj > 0 && <> (billing deduct: +RM {fmt(advAdj)})</>}
+              {totalStatAll > 0 && (
+                <>
+                  {' '}(incl. statutory RM {fmt(totalStatAll)}
+                  {totalAdvStat > 0 && totalAllowStat > 0
+                    ? ` : Adv RM ${fmt(totalAdvStat)} + Allow RM ${fmt(totalAllowStat)}`
+                    : ''}
+                  )
+                </>
+              )}
               {d.prevAccum < 0 && accumAdvAdj === 0 && <span className="text-ledger"> · ✅ Advance cleared</span>}
             </>
           }
@@ -1007,8 +1028,28 @@ function FlowView(p: DashProps) {
             sub={`Prev Accum: -RM ${fmt(Math.abs(d.prevAccum))} · Vr KPI: +RM ${fmt(d.vrKpi)} · Offset: RM ${fmt(Math.abs(d.prevAccum))}`}
           />
         )}
-        <Card label={`📄 ${dir.code} Accumulated 25% Billing + Statutory`} value={fmtRM(accumBill)} sub={`As of ${m.name}`} />
-        <Card label={`💰 ${dir.code} Accumulated Saving`} value={fmtRM(accumSave)} sub={`As of ${m.name}`} />
+        <Card
+          label={`📄 ${dir.code} Accumulated 25% Billing + Statutory`}
+          value={fmtRM(accumBill)}
+          sub={
+            <>
+              As of {m.name}
+              {contraFromThisMonth && contraOffHere > 0 && (
+                <span className="text-danger"> (after contra -RM {fmt(contraOffHere)})</span>
+              )}
+            </>
+          }
+        />
+        <Card
+          label={`💰 ${dir.code} Accumulated Saving`}
+          value={fmtRM(accumSave)}
+          sub={
+            <>
+              As of {m.name}
+              {monthWithdraw > 0 && <span className="text-danger"> (withdraw: -RM {fmt(monthWithdraw)})</span>}
+            </>
+          }
+        />
       </div>
 
       {/* Streams */}
