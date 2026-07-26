@@ -958,7 +958,7 @@ function FlowView(p: DashProps) {
         </div>
         <div className="ml-auto flex gap-2">
           <a
-            href={`/director-pool/print?month=${m.month}&director=${dir.code}`}
+            href={`/print/director-pool?month=${m.month}&director=${dir.code}`}
             target="_blank"
             rel="noreferrer"
             className="px-3.5 py-1 rounded border border-hairline text-xs text-graphite hover:text-accent hover:border-accent transition-colors"
@@ -966,7 +966,7 @@ function FlowView(p: DashProps) {
             📄 PDF — {dir.code} ({m.name})
           </a>
           <a
-            href={`/director-pool/print?month=${m.month}`}
+            href={`/print/director-pool?month=${m.month}`}
             target="_blank"
             rel="noreferrer"
             className="px-3.5 py-1 rounded border border-hairline text-xs text-graphite hover:text-accent hover:border-accent transition-colors"

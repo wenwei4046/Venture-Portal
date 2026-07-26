@@ -4,7 +4,11 @@
 // accumulated ledger cards (with the same sub-notes) and the four streams.
 // ?month=YYYY-MM-DD picks the month (default latest); ?director=CODE prints
 // one director, omitted prints all four (page break between).
+//
+// Lives OUTSIDE the (portal) route group on purpose: the portal frame
+// (sidebar + topbar) must not wrap a print view on screen.
 
+import type { Metadata } from 'next'
 import PrintButton from './PrintButton'
 import { requireRole } from '@/lib/auth'
 import { loadDirectorPoolData } from '@/lib/director-pool-data'
@@ -23,6 +27,8 @@ import {
 interface Props {
   searchParams: Promise<{ month?: string; director?: string }>
 }
+
+export const metadata: Metadata = { title: 'Director Pool — Flow Report' }
 
 const fmt = (v: number) =>
   (Math.abs(v) < 0.005 ? 0 : v).toLocaleString('en-US', {
@@ -59,55 +65,51 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
   const generated = new Date().toLocaleString('en-MY', { dateStyle: 'long', timeStyle: 'short' })
 
   return (
-    <html lang="en-MY">
-      <head>
-        <title>Director Pool — Flow Report — {m.name}</title>
-        <style>{`
-          @media print {
-            body { margin: 0; padding: 10mm 12mm; }
-            .no-print { display: none; }
-            .dir-page { page-break-after: always; }
-            .dir-page:last-of-type { page-break-after: auto; }
-          }
-          * { box-sizing: border-box; }
-          body { font-family: 'Georgia', 'Times New Roman', serif; color: #1C160F; max-width: 860px; margin: 0 auto; padding: 24px; font-size: 12px; line-height: 1.5; }
-          .rpt-head { text-align: center; border-bottom: 1px solid #C6B99E; padding-bottom: 10px; margin-bottom: 14px; }
-          .rpt-head .co { font-size: 15px; font-weight: bold; letter-spacing: 2px; }
-          .rpt-head .sub { font-size: 11px; color: #5A4E40; margin-top: 2px; }
-          .dir-page { margin-bottom: 22px; }
-          .dhead { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid #C6B99E; border-radius: 6px; margin-bottom: 10px; background: #F4EEE2; }
-          .dhead .avatar { width: 32px; height: 32px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 15px; }
-          .dhead .nm { font-size: 14px; font-weight: bold; }
-          .dhead .meta { font-size: 10px; color: #5A4E40; }
-          .chain { display: flex; align-items: stretch; gap: 0; margin-bottom: 12px; }
-          .box { flex: 1; border: 1px solid #A79878; border-radius: 6px; padding: 7px 8px; text-align: center; min-width: 80px; }
-          .box.hl { border-width: 2px; border-color: #1C160F; }
-          .box .l { font-size: 8px; text-transform: uppercase; letter-spacing: .4px; color: #5A4E40; margin-bottom: 3px; font-weight: bold; }
-          .box .v { font-size: 12px; font-weight: bold; font-family: 'Courier New', monospace; }
-          .op { display: flex; align-items: center; padding: 0 4px; font-weight: bold; font-size: 14px; }
-          .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
-          .cards.four { grid-template-columns: repeat(4, 1fr); }
-          .card { border: 1px solid #C6B99E; border-radius: 6px; padding: 8px 10px; }
-          .card .l { font-size: 9px; font-weight: bold; margin-bottom: 4px; }
-          .card .v { font-size: 14px; font-weight: bold; font-family: 'Courier New', monospace; }
-          .card .s { font-size: 8.5px; color: #5A4E40; margin-top: 3px; }
-          .streams { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
-          .stream { border: 1px solid #C6B99E; border-radius: 6px; overflow: hidden; }
-          .stream .hd { padding: 5px 10px; font-size: 10.5px; font-weight: bold; background: #EAE1CE; border-bottom: 1px solid #C6B99E; }
-          .row { display: flex; justify-content: space-between; padding: 4px 10px; border-bottom: 1px solid #EAE1CE; font-size: 10.5px; }
-          .row:last-child { border-bottom: none; }
-          .row.b { font-weight: bold; background: #F4EEE2; }
-          .row .amt { font-family: 'Courier New', monospace; white-space: nowrap; padding-left: 8px; }
-          .row.sec { color: #85775F; font-size: 8.5px; padding: 2px 10px; }
-          .neg { color: #A3371A; }
-          .pos { color: #3D6B45; }
-          .warn { color: #9A6A00; }
-          .footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #C6B99E; font-size: 9px; color: #85775F; }
-          .print-btn { position: fixed; top: 16px; right: 16px; padding: 8px 16px; background: #1C160F; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
-        `}</style>
-      </head>
-      <body>
-        <PrintButton />
+    <div className="dp-print">
+      <style>{`
+        @media print {
+          .dp-print { margin: 0; padding: 0; max-width: none; }
+          .no-print { display: none; }
+          .dp-print .dir-page { page-break-after: always; }
+          .dp-print .dir-page:last-of-type { page-break-after: auto; }
+        }
+        .dp-print, .dp-print * { box-sizing: border-box; }
+        .dp-print { font-family: 'Georgia', 'Times New Roman', serif; color: #1C160F; max-width: 860px; margin: 0 auto; padding: 24px; font-size: 12px; line-height: 1.5; }
+        .dp-print .rpt-head { text-align: center; border-bottom: 1px solid #C6B99E; padding-bottom: 10px; margin-bottom: 14px; }
+        .dp-print .rpt-head .co { font-size: 15px; font-weight: bold; letter-spacing: 2px; }
+        .dp-print .rpt-head .sub { font-size: 11px; color: #5A4E40; margin-top: 2px; }
+        .dp-print .dir-page { margin-bottom: 22px; }
+        .dp-print .dhead { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid #C6B99E; border-radius: 6px; margin-bottom: 10px; background: #F4EEE2; }
+        .dp-print .dhead .avatar { width: 32px; height: 32px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 15px; }
+        .dp-print .dhead .nm { font-size: 14px; font-weight: bold; }
+        .dp-print .dhead .meta { font-size: 10px; color: #5A4E40; }
+        .dp-print .chain { display: flex; align-items: stretch; gap: 0; margin-bottom: 12px; }
+        .dp-print .box { flex: 1; border: 1px solid #A79878; border-radius: 6px; padding: 7px 8px; text-align: center; min-width: 80px; }
+        .dp-print .box.hl { border-width: 2px; border-color: #1C160F; }
+        .dp-print .box .l { font-size: 8px; text-transform: uppercase; letter-spacing: .4px; color: #5A4E40; margin-bottom: 3px; font-weight: bold; }
+        .dp-print .box .v { font-size: 12px; font-weight: bold; font-family: 'Courier New', monospace; }
+        .dp-print .op { display: flex; align-items: center; padding: 0 4px; font-weight: bold; font-size: 14px; }
+        .dp-print .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+        .dp-print .cards.four { grid-template-columns: repeat(4, 1fr); }
+        .dp-print .card { border: 1px solid #C6B99E; border-radius: 6px; padding: 8px 10px; }
+        .dp-print .card .l { font-size: 9px; font-weight: bold; margin-bottom: 4px; }
+        .dp-print .card .v { font-size: 14px; font-weight: bold; font-family: 'Courier New', monospace; }
+        .dp-print .card .s { font-size: 8.5px; color: #5A4E40; margin-top: 3px; }
+        .dp-print .streams { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+        .dp-print .stream { border: 1px solid #C6B99E; border-radius: 6px; overflow: hidden; }
+        .dp-print .stream .hd { padding: 5px 10px; font-size: 10.5px; font-weight: bold; background: #EAE1CE; border-bottom: 1px solid #C6B99E; }
+        .dp-print .row { display: flex; justify-content: space-between; padding: 4px 10px; border-bottom: 1px solid #EAE1CE; font-size: 10.5px; }
+        .dp-print .row:last-child { border-bottom: none; }
+        .dp-print .row.b { font-weight: bold; background: #F4EEE2; }
+        .dp-print .row .amt { font-family: 'Courier New', monospace; white-space: nowrap; padding-left: 8px; }
+        .dp-print .row.sec { color: #85775F; font-size: 8.5px; padding: 2px 10px; }
+        .dp-print .neg { color: #A3371A; }
+        .dp-print .pos { color: #3D6B45; }
+        .dp-print .warn { color: #9A6A00; }
+        .dp-print .footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #C6B99E; font-size: 9px; color: #85775F; }
+        .dp-print .print-btn { position: fixed; top: 16px; right: 16px; padding: 8px 16px; background: #1C160F; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+      `}</style>
+      <PrintButton />
         <div className="rpt-head">
           <div className="co">HOUZS VENTURE SDN BHD</div>
           <div className="sub">
@@ -330,10 +332,9 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
           )
         })}
 
-        <div className="footer">
-          Generated {generated} · HOUZS Venture Portal — Director Pool Calculator · Settings: Fixed RM {fmt(data.settings.fixedSalary)} / Saving {sv}% / Split {gb}/{bi}
-        </div>
-      </body>
-    </html>
+      <div className="footer">
+        Generated {generated} · HOUZS Venture Portal — Director Pool Calculator · Settings: Fixed RM {fmt(data.settings.fixedSalary)} / Saving {sv}% / Split {gb}/{bi}
+      </div>
+    </div>
   )
 }
