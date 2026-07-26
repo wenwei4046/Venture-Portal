@@ -166,14 +166,16 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
                   <div className="box"><div className="l">Balance (100%)</div><div className="v">RM {fmt(d.totalPay)}</div></div>
                 ) : (
                   <>
-                    <div className="box"><div className="l">{bi}% Billing Invoice</div><div className="v warn">RM {fmt(total25)}</div></div>
+                    {/* System-calculated 25% only — keyed statutory stays in the
+                        Billing Detail stream (user request 2026-07-26) */}
+                    <div className="box"><div className="l">{bi}% Billing Invoice</div><div className="v warn">RM {fmt(d.billInv)}</div></div>
                     <div className="box"><div className="l">{gb}% Gross Balance</div><div className="v">RM {fmt(r2(d.salKpiGB + d.allowGB))}</div></div>
                   </>
                 )}
                 {d.advanceOffset > 0 ? (
                   <div className="box"><div className="l">Vr KPI Offset Advance</div><div className="v neg">RM {fmt(d.advanceOffset)}</div></div>
-                ) : totalAdvBox > 0 ? (
-                  <div className="box"><div className="l">Total Advance</div><div className="v neg">RM {fmt(totalAdvBox)}</div></div>
+                ) : d.advThisMonth < 0 ? (
+                  <div className="box"><div className="l">Advance This Month</div><div className="v neg">RM {fmt(Math.abs(d.advThisMonth))}</div></div>
                 ) : d.vrKpi > 0 ? (
                   <div className="box"><div className="l">Exceed (KPI)</div><div className="v pos">+ RM {fmt(d.vrKpi)}</div></div>
                 ) : null}
