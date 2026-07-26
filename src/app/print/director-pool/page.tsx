@@ -103,9 +103,11 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
         .dp-print .row.b { font-weight: bold; background: #F4EEE2; }
         .dp-print .row .amt { font-family: 'Courier New', monospace; white-space: nowrap; padding-left: 8px; }
         .dp-print .row.sec { color: #85775F; font-size: 8.5px; padding: 2px 10px; }
-        .dp-print .neg { color: #A3371A; }
-        .dp-print .pos { color: #3D6B45; }
-        .dp-print .warn { color: #9A6A00; }
+        /* User ruling 2026-07-26: the report prints in plain black — the
+           neg/pos/warn accents stay as classes but all render ink-black. */
+        .dp-print .neg { color: #1C160F; }
+        .dp-print .pos { color: #1C160F; }
+        .dp-print .warn { color: #1C160F; }
         .dp-print .footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #C6B99E; font-size: 9px; color: #85775F; }
         .dp-print .print-btn { position: fixed; top: 16px; right: 16px; padding: 8px 16px; background: #1C160F; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
       `}</style>
