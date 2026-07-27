@@ -62,7 +62,7 @@ export default function SubmitDirectorSalaryButton({
       <div className="flex flex-col items-end gap-2">
         <div className="flex items-center gap-3 bg-surface border border-accent-border rounded-md px-4 py-2">
           <span className="font-serif italic text-graphite text-sm">
-            Submit director salary (RM {totalGross.toLocaleString('en-MY', { minimumFractionDigits: 2 })}) to Finance? <em>Totals + per-subsidiary contributions become visible to Finance immediately.</em>
+            Submit director salary (RM {totalGross.toLocaleString('en-MY', { minimumFractionDigits: 2 })}) to Finance? <em>Totals + per-subsidiary contributions become visible to Finance immediately, and a funding request (gross + employer statutory) is filed in Finance&apos;s payroll queue.</em>
           </span>
           <button
             onClick={handleConfirm}

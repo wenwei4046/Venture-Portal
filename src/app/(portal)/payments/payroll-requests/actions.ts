@@ -67,10 +67,12 @@ export async function generatePvFromRequest(
     : dayjs().format('YYYY-MM-DD')
 
   // ── Read the request + its linked payroll_run for period context ──────────
+  // Run-less requests are director salary fundings (mig 20260727100000) —
+  // they carry period_month directly instead of via a payroll_run.
   const { data: req, error: reqErr } = await supabase
     .from('payroll_payment_requests')
     .select(
-      'id, status, amount, payroll_run_id, target_pool, payroll_runs!inner(period_month)',
+      'id, status, amount, payroll_run_id, target_pool, period_month, payroll_runs(period_month)',
     )
     .eq('id', requestId)
     .maybeSingle()
@@ -84,7 +86,11 @@ export async function generatePvFromRequest(
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const periodMonth = (req.payroll_runs as any).period_month as string
+  const periodMonth = ((req.payroll_runs as any)?.period_month ??
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (req as any).period_month) as string
+  if (!periodMonth) throw new Error('Request has no period — contact an engineer')
+  const isDirector = req.payroll_run_id == null
   const amount = Number(req.amount)
 
   // ── Partial funding: this round funds some/all of the OUTSTANDING remainder ──
@@ -166,7 +172,7 @@ export async function generatePvFromRequest(
       currency: 'MYR',
       bank_account_id: sourceBankId,
       payee_name: 'HOUZS Venture — Payroll staging (Alliance Bank)',
-      description: `Payroll bank transfer — ${periodLabel}${isPartial ? ' (partial)' : ''}`,
+      description: `${isDirector ? 'Director salary' : 'Payroll'} bank transfer — ${periodLabel}${isPartial ? ' (partial)' : ''}`,
       payment_method: 'bank_transfer',
       payment_date: payDate,
       reference_type: 'payroll_payment_request',
@@ -239,7 +245,7 @@ export async function generatePvFromRequest(
       reference_id: voucher.id,
       reference_table: 'payment_vouchers',
       submitted_by: user.id,
-      description: `${voucher.voucher_no}: Payroll bank transfer — ${periodLabel}${isPartial ? ' (partial)' : ''}`,
+      description: `${voucher.voucher_no}: ${isDirector ? 'Director salary' : 'Payroll'} bank transfer — ${periodLabel}${isPartial ? ' (partial)' : ''}`,
       amount: roundAmount,
       status: 'pending',
       workflow_state: 'submitted',
@@ -257,6 +263,7 @@ export async function generatePvFromRequest(
   revalidatePath('/payments/payroll-requests')
   revalidatePath(`/hr-costing/payroll/${periodMonth}`)
   revalidatePath('/hr-costing/payroll')
+  revalidatePath('/director-salary')
   revalidatePath('/dashboard')
   revalidatePath('/approvals')
 
@@ -307,6 +314,7 @@ export async function financeCancelRequest(
   if (periodMonth) revalidatePath(`/hr-costing/payroll/${periodMonth}`)
   revalidatePath('/payments/payroll-requests')
   revalidatePath('/hr-costing/payroll')
+  revalidatePath('/director-salary')
   revalidatePath('/dashboard')
 }
 

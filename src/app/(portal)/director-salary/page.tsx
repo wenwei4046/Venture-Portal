@@ -55,6 +55,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
     { data: submission },
     { data: liveByCompany },
     { data: actualPayrollRows },
+    { data: fundingRequest },
   ] = await Promise.all([
     supabase.from('directors').select('id, name, code, weightage, min_payout').eq('status', 'active').order('code'),
     supabase.from('companies').select('id, name, short_code, director_heads').eq('is_active', true).order('name'),
@@ -70,6 +71,16 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
       .select('*')
       .eq('period_month', period)
       .order('employee_name'),
+    // Auto-filed at submit (mig 20260727100000) — run-less director request.
+    supabase
+      .from('payroll_payment_requests')
+      .select('id, amount, status')
+      .is('payroll_run_id', null)
+      .eq('period_month', period)
+      .in('status', ['submitted', 'pv_generated', 'completed'])
+      .order('requested_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ])
 
   // Director actual payroll (InfoTech import) — verbatim rows + director code.
@@ -227,6 +238,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
           period={period}
           periodLabel={periodLabel}
           submission={submission}
+          fundingRequest={fundingRequest ?? null}
           hasActualPayroll={hasActualPayroll}
           hasCtc={hasCtc}
           liveTotals={liveTotals}
@@ -297,6 +309,7 @@ function SubmissionTab({
   period,
   periodLabel,
   submission,
+  fundingRequest,
   hasActualPayroll,
   hasCtc,
   liveTotals,
@@ -307,6 +320,7 @@ function SubmissionTab({
   periodLabel: string
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   submission: any
+  fundingRequest: { id: string; amount: number; status: string } | null
   hasActualPayroll: boolean
   hasCtc: boolean
   liveTotals: SubmissionTotals | null
@@ -378,6 +392,18 @@ function SubmissionTab({
                 {totals?.directors} director{totals?.directors === 1 ? '' : 's'} · Finance sees
                 these totals + the per-subsidiary split on Billing
               </div>
+              {fundingRequest ? (
+                <div className="font-mono text-xs mt-1">
+                  <span className="text-graphite">Funding request {formatMoney(Number(fundingRequest.amount))} · </span>
+                  {fundingRequest.status === 'submitted' ? (
+                    <span className="text-alert">awaiting Finance</span>
+                  ) : fundingRequest.status === 'pv_generated' ? (
+                    <span className="text-info">PV generated — awaiting Principal</span>
+                  ) : (
+                    <span className="text-ledger">completed — funds staged</span>
+                  )}
+                </div>
+              ) : null}
             </>
           ) : (
             <>

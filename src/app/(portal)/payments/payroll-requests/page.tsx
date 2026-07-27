@@ -12,9 +12,11 @@ interface RequestRow {
   amount: number
   status: string
   requested_at: string
-  payroll_run_id: string
+  payroll_run_id: string | null
   period_month: string
   requested_by_name: string
+  // Run-less requests are director salary fundings (mig 20260727100000).
+  isDirector: boolean
 }
 
 interface BreakdownRpcRow {
@@ -38,7 +40,7 @@ export default async function PayrollRequestsPage() {
     supabase
       .from('payroll_payment_requests')
       .select(`
-        id, amount, status, requested_at, payroll_run_id,
+        id, amount, status, requested_at, payroll_run_id, period_month,
         payroll_runs (period_month),
         users:requested_by (name)
       `)
@@ -62,8 +64,9 @@ export default async function PayrollRequestsPage() {
       status: r.status,
       requested_at: r.requested_at,
       payroll_run_id: r.payroll_run_id,
-      period_month: run.period_month ?? '',
+      period_month: run.period_month ?? r.period_month ?? '',
       requested_by_name: submitter.name ?? 'HR',
+      isDirector: r.payroll_run_id == null,
     }
   })
 
@@ -223,6 +226,11 @@ export default async function PayrollRequestsPage() {
                         {r.period_month
                           ? dayjs(r.period_month).format('MMMM YYYY')
                           : 'Unknown period'}
+                        {r.isDirector ? (
+                          <span className="ml-2 font-mono text-[10px] text-graphite uppercase tracking-wider">
+                            Director salary
+                          </span>
+                        ) : null}
                       </div>
                       <div className="font-serif italic text-graphite text-sm mt-0.5">
                         Requested by {r.requested_by_name} ·{' '}
@@ -274,6 +282,11 @@ export default async function PayrollRequestsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="font-serif text-md text-ink truncate">
                         {r.period_month ? dayjs(r.period_month).format('MMMM YYYY') : '—'}
+                        {r.isDirector ? (
+                          <span className="ml-2 font-mono text-[10px] text-graphite uppercase tracking-wider">
+                            Director salary
+                          </span>
+                        ) : null}
                       </div>
                       <div className="font-serif italic text-graphite text-sm truncate">
                         Fully funded — {(funding?.pvs.length ?? 0)}{' '}

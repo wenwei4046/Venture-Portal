@@ -3527,7 +3527,8 @@ export type Database = {
           created_at: string
           id: string
           notes: string | null
-          payroll_run_id: string
+          payroll_run_id: string | null
+          period_month: string | null
           pv_id: string | null
           requested_at: string
           requested_by: string
@@ -3544,7 +3545,8 @@ export type Database = {
           created_at?: string
           id?: string
           notes?: string | null
-          payroll_run_id: string
+          payroll_run_id?: string | null
+          period_month?: string | null
           pv_id?: string | null
           requested_at?: string
           requested_by: string
@@ -3561,7 +3563,8 @@ export type Database = {
           created_at?: string
           id?: string
           notes?: string | null
-          payroll_run_id?: string
+          payroll_run_id?: string | null
+          period_month?: string | null
           pv_id?: string | null
           requested_at?: string
           requested_by?: string
