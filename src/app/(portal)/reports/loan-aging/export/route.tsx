@@ -31,10 +31,11 @@ const compact = (s: string) =>
 const startEn = (s: string) =>
   s === '未定' ? '—' : s.replace(' 起 (默认)', ' (default)').replace(' 起', '')
 
-const dueLabel = (d: DueRow) =>
-  `${d.counterparty} — ${compact(d.detail)}${d.source ? ` · SC ${d.source}` : ''}`
-const outLabel = (o: OutstandingRow) =>
-  `${o.counterparty} — ${compact(o.detail)}${o.source ? ` · SC ${o.source}` : ''}`
+// SC gets its own column (user 2026-07-24: "SC 可以弄成类似标记") — a PDF
+// table can't render the web chip, a dedicated column is the print equivalent.
+const dueLabel = (d: DueRow) => `${d.counterparty} — ${compact(d.detail)}`
+const outLabel = (o: OutstandingRow) => `${o.counterparty} — ${compact(o.detail)}`
+const sc = (s?: string | null) => (s ? `[${s}]` : '')
 
 export async function GET(req: Request) {
   await requireRole(['principal', 'finance'])
@@ -48,15 +49,16 @@ export async function GET(req: Request) {
   const filename = `loan-monitor-${view}-${data.currentYM}`
 
   if (view === 'aging') {
-    const header = ['Counterparty', 'Due this month', '1 month late', '2 months late', '3+ months late', 'Total unpaid (RM)']
+    const header = ['Counterparty', 'SC', 'Due this month', '1 month late', '2 months late', '3+ months late', 'Total unpaid (RM)']
     const sideBlock = (title: string, s: MonitorSide) => {
       const rows: (string | number | null)[][] = []
       const kinds: PdfRowKind[] = []
-      rows.push([`${title} (${s.due.length})`, '', '', '', '', ''])
+      rows.push([`${title} (${s.due.length})`, '', '', '', '', '', ''])
       kinds.push('group')
       for (const d of s.due) {
         rows.push([
           `   ${dueLabel(d)}`,
+          sc(d.source),
           m(d.buckets.current), m(d.buckets.m1), m(d.buckets.m2), m(d.buckets.m3),
           formatMoneyBare(d.buckets.total),
         ])
@@ -64,6 +66,7 @@ export async function GET(req: Request) {
       }
       rows.push([
         `${title} — TOTAL`,
+        '',
         m(s.dueTotal.current), m(s.dueTotal.m1), m(s.dueTotal.m2), m(s.dueTotal.m3),
         formatMoneyBare(s.dueTotal.total),
       ])
@@ -82,7 +85,7 @@ export async function GET(req: Request) {
           sheetName: 'Loan Aging',
           headerRow: header,
           rows: rows as (string | number)[][],
-          columnWidths: [58, 14, 14, 14, 14, 16],
+          columnWidths: [52, 10, 14, 14, 14, 14, 16],
         }),
       })
     }
@@ -97,7 +100,8 @@ export async function GET(req: Request) {
         >
           <PdfTable
             columns={[
-              { label: 'Counterparty', width: 330, align: 'left' as const },
+              { label: 'Counterparty', width: 272, align: 'left' as const },
+              { label: 'SC', width: 58, align: 'left' as const },
               { label: 'Due this month', width: 62, align: 'right' as const },
               { label: '1 month late', width: 62, align: 'right' as const },
               { label: '2 months late', width: 62, align: 'right' as const },
@@ -113,23 +117,23 @@ export async function GET(req: Request) {
   }
 
   // ── view=outstanding ──
-  const header = ['Counterparty', 'Repayment starts', 'Outstanding (RM)']
+  const header = ['Counterparty', 'SC', 'Repayment starts', 'Outstanding (RM)']
   const sideBlock = (title: string, s: MonitorSide) => {
     const rows: (string | number | null)[][] = []
     const kinds: PdfRowKind[] = []
-    rows.push([`${title} — fixed schedule (${s.scheduled.length})`, '', formatMoneyBare(s.scheduledTotal)])
+    rows.push([`${title} — fixed schedule (${s.scheduled.length})`, '', '', formatMoneyBare(s.scheduledTotal)])
     kinds.push('group')
     for (const o of s.scheduled) {
-      rows.push([`   ${outLabel(o)}`, startEn(o.startLabel), formatMoneyBare(o.outstanding)])
+      rows.push([`   ${outLabel(o)}`, sc(o.source), startEn(o.startLabel), formatMoneyBare(o.outstanding)])
       kinds.push('detail')
     }
-    rows.push([`${title} — no fixed term (${s.noTerm.length})`, '', formatMoneyBare(s.noTermTotal)])
+    rows.push([`${title} — no fixed term (${s.noTerm.length})`, '', '', formatMoneyBare(s.noTermTotal)])
     kinds.push('group')
     for (const o of s.noTerm) {
-      rows.push([`   ${outLabel(o)}`, '—', formatMoneyBare(o.outstanding)])
+      rows.push([`   ${outLabel(o)}`, sc(o.source), '—', formatMoneyBare(o.outstanding)])
       kinds.push('detail')
     }
-    rows.push([`${title} — TOTAL OUTSTANDING`, '', formatMoneyBare(s.grandTotal)])
+    rows.push([`${title} — TOTAL OUTSTANDING`, '', '', formatMoneyBare(s.grandTotal)])
     kinds.push('total')
     return { rows, kinds }
   }
@@ -145,7 +149,7 @@ export async function GET(req: Request) {
         sheetName: 'Outstanding',
         headerRow: header,
         rows: rows as (string | number)[][],
-        columnWidths: [64, 18, 18],
+        columnWidths: [58, 12, 18, 18],
       }),
     })
   }
@@ -159,7 +163,8 @@ export async function GET(req: Request) {
       >
         <PdfTable
           columns={[
-            { label: 'Counterparty', width: 360, align: 'left' as const },
+            { label: 'Counterparty', width: 300, align: 'left' as const },
+            { label: 'SC', width: 60, align: 'left' as const },
             { label: 'Repayment starts', width: 86, align: 'right' as const },
             { label: 'Outstanding', width: 86, align: 'right' as const },
           ]}
