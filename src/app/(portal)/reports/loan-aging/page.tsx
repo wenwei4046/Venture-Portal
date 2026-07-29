@@ -49,6 +49,14 @@ function AgingTable({ side }: { side: AgingSide }) {
             <tr key={a.key}>
               <td className="whitespace-nowrap">
                 <span className="font-serif text-[15px] text-ink">{a.counterparty}</span>
+                {a.source ? (
+                  <span
+                    className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
+                    title={`资金来源: ${a.source}`}
+                  >
+                    SC {a.source}
+                  </span>
+                ) : null}
                 <span className="font-mono text-[11px] text-graphite ml-2">{a.detail}</span>
               </td>
               {BUCKETS.map((b) => (
@@ -96,6 +104,14 @@ function NoTermTable({ side }: { side: AgingSide }) {
               <tr key={n.key}>
                 <td className="whitespace-nowrap">
                   <span className="font-serif text-[15px] text-ink">{n.counterparty}</span>
+                  {n.source ? (
+                    <span
+                      className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
+                      title={`资金来源: ${n.source}`}
+                    >
+                      SC {n.source}
+                    </span>
+                  ) : null}
                   <span className="font-mono text-[11px] text-graphite ml-2">{n.detail}</span>
                 </td>
                 <td className="num">{formatMoney(n.outstanding)}</td>

@@ -8,6 +8,7 @@ import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/paginate'
 import { isLoanUnscheduled } from '@/lib/treasury-schedule'
+import { fundingSourceFromTerms } from '@/lib/utils'
 import { buildInstallmentAging, sumBuckets, type AgingBuckets, EMPTY_BUCKETS } from './loan-aging'
 import type { MatrixColumn, MatrixRow } from './monthly-matrix'
 
@@ -18,6 +19,8 @@ export interface AgingLine {
   counterparty: string
   detail: string
   buckets: AgingBuckets
+  /** 资金来源 badge (loans only — parsed from repayment_terms). */
+  source?: string | null
 }
 
 export interface NoTermLine {
@@ -26,6 +29,7 @@ export interface NoTermLine {
   detail: string
   outstanding: number
   monthlyInterest: number
+  source?: string | null
 }
 
 export interface AgingSide {
@@ -107,6 +111,7 @@ export async function fetchLoanAgingData(supabase: SupabaseClient): Promise<Loan
     const tenure = Number(l.tenure_months)
     const compounding = (l as { compound_interest?: boolean }).compound_interest === true
     const unscheduled = isLoanUnscheduled(l.repayment_terms as string | null)
+    const source = fundingSourceFromTerms(l.repayment_terms as string | null)
     if (compounding || unscheduled || !(tenure > 0)) {
       collectNoTerm.push({
         key: l.id as string,
@@ -114,6 +119,7 @@ export async function fetchLoanAgingData(supabase: SupabaseClient): Promise<Loan
         detail: `RM ${money(principal)} @ ${(rate * 100).toFixed(3)}%/mo · ${compounding ? '利滚利 compounding' : 'no fixed term'}`,
         outstanding: loanOutBy.get(l.id as string) ?? principal,
         monthlyInterest: r2(principal * rate),
+        source,
       })
       continue
     }
@@ -133,6 +139,7 @@ export async function fetchLoanAgingData(supabase: SupabaseClient): Promise<Loan
       counterparty,
       detail: `RM ${money(principal)} @ ${(rate * 100).toFixed(3)}%/mo · ${tenure}mo`,
       buckets,
+      source,
     })
   }
 
@@ -203,7 +210,7 @@ export function agingSideRows(sideLabel: string, s: AgingSide): MatrixRow[] {
   for (const a of s.aged) {
     rows.push({
       key: `${sideLabel}:${a.key}`,
-      label: `${a.counterparty} — ${a.detail}`,
+      label: `${a.counterparty} — ${a.detail}${a.source ? ` · SC ${a.source}` : ''}`,
       depth: 1,
       kind: 'account',
       values: [a.buckets.current, a.buckets.m1, a.buckets.m2, a.buckets.m3, a.buckets.total],
