@@ -128,6 +128,25 @@
      setLoanRepaymentStart / setFundSourceRepaymentStart.
    - Data: CONTS 58k & 60k @4% set to 2026-05 start per the notes evidence.
    Suite 417 (aging tests removed, monitor tests added).
+   **Follow-ups the same evening (user walked every row)**: aging buckets RETURNED
+   into 区1 (anchored on repayment_start_month; loan-aging.ts restored from git);
+   exports split into ?view=aging|outstanding using the Debtor-Aging white PdfTable
+   kit (PDF font has no CJK — export labels are compact ASCII; SC is its own
+   column, page keeps the web chip); more agreed starts set by evidence/user:
+   HC 60k & 58k @3% → 2026-05, BOTH 300k positions (CONTS loan + HC source) →
+   2025-01 (user confirmed repayments ran since Jan-25). Directors RLS opened to
+   finance for SELECT (mig 20260724060000) — names were '—' everywhere for
+   finance. **L32 netting row DELETED** from fund_source_repayments: the
+   53,613.75 '2990 knock-off HC outstanding' was wrongly mirrored onto the HC
+   100k@2%/3mo deposit (user: that deposit was never repaid); the counterparty-
+   level swap already lives in manual JV-000010 (Dr 4052 / Cr 4051, 2026-03-29).
+   ⚠️ KNOWN RECONCILING ITEM: HC's per-deposit outstanding sum now exceeds GL
+   4052 by 53,613.75 (the JV nets HC at account level only, attached to no
+   deposit). If HC ever agrees which deposit it settles, record a netting
+   repayment there and the gap closes. Confirmed real arrears (user): CAR 200k
+   (owes May-Jul), 2990 100k (nothing paid), 2990 200k payable, Kingsley 100k
+   payable. HC 100k@2%/3mo now shows all 3 installments overdue (~106k incl
+   interest) — real per user.
 
 ## Session 2026-07-22 — OneDrive un-sync recovery + fund-out 资金来源 field
 
