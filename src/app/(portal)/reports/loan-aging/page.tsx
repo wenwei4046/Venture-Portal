@@ -30,11 +30,18 @@ function SourceBadge({ source }: { source?: string | null }) {
   )
 }
 
+const BUCKETS = [
+  { key: 'current', label: '本月到期' },
+  { key: 'm1', label: '逾期 1 个月' },
+  { key: 'm2', label: '逾期 2 个月' },
+  { key: 'm3', label: '逾期 3 个月+' },
+] as const
+
 function DueTable({ side, verb }: { side: MonitorSide; verb: '收' | '付' }) {
   if (side.due.length === 0) {
     return (
       <div className="border border-hairline rounded-md bg-surface p-6 text-center mb-6">
-        <p className="font-serif italic text-ledger text-sm">本月全部{verb}清 — 没有未{verb}项 🎉</p>
+        <p className="font-serif italic text-ledger text-sm">全部{verb}清 — 没有到期未{verb}项 🎉</p>
       </div>
     )
   }
@@ -44,9 +51,10 @@ function DueTable({ side, verb }: { side: MonitorSide; verb: '收' | '付' }) {
         <thead>
           <tr>
             <th>Counterparty</th>
-            <th className="num">本月该{verb}</th>
-            <th className="num">本月已{verb}</th>
-            <th className="num">还差</th>
+            {BUCKETS.map((b) => (
+              <th key={b.key} className="num">{b.label}</th>
+            ))}
+            <th className="num">合计未{verb}</th>
           </tr>
         </thead>
         <tbody>
@@ -57,16 +65,18 @@ function DueTable({ side, verb }: { side: MonitorSide; verb: '收' | '付' }) {
                 <SourceBadge source={d.source} />
                 <span className="font-mono text-[11px] text-graphite ml-2">{d.detail}</span>
               </td>
-              <td className="num">{formatMoney(d.dueAmount)}</td>
-              <td className="num">{money(d.paidThisMonth)}</td>
-              <td className="num font-semibold">{formatMoney(d.shortfall)}</td>
+              {BUCKETS.map((b) => (
+                <td key={b.key} className="num">{money(d.buckets[b.key])}</td>
+              ))}
+              <td className="num font-semibold">{formatMoney(d.buckets.total)}</td>
             </tr>
           ))}
           <tr className="bg-surface-2">
             <td className="font-sans font-medium text-ink">Total</td>
-            <td className="num font-semibold">{formatMoney(side.dueTotal.dueAmount)}</td>
-            <td className="num font-semibold">{money(side.dueTotal.paidThisMonth)}</td>
-            <td className="num font-semibold">{formatMoney(side.dueTotal.shortfall)}</td>
+            {BUCKETS.map((b) => (
+              <td key={b.key} className="num font-semibold">{money(side.dueTotal[b.key])}</td>
+            ))}
+            <td className="num font-semibold">{formatMoney(side.dueTotal.total)}</td>
           </tr>
         </tbody>
       </table>
@@ -172,8 +182,8 @@ export default async function LoanMonitorPage() {
           </div>
           <h1 className="page-title">Loan Monitor</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
-            本月该收/该付而未清的排在上面(清了就消失)· Outstanding 总览在下面 ·
-            还款起始月在各笔的详情页设定,没设的默认放款/收款次月起
+            按「还款起始月」排期:到期未清的按逾期月数分桶(清了的期数自动消失)·
+            Outstanding 总览在下面 · 起始月在各笔详情页设定,没设的默认放款/收款次月起
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -194,7 +204,7 @@ export default async function LoanMonitorPage() {
 
       <section className="mb-12">
         <div className="sect-head">
-          <h2>本月应收 · To collect this month — Fund OUT</h2>
+          <h2>应收 aging · To collect — Fund OUT</h2>
           <span className="rule" aria-hidden />
           <span className="count">{data.collect.due.length} UNSETTLED</span>
         </div>
@@ -203,7 +213,7 @@ export default async function LoanMonitorPage() {
 
       <section className="mb-12">
         <div className="sect-head">
-          <h2>本月应付 · To repay this month — Fund IN</h2>
+          <h2>应付 aging · To repay — Fund IN</h2>
           <span className="rule" aria-hidden />
           <span className="count">{data.repay.due.length} UNSETTLED</span>
         </div>

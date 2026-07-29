@@ -11,9 +11,11 @@ import { buildMatrixXlsx } from '@/lib/export/monthly-matrix-export'
 import { MatrixPdf } from '@/lib/export/matrix-pdf'
 
 const COLUMNS: MatrixColumn[] = [
-  { key: 'due', label: 'Due this month' },
-  { key: 'paid', label: 'Paid this month' },
-  { key: 'short', label: 'Shortfall' },
+  { key: 'current', label: 'Due this month' },
+  { key: 'm1', label: '1 month late' },
+  { key: 'm2', label: '2 months late' },
+  { key: 'm3', label: '3+ months late' },
+  { key: 'total', label: 'Total unpaid' },
   { key: 'outstanding', label: 'Outstanding' },
 ]
 
@@ -25,16 +27,16 @@ function sideRows(label: string, s: MonitorSide): MatrixRow[] {
       label: `${d.counterparty} — ${d.detail}${d.source ? ` · SC ${d.source}` : ''}`,
       depth: 1,
       kind: 'account',
-      values: [d.dueAmount, d.paidThisMonth, d.shortfall, 0],
+      values: [d.buckets.current, d.buckets.m1, d.buckets.m2, d.buckets.m3, d.buckets.total, 0],
     })
   }
   rows.push({
     key: `${label}:due-total`,
-    label: `${label} — due this month total`,
+    label: `${label} — unpaid dues total`,
     depth: 0,
     kind: 'subtotal',
     tone: 'auto',
-    values: [s.dueTotal.dueAmount, s.dueTotal.paidThisMonth, s.dueTotal.shortfall, 0],
+    values: [s.dueTotal.current, s.dueTotal.m1, s.dueTotal.m2, s.dueTotal.m3, s.dueTotal.total, 0],
   })
   for (const o of s.scheduled) {
     rows.push({
@@ -42,7 +44,7 @@ function sideRows(label: string, s: MonitorSide): MatrixRow[] {
       label: `${o.counterparty} — ${o.detail}${o.source ? ` · SC ${o.source}` : ''} · ${o.startLabel}`,
       depth: 1,
       kind: 'account',
-      values: [0, 0, 0, o.outstanding],
+      values: [0, 0, 0, 0, 0, o.outstanding],
     })
   }
   for (const o of s.noTerm) {
@@ -51,7 +53,7 @@ function sideRows(label: string, s: MonitorSide): MatrixRow[] {
       label: `${o.counterparty} — ${o.detail}${o.source ? ` · SC ${o.source}` : ''} · 未定`,
       depth: 1,
       kind: 'account',
-      values: [0, 0, 0, o.outstanding],
+      values: [0, 0, 0, 0, 0, o.outstanding],
     })
   }
   rows.push({
@@ -60,7 +62,7 @@ function sideRows(label: string, s: MonitorSide): MatrixRow[] {
     depth: 0,
     kind: 'subtotal',
     tone: 'ledger',
-    values: [0, 0, 0, s.grandTotal],
+    values: [0, 0, 0, 0, 0, s.grandTotal],
   })
   return rows
 }

@@ -1,20 +1,17 @@
-// Loan Monitor data (user redefinition 2026-07-24, replacing the months-late
-// aging buckets):
-//   区1 本月应收/应付 — scheduled positions whose agreed plan has started:
-//        this month's installment vs what was actually collected/paid this
-//        month; a row DISAPPEARS once the month is settled ("收了或付了就不
-//        会出现了").
-//   区2 Outstanding 总览 — every open position's balance, split 定好日期
-//        (fixed schedule) vs 还没定好 (no fixed term / compounding).
-// The agreed start lives in loans/fund_sources.repayment_start_month (user
-// sets it per position; NULL = default: the month AFTER disbursement /
-// effective date). The stored month IS the first installment month.
+// Loan Monitor data (user 2026-07-24, two iterations):
+//   区1 应收/应付 aging — unpaid installments from the AGREED start
+//        (repayment_start_month; NULL = disb/effective +1), pooled payments
+//        FIFO oldest-first, bucketed 本月 / 逾期1 / 2 / 3+ 个月. A fully
+//        caught-up position disappears; settled months never show ("之前如果
+//        定好要还却还没收到的" must age, "收了就不会出现").
+//   区2 Outstanding 总览 — every open balance, split 定好日期 vs 还没定好.
 
 import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/paginate'
 import { isLoanUnscheduled, loanMonthlyInstallment } from '@/lib/treasury-schedule'
 import { fundingSourceFromTerms } from '@/lib/utils'
+import { buildInstallmentAging, sumBuckets, type AgingBuckets, EMPTY_BUCKETS } from './loan-aging'
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 
@@ -38,9 +35,7 @@ export interface DueRow {
   counterparty: string
   detail: string
   source?: string | null
-  dueAmount: number
-  paidThisMonth: number
-  shortfall: number
+  buckets: AgingBuckets
 }
 
 export interface OutstandingRow {
@@ -54,7 +49,7 @@ export interface OutstandingRow {
 
 export interface MonitorSide {
   due: DueRow[]
-  dueTotal: { dueAmount: number; paidThisMonth: number; shortfall: number }
+  dueTotal: AgingBuckets
   scheduled: OutstandingRow[]
   scheduledTotal: number
   noTerm: OutstandingRow[]
@@ -112,17 +107,17 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
   const loanOutBy = new Map((loanOut ?? []).map((o) => [o.loan_id as string, o]))
   const fsOutBy = new Map((fsOut ?? []).map((o) => [o.fund_source_id as string, o]))
 
-  const paidThisMonthByLoan = new Map<string, number>()
+  // ALL-TIME pooled payments — the aging allocates them FIFO from the first
+  // agreed installment, so settled months vanish automatically.
+  const paidByLoan = new Map<string, number>()
   for (const rp of loanReps ?? []) {
-    if ((rp.payment_date as string).slice(0, 7) !== currentYM) continue
     const id = rp.loan_id as string
-    paidThisMonthByLoan.set(id, r2((paidThisMonthByLoan.get(id) ?? 0) + Number(rp.amount)))
+    paidByLoan.set(id, r2((paidByLoan.get(id) ?? 0) + Number(rp.amount)))
   }
-  const paidThisMonthByFs = new Map<string, number>()
+  const paidByFs = new Map<string, number>()
   for (const rp of fsReps ?? []) {
-    if ((rp.payment_date as string).slice(0, 7) !== currentYM) continue
     const id = rp.fund_source_id as string
-    paidThisMonthByFs.set(id, r2((paidThisMonthByFs.get(id) ?? 0) + Number(rp.amount)))
+    paidByFs.set(id, r2((paidByFs.get(id) ?? 0) + Number(rp.amount)))
   }
 
   const startLabel = (startMonth: string | null, firstDueYM: string | null) =>
@@ -171,26 +166,28 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
       })
     }
 
+    if (!firstDueYM || firstDueYM > currentYM) continue // plan not started yet
     const inst = loanMonthlyInstallment({
       principal,
       effectiveRate: rate,
       tenureMonths: tenure,
       principalPaid: Number(out?.total_principal_paid ?? 0),
     })
-    if (inst.remainingPeriods <= 0) continue
-    if (!firstDueYM || firstDueYM > currentYM) continue // plan not started yet
-    const dueAmount = r2(inst.principalDue + inst.interestDue)
-    const paid = paidThisMonthByLoan.get(l.id as string) ?? 0
-    const shortfall = r2(dueAmount - paid)
-    if (shortfall <= 0.005) continue // settled this month → disappears
+    const buckets = buildInstallmentAging({
+      principal,
+      monthlyRate: rate,
+      tenureMonths: tenure,
+      firstDueYM,
+      asOfYM: currentYM,
+      totalPaid: paidByLoan.get(l.id as string) ?? 0,
+    })
+    if (buckets.total <= 0.005) continue // fully caught up → disappears
     collectDue.push({
       key: l.id as string,
       counterparty,
       detail: `RM ${money(principal)} @ ${(rate * 100).toFixed(3)}%/mo · ${tenure}mo · ${inst.remainingPeriods} left`,
       source,
-      dueAmount,
-      paidThisMonth: paid,
-      shortfall,
+      buckets,
     })
   }
 
@@ -236,37 +233,35 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
       })
     }
 
+    if (!firstDueYM || firstDueYM > currentYM) continue
     const principalPaid = Number(out?.total_principal_paid ?? 0)
     const remaining = remainingPeriods(amount, lockIn, principalPaid)
-    if (remaining <= 0) continue
-    if (!firstDueYM || firstDueYM > currentYM) continue
-    const dueAmount = r2(amount / lockIn + amount * rate)
-    const paid = paidThisMonthByFs.get(s.id as string) ?? 0
-    const shortfall = r2(dueAmount - paid)
-    if (shortfall <= 0.005) continue
+    const buckets = buildInstallmentAging({
+      principal: amount,
+      monthlyRate: rate,
+      tenureMonths: lockIn,
+      firstDueYM,
+      asOfYM: currentYM,
+      totalPaid: paidByFs.get(s.id as string) ?? 0,
+    })
+    if (buckets.total <= 0.005) continue
     repayDue.push({
       key: s.id as string,
       counterparty: from as string,
       detail: `RM ${money(amount)} @ ${(rate * 100).toFixed(3)}%/mo · ${lockIn}mo · ${remaining} left`,
-      dueAmount,
-      paidThisMonth: paid,
-      shortfall,
+      buckets,
     })
   }
 
   const side = (due: DueRow[], sched: OutstandingRow[], noTerm: OutstandingRow[]): MonitorSide => {
-    due.sort((a, b) => b.shortfall - a.shortfall)
+    due.sort((a, b) => b.buckets.total - a.buckets.total)
     sched.sort((a, b) => b.outstanding - a.outstanding)
     noTerm.sort((a, b) => b.outstanding - a.outstanding)
     const scheduledTotal = r2(sched.reduce((s, x) => s + x.outstanding, 0))
     const noTermTotal = r2(noTerm.reduce((s, x) => s + x.outstanding, 0))
     return {
       due,
-      dueTotal: {
-        dueAmount: r2(due.reduce((s, x) => s + x.dueAmount, 0)),
-        paidThisMonth: r2(due.reduce((s, x) => s + x.paidThisMonth, 0)),
-        shortfall: r2(due.reduce((s, x) => s + x.shortfall, 0)),
-      },
+      dueTotal: due.length ? sumBuckets(due.map((d) => d.buckets)) : { ...EMPTY_BUCKETS },
       scheduled: sched,
       scheduledTotal,
       noTerm,
