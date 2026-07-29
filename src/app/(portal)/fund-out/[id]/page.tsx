@@ -8,6 +8,7 @@ import { formatMoney } from '@/lib/utils'
 import { cancelLoan } from '../actions'
 import RepaymentForm from '../_components/RepaymentForm'
 import FundingSourceEditor from './_components/FundingSourceEditor'
+import RepaymentStartEditor from './_components/RepaymentStartEditor'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -306,6 +307,16 @@ export default async function LoanDetailPage({ params }: Props) {
         <FundingSourceEditor
           loanId={loan.id}
           repaymentTerms={(loan.repayment_terms as string | null) ?? null}
+        />
+
+        <RepaymentStartEditor
+          loanId={loan.id}
+          current={((loan as { repayment_start_month?: string | null }).repayment_start_month ?? null)?.slice(0, 7) ?? null}
+          defaultHint={
+            loan.disbursement_date
+              ? dayjs(`${(loan.disbursement_date as string).slice(0, 7)}-01`).add(1, 'month').format('YYYY-MM')
+              : '放款次月'
+          }
         />
       </section>
 

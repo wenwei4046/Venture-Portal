@@ -49,8 +49,8 @@ const reports = [
   },
   {
     href: '/reports/loan-aging',
-    title: 'Loan Aging',
-    description: 'Overdue loan installments both ways — to collect (Fund OUT) and to repay (Fund IN).',
+    title: 'Loan Monitor',
+    description: 'This-month dues not yet settled (both ways) + outstanding balances, scheduled vs undecided.',
   },
 ]
 

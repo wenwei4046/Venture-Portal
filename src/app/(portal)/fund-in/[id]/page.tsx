@@ -8,6 +8,7 @@ import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
 import { cancelFundSource } from '../actions'
 import { ConfirmButton } from './_components/ConfirmButton'
 import WithdrawButton from './_components/WithdrawButton'
+import RepaymentStartEditor from './_components/RepaymentStartEditor'
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
   subsidiary: 'Subsidiary',
@@ -417,6 +418,16 @@ export default async function FundSourceDetailPage({ params }: Props) {
           </p>
         </section>
       ) : null}
+
+      <RepaymentStartEditor
+        sourceId={source.id}
+        current={((source as { repayment_start_month?: string | null }).repayment_start_month ?? null)?.slice(0, 7) ?? null}
+        defaultHint={
+          source.effective_date
+            ? dayjs(`${(source.effective_date as string).slice(0, 7)}-01`).add(1, 'month').format('YYYY-MM')
+            : '收款次月'
+        }
+      />
 
       {/* ───────── Actions (Finance only) ───────── */}
       {pendingCancel ? (

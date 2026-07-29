@@ -389,6 +389,31 @@ export async function recordLoanRepaymentReceived(formData: FormData) {
   redirect(`/fund-out/${loanId}`)
 }
 
+// ─── 还款起始月 (Finance self-service, mig 20260724050000) ───────────────────
+// Agreed first-installment month for the Loan Monitor / schedules. NULL =
+// default (month after disbursement). Display/schedule metadata only.
+export async function setLoanRepaymentStart(
+  id: string,
+  month: string
+): Promise<{ error: string } | undefined> {
+  await requireRole(['finance', 'principal'])
+  const supabase = await createClient()
+
+  if (!id) return { error: 'Loan id is required' }
+  if (!/^\d{4}-\d{2}$/.test(month)) return { error: '格式要 YYYY-MM(选一个月份)' }
+
+  const { error } = await supabase.rpc('set_loan_repayment_start' as never, {
+    p_loan_id: id,
+    p_month: `${month}-01`,
+  } as never)
+  if (error) return { error: `保存失败: ${error.message}` }
+
+  revalidatePath(`/fund-out/${id}`)
+  revalidatePath('/reports/loan-aging')
+  revalidatePath('/repayment-schedule')
+  return undefined
+}
+
 // ─── Amend an active loan (Principal — self-service, direct apply) ────────────
 // Principal is the top approval authority, so edits apply immediately via the
 // amend_loan SECURITY DEFINER RPC (audited by loans.updated_at). Only the

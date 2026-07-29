@@ -427,6 +427,29 @@ export async function withdrawFundSource(id: string): Promise<{ error: string } 
   return undefined
 }
 
+// ─── 还款起始月 (Finance self-service, mig 20260724050000) ───────────────────
+export async function setFundSourceRepaymentStart(
+  id: string,
+  month: string
+): Promise<{ error: string } | undefined> {
+  await requireRole(['finance', 'principal'])
+  const supabase = await createClient()
+
+  if (!id) return { error: 'Fund source id is required' }
+  if (!/^\d{4}-\d{2}$/.test(month)) return { error: '格式要 YYYY-MM(选一个月份)' }
+
+  const { error } = await supabase.rpc('set_fund_source_repayment_start' as never, {
+    p_fund_source_id: id,
+    p_month: `${month}-01`,
+  } as never)
+  if (error) return { error: `保存失败: ${error.message}` }
+
+  revalidatePath(`/fund-in/${id}`)
+  revalidatePath('/reports/loan-aging')
+  revalidatePath('/repayment-schedule')
+  return undefined
+}
+
 // ─── Cancel Fund Source (requires Principal approval) ────────────────────────
 
 export async function cancelFundSource(formData: FormData) {

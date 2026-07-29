@@ -110,6 +110,24 @@
    separate NOT-AGED block below each table (Q6), outstanding shown in Total column.
    lib/loan-aging-data.ts fetch+matrix (reuses monthly-matrix kit; aging = exceptions
    report — fully-on-track loans are hidden). +12 tests (suite 419).
+   **SUPERSEDED same day → Loan Monitor**: user saw the buckets and redefined ("我要的
+   是根据定好还款日期的,当月没还的" + outstanding split 定好/没定好). Discovered via
+   repayment notes ("本金 1/6 (本月起还)") that schedules get renegotiated starts the
+   system never stored — months-late math was meaningless. Rebuilt:
+   - mig `20260724050000`: loans.repayment_start_month + fund_sources.repayment_start_
+     month (nullable; stored month IS installment #1; NULL = disb/effective +1) + two
+     SECURITY DEFINER setters (finance/principal).
+   - lib/loan-monitor.ts (fetchLoanMonitorData + resolveFirstDueYM/remainingPeriods;
+     old loan-aging*.ts DELETED): 区1 本月应收/应付 (started plans with remaining
+     periods; shortfall = this month's installment − paid this month; settled rows
+     disappear); 区2 Outstanding split scheduled vs 未定, per side, with start labels.
+   - /reports/loan-aging page rebuilt (Debtor-Aging-style ledger tables, SC badges,
+     sidebar/card renamed "Loan Monitor", route unchanged); export = one matrix
+     [Due/Paid/Shortfall/Outstanding].
+   - RepaymentStartEditor on BOTH detail pages (fund-out + fund-in) via
+     setLoanRepaymentStart / setFundSourceRepaymentStart.
+   - Data: CONTS 58k & 60k @4% set to 2026-05 start per the notes evidence.
+   Suite 417 (aging tests removed, monitor tests added).
 
 ## Session 2026-07-22 — OneDrive un-sync recovery + fund-out 资金来源 field
 

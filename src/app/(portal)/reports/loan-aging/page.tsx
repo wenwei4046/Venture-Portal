@@ -1,76 +1,72 @@
-// Loan Aging (user request 2026-07-24): overdue repayment buckets for BOTH
-// directions — 应收 Fund OUT loans and 应付 Fund IN sources — plus a not-aged
-// section for compounding / no-fixed-term positions below each table.
-// Table styling mirrors Debtor Aging (user 2026-07-24: the MonthlyMatrix
-// render wrapped labels, clashed backgrounds and overlapped glyphs).
+// Loan Monitor (user redefinition 2026-07-24, replaces the months-late aging):
+//   区1 本月应收/应付 — agreed-schedule positions due THIS month that are not
+//        yet settled; a row disappears once collected/paid in full this month.
+//   区2 Outstanding 总览 — every open balance, split 定好日期 vs 还没定好.
+// The agreed start (还款起始月) is set per position on its detail page;
+// unset = defaults to the month after disbursement/receipt.
 
 import dayjs from 'dayjs'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
-import { fetchLoanAgingData, type AgingSide } from '@/lib/loan-aging-data'
+import { fetchLoanMonitorData, type MonitorSide } from '@/lib/loan-monitor'
 
 export const dynamic = 'force-dynamic'
-
-const BUCKETS = [
-  { key: 'current', label: 'Due this month' },
-  { key: 'm1', label: '1 month late' },
-  { key: 'm2', label: '2 months late' },
-  { key: 'm3', label: '3+ months late' },
-] as const
 
 function money(v: number) {
   return v ? <span className="num">{formatMoney(v)}</span> : <span className="num text-muted">—</span>
 }
 
-function AgingTable({ side }: { side: AgingSide }) {
-  if (side.aged.length === 0) {
+function SourceBadge({ source }: { source?: string | null }) {
+  if (!source) return null
+  return (
+    <span
+      className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
+      title={`资金来源: ${source}`}
+    >
+      SC {source}
+    </span>
+  )
+}
+
+function DueTable({ side, verb }: { side: MonitorSide; verb: '收' | '付' }) {
+  if (side.due.length === 0) {
     return (
-      <div className="border border-hairline rounded-md bg-surface p-6 text-center mb-4">
-        <p className="font-serif italic text-ledger text-sm">Fully on track — nothing due or overdue. 🎉</p>
+      <div className="border border-hairline rounded-md bg-surface p-6 text-center mb-6">
+        <p className="font-serif italic text-ledger text-sm">本月全部{verb}清 — 没有未{verb}项 🎉</p>
       </div>
     )
   }
   return (
-    <div className="overflow-x-auto mb-4">
+    <div className="overflow-x-auto mb-6">
       <table className="ledger-table">
         <thead>
           <tr>
             <th>Counterparty</th>
-            {BUCKETS.map((b) => (
-              <th key={b.key} className="num">{b.label}</th>
-            ))}
-            <th className="num">Total due</th>
+            <th className="num">本月该{verb}</th>
+            <th className="num">本月已{verb}</th>
+            <th className="num">还差</th>
           </tr>
         </thead>
         <tbody>
-          {side.aged.map((a) => (
-            <tr key={a.key}>
+          {side.due.map((d) => (
+            <tr key={d.key}>
               <td className="whitespace-nowrap">
-                <span className="font-serif text-[15px] text-ink">{a.counterparty}</span>
-                {a.source ? (
-                  <span
-                    className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
-                    title={`资金来源: ${a.source}`}
-                  >
-                    SC {a.source}
-                  </span>
-                ) : null}
-                <span className="font-mono text-[11px] text-graphite ml-2">{a.detail}</span>
+                <span className="font-serif text-[15px] text-ink">{d.counterparty}</span>
+                <SourceBadge source={d.source} />
+                <span className="font-mono text-[11px] text-graphite ml-2">{d.detail}</span>
               </td>
-              {BUCKETS.map((b) => (
-                <td key={b.key} className="num">{money(a.buckets[b.key])}</td>
-              ))}
-              <td className="num font-semibold">{formatMoney(a.buckets.total)}</td>
+              <td className="num">{formatMoney(d.dueAmount)}</td>
+              <td className="num">{money(d.paidThisMonth)}</td>
+              <td className="num font-semibold">{formatMoney(d.shortfall)}</td>
             </tr>
           ))}
           <tr className="bg-surface-2">
             <td className="font-sans font-medium text-ink">Total</td>
-            {BUCKETS.map((b) => (
-              <td key={b.key} className="num font-semibold">{money(side.totals[b.key])}</td>
-            ))}
-            <td className="num font-semibold">{formatMoney(side.totals.total)}</td>
+            <td className="num font-semibold">{formatMoney(side.dueTotal.dueAmount)}</td>
+            <td className="num font-semibold">{money(side.dueTotal.paidThisMonth)}</td>
+            <td className="num font-semibold">{formatMoney(side.dueTotal.shortfall)}</td>
           </tr>
         </tbody>
       </table>
@@ -78,59 +74,90 @@ function AgingTable({ side }: { side: AgingSide }) {
   )
 }
 
-function NoTermTable({ side }: { side: AgingSide }) {
-  if (side.noTerm.length === 0) return null
+function OutstandingTables({ side }: { side: MonitorSide }) {
   return (
-    <div className="mb-2">
-      <div className="flex items-baseline justify-between mb-2">
-        <h3 className="font-serif italic text-graphite text-sm">
-          无固定期限 / 利滚利 · not aged(没有到期日,只列余额)
-        </h3>
-        <span className="font-mono text-[11px] text-graphite">
-          OUTSTANDING {formatMoney(side.noTermOutstanding)}
-        </span>
+    <div className="space-y-6">
+      <div>
+        <div className="flex items-baseline justify-between mb-2">
+          <h3 className="font-serif italic text-graphite text-sm">定好日期的 · fixed schedule</h3>
+          <span className="font-mono text-[11px] text-graphite">SUBTOTAL {formatMoney(side.scheduledTotal)}</span>
+        </div>
+        {side.scheduled.length === 0 ? (
+          <p className="font-serif italic text-muted text-sm">None.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="ledger-table">
+              <thead>
+                <tr>
+                  <th>Counterparty</th>
+                  <th className="num">还款起始</th>
+                  <th className="num">Outstanding</th>
+                </tr>
+              </thead>
+              <tbody>
+                {side.scheduled.map((o) => (
+                  <tr key={o.key}>
+                    <td className="whitespace-nowrap">
+                      <span className="font-serif text-[15px] text-ink">{o.counterparty}</span>
+                      <SourceBadge source={o.source} />
+                      <span className="font-mono text-[11px] text-graphite ml-2">{o.detail}</span>
+                    </td>
+                    <td className="num font-mono text-[11px] text-graphite">{o.startLabel}</td>
+                    <td className="num font-semibold">{formatMoney(o.outstanding)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
-      <div className="overflow-x-auto">
-        <table className="ledger-table">
-          <thead>
-            <tr>
-              <th>Counterparty</th>
-              <th className="num">Outstanding</th>
-              <th className="num">Monthly interest</th>
-            </tr>
-          </thead>
-          <tbody>
-            {side.noTerm.map((n) => (
-              <tr key={n.key}>
-                <td className="whitespace-nowrap">
-                  <span className="font-serif text-[15px] text-ink">{n.counterparty}</span>
-                  {n.source ? (
-                    <span
-                      className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
-                      title={`资金来源: ${n.source}`}
-                    >
-                      SC {n.source}
-                    </span>
-                  ) : null}
-                  <span className="font-mono text-[11px] text-graphite ml-2">{n.detail}</span>
-                </td>
-                <td className="num">{formatMoney(n.outstanding)}</td>
-                <td className="num">{money(n.monthlyInterest)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+      <div>
+        <div className="flex items-baseline justify-between mb-2">
+          <h3 className="font-serif italic text-graphite text-sm">还没定好的 · no fixed term / 利滚利</h3>
+          <span className="font-mono text-[11px] text-graphite">SUBTOTAL {formatMoney(side.noTermTotal)}</span>
+        </div>
+        {side.noTerm.length === 0 ? (
+          <p className="font-serif italic text-muted text-sm">None.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="ledger-table">
+              <thead>
+                <tr>
+                  <th>Counterparty</th>
+                  <th className="num">Outstanding</th>
+                </tr>
+              </thead>
+              <tbody>
+                {side.noTerm.map((o) => (
+                  <tr key={o.key}>
+                    <td className="whitespace-nowrap">
+                      <span className="font-serif text-[15px] text-ink">{o.counterparty}</span>
+                      <SourceBadge source={o.source} />
+                      <span className="font-mono text-[11px] text-graphite ml-2">{o.detail}</span>
+                    </td>
+                    <td className="num font-semibold">{formatMoney(o.outstanding)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
+
+      <p className="font-mono text-[11.5px] text-graphite tracking-[0.02em] font-medium">
+        GRAND TOTAL OUTSTANDING <span className="text-num-ink">{formatMoney(side.grandTotal)}</span>
+      </p>
     </div>
   )
 }
 
-export default async function LoanAgingPage() {
+export default async function LoanMonitorPage() {
   await requireRole(['principal', 'finance'])
   const supabase = await createClient()
 
-  const data = await fetchLoanAgingData(supabase)
-  const asOfLabel = dayjs(`${data.asOfYM}-01`).format('MMMM YYYY')
+  const data = await fetchLoanMonitorData(supabase)
+  const monthLabel = dayjs(`${data.currentYM}-01`).format('MMMM YYYY')
 
   return (
     <div>
@@ -141,11 +168,12 @@ export default async function LoanAgingPage() {
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>III.</em> REPORTS · LOAN AGING · AS OF {asOfLabel.toUpperCase()}
+            <em>III.</em> REPORTS · LOAN MONITOR · {monthLabel.toUpperCase()}
           </div>
-          <h1 className="page-title">Loan Aging</h1>
+          <h1 className="page-title">Loan Monitor</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
-            按还款排程逐期对账 · flat amortisation · 付款按最旧一期先冲(FIFO)· all amounts RM
+            本月该收/该付而未清的排在上面(清了就消失)· Outstanding 总览在下面 ·
+            还款起始月在各笔的详情页设定,没设的默认放款/收款次月起
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -166,31 +194,39 @@ export default async function LoanAgingPage() {
 
       <section className="mb-12">
         <div className="sect-head">
-          <h2>应收 · To collect — Fund OUT loans</h2>
+          <h2>本月应收 · To collect this month — Fund OUT</h2>
           <span className="rule" aria-hidden />
-          <span className="count">
-            {data.collect.aged.length} WITH DUES · {data.collect.noTerm.length} NOT AGED
-          </span>
+          <span className="count">{data.collect.due.length} UNSETTLED</span>
         </div>
-        <AgingTable side={data.collect} />
-        <NoTermTable side={data.collect} />
+        <DueTable side={data.collect} verb="收" />
       </section>
 
       <section className="mb-12">
         <div className="sect-head">
-          <h2>应付 · To repay — Fund IN sources</h2>
+          <h2>本月应付 · To repay this month — Fund IN</h2>
           <span className="rule" aria-hidden />
-          <span className="count">
-            {data.repay.aged.length} WITH DUES · {data.repay.noTerm.length} NOT AGED
-          </span>
+          <span className="count">{data.repay.due.length} UNSETTLED</span>
         </div>
-        <AgingTable side={data.repay} />
-        <NoTermTable side={data.repay} />
+        <DueTable side={data.repay} verb="付" />
       </section>
 
-      <p className="font-serif italic text-muted text-xs max-w-3xl">
-        本月才放款/收款的,首期下个月才到期,不会出现在这里;完全没拖欠的 loan 也不显示 — 这是一张「找问题」的报表。
-      </p>
+      <section className="mb-12">
+        <div className="sect-head">
+          <h2>Outstanding · 应收结欠 — Fund OUT</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">{formatMoney(data.collect.grandTotal)}</span>
+        </div>
+        <OutstandingTables side={data.collect} />
+      </section>
+
+      <section className="mb-12">
+        <div className="sect-head">
+          <h2>Outstanding · 应付结欠 — Fund IN</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">{formatMoney(data.repay.grandTotal)}</span>
+        </div>
+        <OutstandingTables side={data.repay} />
+      </section>
     </div>
   )
 }
