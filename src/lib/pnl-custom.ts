@@ -112,8 +112,30 @@ const colSum = (rows: number[][], n: number): number[] => {
 export function buildCustomPnlRows(data: MonthlyPnlAccounts, layout: ReportLayout): MatrixRow[] {
   const n = data.columns.length
   const byCode = new Map(data.accounts.map((a) => [a.code, a]))
-  const assigned = new Set<string>()
   const rows: MatrixRow[] = []
+
+  // Auto-file un-placed P&L accounts into the category whose id matches their
+  // accounting default (revenue / cost / other_income / expense) — the same
+  // treatment buildCustomCashFlowRows already has. A saved layout is a
+  // snapshot; COA accounts added or re-parented later otherwise land in the
+  // red "Unassigned" bucket (user report 2026-07-24: six revenue leaves and
+  // inter-billing 9052–9056 were missing from the 06-29 layout). Explicit
+  // placement in the layout always wins; only an account whose default
+  // category has no matching layout category stays Unassigned.
+  const placed = new Set(layout.categories.flatMap((c) => c.accounts))
+  const catIds = new Set(layout.categories.map((c) => c.id))
+  const autoByCat = new Map<string, PnlAccount[]>()
+  const orphans: PnlAccount[] = []
+  for (const a of data.accounts) {
+    if (placed.has(a.code)) continue
+    if (catIds.has(a.defaultCategory)) {
+      const arr = autoByCat.get(a.defaultCategory) ?? []
+      arr.push(a)
+      autoByCat.set(a.defaultCategory, arr)
+    } else {
+      orphans.push(a)
+    }
+  }
 
   // Gross Profit = Revenue − COGS, where "COGS" is whatever the user dropped
   // into the COGS category — NOT just COA cost-type accounts. So we run a tally
@@ -127,8 +149,8 @@ export function buildCustomPnlRows(data: MonthlyPnlAccounts, layout: ReportLayou
   const running = new Array(n).fill(0)
 
   for (const cat of layout.categories) {
-    const accs = cat.accounts.map((c) => byCode.get(c)).filter((a): a is PnlAccount => !!a)
-    accs.forEach((a) => assigned.add(a.code))
+    const listed = cat.accounts.map((c) => byCode.get(c)).filter((a): a is PnlAccount => !!a)
+    const accs = [...listed, ...(autoByCat.get(cat.id) ?? [])]
     const sub = colSum(accs.map((a) => a.values), n)
     rows.push(...buildHierarchyRows(accs, cat.id, 1))
     rows.push({ key: `cat:${cat.id}`, label: cat.name, depth: 0, kind: 'subtotal', tone: 'auto', values: sub })
@@ -155,10 +177,11 @@ export function buildCustomPnlRows(data: MonthlyPnlAccounts, layout: ReportLayou
     })
   }
 
-  const leftovers = data.accounts.filter((a) => !assigned.has(a.code))
-  if (leftovers.length > 0) {
-    rows.push(...buildHierarchyRows(leftovers, 'unassigned', 1))
-    rows.push({ key: 'cat:unassigned', label: 'Unassigned', depth: 0, kind: 'subtotal', tone: 'danger', values: colSum(leftovers.map((a) => a.values), n) })
+  // Only reached if an account's default category has no matching layout
+  // category (e.g. the saved layout deleted the Expenses group entirely).
+  if (orphans.length > 0) {
+    rows.push(...buildHierarchyRows(orphans, 'unassigned', 1))
+    rows.push({ key: 'cat:unassigned', label: 'Unassigned', depth: 0, kind: 'subtotal', tone: 'danger', values: colSum(orphans.map((a) => a.values), n) })
   }
 
   // Net Income = sum of every account, regardless of how they're grouped.

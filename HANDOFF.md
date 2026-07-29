@@ -59,10 +59,19 @@
    interest 451.56 = a FULL month on a deposit held ~9 days — confirm before
    Principal approves.
 3. User password changes: guided via Supabase dashboard SQL editor (their own hands,
-   test password; SQL editor history cleanup advised). PENDING report items from
-   user: "marketing rental" change (not yet described); 9056 Inter-billing - Venture
-   Office sits in P&L Unassigned (layout saved 06-29 predates the 07-06 account —
-   offered layout patch, awaiting choice).
+   test password; SQL editor history cleanup advised).
+4. **P&L layout drift fixed (user: why doesn't P&L mirror my COA Revenue tree)**:
+   the saved pnl layout (06-29) listed only 4 revenue codes — 5001/5021-5025 and
+   inter-billing 9052-9056 were never added, landing in Unassigned or invisible.
+   (a) Layout patched by SQL: Revenue now lists all 10 codes, Expenses all 18 —
+   hierarchy renders via ancestry so children nest under 5010/9050 headers.
+   (b) buildCustomPnlRows now AUTO-FILES un-placed accounts into the category
+   matching defaultCategory (same pattern buildCustomCashFlowRows already had;
+   +4 tests, suite 404). Unassigned only remains when no matching category exists.
+   NOTE: local tsc shows 5 errors in the user's untracked `* - Copy.tsx` snapshots
+   (drifted vs the other session's RequestState/batchState changes) — NOISE, not in
+   the repo, never touch those files; filter with grep -v ' - Copy'.
+   PENDING from user: "marketing rental" report change (not yet described).
 
 ## Session 2026-07-22 — OneDrive un-sync recovery + fund-out 资金来源 field
 
