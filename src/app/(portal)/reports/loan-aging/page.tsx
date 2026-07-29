@@ -48,8 +48,8 @@ function AgingTable({ side }: { side: AgingSide }) {
           {side.aged.map((a) => (
             <tr key={a.key}>
               <td className="whitespace-nowrap">
-                <div className="font-serif text-[15px] text-ink">{a.counterparty}</div>
-                <div className="font-mono text-[11px] text-graphite mt-0.5">{a.detail}</div>
+                <span className="font-serif text-[15px] text-ink">{a.counterparty}</span>
+                <span className="font-mono text-[11px] text-graphite ml-2">{a.detail}</span>
               </td>
               {BUCKETS.map((b) => (
                 <td key={b.key} className="num">{money(a.buckets[b.key])}</td>
@@ -95,8 +95,8 @@ function NoTermTable({ side }: { side: AgingSide }) {
             {side.noTerm.map((n) => (
               <tr key={n.key}>
                 <td className="whitespace-nowrap">
-                  <div className="font-serif text-[15px] text-ink">{n.counterparty}</div>
-                  <div className="font-mono text-[11px] text-graphite mt-0.5">{n.detail}</div>
+                  <span className="font-serif text-[15px] text-ink">{n.counterparty}</span>
+                  <span className="font-mono text-[11px] text-graphite ml-2">{n.detail}</span>
                 </td>
                 <td className="num">{formatMoney(n.outstanding)}</td>
                 <td className="num">{money(n.monthlyInterest)}</td>
