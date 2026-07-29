@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { fetchAllJournalLines, fetchCoaAccounts } from '@/lib/gl-reports'
+import { eliminateInterBilling, fetchInterBillingElimination } from '@/lib/consolidation'
 import { buildPnlAccounts, buildCustomPnlRows, defaultPnlLayout } from '@/lib/pnl-custom'
 import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
 import { segmentFilterFor } from '../_components/report-segments'
@@ -27,11 +28,16 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))
 
-  const [lines, accounts, savedRaw] = await Promise.all([
+  // Consolidated = all-segments view for finance/principal; dept managers'
+  // empty segment is their OWN view via RLS — never eliminate for them.
+  const consolidated = !isDeptMgr && !segment
+  const [rawLines, accounts, savedRaw, elim] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
     readReportLayout(supabase, 'pnl'),
+    consolidated ? fetchInterBillingElimination(supabase) : Promise.resolve(null),
   ])
+  const lines = elim ? eliminateInterBilling(rawLines, elim) : rawLines
 
   const data = buildPnlAccounts(lines, accounts, { year, throughMonth, segment: segmentFilterFor(segment) })
   const saved = (savedRaw ?? null) as ReportLayout | null
@@ -54,6 +60,7 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
           <h1 className="page-title">Monthly P&amp;L</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
             FY {year} · read-only · all amounts RM · % of sales
+            {consolidated ? <> · <em className="text-accent">内部互收已抵销</em></> : null}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">

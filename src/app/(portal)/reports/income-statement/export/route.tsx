@@ -4,6 +4,7 @@ import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { buildPnl, fetchAllJournalLines, fetchCoaAccounts, monthPeriod } from '@/lib/gl-reports'
+import { eliminateInterBilling, fetchInterBillingElimination } from '@/lib/consolidation'
 import { pnlBlocks } from '@/lib/gl-report-blocks'
 import { glStatementExportResponse } from '@/lib/export/gl-statement'
 import { segmentFilterFor } from '../../_components/report-segments'
@@ -22,10 +23,15 @@ export async function GET(req: Request) {
   }
 
   const supabase = await createClient()
-  const [lines, accounts] = await Promise.all([
+  // Mirror the page: the no-segment view is consolidated → eliminate
+  // inter-segment billing pairs (this route is finance/principal only).
+  const consolidated = !segment
+  const [rawLines, accounts, elim] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
+    consolidated ? fetchInterBillingElimination(supabase) : Promise.resolve(null),
   ])
+  const lines = elim ? eliminateInterBilling(rawLines, elim) : rawLines
   const pnl = buildPnl(lines, accounts, {
     current: monthPeriod(period),
     previous: monthPeriod(compare || period),

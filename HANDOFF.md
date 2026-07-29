@@ -72,6 +72,23 @@
    (drifted vs the other session's RequestState/batchState changes) — NOISE, not in
    the repo, never touch those files; filter with grep -v ' - Copy'.
    PENDING from user: "marketing rental" report change (not yet described).
+5. **Revenue reclass (user request, DATA surgery)**: invoice line categories were
+   stored but the pre-Mig-275 issue JEs lumped every multi-line invoice's credit
+   into 5000. Reclassed 38 issued/paid invoices (May-Jul) in one transaction:
+   per-invoice, deleted the lumped 5000 credit line and inserted per-category
+   credit lines from invoice_lines (grouped, description 'Reclass 2026-07-24: …');
+   preflight required JE-credit == lines-sum on every invoice (all OK), post-check
+   required every touched JE balanced (pass), TB 0.00. Result: May/Jun/Jul 5000 = 0,
+   revenue sits in 5001/5021-5026 (+7012/9087/9091 recoveries); Feb-Apr stay in
+   5000 (no line data existed). Mig 275 keeps new issues correct.
+6. **Consolidation elimination (user request: "这样就出两次费用了")**: new
+   lib/consolidation.ts — fetchInterBillingElimination (internal invoice ids =
+   billable_to_type dept_pool|director; 9050-family codes) + eliminateInterBilling
+   (drops lines whose ref_id is an internal invoice, plus any 905x line). Applied
+   ONLY on the consolidated (no-segment, non-dept-manager) view of P&L Statement +
+   Monthly P&L + both exports; per-segment views unchanged; BS/TB/CashFlow
+   untouched; Net Income unchanged (pairs netted anyway). UI notes on both pages.
+   +3 tests (suite 407).
 
 ## Session 2026-07-22 — OneDrive un-sync recovery + fund-out 资金来源 field
 

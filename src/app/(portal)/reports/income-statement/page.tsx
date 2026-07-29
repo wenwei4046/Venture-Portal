@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { applyGlRefs, buildPnl, fetchAllJournalLines, fetchCoaAccounts, fetchGlRefs, monthPeriod } from '@/lib/gl-reports'
+import { eliminateInterBilling, fetchInterBillingElimination } from '@/lib/consolidation'
 import { pnlBlocks } from '@/lib/gl-report-blocks'
 import GlReportView from '../_components/GlReportView'
 import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
@@ -34,12 +35,18 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
   const isDeptMgr = user.role === 'dept_manager'
   const segment = isDeptMgr ? '' : (params.segment ?? '')
 
-  const [rawLines, accounts, glRefs] = await Promise.all([
+  // Consolidated = the true all-segments view (finance/principal, no segment
+  // picked). Dept managers' empty segment is their OWN view via RLS — never
+  // eliminate for them.
+  const consolidated = !isDeptMgr && !segment
+  const [rawLines, accounts, glRefs, elim] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
     fetchGlRefs(supabase),
+    consolidated ? fetchInterBillingElimination(supabase) : Promise.resolve(null),
   ])
-  const lines = applyGlRefs(rawLines, glRefs)
+  let lines = applyGlRefs(rawLines, glRefs)
+  if (elim) lines = eliminateInterBilling(lines, elim)
 
   const pnl = buildPnl(lines, accounts, {
     current: monthPeriod(period),
@@ -70,6 +77,9 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
         Built straight from the general ledger — the same journal lines the Trial Balance ties to.
         Gross profit = revenue − COGS; net income adds other income and deducts expenses.
         Click ▸ on an account to see its journal transactions for the period.
+        {consolidated ? (
+          <> <em className="text-accent">合并视图已抵销部门间互收 — inter-billing between segments is eliminated here; pick a segment to see its own charges.</em></>
+        ) : null}
       </p>
 
       <GlReportView
