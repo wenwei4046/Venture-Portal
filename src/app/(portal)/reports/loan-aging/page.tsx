@@ -186,19 +186,26 @@ export default async function LoanMonitorPage() {
             Outstanding 总览在下面 · 起始月在各笔详情页设定,没设的默认放款/收款次月起
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <a
-            href="/reports/loan-aging/export?format=xlsx"
-            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-          >
-            Excel
-          </a>
-          <a
-            href="/reports/loan-aging/export?format=pdf"
-            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-          >
-            PDF
-          </a>
+        <div className="flex flex-col gap-1.5 shrink-0 text-right">
+          {(['aging', 'outstanding'] as const).map((view) => (
+            <div key={view} className="flex gap-2 items-center justify-end">
+              <span className="text-[11px] font-mono uppercase tracking-wide text-muted w-24 text-right">
+                {view}
+              </span>
+              <a
+                href={`/reports/loan-aging/export?format=xlsx&view=${view}`}
+                className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+              >
+                Excel
+              </a>
+              <a
+                href={`/reports/loan-aging/export?format=pdf&view=${view}`}
+                className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+              >
+                PDF
+              </a>
+            </div>
+          ))}
         </div>
       </div>
 
