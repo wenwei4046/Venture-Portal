@@ -18,10 +18,23 @@ export const dynamic = 'force-dynamic'
 
 const m = (v: number) => (v ? formatMoneyBare(v) : '—')
 
+// The PDF kit's font has no CJK glyphs (Chinese overlaps into garbage) and
+// long labels wrap — exports use compact ASCII-only labels; the HTML page
+// keeps the Chinese copy.
+const compact = (s: string) =>
+  s
+    .replace(/^RM /, '')
+    .replace('.00 @', ' @')
+    .replace('%/mo', '%')
+    .replace('利滚利 compounding', 'compounding')
+
+const startEn = (s: string) =>
+  s === '未定' ? '—' : s.replace(' 起 (默认)', ' (default)').replace(' 起', '')
+
 const dueLabel = (d: DueRow) =>
-  `${d.counterparty} — ${d.detail}${d.source ? ` · SC ${d.source}` : ''}`
+  `${d.counterparty} — ${compact(d.detail)}${d.source ? ` · SC ${d.source}` : ''}`
 const outLabel = (o: OutstandingRow) =>
-  `${o.counterparty} — ${o.detail}${o.source ? ` · SC ${o.source}` : ''}`
+  `${o.counterparty} — ${compact(o.detail)}${o.source ? ` · SC ${o.source}` : ''}`
 
 export async function GET(req: Request) {
   await requireRole(['principal', 'finance'])
@@ -57,8 +70,8 @@ export async function GET(req: Request) {
       kinds.push('total')
       return { rows, kinds }
     }
-    const a = sideBlock('应收 To collect — Fund OUT', data.collect)
-    const b = sideBlock('应付 To repay — Fund IN', data.repay)
+    const a = sideBlock('To collect — Fund OUT', data.collect)
+    const b = sideBlock('To repay — Fund IN', data.repay)
     const rows = [...a.rows, ...b.rows]
     const kinds = [...a.kinds, ...b.kinds]
 
@@ -84,12 +97,12 @@ export async function GET(req: Request) {
         >
           <PdfTable
             columns={[
-              { label: 'Counterparty', width: 250, align: 'left' as const },
-              { label: 'Due this month', width: 66, align: 'right' as const },
-              { label: '1 month late', width: 66, align: 'right' as const },
-              { label: '2 months late', width: 66, align: 'right' as const },
-              { label: '3+ months late', width: 66, align: 'right' as const },
-              { label: 'Total unpaid', width: 76, align: 'right' as const },
+              { label: 'Counterparty', width: 330, align: 'left' as const },
+              { label: 'Due this month', width: 62, align: 'right' as const },
+              { label: '1 month late', width: 62, align: 'right' as const },
+              { label: '2 months late', width: 62, align: 'right' as const },
+              { label: '3+ months late', width: 62, align: 'right' as const },
+              { label: 'Total unpaid', width: 72, align: 'right' as const },
             ]}
             rows={rows}
             rowKinds={kinds}
@@ -104,24 +117,24 @@ export async function GET(req: Request) {
   const sideBlock = (title: string, s: MonitorSide) => {
     const rows: (string | number | null)[][] = []
     const kinds: PdfRowKind[] = []
-    rows.push([`${title} — 定好日期 fixed schedule (${s.scheduled.length})`, '', formatMoneyBare(s.scheduledTotal)])
+    rows.push([`${title} — fixed schedule (${s.scheduled.length})`, '', formatMoneyBare(s.scheduledTotal)])
     kinds.push('group')
     for (const o of s.scheduled) {
-      rows.push([`   ${outLabel(o)}`, o.startLabel, formatMoneyBare(o.outstanding)])
+      rows.push([`   ${outLabel(o)}`, startEn(o.startLabel), formatMoneyBare(o.outstanding)])
       kinds.push('detail')
     }
-    rows.push([`${title} — 未定 no fixed term (${s.noTerm.length})`, '', formatMoneyBare(s.noTermTotal)])
+    rows.push([`${title} — no fixed term (${s.noTerm.length})`, '', formatMoneyBare(s.noTermTotal)])
     kinds.push('group')
     for (const o of s.noTerm) {
-      rows.push([`   ${outLabel(o)}`, '未定', formatMoneyBare(o.outstanding)])
+      rows.push([`   ${outLabel(o)}`, '—', formatMoneyBare(o.outstanding)])
       kinds.push('detail')
     }
     rows.push([`${title} — TOTAL OUTSTANDING`, '', formatMoneyBare(s.grandTotal)])
     kinds.push('total')
     return { rows, kinds }
   }
-  const a = sideBlock('应收 To collect — Fund OUT', data.collect)
-  const b = sideBlock('应付 To repay — Fund IN', data.repay)
+  const a = sideBlock('To collect — Fund OUT', data.collect)
+  const b = sideBlock('To repay — Fund IN', data.repay)
   const rows = [...a.rows, ...b.rows]
   const kinds = [...a.kinds, ...b.kinds]
 
@@ -146,9 +159,9 @@ export async function GET(req: Request) {
       >
         <PdfTable
           columns={[
-            { label: 'Counterparty', width: 330, align: 'left' as const },
-            { label: 'Repayment starts', width: 90, align: 'right' as const },
-            { label: 'Outstanding', width: 90, align: 'right' as const },
+            { label: 'Counterparty', width: 360, align: 'left' as const },
+            { label: 'Repayment starts', width: 86, align: 'right' as const },
+            { label: 'Outstanding', width: 86, align: 'right' as const },
           ]}
           rows={rows}
           rowKinds={kinds}
