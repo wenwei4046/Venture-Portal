@@ -232,10 +232,12 @@ export default async function RepaymentSchedulePage({
     }
     const done = fsDoneThisMonth.has(p.id)
     // 对称于应收侧:本月才收到的资金来源首期下月才到期,不进本月应付。
-    // 已有还款 PV(主动提前还)或本月已还过的仍照常显示。
+    // 已有还款 PV(主动提前还)只在【当前真实月份】的排程显示 —— 之前不看月份,
+    // 7 月新收的 HC 存款带着在途 PV 连 6 月的排程都乱入,虚增了历史月的应付
+    // (user report 2026-07-24)。本月已还过的(已付行)仍照常显示。
     if (
       isBeforeFirstInstallment(fsm?.effective_date ?? null, currentYM) &&
-      !pendingPvByFs.has(p.id) &&
+      !(pendingPvByFs.has(p.id) && isCurrentMonth) &&
       !done
     ) {
       continue
@@ -261,7 +263,9 @@ export default async function RepaymentSchedulePage({
         done,
         compound: compounding,
       })
-    } else if (pendingPvByFs.has(p.id)) {
+    } else if (pendingPvByFs.has(p.id) && isCurrentMonth) {
+      // In-flight repayment PV rows belong to the real current month only —
+      // viewing past/future months falls through to the no-term bucket below.
       const bd = pendingPvByFs.get(p.id)!
       repayRows.push({
         key: p.id,

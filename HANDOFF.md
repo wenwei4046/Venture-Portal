@@ -41,6 +41,29 @@
    crash) — the cancel card targeted the dupe (2f87e5ae), re-approved cleanly: banks
    cache==GL both, TB 0.00, vp net single-counted.
 
+## Session 2026-07-24C — evening fixes
+1. **createPaymentVoucher errors now readable in prod**: the action's throws were
+   sanitized by Next in production ("An error occurred in the Server Components
+   render…") — user stuck building the Alliance→HL offset with an empty required
+   Description and no way to know. Wrapped: createPaymentVoucherInner + exported
+   wrapper returns {error} (NEXT_REDIRECT rethrown via digest check); NewPaymentForm
+   shows result.error. June funding VERIFIED COMPLETE: PV-0153 remainder paid (dept
+   slices Mkt 5,145.95/Fin 2,937.45/HR 1,722.77/DO 766.25; custody np_in 10,572.42),
+   PV-0154 offset paid (Dr3000/Cr3010, zero pool rows), request completed, HR page
+   unlocked, banks cache==GL, TB 0.00. NOTE: HL down to ~2,135 (user approved 3 big
+   pending PVs 158,780 total) — cash-thin, flagged to user.
+2. **Repayment Schedule month-blind pending-PV fix**: sources carrying an in-flight
+   repayment PV surfaced in EVERY viewed month (HC 45,156.32 pending
+   HV-PV-202607-0178 polluted JUNE's to-repay). Both the skip-exception and the
+   pending-row branch now require isCurrentMonth. Also flagged to user: 0178's
+   interest 451.56 = a FULL month on a deposit held ~9 days — confirm before
+   Principal approves.
+3. User password changes: guided via Supabase dashboard SQL editor (their own hands,
+   test password; SQL editor history cleanup advised). PENDING report items from
+   user: "marketing rental" change (not yet described); 9056 Inter-billing - Venture
+   Office sits in P&L Unassigned (layout saved 06-29 predates the 07-06 account —
+   offered layout patch, awaiting choice).
+
 ## Session 2026-07-22 — OneDrive un-sync recovery + fund-out 资金来源 field
 
 1. **Recovery**: full project found at the new Desktop path (Known Folder Move). git HEAD
