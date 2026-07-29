@@ -47,6 +47,11 @@ const reports = [
     title: 'Debtor Aging',
     description: 'Invoices billed but not yet collected, bucketed by days past due.',
   },
+  {
+    href: '/reports/loan-aging',
+    title: 'Loan Aging',
+    description: 'Overdue loan installments both ways — to collect (Fund OUT) and to repay (Fund IN).',
+  },
 ]
 
 export default async function ReportsPage() {

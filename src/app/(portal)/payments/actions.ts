@@ -8,7 +8,48 @@ import { requireRole } from '@/lib/auth'
 import { postJournalEntry, r2 } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
 import { ACCOUNT_TYPES, type AccountType } from '@/lib/coa'
+import { payerExpenseSplits, type NatureSplit } from '@/lib/inter-billing-nature'
 import { segmentForBillingMode, lineAttributions, type SegmentAttribution } from '@/lib/invoice-settlement'
+
+// Nature splits for the inter-billing MIRROR rows (user 2026-07-24) — same
+// mapping billing/actions uses for the issue JE, so the dept-pool P&L and the
+// GL agree on what the charge was (rent / utilities / salary vs lumped 905x).
+async function interBillingNatureSplitsForMirror(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  invoiceId: string,
+  invoiceTotal: number,
+  fallbackCode: string,
+): Promise<NatureSplit[]> {
+  const [{ data: hdr }, { data: ilines }] = await Promise.all([
+    supabase.from('invoices').select('category_code').eq('id', invoiceId).maybeSingle(),
+    supabase.from('invoice_lines').select('category_code, amount').eq('invoice_id', invoiceId),
+  ])
+  const headerCategory = (hdr?.category_code as string | null) ?? null
+  const cats = [
+    ...new Set(
+      [...(ilines ?? []).map((l) => l.category_code as string | null), headerCategory].filter(
+        (c): c is string => !!c,
+      ),
+    ),
+  ]
+  const { data: coa } = cats.length
+    ? await supabase.from('chart_of_accounts').select('code, type').in('code', cats)
+    : { data: [] }
+  const typeMap = new Map((coa ?? []).map((c) => [c.code as string, c.type as string]))
+  const splits = payerExpenseSplits(
+    (ilines ?? []).map((l) => ({ category_code: (l.category_code as string | null) ?? null, amount: Number(l.amount) })),
+    invoiceTotal,
+    headerCategory,
+    (code) => typeMap.get(code),
+    fallbackCode,
+  )
+  const sum = r2(splits.reduce((s, x) => s + x.amount, 0))
+  // Mirror rows must tie to the voucher amount; fall back to one lumped row
+  // rather than fail the settlement over a legacy rounding quirk.
+  return Math.abs(sum - invoiceTotal) > 0.005
+    ? [{ accountCode: fallbackCode, amount: r2(invoiceTotal) }]
+    : splits
+}
 
 // ─── Create payment voucher (Finance) ────────────────────────────────────────
 
@@ -594,24 +635,31 @@ async function createPaymentVoucherInner(formData: FormData) {
     // split of the voucher amount. Without role='mirror' the trigger would
     // see sum=2N (primary N + this row N) ≠ voucher.amount N and reject.
     if (interBilling) {
+      // Mirror rows now split BY NATURE (user 2026-07-24) so the paying
+      // dept's P&L shows Office Rental / utilities / salary share instead of
+      // one lumped 905x — same mapping the issue JE uses; the dept's 905x
+      // remains the fallback for uncategorised lines.
       // role='mirror' (mig 254 column) is not yet in the generated
       // database.types.ts — cast to bypass the stale type. The DB has the
       // CHECK constraint, so an invalid value still fails loud at runtime.
-      const mirrorRow = {
+      const natureSplits = invoiceId
+        ? await interBillingNatureSplitsForMirror(supabase, invoiceId, r2(amount), interBilling.expenseCode)
+        : [{ accountCode: interBilling.expenseCode, amount: r2(amount) }]
+      const mirrorRows = natureSplits.map((s) => ({
         voucher_id: data.id,
         pool: interBilling.payingPool,
-        amount: r2(amount),
-        account_code: interBilling.expenseCode,
+        amount: s.amount,
+        account_code: s.accountCode,
         role: 'mirror',
-      }
+      }))
       const { error: mirrorInsertErr } = await supabase
         .from('payment_voucher_sources')
-        .insert(mirrorRow as never)
+        .insert(mirrorRows as never)
       if (mirrorInsertErr) {
         // Fail loud — silent failure here was the 2026-05-14 bug that left
         // inter-billing expense invisible in the paying dept's P&L.
         throw new Error(
-          `Failed to insert inter-billing mirror source row (paying side, pool=${interBilling.payingPool}, account=${interBilling.expenseCode}): ${mirrorInsertErr.message}`,
+          `Failed to insert inter-billing mirror source rows (paying side, pool=${interBilling.payingPool}): ${mirrorInsertErr.message}`,
         )
       }
     }

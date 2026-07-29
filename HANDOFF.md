@@ -89,6 +89,27 @@
    Monthly P&L + both exports; per-segment views unchanged; BS/TB/CashFlow
    untouched; Net Income unchanged (pairs netted anyway). UI notes on both pages.
    +3 tests (suite 407).
+7. **Inter-billing BY NATURE (user Q1-Q3)**: paying dept's expense now posts to what
+   the charge actually WAS — lib/inter-billing-nature.ts payerExpenseSplits: income
+   category → payer counterpart (7012→9094 Office Rental, 5020→9030 Salary Expense),
+   expense-type category (recovery, e.g. 9091) → same account, unmapped → dept 905x
+   FALLBACK (accounts kept, normally zero — user Q3 answered 保留). Wired: billing/
+   actions approveInvoice + approveInvoicesForPeriod issue-JEs (per-nature debit lines,
+   interBillingNatureSplits helper, fail-loud on sum mismatch) + payments/actions
+   mirror rows (per-nature, falls back to lump on mismatch). HISTORY reclassed by SQL
+   (user Q2 要): preflight proved 0 multi-nature internal invoices, 11 GL 905x lines +
+   7 mirror rows all single-nature → in-place account swap (amount untouched, JEs stay
+   balanced): Marketing 905x → 9094 7,510.45 + 9091 1,677.19; VO 821.86 → 9030.
+   Post: 905x GL 0.00, PVS 905x 0, TB 0.00. Consolidation elimination still covers
+   these lines via the invoice-ref rule (905x belt now vestigial but kept).
+8. **Loan Aging report (user Q4-Q6)**: /reports/loan-aging + xlsx/pdf export + Reports
+   index card. BOTH directions (Q4 要 fund in 也要): 应收 Fund OUT loans / 应付 Fund IN
+   sources. lib/loan-aging.ts buildInstallmentAging — flat amortisation, first due =
+   month after disbursement/effective, pooled payments FIFO oldest-first, buckets
+   due-this-month / 1 / 2 / 3+ months late (Q5 ok); compounding & no-fixed-term in a
+   separate NOT-AGED block below each table (Q6), outstanding shown in Total column.
+   lib/loan-aging-data.ts fetch+matrix (reuses monthly-matrix kit; aging = exceptions
+   report — fully-on-track loans are hidden). +12 tests (suite 419).
 
 ## Session 2026-07-22 — OneDrive un-sync recovery + fund-out 资金来源 field
 

@@ -10,6 +10,7 @@ import { postJournalEntry } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
 import { validateConsolidation, poolAttributions, segmentForBillingMode, lineAttributions } from '@/lib/invoice-settlement'
 import { deptNameToSegment, fallbackRevenueGlCode, invoiceJeDate } from '@/lib/billing'
+import { payerExpenseSplits, type NatureSplit } from '@/lib/inter-billing-nature'
 import { INVOICE_BILLING_MODE_TO_POOL } from '@/lib/cfo-reports'
 import {
   buildConsolidatedInvoiceLines,
@@ -19,6 +20,49 @@ import {
   type DeptComponentGroup,
   type PayrollSegment,
 } from '@/lib/staff-allocation'
+
+// Payer-side inter-billing splits BY NATURE (user 2026-07-24): the paying
+// dept's expense JE debits what the charge actually was — rent share → 9094,
+// utilities share → 9091, payroll share → 9030 — instead of one lumped 905x.
+// The dept's 905x stays as the FALLBACK for uncategorised lines only.
+// Sum must equal the invoice total or we fail loud (asymmetric JE otherwise).
+async function interBillingNatureSplits(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  invoiceId: string,
+  invoiceTotal: number,
+  fallbackCode: string,
+): Promise<NatureSplit[]> {
+  const [{ data: hdr }, { data: ilines }] = await Promise.all([
+    supabase.from('invoices').select('category_code').eq('id', invoiceId).maybeSingle(),
+    supabase.from('invoice_lines').select('category_code, amount').eq('invoice_id', invoiceId),
+  ])
+  const headerCategory = (hdr?.category_code as string | null) ?? null
+  const cats = [
+    ...new Set(
+      [...(ilines ?? []).map((l) => l.category_code as string | null), headerCategory].filter(
+        (c): c is string => !!c,
+      ),
+    ),
+  ]
+  const { data: coa } = cats.length
+    ? await supabase.from('chart_of_accounts').select('code, type').in('code', cats)
+    : { data: [] }
+  const typeMap = new Map((coa ?? []).map((c) => [c.code as string, c.type as string]))
+  const splits = payerExpenseSplits(
+    (ilines ?? []).map((l) => ({ category_code: (l.category_code as string | null) ?? null, amount: Number(l.amount) })),
+    invoiceTotal,
+    headerCategory,
+    (code) => typeMap.get(code),
+    fallbackCode,
+  )
+  const sum = Math.round(splits.reduce((s, x) => s + x.amount, 0) * 100) / 100
+  if (Math.abs(sum - invoiceTotal) > 0.005) {
+    throw new Error(
+      `Inter-billing nature split RM ${sum.toFixed(2)} does not match invoice total RM ${invoiceTotal.toFixed(2)}`,
+    )
+  }
+  return splits
+}
 
 // Mig 200/P1-6a: invoice billing_mode → revenue GL code mapping.
 // 2026-06-11: fallback now lives in lib/billing.ts (fallbackRevenueGlCode) —
@@ -1762,6 +1806,7 @@ export async function approveInvoice(formData: FormData) {
           `Invoice issued but inter-billing expense JE skipped: no active expense account named "Inter-billing — ${payingDept.name}" in the COA (9051–9055 range)`,
         )
       }
+      const natureSplits = await interBillingNatureSplits(supabase, inv.id, amount, expenseAcct.code)
       try {
         await postJournalEntry(supabase, {
           transactionDate: invoiceJeDate(
@@ -1780,7 +1825,7 @@ export async function approveInvoice(formData: FormData) {
           referenceId: inv.id,
           createdBy: user.id,
           lines: [
-            { accountCode: expenseAcct.code, debit: amount, description: `Inter-billing expense — ${payingDept.name}` },
+            ...natureSplits.map((s) => ({ accountCode: s.accountCode, debit: s.amount, description: `Inter-billing (${payingDept.name}) — by nature` })),
             { accountCode: '3030', credit: amount, description: `AR cleared — inter-billing ${inv.invoice_no ?? ''}`.trim() },
           ],
         })
@@ -1928,6 +1973,7 @@ export async function approveInvoicesForPeriod(formData: FormData) {
           `Bulk issue: inter-billing expense JE skipped for invoice ${row.invoice_no ?? row.id}: no active expense account named "Inter-billing — ${payingDept.name}" in the COA (9051–9055 range)`,
         )
       }
+      const natureSplits = await interBillingNatureSplits(supabase, row.id, amount, expenseAcct.code)
       try {
         await postJournalEntry(supabase, {
           transactionDate: txnDate,
@@ -1939,7 +1985,7 @@ export async function approveInvoicesForPeriod(formData: FormData) {
           referenceId: row.id,
           createdBy: user.id,
           lines: [
-            { accountCode: expenseAcct.code, debit: amount, description: `Inter-billing expense — ${payingDept.name}` },
+            ...natureSplits.map((s) => ({ accountCode: s.accountCode, debit: s.amount, description: `Inter-billing (${payingDept.name}) — by nature` })),
             { accountCode: '3030', credit: amount, description: `AR cleared — inter-billing ${row.invoice_no ?? ''}`.trim() },
           ],
         })
