@@ -46,6 +46,22 @@
    consolidated — rule `!isDeptMgr && !segment`, because a dept manager has no
    segment param but IS one segment via RLS. Totals unaffected (the pair nets
    to zero); per-segment views keep the bridge.
+   FOLLOW-UP 3 ("money out 分多几层 section…借贷/repayment 一个,日常开销一个" +
+   "顺序自己排"): the Cash Flow STATEMENT got its own layout editor, mirroring
+   the monthly reports' pattern but with ONE ORDERED SECTION LIST PER SIDE —
+   report_keys `cash_flow_in` / `cash_flow_out` (report_layouts has no key
+   constraint; both added to layout-actions REVALIDATE). Two instances of the
+   existing ReportLayoutEditor on /reports/cash-flow/layout, so no editor
+   changes were needed. New lib/cash-flow-sections.ts:
+   buildCashFlowSideSections groups a side's LEAVES by the layout and rebuilds
+   the COA tree INSIDE each section (custom section → COA header → leaves);
+   unassigned accounts sweep into a trailing 其他 section so a side total can
+   never silently drop an account. defaultSideLayout seeds one section per
+   top-level COA parent. buildCashFlow now also exposes inflowLeaves /
+   outflowLeaves (pre-tree buckets) to feed this. cashFlowBlocks takes an
+   optional {inflow,outflow} section array — omitted = previous behaviour, so
+   nothing else that calls it changes. Page + export both read the layouts.
+   +6 tests (suite 434).
 3. **明细**: the single-month Cash Flow Statement ALREADY had drill-down
    (GlReportView ▸ + applyGlRefs) — user picked it, so the work was making the new
    gross rows carry per-side txns (done above). The Monthly Cash Flow MATRIX still

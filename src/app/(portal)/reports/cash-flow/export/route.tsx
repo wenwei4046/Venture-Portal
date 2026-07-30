@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { buildCashFlow, fetchAllJournalLines, fetchCoaAccounts, monthPeriod } from '@/lib/gl-reports'
 import { cashFlowBlocks } from '@/lib/gl-report-blocks'
+import { buildCashFlowSideSections } from '@/lib/cash-flow-sections'
+import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
 import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
 import { glStatementExportResponse } from '@/lib/export/gl-statement'
 import { segmentFilterFor } from '../../_components/report-segments'
@@ -46,6 +48,13 @@ export async function GET(req: Request) {
     bankCodes,
   )
 
+  // Same user-arranged sections the page renders.
+  const coaWithSynthetic = [...accounts, ib.account, ib.payrollAccount]
+  const [inLayoutRaw, outLayoutRaw] = await Promise.all([
+    readReportLayout(supabase, 'cash_flow_in'),
+    readReportLayout(supabase, 'cash_flow_out'),
+  ])
+
   return glStatementExportResponse({
     format,
     filename: `cash-flow-${period}${segment ? `-${segment}` : ''}`,
@@ -53,6 +62,9 @@ export async function GET(req: Request) {
     periodLabel: `${dayjs(`${period}-01`).format('MMMM YYYY')}${segment ? ` · ${segment}` : ''}`,
     currentLabel: dayjs(`${period}-01`).format('MMM YYYY'),
     compareLabel: compare ? dayjs(`${compare}-01`).format('MMM YYYY') : '',
-    blocks: cashFlowBlocks(cf),
+    blocks: cashFlowBlocks(cf, {
+      inflow: buildCashFlowSideSections(cf.inflowLeaves, coaWithSynthetic, inLayoutRaw as ReportLayout | null, '现金流入 · Money in'),
+      outflow: buildCashFlowSideSections(cf.outflowLeaves, coaWithSynthetic, outLayoutRaw as ReportLayout | null, '现金流出 · Money out'),
+    }),
   })
 }

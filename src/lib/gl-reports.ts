@@ -482,6 +482,14 @@ export function buildBalanceSheet(
 
 // ─── Cash Flow ───────────────────────────────────────────────────────────────
 
+/** One account's cash movement on ONE side (in or out), pre-tree. */
+export interface CashFlowLeaf {
+  code: string
+  current: number
+  previous: number
+  txns: GlTxn[]
+}
+
 export interface CashFlowReport {
   operating: ReportSection
   investing: ReportSection
@@ -493,6 +501,12 @@ export interface CashFlowReport {
   inflow: ReportSection
   /** 现金流出 — the OUTFLOW slices (negative amounts). */
   outflow: ReportSection
+  /** Flat per-account buckets behind `inflow` / `outflow`, before the COA tree
+   *  is built — so a custom layout can group them into its OWN sections and
+   *  nest the COA tree inside each one (user 2026-07-30: 借贷/还款 一个 section,
+   *  日常开销 一个 section, 顺序自己排). */
+  inflowLeaves: CashFlowLeaf[]
+  outflowLeaves: CashFlowLeaf[]
   netChange: { current: number; previous: number }
   openingCash: { current: number; previous: number }
   closingCash: { current: number; previous: number }
@@ -631,6 +645,8 @@ export function buildCashFlow(
   const allTypes: ReadonlySet<AccountType> = new Set(ACCOUNT_TYPES)
   const inflow = section('inflow', '现金流入 · Money in', buildTree(accounts, inBuckets, allTypes))
   const outflow = section('outflow', '现金流出 · Money out', buildTree(accounts, outBuckets, allTypes))
+  const leavesOf = (m: Map<string, Bucket>): CashFlowLeaf[] =>
+    [...m.entries()].map(([code, b]) => ({ code, current: b.current, previous: b.previous, txns: b.txns }))
   const netChange = {
     current: r2(operating.current + investing.current + financing.current),
     previous: r2(operating.previous + investing.previous + financing.previous),
@@ -641,6 +657,8 @@ export function buildCashFlow(
     financing,
     inflow,
     outflow,
+    inflowLeaves: leavesOf(inBuckets),
+    outflowLeaves: leavesOf(outBuckets),
     netChange,
     openingCash: { current: openCur, previous: openPrev },
     closingCash: { current: closeCur, previous: closePrev },

@@ -8,6 +8,9 @@ import { writeReportLayout, type ReportLayout } from '@/lib/report-layouts'
 const REVALIDATE: Record<string, string[]> = {
   cash_flow: ['/reports/monthly-cash-flow', '/reports/monthly-cash-flow/layout'],
   pnl: ['/reports/monthly-pnl', '/reports/monthly-pnl/layout'],
+  // Cash Flow STATEMENT — one ordered section list per side (2026-07-30).
+  cash_flow_in: ['/reports/cash-flow', '/reports/cash-flow/layout'],
+  cash_flow_out: ['/reports/cash-flow', '/reports/cash-flow/layout'],
 }
 
 // Save a company-wide custom report layout (cash flow / P&L).

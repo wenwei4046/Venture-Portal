@@ -17,6 +17,8 @@ import {
   monthPeriod,
 } from '@/lib/gl-reports'
 import { cashFlowBlocks } from '@/lib/gl-report-blocks'
+import { buildCashFlowSideSections } from '@/lib/cash-flow-sections'
+import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
 import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
 import GlReportView from '../_components/GlReportView'
 import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
@@ -73,7 +75,17 @@ export default async function CashFlowPage({ searchParams }: Props) {
     bankCodes,
   )
 
-  const blocks = cashFlowBlocks(cf)
+  // User-arranged sections per side (Edit layout). Unsaved → one section each,
+  // i.e. the plain COA tree.
+  const coaWithSynthetic = [...accounts, ib.account, ib.payrollAccount]
+  const [inLayoutRaw, outLayoutRaw] = await Promise.all([
+    readReportLayout(supabase, 'cash_flow_in'),
+    readReportLayout(supabase, 'cash_flow_out'),
+  ])
+  const blocks = cashFlowBlocks(cf, {
+    inflow: buildCashFlowSideSections(cf.inflowLeaves, coaWithSynthetic, inLayoutRaw as ReportLayout | null, '现金流入 · Money in'),
+    outflow: buildCashFlowSideSections(cf.outflowLeaves, coaWithSynthetic, outLayoutRaw as ReportLayout | null, '现金流出 · Money out'),
+  })
   const periodLabel = dayjs(`${period}-01`).format('MMMM YYYY')
 
   return (
@@ -89,7 +101,18 @@ export default async function CashFlowPage({ searchParams }: Props) {
           </div>
           <h1 className="page-title">Cash Flow Statement</h1>
         </div>
-        <ExportLinks basePath="/reports/cash-flow/export" period={period} compare={compare} segment={segment} />
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Edit layout edits the SHARED company sections — hide from dept managers. */}
+          {!isDeptMgr && (
+            <Link
+              href="/reports/cash-flow/layout"
+              className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white rounded-md text-xs font-sans transition-colors"
+            >
+              Edit layout
+            </Link>
+          )}
+          <ExportLinks basePath="/reports/cash-flow/export" period={period} compare={compare} segment={segment} />
+        </div>
       </div>
 
       <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
