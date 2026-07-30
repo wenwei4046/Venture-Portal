@@ -20,31 +20,59 @@ export default function MonthlyMatrix({
 }) {
   // L1 = subtotals only · L2 = + top accounts & parent roll-ups · L3 = every level.
   const [level, setLevel] = useState<1 | 2 | 3>(3)
+  // Explicit user overrides of the level default, both directions: `collapsed`
+  // closes something the level would show, `expanded` opens something the level
+  // would hide. Without the second set, clicking ▶ at L2 did nothing — the
+  // children were filtered out by depth no matter what the arrow said
+  // (user report 2026-07-30).
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const showPct = Array.isArray(pctBaseByColumn)
-  const toggle = (key: string) =>
+
+  // Deepest ACCOUNT depth this level shows on its own.
+  const maxDepth = level === 1 ? -1 : level === 2 ? 1 : Infinity
+  const opensByLevel = (depth: number) => depth + 1 <= maxDepth
+  const isOpen = (key: string, depth: number) =>
+    collapsed.has(key) ? false : opensByLevel(depth) || expanded.has(key)
+
+  const toggle = (key: string, depth: number) => {
+    const open = isOpen(key, depth)
     setCollapsed((prev) => {
       const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
+      if (open) next.add(key)
+      else next.delete(key)
+      return next
+    })
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (open) next.delete(key)
       else next.add(key)
       return next
     })
+  }
 
-  const leveled = rows.filter((r) => {
-    if (r.kind === 'subtotal') return true // category / grand-total rows always show
-    if (level === 1) return false // totals only
-    if (level === 2) return r.depth <= 1 // + top-level accounts & parent roll-ups
-    return true // L3: all account levels incl. children
-  })
-  // Hide the children of any collapsed parent — everything deeper, until we step
-  // back out to the parent's own depth or shallower.
-  const visibleRows: typeof leveled = []
+  // One pass: skip anything inside a closed parent, and let an explicitly
+  // opened parent's subtree bypass the level filter.
+  const visibleRows: typeof rows = []
+  const openKeys = new Set<string>()
   let hideDepth = Infinity
-  for (const r of leveled) {
+  let bypassDepth = Infinity
+  for (const r of rows) {
     if (r.depth > hideDepth) continue
     hideDepth = Infinity
+    if (r.depth <= bypassDepth) bypassDepth = Infinity
+    const bypassed = r.depth > bypassDepth
+    // Subtotals (section / grand totals) always show.
+    if (!(r.kind === 'subtotal' || bypassed || r.depth <= maxDepth)) continue
     visibleRows.push(r)
-    if (r.kind === 'account' && r.isParent && collapsed.has(r.key)) hideDepth = r.depth
+    if (r.kind === 'account' && r.isParent) {
+      if (isOpen(r.key, r.depth)) {
+        openKeys.add(r.key)
+        if (expanded.has(r.key)) bypassDepth = Math.min(bypassDepth, r.depth)
+      } else {
+        hideDepth = r.depth
+      }
+    }
   }
 
   const pct = (value: number, base: number) =>
@@ -111,7 +139,8 @@ export default function MonthlyMatrix({
               const isSub = row.kind === 'subtotal'
               const isStrong = isSub && row.emphasis === 'strong'
               const isParent = row.kind === 'account' && row.isParent
-              const isCollapsed = isParent && collapsed.has(row.key)
+              // Arrow reflects what is actually on screen, level included.
+              const isCollapsed = isParent && !openKeys.has(row.key)
               // Four shaded tiers, darkest → lightest: headline total (accent
               // wash, matching the GL statements) > section subtotal (surface-2)
               // > parent roll-up (paper) > leaf / child (surface).
@@ -151,7 +180,7 @@ export default function MonthlyMatrix({
                     {isParent ? (
                       <button
                         type="button"
-                        onClick={() => toggle(row.key)}
+                        onClick={() => toggle(row.key, row.depth)}
                         className="inline-flex items-center gap-1.5 text-left hover:text-accent transition-colors"
                         title={isCollapsed ? 'Expand children' : 'Collapse children'}
                       >

@@ -104,6 +104,16 @@
    and monthly P&L Gross Profit + Net Income. Section 小计 rows stay on the
    quieter surface-2 band, so the hierarchy reads the same in both matrices and
    both statements.
+   FOLLOW-UP 7 ("我在 L2 按了展开没有用"): MonthlyMatrix's L1/L2/L3 filter drops
+   accounts by DEPTH (L2 = depth ≤ 1) and children sit at depth 2, so clicking ▶
+   on a parent flipped the arrow but the level filter still hid the children —
+   and the arrow itself was driven by `collapsed` alone, so it claimed "expanded"
+   for rows the level was hiding. Reworked: a second `expanded` set records
+   explicit opens, `isOpen()` = not-collapsed AND (level opens it OR explicitly
+   expanded), and one pass computes visibility with a `bypassDepth` so an
+   explicitly opened parent's subtree overrides the level filter. The arrow now
+   renders from the same openKeys set the pass builds, so it can never disagree
+   with what's on screen.
 3. **明细**: the single-month Cash Flow Statement ALREADY had drill-down
    (GlReportView ▸ + applyGlRefs) — user picked it, so the work was making the new
    gross rows carry per-side txns (done above). The Monthly Cash Flow MATRIX still
