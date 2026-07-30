@@ -13,7 +13,8 @@ type FileKind = 'kwsp' | 'socso' | 'eis' | 'pcb'
  * GET /hr-costing/payroll/[period]/statutory?file=kwsp|socso|eis|pcb
  *
  * Streams one of four Malaysian statutory monthly CSVs, built from the
- * period's hr_monthly_payroll (staff) UNION director_payouts (directors).
+ * period's hr_monthly_payroll (staff) UNION director_monthly_payroll
+ * (directors — InfoTech actuals, mig 20260730100000).
  *
  * Allowed by the Read-only-GET-routes exception in CLAUDE.md (Spec 5a).
  */
@@ -51,12 +52,10 @@ export async function GET(
       `)
       .eq('period_month', period),
     supabase
-      .from('director_payouts')
+      .from('director_monthly_payroll')
       .select(`
-        payroll_gross, payroll_bk, payroll_allow,
-        payroll_epf_er, payroll_epf_ee,
-        payroll_socso_er, payroll_socso_ee,
-        payroll_eis_er, payroll_eis_ee, payroll_pcb,
+        employee_name, basic_salary, statutory_allowance, gross,
+        epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb,
         directors (name, code, nric)
       `)
       .eq('period_month', period),
@@ -93,23 +92,24 @@ export async function GET(
   }
 
   for (const r of directorRows ?? []) {
+    // Unmatched InfoTech rows (director_id NULL) still ship — name comes from
+    // the file; a missing NRIC lands them in the generator's skipped list.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const dir = (r as any).directors
-    if (!dir) continue
-    const statWages = Number(r.payroll_bk ?? 0) + Number(r.payroll_allow ?? 0)
+    const statWages = Number(r.basic_salary ?? 0) + Number(r.statutory_allowance ?? 0)
     contributors.push({
-      code: dir.code ?? null,
-      fullName: dir.name,
-      nric: dir.nric ?? null,
+      code: dir?.code ?? null,
+      fullName: dir?.name ?? r.employee_name,
+      nric: dir?.nric ?? null,
       statutoryWages: statWages,
-      taxableIncome: Number(r.payroll_gross ?? 0) - Number(r.payroll_epf_ee ?? 0),
-      epfEr: Number(r.payroll_epf_er ?? 0),
-      epfEe: Number(r.payroll_epf_ee ?? 0),
-      socsoEr: Number(r.payroll_socso_er ?? 0),
-      socsoEe: Number(r.payroll_socso_ee ?? 0),
-      eisEr: Number(r.payroll_eis_er ?? 0),
-      eisEe: Number(r.payroll_eis_ee ?? 0),
-      pcb: Number(r.payroll_pcb ?? 0),
+      taxableIncome: Number(r.gross ?? 0) - Number(r.epf_ee ?? 0),
+      epfEr: Number(r.epf_er ?? 0),
+      epfEe: Number(r.epf_ee ?? 0),
+      socsoEr: Number(r.socso_er ?? 0),
+      socsoEe: Number(r.socso_ee ?? 0),
+      eisEr: Number(r.eis_er ?? 0),
+      eisEe: Number(r.eis_ee ?? 0),
+      pcb: Number(r.pcb ?? 0),
     })
   }
 

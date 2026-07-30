@@ -53,10 +53,12 @@ export default async function HRPaymentPage({
         'id, net, gross, status, epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb, skbbk_amount, hr_staff_costs(employee_name, departments(name))',
       )
       .eq('period_month', period),
+    // Mig 20260730100000: director actuals live in director_monthly_payroll
+    // (InfoTech import) — director_payouts is retired with the v2 engine.
     supabase
-      .from('director_payouts')
+      .from('director_monthly_payroll')
       .select(
-        'id, payroll_net, payroll_gross, payroll_epf_er, payroll_epf_ee, payroll_socso_er, payroll_socso_ee, payroll_eis_er, payroll_eis_ee, payroll_pcb, payroll_skbbk, directors(name)',
+        'id, net, gross, epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb, skbbk_amount, employee_name',
       )
       .eq('period_month', period),
   ])
@@ -84,11 +86,11 @@ export default async function HRPaymentPage({
     : { data: null }
   const poolBal = Number(poolRow?.balance ?? 0)
   const rows = payrollRows ?? []
-  const dRows = (directorRows ?? []).filter(d => Number(d.payroll_net ?? 0) > 0)
+  const dRows = (directorRows ?? []).filter(d => Number(d.net ?? 0) > 0)
   const staffNet = rows.reduce((s, r) => s + Number(r.net), 0)
   const staffGross = rows.reduce((s, r) => s + Number(r.gross), 0)
-  const directorNet = dRows.reduce((s, d) => s + Number(d.payroll_net ?? 0), 0)
-  const directorGross = dRows.reduce((s, d) => s + Number(d.payroll_gross ?? 0), 0)
+  const directorNet = dRows.reduce((s, d) => s + Number(d.net ?? 0), 0)
+  const directorGross = dRows.reduce((s, d) => s + Number(d.gross ?? 0), 0)
   const totalNet = staffNet + directorNet
   const totalGross = staffGross + directorGross
   const totalAmount = Number(run?.total_amount ?? totalGross)
@@ -143,7 +145,7 @@ export default async function HRPaymentPage({
   // ── Disbursement voucher state — PER SCOPE (mig 20260721000000): staff and
   // director batches are generated/approved/paid independently. reference_id
   // on a disbursement voucher is an hr_monthly_payroll.id (staff) or a
-  // director_payouts.id (directors); voided vouchers don't block a retry.
+  // director_monthly_payroll.id (directors); voided vouchers don't block a retry.
   const staffIds = rows.map(r => r.id as string)
   const directorIds = dRows.map(d => d.id as string)
   const { data: disbursementVouchers } = staffIds.length + directorIds.length
@@ -201,11 +203,11 @@ export default async function HRPaymentPage({
   const n = (v: unknown) => Number(v ?? 0)
 
   const SCHEMES: Array<{ scheme: StatutoryRow['scheme']; payee: string; staff: number; directors: number }> = [
-    { scheme: 'KWSP', payee: 'KWSP', staff: staffSum(r => n(r.epf_er) + n(r.epf_ee)), directors: dirSum(d => n(d.payroll_epf_er) + n(d.payroll_epf_ee)) },
-    { scheme: 'SOCSO', payee: 'PERKESO (SOCSO)', staff: staffSum(r => n(r.socso_er) + n(r.socso_ee)), directors: dirSum(d => n(d.payroll_socso_er) + n(d.payroll_socso_ee)) },
-    { scheme: 'EIS', payee: 'PERKESO (EIS)', staff: staffSum(r => n(r.eis_er) + n(r.eis_ee)), directors: dirSum(d => n(d.payroll_eis_er) + n(d.payroll_eis_ee)) },
-    { scheme: 'PCB', payee: 'LHDN', staff: staffSum(r => n(r.pcb)), directors: dirSum(d => n(d.payroll_pcb)) },
-    { scheme: 'SKBBK', payee: 'SKBBK', staff: staffSum(r => n(r.skbbk_amount)), directors: dirSum(d => n(d.payroll_skbbk)) },
+    { scheme: 'KWSP', payee: 'KWSP', staff: staffSum(r => n(r.epf_er) + n(r.epf_ee)), directors: dirSum(d => n(d.epf_er) + n(d.epf_ee)) },
+    { scheme: 'SOCSO', payee: 'PERKESO (SOCSO)', staff: staffSum(r => n(r.socso_er) + n(r.socso_ee)), directors: dirSum(d => n(d.socso_er) + n(d.socso_ee)) },
+    { scheme: 'EIS', payee: 'PERKESO (EIS)', staff: staffSum(r => n(r.eis_er) + n(r.eis_ee)), directors: dirSum(d => n(d.eis_er) + n(d.eis_ee)) },
+    { scheme: 'PCB', payee: 'LHDN', staff: staffSum(r => n(r.pcb)), directors: dirSum(d => n(d.pcb)) },
+    { scheme: 'SKBBK', payee: 'SKBBK', staff: staffSum(r => n(r.skbbk_amount)), directors: dirSum(d => n(d.skbbk_amount)) },
   ]
   const statutoryRows: StatutoryRow[] = SCHEMES.map(s => {
     const pv = (statutoryPvsRaw ?? []).find(v => v.payee_name === s.payee) ?? null
