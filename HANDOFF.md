@@ -37,6 +37,15 @@
    ACCOUNT_TYPES are eligible because a cash counter account can be any type;
    synthetic IB-XFER/PY-XFER have no parent and stay top-level. +4 tests
    (suite 428).
+   FOLLOW-UP 2 ("inter billing 在 all segment 不应该出现"): the gross split had
+   EXPOSED the internal-transfer bridge — netting used to hide it. IB-XFER and
+   PY-XFER lines are a pure internal reallocation (dept −X / dept +X, each side
+   a self-balancing 2-leg synthetic entry) that exists only so a SINGLE
+   segment's cash ties to its Dept Pool. All four cash-flow entry points
+   (statement page+export, monthly page+export) now drop `ib.lines` when
+   consolidated — rule `!isDeptMgr && !segment`, because a dept manager has no
+   segment param but IS one segment via RLS. Totals unaffected (the pair nets
+   to zero); per-segment views keep the bridge.
 3. **明细**: the single-month Cash Flow Statement ALREADY had drill-down
    (GlReportView ▸ + applyGlRefs) — user picked it, so the work was making the new
    gross rows carry per-side txns (done above). The Monthly Cash Flow MATRIX still

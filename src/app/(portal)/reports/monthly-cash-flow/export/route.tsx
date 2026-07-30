@@ -17,7 +17,7 @@ import { MatrixPdf } from '@/lib/export/matrix-pdf'
 
 export async function GET(req: Request) {
   // dept_manager may export their own segment (RLS scopes journal_lines).
-  await requireRole(['principal', 'finance', 'dept_manager'])
+  const user = await requireRole(['principal', 'finance', 'dept_manager'])
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   const periodRaw = url.searchParams.get('period') ?? ''
@@ -35,7 +35,10 @@ export async function GET(req: Request) {
   ])
   const bankCodes = new Set((banks ?? []) as unknown as string[])
   const ib = await fetchInterBillingCashFlow(supabase, bankCodes)
-  const data = buildCashFlowAccounts([...lines, ...ib.lines], [...accounts, ib.account, ib.payrollAccount], bankCodes, { year, throughMonth, segment: segmentFilterFor(segment) })
+  // Per-segment only — cancels across segments, so drop it when consolidated
+  // (dept managers have no segment param but ARE one segment via RLS).
+  const ibLines = user.role !== 'dept_manager' && !segment ? [] : ib.lines
+  const data = buildCashFlowAccounts([...lines, ...ibLines], [...accounts, ib.account, ib.payrollAccount], bankCodes, { year, throughMonth, segment: segmentFilterFor(segment) })
   const saved = (savedRaw ?? null) as CashFlowLayout | null
   const layout = saved && Array.isArray(saved.categories) && saved.categories.length > 0
     ? saved

@@ -30,9 +30,13 @@ export async function GET(req: Request) {
   ])
   const bankCodes = new Set((banks ?? []) as unknown as string[])
   const ib = await fetchInterBillingCashFlow(supabase, bankCodes)
+  // Mirror the page: internal-transfer bridge lines only make sense inside a
+  // single segment; consolidated exports drop them (this route is
+  // principal/finance only, so no-segment == consolidated).
+  const ibLines = segment ? ib.lines : []
 
   const cf = buildCashFlow(
-    [...lines, ...ib.lines],
+    [...lines, ...ibLines],
     [...accounts, ib.account, ib.payrollAccount],
     {
       current: monthPeriod(period),

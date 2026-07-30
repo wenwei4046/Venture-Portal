@@ -43,8 +43,12 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
   ])
   const bankCodes = new Set((banks ?? []) as unknown as string[])
   const ib = await fetchInterBillingCashFlow(supabase, bankCodes)
+  // Internal-transfer bridge: per-segment only — it cancels across segments,
+  // so the consolidated view must not carry it (same rule as the statement).
+  const consolidated = !isDeptMgr && !segment
+  const ibLines = consolidated ? [] : ib.lines
 
-  const data = buildCashFlowAccounts([...lines, ...ib.lines], [...accounts, ib.account, ib.payrollAccount], bankCodes, {
+  const data = buildCashFlowAccounts([...lines, ...ibLines], [...accounts, ib.account, ib.payrollAccount], bankCodes, {
     year,
     throughMonth,
     segment: segmentFilterFor(segment),

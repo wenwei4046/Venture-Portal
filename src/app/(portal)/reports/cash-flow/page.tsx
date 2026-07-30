@@ -53,7 +53,14 @@ export default async function CashFlowPage({ searchParams }: Props) {
   // Fold inter-billing settles (dept_pools-only, no GL) in as synthetic transfer
   // lines so each segment's closing cash ties to its Dept Pool balance.
   const ib = await fetchInterBillingCashFlow(supabase, bankCodes)
-  const lines = [...applyGlRefs(rawLines, glRefs), ...ib.lines]
+  // The bridge lines are a pure INTERNAL reallocation (one dept −X, another +X)
+  // that exists so a single segment's cash ties to its Dept Pool. Consolidated
+  // = every segment at once, where they cancel — and the 收/出 gross split would
+  // otherwise surface both halves as real money moving (user 2026-07-30:
+  // "inter billing 在 all segment 不应该出现"). Dept managers have no segment
+  // param but ARE a single segment (RLS), so they keep the bridge.
+  const consolidated = !isDeptMgr && !segment
+  const lines = [...applyGlRefs(rawLines, glRefs), ...(consolidated ? [] : ib.lines)]
 
   const cf = buildCashFlow(
     lines,
