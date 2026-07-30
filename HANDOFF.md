@@ -1,4 +1,43 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-07-22 · project MOVED to local Desktop)
+# HOUZS Venture Portal — Session Handoff (checkpoint 2026-07-30 · Cash Flow revamp)
+
+## Session 2026-07-30 — Cash Flow presentation revamp (user-driven, 3 asks)
+
+**Ask 1 要明细 / Ask 2 收钱先出钱后 / Ask 3 void 不要算.**
+
+1. **VOID/reversal pairs now excluded everywhere (DONE)**. Root cause: voiding a paid
+   voucher posts a mirror-image reversing JE but NOTHING ever set
+   `journal_entries.is_reversed` — so the ~8 report queries filtering
+   `is_reversed = false` (ledger, TB, BS…) filtered nothing and both legs showed.
+   Totals were never wrong (every pair nets to zero — verified per pair before
+   touching anything). Fixes:
+   - mig `20260730000000` `mark_journal_entry_reversed(orig, rev)` SECURITY DEFINER
+     (je_no_update blocks direct UPDATE for every role). Flags BOTH legs + cross-links
+     reversed_by_id; REFUSES to flag a pair that doesn't net to zero (guards the
+     invariant that hiding them can't move the TB).
+   - Backfilled the 5 existing pairs (4 vouchers + the cancelled dupe fund source =
+     10 entries). Before/after snapshot identical: TB 0.00, HL 2,135.25, Alliance
+     80,322.67, income 1,095,749.29, expense 1,025,676.62.
+   - `voidPaidReceipt` + `reversePaidPayment` now call the RPC after posting the
+     reversal (fail-loud).
+   - `fetchAllJournalLines` skips `is_reversed` rows → P&L, Cash Flow, Monthly
+     reports all clean. (Ledger/TB/BS already filtered; their filter now actually
+     bites.)
+2. **收/出 gross split (DONE)**: `buildCashFlow` gained `inflow`/`outflow` sections
+   alongside the untouched operating/investing/financing (cash-flow-custom / the
+   monthly matrix still consume those — do NOT remove them). Gross, not net: an
+   account that both received and paid in the window appears on BOTH sides with its
+   own figure AND its own drill-down txns (user chose bank-statement style over
+   netting). inflow + outflow = netChange, so the statement still ties to the bank.
+   `cashFlowBlocks` reordered to 流入 → 流入合计 → 流出 → 流出合计 → net/opening/
+   closing; no O/I/F sub-grouping (user chose flat). +3 tests (suite 427).
+   Page and export share cashFlowBlocks, so both changed together.
+3. **明细**: the single-month Cash Flow Statement ALREADY had drill-down
+   (GlReportView ▸ + applyGlRefs) — user picked it, so the work was making the new
+   gross rows carry per-side txns (done above). The Monthly Cash Flow MATRIX still
+   has no drill-down (MonthlyMatrix has no txn expansion) — user did NOT ask for it
+   this round; it is the obvious next request if they say 明细 again.
+
+# (previous checkpoint) 2026-07-22 · project MOVED to local Desktop
 
 > Context-window handoff. Read this first to continue. User communicates in 华语 (Mandarin).
 > **PROJECT PATH since 2026-07-22: `C:\Users\User\Desktop\Claude\Venture\Venture-Portal`** —

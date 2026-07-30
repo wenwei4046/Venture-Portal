@@ -149,22 +149,22 @@ export function balanceSheetBlocks(bs: BalanceSheetReport, segment?: string): Re
   ]
 }
 
+// 收钱先、出钱后 (user 2026-07-30). Accounts are listed flat under each side —
+// no Operating/Investing/Financing sub-grouping — and an account that both
+// received and paid appears on BOTH sides with its own gross figure and its own
+// drill-down (bank-statement style). 流入合计 + 流出合计 = Net change, so the
+// statement still ties to the bank movement.
 export function cashFlowBlocks(cf: CashFlowReport): ReportBlock[] {
   return [
-    { kind: 'section', section: cf.operating },
+    { kind: 'section', section: cf.inflow },
     {
       kind: 'summary',
-      row: { label: 'Net cash — operating', current: cf.operating.current, previous: cf.operating.previous, tone: 'auto' },
+      row: { label: '流入合计 · Total money in', current: cf.inflow.current, previous: cf.inflow.previous, tone: 'ledger' },
     },
-    { kind: 'section', section: cf.investing },
+    { kind: 'section', section: cf.outflow },
     {
       kind: 'summary',
-      row: { label: 'Net cash — investing', current: cf.investing.current, previous: cf.investing.previous, tone: 'auto' },
-    },
-    { kind: 'section', section: cf.financing },
-    {
-      kind: 'summary',
-      row: { label: 'Net cash — financing', current: cf.financing.current, previous: cf.financing.previous, tone: 'auto' },
+      row: { label: '流出合计 · Total money out', current: cf.outflow.current, previous: cf.outflow.previous, tone: 'auto' },
     },
     {
       kind: 'summary',

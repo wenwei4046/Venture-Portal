@@ -30,6 +30,8 @@ const ACCOUNTS: CoaAccount[] = [
   { code: '9000', name: 'G&A Expense', type: 'expense', parent_code: null, cash_flow_category: 'operating' },
 ]
 
+const r2 = (n: number) => Math.round(n * 100) / 100
+
 let seq = 0
 function entry(date: string, legs: Array<[string, number, number]>, segment = 'corporate'): GlLine[] {
   const id = `e${++seq}`
@@ -137,6 +139,31 @@ describe('buildCashFlow', () => {
     expect(cf.closingCash.current).toBe(6550)
     expect(cf.check.current).toBe(0)
     expect(cf.check.previous).toBe(0)
+  })
+
+  // 收钱先、出钱后 gross split (user 2026-07-30).
+  it('splits inflows and outflows, and they still tie to net change', () => {
+    expect(cf.inflow.current).toBe(6550) // 1,500 sale + 5,000 loan + 50 interest
+    expect(cf.outflow.current).toBe(-800) // 300 COGS + 500 loan disbursed
+    expect(r2(cf.inflow.current + cf.outflow.current)).toBe(cf.netChange.current)
+  })
+
+  it('lists an account that both received and paid on BOTH sides, gross', () => {
+    // 5000 takes a 400 refund out in the same month as its 1,500 sale.
+    const withRefund = [...LINES, ...entry('2026-06-27', [['5000', 400, 0], ['3000', 0, 400]])]
+    const cf2 = buildCashFlow(withRefund, ACCOUNTS, FILTER, BANKS)
+    expect(cf2.inflow.nodes.find((n) => n.code === '5000')?.current).toBe(1500)
+    expect(cf2.outflow.nodes.find((n) => n.code === '5000')?.current).toBe(-400)
+    // Net still nets: the O/I/F view keeps showing 5000 once, at 1,100.
+    expect(cf2.operating.nodes.find((n) => n.code === '5000')?.current).toBe(1100)
+    expect(r2(cf2.inflow.current + cf2.outflow.current)).toBe(cf2.netChange.current)
+  })
+
+  it('gives each side its own drill-down transactions', () => {
+    const withRefund = [...LINES, ...entry('2026-06-27', [['5000', 400, 0], ['3000', 0, 400]])]
+    const cf2 = buildCashFlow(withRefund, ACCOUNTS, FILTER, BANKS)
+    expect(cf2.inflow.nodes.find((n) => n.code === '5000')?.txns.map((t) => t.amount)).toEqual([1500])
+    expect(cf2.outflow.nodes.find((n) => n.code === '5000')?.txns.map((t) => t.amount)).toEqual([-400])
   })
 })
 

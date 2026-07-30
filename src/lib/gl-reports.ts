@@ -486,6 +486,13 @@ export interface CashFlowReport {
   operating: ReportSection
   investing: ReportSection
   financing: ReportSection
+  /** 现金流入 — every counter account's INFLOW slices, gross (user 2026-07-30:
+   *  收钱先、出钱后, 拆开显示像银行流水). An account that both received and
+   *  paid in the window appears in BOTH sections; inflow + outflow = netChange,
+   *  so the statement still ties to the bank movement. */
+  inflow: ReportSection
+  /** 现金流出 — the OUTFLOW slices (negative amounts). */
+  outflow: ReportSection
   netChange: { current: number; previous: number }
   openingCash: { current: number; previous: number }
   closingCash: { current: number; previous: number }
@@ -522,7 +529,10 @@ export function buildCashFlow(
   }
 
   type Flow = { current: number; previous: number; txns: GlTxn[] }
-  const flows = new Map<string, Flow>() // counter account code → flow
+  const flows = new Map<string, Flow>() // counter account code → NET flow (O/I/F sections)
+  // Gross split for the 收/出 presentation: keyed `${code}:in` / `${code}:out`,
+  // so a single account can surface on both sides with its own transactions.
+  const dirFlows = new Map<string, Flow & { code: string; dir: 'in' | 'out' }>()
   let openCur = 0
   let openPrev = 0
   let closeCur = 0
@@ -556,18 +566,31 @@ export function buildCashFlow(
         f = { current: 0, previous: 0, txns: [] }
         flows.set(c.account_code, f)
       }
+      const dir: 'in' | 'out' = share > 0 ? 'in' : 'out'
+      const dirKey = `${c.account_code}:${dir}`
+      let df = dirFlows.get(dirKey)
+      if (!df) {
+        df = { code: c.account_code, dir, current: 0, previous: 0, txns: [] }
+        dirFlows.set(dirKey, df)
+      }
       if (inCur) {
-        f.current = r2(f.current + share)
-        f.txns.push({
+        const txn = {
           date,
           entryNo: c.entry_no,
           description: c.description || c.entry_description || '',
           segment: c.segment,
           party: c.party ?? null,
           amount: share,
-        })
+        }
+        f.current = r2(f.current + share)
+        f.txns.push(txn)
+        df.current = r2(df.current + share)
+        df.txns.push(txn)
       }
-      if (inPrev) f.previous = r2(f.previous + share)
+      if (inPrev) {
+        f.previous = r2(f.previous + share)
+        df.previous = r2(df.previous + share)
+      }
     }
   }
 
@@ -591,6 +614,27 @@ export function buildCashFlow(
   const operating = section('operating', 'Operating Activities', byCat.operating)
   const investing = section('investing', 'Investing Activities', byCat.investing)
   const financing = section('financing', 'Financing Activities', byCat.financing)
+
+  // 收/出 gross sections — biggest movement first so the eye lands on what
+  // matters; an account with both directions appears once per side.
+  const inNodes: AccountNode[] = []
+  const outNodes: AccountNode[] = []
+  for (const df of dirFlows.values()) {
+    df.txns.sort((a, b) => a.date.localeCompare(b.date))
+    const node: AccountNode = {
+      code: df.code,
+      name: byCode.get(df.code)?.name ?? df.code,
+      current: df.current,
+      previous: df.previous,
+      txns: df.txns,
+      children: [],
+    }
+    ;(df.dir === 'in' ? inNodes : outNodes).push(node)
+  }
+  inNodes.sort((a, b) => b.current - a.current || a.code.localeCompare(b.code))
+  outNodes.sort((a, b) => a.current - b.current || a.code.localeCompare(b.code))
+  const inflow = section('inflow', '现金流入 · Money in', inNodes)
+  const outflow = section('outflow', '现金流出 · Money out', outNodes)
   const netChange = {
     current: r2(operating.current + investing.current + financing.current),
     previous: r2(operating.previous + investing.previous + financing.previous),
@@ -599,6 +643,8 @@ export function buildCashFlow(
     operating,
     investing,
     financing,
+    inflow,
+    outflow,
     netChange,
     openingCash: { current: openCur, previous: openPrev },
     closingCash: { current: closeCur, previous: closePrev },
