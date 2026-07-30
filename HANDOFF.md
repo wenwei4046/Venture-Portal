@@ -114,6 +114,18 @@
    explicitly opened parent's subtree overrides the level filter. The arrow now
    renders from the same openKeys set the pass builds, so it can never disagree
    with what's on screen.
+   FOLLOW-UP 8 ("cancelled 的就不应该进我的 ledger…cash flow 同理"): cancelling a
+   LOAN / FUND SOURCE posts a reversing JE but never flagged the pair either.
+   Worse than the voucher case: the Hookka 98,000 disbursement sits in MAY and
+   its cancellation in JUNE, so the monthly cash flow showed a 98k outflow then
+   a 98k inflow for money that never moved. Swept the whole ledger for unflagged
+   reversal/VOID/cancellation JEs — exactly one pair left (that loan) — and
+   flagged it. mig `20260730010000` patches BOTH `execute_loan_cancel` and
+   `execute_fund_source_cancel` via anchored text replacement (assert anchor
+   count == 1, skip if already patched): each now captures its original JE
+   before reversing and calls mark_journal_entry_reversed, which still refuses
+   any pair that doesn't net to zero. Verified after: 12 entries flagged,
+   TB 0.00, both banks cache == GL.
 3. **明细**: the single-month Cash Flow Statement ALREADY had drill-down
    (GlReportView ▸ + applyGlRefs) — user picked it, so the work was making the new
    gross rows carry per-side txns (done above). The Monthly Cash Flow MATRIX still
