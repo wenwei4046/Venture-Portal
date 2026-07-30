@@ -109,6 +109,138 @@ export function buildCashFlowAccounts(
   }
 }
 
+// ─── 收 / 出 matrix, mirroring the Cash Flow STATEMENT ───────────────────────
+// User 2026-07-30: "monthly cash flow 和 cash flow 显示的是一样,以 cash flow
+// 为准." Same gross split, same `cash_flow_in` / `cash_flow_out` layouts, same
+// COA nesting and per-section subtotals — only the columns differ (months).
+
+export interface SideAccount {
+  code: string
+  name: string
+  values: number[] // aligned to columns
+  ancestry: { code: string; name: string }[]
+}
+
+export interface MonthlyCashFlowSides {
+  columns: MatrixColumn[]
+  inflow: SideAccount[]
+  outflow: SideAccount[]
+  inflowTotalByCol: number[]
+  outflowTotalByCol: number[]
+  openingByCol: number[]
+  closingByCol: number[]
+  netChangeByCol: number[]
+}
+
+/** Per-account, per-column values split by direction. Rows are anchored on the
+ *  ACCUMULATED column's side classification (an account that flips direction
+ *  mid-year simply reads 0 in the columns where it sat on the other side). */
+export function buildMonthlyCashFlowSides(
+  lines: GlLine[],
+  accounts: CoaAccount[],
+  bankCodes: ReadonlySet<string>,
+  args: { year: number; throughMonth: number; segment?: string | string[] },
+): MonthlyCashFlowSides {
+  const { year, segment } = args
+  const { months, columns, accPeriod } = monthColumns(year, args.throughMonth)
+
+  const reportAcc = buildCashFlow(lines, accounts, { current: accPeriod, previous: EMPTY_PERIOD, segment }, bankCodes)
+  const reports: CashFlowReport[] = [
+    reportAcc,
+    ...months.map((ym) =>
+      buildCashFlow(lines, accounts, { current: monthPeriod(ym), previous: EMPTY_PERIOD, segment }, bankCodes),
+    ),
+  ]
+
+  const inByCol = reports.map((r) => new Map(r.inflowLeaves.map((l) => [l.code, l.current])))
+  const outByCol = reports.map((r) => new Map(r.outflowLeaves.map((l) => [l.code, l.current])))
+
+  const sideAccounts = (root: ReportSection, byCol: Map<string, number>[]): SideAccount[] => {
+    const out: SideAccount[] = []
+    const walk = (n: AccountNode, ancestors: { code: string; name: string }[]) => {
+      if (n.children.length === 0) {
+        out.push({
+          code: n.code,
+          name: n.name,
+          values: byCol.map((m) => r2(m.get(n.code) ?? 0)),
+          ancestry: ancestors,
+        })
+      } else {
+        const next = [...ancestors, { code: n.code, name: n.name }]
+        n.children.forEach((c) => walk(c, next))
+      }
+    }
+    root.nodes.forEach((n) => walk(n, []))
+    return out
+  }
+
+  const inflow = sideAccounts(reportAcc.inflow, inByCol)
+  const outflow = sideAccounts(reportAcc.outflow, outByCol)
+  const nCols = columns.length
+
+  return {
+    columns,
+    inflow,
+    outflow,
+    inflowTotalByCol: colSum(inflow.map((a) => a.values), nCols),
+    outflowTotalByCol: colSum(outflow.map((a) => a.values), nCols),
+    openingByCol: reports.map((r) => r2(r.openingCash.current)),
+    closingByCol: reports.map((r) => r2(r.closingCash.current)),
+    netChangeByCol: reports.map((r) => r2(r.netChange.current)),
+  }
+}
+
+/** Rows for one side: the layout's ordered sections (COA tree inside each) with
+ *  a subtotal per section, then the side total. Unlisted accounts sweep into
+ *  其他 so a side total can never silently drop one. */
+export function buildSideMatrixRows(
+  side: SideAccount[],
+  layout: { categories: { id: string; name: string; accounts: string[] }[] } | null,
+  nCols: number,
+  sideKey: string,
+  sideLabel: string,
+  sideTotal: number[],
+): MatrixRow[] {
+  const rows: MatrixRow[] = []
+  const cats = layout?.categories?.filter((c) => c && typeof c.id === 'string') ?? []
+  const byCode = new Map(side.map((a) => [a.code, a]))
+  const placed = new Set<string>()
+
+  if (cats.length === 0) {
+    rows.push(...buildHierarchyRows(side, sideKey, 1))
+  } else {
+    for (const c of cats) {
+      const accs = (c.accounts ?? []).map((code) => byCode.get(code)).filter((a): a is SideAccount => !!a)
+      accs.forEach((a) => placed.add(a.code))
+      if (accs.length === 0) continue
+      rows.push(...buildHierarchyRows(accs, `${sideKey}:${c.id}`, 1))
+      rows.push({
+        key: `${sideKey}:${c.id}:sub`,
+        label: `${c.name || 'Untitled'} — 小计`,
+        depth: 0,
+        kind: 'subtotal',
+        tone: 'auto',
+        values: colSum(accs.map((a) => a.values), nCols),
+      })
+    }
+    const leftovers = side.filter((a) => !placed.has(a.code))
+    if (leftovers.length > 0) {
+      rows.push(...buildHierarchyRows(leftovers, `${sideKey}:other`, 1))
+      rows.push({
+        key: `${sideKey}:other:sub`,
+        label: '其他 · Other — 小计',
+        depth: 0,
+        kind: 'subtotal',
+        tone: 'auto',
+        values: colSum(leftovers.map((a) => a.values), nCols),
+      })
+    }
+  }
+
+  rows.push({ key: `${sideKey}:total`, label: sideLabel, depth: 0, kind: 'subtotal', tone: 'auto', values: sideTotal })
+  return rows
+}
+
 /** Default layout when nothing is saved: the three standard activity buckets. */
 export function defaultCashFlowLayout(accountsList: CashFlowAccount[]): CashFlowLayout {
   const order: CashFlowDefaultCategory[] = ['operating', 'investing', 'financing']

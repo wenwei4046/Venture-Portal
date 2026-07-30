@@ -79,6 +79,22 @@
    pseudo-account line so a segment's cash can never drift. Receiving side
    keeps the pseudo account (a recharge received has no natural expense code).
    +4 tests (suite 438).
+   FOLLOW-UP 5 ("monthly cash flow 和 cash flow 显示的是一样,以 cash flow 为准"):
+   the MATRIX now mirrors the statement. New in cash-flow-custom.ts:
+   `buildMonthlyCashFlowSides` (per-column values keyed by direction, taken from
+   each column's inflowLeaves/outflowLeaves; rows anchored on the ACCUMULATED
+   column's side, so an account that flips direction mid-year reads 0 in the
+   columns where it sat on the other side) + `buildSideMatrixRows` (layout
+   sections → COA hierarchy via buildHierarchyRows → per-section 小计 → side
+   total). Page and export both switched; row order is now 流入 sections →
+   流入合计 → 流出 sections → 流出合计 → net change → opening → closing.
+   BOTH views read the SAME `cash_flow_in`/`cash_flow_out` layouts, and the old
+   per-matrix editor (`/reports/monthly-cash-flow/layout`, report_key
+   `cash_flow`) now REDIRECTS to /reports/cash-flow/layout so the two can't
+   drift; the monthly page's Edit-layout button points there too. The stale
+   `cash_flow` report_layouts row is left in place, unread. buildCashFlowAccounts
+   / buildCustomCashFlowRows / defaultCashFlowLayout / ensureInterBillCategory
+   are now unused by pages but kept (still exported + covered by tests).
 3. **明细**: the single-month Cash Flow Statement ALREADY had drill-down
    (GlReportView ▸ + applyGlRefs) — user picked it, so the work was making the new
    gross rows carry per-side txns (done above). The Monthly Cash Flow MATRIX still

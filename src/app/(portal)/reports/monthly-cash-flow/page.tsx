@@ -3,14 +3,10 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { fetchAllJournalLines, fetchCoaAccounts } from '@/lib/gl-reports'
-import {
-  buildCashFlowAccounts,
-  buildCustomCashFlowRows,
-  defaultCashFlowLayout,
-  type CashFlowLayout,
-} from '@/lib/cash-flow-custom'
-import { fetchInterBillingCashFlow, ensureInterBillCategory } from '@/lib/inter-billing-cash-flow'
-import { readReportLayout } from '@/lib/report-layouts'
+import { buildMonthlyCashFlowSides, buildSideMatrixRows } from '@/lib/cash-flow-custom'
+import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
+import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
+import type { MatrixRow } from '@/lib/monthly-matrix'
 import { segmentFilterFor } from '../_components/report-segments'
 import MonthlyMatrix from '../_components/MonthlyMatrix'
 import MonthlyReportControls from '../_components/MonthlyReportControls'
@@ -33,13 +29,17 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))
 
-  const [lines, accounts, { data: banks }, savedRaw] = await Promise.all([
+  // Same two layouts the Cash Flow STATEMENT uses — the statement is the
+  // reference, this view just adds month columns (user 2026-07-30: "monthly
+  // cash flow 和 cash flow 显示的是一样,以 cash flow 为准").
+  const [lines, accounts, { data: banks }, inSaved, outSaved] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
     // bank GL codes via RPC (dept_managers are RLS-blocked from bank_accounts,
     // which zeroed their Cash Flow) — codes only, no balances.
     supabase.rpc('bank_gl_codes' as never),
-    readReportLayout(supabase, 'cash_flow'),
+    readReportLayout(supabase, 'cash_flow_in'),
+    readReportLayout(supabase, 'cash_flow_out'),
   ])
   const bankCodes = new Set((banks ?? []) as unknown as string[])
   const ib = await fetchInterBillingCashFlow(supabase, bankCodes)
@@ -48,18 +48,20 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
   const consolidated = !isDeptMgr && !segment
   const ibLines = consolidated ? [] : ib.lines
 
-  const data = buildCashFlowAccounts([...lines, ...ibLines], [...accounts, ib.account, ib.payrollAccount], bankCodes, {
+  const data = buildMonthlyCashFlowSides([...lines, ...ibLines], [...accounts, ib.account, ib.payrollAccount], bankCodes, {
     year,
     throughMonth,
     segment: segmentFilterFor(segment),
   })
 
-  const saved = (savedRaw ?? null) as CashFlowLayout | null
-  const layout = saved && Array.isArray(saved.categories) && saved.categories.length > 0
-    ? saved
-    : defaultCashFlowLayout(data.accounts)
-
-  const rows = buildCustomCashFlowRows(data, ensureInterBillCategory(layout))
+  const nCols = data.columns.length
+  const rows: MatrixRow[] = [
+    ...buildSideMatrixRows(data.inflow, inSaved as ReportLayout | null, nCols, 'in', '流入合计 · Total money in', data.inflowTotalByCol),
+    ...buildSideMatrixRows(data.outflow, outSaved as ReportLayout | null, nCols, 'out', '流出合计 · Total money out', data.outflowTotalByCol),
+    { key: 'NET_CHANGE', label: 'Net change in cash', depth: 0, kind: 'subtotal', tone: 'auto', values: data.netChangeByCol },
+    { key: 'OPENING_CASH', label: 'Opening cash', depth: 0, kind: 'subtotal', tone: 'ledger', values: data.openingByCol },
+    { key: 'CLOSING_CASH', label: 'Closing cash', depth: 0, kind: 'subtotal', tone: 'ledger', values: data.closingByCol },
+  ]
 
   return (
     <div>
@@ -81,7 +83,8 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
           {/* Edit layout edits the SHARED company layout — hide from dept managers. */}
           {!isDeptMgr && (
             <Link
-              href={`/reports/monthly-cash-flow/layout`}
+              // One shared layout for both cash-flow views — edited on the statement.
+              href={`/reports/cash-flow/layout`}
               className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white rounded-md text-xs font-sans transition-colors"
             >
               Edit layout
