@@ -169,12 +169,24 @@ export function cashFlowBlocks(
     ...sideBlocks(custom?.inflow, cf.inflow),
     {
       kind: 'summary',
-      row: { label: '流入合计 · Total money in', current: cf.inflow.current, previous: cf.inflow.previous, tone: 'ledger' },
+      row: {
+        label: '流入合计 · Total money in',
+        current: cf.inflow.current,
+        previous: cf.inflow.previous,
+        tone: 'ledger',
+        emphasis: 'strong',
+      },
     },
     ...sideBlocks(custom?.outflow, cf.outflow),
     {
       kind: 'summary',
-      row: { label: '流出合计 · Total money out', current: cf.outflow.current, previous: cf.outflow.previous, tone: 'auto' },
+      row: {
+        label: '流出合计 · Total money out',
+        current: cf.outflow.current,
+        previous: cf.outflow.previous,
+        tone: 'auto',
+        emphasis: 'strong',
+      },
     },
     {
       kind: 'summary',

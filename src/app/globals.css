@@ -412,8 +412,23 @@ table.ledger-table.gl-report tbody tr.row-group { background: rgb(var(--surface)
 table.ledger-table.gl-report tbody tr.row-leaf { background: transparent; }
 table.ledger-table.gl-report tbody tr.row-txn { background: rgb(var(--info-bg) / 0.45); }
 table.ledger-table.gl-report tbody tr.row-summary { background: rgb(var(--surface)); }
-table.ledger-table.gl-report tbody tr.row-summary-strong { background: rgb(var(--accent-bg) / 0.55); }
+/* Headline totals (流入/流出合计, net change, closing cash) must out-shout the
+   section-title band above them — user 2026-07-30: the totals were quieter than
+   the group headers. Full accent wash + accent rules + a size bump. */
+table.ledger-table.gl-report tbody tr.row-summary-strong {
+  background: rgb(var(--accent-bg));
+  border-top: 2px solid rgb(var(--accent-border));
+  border-bottom: 2px solid rgb(var(--accent-border));
+}
+table.ledger-table.gl-report tbody tr.row-summary-strong td {
+  padding-top: 18px;
+  padding-bottom: 18px;
+  font-size: 1.0625rem;
+  letter-spacing: 0.01em;
+}
+/* Keep the wash on hover instead of swapping to the (identical) hover tint. */
 table.ledger-table.gl-report tbody tr:hover { background: rgb(var(--accent-bg)); }
+table.ledger-table.gl-report tbody tr.row-summary-strong:hover { background: rgb(var(--accent-bg)); }
 table.ledger-table td {
   padding: 14px 16px;
   vertical-align: baseline;
