@@ -42,7 +42,13 @@ export interface CoaAccount {
 
 /** Fetch every journal line (joined to its entry) in 1000-row pages. The full
  *  ledger is a few thousand rows — client-side aggregation keeps every report
- *  builder pure and unit-testable. */
+ *  builder pure and unit-testable.
+ *
+ *  VOID/reversal pairs are excluded (`is_reversed = false`, user 2026-07-30:
+ *  "cancel 或 void 的不要算"). Both legs of a pair carry the flag (mig
+ *  20260730000000 refuses to flag a pair that doesn't net to zero), so no
+ *  total moves — the cancelled rows simply stop appearing in statements and
+ *  their drill-downs. Matches what the ledger/TB/BS queries already did. */
 export async function fetchAllJournalLines(supabase: SupabaseClient): Promise<GlLine[]> {
   const out: GlLine[] = []
   const PAGE = 1000
@@ -50,7 +56,7 @@ export async function fetchAllJournalLines(supabase: SupabaseClient): Promise<Gl
     const { data, error } = await supabase
       .from('journal_lines')
       .select(
-        'account_code, debit, credit, description, entry_id, journal_entries!inner(transaction_date, entry_no, description, segment, reference_type, reference_id)',
+        'account_code, debit, credit, description, entry_id, journal_entries!inner(transaction_date, entry_no, description, segment, reference_type, reference_id, is_reversed)',
       )
       .order('id', { ascending: true })
       .range(fromIdx, fromIdx + PAGE - 1)
@@ -63,7 +69,12 @@ export async function fetchAllJournalLines(supabase: SupabaseClient): Promise<Gl
         segment: string | null
         reference_type: string | null
         reference_id: string | null
+        is_reversed: boolean
       }
+      // Skip void/reversal pairs — filtered here (not in the query) to match
+      // the existing embedded-column pattern in cfo-reports.fetchBankMovements.
+      // Paging stays correct because the page size check below counts RAW rows.
+      if (je.is_reversed) continue
       out.push({
         account_code: row.account_code as string,
         debit: Number(row.debit ?? 0),

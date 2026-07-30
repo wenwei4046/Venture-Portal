@@ -1245,7 +1245,7 @@ export async function voidPaidReceipt(formData: FormData) {
       .eq('entry_id', e.id)
     if (!lines || lines.length === 0) continue
     try {
-      await postJournalEntry(supabase, {
+      const reversalId = await postJournalEntry(supabase, {
         transactionDate: reversalDate,
         description: `VOID ${v.voucher_no}: reversal of ${e.description ?? ''}`.trim(),
         referenceType: 'payment_voucher_void',
@@ -1259,6 +1259,17 @@ export async function voidPaidReceipt(formData: FormData) {
         })),
         createdBy: user.id,
       })
+      // Flag BOTH legs (mig 20260730000000) so every `is_reversed = false`
+      // report filter drops the cancelled pair — the pair nets to zero, so no
+      // total moves; the ledger and drill-downs just stop showing the noise.
+      // je_no_update blocks a direct update, hence the SECURITY DEFINER RPC.
+      const { error: flagErr } = await supabase.rpc('mark_journal_entry_reversed' as never, {
+        p_original_id: e.id,
+        p_reversal_id: reversalId,
+      } as never)
+      if (flagErr) {
+        throw new Error(`reversal posted but flagging the pair failed: ${flagErr.message}`)
+      }
     } catch (jeErr) {
       // Fail loud (2026-06-11 audit): a swallowed reversal leaves the voided
       // receipt's GL standing — books overstate cash/AR with zero trace.
@@ -1405,7 +1416,7 @@ export async function reversePaidPayment(formData: FormData) {
       .eq('entry_id', e.id)
     if (!lines || lines.length === 0) continue
     try {
-      await postJournalEntry(supabase, {
+      const reversalId = await postJournalEntry(supabase, {
         transactionDate: reversalDate,
         description: `VOID ${v.voucher_no}: reversal of ${e.description ?? ''}`.trim(),
         referenceType: 'payment_voucher_void',
@@ -1419,6 +1430,17 @@ export async function reversePaidPayment(formData: FormData) {
         })),
         createdBy: user.id,
       })
+      // Flag BOTH legs (mig 20260730000000) so every `is_reversed = false`
+      // report filter drops the cancelled pair — the pair nets to zero, so no
+      // total moves; the ledger and drill-downs just stop showing the noise.
+      // je_no_update blocks a direct update, hence the SECURITY DEFINER RPC.
+      const { error: flagErr } = await supabase.rpc('mark_journal_entry_reversed' as never, {
+        p_original_id: e.id,
+        p_reversal_id: reversalId,
+      } as never)
+      if (flagErr) {
+        throw new Error(`reversal posted but flagging the pair failed: ${flagErr.message}`)
+      }
     } catch (jeErr) {
       const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
       throw new Error(`Reverse ${v.voucher_no}: GL reversal failed (${e.entry_no ?? e.id}): ${msg}`)
