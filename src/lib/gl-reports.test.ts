@@ -159,6 +159,16 @@ describe('buildCashFlow', () => {
     expect(r2(cf2.inflow.current + cf2.outflow.current)).toBe(cf2.netChange.current)
   })
 
+  it('nests accounts under their COA parent on each side', () => {
+    // 3051 (Due from Carres) hangs under the 3020 header — the outflow section
+    // must show the header with the leaf inside it, not a flat 3051 row.
+    const header = cf.outflow.nodes.find((n) => n.code === '3020')
+    expect(header).toBeDefined()
+    expect(header!.current).toBe(-500) // rolled up from its child
+    expect(header!.children.map((c) => c.code)).toEqual(['3051'])
+    expect(cf.outflow.nodes.find((n) => n.code === '3051')).toBeUndefined()
+  })
+
   it('gives each side its own drill-down transactions', () => {
     const withRefund = [...LINES, ...entry('2026-06-27', [['5000', 400, 0], ['3000', 0, 400]])]
     const cf2 = buildCashFlow(withRefund, ACCOUNTS, FILTER, BANKS)

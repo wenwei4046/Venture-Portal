@@ -7,7 +7,7 @@
 // transaction drill-down.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { type AccountType, type CashFlowCategory, defaultCashFlowCategoryFor, rangeFor } from './coa'
+import { ACCOUNT_TYPES, type AccountType, type CashFlowCategory, defaultCashFlowCategoryFor, rangeFor } from './coa'
 
 function r2(n: number): number {
   return Math.round(n * 100) / 100
@@ -615,26 +615,22 @@ export function buildCashFlow(
   const investing = section('investing', 'Investing Activities', byCat.investing)
   const financing = section('financing', 'Financing Activities', byCat.financing)
 
-  // 收/出 gross sections — biggest movement first so the eye lands on what
-  // matters; an account with both directions appears once per side.
-  const inNodes: AccountNode[] = []
-  const outNodes: AccountNode[] = []
+  // 收/出 gross sections, nested under their COA parents (user 2026-07-30:
+  // "这些自动分类一下父子account") — same buildTree the P&L and Balance Sheet
+  // use, so e.g. 3053/3054 roll up under 3020 Loans Receivable and the
+  // 4051/4052/4202 payables under 4100. Every COA type is eligible: a cash
+  // counter account can be an asset, liability, revenue… Synthetic transfer
+  // accounts (IB-XFER / PY-XFER) have no parent and stay top-level.
+  const inBuckets = new Map<string, Bucket>()
+  const outBuckets = new Map<string, Bucket>()
   for (const df of dirFlows.values()) {
     df.txns.sort((a, b) => a.date.localeCompare(b.date))
-    const node: AccountNode = {
-      code: df.code,
-      name: byCode.get(df.code)?.name ?? df.code,
-      current: df.current,
-      previous: df.previous,
-      txns: df.txns,
-      children: [],
-    }
-    ;(df.dir === 'in' ? inNodes : outNodes).push(node)
+    const bucket: Bucket = { current: df.current, previous: df.previous, txns: df.txns }
+    ;(df.dir === 'in' ? inBuckets : outBuckets).set(df.code, bucket)
   }
-  inNodes.sort((a, b) => b.current - a.current || a.code.localeCompare(b.code))
-  outNodes.sort((a, b) => a.current - b.current || a.code.localeCompare(b.code))
-  const inflow = section('inflow', '现金流入 · Money in', inNodes)
-  const outflow = section('outflow', '现金流出 · Money out', outNodes)
+  const allTypes: ReadonlySet<AccountType> = new Set(ACCOUNT_TYPES)
+  const inflow = section('inflow', '现金流入 · Money in', buildTree(accounts, inBuckets, allTypes))
+  const outflow = section('outflow', '现金流出 · Money out', buildTree(accounts, outBuckets, allTypes))
   const netChange = {
     current: r2(operating.current + investing.current + financing.current),
     previous: r2(operating.previous + investing.previous + financing.previous),

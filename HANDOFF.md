@@ -29,8 +29,14 @@
    own figure AND its own drill-down txns (user chose bank-statement style over
    netting). inflow + outflow = netChange, so the statement still ties to the bank.
    `cashFlowBlocks` reordered to 流入 → 流入合计 → 流出 → 流出合计 → net/opening/
-   closing; no O/I/F sub-grouping (user chose flat). +3 tests (suite 427).
+   closing; no O/I/F sub-grouping (user chose flat).
    Page and export share cashFlowBlocks, so both changed together.
+   FOLLOW-UP same session ("这些自动分类一下父子account" + "fund out 同理"): both
+   sides now run through the shared `buildTree`, so leaves nest under their COA
+   parent and headers roll up (3053/3054 → 3020; 4051/4052/4202 → 4100). All
+   ACCOUNT_TYPES are eligible because a cash counter account can be any type;
+   synthetic IB-XFER/PY-XFER have no parent and stay top-level. +4 tests
+   (suite 428).
 3. **明细**: the single-month Cash Flow Statement ALREADY had drill-down
    (GlReportView ▸ + applyGlRefs) — user picked it, so the work was making the new
    gross rows carry per-side txns (done above). The Monthly Cash Flow MATRIX still
