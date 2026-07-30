@@ -18,6 +18,10 @@ export interface MatrixRow {
   /** true when this account rolls up child accounts under it. */
   isParent?: boolean
   tone?: 'ledger' | 'danger' | 'auto'
+  /** Headline total (side totals, net change, opening/closing, net income) —
+   *  rendered with the accent wash the GL statements use for the same rows, so
+   *  a matrix and its statement read alike (user 2026-07-30). */
+  emphasis?: 'strong'
   /** display values aligned to columns. */
   values: number[]
 }

@@ -95,6 +95,15 @@
    `cash_flow` report_layouts row is left in place, unread. buildCashFlowAccounts
    / buildCustomCashFlowRows / defaultCashFlowLayout / ensureInterBillCategory
    are now unused by pages but kept (still exported + covered by tests).
+   FOLLOW-UP 6 ("subtotal/total 的 background align with cash flow 的"):
+   MatrixRow gained `emphasis?: 'strong'`; MonthlyMatrix now renders FOUR tiers
+   (headline accent wash + accent rules + 15px/taller > section subtotal
+   surface-2 > parent paper > leaf surface), matching GlReportView's
+   row-summary-strong. Marked strong: monthly cash flow 流入合计/流出合计/
+   Net change/Closing (Opening deliberately left plain, as in the statement)
+   and monthly P&L Gross Profit + Net Income. Section 小计 rows stay on the
+   quieter surface-2 band, so the hierarchy reads the same in both matrices and
+   both statements.
 3. **明细**: the single-month Cash Flow Statement ALREADY had drill-down
    (GlReportView ▸ + applyGlRefs) — user picked it, so the work was making the new
    gross rows carry per-side txns (done above). The Monthly Cash Flow MATRIX still

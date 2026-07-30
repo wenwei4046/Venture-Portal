@@ -109,13 +109,15 @@ export default function MonthlyMatrix({
           <tbody>
             {visibleRows.map((row) => {
               const isSub = row.kind === 'subtotal'
+              const isStrong = isSub && row.emphasis === 'strong'
               const isParent = row.kind === 'account' && row.isParent
               const isCollapsed = isParent && collapsed.has(row.key)
-              // Three shaded tiers, darkest → lightest: subtotal (surface-2) >
-              // parent roll-up (paper) > leaf / child (surface). Parent sits darker
-              // than its children so the hierarchy reads top-down.
-              const cellBg = isSub ? 'bg-surface-2' : isParent ? 'bg-paper' : 'bg-surface'
-              const stickyBg = isSub ? 'bg-surface-2' : isParent ? 'bg-paper' : 'bg-surface'
+              // Four shaded tiers, darkest → lightest: headline total (accent
+              // wash, matching the GL statements) > section subtotal (surface-2)
+              // > parent roll-up (paper) > leaf / child (surface).
+              const bandBg = isStrong ? 'bg-accent-bg' : isSub ? 'bg-surface-2' : isParent ? 'bg-paper' : 'bg-surface'
+              const cellBg = bandBg
+              const stickyBg = bandBg
               const labelTone = isSub
                 ? row.tone === 'danger'
                   ? 'text-danger'
@@ -132,9 +134,18 @@ export default function MonthlyMatrix({
                   : 'text-ink'
               const labelWeight = isSub || isParent ? 'font-semibold' : 'font-normal'
               return (
-                <tr key={row.key} className={`border-b border-hairline last:border-0 ${isSub ? 'border-t' : ''}`}>
+                <tr
+                  key={row.key}
+                  className={`border-b last:border-0 ${
+                    isStrong
+                      ? 'border-t-2 border-b-2 border-accent-border'
+                      : `border-hairline ${isSub ? 'border-t' : ''}`
+                  }`}
+                >
                   <td
-                    className={`sticky left-0 z-10 ${stickyBg} px-4 py-2.5 font-sans ${labelTone} ${labelWeight}`}
+                    className={`sticky left-0 z-10 ${stickyBg} px-4 font-sans ${labelTone} ${labelWeight} ${
+                      isStrong ? 'py-4 text-[15px]' : 'py-2.5'
+                    }`}
                     style={{ paddingLeft: `${16 + row.depth * 18}px` }}
                   >
                     {isParent ? (
@@ -159,14 +170,14 @@ export default function MonthlyMatrix({
                     return (
                       <Fragment key={`${row.key}-${c.key}`}>
                         <td
-                          className={`text-right font-mono tabular px-4 py-2.5 border-l border-hairline ${cellBg} ${valueTone} ${
-                            c.key === 'acc' ? 'font-semibold' : ''
-                          }`}
+                          className={`text-right font-mono tabular px-4 border-l border-hairline ${cellBg} ${valueTone} ${
+                            isStrong ? 'py-4 text-[15px]' : 'py-2.5'
+                          } ${c.key === 'acc' ? 'font-semibold' : ''}`}
                         >
                           {num(v)}
                         </td>
                         {showPct ? (
-                          <td className={`text-right font-mono tabular text-[11px] text-muted pr-4 py-2.5 ${cellBg}`}>
+                          <td className={`text-right font-mono tabular text-[11px] text-muted pr-4 ${isStrong ? 'py-4' : 'py-2.5'} ${cellBg}`}>
                             {pct(v, base)}
                           </td>
                         ) : null}

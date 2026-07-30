@@ -173,6 +173,8 @@ export function buildCustomPnlRows(data: MonthlyPnlAccounts, layout: ReportLayou
       depth: 0,
       kind: 'subtotal',
       tone: 'auto',
+      // Headline row — same accent band the statements give their totals.
+      emphasis: 'strong',
       values: grossValues,
     })
   }
@@ -191,6 +193,7 @@ export function buildCustomPnlRows(data: MonthlyPnlAccounts, layout: ReportLayou
     depth: 0,
     kind: 'subtotal',
     tone: 'auto',
+    emphasis: 'strong',
     values: colSum(data.accounts.map((a) => a.values), n),
   })
 

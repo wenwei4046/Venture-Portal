@@ -237,7 +237,7 @@ export function buildSideMatrixRows(
     }
   }
 
-  rows.push({ key: `${sideKey}:total`, label: sideLabel, depth: 0, kind: 'subtotal', tone: 'auto', values: sideTotal })
+  rows.push({ key: `${sideKey}:total`, label: sideLabel, depth: 0, kind: 'subtotal', tone: 'auto', emphasis: 'strong', values: sideTotal })
   return rows
 }
 
