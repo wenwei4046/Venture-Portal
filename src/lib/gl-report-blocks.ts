@@ -160,10 +160,20 @@ export function cashFlowBlocks(
    *  omitted each side renders as one section, exactly as before. */
   custom?: { inflow?: ReportSection[]; outflow?: ReportSection[] },
 ): ReportBlock[] {
-  const sideBlocks = (sections: ReportSection[] | undefined, fallback: ReportSection): ReportBlock[] =>
-    sections && sections.length > 0
-      ? sections.map((s) => ({ kind: 'section', section: s }) as ReportBlock)
-      : [{ kind: 'section', section: fallback }]
+  // Each custom section carries its own subtotal (user 2026-07-30: "general
+  // expense 少掉一个 total"). Skipped when a side has a single section — the
+  // side total right below would just repeat it.
+  const sideBlocks = (sections: ReportSection[] | undefined, fallback: ReportSection): ReportBlock[] => {
+    if (!sections || sections.length === 0) return [{ kind: 'section', section: fallback }]
+    if (sections.length === 1) return [{ kind: 'section', section: sections[0] }]
+    return sections.flatMap((s) => [
+      { kind: 'section', section: s } as ReportBlock,
+      {
+        kind: 'summary',
+        row: { label: `${s.label} — 小计`, current: s.current, previous: s.previous, tone: 'auto' },
+      } as ReportBlock,
+    ])
+  }
 
   return [
     ...sideBlocks(custom?.inflow, cf.inflow),

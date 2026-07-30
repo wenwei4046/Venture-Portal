@@ -62,6 +62,23 @@
    optional {inflow,outflow} section array — omitted = previous behaviour, so
    nothing else that calls it changes. Page + export both read the layouts.
    +6 tests (suite 434).
+   FOLLOW-UP 4 (same evening): (a) each custom section now emits its own 小计
+   row — cashFlowBlocks.sideBlocks interleaves a summary after every section,
+   skipped when a side has only one (the side total would repeat it).
+   (b) Headline totals restyled to out-rank the section band: row-summary-strong
+   = full accent wash + accent rules top/bottom + 17px + taller padding, and
+   流入合计/流出合计 gained emphasis:'strong' (globals.css — affects P&L and BS
+   headline rows too, deliberately). (c) "marketing 的 internal transfer 就是
+   payroll 和 rental…能不能显示成相对应的 account": the bridge's PAYING side now
+   books to the REAL nature account instead of IB-XFER/PY-XFER —
+   TransferSide.natureCode, resolved from the settle voucher's role='mirror'
+   PVS rows (which carry rent/utilities/salary since the 07-24 by-nature
+   change) and split per nature; payroll drains use PAYROLL_EXPENSE_CODE 9030
+   (cash out for payroll = salary in direct-method terms). Guard: the nature
+   slices must sum EXACTLY to the pool row, else it falls back to one lumped
+   pseudo-account line so a segment's cash can never drift. Receiving side
+   keeps the pseudo account (a recharge received has no natural expense code).
+   +4 tests (suite 438).
 3. **明细**: the single-month Cash Flow Statement ALREADY had drill-down
    (GlReportView ▸ + applyGlRefs) — user picked it, so the work was making the new
    gross rows carry per-side txns (done above). The Monthly Cash Flow MATRIX still

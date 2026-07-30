@@ -136,6 +136,38 @@ describe('payroll custody bridge (mig 20260721)', () => {
   })
 })
 
+describe('paying side by nature (user 2026-07-30)', () => {
+  // Marketing's internal recharge split into its real natures: rent + utilities.
+  const sides: TransferSide[] = [
+    { deptName: 'Marketing', amount: 30, date: '2026-07-03', direction: 'out', natureCode: '9094' },
+    { deptName: 'Marketing', amount: 10, date: '2026-07-03', direction: 'out', natureCode: '9091' },
+    { deptName: 'Venture Office', amount: 40, date: '2026-07-03', direction: 'in' },
+  ]
+  const lines = buildInterBillingCashFlowLines(sides, '3000')
+
+  it('books the payer legs on the real expense accounts', () => {
+    expect(lines.filter((l) => l.account_code === '9094').map((l) => l.debit)).toEqual([30])
+    expect(lines.filter((l) => l.account_code === '9091').map((l) => l.debit)).toEqual([10])
+  })
+
+  it('leaves the receiving side on the pseudo transfer account', () => {
+    const recv = lines.filter((l) => l.segment === 'corporate' && l.account_code === INTERBILL_TRANSFER_CODE)
+    expect(recv).toHaveLength(1)
+  })
+
+  it("still moves the payer's cash by the full amount", () => {
+    expect(cf([...base, ...lines], ['marketing']).closingCash.current).toBe(60) // 100 − 40
+  })
+
+  it('falls back to the pseudo account when no nature is known', () => {
+    const plain = buildInterBillingCashFlowLines(
+      [{ deptName: 'Marketing', amount: 40, date: '2026-07-03', direction: 'out' }],
+      '3000',
+    )
+    expect(plain.some((l) => l.account_code === INTERBILL_TRANSFER_CODE)).toBe(true)
+  })
+})
+
 describe('ensureInterBillCategory', () => {
   it('files the transfer account into the Financing category (so it is not "Unassigned")', () => {
     const layout = {

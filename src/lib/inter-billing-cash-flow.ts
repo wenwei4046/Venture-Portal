@@ -44,6 +44,9 @@ export const interBillTransferAccount: CoaAccount = {
  *  line (only one hr-segment staging JE). Same bridge treatment, its own
  *  Financing line so the report reads "transfer to HR payroll custody". */
 export const PAYROLL_XFER_CODE = 'PY-XFER'
+/** Real COA account the PAYING dept's payroll funding shows up as in its cash
+ *  flow — cash out for payroll is salary in direct-method terms. */
+export const PAYROLL_EXPENSE_CODE = '9030'
 
 export const payrollCustodyAccount: CoaAccount = {
   code: PAYROLL_XFER_CODE,
@@ -97,6 +100,13 @@ export interface TransferSide {
   /** Which internal-transfer flavour this side belongs to (drives the pseudo
    *  Financing account + line labels). Default: 'interbill'. */
   kind?: 'interbill' | 'payroll'
+  /** Real COA expense account this slice represents on the PAYING side —
+   *  9094 Office Rental, 9091 Water & Electricity, 9030 Salary… (user
+   *  2026-07-30: "marketing 的 internal transfer 就是 payroll 和 rental,不能
+   *  直接显示成相对应的 account 的费用?"). Taken from the settle voucher's
+   *  mirror rows, which carry the nature since the 2026-07-24 by-nature
+   *  change. Absent → falls back to the IB-XFER / PY-XFER pseudo account. */
+  natureCode?: string
 }
 
 function mkLine(
@@ -141,11 +151,16 @@ export function buildInterBillingCashFlowLines(sides: TransferSide[], bankCode: 
     const xferCode = payroll ? PAYROLL_XFER_CODE : INTERBILL_TRANSFER_CODE
     const id = `${payroll ? 'pyx' : 'ibx'}-${s.direction}-${i++}`
     if (s.direction === 'out') {
+      // Paying side lands on the REAL expense account when we know the nature,
+      // so a dept's cash flow reads "Office Rental / Salary" instead of a
+      // generic internal-transfer line. Receiving side keeps the pseudo
+      // account — "recharge received" has no natural expense code.
+      const outCode = s.natureCode ?? xferCode
       lines.push(
         mkLine(id, bankCode, 0, amt, date, seg,
           payroll ? 'Transfer to HR payroll custody' : 'Inter-billing transfer out'),
-        mkLine(id, xferCode, amt, 0, date, seg,
-          payroll ? `Payroll custody paid in — ${s.deptName}` : `Inter-billing paid — ${s.deptName}`),
+        mkLine(id, outCode, amt, 0, date, seg,
+          payroll ? `Payroll share — ${s.deptName}` : `Inter-billing paid — ${s.deptName}`),
       )
     } else {
       lines.push(
@@ -211,6 +226,12 @@ export async function fetchInterBillingCashFlow(
       // reversal leg never matches (found live with voided HV-PV-202607-0115).
       supabase.from('payment_vouchers').select('voucher_no').eq('status', 'voided'),
     ])
+    // Mirror rows carry the PAYING side's real expense account per nature
+    // (rent / utilities / salary…) since the 2026-07-24 by-nature change.
+    const mirrorRes = await supabase
+      .from('payment_voucher_sources')
+      .select('amount, account_code, role, payment_vouchers!inner(voucher_no)')
+      .eq('role', 'mirror')
     if (payRes.error) throw payRes.error
     if (recRes.error) throw recRes.error
     if (custodyRes.error) throw custodyRes.error
@@ -232,16 +253,42 @@ export async function fetchInterBillingCashFlow(
       payRows.map((r) => pvref(r.description)).filter((ref) => ref && !voided.has(ref)) as string[],
     )
 
+    // voucher_no → its mirror slices, so a payer row can be split by nature.
+    const naturesByPv = new Map<string, { code: string; amount: number }[]>()
+    for (const m of (mirrorRes.data ?? []) as unknown as Array<{
+      amount: number | null
+      account_code: string | null
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      payment_vouchers: any
+    }>) {
+      const no = m.payment_vouchers?.voucher_no as string | undefined
+      const code = m.account_code as string | null
+      if (!no || !code) continue
+      const arr = naturesByPv.get(no) ?? []
+      arr.push({ code, amount: round2(Number(m.amount ?? 0)) })
+      naturesByPv.set(no, arr)
+    }
+
     const sides: TransferSide[] = []
     for (const r of payRows) {
       const ref = pvref(r.description)
       if (ref && voided.has(ref)) continue
-      sides.push({
-        deptName: (r.departments?.name as string) ?? '',
-        amount: Number(r.amount ?? 0),
-        date: String(r.created_at ?? '').slice(0, 10),
-        direction: 'out',
-      })
+      const deptName = (r.departments?.name as string) ?? ''
+      const amount = round2(Number(r.amount ?? 0))
+      const date = String(r.created_at ?? '').slice(0, 10)
+      // Split by nature when the mirror slices reconcile to this row's amount;
+      // any mismatch (legacy rows, partial data) falls back to one lumped line
+      // so the segment's cash total can never drift.
+      const natures = ref ? naturesByPv.get(ref) : undefined
+      const natureSum = natures ? round2(natures.reduce((s, n) => s + n.amount, 0)) : null
+      if (natures && natureSum === amount) {
+        for (const n of natures) {
+          if (!(n.amount > 0)) continue
+          sides.push({ deptName, amount: n.amount, date, direction: 'out', natureCode: n.code })
+        }
+      } else {
+        sides.push({ deptName, amount, date, direction: 'out' })
+      }
     }
     // Receivers: only np_in whose PV ref matches a (non-voided) payer.
     for (const r of recRows) {
@@ -275,6 +322,9 @@ export async function fetchInterBillingCashFlow(
           date: String(r.created_at ?? '').slice(0, 10),
           direction: 'out',
           kind: 'payroll',
+          // Cash actually left this dept to fund payroll — direct-method cash
+          // flow calls that salary, so show it on 9030 rather than PY-XFER.
+          natureCode: PAYROLL_EXPENSE_CODE,
         })
       }
     }
