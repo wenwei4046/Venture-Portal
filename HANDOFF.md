@@ -1,5 +1,40 @@
 # HOUZS Venture Portal — Session Handoff (checkpoint 2026-07-30 · Cash Flow revamp)
 
+## BUG (open, 2026-07-31) — approvals LIST shows a stale amount vs the DETAIL page
+
+User spotted it: /approvals lists HV-PV-202607-0179 at RM 100,000 but the detail
+page shows RM 90,000.
+
+**Root cause.** The two screens read different sources:
+ - list  → `approval_requests.amount` — a SNAPSHOT written when the voucher was
+   submitted (approvals/page.tsx:31/36)
+ - detail → `payment_vouchers.amount` — live (approvals/[id]/page.tsx:46 then the
+   voucher itself)
+`updatePaymentVoucher()` (payments/actions.ts:994) updates payment_vouchers AND
+replaces payment_voucher_sources, but never syncs the approval_requests row. Edit
+a voucher after submitting it and the snapshot goes stale. `approval_requests_with_target`
+does NOT help — it only joins user names, not the target amount.
+
+**Not a posting bug.** approve_single_voucher reads payment_vouchers +
+payment_voucher_sources, so the GL uses the DETAIL number. header amount == sum of
+PVS rows for all 10 pending vouchers (verified). The list is display-only — but it
+is what the approver reads at the moment of approving.
+
+**Currently stale (2 of 10 pending):**
+| PV | list | actual (will post) | list off by |
+|---|---|---|---|
+| 0179 | 100,000.00 | 90,000.00 | +10,000.00 |
+| 0182 | 1,339.60 | 1,351.14 | −11.54 |
+
+**Fix options put to the user (nothing done yet):**
+ A. Make the list read the live amount per reference_table. Root fix, can never go
+    stale again, and the same list serves fund-in / fund-out / claims / billing /
+    payroll requests — one change covers all. More code (approval_requests is
+    generic, so it needs a per-type lookup).
+ B. Sync the snapshot inside updatePaymentVoucher. Small, but every other
+    amount-changing path must remember to do the same.
+Either way the 2 existing stale rows want a backfill (display only, no GL impact).
+
 ## CLOSED — fund-source repayments (swept 2026-07-31, then stood down)
 
 **USER DIRECTIVE 2026-07-31: "这些欠款你别理，有还的我都更新了" — do NOT audit,
