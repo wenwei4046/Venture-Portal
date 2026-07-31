@@ -45,6 +45,7 @@ export default function MonthlyMatrix({
   const search = ctx?.search ?? ''
   const activeHit = ctx?.activeHit ?? 0
   const setHitCount = ctx?.setHitCount
+  const jump = ctx?.jump ?? 0
 
   const { hitKeys, hitOrder, forceOpen } = useMemo(() => {
     if (!search.trim()) {
@@ -64,12 +65,14 @@ export default function MonthlyMatrix({
 
   // Tell the rail how many rows matched so it can render "2 / 7" and step.
   useEffect(() => setHitCount?.(hitOrder.length), [hitOrder.length, setHitCount])
+  // `jump` is in the deps so Enter re-scrolls even when there is only one match
+  // and the active index therefore can't change.
   useEffect(() => {
     if (!activeKey) return
     document
       .getElementById(`mx-row-${activeKey}`)
       ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-  }, [activeKey])
+  }, [activeKey, jump])
 
   // Deepest ACCOUNT depth this level shows on its own.
   const maxDepth = level === 1 ? -1 : level === 2 ? 1 : Infinity

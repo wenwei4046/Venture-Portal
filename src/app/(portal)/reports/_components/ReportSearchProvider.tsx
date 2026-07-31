@@ -19,6 +19,10 @@ interface ReportSearchValue {
   setHitCount: (n: number) => void
   activeHit: number
   step: (delta: number) => void
+  /** Bumped on every step(). With a single match the index cannot move, so the
+   *  scroll effect would never re-fire and Enter looked dead (user 2026-07-31);
+   *  watching this too makes every Enter jump, however many matches there are. */
+  jump: number
 }
 
 const Ctx = createContext<ReportSearchValue | null>(null)
@@ -27,22 +31,27 @@ export function ReportSearchProvider({ children }: { children: React.ReactNode }
   const [search, setSearchRaw] = useState('')
   const [hitCount, setHitCount] = useState(0)
   const [activeHit, setActiveHit] = useState(0)
+  const [jump, setJump] = useState(0)
 
-  // A new query starts from the first hit again.
+  // A new query starts from the first hit again — and still counts as a jump, so
+  // typing straight to a single match scrolls to it without touching Enter.
   const setSearch = useCallback((s: string) => {
     setSearchRaw(s)
     setActiveHit(0)
+    setJump((j) => j + 1)
   }, [])
 
   const step = useCallback(
-    (delta: number) =>
-      setActiveHit((i) => (hitCount === 0 ? 0 : (i + delta + hitCount) % hitCount)),
+    (delta: number) => {
+      setActiveHit((i) => (hitCount === 0 ? 0 : (i + delta + hitCount) % hitCount))
+      setJump((j) => j + 1)
+    },
     [hitCount],
   )
 
   const value = useMemo(
-    () => ({ search, setSearch, hitCount, setHitCount, activeHit, step }),
-    [search, setSearch, hitCount, activeHit, step],
+    () => ({ search, setSearch, hitCount, setHitCount, activeHit, step, jump }),
+    [search, setSearch, hitCount, activeHit, step, jump],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

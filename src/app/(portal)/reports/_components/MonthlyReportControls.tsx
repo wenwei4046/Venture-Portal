@@ -65,7 +65,7 @@ export default function MonthlyReportControls({
               }}
               placeholder="Code or name…"
               aria-label="Find account by code or name"
-              className="w-full px-2.5 py-1.5 pr-7 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
+              className="search-plain w-full px-2.5 py-1.5 pr-7 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
             />
             {find.search ? (
               <button

@@ -570,3 +570,13 @@ tr.search-row-hit > td.sticky,
 tr.search-row-active > td.sticky { background: rgb(var(--accent-bg)); }
 /* gl-report sets a blanket hover wash — don't let it erase the active cue. */
 table.ledger-table.gl-report tbody tr.search-row-active:hover { background: rgb(var(--accent-bg)); }
+
+/* These search boxes ship their own × button, so suppress the browser's native
+   one — Chrome was rendering two clear icons side by side (user 2026-07-31).
+   Scoped to the class: other search inputs (e.g. staff list) have no custom
+   button and still want the native affordance. */
+input.search-plain::-webkit-search-cancel-button,
+input.search-plain::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}

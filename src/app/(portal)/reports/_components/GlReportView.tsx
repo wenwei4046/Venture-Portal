@@ -87,6 +87,10 @@ export default function GlReportView({
   // is forced open so the hit is actually on screen whatever the detail level.
   const [search, setSearch] = useState('')
   const [activeHit, setActiveHit] = useState(0)
+  // Bumped on every jump request. With a single match the index can't move, so
+  // the scroll effect would never re-fire and Enter looked dead (user
+  // 2026-07-31); watching this makes every Enter jump regardless.
+  const [jump, setJump] = useState(0)
 
   const { hitCodes, forceOpen } = useMemo(() => {
     const hits: string[] = []
@@ -109,17 +113,23 @@ export default function GlReportView({
   const hitSet = useMemo(() => new Set(hitCodes), [hitCodes])
   const activeCode = hitCodes.length > 0 ? hitCodes[activeHit % hitCodes.length] : null
 
-  useEffect(() => setActiveHit(0), [search])
+  // A new query restarts at the first hit — and counts as a jump, so typing
+  // straight to a single match scrolls to it without touching Enter.
+  useEffect(() => {
+    setActiveHit(0)
+    setJump((j) => j + 1)
+  }, [search])
   useEffect(() => {
     if (!activeCode) return
     document
       .getElementById(`gl-row-${activeCode}`)
       ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-  }, [activeCode])
+  }, [activeCode, jump])
 
   const stepHit = (delta: number) => {
     if (hitCodes.length === 0) return
     setActiveHit((i) => (i + delta + hitCodes.length) % hitCodes.length)
+    setJump((j) => j + 1)
   }
 
   function navigate(nextPeriod: string, nextCompare: string, nextSegment: string) {
@@ -224,7 +234,7 @@ export default function GlReportView({
               }}
               placeholder="Code or name…"
               aria-label="Find account by code or name"
-              className="w-full px-2.5 py-1.5 pr-7 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
+              className="search-plain w-full px-2.5 py-1.5 pr-7 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
             />
             {search ? (
               <button
