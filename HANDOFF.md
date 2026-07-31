@@ -34,6 +34,29 @@ Same accrual-vs-clearing walk applied to EPF/SOCSO/EIS/PCB. Total across
  **User will edit the May accrual JE themselves for (A); they asked for a check
  only, not a fix. Do not post anything to 4070-4074.**
 
+ **(A) DONE by the user 2026-07-31 — verified correct.** JE-202605-0113 edited in
+ place (date/period/segment untouched): Dr 9030 +3,200.00, 9084 +970.00,
+ 9081 +442.00, 9082 +58.65, 9083 +6.70 / Cr 4070 +3,772.55, 4071 +816.00,
+ 4072 +75.40, 4073 +13.40. Both sides now 44,607.04, header total agrees,
+ TB 0.00, zero unbalanced entries DB-wide.
+ The added employee reconciles exactly: gross 4,170.00 − EPF ee 374.00 − SOCSO ee
+ 16.75 − EIS ee 6.70 = 3,772.55, i.e. the observed payment gap to the cent — which
+ also PROVES PCB is genuinely 0 for them (had there been PCB, the paid net would
+ have been lower). Statutory wage is 3,400 (EPF er 13%=442 / ee 11%=374; SOCSO
+ 58.65/16.75 and EIS 6.70/6.70 are the PERKESO 3,300.01–3,400 band), so 770 of the
+ allowance is EPF-exempt — matches the earlier prediction.
+ 4070 residual is now a clean 45,144.35 and 4071 a clean 13,961.00 (pure Jun
+ director). Per segment, every dept's 4070 now equals its own Jun accrual
+ (Marketing 29,897.39 → 33,669.94).
+ Reports need no action: no materialised/cached GL report exists (only
+ report_layouts config), so P&L/BS/TB/Cash Flow/Dept Pool recompute live from
+ journal_lines. May P&L Marketing cost +4,677.35; BS accruals +4,677.35 (still
+ balances); Cash Flow and Dept Pool correctly UNCHANGED (accrual JE, no bank leg).
+ No May invoice needs re-issuing — Marketing bills as marketing_project fixed
+ fees, not staff-cost attribution.
+ Side effect of (B) staying unpaid: the May PERKESO liability grew 2,385.30 →
+ 2,474.10 (+75.40 SOCSO +13.40 EIS for the same employee).
+
  Side note: Jun director funding moved to Alliance so far = 42,802.20 + 22,174.00
  = 64,976.20 vs a full Jun director package of 68,427.50 → short 3,451.30. Both
  PVs say "(partial)", so this may be intentional.
