@@ -135,7 +135,24 @@ across all 7 months lands exactly on closing. Excluding the Hookka pair MATTERED
 May was showing −65,242.74 and June +33,012.46; the true figures are +32,757.26 and
 −64,987.54 — the cancelled loan had flipped the sign of two months.
 
-## Session 2026-07-31 — interest to Interest-in-Suspense
+## Session 2026-07-31 — approval blocker + interest to Interest-in-Suspense
+
+0. **BLOCKER FIXED — every payroll_bank_transfer approval was dying** with
+   `record "v_voucher" has no field "reference_id"` (user hit it on
+   HV-PV-202607-0184, Director salary bank transfer Jun 2026, 42,802.20,
+   request target_pool = dept_pool_director). Cause: mig 20260727100000 (the
+   OTHER session's "custody follows the request's target_pool" change) reads
+   `v_voucher.reference_id`, but the `SELECT … INTO v_voucher` list was never
+   extended to fetch it. PL/pgSQL resolves record fields at execution time, so
+   this shipped green and only broke when a payroll round was actually
+   approved. Fixed by mig `20260731000000` (anchored patch, idempotent).
+   ⚠️ **SEPARATE ISSUE FOUND, NOT FIXED — needs a decision**:
+   `approve_voucher_batch` and `approve_voucher_batch_partial` have NO custody
+   credit block at all (no `dept_pool_hr`, no target_pool lookup). A payroll
+   funding PV approved through the BATCH path therefore moves the cash but
+   never parks it in the custody pool. Single approvals are correct. Either
+   port the block to both batch RPCs, or block payroll_bank_transfer from the
+   batch path — ask the user which.
 
 User: "这笔无法记录 interest,我指的是打去 interest in suspense account."
 Context found in the GL: a manual JV on 2026-05-20 carved the 300k back-to-back's
