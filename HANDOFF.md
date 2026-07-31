@@ -1,6 +1,12 @@
 # HOUZS Venture Portal — Session Handoff (checkpoint 2026-07-30 · Cash Flow revamp)
 
-## OPEN — fund-source repayments falling due (swept 2026-07-31)
+## CLOSED — fund-source repayments (swept 2026-07-31, then stood down)
+
+**USER DIRECTIVE 2026-07-31: "这些欠款你别理，有还的我都更新了" — do NOT audit,
+chase, or re-flag outstanding debts / repayment schedules (fund sources, loans,
+debtor aging). The user maintains them and posts repayments as they happen, so a
+zero `total_principal_paid` means "not yet repaid", NOT "missing record". Leave
+the whole category alone unless they ask.** Sweep below kept for reference only.
 
 Only two active fund sources carry an explicit `repayment_date`; the rest are
 open-ended, so "overdue" cannot be judged from the system for them.
