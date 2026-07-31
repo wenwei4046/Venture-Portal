@@ -19,17 +19,37 @@ Mig `20260731040000_statutory_pv_label_matches_shares` (applied live + archived)
  - data fix rewrote the five vouchers' text in payment_vouchers,
    journal_entries and dept_pools (15 rows, text only, no GL effect).
 
-**No in-app path exists to pay Jun's director statutory**: the per-scheme dedupe
-(reference_id = run, payee, status <> voided) blocks a second KWSP/… voucher for
-the same run, and voiding the PAID staff vouchers to regenerate combined ones
-would falsify real bank payments. Options given to the user (nothing built):
- A. Finance keys manual PVs from /payments/new — Dr 4071/4072/4073/4074
-    (segment director via pool dept_pool_director) — simplest;
- B. teach the RPC a director-only top-up round (dev work, needs their go-ahead).
-NOTE for either path: GL accrual vs InfoTech actuals DISAGREE on the director
-side (EPF 13,961.00 vs 13,248.00; PCB 8,691.35 vs 8,116.60; SKBBK accrued 0 vs
-178.60) — that reconciliation belongs to the concurrent director-payroll session;
-pay-side should follow whatever that session lands on.
+**User chose option B — BUILT (mig `20260731050000_director_statutory_topup`,
+applied live + archived).** Their instruction pinned the amount source: "根据
+request fund 那part来出" — the FUNDING-REQUEST algorithm, i.e.
+director_monthly_payroll (InfoTech actuals), NOT the GL accrual figures. The
+arithmetic confirms it: InfoTech director statutory sums to 22,174.00 (KWSP
+13,248.00 + SOCSO 535.60 + EIS 95.20 + PCB 8,116.60 + SKBBK 178.60) = exactly
+the second funding tranche parked in dept_pool_director, so paying the top-ups
+drains the custody pool to zero against what was funded.
+ - RPC `create_payroll_statutory_director_topup(period, scheme, date?, bank?)`:
+   same guards as the main generator (roles, approved run, funding completed,
+   Alliance-first bank), PLUS: a scheme voucher must already exist (else the
+   normal Generate is correct — it includes both shares), and it REFUSES when
+   any non-voided voucher for the scheme+run already carries a
+   dept_pool_director source row (combined voucher or an earlier top-up).
+   Voucher: expense/debit/pending_approval, source_pool 'dept_pool_director',
+   one PVS row (dept_pool_director, 4071/4072/4073/4074/4072), description
+   "… payroll (directors)", normal approval queue.
+ - HR Payment page: statutory rows now split vouchers by source_pool (staff =
+   dept_pool_hr, top-up = dept_pool_director) and fetch which vouchers already
+   carry a director source row → "Generate directors PV" button appears only
+   when the main PV exists, directors > 0, and the share is uncovered. Top-up
+   gets its own date slot + "Save dir date" (setPayrollPvDate works on any
+   pending payroll voucher).
+ - HR triggers it: HR Costing → Payment → Statutory payments → per-scheme
+   "Generate directors PV" → Principal approves as usual.
+The GL accrual side still shows the accrual-vs-InfoTech gap (EPF 13,961.00 vs
+13,248.00; PCB 8,691.35 vs 8,116.60; SKBBK accrued 0 vs 178.60) — paying the
+InfoTech amounts leaves those residuals in 4071/4074 (and SKBBK's 178.60 debits
+4072 with no matching accrual). That reconciliation belongs to the concurrent
+director-payroll session (ER-statutory-editable work); do NOT "fix" it from the
+payment side.
 From Jul onward the order fixes itself: import director InfoTech actuals FIRST,
 then generate statutory — each voucher then carries two PVS rows (staff drains
 dept_pool_hr, directors drain dept_pool_director).

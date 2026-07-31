@@ -5,9 +5,17 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   generateStatutoryScheme,
+  generateStatutoryDirectorTopup,
   setPayrollPvDate,
   type StatutoryScheme,
 } from '../actions'
+
+interface StatutoryPv {
+  id: string
+  voucher_no: string | null
+  status: string
+  payment_date: string | null
+}
 
 export interface StatutoryRow {
   scheme: StatutoryScheme
@@ -16,12 +24,12 @@ export interface StatutoryRow {
   staff: number
   directors: number
   /** Existing non-voided voucher for this scheme, if generated. */
-  pv: {
-    id: string
-    voucher_no: string | null
-    status: string
-    payment_date: string | null
-  } | null
+  pv: StatutoryPv | null
+  /** Director-only top-up voucher (mig 20260731050000), if raised. */
+  topupPv: StatutoryPv | null
+  /** True when the director share is already on SOME voucher (combined or
+   *  top-up) — hides the top-up button. */
+  directorsCovered: boolean
 }
 
 interface Props {
@@ -43,11 +51,18 @@ export default function StatutoryTable({ period, rows }: Props) {
   const [isPending, startTransition] = useTransition()
   const [busy, setBusy] = useState<string | null>(null)
   const [dates, setDates] = useState<Record<string, string>>(() =>
-    Object.fromEntries(rows.map(r => [r.scheme, r.pv?.payment_date ?? ''])),
+    Object.fromEntries(
+      rows.flatMap(r => [
+        [r.scheme, r.pv?.payment_date ?? ''],
+        // Separate date slot for the director top-up voucher.
+        [`${r.scheme}:dir`, r.topupPv?.payment_date ?? ''],
+      ]),
+    ),
   )
   const [error, setError] = useState<string | null>(null)
 
-  function run(scheme: StatutoryScheme, fn: () => Promise<void>) {
+  // Busy key: the scheme, or `${scheme}-dir` for its director top-up actions.
+  function run(scheme: string, fn: () => Promise<void>) {
     setError(null)
     setBusy(scheme)
     startTransition(async () => {
@@ -80,8 +95,15 @@ export default function StatutoryTable({ period, rows }: Props) {
             {rows.map(r => {
               const total = r.staff + r.directors
               const date = dates[r.scheme] ?? ''
+              const dirDate = dates[`${r.scheme}:dir`] ?? ''
               const pvPending = r.pv?.status === 'pending_approval'
               const pvPaid = r.pv?.status === 'paid' || r.pv?.status === 'approved'
+              const topupPending = r.topupPv?.status === 'pending_approval'
+              const topupPaid = r.topupPv?.status === 'paid' || r.topupPv?.status === 'approved'
+              // Offer the director top-up only when the main voucher exists but
+              // carries no director share (Jun 2026: generated before the
+              // director actuals arrived) and there is a share to pay.
+              const offerTopup = r.pv != null && !r.directorsCovered && r.directors > 0
               return (
                 <tr key={r.scheme}>
                   <td>
@@ -95,6 +117,19 @@ export default function StatutoryTable({ period, rows }: Props) {
                         {pvPaid ? ' · paid ✓' : ' · pending'}
                         {' →'}
                       </Link>
+                    ) : null}
+                    {r.topupPv ? (
+                      <div>
+                        <Link
+                          href={`/payments/${r.topupPv.id}`}
+                          className="font-mono text-[11px] text-accent hover:text-accent-hover"
+                        >
+                          {r.topupPv.voucher_no ?? 'PV'}
+                          {' · directors'}
+                          {topupPaid ? ' · paid ✓' : ' · pending'}
+                          {' →'}
+                        </Link>
+                      </div>
                     ) : null}
                   </td>
                   <td className="num text-graphite">{fmt(r.staff)}</td>
@@ -116,6 +151,25 @@ export default function StatutoryTable({ period, rows }: Props) {
                         className="bg-paper border border-hairline rounded-md px-2 py-1 text-xs font-mono text-ink focus:outline-none focus:border-accent-border"
                       />
                     )}
+                    {/* Second slot for the director top-up voucher's date. */}
+                    {offerTopup || topupPending ? (
+                      <div className="mt-1">
+                        <input
+                          type="date"
+                          value={dirDate}
+                          onChange={e =>
+                            setDates(prev => ({ ...prev, [`${r.scheme}:dir`]: e.target.value }))
+                          }
+                          disabled={isPending}
+                          title="Directors top-up payment date"
+                          className="bg-paper border border-hairline rounded-md px-2 py-1 text-xs font-mono text-ink focus:outline-none focus:border-accent-border"
+                        />
+                      </div>
+                    ) : topupPaid ? (
+                      <div className="mt-1 font-mono text-xs text-graphite">
+                        {r.topupPv?.payment_date ?? '—'} <span className="text-muted">· dir</span>
+                      </div>
+                    ) : null}
                   </td>
                   <td className="text-right">
                     {r.pv == null ? (
@@ -144,6 +198,35 @@ export default function StatutoryTable({ period, rows }: Props) {
                       >
                         {busy === r.scheme ? 'Saving…' : 'Save date'}
                       </button>
+                    ) : null}
+                    {/* Director top-up: main voucher exists but carries no
+                        director share — raise the second, director-only PV. */}
+                    {offerTopup ? (
+                      <div className="mt-1.5">
+                        <button
+                          onClick={() =>
+                            run(`${r.scheme}-dir`, () =>
+                              generateStatutoryDirectorTopup(period, r.scheme, dirDate || undefined),
+                            )
+                          }
+                          disabled={isPending}
+                          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-xs px-3 py-1.5 rounded-md disabled:opacity-50 transition-colors"
+                        >
+                          {busy === `${r.scheme}-dir` ? 'Generating…' : 'Generate directors PV'}
+                        </button>
+                      </div>
+                    ) : topupPending ? (
+                      <div className="mt-1.5">
+                        <button
+                          onClick={() =>
+                            run(`${r.scheme}-dir`, () => setPayrollPvDate(r.topupPv!.id, dirDate))
+                          }
+                          disabled={isPending || !/^\d{4}-\d{2}-\d{2}$/.test(dirDate)}
+                          className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-xs px-3 py-1.5 rounded-md disabled:opacity-50 transition-colors"
+                        >
+                          {busy === `${r.scheme}-dir` ? 'Saving…' : 'Save dir date'}
+                        </button>
+                      </div>
                     ) : null}
                   </td>
                 </tr>

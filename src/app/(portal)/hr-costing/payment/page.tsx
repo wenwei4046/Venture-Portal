@@ -190,7 +190,7 @@ export default async function HRPaymentPage({
   const { data: statutoryPvsRaw } = run
     ? await supabase
         .from('payment_vouchers')
-        .select('id, voucher_no, payee_name, status, payment_date')
+        .select('id, voucher_no, payee_name, status, payment_date, source_pool')
         .eq('reference_type', 'payroll_statutory')
         .eq('reference_id', run.id)
         .neq('status', 'voided')
@@ -209,21 +209,40 @@ export default async function HRPaymentPage({
     { scheme: 'PCB', payee: 'LHDN', staff: staffSum(r => n(r.pcb)), directors: dirSum(d => n(d.pcb)) },
     { scheme: 'SKBBK', payee: 'SKBBK', staff: staffSum(r => n(r.skbbk_amount)), directors: dirSum(d => n(d.skbbk_amount)) },
   ]
+  // Which of those vouchers already carry a director source row? A combined
+  // voucher (director actuals present at generation time) needs no top-up.
+  const statutoryPvIds = (statutoryPvsRaw ?? []).map(v => v.id as string)
+  const { data: dirSourceRows } = statutoryPvIds.length
+    ? await supabase
+        .from('payment_voucher_sources')
+        .select('voucher_id')
+        .in('voucher_id', statutoryPvIds)
+        .eq('pool', 'dept_pool_director')
+    : { data: [] }
+  const dirCovered = new Set((dirSourceRows ?? []).map(r => r.voucher_id as string))
+
   const statutoryRows: StatutoryRow[] = SCHEMES.map(s => {
-    const pv = (statutoryPvsRaw ?? []).find(v => v.payee_name === s.payee) ?? null
+    // A payee can carry TWO vouchers since mig 20260731050000: the main one
+    // (source_pool dept_pool_hr — staff, or staff+directors combined) and a
+    // director-only top-up (source_pool dept_pool_director), raised when the
+    // main one was generated before the director actuals existed (Jun 2026).
+    const forPayee = (statutoryPvsRaw ?? []).filter(v => v.payee_name === s.payee)
+    const pv = forPayee.find(v => v.source_pool !== 'dept_pool_director') ?? null
+    const topup = forPayee.find(v => v.source_pool === 'dept_pool_director') ?? null
+    const shape = (v: NonNullable<typeof pv>) => ({
+      id: v.id as string,
+      voucher_no: v.voucher_no,
+      status: v.status as string,
+      payment_date: (v.payment_date ?? null) as string | null,
+    })
     return {
       scheme: s.scheme,
       payee: s.payee,
       staff: Math.round(s.staff * 100) / 100,
       directors: Math.round(s.directors * 100) / 100,
-      pv: pv
-        ? {
-            id: pv.id as string,
-            voucher_no: pv.voucher_no,
-            status: pv.status as string,
-            payment_date: (pv.payment_date ?? null) as string | null,
-          }
-        : null,
+      pv: pv ? shape(pv) : null,
+      topupPv: topup ? shape(topup) : null,
+      directorsCovered: !!topup || (pv ? dirCovered.has(pv.id as string) : false),
     }
   })
 

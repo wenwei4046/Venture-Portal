@@ -85,6 +85,42 @@ export async function generateStatutoryScheme(
 }
 
 /**
+ * Director-only statutory top-up (mig 20260731050000). For a period whose
+ * scheme voucher was generated BEFORE the director InfoTech actuals existed
+ * (Jun 2026: the five staff-only vouchers), this raises a second voucher
+ * carrying just the director share — amounts from director_monthly_payroll,
+ * the same source the payroll funding request summed ("request fund" 算法,
+ * user 2026-07-31). The RPC refuses when the share is already carried.
+ */
+export async function generateStatutoryDirectorTopup(
+  period: string,
+  scheme: StatutoryScheme,
+  paymentDate?: string,
+): Promise<void> {
+  await requireRole(['hr', 'finance', 'principal'])
+  const supabase = await createClient()
+
+  if (paymentDate && !/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) {
+    throw new Error('Invalid payment date')
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.rpc as any)('create_payroll_statutory_director_topup', {
+    p_period: period,
+    p_scheme: scheme,
+    p_payment_date: paymentDate ?? null,
+    p_bank_account_id: null, // auto-picks the Alliance payroll bank
+  })
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/hr-costing/payment')
+  revalidatePath('/payments/payroll-requests')
+  revalidatePath('/payments')
+  revalidatePath('/approvals')
+}
+
+/**
  * HR sets/changes the payment date on a PENDING payroll voucher (the /payments
  * editor is Finance-gated, but payroll payment dates are HR's knowledge).
  */
