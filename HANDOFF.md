@@ -158,10 +158,22 @@ independent bugs, both fixed in mig `20260731020000`:
     Removed.
  Caches then re-derived from the GL. After: Alliance 102,496.67 == GL,
  Hong Leong 199,961.25 == GL, TB 0.00.
- ⚠️ **Business question left with the user**: PV-0186 "To Contra with fund
- Transfer" moves Hong Leong → Hong Leong, i.e. it does NOTHING. If it was meant
- to contra the 22,174.00 director transfer it should be Alliance → Hong Leong —
- void and re-create with the right source bank.
+ **RESOLVED same session.** User voided PV-0186 (HL→HL no-op) and PV-0187
+ (right direction, wrong date 7/31), then re-issued **PV-0188** Alliance→Hong
+ Leong 22,174.00 dated 2026-07-15 — same date as the PV-0185 funding leg, so the
+ pair nets to zero inside July's cash flow. Both voids flagged is_reversed, so
+ neither shows in the ledger.
+ PV-0187 went approve→paid→void AFTER the migration, which proves the new mirror
+ trigger on live data: without it Hong Leong would now be 22,174.00 overstated;
+ it isn't.
+ After: HL 222,135.25 == GL, Alliance 80,322.67 == GL, TB 0.00, per-bank columns
+ foot to bank balances, rows foot to dept pool balances (inter-billing folds net
+ to zero: −5,644.39 −23,882.01 +74,039.60 −48,775.20 +4,262.00 = 0), total cash
+ 302,457.92.
+ **The 42,802.20 leg (PV-0184, 7/09, HL→Alliance) is NOT contra'd — confirmed by
+ the user 2026-07-31 that one WAS a real bank transfer.** Only the 22,174.00 was
+ direct-funded into Alliance by another company, hence only it needed the contra.
+ Don't "fix" the asymmetry later.
 
 0. **BLOCKER FIXED — every payroll_bank_transfer approval was dying** with
    `record "v_voucher" has no field "reference_id"` (user hit it on
