@@ -47,6 +47,7 @@ export function buildMonthlyCashFlow(
     const walk = (n: AccountNode, depth: number) => {
       rows.push({
         key: `${subtotal.key}:${n.code}`,
+        code: n.code,
         label: n.name,
         depth,
         kind: 'account',

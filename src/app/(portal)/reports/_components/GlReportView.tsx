@@ -5,12 +5,14 @@
 // Δ% | % of revenue columns, collapsible account groups, leaf rows expand to
 // their underlying journal transactions, expand/collapse all.
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import { formatMoneyBare } from '@/lib/utils'
 import type { AccountNode, ReportSection } from '@/lib/gl-reports'
 import { deltaPct, pctOf, type ReportBlock } from '@/lib/gl-report-blocks'
+import { matchesAccount } from '@/lib/report-search'
+import Highlight from './Highlight'
 
 export type { ReportBlock }
 
@@ -76,6 +78,48 @@ export default function GlReportView({
   const setLevel = (level: 1 | 2 | 3) => {
     setCollapsed(level === 1 ? new Set(allGroupCodes) : new Set())
     setOpenTxns(level === 3 ? new Set(allTxnCodes) : new Set())
+  }
+
+  // ─── Account search ───
+  // Highlights, never hides: a filtered statement invites reading a subtotal as
+  // if it covered only the visible rows. Matches are collected in document
+  // order so ‹ › walks the report top-to-bottom, and every ancestor of a match
+  // is forced open so the hit is actually on screen whatever the detail level.
+  const [search, setSearch] = useState('')
+  const [activeHit, setActiveHit] = useState(0)
+
+  const { hitCodes, forceOpen } = useMemo(() => {
+    const hits: string[] = []
+    const open = new Set<string>()
+    if (!search.trim()) return { hitCodes: hits, forceOpen: open }
+    const walk = (n: AccountNode, ancestors: string[]) => {
+      if (matchesAccount(search, n.code, n.name)) {
+        hits.push(n.code)
+        for (const a of ancestors) open.add(a)
+      }
+      if (n.children.length > 0) {
+        const next = [...ancestors, n.code]
+        for (const c of n.children) walk(c, next)
+      }
+    }
+    for (const b of blocks) if (b.kind === 'section') b.section.nodes.forEach((n) => walk(n, []))
+    return { hitCodes: hits, forceOpen: open }
+  }, [blocks, search])
+
+  const hitSet = useMemo(() => new Set(hitCodes), [hitCodes])
+  const activeCode = hitCodes.length > 0 ? hitCodes[activeHit % hitCodes.length] : null
+
+  useEffect(() => setActiveHit(0), [search])
+  useEffect(() => {
+    if (!activeCode) return
+    document
+      .getElementById(`gl-row-${activeCode}`)
+      ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [activeCode])
+
+  const stepHit = (delta: number) => {
+    if (hitCodes.length === 0) return
+    setActiveHit((i) => (i + delta + hitCodes.length) % hitCodes.length)
   }
 
   function navigate(nextPeriod: string, nextCompare: string, nextSegment: string) {
@@ -164,6 +208,61 @@ export default function GlReportView({
         </div>
 
         <div>
+          <div className={railHead}>Find account</div>
+          <div className="relative">
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  stepHit(e.shiftKey ? -1 : 1)
+                } else if (e.key === 'Escape') {
+                  setSearch('')
+                }
+              }}
+              placeholder="Code or name…"
+              aria-label="Find account by code or name"
+              className="w-full px-2.5 py-1.5 pr-7 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
+            />
+            {search ? (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted hover:text-danger font-mono text-sm px-1"
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            ) : null}
+          </div>
+          {search.trim() ? (
+            <div className="flex items-center justify-between gap-2 mt-1.5">
+              <span className="font-mono text-[11px] text-muted">
+                {hitCodes.length === 0
+                  ? 'No match'
+                  : `${activeHit + 1} / ${hitCodes.length} match${hitCodes.length === 1 ? '' : 'es'}`}
+              </span>
+              {hitCodes.length > 0 ? (
+                <span className="flex items-center gap-1">
+                  <button type="button" onClick={() => stepHit(-1)} className={railBtn} aria-label="Previous match">
+                    ‹
+                  </button>
+                  <button type="button" onClick={() => stepHit(1)} className={railBtn} aria-label="Next match">
+                    ›
+                  </button>
+                </span>
+              ) : null}
+            </div>
+          ) : (
+            <p className="font-serif italic text-muted text-[11px] mt-1.5 leading-snug">
+              Highlights only — nothing is hidden, so every total still covers the full report.
+            </p>
+          )}
+        </div>
+
+        <div>
           <div className={railHead}>Detail level</div>
           <div className="flex items-center gap-1.5">
             {([
@@ -234,6 +333,10 @@ export default function GlReportView({
                 pctBase={pctBase}
                 colCount={colCount}
                 withCompare={withCompare}
+                search={search}
+                hitSet={hitSet}
+                activeCode={activeCode}
+                forceOpen={forceOpen}
               />
             ) : (
               <tr
@@ -295,6 +398,10 @@ function SectionRows({
   pctBase,
   colCount,
   withCompare,
+  search,
+  hitSet,
+  activeCode,
+  forceOpen,
 }: {
   section: ReportSection
   collapsed: Set<string>
@@ -304,6 +411,11 @@ function SectionRows({
   pctBase?: { current: number; previous: number }
   colCount: number
   withCompare: boolean
+  search: string
+  hitSet: Set<string>
+  activeCode: string | null
+  /** Ancestors of a match — opened regardless of the collapsed state. */
+  forceOpen: Set<string>
 }) {
   const rows: React.ReactNode[] = []
 
@@ -321,7 +433,10 @@ function SectionRows({
 
   const renderNode = (n: AccountNode, depth: number) => {
     const isGroup = n.children.length > 0
-    const isCollapsed = collapsed.has(n.code)
+    // A match below forces its ancestors open, so a hit is never buried.
+    const isCollapsed = collapsed.has(n.code) && !forceOpen.has(n.code)
+    const isHit = hitSet.has(n.code)
+    const isActive = activeCode === n.code
     const txnsOpen = openTxns.has(n.code)
     const hasTxns = !isGroup && n.txns.length > 0
     // The whole code+name area toggles — not just the arrow (user 2026-06-11).
@@ -331,7 +446,13 @@ function SectionRows({
         ? () => onToggleTxns(n.code)
         : undefined
     rows.push(
-      <tr key={n.code} className={isGroup ? 'row-group' : 'row-leaf'}>
+      <tr
+        key={n.code}
+        id={`gl-row-${n.code}`}
+        className={`${isGroup ? 'row-group' : 'row-leaf'}${
+          isActive ? ' search-row-active' : isHit ? ' search-row-hit' : ''
+        }`}
+      >
         <td>
           <button
             type="button"
@@ -363,9 +484,11 @@ function SectionRows({
             ) : (
               <span className="mr-1.5 w-3" aria-hidden />
             )}
-            <span className="font-mono text-xs text-graphite mr-2">{n.code}</span>
+            <span className="font-mono text-xs text-graphite mr-2">
+              <Highlight text={n.code} query={search} />
+            </span>
             <span className={`text-sm text-ink ${isGroup ? 'font-medium' : ''} ${toggleAction ? 'group-hover:text-accent transition-colors' : ''}`}>
-              {n.name}
+              <Highlight text={n.name} query={search} />
             </span>
             {hasTxns ? (
               <span className="ml-2 font-mono text-[10px] text-muted">({n.txns.length})</span>

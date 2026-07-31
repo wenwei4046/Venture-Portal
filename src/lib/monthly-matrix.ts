@@ -13,6 +13,9 @@ export interface MatrixColumn {
 export interface MatrixRow {
   key: string // account code, or subtotal id
   label: string
+  /** Account code, when this row is one. `key` is prefixed on some reports to
+   *  stay unique across sections, so search needs the bare code separately. */
+  code?: string
   depth: number // indent level (0 = top)
   kind: 'account' | 'subtotal'
   /** true when this account rolls up child accounts under it. */
@@ -126,10 +129,10 @@ export function buildHierarchyRows(
   const rows: MatrixRow[] = []
   const emit = (node: Node, depth: number) => {
     if (node.children.size > 0) {
-      rows.push({ key: `${keyPrefix}:${node.code}`, label: node.name, depth, kind: 'account', isParent: true, values: sum(node) })
+      rows.push({ key: `${keyPrefix}:${node.code}`, code: node.code, label: node.name, depth, kind: 'account', isParent: true, values: sum(node) })
       for (const c of sorted(node.children)) emit(c, depth + 1)
     } else {
-      rows.push({ key: `${keyPrefix}:${node.code}`, label: node.name, depth, kind: 'account', values: node.leaf!.values })
+      rows.push({ key: `${keyPrefix}:${node.code}`, code: node.code, label: node.name, depth, kind: 'account', values: node.leaf!.values })
     }
   }
   for (const node of sorted(roots)) emit(node, baseDepth)

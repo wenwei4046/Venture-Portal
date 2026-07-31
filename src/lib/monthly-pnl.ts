@@ -58,6 +58,7 @@ export function buildMonthlyPnl(
     const walk = (n: AccountNode, depth: number) => {
       rows.push({
         key: n.code,
+        code: n.code,
         label: n.name,
         depth,
         kind: 'account',

@@ -1,5 +1,43 @@
 # HOUZS Venture Portal — Session Handoff (checkpoint 2026-07-30 · Cash Flow revamp)
 
+## Account search on the four statements (2026-07-31, user request)
+
+"帮我在 P&L, Monthly P&L, cash flow 和 monthly cash flow 加搜索功能，就快速找account".
+All four render through just two shared components, so the search lives there and
+covers every page at once — no per-page changes.
+
+**User picked HIGHLIGHT, not filter** (asked explicitly). Rationale worth keeping:
+a filtered statement invites reading a subtotal as if it covered only the rows
+still on screen. So a search never removes a row — it highlights the match, forces
+its ancestors open, and offers ‹ › to jump. The L1/L2/L3 detail level is the
+user's own separate choice and is still respected; search only ADDS the matched
+rows (and the path to them) on top of it.
+
+ - **new** `src/lib/report-search.ts` — pure helpers: `matchesAccount` (query is a
+   substring of the account CODE or NAME, case-folded — covers "9030", "salary",
+   "salary expense"), `highlight` (splits text into <mark>-able runs, preserving
+   original casing and reconstructing the source exactly), `ancestorsOfMatches`
+   (pre-order depth stack → the ancestor keys to force open).
+ - **new** `_components/Highlight.tsx` — shared `<mark>` renderer so a hit looks
+   identical on all four reports.
+ - `GlReportView.tsx` (P&L + Cash Flow) — "Find account" box in the left rail with
+   match counter + ‹ ›, Enter/Shift-Enter to step, Esc to clear. Matched ancestors
+   override `collapsed`; active row scrolls to centre.
+ - `MonthlyMatrix.tsx` (Monthly P&L + Monthly Cash Flow) — same, in the toolbar
+   beside L1/L2/L3. `isOpen` consults forceOpen first; the visibility pass gained
+   an `onSearchPath` escape so a deep match surfaces even at L1.
+ - `MatrixRow` gained `code?` — its `key` is prefixed per section on some reports,
+   so search needs the bare code. Set at all 3 construction sites (monthly-matrix
+   buildHierarchyRows ×2, monthly-cash-flow, monthly-pnl); the subtotal rows in
+   cash-flow-custom need no code.
+ - `globals.css` — `.search-hit` (matched substring), `tr.search-row-hit`,
+   `tr.search-row-active`; the matrix's sticky first column and gl-report's
+   blanket hover wash both had to be overridden so the cue survives.
+
+Gates: tsc clean for every tracked file; vitest **457 passed** (444 → +13 in
+`src/__tests__/report-search.test.ts`). NOT visually verified in-app — the dev
+server needs a login this session doesn't have; user checks on the deploy.
+
 ## FIXED (2026-07-31) — approvals LIST showed a stale amount vs the DETAIL page
 
 User spotted it: /approvals lists HV-PV-202607-0179 at RM 100,000 but the detail
