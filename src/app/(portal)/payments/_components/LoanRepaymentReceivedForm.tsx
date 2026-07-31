@@ -8,6 +8,10 @@ interface LoanOption {
   id: string
   label: string
   outstanding: number
+  /** Borrower's Interest-in-Suspense leaf (3060 family), when one exists. */
+  suspenseCode?: string | null
+  suspenseName?: string | null
+  suspenseBalance?: number
 }
 
 interface Props {
@@ -123,6 +127,33 @@ export default function LoanRepaymentReceivedForm({ loans, bankAccounts }: Props
         <AmountField id="interest" label="利息 · Interest" value={interest} onChange={setInterest} />
         <AmountField id="penalty" label="罚息 · Penalty" value={penalty} onChange={setPenalty} />
       </div>
+
+      {/* Where the interest lands. Only shown when interest is being recorded
+          AND this borrower has an Interest-in-Suspense leaf — otherwise the
+          only sensible answer is income and the choice is noise. */}
+      {(parseFloat(interest) || 0) > 0 && selected?.suspenseCode ? (
+        <div className="mb-6">
+          <label htmlFor="interest_account_code" className="block text-sm font-sans font-medium text-graphite mb-1.5">
+            利息入账科目 · Interest credited to
+          </label>
+          <select
+            id="interest_account_code"
+            name="interest_account_code"
+            defaultValue={selected.suspenseCode}
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+          >
+            <option value={selected.suspenseCode}>
+              {selected.suspenseCode} · {selected.suspenseName} — 冲利息挂账(余 RM{' '}
+              {(selected.suspenseBalance ?? 0).toLocaleString('en-MY', { minimumFractionDigits: 2 })})
+            </option>
+            <option value="5027">5027 · Interest Income - Loans — 直接确认为收入</option>
+          </select>
+          <p className="font-serif italic text-muted text-xs mt-1.5">
+            这笔贷款的全期利息已经预先拆到挂账科目里,所以默认冲挂账 —— 再记一次收入会重复。
+            只有当这笔利息不在挂账内(额外收的),才选利息收入。
+          </p>
+        </div>
+      ) : null}
 
       <div className="mb-6 flex items-baseline justify-between border-t border-hairline pt-3">
         <span className="font-serif italic text-graphite text-sm">合计收款 · Total received</span>

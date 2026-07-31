@@ -8,7 +8,12 @@ import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { postJournalEntry } from '@/lib/journal'
 import { validateDisbursementAccount } from '@/lib/loan-disbursement'
-import { resolveLoansReceivableLeaf } from '@/lib/loans-coa'
+import {
+  resolveLoansReceivableLeaf,
+  resolveInterestSuspenseLeaf,
+  INTEREST_INCOME_CODE,
+  INTEREST_SUSPENSE_PARENT,
+} from '@/lib/loans-coa'
 import type { PaymentType } from '@/types'
 import type { Json } from '@/lib/supabase/database.types'
 
@@ -316,10 +321,31 @@ export async function recordRepayment(formData: FormData) {
   //   - 5027 Interest Income — Loans (revenue) ← interest + netting.
   //     User 2026-06-15: interest income belongs in Revenue (it's the core
   //     lending revenue), so it was reclassed 7000 → 5027 (revenue range).
+  //   - interest may instead draw down the borrower's Interest-in-Suspense
+  //     leaf (3060 family) when the caller says so — the 300k back-to-back
+  //     carved the whole term's interest out of the receivable up front, so
+  //     crediting 5027 again would double-count the income (user 2026-07-31).
+  //     Only 5027 or a 3060 child is accepted; anything else is rejected
+  //     rather than silently posted somewhere odd.
+  let interestCredit = INTEREST_INCOME_CODE
+  const requestedInterestAccount = ((formData.get('interest_account_code') as string) ?? '').trim()
+  if (paymentType === 'interest' && requestedInterestAccount && requestedInterestAccount !== INTEREST_INCOME_CODE) {
+    const { data: acc } = await supabase
+      .from('chart_of_accounts')
+      .select('code, parent_code, is_active')
+      .eq('code', requestedInterestAccount)
+      .maybeSingle()
+    if (!acc?.is_active || acc.parent_code !== INTEREST_SUSPENSE_PARENT) {
+      throw new Error(
+        `利息科目 ${requestedInterestAccount} 不可用 — 只能选 ${INTEREST_INCOME_CODE} 利息收入,或 ${INTEREST_SUSPENSE_PARENT} 底下的利息挂账科目`,
+      )
+    }
+    interestCredit = acc.code
+  }
   const creditAccount =
     paymentType === 'principal' ? await resolveLoansReceivableLeaf(supabase, loanId) :
     paymentType === 'penalty'   ? '7010' :
-                                  '5027'   // interest + netting
+                                  interestCredit   // interest + netting
 
   try {
     await postJournalEntry(supabase, {
@@ -380,6 +406,11 @@ export async function recordLoanRepaymentReceived(formData: FormData) {
     fd.set('payment_date', paymentDate)
     if (bankAccountId) fd.set('bank_account_id', bankAccountId)
     if (notes) fd.set('notes', notes)
+    // Interest may be routed to the borrower's Interest-in-Suspense leaf.
+    if (type === 'interest') {
+      const acct = ((formData.get('interest_account_code') as string) ?? '').trim()
+      if (acct) fd.set('interest_account_code', acct)
+    }
     await recordRepayment(fd)
   }
 

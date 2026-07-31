@@ -32,22 +32,49 @@ export default async function NewPaymentPage({ searchParams }: Props) {
 
   // Dedicated flow: record a loan repayment RECEIVED (sub → HV).
   if (mode === 'loan_repayment') {
-    const [{ data: loans }, { data: loanOut }, { data: cos }, { data: banks }] = await Promise.all([
+    const [{ data: loans }, { data: loanOut }, { data: cos }, { data: banks }, { data: suspenseAccts }, { data: suspenseLines }] = await Promise.all([
       supabase.from('loans').select('id, company_id, principal, effective_rate, tenure_months').eq('status', 'active'),
       supabase.from('loan_outstanding').select('loan_id, outstanding'),
       supabase.from('companies').select('id, short_code, name'),
       supabase.from('bank_accounts').select('id, bank_name, account_number, current_balance').eq('status', 'active').order('is_primary', { ascending: false }),
+      // Interest-in-Suspense leaves + their live balances, so the form can
+      // offer "draw down the suspense" instead of booking income twice.
+      supabase.from('chart_of_accounts').select('code, name').eq('parent_code', '3060').eq('is_active', true),
+      supabase.from('journal_lines').select('account_code, debit, credit, journal_entries!inner(is_reversed)').like('account_code', '306%'),
     ])
+    const suspenseBalance = new Map<string, number>()
+    for (const l of (suspenseLines ?? []) as unknown as Array<{
+      account_code: string; debit: number | null; credit: number | null
+      journal_entries: { is_reversed: boolean }
+    }>) {
+      if (l.journal_entries?.is_reversed) continue
+      const cur = suspenseBalance.get(l.account_code) ?? 0
+      suspenseBalance.set(l.account_code, cur + Number(l.debit ?? 0) - Number(l.credit ?? 0))
+    }
+    // Match a suspense leaf to a borrower the same way resolveInterestSuspenseLeaf does.
+    const suspenseFor = (co: { name?: string | null; short_code?: string | null } | null | undefined) => {
+      if (!co) return null
+      const hay = (s: string) => s.toLowerCase()
+      return (suspenseAccts ?? []).find((a) => {
+        const n = hay(a.name as string)
+        return (co.name && n.includes(hay(co.name))) || (co.short_code && n.includes(hay(co.short_code)))
+      }) ?? null
+    }
     const outMap = new Map((loanOut ?? []).map((o) => [o.loan_id as string, Number(o.outstanding)]))
     const coMap = new Map((cos ?? []).map((c) => [c.id as string, c]))
     const loanOptions = (loans ?? [])
       .map((l) => {
         const co = l.company_id ? coMap.get(l.company_id as string) : null
         const outstanding = outMap.get(l.id as string) ?? Number(l.principal)
+        const susp = suspenseFor(co)
         return {
           id: l.id as string,
           outstanding,
           label: `${co?.short_code ?? co?.name ?? '—'} · RM ${Number(l.principal).toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(Number(l.effective_rate) * 100).toFixed(3)}%/mo · 欠 ${outstanding.toLocaleString('en-MY', { minimumFractionDigits: 2 })}`,
+          // Offer the suspense route only when that leaf actually holds a balance.
+          suspenseCode: susp && (suspenseBalance.get(susp.code as string) ?? 0) > 0.005 ? (susp.code as string) : null,
+          suspenseName: susp?.name as string | undefined,
+          suspenseBalance: susp ? Math.round((suspenseBalance.get(susp.code as string) ?? 0) * 100) / 100 : 0,
         }
       })
       .filter((l) => l.outstanding > 0)

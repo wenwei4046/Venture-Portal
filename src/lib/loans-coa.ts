@@ -21,6 +21,46 @@ import type { SupabaseClient } from './voucher-paid-helpers'
  * user-facing message if the COA leaf hasn't been created yet — Finance
  * must add it in Settings → Accounts before retrying the approval / repayment.
  */
+/** Default account the interest leg of a repayment credits. */
+export const INTEREST_INCOME_CODE = '5027'
+/** Header of the per-borrower Interest-in-Suspense receivable family. */
+export const INTEREST_SUSPENSE_PARENT = '3060'
+
+/**
+ * The borrower's `3060 Interest in Suspense — Receivable` leaf, or null when
+ * none exists. Used when interest was carved out of the receivable up front
+ * (e.g. the 300k back-to-back: a manual JV moved the whole term's interest
+ * from 3053 into 3063), so collecting it draws the suspense down instead of
+ * recognising income twice.
+ */
+export async function resolveInterestSuspenseLeaf(
+  supabase: SupabaseClient,
+  loanId: string,
+): Promise<string | null> {
+  const { data: loan } = await supabase
+    .from('loans')
+    .select('company_id')
+    .eq('id', loanId)
+    .maybeSingle()
+  if (!loan?.company_id) return null
+
+  const { data: borrower } = await supabase
+    .from('companies')
+    .select('name, short_code')
+    .eq('id', loan.company_id)
+    .maybeSingle()
+  if (!borrower) return null
+
+  const { data: coa } = await supabase
+    .from('chart_of_accounts')
+    .select('code')
+    .eq('parent_code', INTEREST_SUSPENSE_PARENT)
+    .eq('is_active', true)
+    .or(`name.ilike.%${borrower.name}%,name.ilike.%${borrower.short_code}%`)
+    .maybeSingle()
+  return coa?.code ?? null
+}
+
 export async function resolveLoansReceivableLeaf(
   supabase: SupabaseClient,
   loanId: string,

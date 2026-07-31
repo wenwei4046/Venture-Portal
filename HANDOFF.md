@@ -126,6 +126,36 @@
    before reversing and calls mark_journal_entry_reversed, which still refuses
    any pair that doesn't net to zero. Verified after: 12 entries flagged,
    TB 0.00, both banks cache == GL.
+
+**Cash-flow verification (asked for, done independently in SQL — not read off the
+report)**: closing cash 82,457.92 == HL 2,135.25 + Alliance 80,322.67; ZERO orphan
+bank entries (no JE with a bank leg but no counter leg, so the "uncategorised cash
+movement" check row is 0); every month inflow+outflow == net change; running total
+across all 7 months lands exactly on closing. Excluding the Hookka pair MATTERED:
+May was showing −65,242.74 and June +33,012.46; the true figures are +32,757.26 and
+−64,987.54 — the cancelled loan had flipped the sign of two months.
+
+## Session 2026-07-31 — interest to Interest-in-Suspense
+
+User: "这笔无法记录 interest,我指的是打去 interest in suspense account."
+Context found in the GL: a manual JV on 2026-05-20 carved the 300k back-to-back's
+WHOLE-TERM interest out up front — Dr 3063 (Interest in Suspense - Recv - The Cont)
+38,333.33 / Cr 3053, and Dr 4052 / Cr 4062 (Pay - HOUZS Century) on the funding
+side. So 3053 now holds principal only, and collecting interest must DRAW DOWN
+3063; crediting 5027 again would double-count income.
+- lib/loans-coa.ts: `resolveInterestSuspenseLeaf` + INTEREST_INCOME_CODE /
+  INTEREST_SUSPENSE_PARENT constants (matches a 3060 child by borrower name or
+  short_code, same tolerance as the receivable resolver).
+- recordRepayment accepts `interest_account_code`; applies ONLY to payment_type
+  'interest', and validates it is 5027 or an ACTIVE child of 3060 — anything else
+  throws rather than posting somewhere odd. recordLoanRepaymentReceived forwards
+  it on the interest leg only.
+- 收到 Loan 还款 form: an "利息入账科目" select appears only when interest > 0 AND
+  that borrower's suspense leaf carries a balance; it DEFAULTS to the suspense
+  account (the safe choice) with 5027 as the explicit alternative. /payments/new
+  computes each loan's suspense leaf + live balance (is_reversed excluded).
+- Only The Cont has a suspense balance today (3063 = 38,333.33); every other loan
+  sees no select and behaves exactly as before.
 3. **明细**: the single-month Cash Flow Statement ALREADY had drill-down
    (GlReportView ▸ + applyGlRefs) — user picked it, so the work was making the new
    gross rows carry per-side txns (done above). The Monthly Cash Flow MATRIX still
