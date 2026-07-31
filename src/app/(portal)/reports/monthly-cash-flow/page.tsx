@@ -10,6 +10,7 @@ import type { MatrixRow } from '@/lib/monthly-matrix'
 import { segmentFilterFor } from '../_components/report-segments'
 import MonthlyMatrix from '../_components/MonthlyMatrix'
 import MonthlyReportControls from '../_components/MonthlyReportControls'
+import { ReportSearchProvider } from '../_components/ReportSearchProvider'
 
 export const dynamic = 'force-dynamic'
 
@@ -112,12 +113,15 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
         positive, outflows negative.
       </p>
 
-      <div className="flex gap-8 items-start">
-        <MonthlyReportControls period={period} segment={segment} hideSegment={isDeptMgr} />
-        <div className="min-w-0 flex-1">
-          <MonthlyMatrix columns={data.columns} rows={rows} />
+      {/* Provider bridges the rail's search box to the matrix that owns the rows. */}
+      <ReportSearchProvider>
+        <div className="flex gap-8 items-start">
+          <MonthlyReportControls period={period} segment={segment} hideSegment={isDeptMgr} />
+          <div className="min-w-0 flex-1">
+            <MonthlyMatrix columns={data.columns} rows={rows} />
+          </div>
         </div>
-      </div>
+      </ReportSearchProvider>
     </div>
   )
 }

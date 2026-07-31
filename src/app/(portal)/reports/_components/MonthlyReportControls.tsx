@@ -2,6 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { REPORT_SEGMENTS } from './report-segments'
+import { useReportSearch } from './ReportSearchProvider'
 
 // Left-rail controls for the monthly matrix reports: "up to month" picker +
 // a segment radio list with colour dots (mirrors the GL statements' rail).
@@ -19,6 +20,10 @@ export default function MonthlyReportControls({
   const router = useRouter()
   const pathname = usePathname()
   const sp = useSearchParams()
+  // Present only when the page wraps its rail + matrix in ReportSearchProvider.
+  const find = useReportSearch()
+  const railBtn =
+    'px-2 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors'
 
   const navigate = (next: { period?: string; segment?: string }) => {
     const qs = new URLSearchParams(sp.toString())
@@ -41,6 +46,63 @@ export default function MonthlyReportControls({
           className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
         />
       </div>
+
+      {find ? (
+        <div>
+          <div className="text-xs uppercase tracking-wide text-muted font-sans mb-2">Find account</div>
+          <div className="relative">
+            <input
+              type="search"
+              value={find.search}
+              onChange={(e) => find.setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  find.step(e.shiftKey ? -1 : 1)
+                } else if (e.key === 'Escape') {
+                  find.setSearch('')
+                }
+              }}
+              placeholder="Code or name…"
+              aria-label="Find account by code or name"
+              className="w-full px-2.5 py-1.5 pr-7 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
+            />
+            {find.search ? (
+              <button
+                type="button"
+                onClick={() => find.setSearch('')}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted hover:text-danger font-mono text-sm px-1"
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            ) : null}
+          </div>
+          {find.search.trim() ? (
+            <div className="flex items-center justify-between gap-2 mt-1.5">
+              <span className="font-mono text-[11px] text-muted">
+                {find.hitCount === 0
+                  ? 'No match'
+                  : `${find.activeHit + 1} / ${find.hitCount} match${find.hitCount === 1 ? '' : 'es'}`}
+              </span>
+              {find.hitCount > 0 ? (
+                <span className="flex items-center gap-1">
+                  <button type="button" onClick={() => find.step(-1)} className={railBtn} aria-label="Previous match">
+                    ‹
+                  </button>
+                  <button type="button" onClick={() => find.step(1)} className={railBtn} aria-label="Next match">
+                    ›
+                  </button>
+                </span>
+              ) : null}
+            </div>
+          ) : (
+            <p className="font-serif italic text-muted text-[11px] mt-1.5 leading-snug">
+              Highlights only — nothing is hidden, so every total still covers the full report.
+            </p>
+          )}
+        </div>
+      ) : null}
 
       {!hideSegment && (
       <div>

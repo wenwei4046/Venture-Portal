@@ -23,9 +23,18 @@ rows (and the path to them) on top of it.
  - `GlReportView.tsx` (P&L + Cash Flow) — "Find account" box in the left rail with
    match counter + ‹ ›, Enter/Shift-Enter to step, Esc to clear. Matched ancestors
    override `collapsed`; active row scrolls to centre.
- - `MonthlyMatrix.tsx` (Monthly P&L + Monthly Cash Flow) — same, in the toolbar
-   beside L1/L2/L3. `isOpen` consults forceOpen first; the visibility pass gained
-   an `onSearchPath` escape so a deep match surfaces even at L1.
+ - `MonthlyMatrix.tsx` (Monthly P&L + Monthly Cash Flow) — same behaviour.
+   `isOpen` consults forceOpen first; the visibility pass gained an
+   `onSearchPath` escape so a deep match surfaces even at L1.
+ - **new** `_components/ReportSearchProvider.tsx` — the monthly reports' box was
+   first put in the matrix toolbar; user asked for it in the LEFT RAIL instead,
+   to match the GL statements. The rail (MonthlyReportControls) is a SIBLING of
+   the matrix, so query + cursor now flow through this client context and the
+   matrix publishes its match count back up. Deliberately not a `?q=` URL param —
+   that would round-trip the server on every keystroke. GlReportView needs none
+   of it: it owns its own rail, so its search stays local state.
+   `useReportSearch()` returns null without a provider, and the rail then renders
+   no search UI — so MonthlyReportControls stays usable anywhere else.
  - `MatrixRow` gained `code?` — its `key` is prefixed per section on some reports,
    so search needs the bare code. Set at all 3 construction sites (monthly-matrix
    buildHierarchyRows ×2, monthly-cash-flow, monthly-pnl); the subtotal rows in

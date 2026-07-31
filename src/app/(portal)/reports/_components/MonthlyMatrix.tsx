@@ -5,6 +5,7 @@ import { formatMoneyBare } from '@/lib/utils'
 import type { MonthlyMatrixData } from '@/lib/monthly-matrix'
 import { ancestorsOfMatches, matchesAccount } from '@/lib/report-search'
 import Highlight from './Highlight'
+import { useReportSearch } from './ReportSearchProvider'
 
 // Shared month-matrix table for the Monthly P&L / Cash Flow reports.
 // Columns = Accumulated + each month; each column shows a number and an optional
@@ -36,8 +37,14 @@ export default function MonthlyMatrix({
   // lets the match itself through the level filter, so it surfaces even at L1 —
   // but rows the level was already hiding stay hidden, because the detail level
   // is the user's own separate choice.
-  const [search, setSearch] = useState('')
-  const [activeHit, setActiveHit] = useState(0)
+  //
+  // The BOX lives in the left rail (MonthlyReportControls) to match the GL
+  // statements, and the rail is a sibling — so query + cursor come through
+  // ReportSearchProvider and we publish the match count back up.
+  const ctx = useReportSearch()
+  const search = ctx?.search ?? ''
+  const activeHit = ctx?.activeHit ?? 0
+  const setHitCount = ctx?.setHitCount
 
   const { hitKeys, hitOrder, forceOpen } = useMemo(() => {
     if (!search.trim()) {
@@ -55,18 +62,14 @@ export default function MonthlyMatrix({
 
   const activeKey = hitOrder.length > 0 ? hitOrder[activeHit % hitOrder.length] : null
 
-  useEffect(() => setActiveHit(0), [search])
+  // Tell the rail how many rows matched so it can render "2 / 7" and step.
+  useEffect(() => setHitCount?.(hitOrder.length), [hitOrder.length, setHitCount])
   useEffect(() => {
     if (!activeKey) return
     document
       .getElementById(`mx-row-${activeKey}`)
       ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }, [activeKey])
-
-  const stepHit = (delta: number) => {
-    if (hitOrder.length === 0) return
-    setActiveHit((i) => (i + delta + hitOrder.length) % hitOrder.length)
-  }
 
   // Deepest ACCOUNT depth this level shows on its own.
   const maxDepth = level === 1 ? -1 : level === 2 ? 1 : Infinity
@@ -124,7 +127,7 @@ export default function MonthlyMatrix({
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3 flex-wrap">
+      <div className="flex items-center gap-2 mb-3">
         <span className="text-xs uppercase tracking-wide text-muted font-sans">Detail level</span>
         {([1, 2, 3] as const).map((lv) => (
           <button
@@ -141,65 +144,6 @@ export default function MonthlyMatrix({
             L{lv}
           </button>
         ))}
-
-        <span className="ml-auto flex items-center gap-2">
-          <div className="relative">
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  stepHit(e.shiftKey ? -1 : 1)
-                } else if (e.key === 'Escape') {
-                  setSearch('')
-                }
-              }}
-              placeholder="Find account…"
-              aria-label="Find account by code or name"
-              title="Highlights only — nothing is hidden, so every total still covers the full report"
-              className="w-48 px-2.5 py-1 pr-6 bg-paper border border-hairline rounded-md text-xs text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
-            />
-            {search ? (
-              <button
-                type="button"
-                onClick={() => setSearch('')}
-                className="absolute right-1 top-1/2 -translate-y-1/2 text-muted hover:text-danger font-mono text-xs px-1"
-                aria-label="Clear search"
-              >
-                ×
-              </button>
-            ) : null}
-          </div>
-          {search.trim() ? (
-            <>
-              <span className="font-mono text-[11px] text-muted whitespace-nowrap">
-                {hitOrder.length === 0 ? 'No match' : `${activeHit + 1} / ${hitOrder.length}`}
-              </span>
-              {hitOrder.length > 0 ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => stepHit(-1)}
-                    className="px-2 py-1 rounded-md text-xs font-mono border bg-surface text-graphite border-hairline hover:text-ink transition-colors"
-                    aria-label="Previous match"
-                  >
-                    ‹
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => stepHit(1)}
-                    className="px-2 py-1 rounded-md text-xs font-mono border bg-surface text-graphite border-hairline hover:text-ink transition-colors"
-                    aria-label="Next match"
-                  >
-                    ›
-                  </button>
-                </>
-              ) : null}
-            </>
-          ) : null}
-        </span>
       </div>
 
       <div className="overflow-x-auto border border-hairline rounded-md">
