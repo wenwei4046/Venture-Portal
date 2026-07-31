@@ -51,12 +51,20 @@ drains the custody pool to zero against what was funded.
    duplicate numbers). One failure doesn't stop the rest; failures are shown
    together. Button hides itself when nothing is generatable. Per-row buttons
    unchanged.
-The GL accrual side still shows the accrual-vs-InfoTech gap (EPF 13,961.00 vs
-13,248.00; PCB 8,691.35 vs 8,116.60; SKBBK accrued 0 vs 178.60) — paying the
-InfoTech amounts leaves those residuals in 4071/4074 (and SKBBK's 178.60 debits
-4072 with no matching accrual). That reconciliation belongs to the concurrent
-director-payroll session (ER-statutory-editable work); do NOT "fix" it from the
-payment side.
+**CLOSED same day.** The five top-ups were generated (Generate all), approved
+and PAID within the hour — 22,174.00 total, dept_pool_director left at 3,221.06
+(= funded 68,197.26 − salaries 42,802.20 − statutory 22,174.00, exact), Alliance
+cache == GL, TB 0.00. A dry-run re-generation was refused by the dedupe guard
+(proven live). Then the USER closed the accrual-vs-InfoTech gap themselves by
+rewriting JE-202606-0226 (Jun director accrual) to the InfoTech figures:
+Dr 9030 57,600 / 9081 6,912 / 9082 416.60 / 9083 47.60,
+Cr 4070 42,802.20 / 4071 13,248 / 4072 535.60 + 178.60 (SKBB) / 4073 95.20 /
+4074 8,116.60 — internally exact (gross − ee deductions = net paid, to the
+cent). **4070/4071/4074 are now 0.00 across every segment; Jun payroll (staff +
+directors, salary + all five schemes) is fully settled.** The ONLY residual in
+the accrual family is May PERKESO 2,474.10 (4072: 535.60 dir + 1,565.10 staff;
+4073: 95.20 + 278.20) — genuinely unpaid by the user's explicit choice
+("真的没付，不理他"). Do not flag it, do not "fix" it.
 From Jul onward the order fixes itself: import director InfoTech actuals FIRST,
 then generate statutory — each voucher then carries two PVS rows (staff drains
 dept_pool_hr, directors drain dept_pool_director).
