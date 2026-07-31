@@ -138,7 +138,9 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
             Math.max(0, billingAccum(d.id, m.id, results, data.dirInputs, data.settings) - contraOffset(d.id, m.id, results, data.contra)),
           )
           const accumSave = savingAccum(d.id, m.id, results, data.dirInputs)
-          const totalWd = r2(upto.reduce((s, rm) => s + (data.dirInputs[`${rm.id}_${d.id}`]?.savingWithdrawal ?? 0), 0))
+          // Current month's withdrawal only — synced with the Flow screen card
+          // (user ruling 2026-07-31; was cumulative-to-date).
+          const monthWd = r2(inp.savingWithdrawal ?? 0)
           const totAdvStat = r2(upto.reduce((s, rm) => s + (rm.dirRes.find((x) => x.id === d.id)?.advStatAmount ?? 0), 0))
           const totAllowStat = r2(upto.reduce((s, rm) => s + (rm.dirRes.find((x) => x.id === d.id)?.allowStatAmount ?? 0), 0))
           const totStatAll = r2(totAdvStat + totAllowStat)
@@ -219,7 +221,7 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
                   <div className="v">RM {fmt(accumSave)}</div>
                   <div className="s">
                     As of {m.name}
-                    {totalWd > 0 && <span className="neg"> (withdraw: -RM {fmt(totalWd)})</span>}
+                    {monthWd > 0 && <span className="neg"> (withdraw: -RM {fmt(monthWd)})</span>}
                   </div>
                 </div>
               </div>
