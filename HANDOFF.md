@@ -28,7 +28,11 @@ Same accrual-vs-clearing walk applied to EPF/SOCSO/EIS/PCB. Total across
  (e.g. PV-000081 on 5/14 for April). The next SOCSO/EIS PVs are the July ones for
  JUNE payroll. So either it was paid and never recorded, or it was never paid —
  the latter is a statutory late-payment exposure, NOT just a bookkeeping gap.
- ASK HR/the bank statement first; do not assume.
+ **User confirmed 2026-07-31: it genuinely was never paid, and they are leaving
+ it ("真的没付，不理他"). No adjustment is needed or wanted — the 2,385.30 sitting
+ in 4072/4073 is a CORRECT unpaid liability, not an error. Do not "fix" it.**
+ **User will edit the May accrual JE themselves for (A); they asked for a check
+ only, not a fix. Do not post anything to 4070-4074.**
 
  Side note: Jun director funding moved to Alliance so far = 42,802.20 + 22,174.00
  = 64,976.20 vs a full Jun director package of 68,427.50 → short 3,451.30. Both
