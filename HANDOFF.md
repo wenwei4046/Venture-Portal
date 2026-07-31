@@ -1,5 +1,18 @@
 # HOUZS Venture Portal — Session Handoff (checkpoint 2026-07-30 · Cash Flow revamp)
 
+## OPEN — fund-source repayments falling due (swept 2026-07-31)
+
+Only two active fund sources carry an explicit `repayment_date`; the rest are
+open-ended, so "overdue" cannot be judged from the system for them.
+ - **HC 45,156.32 — due TODAY 2026-07-31**, 1%/mo. PV-0178 (pending_approval,
+   45,607.88 = 45,156.32 + 451.56) IS this repayment. Approving it settles it.
+ - **Kingsley 100,000 — 0%, "4/20起分12期只还本金 (每月 8,333.33)" per its notes
+   [BI#2].** fund_source_outstanding shows outstanding 100,000.00 /
+   total_principal_paid **0.00** — i.e. by 7/31 four instalments (4/20, 5/20,
+   6/20, 7/20) totalling **33,333.32** should have been paid and the system has
+   none. Either paid outside the system and never recorded, or genuinely unpaid.
+   Raised with the user; no action taken.
+
 ## OPEN — 3 pending PVs debit 5027 Interest INCOME while paying money OUT (2026-07-31)
 
 Found while listing Finance's outstanding work. NOT touched — they are still
