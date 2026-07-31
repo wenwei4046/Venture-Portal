@@ -1,5 +1,41 @@
 # HOUZS Venture Portal — Session Handoff (checkpoint 2026-07-30 · Cash Flow revamp)
 
+## OPEN — 4071-4074 statutory accruals swept too (2026-07-31, NOT fixed)
+
+Same accrual-vs-clearing walk applied to EPF/SOCSO/EIS/PCB. Total across
+4070-4074 = 66,224.25, which is 68,427.50 of unpaid Jun DIRECTOR payroll less
+2,203.25 of genuine errors:
+
+| acct | residual | Jun director unpaid | other |
+|---|---|---|---|
+| 4070 Salary | 41,371.80 | 45,144.35 | −3,772.55 Mktg May under-accrual |
+| 4071 EPF | 13,145.00 | 13,961.00 | −816.00 Mktg May under-accrual |
+| 4072 SOCSO | 2,560.90 | 535.60 | +2,025.30 May PERKESO never posted |
+| 4073 EIS | 455.20 | 95.20 | +360.00 May PERKESO never posted |
+| 4074 PCB | 8,691.35 | 8,691.35 | clean (Feb gap was Jan+Feb caught up in Mar) |
+
+ **(A) The May Marketing under-accrual is now pinned to one employee.** EPF gap
+ is 816.00 = EXACTLY 13% + 11% of a 3,400.00 gross. EDWIN LIEW GAO NAN
+ (Marketing, basic 3,100, status inactive, resignation_date NULL, absent from
+ Jun payroll) fits. His expected net ≈3,002 though, vs a 3,772.55 salary gap —
+ the extra ≈770 is probably EPF-exempt final pay / leave encashment. Every other
+ dept matched to the cent in BOTH accounts, so it is one person in one dept in
+ one month. Confirm against HR's May payslip file before posting anything.
+
+ **(B) May PERKESO (SOCSO 2,025.30 + EIS 360.00 = 2,385.30) has NO payment
+ voucher anywhere in the system.** June recorded only PCB-MAY (PV-0060, 10,582.40)
+ and KWSP-MAY (PV-0061, 31,831.00). Prior months always paid PERKESO together
+ (e.g. PV-000081 on 5/14 for April). The next SOCSO/EIS PVs are the July ones for
+ JUNE payroll. So either it was paid and never recorded, or it was never paid —
+ the latter is a statutory late-payment exposure, NOT just a bookkeeping gap.
+ ASK HR/the bank statement first; do not assume.
+
+ Side note: Jun director funding moved to Alliance so far = 42,802.20 + 22,174.00
+ = 64,976.20 vs a full Jun director package of 68,427.50 → short 3,451.30. Both
+ PVs say "(partial)", so this may be intentional.
+ Label typos (cosmetic, not touched): "Staff Payroll - May'2025",
+ "PCB - MAY'25" — both are May'2026.
+
 ## OPEN — 4070 Accrual-Salary residual 41,371.80 (investigated 2026-07-31, NOT fixed)
 
 4070 should carry exactly one month of unpaid salary and clear each cycle.
