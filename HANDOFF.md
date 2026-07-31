@@ -1,5 +1,45 @@
 # HOUZS Venture Portal — Session Handoff (checkpoint 2026-07-30 · Cash Flow revamp)
 
+## OPEN — 4070 Accrual-Salary residual 41,371.80 (investigated 2026-07-31, NOT fixed)
+
+4070 should carry exactly one month of unpaid salary and clear each cycle.
+It carries 41,371.80, which decomposes cleanly into two unrelated things:
+
+ **(a) +45,144.35 — Jun director salary, not an error.** Jun accrued 117,528.75
+ in total; the 18 Jul staff disbursement PVs cleared 72,384.40; the rest is the
+ directors, whose per-director disbursement vouchers have not been raised yet.
+ Cash was already funded into Alliance (PV-0184 + PV-0185). Raising the
+ disbursement PVs debits 4070 and clears it. Nothing to do.
+
+ **(b) −3,772.55 — real error, May Marketing under-accrued.** Isolated to ONE
+ line of ONE voucher:
+   accrual JE-202605-0113 "Markting Salary - May'26"  Cr 4070 31,340.44
+   payment JE-202606-0145 (PV HV-PV-202606-0056)      Dr 4070 35,112.99
+ Every other dept in that SAME PV matches to the cent (Finance 17,948.60, HR
+ 16,026.30, Dir Office 4,358.00, Director 45,144.35 via PV-0057). The accrual JV
+ is internally consistent (9030 29,666.11 + 9084 5,761.68 − ee deductions
+ 4,087.35 = 31,340.44), and the 35,112.99 is REAL cash out of Alliance — so the
+ accrual is short, the payment is not over. Feb and Apr marketing accruals each
+ had TWO 4070 lines (main + top-up); May has only one — the top-up looks never
+ posted. Consequence: 3,772.55 of May marketing salary never reached the P&L.
+ Cannot name the employee from system data: hr_monthly_payroll holds ONLY
+ 2026-06 (19 rows); May and earlier are legacy JV imports with no per-employee
+ detail. Needs the HR colleague's May payslip file.
+ Lead: Marketing has 10 rows in hr_staff_costs but 9 in Jun payroll — EDWIN LIEW
+ GAO NAN (basic 3,100, status inactive, resignation_date NULL) is the only one
+ missing. Basic alone ≠ 3,772.55, so check whether May was his final month.
+ Proposed fix once confirmed (NOT APPLIED — touches expense, user rule
+ "有碰到费用的就不要"): JV dated 2026-05-31, segment marketing,
+ Dr 9030 3,772.55 / Cr 4070 3,772.55. Residual then becomes a clean 45,144.35.
+
+ **Presentation caveat (user said don't touch it yet, 2026-07-31: "2 的别乱做
+ 东西。我到时理解清楚先")**: per-segment 4070 is unreliable because the Jul
+ disbursement PVs all carry segment = hr (HR is the paying custodian) while the
+ accrual JVs carry the employee's own department. GL total is right; the split
+ is not. e.g. HR shows −56,725.20 vs a real Jun accrual of 15,659.20; CHOW WAI
+ MAN is Director Office but his 4,893.25 clearing landed in HR. DO NOT re-segment
+ without the user's go-ahead.
+
 ## Session 2026-07-30 — Cash Flow presentation revamp (user-driven, 3 asks)
 
 **Ask 1 要明细 / Ask 2 收钱先出钱后 / Ask 3 void 不要算.**
