@@ -3,6 +3,7 @@ import dayjs from 'dayjs'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
+import { resolveLiveApprovalAmounts } from '@/lib/approval-amounts'
 
 // Always re-fetch on request — dept pool balances change after every approve
 // & pay, so cached renders go stale within seconds.
@@ -459,7 +460,7 @@ export default async function DashboardPage() {
         supabase.from('dept_pool_balances').select('balance').eq('department_id', dept.id).maybeSingle(),
         supabase
           .from('approval_requests')
-          .select('id, request_type, description, amount, created_at')
+          .select('id, request_type, description, amount, reference_id, reference_table, created_at')
           .eq('submitted_by', user.id)
           .eq('status', 'pending')
           .order('created_at', { ascending: false })
@@ -487,7 +488,14 @@ export default async function DashboardPage() {
         net_profit: Number(npRow?.out_net_profit ?? 0),
       }
       const balance = Number(balanceRow?.balance ?? 0)
-      const pendingList = pendingSubmissions ?? []
+      // Read amounts through to the target row — approval_requests.amount is a
+      // stale submit-time snapshot once the request is edited (see
+      // lib/approval-amounts.ts).
+      const deptLive = await resolveLiveApprovalAmounts(supabase, pendingSubmissions ?? [])
+      const pendingList = (pendingSubmissions ?? []).map((r) => ({
+        ...r,
+        amount: deptLive.get(r.id) ?? null,
+      }))
       const pendingCount = pendingList.length
       const pendingTotal = pendingList.reduce((s, r) => s + Number(r.amount ?? 0), 0)
       const recentList = recentExpenses ?? []
@@ -694,12 +702,16 @@ export default async function DashboardPage() {
 
   // dashboard_summary RPC doesn't return reference_id for pending approvals.
   // Supplementary query so Overview links can deep-link to /approvals/payroll-run/[ref]
-  // the same way the Approvals tab does.
+  // the same way the Approvals tab does. It also carries the amount through to
+  // the target row — the RPC hands back approval_requests.amount, a submit-time
+  // snapshot that goes stale the moment the request is edited (see
+  // lib/approval-amounts.ts).
   const pendingApprovalRefs = new Map<string, string | null>()
+  const pendingApprovalAmounts = new Map<string, number | null>()
   if (isPrincipal && pendingApprovals.length > 0) {
     const { data: refData } = await supabase
       .from('approval_requests')
-      .select('id, reference_id')
+      .select('id, amount, reference_id, reference_table')
       .in(
         'id',
         pendingApprovals.map((p: PendingApproval) => p.id),
@@ -707,6 +719,8 @@ export default async function DashboardPage() {
     for (const row of refData ?? []) {
       pendingApprovalRefs.set(row.id, row.reference_id as string | null)
     }
+    const live = await resolveLiveApprovalAmounts(supabase, refData ?? [])
+    for (const [id, amt] of live) pendingApprovalAmounts.set(id, amt)
   }
 
   // Finance sees "Awaiting Principal sign-off" — their own submitted approval_requests
@@ -716,25 +730,33 @@ export default async function DashboardPage() {
   const { data: financePending } = isFinance
     ? await supabase
         .from('approval_requests')
-        .select('id, request_type, description, amount, reference_id, created_at')
+        .select('id, request_type, description, amount, reference_id, reference_table, created_at')
         .eq('submitted_by', user.id)
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
         .limit(10)
     : { data: null }
-  const financePendingList = financePending ?? []
+  const financePendingLive = await resolveLiveApprovalAmounts(supabase, financePending ?? [])
+  const financePendingList = (financePending ?? []).map((r) => ({
+    ...r,
+    amount: financePendingLive.get(r.id) ?? null,
+  }))
 
   // Finance sees "Recent actions" — their submitted requests that have been decided
   const { data: financeRecent } = isFinance
     ? await supabase
         .from('approval_requests')
-        .select('id, request_type, description, amount, reference_id, status, approved_at, created_at')
+        .select('id, request_type, description, amount, reference_id, reference_table, status, approved_at, created_at')
         .eq('submitted_by', user.id)
         .in('status', ['approved', 'rejected'])
         .order('approved_at', { ascending: false })
         .limit(5)
     : { data: null }
-  const financeRecentList = financeRecent ?? []
+  const financeRecentLive = await resolveLiveApprovalAmounts(supabase, financeRecent ?? [])
+  const financeRecentList = (financeRecent ?? []).map((r) => ({
+    ...r,
+    amount: financeRecentLive.get(r.id) ?? null,
+  }))
 
   return (
     <div>
@@ -952,7 +974,14 @@ export default async function DashboardPage() {
                         {req.description ?? '—'}
                       </div>
                       <div className="font-mono text-xs text-muted mt-1">
-                        {req.amount != null ? formatMoney(Number(req.amount)) : '—'}
+                        {(() => {
+                          const amt = pendingApprovalAmounts.has(req.id)
+                            ? pendingApprovalAmounts.get(req.id)
+                            : req.amount == null
+                              ? null
+                              : Number(req.amount)
+                          return amt != null ? formatMoney(amt) : '—'
+                        })()}
                         {req.submitted_by_name
                           ? ` · by ${req.submitted_by_name}`
                           : ''}

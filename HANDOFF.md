@@ -1,6 +1,6 @@
 # HOUZS Venture Portal — Session Handoff (checkpoint 2026-07-30 · Cash Flow revamp)
 
-## BUG (open, 2026-07-31) — approvals LIST shows a stale amount vs the DETAIL page
+## FIXED (2026-07-31) — approvals LIST showed a stale amount vs the DETAIL page
 
 User spotted it: /approvals lists HV-PV-202607-0179 at RM 100,000 but the detail
 page shows RM 90,000.
@@ -26,14 +26,39 @@ is what the approver reads at the moment of approving.
 | 0179 | 100,000.00 | 90,000.00 | +10,000.00 |
 | 0182 | 1,339.60 | 1,351.14 | −11.54 |
 
-**Fix options put to the user (nothing done yet):**
- A. Make the list read the live amount per reference_table. Root fix, can never go
-    stale again, and the same list serves fund-in / fund-out / claims / billing /
-    payroll requests — one change covers all. More code (approval_requests is
-    generic, so it needs a per-type lookup).
- B. Sync the snapshot inside updatePaymentVoucher. Small, but every other
-    amount-changing path must remember to do the same.
-Either way the 2 existing stale rows want a backfill (display only, no GL impact).
+**User chose option A — read through to the target row.** (Option B, syncing the
+snapshot on edit, was rejected: one forgotten edit path and the bug returns —
+which is exactly how it got here.)
+
+Shipped:
+ - **new** `src/lib/approval-amounts.ts` — `resolveLiveApprovalAmounts(supabase,
+   rows)` returns approval_requests.id → live amount. One query per distinct
+   target table (not per row). Column map: payment_vouchers/fund_sources →
+   `amount`, loans → `principal`; `dept_pools` requests carry no amount. Falls
+   back to the snapshot when the target can't be read (deleted / RLS-hidden), so
+   a row never silently blanks. Table+column come from that map only, never from
+   user input — but they're dynamic, so the typed client can't parse the select
+   list and the result is hand-typed.
+ - `approvals/page.tsx` — pending queue AND recent-decisions list now go through
+   `amountOf()`. Covers every request type in the queue at once (payment_voucher,
+   new_fund_source, new_loan, loan_cancel, dept_expense…).
+ - `dashboard/page.tsx` — same treatment in all four places that showed an
+   approval amount: dept-manager pending submissions (incl. `pendingTotal`),
+   Finance "Awaiting Principal sign-off", Finance "Recent actions", and the
+   Principal Overview queue (its amount comes from the dashboard_summary RPC, so
+   the existing supplementary reference_id query was widened to carry amount +
+   reference_table and resolve alongside).
+ - `src/__tests__/approval-amounts.test.ts` — 6 cases: live-over-snapshot,
+   loans→principal, missing-target fallback, no-lookup-needed passthrough,
+   one-query-per-table batching, numeric-string coercion.
+
+No backfill needed: the snapshot is no longer read for display, so PV-0179 and
+PV-0182 correct themselves. approval_requests.amount is left as the historical
+submit-time record.
+
+Gates: tsc clean for every tracked file (the only remaining errors are in
+untracked `* - Copy.*` files, which are NOT in git and never reach Vercel);
+vitest 444 passed / 43 files; production build verified by the Vercel deploy.
 
 ## CLOSED — fund-source repayments (swept 2026-07-31, then stood down)
 

@@ -2,6 +2,7 @@ import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
+import { resolveLiveApprovalAmounts } from '@/lib/approval-amounts'
 import PendingApprovals from './_components/PendingApprovals'
 
 interface ApprovalRow {
@@ -47,6 +48,21 @@ export default async function ApprovalsPage() {
     (submitters ?? []).map((u) => [u.id, u.name as string])
   )
 
+  // approval_requests.amount is a submit-time snapshot that no edit path
+  // refreshes, so an edited-after-submit voucher showed the OLD figure here
+  // while the detail page (and the posting) used the new one. Read the amount
+  // through to the target row instead — see lib/approval-amounts.ts.
+  const liveAmounts = await resolveLiveApprovalAmounts(supabase, [
+    ...pending,
+    ...recent,
+  ])
+  const amountOf = (row: ApprovalRow): number | null =>
+    liveAmounts.has(row.id)
+      ? liveAmounts.get(row.id)!
+      : row.amount === null
+        ? null
+        : Number(row.amount)
+
   // ─── Group pending approvals by group_id (Phase 7 Step 9) ───
   // Each group_id surfaces as ONE combined card; ungrouped rows render solo.
   type PendingItem =
@@ -88,7 +104,7 @@ export default async function ApprovalsPage() {
           items: item.items.map((r) => ({
             request_type: r.request_type,
             description: r.description,
-            amount: r.amount === null ? null : Number(r.amount),
+            amount: amountOf(r),
             reference_id: r.reference_id,
             reference_table: r.reference_table,
           })),
@@ -103,7 +119,7 @@ export default async function ApprovalsPage() {
           requestType: item.row.request_type,
           typeLabel: formatRequestType(item.row.request_type),
           description: item.row.description,
-          amount: item.row.amount === null ? null : Number(item.row.amount),
+          amount: amountOf(item.row),
           createdAt: item.row.created_at,
           submitterName:
             submitterMap.get(item.row.submitted_by) ?? 'Unknown',
@@ -135,7 +151,9 @@ export default async function ApprovalsPage() {
             <span className="count">LAST {recent.length} RESOLVED</span>
           </div>
           <div className="border-t border-hairline row-stagger">
-            {recent.map((req, i) => (
+            {recent.map((req, i) => {
+              const amount = amountOf(req)
+              return (
               <div
                 key={req.id}
                 style={{ '--i': i } as React.CSSProperties}
@@ -157,13 +175,14 @@ export default async function ApprovalsPage() {
                     · {req.approved_at ? dayjs(req.approved_at).format('D MMM') : ''}
                   </div>
                 </div>
-                {req.amount ? (
+                {amount ? (
                   <div className="font-mono tabular text-sm font-medium text-ink">
-                    {formatMoney(Number(req.amount))}
+                    {formatMoney(amount)}
                   </div>
                 ) : null}
               </div>
-            ))}
+              )
+            })}
           </div>
         </section>
       ) : null}
