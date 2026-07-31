@@ -1004,16 +1004,18 @@ function FlowView(p: DashProps) {
           <FlowBox label="Balance (100%)" value={fmtRM(d.totalPay)} tone="info" />
         ) : (
           <>
-            {/* System-calculated figures only — synced with the PDF report
-                (user ruling 2026-07-26); keyed statutory lives in the streams */}
-            <FlowBox label="25% Billing Invoice" value={fmtRM(d.billInv)} tone="alert" />
+            {/* Boxes carry the TOTALS incl. keyed statutory — Total 25% Billing
+                Invoice and Total Advance (Adv + Adv Stat + Allow Stat), matching
+                the stream totals (user ruling 2026-07-31, supersedes 07-26).
+                Synced with the PDF report. */}
+            <FlowBox label="25% Billing Invoice" value={fmtRM(total25)} tone="alert" />
             <FlowBox label="75% Gross Balance" value={fmtRM(r2(d.salKpiGB + d.allowGB))} tone="info" />
           </>
         )}
         {d.advanceOffset > 0 ? (
           <FlowBox label="Vr KPI Offset Advance" value={fmtRM(d.advanceOffset)} tone="danger" />
-        ) : d.advThisMonth < 0 ? (
-          <FlowBox label="Advance" value={fmtRM(Math.abs(d.advThisMonth))} tone="danger" />
+        ) : totalAdvBox > 0 ? (
+          <FlowBox label="Advance" value={fmtRM(totalAdvBox)} tone="danger" />
         ) : d.vrKpi > 0 ? (
           <FlowBox label="Exceed (KPI)" value={`+ ${fmtRM(d.vrKpi)}`} tone="ledger" />
         ) : null}
