@@ -44,6 +44,13 @@ drains the custody pool to zero against what was funded.
    pending payroll voucher).
  - HR triggers it: HR Costing → Payment → Statutory payments → per-scheme
    "Generate directors PV" → Principal approves as usual.
+ - **"Generate all (N)"** button above the table (user follow-up: "多一个一键
+   按钮生成完全部，原本的一个一个按保留"): runs each row's own pending action —
+   normal Generate where no voucher exists, director top-up where uncovered —
+   SEQUENTIALLY (voucher numbering is count-based; parallel calls could mint
+   duplicate numbers). One failure doesn't stop the rest; failures are shown
+   together. Button hides itself when nothing is generatable. Per-row buttons
+   unchanged.
 The GL accrual side still shows the accrual-vs-InfoTech gap (EPF 13,961.00 vs
 13,248.00; PCB 8,691.35 vs 8,116.60; SKBBK accrued 0 vs 178.60) — paying the
 InfoTech amounts leaves those residuals in 4071/4074 (and SKBBK's 178.60 debits

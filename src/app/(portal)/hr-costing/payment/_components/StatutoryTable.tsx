@@ -61,7 +61,7 @@ export default function StatutoryTable({ period, rows }: Props) {
   )
   const [error, setError] = useState<string | null>(null)
 
-  // Busy key: the scheme, or `${scheme}-dir` for its director top-up actions.
+  // Busy key: the scheme, `${scheme}-dir` for its director top-up, or 'ALL'.
   function run(scheme: string, fn: () => Promise<void>) {
     setError(null)
     setBusy(scheme)
@@ -77,8 +77,53 @@ export default function StatutoryTable({ period, rows }: Props) {
     })
   }
 
+  // What "Generate all" would do per row — the same action its own button
+  // offers: normal Generate when no voucher exists, director top-up when the
+  // main one exists but carries no director share. Rows needing neither are
+  // skipped.
+  const pendingActions = rows.filter(r =>
+    r.pv == null ? r.staff + r.directors > 0 : !r.directorsCovered && r.directors > 0,
+  )
+
+  // SEQUENTIAL on purpose: voucher numbering derives from a row count, so
+  // parallel calls could mint duplicate numbers. One failure doesn't stop the
+  // rest — failures are collected and shown together.
+  async function generateAll() {
+    const failures: string[] = []
+    for (const r of pendingActions) {
+      try {
+        if (r.pv == null) {
+          await generateStatutoryScheme(period, r.scheme, (dates[r.scheme] ?? '') || undefined)
+        } else {
+          await generateStatutoryDirectorTopup(
+            period, r.scheme, (dates[`${r.scheme}:dir`] ?? '') || undefined,
+          )
+        }
+      } catch (err) {
+        failures.push(`${r.payee}: ${err instanceof Error ? err.message : 'failed'}`)
+      }
+    }
+    if (failures.length > 0) throw new Error(failures.join(' · '))
+  }
+
   return (
     <div>
+      {pendingActions.length > 0 ? (
+        <div className="flex items-center justify-end gap-3 mb-2">
+          <span className="font-serif italic text-muted text-xs">
+            一键生成全部 · one voucher per institution, dates editable while pending
+          </span>
+          <button
+            onClick={() => run('ALL', generateAll)}
+            disabled={isPending}
+            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-xs px-3.5 py-1.5 rounded-md disabled:opacity-50 transition-colors"
+          >
+            {busy === 'ALL'
+              ? 'Generating…'
+              : `Generate all (${pendingActions.length})`}
+          </button>
+        </div>
+      ) : null}
       <div className="overflow-x-auto">
         <table className="ledger-table">
           <thead>
