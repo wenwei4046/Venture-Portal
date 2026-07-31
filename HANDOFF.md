@@ -22,7 +22,14 @@ Also: 0149 and 0150 are both "3rd Installment" yet use opposite accounts
 0179 (Ohana 90,000 → Dr 3052) and 0181 (ESH 100,000 → Dr 3072) look structurally
 fine — lending out raises the receivable. 0180 (85,250, "Fund Transfer -
 Interest") debits 4052 principal, not an interest account — worth a look too.
-**Raised with the user; awaiting their call. Do not edit or approve these.**
+**RESOLVED by the user 2026-07-31** — all three now post the interest to **6000
+Interest Expense - Fund Sources** instead of 5027 (0149 1,800 / 0150 1,740 /
+0178 451.56). July interest income is no longer cut by 3,991.56. Still
+pending_approval, so nothing had reached the GL.
+**The 3056-vs-4052 split is the user's deliberate call ("剩下的没什么了") — do NOT
+re-raise it.** It is presentation only: Dr 3056 (asset up) and Dr 4052 (liability
+down) move HC's NET position by the same amount; only the gross balance-sheet
+line differs, and HC is netted anyway.
 
 ## OPEN — 4071-4074 statutory accruals swept too (2026-07-31, NOT fixed)
 
