@@ -62,6 +62,12 @@ export interface BatchCTCInput {
   basic: number
   kpi: number
   allowance: number
+  /** Manual ER override (mig 20260731100000): when true, the keyed employer
+   *  values are stored as-is and the JADUAL trigger does not overwrite them. */
+  erManual?: boolean
+  employerEpf?: number
+  employerSocso?: number
+  employerEis?: number
 }
 
 export async function batchSaveCTC(period: string, records: BatchCTCInput[]) {
@@ -105,16 +111,34 @@ export async function batchSaveCTC(period: string, records: BatchCTCInput[]) {
     if (headErr) throw new Error(`Failed to read company heads: ${headErr.message}`)
     const headsByCompany = new Map((headRows ?? []).map(c => [c.id, Math.max(1, Number(c.director_heads ?? 1))]))
 
-    const rows = keep.map(r => ({
-      director_id: r.directorId,
-      company_id: r.companyId,
-      period_month: periodNorm,
-      basic: r.basic,
-      kpi: r.kpi,
-      allowance: r.allowance,
-      heads: headsByCompany.get(r.companyId) ?? 1,
-      created_by: user.id,
-    }))
+    const rows = keep.map(r => {
+      const manual = r.erManual === true
+      const nn = (v: number | undefined) => {
+        const n = Number(v ?? 0)
+        if (!Number.isFinite(n) || n < 0) throw new Error('ER override values must be non-negative numbers')
+        return Math.round(n * 100) / 100
+      }
+      return {
+        director_id: r.directorId,
+        company_id: r.companyId,
+        period_month: periodNorm,
+        basic: r.basic,
+        kpi: r.kpi,
+        allowance: r.allowance,
+        heads: headsByCompany.get(r.companyId) ?? 1,
+        er_manual: manual,
+        // Only meaningful when er_manual — otherwise the trigger recomputes
+        // them from B+K and these are ignored.
+        ...(manual
+          ? {
+              employer_epf: nn(r.employerEpf),
+              employer_socso: nn(r.employerSocso),
+              employer_eis: nn(r.employerEis),
+            }
+          : {}),
+        created_by: user.id,
+      }
+    })
 
     const { error } = await supabase.from('director_ctc').upsert(rows, {
       onConflict: 'director_id,company_id,period_month',

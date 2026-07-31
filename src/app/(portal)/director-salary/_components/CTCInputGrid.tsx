@@ -30,6 +30,8 @@ interface ExistingCTC {
   employer_socso: number | null
   employer_eis: number | null
   total_ctc: number | null
+  /** Mig 20260731100000: ER values were keyed manually — don't auto-recompute. */
+  er_manual?: boolean | null
 }
 
 interface Props {
@@ -45,6 +47,8 @@ interface ERBreakdown {
   eis: number
   total: number
 }
+
+const round2 = (n: number) => Math.round(n * 100) / 100
 
 export default function CTCInputGrid({ directors, companies, existingCTC, period }: Props) {
   const router = useRouter()
@@ -79,6 +83,19 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
     return map
   })
 
+  // Manual ER override per company (mig 20260731100000): overridden companies
+  // are excluded from the live re-lookup and save their keyed ER values.
+  const [manualByCompany, setManualByCompany] = useState<Record<string, boolean>>(() => {
+    const map: Record<string, boolean> = {}
+    for (const ctc of existingCTC) {
+      if (ctc.er_manual) map[ctc.company_id] = true
+    }
+    return map
+  })
+
+  // Which company's ER editor popover is open.
+  const [openEr, setOpenEr] = useState<string | null>(null)
+
   // Use first director as the "pool input" director for DB storage
   const poolDirectorId = directors[0]?.id ?? ''
 
@@ -94,10 +111,27 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
     setStatus('idle')
   }
 
+  function setErField(compId: string, field: 'epf' | 'socso' | 'eis', val: number) {
+    setManualByCompany(prev => ({ ...prev, [compId]: true }))
+    setErByCompany(prev => {
+      const cur = prev[compId] ?? { epf: 0, socso: 0, eis: 0, total: 0 }
+      const next = { ...cur, [field]: round2(val) }
+      next.total = round2(next.epf + next.socso + next.eis)
+      return { ...prev, [compId]: next }
+    })
+    setStatus('idle')
+  }
+
+  function resetEr(compId: string) {
+    // Back to auto: the debounced lookup effect recomputes it immediately.
+    setManualByCompany(prev => ({ ...prev, [compId]: false }))
+    setStatus('idle')
+  }
 
   // Debounced live statutory lookup: when basic or kpi changes, fetch ER from
   // lookup_epf/socso/eis and update erByCompany. Uses same RPCs the DB trigger
-  // uses, so preview matches the value that will be stored on save.
+  // uses, so preview matches the value that will be stored on save. Companies
+  // with a manual override keep their keyed values untouched.
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
   useEffect(() => {
     if (!supabaseRef.current) supabaseRef.current = createClient()
@@ -106,6 +140,7 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
     const handle = setTimeout(async () => {
       const next: Record<string, ERBreakdown> = {}
       for (const comp of companies) {
+        if (manualByCompany[comp.id]) continue // keep the keyed values
         const bk = (values[comp.id]?.basic ?? 0) + (values[comp.id]?.kpi ?? 0)
         if (bk <= 0) {
           next[comp.id] = { epf: 0, socso: 0, eis: 0, total: 0 }
@@ -126,11 +161,11 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
         const eis = Number(eisRes.data?.[0]?.employer ?? 0) * heads
         next[comp.id] = { epf, socso, eis, total: epf + socso + eis }
       }
-      setErByCompany(next)
+      setErByCompany(prev => ({ ...prev, ...next }))
     }, 300)
 
     return () => clearTimeout(handle)
-  }, [values, companies])
+  }, [values, companies, manualByCompany])
 
   // Totals
   const companyRows = companies.map(c => ({
@@ -149,18 +184,29 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
   function handleSave() {
     setError(null)
     setStatus('idle')
+    setOpenEr(null)
 
     // Save all company entries under the pool director. Zero rows are sent
     // too — the server treats an all-zero company as "clear this company's
     // CTC for the period" (deletes the stale rows instead of skipping them).
     const records: BatchCTCInput[] = []
     for (const comp of companies) {
+      const er = erByCompany[comp.id]
+      const manual = manualByCompany[comp.id] === true
       records.push({
         directorId: poolDirectorId,
         companyId: comp.id,
         basic: getValue(comp.id, 'basic'),
         kpi: getValue(comp.id, 'kpi'),
         allowance: getValue(comp.id, 'allowance'),
+        erManual: manual,
+        ...(manual
+          ? {
+              employerEpf: er?.epf ?? 0,
+              employerSocso: er?.socso ?? 0,
+              employerEis: er?.eis ?? 0,
+            }
+          : {}),
       })
     }
 
@@ -201,8 +247,10 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
               const k = getValue(comp.id, 'kpi')
               const a = getValue(comp.id, 'allowance')
               const er = erByCompany[comp.id] ?? { epf: 0, socso: 0, eis: 0, total: 0 }
+              const manual = manualByCompany[comp.id] === true
               const rowTotal = b + k + a + er.total
-              const tooltip = `EPF ER: ${formatMoney(er.epf)}\nSOCSO ER: ${formatMoney(er.socso)}\nEIS ER: ${formatMoney(er.eis)}\nBased on B+K = ${formatMoney(b + k)}`
+              const editable = er.total > 0 || manual || b + k > 0
+              const isOpen = openEr === comp.id
               return (
                 <tr key={comp.id} className="border-b border-hairline last:border-0">
                   <td className="py-3 pr-4">
@@ -223,20 +271,79 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
                     </td>
                   ))}
                   <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
-                    {er.total > 0 ? (
-                      <span className="relative inline-block group cursor-help border-b border-dashed border-hairline">
-                        {formatMoneyBare(er.total)}
-                        <span className="invisible group-hover:visible absolute right-0 top-full mt-1 z-20 w-56 bg-ink text-paper text-xs font-sans rounded-md shadow-lg p-3 text-left space-y-1 whitespace-nowrap">
-                          <span className="block border-b border-white/10 pb-1 mb-1 font-serif italic text-paper/70">
-                            Based on B+K = {formatMoney(b + k)}
-                          </span>
-                          <span className="flex justify-between"><span className="text-paper/70">EPF ER</span><span className="font-mono tabular">{formatMoney(er.epf)}</span></span>
-                          <span className="flex justify-between"><span className="text-paper/70">SOCSO ER</span><span className="font-mono tabular">{formatMoney(er.socso)}</span></span>
-                          <span className="flex justify-between"><span className="text-paper/70">EIS ER</span><span className="font-mono tabular">{formatMoney(er.eis)}</span></span>
-                          <span className="flex justify-between border-t border-white/10 pt-1 mt-1 font-semibold"><span>Total</span><span className="font-mono tabular">{formatMoney(er.total)}</span></span>
-                        </span>
+                    {editable ? (
+                      <span className="relative inline-block">
+                        <button
+                          type="button"
+                          onClick={() => setOpenEr(isOpen ? null : comp.id)}
+                          className={`border-b border-dashed cursor-pointer font-mono tabular font-medium ${
+                            manual ? 'text-alert border-alert/60' : 'text-graphite border-hairline'
+                          } hover:border-accent-border`}
+                          title={manual ? 'Manually keyed — click to edit' : 'Auto from B+K — click to override'}
+                        >
+                          {formatMoneyBare(er.total)}
+                          {manual ? <span className="ml-1 font-sans text-[10px] uppercase tracking-wide">M</span> : null}
+                        </button>
+                        {isOpen ? (
+                          <>
+                            {/* click-away backdrop */}
+                            <span
+                              className="fixed inset-0 z-20 cursor-default"
+                              onClick={() => setOpenEr(null)}
+                            />
+                            <span className="absolute right-0 top-full mt-1 z-30 w-64 bg-ink text-paper text-xs font-sans rounded-md shadow-lg p-3 text-left space-y-2 block">
+                              <span className="block border-b border-white/10 pb-1 font-serif italic text-paper/70">
+                                {manual ? 'Manually keyed' : <>Auto · based on B+K = {formatMoney(b + k)}</>}
+                              </span>
+                              {(
+                                [
+                                  ['epf', 'EPF ER'],
+                                  ['socso', 'SOCSO ER'],
+                                  ['eis', 'EIS ER'],
+                                ] as const
+                              ).map(([field, label]) => (
+                                <span key={field} className="flex items-center justify-between gap-2">
+                                  <span className="text-paper/70">{label}</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={er[field] || ''}
+                                    onChange={e => setErField(comp.id, field, parseFloat(e.target.value) || 0)}
+                                    placeholder="0.00"
+                                    className="w-24 px-2 py-1 bg-paper/10 border border-white/20 rounded text-xs font-mono tabular text-paper text-right focus:outline-none focus:border-accent"
+                                  />
+                                </span>
+                              ))}
+                              <span className="flex justify-between border-t border-white/10 pt-1 font-semibold">
+                                <span>Total</span>
+                                <span className="font-mono tabular">{formatMoney(er.total)}</span>
+                              </span>
+                              <span className="flex justify-end gap-2 pt-1">
+                                {manual ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => resetEr(comp.id)}
+                                    className="px-2 py-1 rounded border border-white/20 text-paper/80 hover:text-paper hover:border-white/40 font-sans text-xs"
+                                  >
+                                    ↺ Auto
+                                  </button>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  onClick={() => setOpenEr(null)}
+                                  className="px-2 py-1 rounded bg-accent hover:bg-accent-hover text-white font-sans text-xs"
+                                >
+                                  Done
+                                </button>
+                              </span>
+                            </span>
+                          </>
+                        ) : null}
                       </span>
-                    ) : '—'}
+                    ) : (
+                      '—'
+                    )}
                   </td>
                   <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">
                     {rowTotal > 0 ? formatMoneyBare(rowTotal) : '—'}

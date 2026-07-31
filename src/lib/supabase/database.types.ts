@@ -1005,6 +1005,7 @@ export type Database = {
           employer_eis: number | null
           employer_epf: number | null
           employer_socso: number | null
+          er_manual: boolean
           heads: number
           id: string
           kpi: number
@@ -1021,6 +1022,7 @@ export type Database = {
           employer_eis?: number | null
           employer_epf?: number | null
           employer_socso?: number | null
+          er_manual?: boolean
           heads?: number
           id?: string
           kpi?: number
@@ -1037,6 +1039,7 @@ export type Database = {
           employer_eis?: number | null
           employer_epf?: number | null
           employer_socso?: number | null
+          er_manual?: boolean
           heads?: number
           id?: string
           kpi?: number

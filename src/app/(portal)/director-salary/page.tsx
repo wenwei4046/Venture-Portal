@@ -198,6 +198,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
                 employer_socso: r.employer_socso ? Number(r.employer_socso) : null,
                 employer_eis: r.employer_eis ? Number(r.employer_eis) : null,
                 total_ctc: r.total_ctc ? Number(r.total_ctc) : null,
+                er_manual: r.er_manual === true,
               }))}
               period={period}
             />
