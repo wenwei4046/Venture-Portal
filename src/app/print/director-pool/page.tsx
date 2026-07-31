@@ -145,6 +145,9 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
           const monthAllowStat = r2(d.allowStatAmount)
           const monthStatAll = r2(monthAdvStat + monthAllowStat)
           const contraOff = contraOffset(d.id, m.id, results, data.contra)
+          // Note shows only on the month the contra was executed from —
+          // synced with the Flow screen (user ruling 2026-07-31).
+          const contraFromThisMonth = data.contra.some((ev) => ev.directorId === d.id && ev.fromMonthId === m.id)
 
           return (
             <div key={dir.id} className="dir-page">
@@ -213,7 +216,7 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
                   <div className="v">RM {fmt(accumBill)}</div>
                   <div className="s">
                     As of {m.name}
-                    {contraOff > 0 && <span className="neg"> (after contra -RM {fmt(contraOff)})</span>}
+                    {contraFromThisMonth && contraOff > 0 && <span className="neg"> (after contra -RM {fmt(contraOff)})</span>}
                   </div>
                 </div>
                 <div className="card">
