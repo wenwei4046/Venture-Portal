@@ -97,6 +97,13 @@ export interface DirectorMonthResult {
   advThisMonth: number
   advStatAmount: number
   allowStatAmount: number
+  /** Keyed statutory covered by this month's positive Vr KPI (user ruling
+   *  2026-07-31): paid from the excess instead of becoming advance debt.
+   *  Deducted from the HR payout alongside advanceOffset. */
+  statFromSurplus: number
+  /** This month's billing-deduct repayment (billingDeductAdv months):
+   *  min(this month's advance additions, this month's 25% billing total). */
+  billingDeduct: number
   prevAccum: number
   advanceSurplus: number
   advanceOffset: number
@@ -171,8 +178,15 @@ export function calcAll(
 
   const sorted = [...months].sort((a, b) => a.month.localeCompare(b.month))
   const accumulated: Record<string, number> = {}
+  // Cumulative billing-deduct repayments per director. These live OUTSIDE the
+  // raw accumulated (they were a display-layer adjustment historically); the
+  // TRUE remaining debt is accumulated + billingRepaid. Offsetting Vr KPI
+  // against the raw figure alone re-collected debt that billing had already
+  // repaid (user-spotted 2026-07-31, WW July).
+  const billingRepaid: Record<string, number> = {}
   directors.forEach((d) => {
     accumulated[d.id] = 0
+    billingRepaid[d.id] = 0
   })
 
   return sorted.map((month) => {
@@ -211,8 +225,12 @@ export function calcAll(
       let advThisMonth = 0
       let advanceSurplus = 0
       let advanceOffset = 0
+      let statFromSurplus = 0
+      let billingDeduct = 0
       const prevAccum = accumulated[d.id]
       const hasOverride = inp.advOverrideThis != null || inp.advOverrideAccum != null
+      // True remaining debt = raw accumulated + billing-deduct repayments.
+      const trueDebt = r2(accumulated[d.id] + billingRepaid[d.id])
 
       if (month.fullPayout) {
         // Full payout: track this month's shortfall but never offset prior debt
@@ -229,21 +247,50 @@ export function calcAll(
       } else if (vrKpi < 0) {
         advThisMonth = vrKpi
         accumulated[d.id] = r2(accumulated[d.id] + vrKpi)
-      } else if (accumulated[d.id] < 0) {
-        // Surplus Vr KPI offsets accumulated advance (cap at 0)
-        advanceOffset = Math.min(vrKpi, Math.abs(accumulated[d.id]))
+      } else if (trueDebt < 0) {
+        // Surplus Vr KPI offsets the TRUE remaining advance (cap at 0) — debt
+        // already repaid by billing deducts must not be collected again.
+        advanceOffset = Math.min(vrKpi, Math.abs(trueDebt))
         accumulated[d.id] = r2(accumulated[d.id] + advanceOffset)
         if (vrKpi > advanceOffset) advanceSurplus = r2(vrKpi - advanceOffset)
       }
 
-      // Keyed statutory amounts add to the advance debt (unless overridden)
+      // Keyed statutory amounts add to the advance debt (unless overridden).
+      // User ruling 2026-07-31: a positive Vr KPI left after the debt offset
+      // pays this month's keyed statutory FIRST (deducted from the payout);
+      // only the uncovered part becomes debt.
       const advStatAmount = n(inp.advStat)
-      if (advStatAmount > 0 && !hasOverride) {
-        accumulated[d.id] = r2(accumulated[d.id] - advStatAmount)
-      }
       const allowStatAmount = n(inp.allowPayStat)
-      if (allowStatAmount > 0 && !hasOverride) {
-        accumulated[d.id] = r2(accumulated[d.id] - allowStatAmount)
+      const statApplied = r2(
+        (advStatAmount > 0 && !hasOverride ? advStatAmount : 0) +
+          (allowStatAmount > 0 && !hasOverride ? allowStatAmount : 0),
+      )
+      if (statApplied > 0) {
+        const surplusAvail =
+          !month.fullPayout && !hasOverride && vrKpi > 0 ? r2(vrKpi - advanceOffset) : 0
+        statFromSurplus = r2(Math.min(surplusAvail, statApplied))
+        accumulated[d.id] = r2(accumulated[d.id] - r2(statApplied - statFromSurplus))
+      }
+      if (statFromSurplus > 0 && advanceSurplus > 0) {
+        // The paid-out surplus shrinks by whatever it spent on statutory.
+        advanceSurplus = r2(Math.max(0, advanceSurplus - statFromSurplus))
+      }
+
+      // Billing-deduct month: this month's advance additions are repaid from
+      // the month's 25% billing total (mirrors billingRow). Tracked so later
+      // months' Vr KPI offsets see the true remaining debt.
+      if (month.billingDeductAdv) {
+        const totalAdv = r2(Math.abs(advThisMonth) + r2(advStatAmount + allowStatAmount) - statFromSurplus)
+        if (totalAdv > 0) {
+          const dedStatSal = month.fullPayout ? 0 : n(inp.billingStat)
+          const dedStatAl =
+            month.fullPayout || !showAllowStat(month.month, settings) ? 0 : n(inp.allowBillingStat)
+          const dedSalSys = month.fullPayout ? 0 : salKpiBillInv
+          const dedAlSys = month.fullPayout ? 0 : allowBillInv
+          const billTotal = r2(dedSalSys + dedStatSal + dedAlSys + dedStatAl)
+          billingDeduct = r2(Math.min(totalAdv, billTotal))
+          billingRepaid[d.id] = r2(billingRepaid[d.id] + billingDeduct)
+        }
       }
 
       return {
@@ -274,6 +321,8 @@ export function calcAll(
         advThisMonth,
         advStatAmount,
         allowStatAmount,
+        statFromSurplus,
+        billingDeduct,
         prevAccum,
         advanceSurplus,
         advanceOffset,
@@ -410,25 +459,20 @@ export function allowStatAccum(
  * Advance adjustment from billing-deduct-adv months up to a month inclusive:
  * the part of each flagged month's advance covered by that month's billing.
  * Displayed accumulated advance = engine accumulated + this adjustment.
+ * Since 2026-07-31 the per-month deduct is computed inside calcAll (so the
+ * Vr KPI offset sees the true remaining debt) — this just sums it.
  */
 export function billingDeductAdjustment(
   directorId: string,
   uptoMonthId: string,
   results: MonthResult[],
-  dirInputs: DirectorInputMap,
-  settings: Pick<DpSettings, 'allowStatUntil'>,
 ): number {
   const uptoIdx = results.findIndex((m) => m.id === uptoMonthId)
   if (uptoIdx < 0) return 0
   let adj = 0
   results.slice(0, uptoIdx + 1).forEach((m) => {
-    if (!m.billingDeductAdv) return
     const d = m.dirRes.find((x) => x.id === directorId)
-    if (!d) return
-    const totalAdv = r2(Math.abs(d.advThisMonth) + d.advStatAmount + d.allowStatAmount)
-    if (totalAdv <= 0) return
-    const row = billingRow(m, d, dirInputs, settings)
-    adj += Math.min(totalAdv, row.total)
+    if (d) adj += d.billingDeduct
   })
   return r2(adj)
 }

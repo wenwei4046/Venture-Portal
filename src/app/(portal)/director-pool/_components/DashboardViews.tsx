@@ -395,12 +395,17 @@ function AdvanceView(p: DashProps) {
 
   let adjTotal = 0
   const cards = latest.dirRes.map((d) => {
-    const adj = billingDeductAdjustment(d.id, latest.id, results, dirInputs, settings)
+    const adj = billingDeductAdjustment(d.id, latest.id, results)
     const adjAccum = r2(d.accumulated + adj)
     adjTotal += adjAccum
-    const totAdvStat = r2(results.reduce((s, m) => s + (m.dirRes.find((x) => x.id === d.id)?.advStatAmount ?? 0), 0))
-    const totAllowStat = r2(results.reduce((s, m) => s + (m.dirRes.find((x) => x.id === d.id)?.allowStatAmount ?? 0), 0))
-    return { d, adjAccum, adj, totAdvStat, totAllowStat }
+    // Statutory that actually entered the debt (keyed minus surplus-covered).
+    const totStat = r2(
+      results.reduce((s, m) => {
+        const dd = m.dirRes.find((x) => x.id === d.id)
+        return s + (dd ? r2(dd.advStatAmount + dd.allowStatAmount - dd.statFromSurplus) : 0)
+      }, 0),
+    )
+    return { d, adjAccum, adj, totStat }
   })
   adjTotal = r2(adjTotal)
 
@@ -413,7 +418,7 @@ function AdvanceView(p: DashProps) {
       </p>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <Card label="Total Accumulated Advance" value={<Money v={adjTotal} dash="RM 0.00" />} sub={`All directors (${latest.name})`} danger={adjTotal < 0} />
-        {cards.map(({ d, adjAccum, adj, totAdvStat, totAllowStat }) => (
+        {cards.map(({ d, adjAccum, adj, totStat }) => (
           <Card
             key={d.id}
             label={<><Dot color={d.color} />{d.code} Accum. Advance</>}
@@ -423,9 +428,7 @@ function AdvanceView(p: DashProps) {
               <>
                 As of {latest.name}
                 {adj > 0 && <> · billing deduct +{fmt(adj)}</>}
-                {r2(totAdvStat + totAllowStat) > 0 && (
-                  <> · incl. statutory RM {fmt(r2(totAdvStat + totAllowStat))}</>
-                )}
+                {totStat > 0 && <> · incl. statutory RM {fmt(totStat)}</>}
               </>
             }
           />
@@ -644,8 +647,8 @@ function BillingView(p: DashProps) {
                 const inp = dirInputs[d.statKey] ?? {}
                 const sas = showAllowStat(m.month, settings)
                 const row = billingRow(m, d, dirInputs, settings)
-                const totalAdv = r2(Math.abs(d.advThisMonth) + d.advStatAmount + d.allowStatAmount)
-                const advDeduct = m.billingDeductAdv && totalAdv > 0 ? r2(Math.min(totalAdv, row.total)) : 0
+                const totalAdv = r2(Math.abs(d.advThisMonth) + d.advStatAmount + d.allowStatAmount - d.statFromSurplus)
+                const advDeduct = d.billingDeduct
                 const advRemain = m.billingDeductAdv && totalAdv > 0 ? r2(totalAdv - advDeduct) : 0
                 const net = m.billingDeductAdv && !m.fullPayout ? r2(row.total - advDeduct) : 0
                 g.salSys += row.salSys; g.statSal += row.statSal; g.alSys += row.alSys; g.statAl += row.statAl
@@ -917,20 +920,25 @@ function FlowView(p: DashProps) {
   const statSalVal = m.fullPayout ? 0 : (inp.billingStat ?? 0)
   const statAlVal = m.fullPayout || !sas ? 0 : (inp.allowBillingStat ?? 0)
   const total25 = m.fullPayout ? 0 : r2(d.salKpiBillInv + statSalVal + d.allowBillInv + statAlVal)
-  const totalHRPayout = r2(d.totalPay + Math.abs(d.advThisMonth) - d.advanceOffset)
-  const totalAdvBox = r2(Math.abs(d.advThisMonth) + d.advStatAmount + d.allowStatAmount)
+  // Payout: Vr KPI offset repays old debt, statFromSurplus pays this month's
+  // keyed statutory (user ruling 2026-07-31) — both come off the payout.
+  const totalHRPayout = r2(d.totalPay + Math.abs(d.advThisMonth) - d.advanceOffset - d.statFromSurplus)
+  // Advance added this month: statutory covered by the Vr KPI surplus never
+  // becomes debt.
+  const totalAdvBox = r2(Math.abs(d.advThisMonth) + d.advStatAmount + d.allowStatAmount - d.statFromSurplus)
 
-  const advAdj = billingDeductAdjustment(d.id, m.id, results, dirInputs, settings)
+  const advAdj = billingDeductAdjustment(d.id, m.id, results)
   const accumAdvAdj = r2(d.accumulated + advAdj)
   const accumBill = r2(Math.max(0, billingAccum(d.id, m.id, results, dirInputs, settings) - contraOffset(d.id, m.id, results, contra)))
   const accumSave = savingAccum(d.id, m.id, results, dirInputs)
 
   // Card sub-notes show THIS MONTH's events only (user ruling 2026-07-31,
   // matching the Saving card) — the card VALUE stays accumulated as-of.
-  const monthDeduct = m.billingDeductAdv ? r2(Math.min(totalAdvBox, total25)) : 0
+  const monthDeduct = d.billingDeduct
   const monthAdvStat = r2(d.advStatAmount)
   const monthAllowStat = r2(d.allowStatAmount)
-  const monthStatAll = r2(monthAdvStat + monthAllowStat)
+  // Only the statutory that actually entered the debt.
+  const monthStatAll = r2(monthAdvStat + monthAllowStat - d.statFromSurplus)
   const contraFromThisMonth = contra.some((ev) => ev.directorId === d.id && ev.fromMonthId === m.id)
   const contraOffHere = contraOffset(d.id, m.id, results, contra)
   const monthWithdraw = inp.savingWithdrawal ?? 0
@@ -1035,7 +1043,7 @@ function FlowView(p: DashProps) {
               {monthStatAll > 0 && (
                 <>
                   {' '}(incl. statutory RM {fmt(monthStatAll)}
-                  {monthAdvStat > 0 && monthAllowStat > 0
+                  {d.statFromSurplus === 0 && monthAdvStat > 0 && monthAllowStat > 0
                     ? ` : Adv RM ${fmt(monthAdvStat)} + Allow RM ${fmt(monthAllowStat)}`
                     : ''}
                   )
@@ -1137,6 +1145,9 @@ function FlowView(p: DashProps) {
           ...(d.allowStatAmount > 0
             ? ([['+ 75% Allow Statutory (自己填) → Accum. Advance', `+ RM ${fmt(d.allowStatAmount)}`, false, 'alert']] as FlowRow[])
             : []),
+          ...(d.statFromSurplus > 0
+            ? ([['Less: Statutory 由 Vr KPI 超额支付 (从 payout 扣)', `- RM ${fmt(d.statFromSurplus)}`, false, 'ledger']] as FlowRow[])
+            : []),
           ...(totalAdvBox > 0
             ? ([[
                 `Total Advance (Adv${d.advStatAmount > 0 ? ' + Adv Stat' : ''}${d.allowStatAmount > 0 ? ' + Allow Stat' : ''})`,
@@ -1163,14 +1174,14 @@ function FlowView(p: DashProps) {
               ? ([
                   [
                     `(-) Total Advance Deduct${totalAdvBox > total25 ? ' (capped at billing)' : ''}`,
-                    `- RM ${fmt(Math.min(totalAdvBox, total25))}`,
+                    `- RM ${fmt(d.billingDeduct)}`,
                     false,
                     'danger',
                   ],
-                  ...(totalAdvBox > total25
-                    ? ([['⚠️ Remaining Advance → Accum. Advance', fmtRM(r2(totalAdvBox - total25)), false, 'danger']] as FlowRow[])
+                  ...(totalAdvBox > d.billingDeduct
+                    ? ([['⚠️ Remaining Advance → Accum. Advance', fmtRM(r2(totalAdvBox - d.billingDeduct)), false, 'danger']] as FlowRow[])
                     : []),
-                  ['Net 25% Billing (After Deduct Advance)', fmtRM(r2(Math.max(0, total25 - totalAdvBox))), true, 'alert'],
+                  ['Net 25% Billing (After Deduct Advance)', fmtRM(r2(Math.max(0, total25 - d.billingDeduct))), true, 'alert'],
                 ] as FlowRow[])
               : []),
             [

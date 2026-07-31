@@ -127,10 +127,12 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
           const statAlVal = m.fullPayout || !sas ? 0 : (inp.allowBillingStat ?? 0)
           const billingVal = r2(statSalVal + statAlVal)
           const total25 = m.fullPayout ? 0 : r2(d.salKpiBillInv + statSalVal + d.allowBillInv + statAlVal)
-          const totalHRPayout = r2(d.totalPay + Math.abs(d.advThisMonth) - d.advanceOffset)
-          const totalAdvBox = r2(Math.abs(d.advThisMonth) + d.advStatAmount + d.allowStatAmount)
+          // Payout: Vr KPI offset repays old debt, statFromSurplus pays this
+          // month's keyed statutory (user ruling 2026-07-31) — both come off.
+          const totalHRPayout = r2(d.totalPay + Math.abs(d.advThisMonth) - d.advanceOffset - d.statFromSurplus)
+          const totalAdvBox = r2(Math.abs(d.advThisMonth) + d.advStatAmount + d.allowStatAmount - d.statFromSurplus)
 
-          const advAdj = billingDeductAdjustment(d.id, m.id, results, data.dirInputs, data.settings)
+          const advAdj = billingDeductAdjustment(d.id, m.id, results)
           const adjAccum = r2(d.accumulated + advAdj)
           const accumBill = r2(
             Math.max(0, billingAccum(d.id, m.id, results, data.dirInputs, data.settings) - contraOffset(d.id, m.id, results, data.contra)),
@@ -140,10 +142,11 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
           // screen (user ruling 2026-07-31; were cumulative-to-date). The card
           // VALUES stay accumulated as-of.
           const monthWd = r2(inp.savingWithdrawal ?? 0)
-          const monthDeduct = m.billingDeductAdv ? r2(Math.min(totalAdvBox, total25)) : 0
+          const monthDeduct = d.billingDeduct
           const monthAdvStat = r2(d.advStatAmount)
           const monthAllowStat = r2(d.allowStatAmount)
-          const monthStatAll = r2(monthAdvStat + monthAllowStat)
+          // Only the statutory that actually entered the debt.
+          const monthStatAll = r2(monthAdvStat + monthAllowStat - d.statFromSurplus)
           const contraOff = contraOffset(d.id, m.id, results, data.contra)
           // Note shows only on the month the contra was executed from —
           // synced with the Flow screen (user ruling 2026-07-31).
@@ -199,7 +202,7 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
                     As of {m.name}
                     {monthDeduct > 0 && <> (billing deduct: +RM {fmt(monthDeduct)})</>}
                     {monthStatAll > 0 && (
-                      <> (incl. statutory RM {fmt(monthStatAll)}{monthAdvStat > 0 && monthAllowStat > 0 ? ` : Adv RM ${fmt(monthAdvStat)} + Allow RM ${fmt(monthAllowStat)}` : ''})</>
+                      <> (incl. statutory RM {fmt(monthStatAll)}{d.statFromSurplus === 0 && monthAdvStat > 0 && monthAllowStat > 0 ? ` : Adv RM ${fmt(monthAdvStat)} + Allow RM ${fmt(monthAllowStat)}` : ''})</>
                     )}
                     {d.prevAccum < 0 && adjAccum === 0 && <span className="pos"> · ✅ Advance cleared</span>}
                   </div>
@@ -279,6 +282,9 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
                   {d.allowStatAmount > 0 && (
                     <div className="row warn"><span>+ 75% Allow Statutory (自己填)</span><span className="amt">+ RM {fmt(d.allowStatAmount)}</span></div>
                   )}
+                  {d.statFromSurplus > 0 && (
+                    <div className="row pos"><span>Less: Statutory 由 Vr KPI 超额支付 (从 payout 扣)</span><span className="amt">- RM {fmt(d.statFromSurplus)}</span></div>
+                  )}
                   {totalAdvBox > 0 && (
                     <div className="row b neg"><span>Total Advance</span><span className="amt">RM {fmt(totalAdvBox)}</span></div>
                   )}
@@ -297,11 +303,11 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
                     <div className="row b pos"><span>Total {bi}% Billing Invoice</span><span className="amt">RM {fmt(total25)}</span></div>
                     {m.billingDeductAdv && totalAdvBox > 0 && (
                       <>
-                        <div className="row neg"><span>(-) Total Advance Deduct{totalAdvBox > total25 ? ' (capped at billing)' : ''}</span><span className="amt">- RM {fmt(Math.min(totalAdvBox, total25))}</span></div>
-                        {totalAdvBox > total25 && (
-                          <div className="row neg"><span>⚠️ Remaining → Accum. Advance</span><span className="amt">RM {fmt(r2(totalAdvBox - total25))}</span></div>
+                        <div className="row neg"><span>(-) Total Advance Deduct{totalAdvBox > total25 ? ' (capped at billing)' : ''}</span><span className="amt">- RM {fmt(d.billingDeduct)}</span></div>
+                        {totalAdvBox > d.billingDeduct && (
+                          <div className="row neg"><span>⚠️ Remaining → Accum. Advance</span><span className="amt">RM {fmt(r2(totalAdvBox - d.billingDeduct))}</span></div>
                         )}
-                        <div className="row b warn"><span>Net {bi}% Billing</span><span className="amt">RM {fmt(r2(Math.max(0, total25 - totalAdvBox)))}</span></div>
+                        <div className="row b warn"><span>Net {bi}% Billing</span><span className="amt">RM {fmt(r2(Math.max(0, total25 - d.billingDeduct)))}</span></div>
                       </>
                     )}
                     <div className="row b"><span>→ Payout as Allowance</span><span className="amt">{m.includeBilling ? `RM ${fmt(billingVal)}` : '不算进'}</span></div>

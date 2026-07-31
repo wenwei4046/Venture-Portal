@@ -251,7 +251,47 @@ describe('billing-deduct-adv display adjustment', () => {
     const feb = mkMonth('m1', '2026-02-01', { salary: 40000, kpi: 0, allowance: 0 }, { billingDeductAdv: true })
     const results = calcAll(settings, directors, [feb], {})
     // WL advance 8343.75, billing row total 2018.75 → adjustment 2018.75
-    expect(billingDeductAdjustment('WL', 'm1', results, {}, settings)).toBe(2018.75)
+    expect(billingDeductAdjustment('WL', 'm1', results)).toBe(2018.75)
+    expect(results[0].dirRes.find((d) => d.id === 'WL')!.billingDeduct).toBe(2018.75)
+  })
+
+  // User ruling 2026-07-31 (WW July): debt already repaid by billing deducts
+  // must not be collected again by a later positive Vr KPI.
+  it('a later Vr KPI surplus does not re-collect billing-repaid debt', () => {
+    // WL feb: shortfall 3044.53, billing 3785.16 covers it fully (deduct
+    // 3044.53) → true remaining debt 0 although the raw accumulated is −3044.53.
+    const feb = mkMonth('m1', '2026-02-01', { salary: 75000, kpi: 0, allowance: 0 }, { billingDeductAdv: true })
+    const mar = mkMonth('m2', '2026-03-01', { salary: 100000, kpi: 0, allowance: 0 })
+    const results = calcAll(settings, directors, [feb, mar], {})
+    const wlFeb = results[0].dirRes.find((d) => d.id === 'WL')!
+    expect(wlFeb.billingDeduct).toBe(3044.53)
+    const wlMar = results[1].dirRes.find((d) => d.id === 'WL')!
+    expect(wlMar.vrKpi).toBe(740.63)
+    expect(wlMar.advanceOffset).toBe(0) // nothing left to offset
+    // Displayed accumulated (raw + adjustment) stays cleared.
+    expect(r2(wlMar.accumulated + billingDeductAdjustment('WL', 'm2', results))).toBe(0)
+  })
+
+  it('keyed statutory is paid from the Vr KPI surplus, not added to debt', () => {
+    const feb = mkMonth('m1', '2026-02-01', { salary: 75000, kpi: 0, allowance: 0 }, { billingDeductAdv: true })
+    const mar = mkMonth('m2', '2026-03-01', { salary: 100000, kpi: 0, allowance: 0 })
+    const inputs: DirectorInputMap = { m2_WL: { advStat: 500 } }
+    const results = calcAll(settings, directors, [feb, mar], inputs)
+    const wlMar = results[1].dirRes.find((d) => d.id === 'WL')!
+    // Surplus 740.63 covers the 500 statutory in full → debt untouched.
+    expect(wlMar.statFromSurplus).toBe(500)
+    expect(r2(wlMar.accumulated + billingDeductAdjustment('WL', 'm2', results))).toBe(0)
+  })
+
+  it('statutory beyond the surplus still becomes debt', () => {
+    const feb = mkMonth('m1', '2026-02-01', { salary: 75000, kpi: 0, allowance: 0 }, { billingDeductAdv: true })
+    const mar = mkMonth('m2', '2026-03-01', { salary: 100000, kpi: 0, allowance: 0 })
+    const inputs: DirectorInputMap = { m2_WL: { advStat: 1000 } }
+    const results = calcAll(settings, directors, [feb, mar], inputs)
+    const wlMar = results[1].dirRes.find((d) => d.id === 'WL')!
+    // Surplus 740.63 covers part; the remaining 259.37 adds to the debt.
+    expect(wlMar.statFromSurplus).toBe(740.63)
+    expect(r2(wlMar.accumulated + billingDeductAdjustment('WL', 'm2', results))).toBe(-259.37)
   })
 })
 
