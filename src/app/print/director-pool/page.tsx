@@ -131,6 +131,8 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
           // month's keyed statutory (user ruling 2026-07-31) — both come off.
           const totalHRPayout = r2(d.totalPay + Math.abs(d.advThisMonth) - d.advanceOffset - d.statFromSurplus)
           const totalAdvBox = r2(Math.abs(d.advThisMonth) + d.advStatAmount + d.allowStatAmount - d.statFromSurplus)
+          // Net exceed reaching the payout (after offset + surplus-paid statutory).
+          const netExceed = r2(d.vrKpi - d.advanceOffset - d.statFromSurplus)
 
           const advAdj = billingDeductAdjustment(d.id, m.id, results)
           const adjAccum = r2(d.accumulated + advAdj)
@@ -187,8 +189,8 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
                   <div className="box"><div className="l">Vr KPI Offset Advance</div><div className="v neg">RM {fmt(d.advanceOffset)}</div></div>
                 ) : totalAdvBox > 0 ? (
                   <div className="box"><div className="l">Advance</div><div className="v neg">RM {fmt(totalAdvBox)}</div></div>
-                ) : d.vrKpi > 0 ? (
-                  <div className="box"><div className="l">Exceed (KPI)</div><div className="v pos">+ RM {fmt(d.vrKpi)}</div></div>
+                ) : d.vrKpi > 0 && netExceed > 0 ? (
+                  <div className="box"><div className="l">Exceed (KPI)</div><div className="v pos">+ RM {fmt(netExceed)}</div></div>
                 ) : null}
                 <div className="box hl"><div className="l">HR Payout Before Deduct Statutory</div><div className="v">RM {fmt(totalHRPayout)}</div></div>
               </div>
@@ -284,6 +286,9 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
                   )}
                   {d.statFromSurplus > 0 && (
                     <div className="row pos"><span>Less: Statutory 由 Vr KPI 超额支付 (从 payout 扣)</span><span className="amt">- RM {fmt(d.statFromSurplus)}</span></div>
+                  )}
+                  {d.statFromSurplus > 0 && netExceed > 0 && (
+                    <div className="row b pos"><span>Balance Advance (超额结余 → Payout)</span><span className="amt">+ RM {fmt(netExceed)}</span></div>
                   )}
                   {totalAdvBox > 0 && (
                     <div className="row b neg"><span>Total Advance</span><span className="amt">RM {fmt(totalAdvBox)}</span></div>

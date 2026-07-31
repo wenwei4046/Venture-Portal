@@ -926,6 +926,10 @@ function FlowView(p: DashProps) {
   // Advance added this month: statutory covered by the Vr KPI surplus never
   // becomes debt.
   const totalAdvBox = r2(Math.abs(d.advThisMonth) + d.advStatAmount + d.allowStatAmount - d.statFromSurplus)
+  // Net exceed actually reaching the payout — after the debt offset and the
+  // statutory paid from the surplus (user 2026-07-31: show the net, 外面的人
+  // 才看得懂).
+  const netExceed = r2(d.vrKpi - d.advanceOffset - d.statFromSurplus)
 
   const advAdj = billingDeductAdjustment(d.id, m.id, results)
   const accumAdvAdj = r2(d.accumulated + advAdj)
@@ -1024,8 +1028,8 @@ function FlowView(p: DashProps) {
           <FlowBox label="Vr KPI Offset Advance" value={fmtRM(d.advanceOffset)} tone="danger" />
         ) : totalAdvBox > 0 ? (
           <FlowBox label="Advance" value={fmtRM(totalAdvBox)} tone="danger" />
-        ) : d.vrKpi > 0 ? (
-          <FlowBox label="Exceed (KPI)" value={`+ ${fmtRM(d.vrKpi)}`} tone="ledger" />
+        ) : d.vrKpi > 0 && netExceed > 0 ? (
+          <FlowBox label="Exceed (KPI)" value={`+ ${fmtRM(netExceed)}`} tone="ledger" />
         ) : null}
         <FlowBox label="HR Payout Before Deduct Statutory" value={fmtRM(totalHRPayout)} />
       </div>
@@ -1147,6 +1151,9 @@ function FlowView(p: DashProps) {
             : []),
           ...(d.statFromSurplus > 0
             ? ([['Less: Statutory 由 Vr KPI 超额支付 (从 payout 扣)', `- RM ${fmt(d.statFromSurplus)}`, false, 'ledger']] as FlowRow[])
+            : []),
+          ...(d.statFromSurplus > 0 && netExceed > 0
+            ? ([['Balance Advance (超额结余 → Payout)', `+ RM ${fmt(netExceed)}`, true, 'ledger']] as FlowRow[])
             : []),
           ...(totalAdvBox > 0
             ? ([[
