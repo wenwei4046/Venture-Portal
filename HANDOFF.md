@@ -501,8 +501,22 @@ side. So 3053 now holds principal only, and collecting interest must DRAW DOWN
    (finance/principal via current_user_role(), strips `·`/newlines, max 60 chars, any loan
    status). UI: FundingSourceEditor on the loan detail page (inline input + 保存, empty =
    remove badge) via new setLoanFundingSource action. Rates/tenure/dates stay
-   Principal-only. STILL PENDING (user-side): fill sources for the July loans — Carres
-   10k, The Cont 10k + 80k, 2990 60k, CMI 55,540.08, Hookka 98k — user can now DIY.
+   Principal-only. ~~STILL PENDING (user-side): fill sources for the July loans — Carres
+   10k, The Cont 10k + 80k, 2990 60k, CMI 55,540.08, Hookka 98k~~ — **DONE by the user;
+   re-swept 2026-07-31: every JULY loan now carries a badge** (Carres 10k / The Cont 10k
+   = 2990s, The Cont 80k + 2990 60k on 7/07 = HC, 2990 60k on 7/24 = Conts; the active
+   Hookka 98k = HC — only its CANCELLED twin has none, which is fine). Four OLDER loans
+   still lack the badge:
+   - 2990 10,000 (2026-04-30, active) — terms already say "资金从 Kingsley 借过来";
+     format-only, just needs "Kingsley" through the field.
+   - CMI 55,540.08 (2026-06-25, active) — terms say "Capital Inject - from Houzs";
+     matches fund source **HC 55,540.08 eff 2026-06-27** to the cent. HC *is* Houzs
+     Century, so format-only too.
+   - CONTS 120,000 (2026-06-08, fully_repaid) — no source at all, but fund source
+     **HC 120,000 eff 2026-06-08** is same-day same-amount. Near-certain HC; user to confirm.
+   - CONTS 50,000 (2026-05-11, fully_repaid) — no source. Only fund IN that day is
+     **2990 45,000** — date matches, amount short by 5,000. NOT conclusive; ask the user.
+   Nothing written — user asked for a look only.
 3. **List columns + search (user requests)**: Fund IN list rebuilt on SortableTable
    (new _components/FundSourcesTable.tsx — search box over From/Type, click-sort all
    columns, facet filters on Type/Status; StatusLabel moved in there; page.tsx now just
