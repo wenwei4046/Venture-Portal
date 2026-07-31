@@ -514,8 +514,9 @@ side. So 3053 now holds principal only, and collecting interest must DRAW DOWN
      Century, so format-only too.
    - CONTS 120,000 (2026-06-08, fully_repaid) — no source at all, but fund source
      **HC 120,000 eff 2026-06-08** is same-day same-amount. Near-certain HC; user to confirm.
-   - CONTS 50,000 (2026-05-11, fully_repaid) — no source. Only fund IN that day is
-     **2990 45,000** — date matches, amount short by 5,000. NOT conclusive; ask the user.
+   - CONTS 50,000 (2026-05-11, fully_repaid) — no source. **ANSWERED by the user
+     2026-07-31: it is two sources — 2990's 45,000 fund IN PLUS 5,000 of Venture's OWN
+     fund pool.** Not a missing record, a split funding. Don't re-raise it as a gap.
    Nothing written — user asked for a look only.
 3. **List columns + search (user requests)**: Fund IN list rebuilt on SortableTable
    (new _components/FundSourcesTable.tsx — search box over From/Type, click-sort all
