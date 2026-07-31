@@ -146,13 +146,18 @@ May was showing −65,242.74 and June +33,012.46; the true figures are +32,757.2
    extended to fetch it. PL/pgSQL resolves record fields at execution time, so
    this shipped green and only broke when a payroll round was actually
    approved. Fixed by mig `20260731000000` (anchored patch, idempotent).
-   ⚠️ **SEPARATE ISSUE FOUND, NOT FIXED — needs a decision**:
-   `approve_voucher_batch` and `approve_voucher_batch_partial` have NO custody
-   credit block at all (no `dept_pool_hr`, no target_pool lookup). A payroll
-   funding PV approved through the BATCH path therefore moves the cash but
-   never parks it in the custody pool. Single approvals are correct. Either
-   port the block to both batch RPCs, or block payroll_bank_transfer from the
-   batch path — ask the user which.
+   **Related gap, FIXED (user chose "port it")**: both batch RPCs skipped
+   payroll entirely — `voucher_type NOT IN (…, 'payroll_bank_transfer')` cut the
+   drain loop and no custody block existed, so a payroll PV approved via BATCH
+   moved bank cash while leaving every pool untouched (custody understated,
+   paying depts overstated). mig `20260731010000` ports all three behaviours to
+   `approve_voucher_batch` + `approve_voucher_batch_partial`: drain the source
+   pools, allow 预支 while draining, credit the full round to the request's
+   target_pool — plus reference_id added to both RETURNING lists (same trap as
+   above). All three approval paths now behave identically; anchored + idempotent.
+   NOTE: no payroll PV had actually been batch-approved, so there is no historical
+   data to repair (checked: the only paid payroll transfers came through the
+   single path).
 
 User: "这笔无法记录 interest,我指的是打去 interest in suspense account."
 Context found in the GL: a manual JV on 2026-05-20 carved the 300k back-to-back's
