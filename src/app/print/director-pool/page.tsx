@@ -57,8 +57,6 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
   }
 
   const sas = showAllowStat(m.month, data.settings)
-  const uptoIdx = results.findIndex((x) => x.id === m.id)
-  const upto = results.slice(0, uptoIdx + 1)
   const gb = data.settings.gbPct
   const bi = r2(100 - gb)
   const sv = data.settings.savingPct
@@ -138,12 +136,14 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
             Math.max(0, billingAccum(d.id, m.id, results, data.dirInputs, data.settings) - contraOffset(d.id, m.id, results, data.contra)),
           )
           const accumSave = savingAccum(d.id, m.id, results, data.dirInputs)
-          // Current month's withdrawal only — synced with the Flow screen card
-          // (user ruling 2026-07-31; was cumulative-to-date).
+          // Card sub-notes show THIS MONTH's events only, synced with the Flow
+          // screen (user ruling 2026-07-31; were cumulative-to-date). The card
+          // VALUES stay accumulated as-of.
           const monthWd = r2(inp.savingWithdrawal ?? 0)
-          const totAdvStat = r2(upto.reduce((s, rm) => s + (rm.dirRes.find((x) => x.id === d.id)?.advStatAmount ?? 0), 0))
-          const totAllowStat = r2(upto.reduce((s, rm) => s + (rm.dirRes.find((x) => x.id === d.id)?.allowStatAmount ?? 0), 0))
-          const totStatAll = r2(totAdvStat + totAllowStat)
+          const monthDeduct = m.billingDeductAdv ? r2(Math.min(totalAdvBox, total25)) : 0
+          const monthAdvStat = r2(d.advStatAmount)
+          const monthAllowStat = r2(d.allowStatAmount)
+          const monthStatAll = r2(monthAdvStat + monthAllowStat)
           const contraOff = contraOffset(d.id, m.id, results, data.contra)
 
           return (
@@ -194,9 +194,9 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
                   <div className={`v${adjAccum < 0 ? ' neg' : ''}`}>{adjAccum < 0 ? '-' : ''}RM {fmt(Math.abs(adjAccum))}</div>
                   <div className="s">
                     As of {m.name}
-                    {advAdj > 0 && <> (billing deduct: +RM {fmt(advAdj)})</>}
-                    {totStatAll > 0 && (
-                      <> (incl. statutory RM {fmt(totStatAll)}{totAdvStat > 0 && totAllowStat > 0 ? ` : Adv RM ${fmt(totAdvStat)} + Allow RM ${fmt(totAllowStat)}` : ''})</>
+                    {monthDeduct > 0 && <> (billing deduct: +RM {fmt(monthDeduct)})</>}
+                    {monthStatAll > 0 && (
+                      <> (incl. statutory RM {fmt(monthStatAll)}{monthAdvStat > 0 && monthAllowStat > 0 ? ` : Adv RM ${fmt(monthAdvStat)} + Allow RM ${fmt(monthAllowStat)}` : ''})</>
                     )}
                     {d.prevAccum < 0 && adjAccum === 0 && <span className="pos"> · ✅ Advance cleared</span>}
                   </div>

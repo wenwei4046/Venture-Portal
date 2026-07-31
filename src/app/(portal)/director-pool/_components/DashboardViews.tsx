@@ -925,12 +925,12 @@ function FlowView(p: DashProps) {
   const accumBill = r2(Math.max(0, billingAccum(d.id, m.id, results, dirInputs, settings) - contraOffset(d.id, m.id, results, contra)))
   const accumSave = savingAccum(d.id, m.id, results, dirInputs)
 
-  // Card sub-notes — same breakdowns as the HTML tool's flow cards
-  const uptoIdx = results.findIndex((x) => x.id === m.id)
-  const upto = results.slice(0, uptoIdx + 1)
-  const totalAdvStat = r2(upto.reduce((s, rm) => s + (rm.dirRes.find((x) => x.id === d.id)?.advStatAmount ?? 0), 0))
-  const totalAllowStat = r2(upto.reduce((s, rm) => s + (rm.dirRes.find((x) => x.id === d.id)?.allowStatAmount ?? 0), 0))
-  const totalStatAll = r2(totalAdvStat + totalAllowStat)
+  // Card sub-notes show THIS MONTH's events only (user ruling 2026-07-31,
+  // matching the Saving card) — the card VALUE stays accumulated as-of.
+  const monthDeduct = m.billingDeductAdv ? r2(Math.min(totalAdvBox, total25)) : 0
+  const monthAdvStat = r2(d.advStatAmount)
+  const monthAllowStat = r2(d.allowStatAmount)
+  const monthStatAll = r2(monthAdvStat + monthAllowStat)
   const contraFromThisMonth = contra.some((ev) => ev.directorId === d.id && ev.fromMonthId === m.id)
   const contraOffHere = contraOffset(d.id, m.id, results, contra)
   const monthWithdraw = inp.savingWithdrawal ?? 0
@@ -1031,12 +1031,12 @@ function FlowView(p: DashProps) {
           sub={
             <>
               As of {m.name}
-              {advAdj > 0 && <> (billing deduct: +RM {fmt(advAdj)})</>}
-              {totalStatAll > 0 && (
+              {monthDeduct > 0 && <> (billing deduct: +RM {fmt(monthDeduct)})</>}
+              {monthStatAll > 0 && (
                 <>
-                  {' '}(incl. statutory RM {fmt(totalStatAll)}
-                  {totalAdvStat > 0 && totalAllowStat > 0
-                    ? ` : Adv RM ${fmt(totalAdvStat)} + Allow RM ${fmt(totalAllowStat)}`
+                  {' '}(incl. statutory RM {fmt(monthStatAll)}
+                  {monthAdvStat > 0 && monthAllowStat > 0
+                    ? ` : Adv RM ${fmt(monthAdvStat)} + Allow RM ${fmt(monthAllowStat)}`
                     : ''}
                   )
                 </>
