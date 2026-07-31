@@ -135,7 +135,33 @@ across all 7 months lands exactly on closing. Excluding the Hookka pair MATTERED
 May was showing −65,242.74 and June +33,012.46; the true figures are +32,757.26 and
 −64,987.54 — the cancelled loan had flipped the sign of two months.
 
-## Session 2026-07-31 — approval blocker + interest to Interest-in-Suspense
+## Session 2026-07-31 — approval blocker, interest-in-suspense, bank cache drift
+
+**Bank cache vs GL drift (found while the user asked "pool cash 显示是对的?")**
+The Dept Pool per-bank page reads journal_lines and was internally consistent
+(each column summed to its bank's GL balance), but `bank_accounts.current_balance`
+had drifted: Alliance +42,802.20 too high, Hong Leong −22,174.00 too low. Two
+independent bugs, both fixed in mig `20260731020000`:
+ A) **Voiding a paid transfer never undid the destination credit.**
+    credit_dest_bank_on_bank_transfer credits the dest bank on →paid, but
+    reversePaidPayment (and every other void path) only restored the SOURCE via
+    bump_bank_balance. Voiding HV-PV-202607-0109 (internal_transfer HL→Alliance
+    42,802.20) therefore left Alliance overstated. Fixed with a MIRROR trigger
+    `debit_dest_bank_on_transfer_void` on paid→voided — chosen over patching the
+    TS action so every void path is covered.
+ B) **Same-bank contra transfers lost the debit.** HV-PV-202607-0186 (source
+    Hong Leong, source row account_code 3000 = Hong Leong) has a GL that nets to
+    zero (Dr 3000 / Cr 3000), but the approval debited the cache while the credit
+    trigger skipped it via `db.id <> new.bank_account_id`. That guard (mig
+    20260606030000) was defensive, never fixed an observed bug, and only bites
+    when a source row names the source bank — exactly when the credit SHOULD run.
+    Removed.
+ Caches then re-derived from the GL. After: Alliance 102,496.67 == GL,
+ Hong Leong 199,961.25 == GL, TB 0.00.
+ ⚠️ **Business question left with the user**: PV-0186 "To Contra with fund
+ Transfer" moves Hong Leong → Hong Leong, i.e. it does NOTHING. If it was meant
+ to contra the 22,174.00 director transfer it should be Alliance → Hong Leong —
+ void and re-create with the right source bank.
 
 0. **BLOCKER FIXED — every payroll_bank_transfer approval was dying** with
    `record "v_voucher" has no field "reference_id"` (user hit it on
