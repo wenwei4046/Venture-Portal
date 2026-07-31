@@ -1,5 +1,29 @@
 # HOUZS Venture Portal — Session Handoff (checkpoint 2026-07-30 · Cash Flow revamp)
 
+## OPEN — 3 pending PVs debit 5027 Interest INCOME while paying money OUT (2026-07-31)
+
+Found while listing Finance's outstanding work. NOT touched — they are still
+pending_approval, so nothing has hit the GL yet.
+
+| PV | amount | rows | issue |
+|---|---|---|---|
+| 0149 | 11,800.00 | Dr 3056 10,000 + Dr **5027** 1,800 | 3056 is due-FROM (asset) — paying out should reduce 4052, and 5027 is revenue |
+| 0150 | 11,406.67 | Dr 4052 9,666.67 + Dr **5027** 1,740 | 4052 right; 5027 wrong |
+| 0178 | 45,607.88 | Dr 3056 45,156.32 + Dr **5027** 451.56 | same as 0149 |
+
+Debiting 5027 (revenue, currently −28,843.13) cuts July interest income by
+**3,991.56**. Interest PAID to a fund source belongs in **6000 Interest Expense -
+Fund Sources**, or should draw down **4062 Interest in Suspense - Pay - HOUZS
+Century** — both accounts already exist. This is the exact mirror of the
+receiving-side fix (interest received → 3060 suspense, not 5027 income).
+Also: 0149 and 0150 are both "3rd Installment" yet use opposite accounts
+(3056 asset vs 4052 liability) — one of them is wrong; and 0150/0178 say
+"The Conts"/"Conts" in the description while posting to HOUZS Century.
+0179 (Ohana 90,000 → Dr 3052) and 0181 (ESH 100,000 → Dr 3072) look structurally
+fine — lending out raises the receivable. 0180 (85,250, "Fund Transfer -
+Interest") debits 4052 principal, not an interest account — worth a look too.
+**Raised with the user; awaiting their call. Do not edit or approve these.**
+
 ## OPEN — 4071-4074 statutory accruals swept too (2026-07-31, NOT fixed)
 
 Same accrual-vs-clearing walk applied to EPF/SOCSO/EIS/PCB. Total across
