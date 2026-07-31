@@ -1,5 +1,39 @@
 # HOUZS Venture Portal — Session Handoff (checkpoint 2026-07-30 · Cash Flow revamp)
 
+## Jun statutory PVs said "(staff + directors)" but carried STAFF ONLY (fixed 2026-07-31)
+
+User asked whether HR's KWSP/SOCSO payments included the directors. They did NOT:
+every one of the five paid PVs (0173-0177) ties to the cent to the four staff
+departments' accruals — EPF 18,496.00 / SOCSO 1,596.60 + SKBBK 532.35 = 2,128.95 /
+EIS 283.80 / PCB 2,097.55 — while the director shares (EPF 13,961.00, SOCSO 535.60,
+EIS 95.20, PCB 8,691.35 = **23,283.15**) are still accrued in 4071-4074.
+
+Why: create_payroll_statutory_vouchers sums staff + directors BY DESIGN, but the
+five were generated 16 Jul, before director_monthly_payroll had any Jun rows
+(InfoTech actuals arrived with mig 20260730100000 / the director-side session).
+v_dir_amt = 0, yet the description string was hardcoded "(staff + directors)".
+
+Mig `20260731040000_statutory_pv_label_matches_shares` (applied live + archived):
+ - generator label now derives from the shares actually present
+   (both / directors-only / staff-only);
+ - data fix rewrote the five vouchers' text in payment_vouchers,
+   journal_entries and dept_pools (15 rows, text only, no GL effect).
+
+**No in-app path exists to pay Jun's director statutory**: the per-scheme dedupe
+(reference_id = run, payee, status <> voided) blocks a second KWSP/… voucher for
+the same run, and voiding the PAID staff vouchers to regenerate combined ones
+would falsify real bank payments. Options given to the user (nothing built):
+ A. Finance keys manual PVs from /payments/new — Dr 4071/4072/4073/4074
+    (segment director via pool dept_pool_director) — simplest;
+ B. teach the RPC a director-only top-up round (dev work, needs their go-ahead).
+NOTE for either path: GL accrual vs InfoTech actuals DISAGREE on the director
+side (EPF 13,961.00 vs 13,248.00; PCB 8,691.35 vs 8,116.60; SKBBK accrued 0 vs
+178.60) — that reconciliation belongs to the concurrent director-payroll session;
+pay-side should follow whatever that session lands on.
+From Jul onward the order fixes itself: import director InfoTech actuals FIRST,
+then generate statutory — each voucher then carries two PVS rows (staff drains
+dept_pool_hr, directors drain dept_pool_director).
+
 ## Account search on the four statements (2026-07-31, user request)
 
 "帮我在 P&L, Monthly P&L, cash flow 和 monthly cash flow 加搜索功能，就快速找account".
