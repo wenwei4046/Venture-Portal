@@ -33,6 +33,8 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
   const [hrMonth, setHrMonth] = useState(data.hrPeriods[0] ?? '')
   const [confirmImport, setConfirmImport] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  // Default view is ACTIVE only; a toggle reveals the inactive people.
+  const [showInactive, setShowInactive] = useState(false)
 
   // The editor is a MODAL (user 2026-08-01: "我希望是pop out 出来…而不是跳上去")
   // — same overlay pattern as BatchDetailsModal. Esc closes.
@@ -291,20 +293,36 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
         + 加人
       </button>
 
-      {/* List — SortableTable: search, click-to-sort headers, newest first. */}
+      {/* List — SortableTable: search, click-to-sort headers, newest first.
+          Active only by default; the toggle reveals inactive. */}
       <SortableTable
-        rows={data.staff}
+        rows={showInactive ? data.staff : data.staff.filter((s) => s.status === 'active')}
         getRowKey={(s) => s.id}
         defaultSort={{ key: 'added', dir: 'desc' }}
         searchKeys={['name', 'department', 'splits']}
         searchPlaceholder="搜名字 / 部门 / 公司…"
         toolbarRight={
-          <span className="font-mono text-xs text-muted whitespace-nowrap">
-            <span className="text-ledger font-semibold">
-              Active {data.staff.filter((s) => s.status === 'active').length}
+          <span className="flex items-center gap-3 whitespace-nowrap">
+            <span className="font-mono text-xs text-muted">
+              <span className="text-ledger font-semibold">
+                Active {data.staff.filter((s) => s.status === 'active').length}
+              </span>
+              {' · '}Inactive {data.staff.filter((s) => s.status === 'inactive').length}
+              {' · '}共 {data.staff.length} 人
             </span>
-            {' · '}Inactive {data.staff.filter((s) => s.status === 'inactive').length}
-            {' · '}共 {data.staff.length} 人
+            {data.staff.some((s) => s.status === 'inactive') ? (
+              <button
+                type="button"
+                onClick={() => setShowInactive((v) => !v)}
+                className={`px-2.5 py-1 rounded-md text-xs font-mono border transition-colors ${
+                  showInactive
+                    ? 'bg-ink text-paper border-ink'
+                    : 'bg-surface text-graphite border-hairline hover:text-ink'
+                }`}
+              >
+                {showInactive ? '只看 Active' : '显示 Inactive'}
+              </button>
+            ) : null}
           </span>
         }
         columns={staffColumns(startEdit, (id) => run(() => deleteAllocStaff(id)), isPending)}
