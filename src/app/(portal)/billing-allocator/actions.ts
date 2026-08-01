@@ -60,6 +60,8 @@ export async function saveAllocStaff(payload: {
   id?: string
   name: string
   status: 'active' | 'inactive'
+  /** Free team/function label — display only, never touches the math. */
+  department: string
   splits: StaffSplitInput[]
 }): Promise<void> {
   const user = await requireRole(['finance', 'principal'])
@@ -67,6 +69,7 @@ export async function saveAllocStaff(payload: {
 
   const name = payload.name.trim()
   if (!name) throw new Error('Name is required')
+  const department = payload.department.trim()
   const splits = (payload.splits ?? []).filter((s) => Number(s.pct) > 0)
   const total = Math.round(splits.reduce((s, x) => s + Number(x.pct), 0) * 100) / 100
   if (total > 100) throw new Error(`Splits total ${total}% — cannot exceed 100%`)
@@ -75,7 +78,7 @@ export async function saveAllocStaff(payload: {
   if (staffId) {
     const { error } = await supabase
       .from('alloc_staff')
-      .update({ name, status: payload.status, updated_at: new Date().toISOString() })
+      .update({ name, status: payload.status, department, updated_at: new Date().toISOString() })
       .eq('id', staffId)
     if (error) throw new Error(error.message)
     const { error: delErr } = await supabase.from('alloc_staff_splits').delete().eq('staff_id', staffId)
@@ -83,7 +86,7 @@ export async function saveAllocStaff(payload: {
   } else {
     const { data, error } = await supabase
       .from('alloc_staff')
-      .insert({ name, status: payload.status, created_by: user.id })
+      .insert({ name, status: payload.status, department, created_by: user.id })
       .select('id')
       .single()
     if (error || !data) throw new Error(error?.message ?? 'insert failed')
@@ -165,26 +168,31 @@ export async function importAllocStaffFromHr(hrPeriod: string): Promise<{ import
   const supabase = await allocClient()
   const pd = periodDate(hrPeriod)
 
-  const { data: hrRows, error: hrErr } = await supabase
-    .from('hr_staff_allocation')
-    .select('staff_id, company_id, allocation_pct, hr_staff_costs(employee_name, status)')
-    .eq('period_month', pd)
+  const [{ data: hrRows, error: hrErr }, { data: deptRows }] = await Promise.all([
+    supabase
+      .from('hr_staff_allocation')
+      .select('staff_id, company_id, allocation_pct, hr_staff_costs(employee_name, status, department_id)')
+      .eq('period_month', pd),
+    supabase.from('departments').select('id, name'),
+  ])
   if (hrErr) throw new Error(hrErr.message)
   if (!hrRows || hrRows.length === 0) {
     throw new Error(`HR has no allocation rows for ${hrPeriod}`)
   }
+  const deptNameById = new Map((deptRows ?? []).map((d) => [d.id as string, d.name as string]))
 
   type HrRow = {
     staff_id: string
     company_id: string
     allocation_pct: number | string
-    hr_staff_costs: { employee_name: string; status: string } | null
+    hr_staff_costs: { employee_name: string; status: string; department_id: string | null } | null
   }
-  const byStaff = new Map<string, { name: string; status: string; splits: { companyId: string; pct: number }[] }>()
+  const byStaff = new Map<string, { name: string; status: string; department: string; splits: { companyId: string; pct: number }[] }>()
   for (const r of hrRows as unknown as HrRow[]) {
     const name = r.hr_staff_costs?.employee_name ?? 'Unknown'
     const status = (r.hr_staff_costs?.status ?? 'active') === 'active' ? 'active' : 'inactive'
-    if (!byStaff.has(r.staff_id)) byStaff.set(r.staff_id, { name, status, splits: [] })
+    const department = deptNameById.get(r.hr_staff_costs?.department_id ?? '') ?? ''
+    if (!byStaff.has(r.staff_id)) byStaff.set(r.staff_id, { name, status, department, splits: [] })
     const pct = Math.round(Number(r.allocation_pct) * 100 * 100) / 100 // fraction → %
     if (pct > 0) byStaff.get(r.staff_id)!.splits.push({ companyId: r.company_id, pct })
   }
@@ -199,7 +207,7 @@ export async function importAllocStaffFromHr(hrPeriod: string): Promise<{ import
   for (const s of byStaff.values()) {
     const { data: created, error } = await supabase
       .from('alloc_staff')
-      .insert({ name: s.name, status: s.status })
+      .insert({ name: s.name, status: s.status, department: s.department })
       .select('id')
       .single()
     if (error || !created) throw new Error(error?.message ?? 'staff insert failed')

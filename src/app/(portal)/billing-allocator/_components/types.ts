@@ -9,6 +9,8 @@ export interface StaffRow {
   id: string
   name: string
   status: 'active' | 'inactive'
+  /** Free team/function label, Finance-maintained. No effect on the math. */
+  department: string
   /** ISO timestamp — when the person was added to the allocator list. */
   createdAt: string
   /** targetId: company uuid, `dept:<uuid>` for a department, null = HV own. */

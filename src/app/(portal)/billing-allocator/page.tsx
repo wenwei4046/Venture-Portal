@@ -42,7 +42,7 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
   ] = await Promise.all([
     supabase.from('companies').select('id, short_code, name').eq('is_active', true).order('name'),
     supabase.from('departments').select('id, name').order('name'),
-    supabase.from('alloc_staff').select('id, name, status, created_at').order('created_at', { ascending: false }),
+    supabase.from('alloc_staff').select('id, name, status, department, created_at').order('created_at', { ascending: false }),
     supabase.from('alloc_staff_splits').select('staff_id, company_id, department_id, pct'),
     supabase.from('alloc_staff_history').select('period_month').order('period_month', { ascending: false }),
     supabase.from('alloc_categories').select('id, name, coa_code').order('name'),
@@ -80,6 +80,7 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     id: s.id as string,
     name: s.name as string,
     status: s.status as 'active' | 'inactive',
+    department: (s.department as string | null) ?? '',
     createdAt: (s.created_at as string | null) ?? '',
     splits: (splits ?? [])
       .filter((x) => x.staff_id === s.id)

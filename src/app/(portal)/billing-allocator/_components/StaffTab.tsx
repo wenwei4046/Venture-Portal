@@ -19,6 +19,7 @@ interface EditState {
   id?: string
   name: string
   status: 'active' | 'inactive'
+  department: string
   /** targetId: OWN sentinel, company uuid, or `dept:<uuid>`. */
   splits: { key: number; targetId: string; pct: string }[]
 }
@@ -62,9 +63,10 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
             id: s.id,
             name: s.name,
             status: s.status,
+            department: s.department,
             splits: s.splits.map((x, i) => ({ key: i, targetId: x.targetId ?? OWN, pct: String(x.pct) })),
           }
-        : { name: '', status: 'active', splits: [{ key: 0, targetId: OWN, pct: '100' }] },
+        : { name: '', status: 'active', department: '', splits: [{ key: 0, targetId: OWN, pct: '100' }] },
     )
   }
 
@@ -74,10 +76,17 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
       .map((s) => ({ targetId: s.targetId === OWN ? null : s.targetId, pct: parseFloat(s.pct) || 0 }))
       .filter((s) => s.pct > 0)
     run(async () => {
-      await saveAllocStaff({ id: edit.id, name: edit.name, status: edit.status, splits })
+      await saveAllocStaff({
+        id: edit.id, name: edit.name, status: edit.status, department: edit.department, splits,
+      })
       setEdit(null)
     })
   }
+
+  // Existing labels feed the editor's datalist so spellings stay consistent.
+  const departmentOptions = Array.from(
+    new Set(data.staff.map((s) => s.department).filter(Boolean)),
+  ).sort()
 
   const totalPct = edit
     ? Math.round(edit.splits.reduce((s, x) => s + (parseFloat(x.pct) || 0), 0) * 100) / 100
@@ -172,6 +181,21 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
               <input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} className={`${inputCls} w-full`} />
             </div>
             <div>
+              <label className="block text-xs font-sans text-graphite mb-1">Department</label>
+              <input
+                value={edit.department}
+                onChange={(e) => setEdit({ ...edit, department: e.target.value })}
+                list="alloc-departments"
+                placeholder="e.g. Marketing / CS / Admin"
+                className={`${inputCls} w-full`}
+              />
+              <datalist id="alloc-departments">
+                {departmentOptions.map((d) => (
+                  <option key={d} value={d} />
+                ))}
+              </datalist>
+            </div>
+            <div>
               <label className="block text-xs font-sans text-graphite mb-1">Status</label>
               <select
                 value={edit.status}
@@ -263,8 +287,8 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
         rows={data.staff}
         getRowKey={(s) => s.id}
         defaultSort={{ key: 'added', dir: 'desc' }}
-        searchKeys={['name', 'splits']}
-        searchPlaceholder="搜名字或公司…"
+        searchKeys={['name', 'department', 'splits']}
+        searchPlaceholder="搜名字 / 部门 / 公司…"
         toolbarRight={
           <span className="font-mono text-xs text-muted whitespace-nowrap">
             <span className="text-ledger font-semibold">
@@ -296,6 +320,20 @@ function staffColumns(
       label: 'Name',
       render: (s) => s.name, // plain string → searchable directly
       cellClassName: 'font-serif text-md text-ink',
+    },
+    {
+      key: 'department',
+      label: 'Department',
+      filterable: true,
+      sortValue: (s) => s.department,
+      render: (s) =>
+        s.department ? (
+          <span className="px-2 py-0.5 bg-surface-2 rounded-md font-mono text-[10px] uppercase text-graphite">
+            {s.department}
+          </span>
+        ) : (
+          <span className="text-muted text-xs">—</span>
+        ),
     },
     {
       key: 'status',
