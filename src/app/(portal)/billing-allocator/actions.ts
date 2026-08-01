@@ -317,25 +317,18 @@ export interface ExpenseBatchInput {
   customSplits?: { companyId: string; amount: number }[]
 }
 
-/**
- * Recomputes SERVER-SIDE with the same engine the preview used — the client's
- * numbers are never trusted — then stores txns + details (own share included,
- * flagged). hcMode 'snapshot' uses the period's own headcount snapshot.
- */
-export async function saveAllocBatch(payload: {
-  period: string
-  hcMode: 'current' | 'snapshot'
-  expenses: ExpenseBatchInput[]
-}): Promise<{ txnNos: string[] }> {
-  const user = await requireRole(['finance', 'principal'])
-  const supabase = await allocClient()
-  const pd = periodDate(payload.period)
-  if (!payload.expenses || payload.expenses.length === 0) throw new Error('No expenses to save')
-
-  // Editing a period that already has allocator invoices would silently desync
-  // the drafts — force the delete-drafts-first flow instead.
-  await assertPeriodNotInvoiced(supabase, payload.period)
-
+/** Targets + headcount context for a period — shared by save and update. */
+async function loadCalcContext(
+  supabase: SupabaseClient,
+  period: string,
+  hcMode: 'current' | 'snapshot',
+): Promise<{
+  targets: { id: string; label: string }[]
+  staffSplits: StaffSplit[]
+  hcLabel: string
+  hcPeriodCol: string | null
+}> {
+  const pd = periodDate(period)
   const [{ data: cos, error: coErr }, { data: depts, error: dErr }] = await Promise.all([
     supabase.from('companies').select('id, short_code, name').eq('is_active', true).order('name'),
     supabase.from('departments').select('id, name'),
@@ -350,20 +343,20 @@ export async function saveAllocBatch(payload: {
   let staffSplits: StaffSplit[] = []
   let hcLabel = 'current'
   let hcPeriodCol: string | null = null
-  if (payload.hcMode === 'snapshot') {
+  if (hcMode === 'snapshot') {
     const { data: hist, error } = await supabase
       .from('alloc_staff_history')
       .select('company_id, department_id, pct, status')
       .eq('period_month', pd)
     if (error) throw new Error(error.message)
-    if (!hist || hist.length === 0) throw new Error(`No headcount snapshot for ${payload.period} — save one on the Staff tab first`)
+    if (!hist || hist.length === 0) throw new Error(`No headcount snapshot for ${period} — save one on the Staff tab first`)
     staffSplits = hist
       .filter((h) => h.status === 'active')
       .map((h) => ({
         companyId: encodeTarget((h.company_id as string | null), (h.department_id as string | null)),
         pct: Number(h.pct),
       }))
-    hcLabel = payload.period
+    hcLabel = period
     hcPeriodCol = pd
   } else {
     const [{ data: staff, error: sErr }, { data: splits, error: spErr }] = await Promise.all([
@@ -398,6 +391,31 @@ export async function saveAllocBatch(payload: {
       label: `${deptById.get(k.slice(DEPT_PREFIX.length)) ?? '?'} (dept)`,
     })),
   ]
+  return { targets, staffSplits, hcLabel, hcPeriodCol }
+}
+
+/**
+ * Recomputes SERVER-SIDE with the same engine the preview used — the client's
+ * numbers are never trusted — then stores txns + details (own share included,
+ * flagged). hcMode 'snapshot' uses the period's own headcount snapshot.
+ */
+export async function saveAllocBatch(payload: {
+  period: string
+  hcMode: 'current' | 'snapshot'
+  expenses: ExpenseBatchInput[]
+}): Promise<{ txnNos: string[] }> {
+  const user = await requireRole(['finance', 'principal'])
+  const supabase = await allocClient()
+  const pd = periodDate(payload.period)
+  if (!payload.expenses || payload.expenses.length === 0) throw new Error('No expenses to save')
+
+  // Editing a period that already has allocator invoices would silently desync
+  // the drafts — force the delete-drafts-first flow instead.
+  await assertPeriodNotInvoiced(supabase, payload.period)
+
+  const { targets, staffSplits, hcLabel, hcPeriodCol } = await loadCalcContext(
+    supabase, payload.period, payload.hcMode,
+  )
 
   // Allocate everything BEFORE writing anything — one bad expense aborts all.
   const computed = payload.expenses.map((exp) => ({
@@ -467,6 +485,76 @@ export async function saveAllocBatch(payload: {
 
   revalidatePath('/billing-allocator')
   return { txnNos }
+}
+
+/**
+ * Replace a saved allocation in place — same txn_no, freshly recomputed
+ * details ("我如果有错无法更改", user 2026-08-01). Same lock as delete: an
+ * invoiced period refuses edits until its drafts are gone.
+ */
+export async function updateAllocTxn(payload: {
+  txnId: string
+  hcMode: 'current' | 'snapshot'
+  expense: ExpenseBatchInput
+}): Promise<{ txnNo: string }> {
+  await requireRole(['finance', 'principal'])
+  const supabase = await allocClient()
+
+  const { data: txn, error: getErr } = await supabase
+    .from('alloc_txns')
+    .select('id, txn_no, period_month')
+    .eq('id', payload.txnId)
+    .single()
+  if (getErr || !txn) throw new Error('Allocation not found')
+  const period = dayjs(txn.period_month as string).format('YYYY-MM')
+  await assertPeriodNotInvoiced(supabase, period)
+
+  const { targets, staffSplits, hcLabel, hcPeriodCol } = await loadCalcContext(
+    supabase, period, payload.hcMode,
+  )
+  const exp = payload.expense
+  const lines = allocateExpense(
+    {
+      description: exp.description,
+      amount: exp.amount,
+      method: exp.method,
+      percentSplits: exp.percentSplits,
+      customSplits: exp.customSplits,
+    },
+    { companies: targets, staffSplits, hcLabel },
+  )
+
+  const { error: updErr } = await supabase
+    .from('alloc_txns')
+    .update({
+      description: exp.description.trim(),
+      amount: Math.round(Number(exp.amount) * 100) / 100,
+      method: exp.method,
+      category_id: exp.categoryId,
+      hc_period: exp.method === 'headcount' ? hcPeriodCol : null,
+    })
+    .eq('id', txn.id)
+  if (updErr) throw new Error(updErr.message)
+
+  const { error: delErr } = await supabase.from('alloc_txn_details').delete().eq('txn_id', txn.id)
+  if (delErr) throw new Error(delErr.message)
+  const { error: detErr } = await supabase.from('alloc_txn_details').insert(
+    lines.map((l) => {
+      const t = decodeTarget(l.companyId)
+      return {
+        txn_id: txn.id,
+        company_id: t.companyId,
+        department_id: t.departmentId,
+        method_detail: l.detail,
+        amount: l.amount,
+        is_own_share: l.isOwnShare,
+      }
+    }),
+  )
+  if (detErr) throw new Error(detErr.message)
+
+  revalidatePath('/billing-allocator')
+  return { txnNo: txn.txn_no as string }
 }
 
 export async function deleteAllocTxn(id: string): Promise<void> {

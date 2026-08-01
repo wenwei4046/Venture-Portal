@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   allocateExpense,
@@ -9,8 +9,8 @@ import {
   type AllocationLine,
   type StaffSplit,
 } from '@/lib/billing-allocator'
-import { saveAllocBatch, type ExpenseBatchInput } from '../actions'
-import type { AllocatorData } from './types'
+import { saveAllocBatch, updateAllocTxn, type ExpenseBatchInput } from '../actions'
+import type { AllocatorData, TxnRow } from './types'
 
 const fmt = (n: number) => n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -28,13 +28,55 @@ interface Row {
 const inputCls =
   'px-2.5 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border'
 
-export default function CalculateTab({ data, onSaved }: { data: AllocatorData; onSaved: () => void }) {
+export default function CalculateTab({
+  data,
+  editTxn,
+  onDoneEditing,
+  onSaved,
+}: {
+  data: AllocatorData
+  /** A Records row being corrected — prefills the form; saving OVERWRITES it. */
+  editTxn?: TxnRow | null
+  onDoneEditing: () => void
+  onSaved: () => void
+}) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [rows, setRows] = useState<Row[]>([blankRow(0)])
   const [hcMode, setHcMode] = useState<'current' | 'snapshot'>('current')
   const [error, setError] = useState<string | null>(null)
   const [nextKey, setNextKey] = useState(1)
+
+  // Entering edit mode: load the txn back into a single form row. Percentage
+  // splits reconstruct from the stored "17.5%" detail strings; custom from the
+  // stored amounts (dept targets can't appear — those editors are company-only).
+  useEffect(() => {
+    if (!editTxn) return
+    const pct: Record<string, string> = {}
+    const custom: Record<string, string> = {}
+    for (const d of editTxn.details) {
+      if (d.isOwnShare || !d.companyId || d.companyId.startsWith('dept:')) continue
+      if (editTxn.method === 'percentage') pct[d.companyId] = String(parseFloat(d.detail) || '')
+      if (editTxn.method === 'custom') custom[d.companyId] = String(d.amount)
+    }
+    setRows([{
+      key: 0,
+      description: editTxn.description,
+      amount: String(editTxn.amount),
+      method: editTxn.method as AllocMethod,
+      categoryId: editTxn.categoryId ?? '',
+      pct,
+      custom,
+    }])
+    setHcMode(editTxn.hcPeriod ? 'snapshot' : 'current')
+    setError(null)
+  }, [editTxn])
+
+  const cancelEdit = () => {
+    setRows([blankRow(nextKey)])
+    setNextKey((k) => k + 1)
+    onDoneEditing()
+  }
 
   const hasSnapshot = data.snapshotPeriods.includes(data.period)
 
@@ -124,8 +166,14 @@ export default function CalculateTab({ data, onSaved }: { data: AllocatorData; o
     setError(null)
     startTransition(async () => {
       try {
-        const expenses = preview.filter((p) => p.lines).map((p) => toInput(p.row))
-        await saveAllocBatch({ period: data.period, hcMode, expenses })
+        if (editTxn) {
+          const first = preview.find((p) => p.lines)
+          if (!first) throw new Error('Nothing to save')
+          await updateAllocTxn({ txnId: editTxn.id, hcMode, expense: toInput(first.row) })
+        } else {
+          const expenses = preview.filter((p) => p.lines).map((p) => toInput(p.row))
+          await saveAllocBatch({ period: data.period, hcMode, expenses })
+        }
         setRows([blankRow(nextKey)])
         setNextKey((k) => k + 1)
         router.refresh()
@@ -138,6 +186,17 @@ export default function CalculateTab({ data, onSaved }: { data: AllocatorData; o
 
   return (
     <div className="space-y-6">
+      {editTxn ? (
+        <div className="border border-accent-border bg-accent-bg rounded-md p-3 flex items-center justify-between flex-wrap gap-2">
+          <span className="font-serif italic text-accent text-sm">
+            正在修改 <span className="font-mono not-italic text-ink">{editTxn.txnNo}</span> — 存档会覆盖原记录(单号不变)
+          </span>
+          <button type="button" onClick={cancelEdit} className="text-sm text-graphite hover:text-ink font-sans">
+            取消修改
+          </button>
+        </div>
+      ) : null}
+
       {/* Headcount source */}
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-xs uppercase tracking-wide text-muted font-sans">Headcount 用</span>
@@ -252,13 +311,15 @@ export default function CalculateTab({ data, onSaved }: { data: AllocatorData; o
             ) : null}
           </div>
         ))}
-        <button
-          type="button"
-          onClick={() => { setRows((prev) => [...prev, blankRow(nextKey)]); setNextKey((k) => k + 1) }}
-          className="text-sm text-accent hover:text-accent-hover font-serif italic"
-        >
-          + 加一笔费用
-        </button>
+        {!editTxn ? (
+          <button
+            type="button"
+            onClick={() => { setRows((prev) => [...prev, blankRow(nextKey)]); setNextKey((k) => k + 1) }}
+            className="text-sm text-accent hover:text-accent-hover font-serif italic"
+          >
+            + 加一笔费用
+          </button>
+        ) : null}
       </div>
 
       {/* Preview */}
@@ -318,10 +379,10 @@ export default function CalculateTab({ data, onSaved }: { data: AllocatorData; o
           disabled={isPending || !previewOk}
           className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50"
         >
-          {isPending ? '存档中…' : `存进 ${data.period} 记录`}
+          {isPending ? '存档中…' : editTxn ? `覆盖 ${editTxn.txnNo}` : `存进 ${data.period} 记录`}
         </button>
         <span className="font-serif italic text-muted text-xs">
-          存档后去「记录」tab 一键开 draft invoice。
+          {editTxn ? '覆盖后原来的分摊明细整个换成新算的。' : '存档后去「记录」tab 一键开 draft invoice。'}
         </span>
       </div>
     </div>

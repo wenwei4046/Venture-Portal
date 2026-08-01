@@ -121,6 +121,7 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     description: t.description as string,
     amount: Number(t.amount),
     method: t.method as string,
+    categoryId: (t.category_id as string | null) ?? null,
     categoryName: catName.get((t.category_id as string | null) ?? '') ?? '',
     hcPeriod: t.hc_period ? dayjs(t.hc_period as string).format('YYYY-MM') : null,
     details: ((t.alloc_txn_details ?? []) as Array<{

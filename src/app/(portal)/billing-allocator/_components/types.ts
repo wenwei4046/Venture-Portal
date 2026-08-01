@@ -45,6 +45,7 @@ export interface TxnRow {
   description: string
   amount: number
   method: string
+  categoryId: string | null
   categoryName: string
   hcPeriod: string | null
   details: TxnDetailRow[]

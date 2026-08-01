@@ -4,11 +4,18 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { deleteAllocTxn, generateAllocatorInvoices, type GenerateResult } from '../actions'
-import type { AllocatorData } from './types'
+import type { AllocatorData, TxnRow } from './types'
 
 const fmt = (n: number) => n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-export default function RecordsTab({ data }: { data: AllocatorData }) {
+export default function RecordsTab({
+  data,
+  onEdit,
+}: {
+  data: AllocatorData
+  /** Loads the record into the Calculate tab; saving there overwrites it. */
+  onEdit: (t: TxnRow) => void
+}) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -144,7 +151,16 @@ export default function RecordsTab({ data }: { data: AllocatorData }) {
                     ))}
                   </div>
                 </td>
-                <td className="text-right">
+                <td className="text-right whitespace-nowrap">
+                  <button
+                    type="button"
+                    onClick={() => onEdit(t)}
+                    disabled={isPending || invoiced}
+                    title={invoiced ? '已开单,先删 draft invoice' : '带回计算 tab 修改,存档覆盖原记录'}
+                    className="text-accent hover:text-accent-hover font-serif italic text-sm mr-3 disabled:opacity-40"
+                  >
+                    改
+                  </button>
                   <button
                     type="button"
                     onClick={() => run(() => deleteAllocTxn(t.id))}

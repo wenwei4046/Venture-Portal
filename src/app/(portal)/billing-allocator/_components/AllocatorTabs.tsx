@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import type { AllocatorData } from './types'
+import type { AllocatorData, TxnRow } from './types'
 import CalculateTab from './CalculateTab'
 import RecordsTab from './RecordsTab'
 import StaffTab from './StaffTab'
@@ -21,6 +21,9 @@ export default function AllocatorTabs({ data }: { data: AllocatorData }) {
   const router = useRouter()
   const pathname = usePathname()
   const [tab, setTab] = useState<TabKey>(data.txns.length > 0 ? 'records' : 'calc')
+  // A record being corrected: Records' 改 loads it into Calculate; saving
+  // there overwrites the original (same ALC number).
+  const [editTxn, setEditTxn] = useState<TxnRow | null>(null)
 
   return (
     <div>
@@ -53,9 +56,14 @@ export default function AllocatorTabs({ data }: { data: AllocatorData }) {
       </div>
 
       {tab === 'calc' ? (
-        <CalculateTab data={data} onSaved={() => setTab('records')} />
+        <CalculateTab
+          data={data}
+          editTxn={editTxn}
+          onDoneEditing={() => setEditTxn(null)}
+          onSaved={() => { setEditTxn(null); setTab('records') }}
+        />
       ) : tab === 'records' ? (
-        <RecordsTab data={data} />
+        <RecordsTab data={data} onEdit={(t) => { setEditTxn(t); setTab('calc') }} />
       ) : tab === 'staff' ? (
         <StaffTab data={data} />
       ) : (

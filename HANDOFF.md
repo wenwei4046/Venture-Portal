@@ -72,6 +72,16 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+Follow-up 3 (2026-08-01, UX round after first real use): staff editor moved
+ABOVE the table + scrollIntoView + "正在编辑 — {name}" (37 rows pushed it below
+the fold; Edit looked dead). Staff list rebuilt on the shared SortableTable —
+newest-first by Added date (new column), click-sort headers, search over name +
+split labels, Status facet filter. **Records became editable** ("我如果有错无法
+更改"): 改 on a row loads it into Calculate (percentage splits reconstruct from
+the stored "17.5%" detail strings, custom from stored amounts), the banner says
+存档会覆盖原记录, and `updateAllocTxn` replaces details in place keeping the
+same ALC number — same invoiced-period lock as delete.
+
 NOT built (explicitly out of v1): dashboard/PDF statements (the invoice IS the
 statement), inter-subsidiary payers, Area method, Feb-Jun history import
 (user chose 2026-07 only; paste again anytime to add).
