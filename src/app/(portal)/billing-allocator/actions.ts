@@ -135,6 +135,77 @@ async function snapshotPeriod(period: string): Promise<void> {
   }
 }
 
+/**
+ * One-click seed from HR's allocation table (READ-ONLY on HR data; Finance
+ * already reads it for invoice autofill). REPLACES the whole allocator list
+ * with HR's staff×company×% for the chosen HR month — after that it is
+ * Finance's independent copy again (HR edits do NOT flow through; re-import
+ * to refresh). HR stores fractions (0.30 = 30%) and has no own-share concept:
+ * a staff whose splits total under 100% gets the remainder as "HV own".
+ */
+export async function importAllocStaffFromHr(hrPeriod: string): Promise<{ imported: number }> {
+  await requireRole(['finance', 'principal'])
+  const supabase = await allocClient()
+  const pd = periodDate(hrPeriod)
+
+  const { data: hrRows, error: hrErr } = await supabase
+    .from('hr_staff_allocation')
+    .select('staff_id, company_id, allocation_pct, hr_staff_costs(employee_name, status)')
+    .eq('period_month', pd)
+  if (hrErr) throw new Error(hrErr.message)
+  if (!hrRows || hrRows.length === 0) {
+    throw new Error(`HR has no allocation rows for ${hrPeriod}`)
+  }
+
+  type HrRow = {
+    staff_id: string
+    company_id: string
+    allocation_pct: number | string
+    hr_staff_costs: { employee_name: string; status: string } | null
+  }
+  const byStaff = new Map<string, { name: string; status: string; splits: { companyId: string; pct: number }[] }>()
+  for (const r of hrRows as unknown as HrRow[]) {
+    const name = r.hr_staff_costs?.employee_name ?? 'Unknown'
+    const status = (r.hr_staff_costs?.status ?? 'active') === 'active' ? 'active' : 'inactive'
+    if (!byStaff.has(r.staff_id)) byStaff.set(r.staff_id, { name, status, splits: [] })
+    const pct = Math.round(Number(r.allocation_pct) * 100 * 100) / 100 // fraction → %
+    if (pct > 0) byStaff.get(r.staff_id)!.splits.push({ companyId: r.company_id, pct })
+  }
+
+  // Replace-all: wipe the allocator list, then insert HR's.
+  const { error: wipeErr } = await supabase
+    .from('alloc_staff')
+    .delete()
+    .not('id', 'is', null)
+  if (wipeErr) throw new Error(wipeErr.message)
+
+  for (const s of byStaff.values()) {
+    const { data: created, error } = await supabase
+      .from('alloc_staff')
+      .insert({ name: s.name, status: s.status })
+      .select('id')
+      .single()
+    if (error || !created) throw new Error(error?.message ?? 'staff insert failed')
+    const total = Math.round(s.splits.reduce((a, x) => a + x.pct, 0) * 100) / 100
+    const rows: Array<{ staff_id: string; company_id: string | null; pct: number }> = s.splits.map((x) => ({
+      staff_id: created.id as string,
+      company_id: x.companyId,
+      pct: x.pct,
+    }))
+    // HR under-100% remainder = HV's own share.
+    const remainder = Math.round((100 - total) * 100) / 100
+    if (remainder >= 0.01) rows.push({ staff_id: created.id as string, company_id: null, pct: remainder })
+    if (rows.length > 0) {
+      const { error: spErr } = await supabase.from('alloc_staff_splits').insert(rows)
+      if (spErr) throw new Error(spErr.message)
+    }
+  }
+
+  await snapshotPeriod(dayjs().format('YYYY-MM'))
+  revalidatePath('/billing-allocator')
+  return { imported: byStaff.size }
+}
+
 // ─── Categories ──────────────────────────────────────────────────────────────
 
 export async function saveAllocCategory(payload: { id?: string; name: string; coaCode: string }): Promise<void> {

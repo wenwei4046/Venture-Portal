@@ -61,6 +61,8 @@ export interface AllocatorData {
   companies: CoOpt[]
   staff: StaffRow[]
   snapshotPeriods: string[]
+  /** Months HR's hr_staff_allocation has data for — drives the import picker. */
+  hrPeriods: string[]
   categories: CategoryRow[]
   templates: TemplateRow[]
   txns: TxnRow[]

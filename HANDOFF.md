@@ -40,6 +40,16 @@ database.types.ts was NOT regenerated — allocator files use the untyped
 SupabaseClient cast (same convention as lib/cfo-reports.ts); regenerate types
 whenever convenient and the casts can go.
 
+Follow-up same day ("staff那边没有办法用我现有的去记录?"): **"从 HR 带入"
+one-click import** on the Staff tab — `importAllocStaffFromHr(hrPeriod)` READS
+hr_staff_allocation + hr_staff_costs (read-only, same precedent as the invoice
+autofill) and REPLACES the allocator list with that month's staff×company×%.
+HR stores FRACTIONS (0.30 = 30%) → ×100 on import; HR has no own-share concept,
+so a staff totalling under 100% gets the remainder as "HV own" (e.g. CHOW WAI
+MAN 87.29% → 12.71% own). Two-step confirm in the UI (replace-all is
+destructive to hand edits). After import it is Finance's independent copy — HR
+edits do NOT flow through; re-import to refresh.
+
 NOT built (explicitly out of v1): dashboard/PDF statements (the invoice IS the
 statement), inter-subsidiary payers, Area method, old-spreadsheet import
 (user: revisit later if wanted).

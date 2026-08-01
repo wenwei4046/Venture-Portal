@@ -2,7 +2,10 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { saveAllocStaff, deleteAllocStaff, saveAllocSnapshot, type StaffSplitInput } from '../actions'
+import {
+  saveAllocStaff, deleteAllocStaff, saveAllocSnapshot, importAllocStaffFromHr,
+  type StaffSplitInput,
+} from '../actions'
 import type { AllocatorData, StaffRow } from './types'
 
 const OWN = '__own__' // select sentinel for "HOUZS Venture (own)" — DB stores NULL
@@ -23,6 +26,9 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
   const [error, setError] = useState<string | null>(null)
   const [edit, setEdit] = useState<EditState | null>(null)
   const [nextKey, setNextKey] = useState(1000)
+  const [hrMonth, setHrMonth] = useState(data.hrPeriods[0] ?? '')
+  const [confirmImport, setConfirmImport] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
 
   const run = (fn: () => Promise<void>) => {
     setError(null)
@@ -71,6 +77,56 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
         「HOUZS Venture (own)」那份算 HV 自己的、不开单。
         名单一改,本月快照自动更新;算旧月份要先存那个月的快照。
       </p>
+
+      {/* Import from HR's allocation table */}
+      {data.hrPeriods.length > 0 ? (
+        <div className="flex items-center gap-3 flex-wrap border border-hairline rounded-md bg-surface p-3">
+          <span className="text-xs uppercase tracking-wide text-muted font-sans">从 HR 带入</span>
+          <select value={hrMonth} onChange={(e) => { setHrMonth(e.target.value); setConfirmImport(false) }} className={inputCls}>
+            {data.hrPeriods.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+          {confirmImport ? (
+            <span className="flex items-center gap-2">
+              <span className="font-serif italic text-danger text-sm">会把现在的名单整个换掉 —</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmImport(false)
+                  run(async () => {
+                    const { imported } = await importAllocStaffFromHr(hrMonth)
+                    setNotice(`带入 ${imported} 人(HR ${hrMonth});之后是你的独立副本,HR 改了不会自动跟。`)
+                  })
+                }}
+                disabled={isPending}
+                className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-3 py-1.5 rounded-md disabled:opacity-50"
+              >
+                确定带入
+              </button>
+              <button type="button" onClick={() => setConfirmImport(false)} className="text-sm text-graphite hover:text-ink font-sans">
+                算了
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmImport(true)}
+              disabled={isPending}
+              className="bg-surface-2 hover:bg-paper border border-hairline text-ink font-serif italic text-sm px-3.5 py-1.5 rounded-md transition-colors disabled:opacity-50"
+            >
+              {isPending ? '带入中…' : '带入 HR 名单'}
+            </button>
+          )}
+          <span className="font-serif italic text-muted text-xs">
+            HR 没分满 100% 的,差额自动记成 HV own。
+          </span>
+        </div>
+      ) : null}
+
+      {notice ? (
+        <div className="border border-accent-border bg-accent-bg rounded-md p-3 font-serif italic text-sm text-ink">{notice}</div>
+      ) : null}
 
       {/* Snapshot controls */}
       <div className="flex items-center gap-3 flex-wrap border border-hairline rounded-md bg-surface p-3">

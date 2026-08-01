@@ -37,6 +37,7 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     { data: templateSplits },
     { data: txns },
     { data: allocInvoices },
+    { data: hrMonths },
   ] = await Promise.all([
     supabase.from('companies').select('id, short_code, name').eq('is_active', true).order('name'),
     supabase.from('alloc_staff').select('id, name, status').order('name'),
@@ -51,6 +52,8 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
       .eq('period_month', pd)
       .order('txn_no'),
     supabase.from('invoices').select('id, invoice_no, company_id, status').eq('reference_no', ref),
+    // READ-ONLY peek at HR's allocation months, for the one-click import.
+    supabase.from('hr_staff_allocation').select('period_month').order('period_month', { ascending: false }),
   ])
 
   const companies: CoOpt[] = (cos ?? []).map((c) => ({
@@ -121,11 +124,16 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     status: i.status as string,
   }))
 
+  const hrPeriods = Array.from(
+    new Set((hrMonths ?? []).map((r) => dayjs(r.period_month as string).format('YYYY-MM'))),
+  )
+
   const data: AllocatorData = {
     period,
     companies,
     staff: staffRows,
     snapshotPeriods,
+    hrPeriods,
     categories,
     templates: templateRows,
     txns: txnRows,
