@@ -59,18 +59,27 @@ export default function RecordsTab({
       {/* Invoices banner */}
       {invoiced ? (
         <div className="border border-accent-border bg-accent-bg rounded-md p-4">
-          <div className="font-serif italic text-accent text-sm mb-2">
-            {data.period} 已开单 — 记录已锁定(要改先去 Invoice 页删掉 draft)
+          <div className="flex items-baseline justify-between gap-3 flex-wrap mb-2">
+            <span className="font-serif italic text-accent text-sm">
+              {data.period} 已开单 — 记录已锁定(要改先去 Invoice 页删掉 draft)
+            </span>
+            <Link href="/statements" className="font-serif italic text-sm text-accent hover:text-accent-hover">
+              去 Invoice 页处理 →
+            </Link>
           </div>
           <div className="flex flex-wrap gap-2">
+            {/* invoice-doc is the per-invoice document view (a /statements/[id]
+                link 404s — that route is monthly statements, user 2026-08-01). */}
             {data.invoices.map((inv) => (
-              <Link
+              <a
                 key={inv.id}
-                href={`/statements/${inv.id}`}
+                href={`/billing/invoice-doc?id=${inv.id}`}
+                target="_blank"
+                rel="noreferrer"
                 className="px-2.5 py-1 bg-surface border border-hairline rounded-md font-mono text-xs text-ink hover:text-accent transition-colors"
               >
                 {inv.companyLabel} · {inv.invoiceNo} · <em className="font-serif">{inv.status}</em> →
-              </Link>
+              </a>
             ))}
           </div>
         </div>
