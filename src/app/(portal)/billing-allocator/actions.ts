@@ -727,8 +727,14 @@ export async function generateAllocatorInvoices(period: string): Promise<Generat
       const key = encodeTarget(d.company_id, d.department_id)
       if (d.is_own_share || !key) continue
       if (!byTarget.has(key)) byTarget.set(key, [])
+      // Line shows the ORIGINAL bill amount × the share that produced this
+      // figure (user 2026-08-01: "显示原本的数额*百分比在description 那边") —
+      // e.g. "… — RM 739.90 × 10% · ALC-202608-001". Custom amounts aren't
+      // derived from the base, so they just say Custom.
+      const base = `RM ${Number(t.amount).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      const calc = d.method_detail === 'Custom' ? 'Custom' : `${base} × ${d.method_detail}`
       byTarget.get(key)!.push({
-        description: `${t.description} — ${d.method_detail} · ${t.txn_no}`,
+        description: `${t.description} — ${calc} · ${t.txn_no}`,
         amount: Number(d.amount),
         categoryCode: coaByCat.get(t.category_id as string) ?? '',
       })
@@ -757,7 +763,7 @@ export async function generateAllocatorInvoices(period: string): Promise<Generat
       invoiceDate: today,
       dueDate: '',
       referenceNo: ref,
-      headerDescription: `Shared expense allocation — ${monthLabel}`,
+      headerDescription: `Billing Allocator — ${monthLabel}`,
       companyId: t.companyId ?? undefined,
       departmentId: t.departmentId ?? undefined,
       lines,
