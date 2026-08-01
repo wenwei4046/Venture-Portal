@@ -6,6 +6,7 @@ import type { AllocMethod } from '@/lib/billing-allocator'
 import {
   saveAllocCategory, deleteAllocCategory,
   saveAllocTemplate, deleteAllocTemplate,
+  setAllocCompanyEnabled,
 } from '../actions'
 import type { AllocatorData, TemplateRow } from './types'
 
@@ -56,6 +57,37 @@ export default function SetupTab({ data }: { data: AllocatorData }) {
       {error ? (
         <div className="bg-danger-bg border border-danger text-danger rounded-md p-3 text-sm font-sans">{error}</div>
       ) : null}
+
+      {/* ── Participating companies ── */}
+      <section>
+        <div className="sect-head">
+          <h2>参与分摊的公司 · Companies</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">{data.companySettings.filter((c) => c.enabled).length} / {data.companySettings.length}</span>
+        </div>
+        <p className="font-serif italic text-muted text-xs mb-3 max-w-2xl">
+          只影响 Allocator:关掉的公司不再出现在分摊格 / Equal / 名单选项里,
+          系统其他地方(loan、invoice)完全不受影响;旧记录照样显示它的名字。
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {data.companySettings.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => run(() => setAllocCompanyEnabled(c.id, !c.enabled))}
+              disabled={isPending}
+              title={c.enabled ? '点一下关掉(不再参与分摊)' : '点一下开回来'}
+              className={`px-3 py-1.5 rounded-md border font-mono text-sm transition-colors disabled:opacity-50 ${
+                c.enabled
+                  ? 'bg-accent-bg text-ink border-accent-border'
+                  : 'bg-surface text-muted border-hairline line-through'
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      </section>
 
       {/* ── Categories ── */}
       <section>

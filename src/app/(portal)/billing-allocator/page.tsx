@@ -40,6 +40,7 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     { data: allocInvoices },
     { data: hrMonths },
     { data: periodSnapshot },
+    { data: coSettings },
   ] = await Promise.all([
     supabase.from('companies').select('id, short_code, name').eq('is_active', true).order('name'),
     supabase.from('departments').select('id, name').order('name'),
@@ -62,17 +63,25 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
       .from('alloc_staff_history')
       .select('company_id, department_id, pct, status')
       .eq('period_month', pd),
+    supabase.from('alloc_company_settings').select('company_id, enabled'),
   ])
 
-  const companies: CoOpt[] = (cos ?? []).map((c) => ({
+  // Full list drives LABELS (history must keep resolving even after a company
+  // is switched off); the enabled subset drives pickers/targets.
+  const allCompanies: CoOpt[] = (cos ?? []).map((c) => ({
     id: c.id as string,
     label: (c.short_code ?? c.name) as string,
   }))
+  const disabledCos = new Set(
+    (coSettings ?? []).filter((s) => s.enabled === false).map((s) => s.company_id as string),
+  )
+  const companies: CoOpt[] = allCompanies.filter((c) => !disabledCos.has(c.id))
+  const companySettings = allCompanies.map((c) => ({ ...c, enabled: !disabledCos.has(c.id) }))
   const departments: CoOpt[] = (depts ?? []).map((d) => ({
     id: `dept:${d.id}`,
     label: `${d.name} (dept)`,
   }))
-  const coLabel = new Map(companies.map((c) => [c.id, c.label]))
+  const coLabel = new Map(allCompanies.map((c) => [c.id, c.label]))
   const deptLabel = new Map(departments.map((d) => [d.id, d.label]))
   // Target resolution: company uuid / dept:<uuid> / null = HV own.
   const targetIdOf = (companyId: string | null, departmentId: string | null): string | null =>
@@ -175,6 +184,7 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
   const data: AllocatorData = {
     period,
     companies,
+    companySettings,
     departments,
     staff: staffRows,
     snapshotSplits,

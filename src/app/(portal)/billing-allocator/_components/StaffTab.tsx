@@ -47,8 +47,10 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
 
   const labelOfTarget = (targetId: string | null): string => {
     if (targetId === null) return 'HV own'
+    // companySettings covers switched-off companies too, so old snapshots
+    // keep their labels.
     return (
-      data.companies.find((c) => c.id === targetId)?.label ??
+      data.companySettings.find((c) => c.id === targetId)?.label ??
       data.departments.find((d) => d.id === targetId)?.label ??
       '?'
     )
@@ -286,6 +288,13 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
                     {data.departments.map((d) => (
                       <option key={d.id} value={d.id}>{d.label}</option>
                     ))}
+                    {/* Switched-off companies this person still references —
+                        keep the option so editing doesn't silently drop it. */}
+                    {data.companySettings
+                      .filter((c) => !c.enabled && edit.splits.some((x) => x.targetId === c.id))
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>{c.label}(停用)</option>
+                      ))}
                   </select>
                   <input
                     type="number" step="0.01" min="0" max="100"

@@ -72,6 +72,20 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+Follow-up 5 (2026-08-01, calc round): one bill mixing methods = enter it as
+multiple expense rows (user confirmed "拆两行输入就够" — per-company invoices
+already merge everything into ONE invoice per target). Percentage/Custom split
+editors gained an **"HV 自己承担(不开单)"** first slot (engine: companyId null
+→ own-share line, percentage still validates 100 incl own, penny fix
+reconciles own+billed to the amount). **Participating companies are
+Finance-maintained** (mig `20260801040000` alloc_company_settings; Setup tab
+toggle chips): switched-off companies vanish from pickers/Equal/calc targets —
+allocator-scoped ONLY (companies.is_active untouched), labels for old
+records/snapshots still resolve via the full list, and a staff editor keeps a
+"(停用)" option for splits that still reference one. Snapshot re-save REPLACES
+that month (delete+rewrite); snapshot-mode preview now uses the period's
+snapshot rows so preview == server calc (fixed same day).
+
 Follow-up 4 (2026-08-01, staff-tab polish round): staff editor became a MODAL
 (user: "pop out 出来…而不是跳上去") — BatchDetailsModal overlay pattern, Esc /
 overlay-click cancels. Department label added to alloc_staff (mig

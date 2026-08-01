@@ -63,7 +63,11 @@ export interface AllocInvoiceRow {
 
 export interface AllocatorData {
   period: string
+  /** ENABLED companies only — drives pickers, Equal splits and calc targets. */
   companies: CoOpt[]
+  /** Every active company + its allocator on/off flag — Setup maintenance and
+   *  label fallbacks for history that references a switched-off company. */
+  companySettings: (CoOpt & { enabled: boolean })[]
   /** All departments, id encoded `dept:<uuid>` — staff-split picker options.
    *  Calc targets only include departments actually present in staff splits. */
   departments: CoOpt[]

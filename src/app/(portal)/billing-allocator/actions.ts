@@ -235,6 +235,20 @@ export async function importAllocStaffFromHr(hrPeriod: string): Promise<{ import
   return { imported: byStaff.size }
 }
 
+// ─── Participating companies ─────────────────────────────────────────────────
+
+/** Toggle whether a company appears in the allocator's pickers/targets.
+ *  Allocator-scoped only — companies.is_active is untouched. */
+export async function setAllocCompanyEnabled(companyId: string, enabled: boolean): Promise<void> {
+  await requireRole(['finance', 'principal'])
+  const supabase = await allocClient()
+  const { error } = await supabase
+    .from('alloc_company_settings')
+    .upsert({ company_id: companyId, enabled, updated_at: new Date().toISOString() })
+  if (error) throw new Error(error.message)
+  revalidatePath('/billing-allocator')
+}
+
 // ─── Snapshot review ─────────────────────────────────────────────────────────
 
 export interface SnapshotDetailRow {
@@ -382,13 +396,20 @@ async function loadCalcContext(
   hcPeriodCol: string | null
 }> {
   const pd = periodDate(period)
-  const [{ data: cos, error: coErr }, { data: depts, error: dErr }] = await Promise.all([
+  const [{ data: cos, error: coErr }, { data: depts, error: dErr }, { data: coSettings }] = await Promise.all([
     supabase.from('companies').select('id, short_code, name').eq('is_active', true).order('name'),
     supabase.from('departments').select('id, name'),
+    supabase.from('alloc_company_settings').select('company_id, enabled'),
   ])
   if (coErr) throw new Error(coErr.message)
   if (dErr) throw new Error(dErr.message)
-  const companies = (cos ?? []).map((c) => ({ id: c.id as string, label: (c.short_code ?? c.name) as string }))
+  // Allocator-scoped participation: no row = enabled.
+  const disabled = new Set(
+    (coSettings ?? []).filter((s) => s.enabled === false).map((s) => s.company_id as string),
+  )
+  const companies = (cos ?? [])
+    .filter((c) => !disabled.has(c.id as string))
+    .map((c) => ({ id: c.id as string, label: (c.short_code ?? c.name) as string }))
   const deptById = new Map((depts ?? []).map((d) => [d.id as string, d.name as string]))
 
   // Headcount source: the period's snapshot, or the live list. Targets are
