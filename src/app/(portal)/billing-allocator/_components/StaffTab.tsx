@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   saveAllocStaff, deleteAllocStaff, saveAllocSnapshot, importAllocStaffFromHr,
@@ -30,6 +30,16 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
   const [hrMonth, setHrMonth] = useState(data.hrPeriods[0] ?? '')
   const [confirmImport, setConfirmImport] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+
+  // The editor sits ABOVE the table (a 37-row list pushed it far below the
+  // fold — clicking Edit looked like nothing happened, user 2026-08-01).
+  // Scroll to it when a DIFFERENT row opens — keyed on identity, not the edit
+  // object, which changes on every keystroke.
+  const editorRef = useRef<HTMLDivElement>(null)
+  const editKey = edit ? edit.id ?? 'new' : null
+  useEffect(() => {
+    if (editKey) editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [editKey])
 
   const run = (fn: () => Promise<void>) => {
     setError(null)
@@ -148,62 +158,12 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
         <div className="bg-danger-bg border border-danger text-danger rounded-md p-3 text-sm font-sans">{error}</div>
       ) : null}
 
-      {/* List */}
-      <div className="overflow-x-auto border border-hairline rounded-md">
-        <table className="ledger-table w-full">
-          <thead>
-            <tr><th>Name</th><th>Status</th><th>Splits</th><th></th></tr>
-          </thead>
-          <tbody>
-            {data.staff.map((s) => (
-              <tr key={s.id}>
-                <td className="font-serif text-md text-ink">{s.name}</td>
-                <td>
-                  <span className={`px-2 py-0.5 rounded-md font-mono text-[10px] uppercase ${
-                    s.status === 'active' ? 'bg-accent-bg text-ink' : 'bg-surface-2 text-muted'
-                  }`}>
-                    {s.status}
-                  </span>
-                </td>
-                <td>
-                  <div className="flex flex-wrap gap-1.5 py-1">
-                    {s.splits.map((x, i) => (
-                      <span key={i} className={`px-2 py-0.5 rounded-md border text-xs font-mono ${
-                        x.targetId === null
-                          ? 'bg-surface text-muted border-hairline italic'
-                          : 'bg-accent-bg text-ink border-accent-border'
-                      }`}>
-                        {x.targetId === null ? 'HV own' : x.label} {x.pct}%
-                      </span>
-                    ))}
-                    {s.splits.length === 0 ? <span className="font-serif italic text-muted text-xs">no splits</span> : null}
-                  </div>
-                </td>
-                <td className="text-right whitespace-nowrap">
-                  <button type="button" onClick={() => startEdit(s)} className="text-accent hover:text-accent-hover font-serif italic text-sm mr-3">
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => run(() => deleteAllocStaff(s.id))}
-                    disabled={isPending}
-                    className="text-muted hover:text-danger font-mono text-sm"
-                  >
-                    ×
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {data.staff.length === 0 ? (
-              <tr><td colSpan={4} className="font-serif italic text-muted text-sm">名单还是空的 — 加人后 Headcount 法才有数。</td></tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Editor */}
+      {/* Editor — ABOVE the table so opening it is always visible. */}
       {edit ? (
-        <div className="border border-accent-border bg-accent-bg rounded-md p-4 space-y-3">
+        <div ref={editorRef} className="border border-accent-border bg-accent-bg rounded-md p-4 space-y-3">
+          <div className="font-serif italic text-accent text-sm">
+            {edit.id ? <>正在编辑 — <span className="text-ink">{edit.name || '…'}</span></> : '加人'}
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-sans text-graphite mb-1">Name *</label>
@@ -295,6 +255,59 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
           + 加人
         </button>
       )}
+
+      {/* List */}
+      <div className="overflow-x-auto border border-hairline rounded-md">
+        <table className="ledger-table w-full">
+          <thead>
+            <tr><th>Name</th><th>Status</th><th>Splits</th><th></th></tr>
+          </thead>
+          <tbody>
+            {data.staff.map((s) => (
+              <tr key={s.id}>
+                <td className="font-serif text-md text-ink">{s.name}</td>
+                <td>
+                  <span className={`px-2 py-0.5 rounded-md font-mono text-[10px] uppercase ${
+                    s.status === 'active' ? 'bg-accent-bg text-ink' : 'bg-surface-2 text-muted'
+                  }`}>
+                    {s.status}
+                  </span>
+                </td>
+                <td>
+                  <div className="flex flex-wrap gap-1.5 py-1">
+                    {s.splits.map((x, i) => (
+                      <span key={i} className={`px-2 py-0.5 rounded-md border text-xs font-mono ${
+                        x.targetId === null
+                          ? 'bg-surface text-muted border-hairline italic'
+                          : 'bg-accent-bg text-ink border-accent-border'
+                      }`}>
+                        {x.targetId === null ? 'HV own' : x.label} {x.pct}%
+                      </span>
+                    ))}
+                    {s.splits.length === 0 ? <span className="font-serif italic text-muted text-xs">no splits</span> : null}
+                  </div>
+                </td>
+                <td className="text-right whitespace-nowrap">
+                  <button type="button" onClick={() => startEdit(s)} className="text-accent hover:text-accent-hover font-serif italic text-sm mr-3">
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => run(() => deleteAllocStaff(s.id))}
+                    disabled={isPending}
+                    className="text-muted hover:text-danger font-mono text-sm"
+                  >
+                    ×
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {data.staff.length === 0 ? (
+              <tr><td colSpan={4} className="font-serif italic text-muted text-sm">名单还是空的 — 加人后 Headcount 法才有数。</td></tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
