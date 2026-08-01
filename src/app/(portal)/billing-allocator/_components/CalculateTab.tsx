@@ -14,6 +14,9 @@ import type { AllocatorData, TxnRow } from './types'
 
 const fmt = (n: number) => n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
+// Split-editor key for "HV bears this share itself" — engine gets null.
+const OWN_SPLIT = '__own__'
+
 interface Row {
   key: number
   description: string
@@ -55,9 +58,12 @@ export default function CalculateTab({
     const pct: Record<string, string> = {}
     const custom: Record<string, string> = {}
     for (const d of editTxn.details) {
-      if (d.isOwnShare || !d.companyId || d.companyId.startsWith('dept:')) continue
-      if (editTxn.method === 'percentage') pct[d.companyId] = String(parseFloat(d.detail) || '')
-      if (editTxn.method === 'custom') custom[d.companyId] = String(d.amount)
+      // Own-share rows come back as the OWN_SPLIT slot; dept rows can't appear
+      // in these editors (company-only), skip them defensively.
+      const key = d.isOwnShare || d.companyId === null ? OWN_SPLIT : d.companyId
+      if (key !== OWN_SPLIT && key.startsWith('dept:')) continue
+      if (editTxn.method === 'percentage') pct[key] = String(parseFloat(d.detail) || '')
+      if (editTxn.method === 'custom') custom[key] = String(d.amount)
     }
     setRows([{
       key: 0,
@@ -134,13 +140,13 @@ export default function CalculateTab({
     percentSplits:
       r.method === 'percentage'
         ? Object.entries(r.pct)
-            .map(([companyId, v]) => ({ companyId, pct: parseFloat(v) || 0 }))
+            .map(([key, v]) => ({ companyId: key === OWN_SPLIT ? null : key, pct: parseFloat(v) || 0 }))
             .filter((x) => x.pct > 0)
         : undefined,
     customSplits:
       r.method === 'custom'
         ? Object.entries(r.custom)
-            .map(([companyId, v]) => ({ companyId, amount: parseFloat(v) || 0 }))
+            .map(([key, v]) => ({ companyId: key === OWN_SPLIT ? null : key, amount: parseFloat(v) || 0 }))
             .filter((x) => x.amount > 0)
         : undefined,
   })
@@ -298,8 +304,8 @@ export default function CalculateTab({
 
             {r.method === 'percentage' ? (
               <SplitEditor
-                label="各公司 %(合计要 100)"
-                companies={data.companies}
+                label="各公司 %(合计要 100,HV 自己那份填在第一格)"
+                companies={[{ id: OWN_SPLIT, label: 'HV 自己承担(不开单)' }, ...data.companies]}
                 values={r.pct}
                 suffix="%"
                 onChange={(pct) => update(r.key, { pct })}
@@ -307,8 +313,8 @@ export default function CalculateTab({
             ) : null}
             {r.method === 'custom' ? (
               <SplitEditor
-                label="各公司金额 RM"
-                companies={data.companies}
+                label="各公司金额 RM(HV 自己那份填在第一格)"
+                companies={[{ id: OWN_SPLIT, label: 'HV 自己承担(不开单)' }, ...data.companies]}
                 values={r.custom}
                 suffix="RM"
                 onChange={(custom) => update(r.key, { custom })}

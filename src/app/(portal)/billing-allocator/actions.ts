@@ -365,8 +365,9 @@ export interface ExpenseBatchInput {
   amount: number
   method: AllocMethod
   categoryId: string | null
-  percentSplits?: { companyId: string; pct: number }[]
-  customSplits?: { companyId: string; amount: number }[]
+  /** companyId null = HV's own share (shown, never billed). */
+  percentSplits?: { companyId: string | null; pct: number }[]
+  customSplits?: { companyId: string | null; amount: number }[]
 }
 
 /** Targets + headcount context for a period — shared by save and update. */

@@ -30,10 +30,11 @@ export interface ExpenseInput {
   description: string
   amount: number
   method: AllocMethod
-  /** percentage method: must cover 100% across companies (no own share). */
-  percentSplits?: { companyId: string; pct: number }[]
-  /** custom method: explicit amounts per company. */
-  customSplits?: { companyId: string; amount: number }[]
+  /** percentage method: must total 100%. companyId null = HV's own share —
+   *  shown, never billed (user 2026-08-01: "没有办法选择hv 自己承担"). */
+  percentSplits?: { companyId: string | null; pct: number }[]
+  /** custom method: explicit amounts; companyId null = HV's own share. */
+  customSplits?: { companyId: string | null; amount: number }[]
 }
 
 export interface AllocationLine {
@@ -110,6 +111,15 @@ export function allocateExpense(
         throw new Error(`"${exp.description}": percentages must total 100 (got ${pctTotal})`)
       }
       for (const s of splits) {
+        if (s.companyId === null) {
+          lines.push({
+            companyId: null,
+            detail: `${s.pct}% (own)`,
+            amount: r2((amount * s.pct) / 100),
+            isOwnShare: true,
+          })
+          continue
+        }
         if (!byId.has(s.companyId)) throw new Error(`"${exp.description}": unknown company in split`)
         lines.push({
           companyId: s.companyId,
@@ -139,6 +149,10 @@ export function allocateExpense(
       const splits = (exp.customSplits ?? []).filter((s) => Number(s.amount) > 0)
       if (splits.length === 0) throw new Error(`"${exp.description}": no custom amounts set`)
       for (const s of splits) {
+        if (s.companyId === null) {
+          lines.push({ companyId: null, detail: 'Custom (own)', amount: r2(Number(s.amount)), isOwnShare: true })
+          continue
+        }
         if (!byId.has(s.companyId)) throw new Error(`"${exp.description}": unknown company in split`)
         lines.push({ companyId: s.companyId, detail: 'Custom', amount: r2(Number(s.amount)), isOwnShare: false })
       }

@@ -86,6 +86,28 @@ describe('allocateExpense — percentage', () => {
     expect(billedTotal(lines)).toBe(100)
   })
 
+  it('supports an HV own share (null companyId): shown, flagged, not billed', () => {
+    const lines = allocateExpense(
+      {
+        description: 'Job ads',
+        amount: 1917.78,
+        method: 'percentage',
+        percentSplits: [
+          { companyId: 'car', pct: 40 },
+          { companyId: null, pct: 60 },
+        ],
+      },
+      { companies: COS, staffSplits: [] },
+    )
+    const own = lines.find((l) => l.isOwnShare)!
+    expect(own.companyId).toBeNull()
+    expect(own.detail).toBe('60% (own)')
+    expect(own.amount).toBeCloseTo(1150.67, 2)
+    expect(billedTotal(lines)).toBeCloseTo(767.11, 2) // CAR 40% only
+    // own + billed reconstruct the amount exactly (penny fix incl own)
+    expect(lines.reduce((s, l) => s + l.amount, 0)).toBeCloseTo(1917.78, 2)
+  })
+
   it('rejects percentages that do not total 100', () => {
     expect(() =>
       allocateExpense(
@@ -129,6 +151,23 @@ describe('allocateExpense — custom', () => {
     )
     expect(billedTotal(lines)).toBe(450) // deliberately ≠ 500, script parity
     expect(lines.every((l) => l.detail === 'Custom')).toBe(true)
+  })
+
+  it('supports an HV own amount (null companyId): shown, not billed', () => {
+    const lines = allocateExpense(
+      {
+        description: 'One-off',
+        amount: 500,
+        method: 'custom',
+        customSplits: [
+          { companyId: 'conts', amount: 300 },
+          { companyId: null, amount: 200 },
+        ],
+      },
+      { companies: COS, staffSplits: [] },
+    )
+    expect(lines.find((l) => l.isOwnShare)!.detail).toBe('Custom (own)')
+    expect(billedTotal(lines)).toBe(300)
   })
 })
 
