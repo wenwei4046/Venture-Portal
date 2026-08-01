@@ -92,6 +92,9 @@ const navEntries: NavEntry[] = [
   // /statements IS the invoices landing (Phase 7 Step 11 merge); the monthly
   // statements list lives at /statements/monthly (inside Fund In / Out below).
   { href: '/statements', label: 'Invoice', section: 'Daily Operations', exact: true, visible: canAccessTreasury },
+  // Shared-expense allocator (port of the user's Apps Script, 2026-08-01):
+  // HV-paid costs → headcount/percentage/equal/custom split → draft invoices.
+  { href: '/billing-allocator', label: 'Billing Allocator', section: 'Daily Operations', visible: canAccessTreasury },
   // HR Costing group covers all monthly sub-pages. HR's daily workspace;
   // Principal gets the same group since the unified portal (2026-07-16) —
   // replaces the old flat /hr-costing link under Departments.

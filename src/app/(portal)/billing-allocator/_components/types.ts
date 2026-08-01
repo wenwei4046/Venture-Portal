@@ -1,0 +1,68 @@
+import type { AllocMethod } from '@/lib/billing-allocator'
+
+export interface CoOpt {
+  id: string
+  label: string
+}
+
+export interface StaffRow {
+  id: string
+  name: string
+  status: 'active' | 'inactive'
+  /** companyId null = HOUZS Venture (own share). */
+  splits: { companyId: string | null; pct: number }[]
+}
+
+export interface CategoryRow {
+  id: string
+  name: string
+  coaCode: string
+}
+
+export interface TemplateRow {
+  id: string
+  name: string
+  method: AllocMethod
+  amount: number
+  categoryId: string | null
+  status: string
+  splits: { companyId: string; pct: number }[]
+}
+
+export interface TxnDetailRow {
+  companyId: string | null
+  companyLabel: string
+  detail: string
+  amount: number
+  isOwnShare: boolean
+}
+
+export interface TxnRow {
+  id: string
+  txnNo: string
+  description: string
+  amount: number
+  method: string
+  categoryName: string
+  hcPeriod: string | null
+  details: TxnDetailRow[]
+}
+
+export interface AllocInvoiceRow {
+  id: string
+  invoiceNo: string
+  companyId: string
+  companyLabel: string
+  status: string
+}
+
+export interface AllocatorData {
+  period: string
+  companies: CoOpt[]
+  staff: StaffRow[]
+  snapshotPeriods: string[]
+  categories: CategoryRow[]
+  templates: TemplateRow[]
+  txns: TxnRow[]
+  invoices: AllocInvoiceRow[]
+}

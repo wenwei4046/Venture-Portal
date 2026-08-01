@@ -1,5 +1,49 @@
 # HOUZS Venture Portal — Session Handoff (checkpoint 2026-07-30 · Cash Flow revamp)
 
+## Billing Allocator (2026-08-01, port of the user's Apps Script — SHIPPED)
+
+New /billing-allocator (Finance + Principal; sidebar under Daily Operations next
+to Invoice). Scope fixed by the user's answers before building:
+ - **Payer is ONLY HOUZS Venture** (no inter-subsidiary billing).
+ - **Headcount uses the allocator's OWN staff list** — user explicitly chose a
+   Finance-maintained list over reading hr_staff_allocation. Per-month
+   snapshots (alloc_staff_history): every staff edit re-snapshots the current
+   month (script parity); calc offers current-list vs the period's snapshot.
+ - Methods: headcount / percentage / equal / custom — **no Area**.
+ - Output: **draft invoices**, then the normal /statements review → issue →
+   settle flow.
+
+**The invoice handoff — the user's #1 correctness concern ("要确定他对接去
+invoice 时是对的")**: generateAllocatorInvoices() does NOT write invoices
+itself — it calls the exported `createMultiLineInvoice` from billing/actions,
+i.e. the EXACT function behind the manual multi-line Create Invoice button.
+Numbering (mint_invoice_no), draft status, period-open check (assertPeriodOpen),
+line rollback on failure, revalidation — all identical to a hand-made invoice by
+construction. Parameters: billableType subsidiary, billingMode
+**venture_attribution** (→ settles into venture_pool, same as the utility-split
+invoices), reference_no **ALC-YYYYMM** (the link AND the dedupe key), one line
+per allocation detail ("desc — method_detail · ALC-no"), categoryCode from
+alloc_categories.coa_code (blank → 5000 fallback at issue, same as manual).
+
+Locking: a period with ANY ALC-ref invoice refuses txn save/delete AND skips
+those companies on regenerate — delete the drafts in /statements first. Own
+share (companyId NULL everywhere) is stored + shown but never billed.
+
+Engine `src/lib/billing-allocator.ts` is a faithful port incl. rounding
+quirks: percentage/equal penny-fix lands on the LAST row; headcount rows round
+independently (NO fix — sheet parity); custom taken as typed (billed may ≠
+header amount, deliberate). 10 unit tests in billing-allocator.test.ts.
+
+DB: mig `20260801000000_billing_allocator` — 8 alloc_* tables, RLS
+finance+principal only (verified live: 8 tables, 8 policies). NOTE:
+database.types.ts was NOT regenerated — allocator files use the untyped
+SupabaseClient cast (same convention as lib/cfo-reports.ts); regenerate types
+whenever convenient and the casts can go.
+
+NOT built (explicitly out of v1): dashboard/PDF statements (the invoice IS the
+statement), inter-subsidiary payers, Area method, old-spreadsheet import
+(user: revisit later if wanted).
+
 ## Jun statutory PVs said "(staff + directors)" but carried STAFF ONLY (fixed 2026-07-31)
 
 User asked whether HR's KWSP/SOCSO payments included the directors. They did NOT:
