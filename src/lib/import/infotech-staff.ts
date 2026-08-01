@@ -1,9 +1,9 @@
 /**
- * Parser for InfoTech HRMS "Active, Newly Joined & Resigned Employees List
- * (By Department)" xlsx export — used for onboarding a batch of staff
- * into the portal from InfoTech's employee master.
+ * Parser for InfoTech HRMS "Active, Newly Joined & Resigned Employees List"
+ * xlsx export — used for onboarding a batch of staff into the portal from
+ * InfoTech's employee master. Handles both report layouts:
  *
- * File shape (positional):
+ * "(By Department)":
  *   Row 0   Report title
  *   Row 2   Column headers: No | Code | Employee Name | Department |
  *           Designation | (blank) | Basic | Join Date | Termination/Birth Date |
@@ -16,9 +16,12 @@
  *   "NEWLY JOINED EMPLOYEES"   also to be imported — these are active too
  *   "RESIGNED EMPLOYEES"       skipped; resigned rows don't belong in live staff
  *
- * We read dept code from the "Department Code" header to associate each
- * employee with a department. Dept code → portal's `departments.name` is a
- * lookup layer handled server-side (see import/actions.ts).
+ * "(By Individual)": same columns and section markers, but NO "Department
+ *   Code:" section headers — each employee row carries its dept code in the
+ *   Department column (col 3) instead. Both layouts fill col 3 on employee
+ *   rows, so the row value is preferred and the section header is the
+ *   fallback. Dept code → portal's `departments.name` is a lookup layer
+ *   handled server-side (see import/actions.ts).
  */
 
 import { read, utils, type WorkBook } from 'xlsx'
@@ -109,12 +112,16 @@ export function parseInfotechStaffGrid(
       continue
     }
 
+    // Both layouts put the dept code on the row itself; "By Individual" has
+    // ONLY that (no section headers), so the row value wins.
+    const rowDept = cellStr(row[3]).trim()
+
     rows.push({
       excelRow,
       employeeCode: code,
       employeeName: name,
-      deptCode: currentDeptCode,
-      deptName: currentDeptName,
+      deptCode: rowDept || currentDeptCode,
+      deptName: !rowDept || rowDept === currentDeptCode ? currentDeptName : '',
       designation: cellStr(row[4]).trim() || null,
       basicSalary: num(row[6]),
       hireDate: parseDDMMYYYY(cellStr(row[7])),

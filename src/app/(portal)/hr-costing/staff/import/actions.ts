@@ -15,6 +15,7 @@ const DEPT_CODE_MAP: Record<string, string> = {
   'H-DO': 'Director Office',
   'H-FIN': 'Finance',
   'H-HR': 'HR',
+  'H-IT': 'IT',
   'H-MK': 'Marketing',
 }
 
