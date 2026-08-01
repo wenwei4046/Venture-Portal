@@ -35,10 +35,24 @@ function periodDate(period: string): string {
  *  the dedupe key. */
 const refFor = (period: string) => `ALC-${period.replace('-', '')}`
 
+// Target encoding used across the allocator ("marketing 算inter-billing。单还是
+// 要开", user 2026-08-01): a company uuid bills the subsidiary, `dept:<uuid>`
+// bills the department (inter-billing dept_pool invoice), null = HV own share.
+const DEPT_PREFIX = 'dept:'
+const decodeTarget = (targetId: string | null): { companyId: string | null; departmentId: string | null } =>
+  targetId === null
+    ? { companyId: null, departmentId: null }
+    : targetId.startsWith(DEPT_PREFIX)
+      ? { companyId: null, departmentId: targetId.slice(DEPT_PREFIX.length) }
+      : { companyId: targetId, departmentId: null }
+const encodeTarget = (companyId: string | null, departmentId: string | null): string | null =>
+  companyId ?? (departmentId ? `${DEPT_PREFIX}${departmentId}` : null)
+
 // ─── Staff (Finance's own list) ──────────────────────────────────────────────
 
 export interface StaffSplitInput {
-  companyId: string | null // null = HOUZS Venture (own share)
+  /** company uuid, `dept:<uuid>`, or null = HOUZS Venture (own share). */
+  targetId: string | null
   pct: number
 }
 
@@ -78,7 +92,10 @@ export async function saveAllocStaff(payload: {
 
   if (splits.length > 0) {
     const { error } = await supabase.from('alloc_staff_splits').insert(
-      splits.map((s) => ({ staff_id: staffId, company_id: s.companyId, pct: s.pct })),
+      splits.map((s) => {
+        const t = decodeTarget(s.targetId)
+        return { staff_id: staffId, company_id: t.companyId, department_id: t.departmentId, pct: s.pct }
+      }),
     )
     if (error) throw new Error(error.message)
   }
@@ -110,7 +127,7 @@ async function snapshotPeriod(period: string): Promise<void> {
 
   const [{ data: staff, error: sErr }, { data: splits, error: spErr }] = await Promise.all([
     supabase.from('alloc_staff').select('id, name, status'),
-    supabase.from('alloc_staff_splits').select('staff_id, company_id, pct'),
+    supabase.from('alloc_staff_splits').select('staff_id, company_id, department_id, pct'),
   ])
   if (sErr) throw new Error(sErr.message)
   if (spErr) throw new Error(spErr.message)
@@ -122,10 +139,10 @@ async function snapshotPeriod(period: string): Promise<void> {
   for (const st of staff ?? []) {
     const mine = (splits ?? []).filter((x) => x.staff_id === st.id)
     if (mine.length === 0) {
-      rows.push({ period_month: pd, staff_id: st.id, staff_name: st.name, status: st.status, company_id: null, pct: 0 })
+      rows.push({ period_month: pd, staff_id: st.id, staff_name: st.name, status: st.status, company_id: null, department_id: null, pct: 0 })
     } else {
       for (const m of mine) {
-        rows.push({ period_month: pd, staff_id: st.id, staff_name: st.name, status: st.status, company_id: m.company_id, pct: m.pct })
+        rows.push({ period_month: pd, staff_id: st.id, staff_name: st.name, status: st.status, company_id: m.company_id, department_id: m.department_id, pct: m.pct })
       }
     }
   }
@@ -319,42 +336,68 @@ export async function saveAllocBatch(payload: {
   // the drafts — force the delete-drafts-first flow instead.
   await assertPeriodNotInvoiced(supabase, payload.period)
 
-  const { data: cos, error: coErr } = await supabase
-    .from('companies')
-    .select('id, short_code, name')
-    .eq('is_active', true)
-    .order('name')
+  const [{ data: cos, error: coErr }, { data: depts, error: dErr }] = await Promise.all([
+    supabase.from('companies').select('id, short_code, name').eq('is_active', true).order('name'),
+    supabase.from('departments').select('id, name'),
+  ])
   if (coErr) throw new Error(coErr.message)
+  if (dErr) throw new Error(dErr.message)
   const companies = (cos ?? []).map((c) => ({ id: c.id as string, label: (c.short_code ?? c.name) as string }))
+  const deptById = new Map((depts ?? []).map((d) => [d.id as string, d.name as string]))
 
-  // Headcount source: the period's snapshot, or the live list.
+  // Headcount source: the period's snapshot, or the live list. Targets are
+  // encoded (company uuid / dept:<uuid> / null own) — opaque to the engine.
   let staffSplits: StaffSplit[] = []
   let hcLabel = 'current'
   let hcPeriodCol: string | null = null
   if (payload.hcMode === 'snapshot') {
     const { data: hist, error } = await supabase
       .from('alloc_staff_history')
-      .select('company_id, pct, status')
+      .select('company_id, department_id, pct, status')
       .eq('period_month', pd)
     if (error) throw new Error(error.message)
     if (!hist || hist.length === 0) throw new Error(`No headcount snapshot for ${payload.period} — save one on the Staff tab first`)
     staffSplits = hist
       .filter((h) => h.status === 'active')
-      .map((h) => ({ companyId: (h.company_id as string | null), pct: Number(h.pct) }))
+      .map((h) => ({
+        companyId: encodeTarget((h.company_id as string | null), (h.department_id as string | null)),
+        pct: Number(h.pct),
+      }))
     hcLabel = payload.period
     hcPeriodCol = pd
   } else {
     const [{ data: staff, error: sErr }, { data: splits, error: spErr }] = await Promise.all([
       supabase.from('alloc_staff').select('id, status'),
-      supabase.from('alloc_staff_splits').select('staff_id, company_id, pct'),
+      supabase.from('alloc_staff_splits').select('staff_id, company_id, department_id, pct'),
     ])
     if (sErr) throw new Error(sErr.message)
     if (spErr) throw new Error(spErr.message)
     const active = new Set((staff ?? []).filter((s) => s.status === 'active').map((s) => s.id))
     staffSplits = (splits ?? [])
       .filter((x) => active.has(x.staff_id))
-      .map((x) => ({ companyId: (x.company_id as string | null), pct: Number(x.pct) }))
+      .map((x) => ({
+        companyId: encodeTarget((x.company_id as string | null), (x.department_id as string | null)),
+        pct: Number(x.pct),
+      }))
   }
+
+  // Billable targets = subsidiaries + the departments the headcount actually
+  // references (so Equal/headcount include e.g. Marketing, matching the sheet
+  // where "Marketing Department" sat in the Companies list).
+  const referencedDepts = Array.from(
+    new Set(
+      staffSplits
+        .map((s) => s.companyId)
+        .filter((k): k is string => !!k && k.startsWith(DEPT_PREFIX)),
+    ),
+  )
+  const targets = [
+    ...companies,
+    ...referencedDepts.map((k) => ({
+      id: k,
+      label: `${deptById.get(k.slice(DEPT_PREFIX.length)) ?? '?'} (dept)`,
+    })),
+  ]
 
   // Allocate everything BEFORE writing anything — one bad expense aborts all.
   const computed = payload.expenses.map((exp) => ({
@@ -367,7 +410,7 @@ export async function saveAllocBatch(payload: {
         percentSplits: exp.percentSplits,
         customSplits: exp.customSplits,
       },
-      { companies, staffSplits, hcLabel },
+      { companies: targets, staffSplits, hcLabel },
     ),
   }))
 
@@ -403,13 +446,17 @@ export async function saveAllocBatch(payload: {
     if (txnErr || !txn) throw new Error(txnErr?.message ?? 'txn insert failed')
 
     const { error: detErr } = await supabase.from('alloc_txn_details').insert(
-      lines.map((l) => ({
-        txn_id: txn.id,
-        company_id: l.companyId,
-        method_detail: l.detail,
-        amount: l.amount,
-        is_own_share: l.isOwnShare,
-      })),
+      lines.map((l) => {
+        const t = decodeTarget(l.companyId)
+        return {
+          txn_id: txn.id,
+          company_id: t.companyId,
+          department_id: t.departmentId,
+          method_detail: l.detail,
+          amount: l.amount,
+          is_own_share: l.isOwnShare,
+        }
+      }),
     )
     if (detErr) {
       await supabase.from('alloc_txns').delete().eq('id', txn.id)
@@ -473,13 +520,14 @@ export async function generateAllocatorInvoices(period: string): Promise<Generat
   const pd = periodDate(period)
   const ref = refFor(period)
 
-  const [{ data: txns, error: tErr }, { data: cos, error: cErr }, { data: cats }] = await Promise.all([
+  const [{ data: txns, error: tErr }, { data: cos, error: cErr }, { data: depts }, { data: cats }] = await Promise.all([
     supabase
       .from('alloc_txns')
-      .select('id, txn_no, description, amount, method, category_id, alloc_txn_details(company_id, method_detail, amount, is_own_share)')
+      .select('id, txn_no, description, amount, method, category_id, alloc_txn_details(company_id, department_id, method_detail, amount, is_own_share)')
       .eq('period_month', pd)
       .order('txn_no'),
     supabase.from('companies').select('id, short_code, name').eq('is_active', true),
+    supabase.from('departments').select('id, name'),
     supabase.from('alloc_categories').select('id, coa_code'),
   ])
   if (tErr) throw new Error(tErr.message)
@@ -487,56 +535,69 @@ export async function generateAllocatorInvoices(period: string): Promise<Generat
   if (!txns || txns.length === 0) throw new Error(`No allocations saved for ${period}`)
 
   const coLabel = new Map((cos ?? []).map((c) => [c.id as string, (c.short_code ?? c.name) as string]))
+  const deptName = new Map((depts ?? []).map((d) => [d.id as string, d.name as string]))
+  const labelFor = (targetId: string) =>
+    targetId.startsWith(DEPT_PREFIX)
+      ? `${deptName.get(targetId.slice(DEPT_PREFIX.length)) ?? '?'} (dept)`
+      : coLabel.get(targetId) ?? targetId
   const coaByCat = new Map((cats ?? []).map((c) => [c.id as string, (c.coa_code as string | null) ?? '']))
 
   const { data: existing } = await supabase
     .from('invoices')
-    .select('company_id, invoice_no, status')
+    .select('company_id, billable_to_department_id, invoice_no, status')
     .eq('reference_no', ref)
   const already = new Map(
-    (existing ?? []).map((r) => [r.company_id as string, `${r.invoice_no} (${r.status})`]),
+    (existing ?? []).map((r) => [
+      encodeTarget((r.company_id as string | null), (r.billable_to_department_id as string | null)) ?? '',
+      `${r.invoice_no} (${r.status})`,
+    ]),
   )
 
-  // Group billed detail lines by company, in txn order.
+  // Group billed detail lines by target (subsidiary or department), txn order.
   type Line = { description: string; amount: number; categoryCode: string }
-  const byCompany = new Map<string, Line[]>()
+  const byTarget = new Map<string, Line[]>()
   for (const t of txns) {
     const details = (t.alloc_txn_details ?? []) as Array<{
-      company_id: string | null; method_detail: string; amount: number | string; is_own_share: boolean
+      company_id: string | null; department_id: string | null
+      method_detail: string; amount: number | string; is_own_share: boolean
     }>
     for (const d of details) {
-      if (d.is_own_share || !d.company_id) continue
-      if (!byCompany.has(d.company_id)) byCompany.set(d.company_id, [])
-      byCompany.get(d.company_id)!.push({
+      const key = encodeTarget(d.company_id, d.department_id)
+      if (d.is_own_share || !key) continue
+      if (!byTarget.has(key)) byTarget.set(key, [])
+      byTarget.get(key)!.push({
         description: `${t.description} — ${d.method_detail} · ${t.txn_no}`,
         amount: Number(d.amount),
         categoryCode: coaByCat.get(t.category_id as string) ?? '',
       })
     }
   }
-  if (byCompany.size === 0) throw new Error('Nothing billable — every line is own share')
+  if (byTarget.size === 0) throw new Error('Nothing billable — every line is own share')
 
   const monthLabel = dayjs(pd).format('MMM YYYY')
   const today = dayjs().format('YYYY-MM-DD')
   const result: GenerateResult = { created: [], skipped: [] }
 
   // SEQUENTIAL — invoice numbering and draft-cleanup behave exactly like
-  // clicking the manual button once per company.
-  for (const [companyId, lines] of byCompany) {
-    const label = coLabel.get(companyId) ?? companyId
-    if (already.has(companyId)) {
-      result.skipped.push({ company: label, reason: already.get(companyId)! })
+  // clicking the manual button once per target. Companies bill as subsidiary;
+  // departments as dept_pool (inter-billing) — SAME createMultiLineInvoice.
+  for (const [targetId, lines] of byTarget) {
+    const label = labelFor(targetId)
+    if (already.has(targetId)) {
+      result.skipped.push({ company: label, reason: already.get(targetId)! })
       continue
     }
+    const t = decodeTarget(targetId)
     const { invoice_no } = await createMultiLineInvoice({
-      billableType: 'subsidiary',
+      billableType: t.departmentId ? 'dept_pool' : 'subsidiary',
       billingMode: 'venture_attribution',
       period,
       invoiceDate: today,
       dueDate: '',
       referenceNo: ref,
       headerDescription: `Shared expense allocation — ${monthLabel}`,
-      companyId,
+      companyId: t.companyId ?? undefined,
+      departmentId: t.departmentId ?? undefined,
       lines,
     })
     result.created.push({ company: label, invoiceNo: invoice_no })

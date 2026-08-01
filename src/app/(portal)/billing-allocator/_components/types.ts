@@ -9,8 +9,8 @@ export interface StaffRow {
   id: string
   name: string
   status: 'active' | 'inactive'
-  /** companyId null = HOUZS Venture (own share). */
-  splits: { companyId: string | null; pct: number }[]
+  /** targetId: company uuid, `dept:<uuid>` for a department, null = HV own. */
+  splits: { targetId: string | null; label: string; pct: number }[]
 }
 
 export interface CategoryRow {
@@ -59,6 +59,9 @@ export interface AllocInvoiceRow {
 export interface AllocatorData {
   period: string
   companies: CoOpt[]
+  /** All departments, id encoded `dept:<uuid>` — staff-split picker options.
+   *  Calc targets only include departments actually present in staff splits. */
+  departments: CoOpt[]
   staff: StaffRow[]
   snapshotPeriods: string[]
   /** Months HR's hr_staff_allocation has data for — drives the import picker. */

@@ -39,13 +39,23 @@ export default function CalculateTab({ data, onSaved }: { data: AllocatorData; o
   const hasSnapshot = data.snapshotPeriods.includes(data.period)
 
   // Live staff splits for the client-side preview (server recomputes on save).
+  // Target keys are opaque to the engine: company uuid / dept:<uuid> / null own.
   const staffSplits: StaffSplit[] = useMemo(
     () =>
       data.staff
         .filter((s) => s.status === 'active')
-        .flatMap((s) => s.splits.map((x) => ({ companyId: x.companyId, pct: x.pct }))),
+        .flatMap((s) => s.splits.map((x) => ({ companyId: x.targetId, pct: x.pct }))),
     [data.staff],
   )
+
+  // Billable targets = subsidiaries + departments the headcount references
+  // (mirrors saveAllocBatch — Equal and headcount include e.g. Marketing).
+  const targets = useMemo(() => {
+    const referenced = new Set(
+      staffSplits.map((s) => s.companyId).filter((k): k is string => !!k && k.startsWith('dept:')),
+    )
+    return [...data.companies, ...data.departments.filter((d) => referenced.has(d.id))]
+  }, [data.companies, data.departments, staffSplits])
 
   function blankRow(key: number): Row {
     return { key, description: '', amount: '', method: 'headcount', categoryId: '', pct: {}, custom: {} }
@@ -95,7 +105,7 @@ export default function CalculateTab({ data, onSaved }: { data: AllocatorData; o
       if (!r.description.trim() && !(parseFloat(r.amount) > 0)) continue
       try {
         const lines = allocateExpense(toInput(r), {
-          companies: data.companies,
+          companies: targets,
           staffSplits,
           hcLabel: hcMode === 'snapshot' ? data.period : 'current',
         })
@@ -105,8 +115,7 @@ export default function CalculateTab({ data, onSaved }: { data: AllocatorData; o
       }
     }
     return out
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, staffSplits, hcMode, data.companies, data.period])
+  }, [rows, staffSplits, targets, hcMode, data.period])
 
   const previewOk = preview.length > 0 && preview.every((p) => !p.error)
   const billedSum = preview.reduce((s, p) => s + (p.lines ? billedTotal(p.lines) : 0), 0)
@@ -282,7 +291,7 @@ export default function CalculateTab({ data, onSaved }: { data: AllocatorData; o
                             : 'bg-accent-bg text-ink border-accent-border'
                         }`}
                       >
-                        {l.isOwnShare ? 'HV own' : data.companies.find((c) => c.id === l.companyId)?.label}
+                        {l.isOwnShare ? 'HV own' : targets.find((c) => c.id === l.companyId)?.label}
                         {' '}{fmt(l.amount)}
                       </span>
                     ))}

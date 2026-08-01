@@ -50,9 +50,31 @@ MAN 87.29% → 12.71% own). Two-step confirm in the UI (replace-all is
 destructive to hand edits). After import it is Finance's independent copy — HR
 edits do NOT flow through; re-import to refresh.
 
+Follow-up 2 (2026-08-01): **the user's actual Apps Script data is IN.** They
+pasted HeadcountHistory + ExpenseTemplates + DefaultAllocation + Categories.
+Rulings taken: ACTIVE rows only; history depth = 2026-07 only (older months
+were already billed from the sheet); and **"marketing 算inter-billing。单还是要开"**
+→ targets extended to DEPARTMENTS (mig `20260801010000_allocator_dept_targets`:
+department_id on alloc_staff_splits / _history / _txn_details, CHECK one-target).
+Target encoding everywhere: company uuid | `dept:<uuid>` | null = HV own — the
+ENGINE is unchanged (keys are opaque to it); Equal/headcount include a dept
+once staff reference it, matching the sheet where "Marketing Department" sat in
+the Companies list. generateAllocatorInvoices branches billableType:
+subsidiary vs **dept_pool + departmentId** — still the same
+createMultiLineInvoice; dedupe key now company_id OR billable_to_department_id.
+Imported (verified live): 37 active staff / 64 splits — FTE: CONTS 8.7667,
+Marketing(dept) 8.0, DC 7.7667, CAR 6.5107, HC 5.0516, 2990 0.4773, HK 0.30,
+HV own 0.1271 (Vivian Chow 12.71%), total exactly 37.0. 2026-07 snapshot saved.
+Sheet company names→codes: Carress→CAR, Houzs Century→HC, The Conts→CONTS,
+Dream Crafter→DC, 2990 Home→2990, Hookka Manufacturing→HK, Houzs Venture
+Holding→own. Templates: Office Rental (headcount, 18,980, Rental), Showroom
+Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
+Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
+codes yet — lines fall back to 5000 at issue until the user maps them).
+
 NOT built (explicitly out of v1): dashboard/PDF statements (the invoice IS the
-statement), inter-subsidiary payers, Area method, old-spreadsheet import
-(user: revisit later if wanted).
+statement), inter-subsidiary payers, Area method, Feb-Jun history import
+(user chose 2026-07 only; paste again anytime to add).
 
 ## Jun statutory PVs said "(staff + directors)" but carried STAFF ONLY (fixed 2026-07-31)
 

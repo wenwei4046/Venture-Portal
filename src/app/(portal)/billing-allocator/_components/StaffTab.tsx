@@ -17,7 +17,8 @@ interface EditState {
   id?: string
   name: string
   status: 'active' | 'inactive'
-  splits: { key: number; companyId: string; pct: string }[]
+  /** targetId: OWN sentinel, company uuid, or `dept:<uuid>`. */
+  splits: { key: number; targetId: string; pct: string }[]
 }
 
 export default function StaffTab({ data }: { data: AllocatorData }) {
@@ -49,16 +50,16 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
             id: s.id,
             name: s.name,
             status: s.status,
-            splits: s.splits.map((x, i) => ({ key: i, companyId: x.companyId ?? OWN, pct: String(x.pct) })),
+            splits: s.splits.map((x, i) => ({ key: i, targetId: x.targetId ?? OWN, pct: String(x.pct) })),
           }
-        : { name: '', status: 'active', splits: [{ key: 0, companyId: OWN, pct: '100' }] },
+        : { name: '', status: 'active', splits: [{ key: 0, targetId: OWN, pct: '100' }] },
     )
   }
 
   const submit = () => {
     if (!edit) return
     const splits: StaffSplitInput[] = edit.splits
-      .map((s) => ({ companyId: s.companyId === OWN ? null : s.companyId, pct: parseFloat(s.pct) || 0 }))
+      .map((s) => ({ targetId: s.targetId === OWN ? null : s.targetId, pct: parseFloat(s.pct) || 0 }))
       .filter((s) => s.pct > 0)
     run(async () => {
       await saveAllocStaff({ id: edit.id, name: edit.name, status: edit.status, splits })
@@ -168,11 +169,11 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
                   <div className="flex flex-wrap gap-1.5 py-1">
                     {s.splits.map((x, i) => (
                       <span key={i} className={`px-2 py-0.5 rounded-md border text-xs font-mono ${
-                        x.companyId === null
+                        x.targetId === null
                           ? 'bg-surface text-muted border-hairline italic'
                           : 'bg-accent-bg text-ink border-accent-border'
                       }`}>
-                        {x.companyId === null ? 'HV own' : data.companies.find((c) => c.id === x.companyId)?.label ?? '?'} {x.pct}%
+                        {x.targetId === null ? 'HV own' : x.label} {x.pct}%
                       </span>
                     ))}
                     {s.splits.length === 0 ? <span className="font-serif italic text-muted text-xs">no splits</span> : null}
@@ -228,11 +229,11 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
               {edit.splits.map((sp) => (
                 <div key={sp.key} className="flex items-center gap-2">
                   <select
-                    value={sp.companyId}
+                    value={sp.targetId}
                     onChange={(e) =>
                       setEdit({
                         ...edit,
-                        splits: edit.splits.map((x) => (x.key === sp.key ? { ...x, companyId: e.target.value } : x)),
+                        splits: edit.splits.map((x) => (x.key === sp.key ? { ...x, targetId: e.target.value } : x)),
                       })
                     }
                     className={inputCls}
@@ -240,6 +241,9 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
                     <option value={OWN}>HOUZS Venture (own)</option>
                     {data.companies.map((c) => (
                       <option key={c.id} value={c.id}>{c.label}</option>
+                    ))}
+                    {data.departments.map((d) => (
+                      <option key={d.id} value={d.id}>{d.label}</option>
                     ))}
                   </select>
                   <input
@@ -265,10 +269,10 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
               ))}
               <button
                 type="button"
-                onClick={() => { setEdit({ ...edit, splits: [...edit.splits, { key: nextKey, companyId: OWN, pct: '' }] }); setNextKey((k) => k + 1) }}
+                onClick={() => { setEdit({ ...edit, splits: [...edit.splits, { key: nextKey, targetId: OWN, pct: '' }] }); setNextKey((k) => k + 1) }}
                 className="text-sm text-accent hover:text-accent-hover font-serif italic"
               >
-                + 加一个公司
+                + 加一个对象
               </button>
             </div>
           </div>

@@ -29,6 +29,7 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
 
   const [
     { data: cos },
+    { data: depts },
     { data: staff },
     { data: splits },
     { data: snapshots },
@@ -40,18 +41,19 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     { data: hrMonths },
   ] = await Promise.all([
     supabase.from('companies').select('id, short_code, name').eq('is_active', true).order('name'),
+    supabase.from('departments').select('id, name').order('name'),
     supabase.from('alloc_staff').select('id, name, status').order('name'),
-    supabase.from('alloc_staff_splits').select('staff_id, company_id, pct'),
+    supabase.from('alloc_staff_splits').select('staff_id, company_id, department_id, pct'),
     supabase.from('alloc_staff_history').select('period_month').order('period_month', { ascending: false }),
     supabase.from('alloc_categories').select('id, name, coa_code').order('name'),
     supabase.from('alloc_templates').select('id, name, default_method, default_amount, category_id, status').order('name'),
     supabase.from('alloc_template_splits').select('template_id, company_id, pct'),
     supabase
       .from('alloc_txns')
-      .select('id, txn_no, description, amount, method, category_id, hc_period, alloc_txn_details(company_id, method_detail, amount, is_own_share)')
+      .select('id, txn_no, description, amount, method, category_id, hc_period, alloc_txn_details(company_id, department_id, method_detail, amount, is_own_share)')
       .eq('period_month', pd)
       .order('txn_no'),
-    supabase.from('invoices').select('id, invoice_no, company_id, status').eq('reference_no', ref),
+    supabase.from('invoices').select('id, invoice_no, company_id, billable_to_department_id, status').eq('reference_no', ref),
     // READ-ONLY peek at HR's allocation months, for the one-click import.
     supabase.from('hr_staff_allocation').select('period_month').order('period_month', { ascending: false }),
   ])
@@ -60,8 +62,19 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     id: c.id as string,
     label: (c.short_code ?? c.name) as string,
   }))
+  const departments: CoOpt[] = (depts ?? []).map((d) => ({
+    id: `dept:${d.id}`,
+    label: `${d.name} (dept)`,
+  }))
   const coLabel = new Map(companies.map((c) => [c.id, c.label]))
-  const labelOf = (id: string | null) => (id === null ? 'HOUZS Venture (own)' : coLabel.get(id) ?? '?')
+  const deptLabel = new Map(departments.map((d) => [d.id, d.label]))
+  // Target resolution: company uuid / dept:<uuid> / null = HV own.
+  const targetIdOf = (companyId: string | null, departmentId: string | null): string | null =>
+    companyId ?? (departmentId ? `dept:${departmentId}` : null)
+  const labelOf = (targetId: string | null) =>
+    targetId === null
+      ? 'HOUZS Venture (own)'
+      : coLabel.get(targetId) ?? deptLabel.get(targetId) ?? '?'
 
   const staffRows: StaffRow[] = (staff ?? []).map((s) => ({
     id: s.id as string,
@@ -69,7 +82,13 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     status: s.status as 'active' | 'inactive',
     splits: (splits ?? [])
       .filter((x) => x.staff_id === s.id)
-      .map((x) => ({ companyId: (x.company_id as string | null), pct: Number(x.pct) })),
+      .map((x) => {
+        const targetId = targetIdOf(
+          (x.company_id as string | null),
+          (x.department_id as string | null),
+        )
+        return { targetId, label: labelOf(targetId), pct: Number(x.pct) }
+      }),
   }))
 
   const snapshotPeriods = Array.from(
@@ -104,25 +123,35 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     categoryName: catName.get((t.category_id as string | null) ?? '') ?? '',
     hcPeriod: t.hc_period ? dayjs(t.hc_period as string).format('YYYY-MM') : null,
     details: ((t.alloc_txn_details ?? []) as Array<{
-      company_id: string | null; method_detail: string; amount: number | string; is_own_share: boolean
+      company_id: string | null; department_id: string | null
+      method_detail: string; amount: number | string; is_own_share: boolean
     }>)
-      .map((d) => ({
-        companyId: d.company_id,
-        companyLabel: labelOf(d.company_id),
-        detail: d.method_detail,
-        amount: Number(d.amount),
-        isOwnShare: d.is_own_share,
-      }))
+      .map((d) => {
+        const targetId = targetIdOf(d.company_id, d.department_id)
+        return {
+          companyId: targetId,
+          companyLabel: labelOf(targetId),
+          detail: d.method_detail,
+          amount: Number(d.amount),
+          isOwnShare: d.is_own_share,
+        }
+      })
       .sort((a, b) => Number(a.isOwnShare) - Number(b.isOwnShare) || a.companyLabel.localeCompare(b.companyLabel)),
   }))
 
-  const invoiceRows: AllocInvoiceRow[] = (allocInvoices ?? []).map((i) => ({
-    id: i.id as string,
-    invoiceNo: (i.invoice_no as string | null) ?? '—',
-    companyId: (i.company_id as string | null) ?? '',
-    companyLabel: labelOf((i.company_id as string | null) ?? null),
-    status: i.status as string,
-  }))
+  const invoiceRows: AllocInvoiceRow[] = (allocInvoices ?? []).map((i) => {
+    const targetId = targetIdOf(
+      (i.company_id as string | null),
+      (i.billable_to_department_id as string | null),
+    )
+    return {
+      id: i.id as string,
+      invoiceNo: (i.invoice_no as string | null) ?? '—',
+      companyId: targetId ?? '',
+      companyLabel: labelOf(targetId),
+      status: i.status as string,
+    }
+  })
 
   const hrPeriods = Array.from(
     new Set((hrMonths ?? []).map((r) => dayjs(r.period_month as string).format('YYYY-MM'))),
@@ -131,6 +160,7 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
   const data: AllocatorData = {
     period,
     companies,
+    departments,
     staff: staffRows,
     snapshotPeriods,
     hrPeriods,
