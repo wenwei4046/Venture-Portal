@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import SortableTable, { type SortableColumn } from '@/components/SortableTable'
@@ -34,15 +34,14 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
   const [confirmImport, setConfirmImport] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
 
-  // The editor sits ABOVE the table (a 37-row list pushed it far below the
-  // fold — clicking Edit looked like nothing happened, user 2026-08-01).
-  // Scroll to it when a DIFFERENT row opens — keyed on identity, not the edit
-  // object, which changes on every keystroke.
-  const editorRef = useRef<HTMLDivElement>(null)
-  const editKey = edit ? edit.id ?? 'new' : null
+  // The editor is a MODAL (user 2026-08-01: "我希望是pop out 出来…而不是跳上去")
+  // — same overlay pattern as BatchDetailsModal. Esc closes.
   useEffect(() => {
-    if (editKey) editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }, [editKey])
+    if (!edit) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setEdit(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [edit])
 
   const run = (fn: () => Promise<void>) => {
     setError(null)
@@ -169,9 +168,18 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
         <div className="bg-danger-bg border border-danger text-danger rounded-md p-3 text-sm font-sans">{error}</div>
       ) : null}
 
-      {/* Editor — ABOVE the table so opening it is always visible. */}
+      {/* Editor — modal popup; overlay click or Esc cancels. */}
       {edit ? (
-        <div ref={editorRef} className="border border-accent-border bg-accent-bg rounded-md p-4 space-y-3">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setEdit(null)}
+        >
+        <div
+          className="bg-paper border border-hairline rounded-lg shadow-xl max-w-2xl w-[92vw] max-h-[85vh] overflow-y-auto p-5 space-y-3"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="font-serif italic text-accent text-sm">
             {edit.id ? <>正在编辑 — <span className="text-ink">{edit.name || '…'}</span></> : '加人'}
           </div>
@@ -276,11 +284,12 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
             </button>
           </div>
         </div>
-      ) : (
-        <button type="button" onClick={() => startEdit()} className="text-sm text-accent hover:text-accent-hover font-serif italic">
-          + 加人
-        </button>
-      )}
+        </div>
+      ) : null}
+
+      <button type="button" onClick={() => startEdit()} className="text-sm text-accent hover:text-accent-hover font-serif italic">
+        + 加人
+      </button>
 
       {/* List — SortableTable: search, click-to-sort headers, newest first. */}
       <SortableTable
