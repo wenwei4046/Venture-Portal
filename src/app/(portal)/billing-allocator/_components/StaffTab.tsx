@@ -265,6 +265,15 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
         defaultSort={{ key: 'added', dir: 'desc' }}
         searchKeys={['name', 'splits']}
         searchPlaceholder="搜名字或公司…"
+        toolbarRight={
+          <span className="font-mono text-xs text-muted whitespace-nowrap">
+            <span className="text-ledger font-semibold">
+              Active {data.staff.filter((s) => s.status === 'active').length}
+            </span>
+            {' · '}Inactive {data.staff.filter((s) => s.status === 'inactive').length}
+            {' · '}共 {data.staff.length} 人
+          </span>
+        }
         columns={staffColumns(startEdit, (id) => run(() => deleteAllocStaff(id)), isPending)}
         emptyState={
           <div className="font-serif italic text-muted text-sm p-4">
