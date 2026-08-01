@@ -71,6 +71,9 @@ export interface AllocatorData {
   snapshotPeriods: string[]
   /** Months HR's hr_staff_allocation has data for — drives the import picker. */
   hrPeriods: string[]
+  /** THIS period's snapshot (active rows, encoded targets) so the Calculate
+   *  preview under hcMode=snapshot matches what the server will use. */
+  snapshotSplits: { targetId: string | null; pct: number }[]
   categories: CategoryRow[]
   templates: TemplateRow[]
   txns: TxnRow[]

@@ -80,14 +80,19 @@ export default function CalculateTab({
 
   const hasSnapshot = data.snapshotPeriods.includes(data.period)
 
-  // Live staff splits for the client-side preview (server recomputes on save).
+  // Staff splits for the client-side preview (server recomputes on save).
   // Target keys are opaque to the engine: company uuid / dept:<uuid> / null own.
+  // hcMode=snapshot uses THE PERIOD'S SNAPSHOT — the same rows the server will
+  // load — so the preview always matches what gets saved (user 2026-08-01:
+  // "要确保是会用我选的月份的名单去计算").
   const staffSplits: StaffSplit[] = useMemo(
     () =>
-      data.staff
-        .filter((s) => s.status === 'active')
-        .flatMap((s) => s.splits.map((x) => ({ companyId: x.targetId, pct: x.pct }))),
-    [data.staff],
+      hcMode === 'snapshot'
+        ? data.snapshotSplits.map((x) => ({ companyId: x.targetId, pct: x.pct }))
+        : data.staff
+            .filter((s) => s.status === 'active')
+            .flatMap((s) => s.splits.map((x) => ({ companyId: x.targetId, pct: x.pct }))),
+    [data.staff, data.snapshotSplits, hcMode],
   )
 
   // Billable targets = subsidiaries + departments the headcount references

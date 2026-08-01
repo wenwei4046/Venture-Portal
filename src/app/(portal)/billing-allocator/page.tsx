@@ -39,6 +39,7 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     { data: txns },
     { data: allocInvoices },
     { data: hrMonths },
+    { data: periodSnapshot },
   ] = await Promise.all([
     supabase.from('companies').select('id, short_code, name').eq('is_active', true).order('name'),
     supabase.from('departments').select('id, name').order('name'),
@@ -56,6 +57,11 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     supabase.from('invoices').select('id, invoice_no, company_id, billable_to_department_id, status').eq('reference_no', ref),
     // READ-ONLY peek at HR's allocation months, for the one-click import.
     supabase.from('hr_staff_allocation').select('period_month').order('period_month', { ascending: false }),
+    // This period's snapshot — feeds the Calculate preview under hcMode=snapshot.
+    supabase
+      .from('alloc_staff_history')
+      .select('company_id, department_id, pct, status')
+      .eq('period_month', pd),
   ])
 
   const companies: CoOpt[] = (cos ?? []).map((c) => ({
@@ -160,11 +166,18 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     new Set((hrMonths ?? []).map((r) => dayjs(r.period_month as string).format('YYYY-MM'))),
   )
 
+  const snapshotSplits = ((periodSnapshot ?? []) as Array<{
+    company_id: string | null; department_id: string | null; pct: number | string; status: string
+  }>)
+    .filter((r) => r.status === 'active' && Number(r.pct) > 0)
+    .map((r) => ({ targetId: targetIdOf(r.company_id, r.department_id), pct: Number(r.pct) }))
+
   const data: AllocatorData = {
     period,
     companies,
     departments,
     staff: staffRows,
+    snapshotSplits,
     snapshotPeriods,
     hrPeriods,
     categories,
