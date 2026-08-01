@@ -43,6 +43,7 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
     rows: SnapshotDetailRow[]
     savedAt: string | null
   } | null>(null)
+  const [snapSearch, setSnapSearch] = useState('')
 
   const labelOfTarget = (targetId: string | null): string => {
     if (targetId === null) return 'HV own'
@@ -55,6 +56,7 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
 
   const openSnapshot = (period: string) => {
     setError(null)
+    setSnapSearch('')
     startTransition(async () => {
       try {
         const { rows, savedAt } = await getAllocSnapshot(period)
@@ -340,14 +342,26 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
         const totals = new Map<string | null, number>()
         for (const r of active) totals.set(r.targetId, (totals.get(r.targetId) ?? 0) + r.pct / 100)
         const totalHeads = Array.from(totals.values()).reduce((a, b) => a + b, 0)
-        const byStaff = new Map<string, { status: string; splits: { targetId: string | null; pct: number }[] }>()
+        const byStaff = new Map<string, { status: string; department: string; splits: { targetId: string | null; pct: number }[] }>()
         for (const r of snapView.rows) {
-          if (!byStaff.has(r.staffName)) byStaff.set(r.staffName, { status: r.status, splits: [] })
+          if (!byStaff.has(r.staffName)) byStaff.set(r.staffName, { status: r.status, department: r.department, splits: [] })
           if (r.pct > 0) byStaff.get(r.staffName)!.splits.push({ targetId: r.targetId, pct: r.pct })
         }
-        const roster = Array.from(byStaff.entries()).sort(
-          (a, b) => Number(a[1].status !== 'active') - Number(b[1].status !== 'active') || a[0].localeCompare(b[0]),
-        )
+        // Same search reach as the live list: name / department / split labels.
+        const q = snapSearch.trim().toLowerCase()
+        const roster = Array.from(byStaff.entries())
+          .filter(([name, info]) => {
+            if (!q) return true
+            const hay = [
+              name,
+              info.department,
+              ...info.splits.map((sp) => labelOfTarget(sp.targetId)),
+            ].join(' ').toLowerCase()
+            return hay.includes(q)
+          })
+          .sort(
+            (a, b) => Number(a[1].status !== 'active') - Number(b[1].status !== 'active') || a[0].localeCompare(b[0]),
+          )
         return (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm"
@@ -399,13 +413,30 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
               </div>
 
               <div>
-                <div className="font-sans text-[10.5px] font-semibold uppercase tracking-[0.18em] text-accent mb-2">
-                  名单({roster.length} 人)
+                <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
+                  <div className="font-sans text-[10.5px] font-semibold uppercase tracking-[0.18em] text-accent">
+                    名单({roster.length}{q ? ` / ${byStaff.size}` : ''} 人)
+                  </div>
+                  <input
+                    type="search"
+                    value={snapSearch}
+                    onChange={(e) => setSnapSearch(e.target.value)}
+                    placeholder="搜名字 / 部门 / 公司…"
+                    className="search-plain px-2.5 py-1 bg-paper border border-hairline rounded-md text-xs text-ink placeholder:text-muted focus:outline-none focus:border-accent-border w-56"
+                  />
                 </div>
                 <div className="divide-y divide-hairline border border-hairline rounded-md">
+                  {roster.length === 0 ? (
+                    <div className="px-3 py-3 font-serif italic text-muted text-sm">没找到。</div>
+                  ) : null}
                   {roster.map(([name, info]) => (
                     <div key={name} className={`px-3 py-2 flex items-center gap-3 flex-wrap ${info.status !== 'active' ? 'opacity-50' : ''}`}>
                       <span className="font-serif text-md text-ink min-w-[10rem]">{name}</span>
+                      {info.department ? (
+                        <span className="px-1.5 py-0.5 bg-surface-2 rounded font-mono text-[9px] uppercase text-graphite">
+                          {info.department}
+                        </span>
+                      ) : null}
                       <span className={`px-1.5 py-0.5 rounded font-mono text-[9px] uppercase ${
                         info.status === 'active' ? 'bg-accent-bg text-ink' : 'bg-surface-2 text-muted'
                       }`}>

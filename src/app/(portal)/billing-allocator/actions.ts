@@ -129,7 +129,7 @@ async function snapshotPeriod(period: string): Promise<void> {
   const pd = periodDate(period)
 
   const [{ data: staff, error: sErr }, { data: splits, error: spErr }] = await Promise.all([
-    supabase.from('alloc_staff').select('id, name, status'),
+    supabase.from('alloc_staff').select('id, name, status, department'),
     supabase.from('alloc_staff_splits').select('staff_id, company_id, department_id, pct'),
   ])
   if (sErr) throw new Error(sErr.message)
@@ -141,11 +141,15 @@ async function snapshotPeriod(period: string): Promise<void> {
   const rows: Array<Record<string, unknown>> = []
   for (const st of staff ?? []) {
     const mine = (splits ?? []).filter((x) => x.staff_id === st.id)
+    const base = {
+      period_month: pd, staff_id: st.id, staff_name: st.name,
+      status: st.status, department: (st.department as string | null) ?? '',
+    }
     if (mine.length === 0) {
-      rows.push({ period_month: pd, staff_id: st.id, staff_name: st.name, status: st.status, company_id: null, department_id: null, pct: 0 })
+      rows.push({ ...base, company_id: null, department_id: null, pct: 0 })
     } else {
       for (const m of mine) {
-        rows.push({ period_month: pd, staff_id: st.id, staff_name: st.name, status: st.status, company_id: m.company_id, department_id: m.department_id, pct: m.pct })
+        rows.push({ ...base, company_id: m.company_id, department_id: m.department_id, pct: m.pct })
       }
     }
   }
@@ -236,6 +240,7 @@ export async function importAllocStaffFromHr(hrPeriod: string): Promise<{ import
 export interface SnapshotDetailRow {
   staffName: string
   status: string
+  department: string
   /** company uuid | dept:<uuid> | null (own share, or a no-split placeholder). */
   targetId: string | null
   pct: number
@@ -251,7 +256,7 @@ export async function getAllocSnapshot(
   const pd = periodDate(period)
   const { data, error } = await supabase
     .from('alloc_staff_history')
-    .select('staff_name, status, company_id, department_id, pct, snapshotted_at')
+    .select('staff_name, status, department, company_id, department_id, pct, snapshotted_at')
     .eq('period_month', pd)
     .order('staff_name')
   if (error) throw new Error(error.message)
@@ -262,6 +267,7 @@ export async function getAllocSnapshot(
     return {
       staffName: r.staff_name as string,
       status: r.status as string,
+      department: (r.department as string | null) ?? '',
       targetId: encodeTarget((r.company_id as string | null), (r.department_id as string | null)),
       pct: Number(r.pct),
     }
