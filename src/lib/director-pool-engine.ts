@@ -139,6 +139,21 @@ export function showAllowStat(monthDate: string, settings: Pick<DpSettings, 'all
   return monthDate < settings.allowStatUntil
 }
 
+/**
+ * 75% Allowance Statutory top-up base (user ruling 2026-08-01): statutory is
+ * due only on the slice of the allowance 75% gross balance used to top the
+ * Sal+KPI 75% gross balance up to the fixed salary. Returns that base for the
+ * manual table lookup — 0 when the Sal+KPI stream already covers the fixed
+ * salary (no allowance statutory needed).
+ */
+export function allowStatTopUpBase(
+  d: Pick<DirectorMonthResult, 'salKpiGB' | 'allowGB' | 'dirFixed'>,
+): number {
+  const gap = r2(d.dirFixed - d.salKpiGB)
+  if (gap <= 0) return 0
+  return r2(Math.min(gap, d.allowGB))
+}
+
 /** Fixed salary for a director in a month, honouring from-month overrides. */
 export function getFixed(
   directorId: string,

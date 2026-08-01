@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   calcAll,
+  allowStatTopUpBase,
   billingAccum,
   savingAccum,
   allowStatAccum,
@@ -83,6 +84,33 @@ describe('calcAll — weight split / saving / 75-25 chain', () => {
     expect(m.poolTotal).toBe(130000)
     const grossSum = r2(m.dirRes.reduce((s, d) => s + d.salKpiGross + d.allowGross, 0))
     expect(grossSum).toBe(130000)
+  })
+})
+
+describe('allowStatTopUpBase — 75% Allowance Statutory top-up rule (2026-08-01)', () => {
+  it('WW July 2026: 13,721.23 Sal+KPI GB + 1,113.89 Allow GB → base 678.77', () => {
+    // Real July 2026 pool: salary 50,900 / KPI 15,793.87 / allowance 5,414.25
+    const months = [
+      mkMonth('jul', '2026-07-01', { salary: 50900, kpi: 15793.87, allowance: 5414.25 }),
+    ]
+    const [m] = calcAll(settings, directors, months, {})
+    const ww = m.dirRes.find((d) => d.id === 'WW')!
+    expect(ww.salKpiGB).toBe(13721.23)
+    expect(ww.allowGB).toBe(1113.89)
+    expect(allowStatTopUpBase(ww)).toBe(678.77) // 14,400 − 13,721.23
+  })
+
+  it('returns 0 when the Sal+KPI stream already covers the fixed salary', () => {
+    expect(allowStatTopUpBase({ salKpiGB: 14400, allowGB: 1000, dirFixed: 14400 })).toBe(0)
+    expect(allowStatTopUpBase({ salKpiGB: 20000, allowGB: 1000, dirFixed: 14400 })).toBe(0)
+  })
+
+  it('caps the base at the allowance 75% gross balance when the gap is bigger', () => {
+    expect(allowStatTopUpBase({ salKpiGB: 12000, allowGB: 1500, dirFixed: 14400 })).toBe(1500)
+  })
+
+  it('honours a per-director fixed salary override via dirFixed', () => {
+    expect(allowStatTopUpBase({ salKpiGB: 14500, allowGB: 1000, dirFixed: 15000 })).toBe(500)
   })
 })
 

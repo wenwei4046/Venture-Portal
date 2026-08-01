@@ -10,10 +10,12 @@ import {
   calcAll,
   r2,
   showAllowStat,
+  allowStatTopUpBase,
   type DpMonth,
   type DirectorInputMap,
   type DpContraEvent,
   type MonthResult,
+  type DirectorMonthResult,
 } from '@/lib/director-pool-engine'
 import type { DirectorPoolData } from '@/lib/director-pool-data'
 import {
@@ -86,6 +88,19 @@ export function MoneyInput({
         if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
       }}
     />
+  )
+}
+
+/** Hint under the 75% Allowance Statutory input (user ruling 2026-08-01):
+ *  statutory is due only on the allowance slice topping the Sal+KPI 75% GB up
+ *  to the fixed salary — show that lookup base, or that none is needed. */
+export function TopUpHint({ d }: { d: Pick<DirectorMonthResult, 'salKpiGB' | 'allowGB' | 'dirFixed'> }) {
+  if (d.allowGB <= 0) return null
+  const base = allowStatTopUpBase(d)
+  return base > 0 ? (
+    <div className="font-mono text-[10px] text-info whitespace-nowrap mt-0.5">补差 base: {fmt(base)}</div>
+  ) : (
+    <div className="font-mono text-[10px] text-graphite whitespace-nowrap mt-0.5">无需 statutory</div>
   )
 }
 
@@ -918,12 +933,15 @@ function CalculatorTab(p: CalcProps) {
                           <td className="num">{mr.fullPayout ? '—' : d.allowGross > 0 ? fmt(d.allowGB) : '—'}</td>
                           <td className="num">
                             {mr.fullPayout ? '—' : (
-                              <MoneyInput
-                                value={inp.allowPayStat ?? null}
-                                placeholder="填写"
-                                onCommit={(v) => p.onDirInput(mr.id, d.id, 'allowPayStat', v)}
-                                className="w-24"
-                              />
+                              <>
+                                <MoneyInput
+                                  value={inp.allowPayStat ?? null}
+                                  placeholder="填写"
+                                  onCommit={(v) => p.onDirInput(mr.id, d.id, 'allowPayStat', v)}
+                                  className="w-24"
+                                />
+                                <TopUpHint d={d} />
+                              </>
                             )}
                           </td>
                           <td className="num">{mr.fullPayout ? '—' : fmt(d.salKpiBillInv)}</td>

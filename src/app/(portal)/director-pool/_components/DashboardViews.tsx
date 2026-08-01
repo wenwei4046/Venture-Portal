@@ -31,7 +31,7 @@ import {
   type DpSettings,
 } from '@/lib/director-pool-engine'
 import type { DpCompany } from '@/lib/director-pool-data'
-import { fmt, fmtRM, Money, MoneyInput, MonthTabs, Dot } from './DirectorPoolClient'
+import { fmt, fmtRM, Money, MoneyInput, MonthTabs, Dot, TopUpHint } from './DirectorPoolClient'
 
 // Chart-series palette for companies (data colours, mirrors the HTML tool)
 const CO_COLORS = ['#4a9eff', '#f5a623', '#2ec4b6', '#e74c3c', '#9b8dd9', '#20b2aa', '#b39ddb']
@@ -843,6 +843,7 @@ function AllowStatView(p: DashProps) {
                     <td className="num">{m.fullPayout ? '—' : fmt(d.allowGB)}</td>
                     <td className="num">
                       <MoneyInput value={inp.allowPayStat ?? null} placeholder="填写" onCommit={(v) => p.onDirInput(m.id, d.id, 'allowPayStat', v)} className="w-24" />
+                      {!m.fullPayout && <TopUpHint d={d} />}
                     </td>
                     <td className="num font-medium text-ledger">
                       {allowStatAccum(d.id, m.id, results, dirInputs) > 0 ? fmt(allowStatAccum(d.id, m.id, results, dirInputs)) : '—'}
