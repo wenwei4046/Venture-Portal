@@ -718,6 +718,9 @@ export async function generateAllocatorInvoices(period: string): Promise<Generat
   // Group billed detail lines by target (subsidiary or department), txn order.
   type Line = { description: string; amount: number; categoryCode: string }
   const byTarget = new Map<string, Line[]>()
+  // Per-target expense names, deduped in txn order — they BECOME the invoice
+  // summary (user 2026-08-01: "summary 改成这些的...全部四个就显示4个").
+  const descsByTarget = new Map<string, string[]>()
   for (const t of txns) {
     const details = (t.alloc_txn_details ?? []) as Array<{
       company_id: string | null; department_id: string | null
@@ -738,6 +741,9 @@ export async function generateAllocatorInvoices(period: string): Promise<Generat
         amount: Number(d.amount),
         categoryCode: coaByCat.get(t.category_id as string) ?? '',
       })
+      if (!descsByTarget.has(key)) descsByTarget.set(key, [])
+      const descs = descsByTarget.get(key)!
+      if (!descs.includes(t.description as string)) descs.push(t.description as string)
     }
   }
   if (byTarget.size === 0) throw new Error('Nothing billable — every line is own share')
@@ -763,7 +769,8 @@ export async function generateAllocatorInvoices(period: string): Promise<Generat
       invoiceDate: today,
       dueDate: '',
       referenceNo: ref,
-      headerDescription: `Billing Allocator — ${monthLabel}`,
+      // Summary = this invoice's own expense names, all of them.
+      headerDescription: `${(descsByTarget.get(targetId) ?? []).join(' · ')} — ${monthLabel}`,
       companyId: t.companyId ?? undefined,
       departmentId: t.departmentId ?? undefined,
       lines,
