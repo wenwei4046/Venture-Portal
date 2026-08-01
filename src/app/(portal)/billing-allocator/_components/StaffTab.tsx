@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import dayjs from 'dayjs'
+import SortableTable, { type SortableColumn } from '@/components/SortableTable'
 import {
   saveAllocStaff, deleteAllocStaff, saveAllocSnapshot, importAllocStaffFromHr,
   type StaffSplitInput,
@@ -256,58 +258,105 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
         </button>
       )}
 
-      {/* List */}
-      <div className="overflow-x-auto border border-hairline rounded-md">
-        <table className="ledger-table w-full">
-          <thead>
-            <tr><th>Name</th><th>Status</th><th>Splits</th><th></th></tr>
-          </thead>
-          <tbody>
-            {data.staff.map((s) => (
-              <tr key={s.id}>
-                <td className="font-serif text-md text-ink">{s.name}</td>
-                <td>
-                  <span className={`px-2 py-0.5 rounded-md font-mono text-[10px] uppercase ${
-                    s.status === 'active' ? 'bg-accent-bg text-ink' : 'bg-surface-2 text-muted'
-                  }`}>
-                    {s.status}
-                  </span>
-                </td>
-                <td>
-                  <div className="flex flex-wrap gap-1.5 py-1">
-                    {s.splits.map((x, i) => (
-                      <span key={i} className={`px-2 py-0.5 rounded-md border text-xs font-mono ${
-                        x.targetId === null
-                          ? 'bg-surface text-muted border-hairline italic'
-                          : 'bg-accent-bg text-ink border-accent-border'
-                      }`}>
-                        {x.targetId === null ? 'HV own' : x.label} {x.pct}%
-                      </span>
-                    ))}
-                    {s.splits.length === 0 ? <span className="font-serif italic text-muted text-xs">no splits</span> : null}
-                  </div>
-                </td>
-                <td className="text-right whitespace-nowrap">
-                  <button type="button" onClick={() => startEdit(s)} className="text-accent hover:text-accent-hover font-serif italic text-sm mr-3">
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => run(() => deleteAllocStaff(s.id))}
-                    disabled={isPending}
-                    className="text-muted hover:text-danger font-mono text-sm"
-                  >
-                    ×
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {data.staff.length === 0 ? (
-              <tr><td colSpan={4} className="font-serif italic text-muted text-sm">名单还是空的 — 加人后 Headcount 法才有数。</td></tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
+      {/* List — SortableTable: search, click-to-sort headers, newest first. */}
+      <SortableTable
+        rows={data.staff}
+        getRowKey={(s) => s.id}
+        defaultSort={{ key: 'added', dir: 'desc' }}
+        searchKeys={['name', 'splits']}
+        searchPlaceholder="搜名字或公司…"
+        columns={staffColumns(startEdit, (id) => run(() => deleteAllocStaff(id)), isPending)}
+        emptyState={
+          <div className="font-serif italic text-muted text-sm p-4">
+            名单还是空的 — 加人后 Headcount 法才有数。
+          </div>
+        }
+      />
     </div>
   )
+}
+
+function staffColumns(
+  onEdit: (s: StaffRow) => void,
+  onDelete: (id: string) => void,
+  isPending: boolean,
+): SortableColumn<StaffRow>[] {
+  return [
+    {
+      key: 'name',
+      label: 'Name',
+      render: (s) => s.name, // plain string → searchable directly
+      cellClassName: 'font-serif text-md text-ink',
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      sortValue: (s) => s.status,
+      filterable: true,
+      render: (s) => (
+        <span className={`px-2 py-0.5 rounded-md font-mono text-[10px] uppercase ${
+          s.status === 'active' ? 'bg-accent-bg text-ink' : 'bg-surface-2 text-muted'
+        }`}>
+          {s.status}
+        </span>
+      ),
+    },
+    {
+      key: 'splits',
+      label: 'Splits',
+      // Text form feeds both search ("搜公司") and sort.
+      sortValue: (s) =>
+        s.splits.map((x) => (x.targetId === null ? 'HV own' : x.label)).join(' '),
+      render: (s) => (
+        <div className="flex flex-wrap gap-1.5 py-1">
+          {s.splits.map((x, i) => (
+            <span key={i} className={`px-2 py-0.5 rounded-md border text-xs font-mono ${
+              x.targetId === null
+                ? 'bg-surface text-muted border-hairline italic'
+                : 'bg-accent-bg text-ink border-accent-border'
+            }`}>
+              {x.targetId === null ? 'HV own' : x.label} {x.pct}%
+            </span>
+          ))}
+          {s.splits.length === 0 ? <span className="font-serif italic text-muted text-xs">no splits</span> : null}
+        </div>
+      ),
+    },
+    {
+      key: 'added',
+      label: 'Added',
+      sortValue: (s) => (s.createdAt ? new Date(s.createdAt) : null),
+      render: (s) => (
+        <span className="font-mono text-xs text-graphite whitespace-nowrap">
+          {s.createdAt ? dayjs(s.createdAt).format('YYYY-MM-DD') : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      label: '',
+      sortable: false,
+      align: 'right',
+      cellClassName: 'whitespace-nowrap',
+      render: (s) => (
+        <>
+          <button
+            type="button"
+            onClick={() => onEdit(s)}
+            className="text-accent hover:text-accent-hover font-serif italic text-sm mr-3"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete(s.id)}
+            disabled={isPending}
+            className="text-muted hover:text-danger font-mono text-sm"
+          >
+            ×
+          </button>
+        </>
+      ),
+    },
+  ]
 }

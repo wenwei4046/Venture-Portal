@@ -9,6 +9,8 @@ export interface StaffRow {
   id: string
   name: string
   status: 'active' | 'inactive'
+  /** ISO timestamp — when the person was added to the allocator list. */
+  createdAt: string
   /** targetId: company uuid, `dept:<uuid>` for a department, null = HV own. */
   splits: { targetId: string | null; label: string; pct: number }[]
 }
