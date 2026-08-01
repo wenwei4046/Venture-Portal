@@ -72,6 +72,18 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+Follow-up 4 (2026-08-01, staff-tab polish round): staff editor became a MODAL
+(user: "pop out 出来…而不是跳上去") — BatchDetailsModal overlay pattern, Esc /
+overlay-click cancels. Department label added to alloc_staff (mig
+`20260801020000` — free text, Finance-maintained, datalist suggestions,
+filterable column, "split 是 split, department 是 department", NO effect on the
+math; Marketing seeded for the 100%-Marketing-split people; HR import carries
+HR's department name). Active/inactive/total counts by the search box; list
+defaults to ACTIVE with a 显示 Inactive toggle. Snapshot periods are clickable
+→ review modal per period: per-company FTE totals (+%) computed from the
+snapshot's ACTIVE rows + the full roster with each person's splits
+(`getAllocSnapshot`), so a saved month is auditable afterwards.
+
 Follow-up 3 (2026-08-01, UX round after first real use): staff editor moved
 ABOVE the table + scrollIntoView + "正在编辑 — {name}" (37 rows pushed it below
 the fold; Edit looked dead). Staff list rebuilt on the shared SortableTable —

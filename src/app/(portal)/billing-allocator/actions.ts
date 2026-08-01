@@ -231,6 +231,44 @@ export async function importAllocStaffFromHr(hrPeriod: string): Promise<{ import
   return { imported: byStaff.size }
 }
 
+// ─── Snapshot review ─────────────────────────────────────────────────────────
+
+export interface SnapshotDetailRow {
+  staffName: string
+  status: string
+  /** company uuid | dept:<uuid> | null (own share, or a no-split placeholder). */
+  targetId: string | null
+  pct: number
+}
+
+/** A saved snapshot, for review: who was in it and how they split
+ *  ("存快照后我希望可以有记录检查回", user 2026-08-01). */
+export async function getAllocSnapshot(
+  period: string,
+): Promise<{ rows: SnapshotDetailRow[]; savedAt: string | null }> {
+  await requireRole(['finance', 'principal'])
+  const supabase = await allocClient()
+  const pd = periodDate(period)
+  const { data, error } = await supabase
+    .from('alloc_staff_history')
+    .select('staff_name, status, company_id, department_id, pct, snapshotted_at')
+    .eq('period_month', pd)
+    .order('staff_name')
+  if (error) throw new Error(error.message)
+  let savedAt: string | null = null
+  const rows = (data ?? []).map((r) => {
+    const at = r.snapshotted_at as string | null
+    if (at && (!savedAt || at > savedAt)) savedAt = at
+    return {
+      staffName: r.staff_name as string,
+      status: r.status as string,
+      targetId: encodeTarget((r.company_id as string | null), (r.department_id as string | null)),
+      pct: Number(r.pct),
+    }
+  })
+  return { rows, savedAt }
+}
+
 // ─── Categories ──────────────────────────────────────────────────────────────
 
 export async function saveAllocCategory(payload: { id?: string; name: string; coaCode: string }): Promise<void> {

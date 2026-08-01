@@ -6,7 +6,8 @@ import dayjs from 'dayjs'
 import SortableTable, { type SortableColumn } from '@/components/SortableTable'
 import {
   saveAllocStaff, deleteAllocStaff, saveAllocSnapshot, importAllocStaffFromHr,
-  type StaffSplitInput,
+  getAllocSnapshot,
+  type StaffSplitInput, type SnapshotDetailRow,
 } from '../actions'
 import type { AllocatorData, StaffRow } from './types'
 
@@ -35,6 +36,34 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
   const [notice, setNotice] = useState<string | null>(null)
   // Default view is ACTIVE only; a toggle reveals the inactive people.
   const [showInactive, setShowInactive] = useState(false)
+  // Snapshot review modal: click a saved period to see its per-company share
+  // totals + the roster as it stood.
+  const [snapView, setSnapView] = useState<{
+    period: string
+    rows: SnapshotDetailRow[]
+    savedAt: string | null
+  } | null>(null)
+
+  const labelOfTarget = (targetId: string | null): string => {
+    if (targetId === null) return 'HV own'
+    return (
+      data.companies.find((c) => c.id === targetId)?.label ??
+      data.departments.find((d) => d.id === targetId)?.label ??
+      '?'
+    )
+  }
+
+  const openSnapshot = (period: string) => {
+    setError(null)
+    startTransition(async () => {
+      try {
+        const { rows, savedAt } = await getAllocSnapshot(period)
+        setSnapView({ period, rows, savedAt })
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Load failed')
+      }
+    })
+  }
 
   // The editor is a MODAL (user 2026-08-01: "我希望是pop out 出来…而不是跳上去")
   // — same overlay pattern as BatchDetailsModal. Esc closes.
@@ -161,9 +190,23 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
         >
           存 {data.period} 快照
         </button>
-        <span className="font-mono text-xs text-muted">
-          已有快照:{data.snapshotPeriods.length > 0 ? data.snapshotPeriods.join(' · ') : '无'}
-        </span>
+        <span className="font-mono text-xs text-muted">已有快照:</span>
+        {data.snapshotPeriods.length > 0 ? (
+          data.snapshotPeriods.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => openSnapshot(p)}
+              disabled={isPending}
+              title="看这个月的快照:各公司合计 + 名单"
+              className="px-2 py-0.5 bg-paper border border-hairline rounded-md font-mono text-xs text-accent hover:text-accent-hover hover:border-accent-border transition-colors disabled:opacity-50"
+            >
+              {p} →
+            </button>
+          ))
+        ) : (
+          <span className="font-mono text-xs text-muted">无</span>
+        )}
       </div>
 
       {error ? (
@@ -288,6 +331,108 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
         </div>
         </div>
       ) : null}
+
+      {/* Snapshot review modal */}
+      {snapView ? (() => {
+        // Active rows drive the totals — exactly what a calc on this snapshot
+        // would use. Roster shows everyone, inactive greyed.
+        const active = snapView.rows.filter((r) => r.status === 'active' && r.pct > 0)
+        const totals = new Map<string | null, number>()
+        for (const r of active) totals.set(r.targetId, (totals.get(r.targetId) ?? 0) + r.pct / 100)
+        const totalHeads = Array.from(totals.values()).reduce((a, b) => a + b, 0)
+        const byStaff = new Map<string, { status: string; splits: { targetId: string | null; pct: number }[] }>()
+        for (const r of snapView.rows) {
+          if (!byStaff.has(r.staffName)) byStaff.set(r.staffName, { status: r.status, splits: [] })
+          if (r.pct > 0) byStaff.get(r.staffName)!.splits.push({ targetId: r.targetId, pct: r.pct })
+        }
+        const roster = Array.from(byStaff.entries()).sort(
+          (a, b) => Number(a[1].status !== 'active') - Number(b[1].status !== 'active') || a[0].localeCompare(b[0]),
+        )
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setSnapView(null)}
+          >
+            <div
+              className="bg-paper border border-hairline rounded-lg shadow-xl max-w-3xl w-[92vw] max-h-[85vh] overflow-y-auto p-5 space-y-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                <div className="font-serif text-lg text-ink">
+                  快照 · {snapView.period}
+                  {snapView.savedAt ? (
+                    <span className="ml-2 font-mono text-xs text-muted">
+                      存于 {dayjs(snapView.savedAt).format('YYYY-MM-DD HH:mm')}
+                    </span>
+                  ) : null}
+                </div>
+                <button type="button" onClick={() => setSnapView(null)} className="text-muted hover:text-danger font-mono text-sm">
+                  ×
+                </button>
+              </div>
+
+              <div>
+                <div className="font-sans text-[10.5px] font-semibold uppercase tracking-[0.18em] text-accent mb-2">
+                  各公司合计(active,{totalHeads.toFixed(2)} 人头)
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {Array.from(totals.entries())
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([targetId, heads]) => (
+                      <span
+                        key={targetId ?? 'own'}
+                        className={`px-2.5 py-1 rounded-md border font-mono tabular text-sm ${
+                          targetId === null
+                            ? 'bg-surface text-muted border-hairline italic'
+                            : 'bg-accent-bg text-ink border-accent-border'
+                        }`}
+                      >
+                        {labelOfTarget(targetId)} · {heads.toFixed(2)} 头
+                        <span className="text-muted text-xs">
+                          {' '}({totalHeads > 0 ? ((heads / totalHeads) * 100).toFixed(1) : '0.0'}%)
+                        </span>
+                      </span>
+                    ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="font-sans text-[10.5px] font-semibold uppercase tracking-[0.18em] text-accent mb-2">
+                  名单({roster.length} 人)
+                </div>
+                <div className="divide-y divide-hairline border border-hairline rounded-md">
+                  {roster.map(([name, info]) => (
+                    <div key={name} className={`px-3 py-2 flex items-center gap-3 flex-wrap ${info.status !== 'active' ? 'opacity-50' : ''}`}>
+                      <span className="font-serif text-md text-ink min-w-[10rem]">{name}</span>
+                      <span className={`px-1.5 py-0.5 rounded font-mono text-[9px] uppercase ${
+                        info.status === 'active' ? 'bg-accent-bg text-ink' : 'bg-surface-2 text-muted'
+                      }`}>
+                        {info.status}
+                      </span>
+                      <span className="flex flex-wrap gap-1.5">
+                        {info.splits.map((sp, i) => (
+                          <span key={i} className={`px-1.5 py-0.5 rounded border font-mono text-[10px] ${
+                            sp.targetId === null
+                              ? 'bg-surface text-muted border-hairline italic'
+                              : 'bg-accent-bg text-ink border-accent-border'
+                          }`}>
+                            {labelOfTarget(sp.targetId)} {sp.pct}%
+                          </span>
+                        ))}
+                        {info.splits.length === 0 ? (
+                          <span className="font-serif italic text-muted text-xs">no splits</span>
+                        ) : null}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })() : null}
 
       <button type="button" onClick={() => startEdit()} className="text-sm text-accent hover:text-accent-hover font-serif italic">
         + 加人
