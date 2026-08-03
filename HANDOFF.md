@@ -72,6 +72,17 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+Follow-up 8 (2026-08-01, bulk-issue COA bug): user bulk-issued both Aug
+batches and caught that every JE credited **5000** while the invoice lines
+said 9095/7012 — `approveInvoicesForPeriod`'s non-consolidated branch predated
+mig 275 and never read invoice_lines. Code FIXED (bulk now fans out per line's
+category_code, legacy single credit only when no lines). Data corrected in
+place per the user's "A": the 13 credit lines moved 5000→9095 (6 lines,
+4,523.99) and 5000→7012 (7 lines, 18,729.88); after: 0 lines left in 5000 for
+ALC refs, TB 0.00, invoices themselves untouched (they were always right —
+the user's manual 9095 picks and the Rental→7012 category both landed on the
+lines correctly; only the bulk-issue translator ignored them).
+
 Follow-up 7 (2026-08-01, post-issue round): **actions return errors instead of
 throwing** — Next.js masks thrown server-action errors in prod (the
 period-lock guard surfaced as the generic "Server Components render" digest);
