@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { submitToFinance } from '../actions'
+import { usePayrollDraft } from './PayrollDraftContext'
 
 interface Props {
   period: string
@@ -12,6 +13,7 @@ export default function SubmitToFinanceButton({ period, totalAmount }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const { dirtyCount } = usePayrollDraft()
 
   function handleConfirm() {
     setError(null)
@@ -27,6 +29,25 @@ export default function SubmitToFinanceButton({ period, totalAmount }: Props) {
         setConfirming(false)
       }
     })
+  }
+
+  // Unsaved inline edits would be silently excluded from the submitted totals
+  // — force a Save (page-level button or per-row) before allowing submit.
+  if (dirtyCount > 0) {
+    return (
+      <div className="flex flex-col items-end gap-1">
+        <button
+          disabled
+          className="bg-accent text-white font-serif italic text-sm px-4 py-2 rounded-md opacity-40 cursor-not-allowed"
+          title="Save your edits first"
+        >
+          Submit to Finance
+        </button>
+        <span className="text-xs font-serif italic text-alert">
+          {dirtyCount} unsaved row{dirtyCount > 1 ? 's' : ''} — save first
+        </span>
+      </div>
+    )
   }
 
   if (confirming) {

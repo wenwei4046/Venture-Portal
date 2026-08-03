@@ -93,6 +93,42 @@ export async function updatePayrollRow(
   revalidatePath('/hr-costing/payroll', 'layout')
 }
 
+/**
+ * Batch-save every row the page-level Save button collected. Same rules as
+ * updatePayrollRow (draft-only, trigger recomputes statutory) but one
+ * revalidate for the whole batch. Partial failure keeps going — the error
+ * reports how many saved so HR knows which rows to re-check.
+ */
+export async function updatePayrollRows(
+  updates: { id: string; fields: PayrollRowUpdate }[],
+): Promise<{ saved: number }> {
+  await requireRole(['hr', 'principal'])
+  if (updates.length === 0) return { saved: 0 }
+
+  const supabase = await createClient()
+
+  let saved = 0
+  const failures: string[] = []
+  for (const u of updates) {
+    const { error } = await supabase
+      .from('hr_monthly_payroll')
+      .update(u.fields)
+      .eq('id', u.id)
+      .eq('status', 'draft')
+    if (error) failures.push(error.message)
+    else saved++
+  }
+
+  revalidatePath('/hr-costing/payroll', 'layout')
+
+  if (failures.length > 0) {
+    throw new Error(
+      `Saved ${saved} of ${updates.length} rows — ${failures.length} failed: ${failures[0]}`,
+    )
+  }
+  return { saved }
+}
+
 // ─── Override / Reset Statutory (Phase 11.2 + PCB 2026-06-04) ──────────────
 //
 // The compute trigger on hr_monthly_payroll only fires when one of basic_salary,

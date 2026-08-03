@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import { updatePayrollRow } from '../actions'
+import { usePayrollDraft } from './PayrollDraftContext'
 import type { PayrollRowData } from './PayrollGrid'
 
 interface Props {
@@ -68,6 +69,14 @@ export default function PayrollRow({
   }
 
   const locked = row.status !== 'draft'
+
+  // Report pending edits to the page-level draft context — powers the
+  // header Save button and blocks Submit to Finance while unsaved.
+  const { setRowEdit } = usePayrollDraft()
+  useEffect(() => {
+    setRowEdit(row.id, dirty && !locked ? edit : null)
+  }, [row.id, dirty, locked, edit, setRowEdit])
+  useEffect(() => () => setRowEdit(row.id, null), [row.id, setRowEdit])
 
   // Narrow editable cell — minimal chrome
   const cell = (

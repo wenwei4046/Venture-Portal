@@ -8,6 +8,8 @@ import PayrollGrid, { type PayrollRowData } from '../_components/PayrollGrid'
 import CopyFromLastMonthButton from '../_components/CopyFromLastMonthButton'
 import CreatePeriodButton from '../_components/CreatePeriodButton'
 import SubmitToFinanceButton from '../_components/SubmitToFinanceButton'
+import SaveAllButton from '../_components/SaveAllButton'
+import { PayrollDraftProvider } from '../_components/PayrollDraftContext'
 import ReopenPayrollButton from '../_components/ReopenPayrollButton'
 import MoreActionsDropdown from '../_components/MoreActionsDropdown'
 import { deletePayrollPeriod } from '../actions'
@@ -316,6 +318,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
   }
 
   return (
+    <PayrollDraftProvider>
     <div>
       {/* Reopened notice — HR pulled the figures back via Reopen (mig 278). */}
       {showReopenedNote ? (
@@ -505,6 +508,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
         <DirectorSalarySection rows={directorPayouts} period={period} />
       )}
     </div>
+    </PayrollDraftProvider>
   )
 }
 
@@ -645,7 +649,10 @@ function PhaseCta({
     // total_amount the submit RPC computes is CTC (gross + employer statutory),
     // not gross — show that so the confirm dialog matches what Finance funds.
     return (
-      <SubmitToFinanceButton period={period} totalAmount={totalCtc} />
+      <div className="flex items-start gap-2">
+        <SaveAllButton />
+        <SubmitToFinanceButton period={period} totalAmount={totalCtc} />
+      </div>
     )
   }
   if (phase === 'awaiting-approval') {
