@@ -1,4 +1,5 @@
 import type { AllocMethod } from '@/lib/billing-allocator'
+import type { AccountOption } from '@/components/AccountPicker'
 
 export interface CoOpt {
   id: string
@@ -78,6 +79,8 @@ export interface AllocatorData {
   /** THIS period's snapshot (active rows, encoded targets) so the Calculate
    *  preview under hcMode=snapshot matches what the server will use. */
   snapshotSplits: { targetId: string | null; pct: number }[]
+  /** Full COA for the category COA picker (AccountPicker filters itself). */
+  coaAccounts: AccountOption[]
   categories: CategoryRow[]
   templates: TemplateRow[]
   txns: TxnRow[]

@@ -41,6 +41,7 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     { data: hrMonths },
     { data: periodSnapshot },
     { data: coSettings },
+    { data: coaRows },
   ] = await Promise.all([
     supabase.from('companies').select('id, short_code, name').eq('is_active', true).order('name'),
     supabase.from('departments').select('id, name').order('name'),
@@ -64,6 +65,11 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
       .select('company_id, department_id, pct, status')
       .eq('period_month', pd),
     supabase.from('alloc_company_settings').select('company_id, enabled'),
+    supabase
+      .from('chart_of_accounts')
+      .select('code, name, type, parent_code, is_active')
+      .eq('is_active', true)
+      .order('code'),
   ])
 
   // Full list drives LABELS (history must keep resolving even after a company
@@ -188,6 +194,13 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     departments,
     staff: staffRows,
     snapshotSplits,
+    coaAccounts: (coaRows ?? []).map((a) => ({
+      code: a.code as string,
+      name: a.name as string,
+      type: a.type as AllocatorData['coaAccounts'][number]['type'],
+      parent_code: (a.parent_code as string | null) ?? null,
+      is_active: Boolean(a.is_active),
+    })),
     snapshotPeriods,
     hrPeriods,
     categories,

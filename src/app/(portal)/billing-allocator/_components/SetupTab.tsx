@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import AccountPicker from '@/components/AccountPicker'
 import type { AllocMethod } from '@/lib/billing-allocator'
 import {
   saveAllocCategory, deleteAllocCategory,
@@ -119,9 +120,17 @@ export default function SetupTab({ data }: { data: AllocatorData }) {
               <label className="block text-xs font-sans text-graphite mb-1">名称 *</label>
               <input value={catEdit.name} onChange={(e) => setCatEdit({ ...catEdit, name: e.target.value })} className={inputCls} />
             </div>
-            <div>
-              <label className="block text-xs font-sans text-graphite mb-1">COA code(可选)</label>
-              <input value={catEdit.coaCode} onChange={(e) => setCatEdit({ ...catEdit, coaCode: e.target.value })} className={`${inputCls} font-mono w-28`} placeholder="e.g. 5040" />
+            <div className="w-80 max-w-full">
+              <label className="block text-xs font-sans text-graphite mb-1">
+                COA 科目(可选 — 打字搜、点了选)
+              </label>
+              <AccountPicker
+                accounts={data.coaAccounts}
+                value={catEdit.coaCode}
+                onChange={(code) => setCatEdit({ ...catEdit, coaCode: code })}
+                name="coa_code"
+                placeholder="搜科目号或名字…"
+              />
             </div>
             <button
               type="button"
