@@ -10,6 +10,7 @@ import {
   setAllocCompanyEnabled,
 } from '../actions'
 import type { AllocatorData, TemplateRow } from './types'
+import { unwrap } from './unwrap'
 
 const inputCls =
   'px-2.5 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border'
@@ -75,7 +76,7 @@ export default function SetupTab({ data }: { data: AllocatorData }) {
             <button
               key={c.id}
               type="button"
-              onClick={() => run(() => setAllocCompanyEnabled(c.id, !c.enabled))}
+              onClick={() => run(async () => { unwrap(await setAllocCompanyEnabled(c.id, !c.enabled)) })}
               disabled={isPending}
               title={c.enabled ? '点一下关掉(不再参与分摊)' : '点一下开回来'}
               className={`px-3 py-1.5 rounded-md border font-mono text-sm transition-colors disabled:opacity-50 ${
@@ -108,7 +109,7 @@ export default function SetupTab({ data }: { data: AllocatorData }) {
               <button type="button" onClick={() => setCatEdit({ id: c.id, name: c.name, coaCode: c.coaCode })} className="text-accent hover:text-accent-hover font-serif italic text-xs">
                 edit
               </button>
-              <button type="button" onClick={() => run(() => deleteAllocCategory(c.id))} disabled={isPending} className="text-muted hover:text-danger font-mono text-xs">
+              <button type="button" onClick={() => run(async () => { unwrap(await deleteAllocCategory(c.id)) })} disabled={isPending} className="text-muted hover:text-danger font-mono text-xs">
                 ×
               </button>
             </span>
@@ -134,7 +135,7 @@ export default function SetupTab({ data }: { data: AllocatorData }) {
             </div>
             <button
               type="button"
-              onClick={() => run(async () => { await saveAllocCategory(catEdit); setCatEdit(null) })}
+              onClick={() => run(async () => { unwrap(await saveAllocCategory(catEdit)); setCatEdit(null) })}
               disabled={isPending || !catEdit.name.trim()}
               className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-1.5 rounded-md disabled:opacity-50"
             >
@@ -186,7 +187,7 @@ export default function SetupTab({ data }: { data: AllocatorData }) {
                   <td className="font-mono text-[10px] uppercase text-muted">{t.status}</td>
                   <td className="text-right whitespace-nowrap">
                     <button type="button" onClick={() => startTpl(t)} className="text-accent hover:text-accent-hover font-serif italic text-sm mr-3">Edit</button>
-                    <button type="button" onClick={() => run(() => deleteAllocTemplate(t.id))} disabled={isPending} className="text-muted hover:text-danger font-mono text-sm">×</button>
+                    <button type="button" onClick={() => run(async () => { unwrap(await deleteAllocTemplate(t.id)) })} disabled={isPending} className="text-muted hover:text-danger font-mono text-sm">×</button>
                   </td>
                 </tr>
               ))}
@@ -252,7 +253,7 @@ export default function SetupTab({ data }: { data: AllocatorData }) {
                 type="button"
                 onClick={() =>
                   run(async () => {
-                    await saveAllocTemplate({
+                    unwrap(await saveAllocTemplate({
                       id: tplEdit.id,
                       name: tplEdit.name,
                       method: tplEdit.method,
@@ -262,7 +263,7 @@ export default function SetupTab({ data }: { data: AllocatorData }) {
                       splits: Object.entries(tplEdit.pct)
                         .map(([companyId, v]) => ({ companyId, pct: parseFloat(v) || 0 }))
                         .filter((x) => x.pct > 0),
-                    })
+                    }))
                     setTplEdit(null)
                   })
                 }

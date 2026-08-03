@@ -10,6 +10,7 @@ import {
   type StaffSplitInput, type SnapshotDetailRow,
 } from '../actions'
 import type { AllocatorData, StaffRow } from './types'
+import { unwrap } from './unwrap'
 
 const OWN = '__own__' // select sentinel for "HOUZS Venture (own)" — DB stores NULL
 
@@ -61,7 +62,7 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
     setSnapSearch('')
     startTransition(async () => {
       try {
-        const { rows, savedAt } = await getAllocSnapshot(period)
+        const { rows, savedAt } = unwrap(await getAllocSnapshot(period))
         setSnapView({ period, rows, savedAt })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Load failed')
@@ -110,9 +111,9 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
       .map((s) => ({ targetId: s.targetId === OWN ? null : s.targetId, pct: parseFloat(s.pct) || 0 }))
       .filter((s) => s.pct > 0)
     run(async () => {
-      await saveAllocStaff({
+      unwrap(await saveAllocStaff({
         id: edit.id, name: edit.name, status: edit.status, department: edit.department, splits,
-      })
+      }))
       setEdit(null)
     })
   }
@@ -151,7 +152,7 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
                 onClick={() => {
                   setConfirmImport(false)
                   run(async () => {
-                    const { imported } = await importAllocStaffFromHr(hrMonth)
+                    const { imported } = unwrap(await importAllocStaffFromHr(hrMonth))
                     setNotice(`带入 ${imported} 人(HR ${hrMonth});之后是你的独立副本,HR 改了不会自动跟。`)
                   })
                 }}
@@ -188,7 +189,7 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
       <div className="flex items-center gap-3 flex-wrap border border-hairline rounded-md bg-surface p-3">
         <button
           type="button"
-          onClick={() => run(() => saveAllocSnapshot(data.period))}
+          onClick={() => run(async () => { unwrap(await saveAllocSnapshot(data.period)) })}
           disabled={isPending}
           className="bg-surface-2 hover:bg-paper border border-hairline text-ink font-serif italic text-sm px-3.5 py-1.5 rounded-md transition-colors disabled:opacity-50"
         >
@@ -510,7 +511,7 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
             ) : null}
           </span>
         }
-        columns={staffColumns(startEdit, (id) => run(() => deleteAllocStaff(id)), isPending)}
+        columns={staffColumns(startEdit, (id) => run(async () => { unwrap(await deleteAllocStaff(id)) }), isPending)}
         emptyState={
           <div className="font-serif italic text-muted text-sm p-4">
             名单还是空的 — 加人后 Headcount 法才有数。

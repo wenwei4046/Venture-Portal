@@ -56,7 +56,7 @@ export interface StaffSplitInput {
   pct: number
 }
 
-export async function saveAllocStaff(payload: {
+async function saveAllocStaffInner(payload: {
   id?: string
   name: string
   status: 'active' | 'inactive'
@@ -108,7 +108,7 @@ export async function saveAllocStaff(payload: {
   revalidatePath('/billing-allocator')
 }
 
-export async function deleteAllocStaff(id: string): Promise<void> {
+async function deleteAllocStaffInner(id: string): Promise<void> {
   await requireRole(['finance', 'principal'])
   const supabase = await allocClient()
   const { error } = await supabase.from('alloc_staff').delete().eq('id', id)
@@ -118,7 +118,7 @@ export async function deleteAllocStaff(id: string): Promise<void> {
 }
 
 /** Replace `period`'s headcount snapshot with the live list. */
-export async function saveAllocSnapshot(period: string): Promise<void> {
+async function saveAllocSnapshotInner(period: string): Promise<void> {
   await requireRole(['finance', 'principal'])
   await snapshotPeriod(period)
   revalidatePath('/billing-allocator')
@@ -167,7 +167,7 @@ async function snapshotPeriod(period: string): Promise<void> {
  * to refresh). HR stores fractions (0.30 = 30%) and has no own-share concept:
  * a staff whose splits total under 100% gets the remainder as "HV own".
  */
-export async function importAllocStaffFromHr(hrPeriod: string): Promise<{ imported: number }> {
+async function importAllocStaffFromHrInner(hrPeriod: string): Promise<{ imported: number }> {
   await requireRole(['finance', 'principal'])
   const supabase = await allocClient()
   const pd = periodDate(hrPeriod)
@@ -239,7 +239,7 @@ export async function importAllocStaffFromHr(hrPeriod: string): Promise<{ import
 
 /** Toggle whether a company appears in the allocator's pickers/targets.
  *  Allocator-scoped only — companies.is_active is untouched. */
-export async function setAllocCompanyEnabled(companyId: string, enabled: boolean): Promise<void> {
+async function setAllocCompanyEnabledInner(companyId: string, enabled: boolean): Promise<void> {
   await requireRole(['finance', 'principal'])
   const supabase = await allocClient()
   const { error } = await supabase
@@ -262,7 +262,7 @@ export interface SnapshotDetailRow {
 
 /** A saved snapshot, for review: who was in it and how they split
  *  ("存快照后我希望可以有记录检查回", user 2026-08-01). */
-export async function getAllocSnapshot(
+async function getAllocSnapshotInner(
   period: string,
 ): Promise<{ rows: SnapshotDetailRow[]; savedAt: string | null }> {
   await requireRole(['finance', 'principal'])
@@ -291,7 +291,7 @@ export async function getAllocSnapshot(
 
 // ─── Categories ──────────────────────────────────────────────────────────────
 
-export async function saveAllocCategory(payload: { id?: string; name: string; coaCode: string }): Promise<void> {
+async function saveAllocCategoryInner(payload: { id?: string; name: string; coaCode: string }): Promise<void> {
   await requireRole(['finance', 'principal'])
   const supabase = await allocClient()
   const name = payload.name.trim()
@@ -308,7 +308,7 @@ export async function saveAllocCategory(payload: { id?: string; name: string; co
   revalidatePath('/billing-allocator')
 }
 
-export async function deleteAllocCategory(id: string): Promise<void> {
+async function deleteAllocCategoryInner(id: string): Promise<void> {
   await requireRole(['finance', 'principal'])
   const supabase = await allocClient()
   const { error } = await supabase.from('alloc_categories').delete().eq('id', id)
@@ -318,7 +318,7 @@ export async function deleteAllocCategory(id: string): Promise<void> {
 
 // ─── Templates ───────────────────────────────────────────────────────────────
 
-export async function saveAllocTemplate(payload: {
+async function saveAllocTemplateInner(payload: {
   id?: string
   name: string
   method: AllocMethod
@@ -364,7 +364,7 @@ export async function saveAllocTemplate(payload: {
   revalidatePath('/billing-allocator')
 }
 
-export async function deleteAllocTemplate(id: string): Promise<void> {
+async function deleteAllocTemplateInner(id: string): Promise<void> {
   await requireRole(['finance', 'principal'])
   const supabase = await allocClient()
   const { error } = await supabase.from('alloc_templates').delete().eq('id', id)
@@ -473,7 +473,7 @@ async function loadCalcContext(
  * numbers are never trusted — then stores txns + details (own share included,
  * flagged). hcMode 'snapshot' uses the period's own headcount snapshot.
  */
-export async function saveAllocBatch(payload: {
+async function saveAllocBatchInner(payload: {
   period: string
   hcMode: 'current' | 'snapshot'
   expenses: ExpenseBatchInput[]
@@ -566,7 +566,7 @@ export async function saveAllocBatch(payload: {
  * details ("我如果有错无法更改", user 2026-08-01). Same lock as delete: an
  * invoiced period refuses edits until its drafts are gone.
  */
-export async function updateAllocTxn(payload: {
+async function updateAllocTxnInner(payload: {
   txnId: string
   hcMode: 'current' | 'snapshot'
   expense: ExpenseBatchInput
@@ -631,7 +631,7 @@ export async function updateAllocTxn(payload: {
   return { txnNo: txn.txn_no as string }
 }
 
-export async function deleteAllocTxn(id: string): Promise<void> {
+async function deleteAllocTxnInner(id: string): Promise<void> {
   await requireRole(['finance', 'principal'])
   const supabase = await allocClient()
   const { data: txn, error: getErr } = await supabase
@@ -676,7 +676,7 @@ export interface GenerateResult {
  * have an allocator invoice this period (any status) are skipped — delete the
  * draft in /statements to regenerate.
  */
-export async function generateAllocatorInvoices(period: string): Promise<GenerateResult> {
+async function generateAllocatorInvoicesInner(period: string): Promise<GenerateResult> {
   await requireRole(['finance', 'principal'])
   const supabase = await allocClient()
   const pd = periodDate(period)
@@ -781,4 +781,66 @@ export async function generateAllocatorInvoices(period: string): Promise<Generat
   revalidatePath('/billing-allocator')
   revalidatePath('/statements')
   return result
+}
+
+// ─── Exported wrappers: return the error, never throw it ─────────────────────
+//
+// Next.js masks errors thrown inside server actions in production builds
+// (the user hit the generic "Server Components render" message when the
+// period-already-invoiced guard fired, 2026-08-01). Every action therefore
+// funnels through guard(): the real message comes back as `error` and the
+// client's unwrap() re-throws it locally where it can actually be shown.
+
+async function guard<T extends object>(fallback: T, fn: () => Promise<T>): Promise<T & { error?: string }> {
+  try {
+    return await fn()
+  } catch (err) {
+    return { ...fallback, error: err instanceof Error ? err.message : 'Action failed' }
+  }
+}
+
+export async function saveAllocStaff(payload: Parameters<typeof saveAllocStaffInner>[0]) {
+  return guard({}, async () => { await saveAllocStaffInner(payload); return {} })
+}
+export async function deleteAllocStaff(id: string) {
+  return guard({}, async () => { await deleteAllocStaffInner(id); return {} })
+}
+export async function saveAllocSnapshot(period: string) {
+  return guard({}, async () => { await saveAllocSnapshotInner(period); return {} })
+}
+export async function importAllocStaffFromHr(hrPeriod: string) {
+  return guard<{ imported: number }>({ imported: 0 }, () => importAllocStaffFromHrInner(hrPeriod))
+}
+export async function setAllocCompanyEnabled(companyId: string, enabled: boolean) {
+  return guard({}, async () => { await setAllocCompanyEnabledInner(companyId, enabled); return {} })
+}
+export async function getAllocSnapshot(period: string) {
+  return guard<{ rows: SnapshotDetailRow[]; savedAt: string | null }>(
+    { rows: [], savedAt: null },
+    () => getAllocSnapshotInner(period),
+  )
+}
+export async function saveAllocCategory(payload: Parameters<typeof saveAllocCategoryInner>[0]) {
+  return guard({}, async () => { await saveAllocCategoryInner(payload); return {} })
+}
+export async function deleteAllocCategory(id: string) {
+  return guard({}, async () => { await deleteAllocCategoryInner(id); return {} })
+}
+export async function saveAllocTemplate(payload: Parameters<typeof saveAllocTemplateInner>[0]) {
+  return guard({}, async () => { await saveAllocTemplateInner(payload); return {} })
+}
+export async function deleteAllocTemplate(id: string) {
+  return guard({}, async () => { await deleteAllocTemplateInner(id); return {} })
+}
+export async function saveAllocBatch(payload: Parameters<typeof saveAllocBatchInner>[0]) {
+  return guard<{ txnNos: string[] }>({ txnNos: [] }, () => saveAllocBatchInner(payload))
+}
+export async function updateAllocTxn(payload: Parameters<typeof updateAllocTxnInner>[0]) {
+  return guard<{ txnNo: string }>({ txnNo: '' }, () => updateAllocTxnInner(payload))
+}
+export async function deleteAllocTxn(id: string) {
+  return guard({}, async () => { await deleteAllocTxnInner(id); return {} })
+}
+export async function generateAllocatorInvoices(period: string) {
+  return guard<GenerateResult>({ created: [], skipped: [] }, () => generateAllocatorInvoicesInner(period))
 }

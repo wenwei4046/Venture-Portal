@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { deleteAllocTxn, generateAllocatorInvoices, type GenerateResult } from '../actions'
 import type { AllocatorData, TxnRow } from './types'
+import { unwrap } from './unwrap'
 
 const fmt = (n: number) => n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -87,7 +88,7 @@ export default function RecordsTab({
         <div className="flex items-center gap-4 flex-wrap">
           <button
             type="button"
-            onClick={() => run(async () => { setGenResult(await generateAllocatorInvoices(data.period)) })}
+            onClick={() => run(async () => { setGenResult(unwrap(await generateAllocatorInvoices(data.period))) })}
             disabled={isPending}
             className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50"
           >
@@ -172,7 +173,7 @@ export default function RecordsTab({
                   </button>
                   <button
                     type="button"
-                    onClick={() => run(() => deleteAllocTxn(t.id))}
+                    onClick={() => run(async () => { unwrap(await deleteAllocTxn(t.id)) })}
                     disabled={isPending || invoiced}
                     title={invoiced ? '已开单,先删 draft invoice' : '删掉这笔分摊'}
                     className="text-muted hover:text-danger font-mono text-sm px-1 disabled:opacity-40"

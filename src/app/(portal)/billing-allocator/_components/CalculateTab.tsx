@@ -11,6 +11,7 @@ import {
 } from '@/lib/billing-allocator'
 import { saveAllocBatch, updateAllocTxn, type ExpenseBatchInput } from '../actions'
 import type { AllocatorData, TxnRow } from './types'
+import { unwrap } from './unwrap'
 
 const fmt = (n: number) => n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -180,10 +181,10 @@ export default function CalculateTab({
         if (editTxn) {
           const first = preview.find((p) => p.lines)
           if (!first) throw new Error('Nothing to save')
-          await updateAllocTxn({ txnId: editTxn.id, hcMode, expense: toInput(first.row) })
+          unwrap(await updateAllocTxn({ txnId: editTxn.id, hcMode, expense: toInput(first.row) }))
         } else {
           const expenses = preview.filter((p) => p.lines).map((p) => toInput(p.row))
-          await saveAllocBatch({ period: data.period, hcMode, expenses })
+          unwrap(await saveAllocBatch({ period: data.period, hcMode, expenses }))
         }
         setRows([blankRow(nextKey)])
         setNextKey((k) => k + 1)
