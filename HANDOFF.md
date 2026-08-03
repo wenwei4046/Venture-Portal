@@ -72,6 +72,19 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+Follow-up 6 (2026-08-01, invoice round): Aug regenerated + verified — all 6
+drafts tie to alloc records to the cent (incl. the 17.5%/17.5% penny landing
+on the last row). Invoice line format: "desc — RM {base} × {share} · ALC-no";
+summary = that invoice's own expense names joined. Records-tab chips open
+/billing/invoice-doc?id= (the old /statements/[id] link 404'd — that route is
+monthly statements). Category COA is now the shared AccountPicker; the user
+mapped: Advertisement→9095, Upkeep→9086, Utilities→9091 (contra-expense
+treatment) and **Rental→7012 Rental Income — DELIBERATE ("这个我故意弄成这样"):
+rental recharges present as income while the other three net down the expense.
+Do NOT flag this as inconsistent.** resolveRevenueGlCode accepts any active
+postable code (bill-back by design), so issuing works for all four; NULL
+category still falls back to 5000.
+
 Follow-up 5 (2026-08-01, calc round): one bill mixing methods = enter it as
 multiple expense rows (user confirmed "拆两行输入就够" — per-company invoices
 already merge everything into ONE invoice per target). Percentage/Custom split
