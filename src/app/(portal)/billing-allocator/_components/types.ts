@@ -46,6 +46,10 @@ export interface TxnRow {
   id: string
   txnNo: string
   description: string
+  /** invoices.reference_no of the batch that billed it; null = not billed. */
+  billedRef: string | null
+  /** true while that batch still has live invoices — edit/delete disabled. */
+  locked: boolean
   amount: number
   method: string
   categoryId: string | null

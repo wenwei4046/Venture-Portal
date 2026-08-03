@@ -23,6 +23,11 @@ export default function RecordsTab({
   const [genResult, setGenResult] = useState<GenerateResult | null>(null)
 
   const invoiced = data.invoices.length > 0
+  // Multi-batch: only UNBILLED allocations feed the next Generate.
+  const unbilled = data.txns.filter((t) => !t.locked)
+  const unbilledTargets = new Set(
+    unbilled.flatMap((t) => t.details.filter((d) => !d.isOwnShare).map((d) => d.companyLabel)),
+  )
 
   // Per-company billed totals across the period's txns (own share excluded).
   const totals = new Map<string, number>()
@@ -57,12 +62,13 @@ export default function RecordsTab({
 
   return (
     <div className="space-y-6">
-      {/* Invoices banner */}
+      {/* Invoices banner — every batch of the month. New expenses can still
+          be added; only their OWN batch locks an allocation. */}
       {invoiced ? (
         <div className="border border-accent-border bg-accent-bg rounded-md p-4">
           <div className="flex items-baseline justify-between gap-3 flex-wrap mb-2">
             <span className="font-serif italic text-accent text-sm">
-              {data.period} 已开单 — 记录已锁定(要改先去 Invoice 页删掉 draft)
+              {data.period} 已开的单 — 开过单的记录锁定;新费用照常可以加,再按 Generate 只开新的
             </span>
             <Link href="/statements" className="font-serif italic text-sm text-accent hover:text-accent-hover">
               去 Invoice 页处理 →
@@ -84,7 +90,9 @@ export default function RecordsTab({
             ))}
           </div>
         </div>
-      ) : (
+      ) : null}
+
+      {unbilled.length > 0 ? (
         <div className="flex items-center gap-4 flex-wrap">
           <button
             type="button"
@@ -92,15 +100,13 @@ export default function RecordsTab({
             disabled={isPending}
             className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50"
           >
-            {isPending ? '开单中…' : `Generate draft invoices (${new Set(
-              data.txns.flatMap((t) => t.details.filter((d) => !d.isOwnShare).map((d) => d.companyLabel)),
-            ).size} 家)`}
+            {isPending ? '开单中…' : `Generate draft invoices(${unbilled.length} 笔未开单 · ${unbilledTargets.size} 家)`}
           </button>
           <span className="font-serif italic text-muted text-xs">
-            每家一张 draft,跟手工多行开单同一条路;开完去 Invoice 页复核 issue。
+            只开还没开过单的分摊,每家一张 draft;开完去 Invoice 页复核 issue。
           </span>
         </div>
-      )}
+      ) : null}
 
       {genResult ? (
         <div className="border border-hairline rounded-md bg-surface p-4 text-sm font-sans space-y-1">
@@ -138,6 +144,11 @@ export default function RecordsTab({
                   <div className="font-serif text-md text-ink">{t.description}</div>
                   <div className="font-mono text-[10px] text-muted">
                     {t.categoryName || '—'}{t.hcPeriod ? ` · HC ${t.hcPeriod}` : ''}
+                    {t.locked ? (
+                      <span className="ml-1.5 px-1.5 py-0.5 bg-surface-2 rounded text-graphite uppercase">已开单 · {t.billedRef}</span>
+                    ) : (
+                      <span className="ml-1.5 px-1.5 py-0.5 bg-accent-bg rounded text-accent uppercase">未开单</span>
+                    )}
                   </div>
                 </td>
                 <td>
@@ -165,8 +176,8 @@ export default function RecordsTab({
                   <button
                     type="button"
                     onClick={() => onEdit(t)}
-                    disabled={isPending || invoiced}
-                    title={invoiced ? '已开单,先删 draft invoice' : '带回计算 tab 修改,存档覆盖原记录'}
+                    disabled={isPending || t.locked}
+                    title={t.locked ? `已开单(${t.billedRef}),draft 先删那批才能改` : '带回计算 tab 修改,存档覆盖原记录'}
                     className="text-accent hover:text-accent-hover font-serif italic text-sm mr-3 disabled:opacity-40"
                   >
                     改
@@ -174,8 +185,8 @@ export default function RecordsTab({
                   <button
                     type="button"
                     onClick={() => run(async () => { unwrap(await deleteAllocTxn(t.id)) })}
-                    disabled={isPending || invoiced}
-                    title={invoiced ? '已开单,先删 draft invoice' : '删掉这笔分摊'}
+                    disabled={isPending || t.locked}
+                    title={t.locked ? `已开单(${t.billedRef}),draft 先删那批才能删` : '删掉这笔分摊'}
                     className="text-muted hover:text-danger font-mono text-sm px-1 disabled:opacity-40"
                   >
                     ×

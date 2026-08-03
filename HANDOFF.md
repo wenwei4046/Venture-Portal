@@ -72,6 +72,21 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+Follow-up 7 (2026-08-01, post-issue round): **actions return errors instead of
+throwing** — Next.js masks thrown server-action errors in prod (the
+period-lock guard surfaced as the generic "Server Components render" digest);
+all 14 actions now wrap through guard() → { error }, clients unwrap() locally
+(new _components/unwrap.ts). Then the user ISSUED the Aug drafts and asked how
+to bill NEW expenses → **multi-batch billing** (mig `20260801050000`
+alloc_txns.billed_ref, backfilled ALC-202608 onto the 4 issued Job Street
+rows): new expenses join a month anytime; Generate bills ONLY unbilled
+allocations under a fresh ref (ALC-YYYYMM → -2 → -3…); locks are PER
+ALLOCATION (billed_ref's batch still has live invoices → 改/× refuse; delete
+that batch's drafts → auto-unlocks; issued = permanent). Generate CLAIMS
+billed_ref before creating invoices — a first-create failure leaves the ref
+invoice-less so the claim self-releases. Records rows badge 已开单·ref /
+未开单; the Generate button counts unbilled only.
+
 Follow-up 6 (2026-08-01, invoice round): Aug regenerated + verified — all 6
 drafts tie to alloc records to the cent (incl. the 17.5%/17.5% penny landing
 on the last row). Invoice line format: "desc — RM {base} × {share} · ALC-no";

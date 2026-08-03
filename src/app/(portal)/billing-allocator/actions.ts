@@ -483,9 +483,9 @@ async function saveAllocBatchInner(payload: {
   const pd = periodDate(payload.period)
   if (!payload.expenses || payload.expenses.length === 0) throw new Error('No expenses to save')
 
-  // Editing a period that already has allocator invoices would silently desync
-  // the drafts — force the delete-drafts-first flow instead.
-  await assertPeriodNotInvoiced(supabase, payload.period)
+  // Multi-batch model: NEW expenses may join a month anytime — already-billed
+  // allocations are protected individually (see assertTxnNotBilled), and the
+  // next Generate only picks up the unbilled ones.
 
   const { targets, staffSplits, hcLabel, hcPeriodCol } = await loadCalcContext(
     supabase, payload.period, payload.hcMode,
@@ -576,12 +576,12 @@ async function updateAllocTxnInner(payload: {
 
   const { data: txn, error: getErr } = await supabase
     .from('alloc_txns')
-    .select('id, txn_no, period_month')
+    .select('id, txn_no, period_month, billed_ref')
     .eq('id', payload.txnId)
     .single()
   if (getErr || !txn) throw new Error('Allocation not found')
   const period = dayjs(txn.period_month as string).format('YYYY-MM')
-  await assertPeriodNotInvoiced(supabase, period)
+  await assertTxnNotBilled(supabase, txn.txn_no as string, (txn.billed_ref as string | null) ?? null)
 
   const { targets, staffSplits, hcLabel, hcPeriodCol } = await loadCalcContext(
     supabase, period, payload.hcMode,
@@ -636,29 +636,33 @@ async function deleteAllocTxnInner(id: string): Promise<void> {
   const supabase = await allocClient()
   const { data: txn, error: getErr } = await supabase
     .from('alloc_txns')
-    .select('id, period_month')
+    .select('id, txn_no, period_month, billed_ref')
     .eq('id', id)
     .single()
   if (getErr || !txn) throw new Error('Allocation not found')
-  await assertPeriodNotInvoiced(supabase, dayjs(txn.period_month as string).format('YYYY-MM'))
+  await assertTxnNotBilled(supabase, txn.txn_no as string, (txn.billed_ref as string | null) ?? null)
   const { error } = await supabase.from('alloc_txns').delete().eq('id', id)
   if (error) throw new Error(error.message)
   revalidatePath('/billing-allocator')
 }
 
-async function assertPeriodNotInvoiced(
+/** Per-allocation lock: refuse edit/delete while the batch that billed it
+ *  still has live invoices. A batch whose drafts were all deleted unlocks. */
+async function assertTxnNotBilled(
   supabase: SupabaseClient,
-  period: string,
+  txnNo: string,
+  billedRef: string | null,
 ): Promise<void> {
+  if (!billedRef) return
   const { data } = await supabase
     .from('invoices')
     .select('invoice_no, status')
-    .eq('reference_no', refFor(period))
+    .eq('reference_no', billedRef)
     .limit(1)
   if (data && data.length > 0) {
     throw new Error(
-      `Period ${period} already has allocator invoices (${data[0].invoice_no}, ${data[0].status}). ` +
-        'Delete the draft invoices in /statements first, then edit and regenerate.',
+      `${txnNo} 已经开单(${billedRef},如 ${data[0].invoice_no} · ${data[0].status})。` +
+        'draft 的话先去 Invoice 页删掉那批;已 issue 的记录不能再改。',
     )
   }
 }
@@ -671,30 +675,45 @@ export interface GenerateResult {
 }
 
 /**
- * One DRAFT invoice per bill-to company for the period, through the exact same
- * path as the manual multi-line Create Invoice button. Companies that already
- * have an allocator invoice this period (any status) are skipped — delete the
- * draft in /statements to regenerate.
+ * One DRAFT invoice per bill-to target, through the exact same path as the
+ * manual multi-line Create Invoice button. MULTI-BATCH: only allocations not
+ * yet billed (billed_ref NULL, or its batch's invoices all deleted) go out,
+ * under a fresh reference — ALC-YYYYMM, then ALC-YYYYMM-2, -3, … Issued
+ * batches are never touched.
  */
 async function generateAllocatorInvoicesInner(period: string): Promise<GenerateResult> {
   await requireRole(['finance', 'principal'])
   const supabase = await allocClient()
   const pd = periodDate(period)
-  const ref = refFor(period)
+  const baseRef = refFor(period)
 
-  const [{ data: txns, error: tErr }, { data: cos, error: cErr }, { data: depts }, { data: cats }] = await Promise.all([
+  const [{ data: txns, error: tErr }, { data: cos, error: cErr }, { data: depts }, { data: cats }, { data: monthInvoices }] = await Promise.all([
     supabase
       .from('alloc_txns')
-      .select('id, txn_no, description, amount, method, category_id, alloc_txn_details(company_id, department_id, method_detail, amount, is_own_share)')
+      .select('id, txn_no, description, amount, method, category_id, billed_ref, alloc_txn_details(company_id, department_id, method_detail, amount, is_own_share)')
       .eq('period_month', pd)
       .order('txn_no'),
     supabase.from('companies').select('id, short_code, name').eq('is_active', true),
     supabase.from('departments').select('id, name'),
     supabase.from('alloc_categories').select('id, coa_code'),
+    supabase.from('invoices').select('reference_no').like('reference_no', `${baseRef}%`),
   ])
   if (tErr) throw new Error(tErr.message)
   if (cErr) throw new Error(cErr.message)
   if (!txns || txns.length === 0) throw new Error(`No allocations saved for ${period}`)
+
+  // Batches that still have live invoices; a fresh ref for this run.
+  const liveRefs = new Set((monthInvoices ?? []).map((r) => r.reference_no as string))
+  let batchRef = baseRef
+  for (let n = 2; liveRefs.has(batchRef); n++) batchRef = `${baseRef}-${n}`
+
+  const eligible = txns.filter((t) => {
+    const br = (t.billed_ref as string | null) ?? null
+    return !br || !liveRefs.has(br)
+  })
+  if (eligible.length === 0) {
+    throw new Error(`${period} 的分摊全部开过单了 — 先加新费用,或删掉某批 draft 再重开。`)
+  }
 
   const coLabel = new Map((cos ?? []).map((c) => [c.id as string, (c.short_code ?? c.name) as string]))
   const deptName = new Map((depts ?? []).map((d) => [d.id as string, d.name as string]))
@@ -704,24 +723,13 @@ async function generateAllocatorInvoicesInner(period: string): Promise<GenerateR
       : coLabel.get(targetId) ?? targetId
   const coaByCat = new Map((cats ?? []).map((c) => [c.id as string, (c.coa_code as string | null) ?? '']))
 
-  const { data: existing } = await supabase
-    .from('invoices')
-    .select('company_id, billable_to_department_id, invoice_no, status')
-    .eq('reference_no', ref)
-  const already = new Map(
-    (existing ?? []).map((r) => [
-      encodeTarget((r.company_id as string | null), (r.billable_to_department_id as string | null)) ?? '',
-      `${r.invoice_no} (${r.status})`,
-    ]),
-  )
-
   // Group billed detail lines by target (subsidiary or department), txn order.
   type Line = { description: string; amount: number; categoryCode: string }
   const byTarget = new Map<string, Line[]>()
   // Per-target expense names, deduped in txn order — they BECOME the invoice
   // summary (user 2026-08-01: "summary 改成这些的...全部四个就显示4个").
   const descsByTarget = new Map<string, string[]>()
-  for (const t of txns) {
+  for (const t of eligible) {
     const details = (t.alloc_txn_details ?? []) as Array<{
       company_id: string | null; department_id: string | null
       method_detail: string; amount: number | string; is_own_share: boolean
@@ -752,15 +760,21 @@ async function generateAllocatorInvoicesInner(period: string): Promise<GenerateR
   const today = dayjs().format('YYYY-MM-DD')
   const result: GenerateResult = { created: [], skipped: [] }
 
+  // CLAIM the allocations under this batch ref BEFORE creating invoices: if
+  // the very first create fails (e.g. period closed), no invoice carries the
+  // ref, so the claim self-releases and the next run re-bills them.
+  const eligibleIds = eligible.map((t) => t.id as string)
+  const { error: claimErr } = await supabase
+    .from('alloc_txns')
+    .update({ billed_ref: batchRef })
+    .in('id', eligibleIds)
+  if (claimErr) throw new Error(claimErr.message)
+
   // SEQUENTIAL — invoice numbering and draft-cleanup behave exactly like
   // clicking the manual button once per target. Companies bill as subsidiary;
   // departments as dept_pool (inter-billing) — SAME createMultiLineInvoice.
   for (const [targetId, lines] of byTarget) {
     const label = labelFor(targetId)
-    if (already.has(targetId)) {
-      result.skipped.push({ company: label, reason: already.get(targetId)! })
-      continue
-    }
     const t = decodeTarget(targetId)
     const { invoice_no } = await createMultiLineInvoice({
       billableType: t.departmentId ? 'dept_pool' : 'subsidiary',
@@ -768,7 +782,7 @@ async function generateAllocatorInvoicesInner(period: string): Promise<GenerateR
       period,
       invoiceDate: today,
       dueDate: '',
-      referenceNo: ref,
+      referenceNo: batchRef,
       // Summary = this invoice's own expense names, all of them.
       headerDescription: `${(descsByTarget.get(targetId) ?? []).join(' · ')} — ${monthLabel}`,
       companyId: t.companyId ?? undefined,

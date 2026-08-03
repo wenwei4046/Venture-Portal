@@ -53,10 +53,14 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     supabase.from('alloc_template_splits').select('template_id, company_id, pct'),
     supabase
       .from('alloc_txns')
-      .select('id, txn_no, description, amount, method, category_id, hc_period, alloc_txn_details(company_id, department_id, method_detail, amount, is_own_share)')
+      .select('id, txn_no, description, amount, method, category_id, hc_period, billed_ref, alloc_txn_details(company_id, department_id, method_detail, amount, is_own_share)')
       .eq('period_month', pd)
       .order('txn_no'),
-    supabase.from('invoices').select('id, invoice_no, company_id, billable_to_department_id, status').eq('reference_no', ref),
+    // ALL batches of the month: ALC-YYYYMM, ALC-YYYYMM-2, …
+    supabase
+      .from('invoices')
+      .select('id, invoice_no, company_id, billable_to_department_id, status, reference_no')
+      .like('reference_no', `${ref}%`),
     // READ-ONLY peek at HR's allocation months, for the one-click import.
     supabase.from('hr_staff_allocation').select('period_month').order('period_month', { ascending: false }),
     // This period's snapshot — feeds the Calculate preview under hcMode=snapshot.
@@ -137,10 +141,15 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
       .map((x) => ({ companyId: x.company_id as string, pct: Number(x.pct) })),
   }))
 
+  // A txn is locked while ITS batch still has live invoices.
+  const liveRefs = new Set((allocInvoices ?? []).map((i) => i.reference_no as string))
+
   const txnRows: TxnRow[] = (txns ?? []).map((t) => ({
     id: t.id as string,
     txnNo: t.txn_no as string,
     description: t.description as string,
+    billedRef: (t.billed_ref as string | null) ?? null,
+    locked: !!t.billed_ref && liveRefs.has(t.billed_ref as string),
     amount: Number(t.amount),
     method: t.method as string,
     categoryId: (t.category_id as string | null) ?? null,
