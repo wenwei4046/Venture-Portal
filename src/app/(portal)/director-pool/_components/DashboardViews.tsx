@@ -649,7 +649,10 @@ function BillingView(p: DashProps) {
                 const row = billingRow(m, d, dirInputs, settings)
                 const totalAdv = r2(Math.abs(d.advThisMonth) + d.advStatAmount + d.allowStatAmount - d.statFromSurplus)
                 const advDeduct = d.billingDeduct
-                const advRemain = m.billingDeductAdv && totalAdv > 0 ? r2(totalAdv - advDeduct) : 0
+                // Deduct can exceed this month's additions — the excess repays
+                // old accumulated advance (2026-08-03 rule).
+                const advRemain = m.billingDeductAdv && totalAdv > 0 ? r2(Math.max(0, totalAdv - advDeduct)) : 0
+                const oldRepaid = m.billingDeductAdv ? r2(Math.max(0, advDeduct - totalAdv)) : 0
                 const net = m.billingDeductAdv && !m.fullPayout ? r2(row.total - advDeduct) : 0
                 g.salSys += row.salSys; g.statSal += row.statSal; g.alSys += row.alSys; g.statAl += row.statAl
                 g.total += row.total; g.advDeduct += advDeduct; g.net += net
@@ -676,6 +679,7 @@ function BillingView(p: DashProps) {
                         <span className="text-danger">
                           ({fmt(advDeduct)})
                           {advRemain > 0 && <span className="block font-mono text-[9.5px] text-graphite">余 {fmt(advRemain)} → Accum</span>}
+                          {oldRepaid > 0 && <span className="block font-mono text-[9.5px] text-graphite">含还旧账 {fmt(oldRepaid)}</span>}
                         </span>
                       ) : '—'}
                     </td>
@@ -1178,7 +1182,7 @@ function FlowView(p: DashProps) {
             ['25% Billing Invoice (Allowance)', d.allowGross > 0 ? fmtRM(d.allowBillInv) : '-'],
             ...(sas ? ([['25% Statutory (Allow 自己填)', fmtRM(statAlVal)]] as FlowRow[]) : []),
             ['Total 25% Billing Invoice', fmtRM(total25), true, 'ledger'],
-            ...(m.billingDeductAdv && totalAdvBox > 0
+            ...(m.billingDeductAdv && (totalAdvBox > 0 || d.billingDeduct > 0)
               ? ([
                   [
                     `(-) Total Advance Deduct${totalAdvBox > total25 ? ' (capped at billing)' : ''}`,
@@ -1186,6 +1190,12 @@ function FlowView(p: DashProps) {
                     false,
                     'danger',
                   ],
+                  // Excess over this month's additions repays OLD accumulated
+                  // advance (2026-08-03 rule) — broken out so the deduct line
+                  // reconciles against the Total Advance box above.
+                  ...(d.billingDeduct > totalAdvBox
+                    ? ([['↳ 含还旧账 (Old Advance Repaid)', fmtRM(r2(d.billingDeduct - totalAdvBox)), false, 'ledger']] as FlowRow[])
+                    : []),
                   ...(totalAdvBox > d.billingDeduct
                     ? ([['⚠️ Remaining Advance → Accum. Advance', fmtRM(r2(totalAdvBox - d.billingDeduct)), false, 'danger']] as FlowRow[])
                     : []),

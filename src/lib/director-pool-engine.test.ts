@@ -321,6 +321,83 @@ describe('billing-deduct-adv display adjustment', () => {
     expect(wlMar.statFromSurplus).toBe(740.63)
     expect(r2(wlMar.accumulated + billingDeductAdjustment('WL', 'm2', results))).toBe(-259.37)
   })
+
+  // User ruling 2026-08-03 (WL July): billing left over after covering this
+  // month's additions pays down the OLD accumulated advance too.
+  it('leftover billing repays old accumulated advance', () => {
+    // Feb (unflagged): WL debt −8343.75. Mar (flagged): additions 3044.53,
+    // billing 3785.16 → deduct the full 3785.16 (3044.53 this month +
+    // 740.63 off the old debt), not just this month's additions.
+    const feb = mkMonth('m1', '2026-02-01', { salary: 40000, kpi: 0, allowance: 0 })
+    const mar = mkMonth('m2', '2026-03-01', { salary: 75000, kpi: 0, allowance: 0 }, { billingDeductAdv: true })
+    const results = calcAll(settings, directors, [feb, mar], {})
+    const wlMar = results[1].dirRes.find((d) => d.id === 'WL')!
+    expect(wlMar.vrKpi).toBe(-3044.53)
+    expect(wlMar.billingDeduct).toBe(3785.16)
+    // Displayed accumulated: −8343.75 − 3044.53 + 3785.16 = −7603.12
+    expect(r2(wlMar.accumulated + billingDeductAdjustment('WL', 'm2', results))).toBe(-7603.12)
+  })
+
+  it('a flagged month with no new advance still repays old debt from billing', () => {
+    // Feb (unflagged): debt −8343.75. Mar (flagged): vr +740.63 offsets first,
+    // then the whole 5046.88 billing goes to the remaining old debt.
+    const feb = mkMonth('m1', '2026-02-01', { salary: 40000, kpi: 0, allowance: 0 })
+    const mar = mkMonth('m2', '2026-03-01', { salary: 100000, kpi: 0, allowance: 0 }, { billingDeductAdv: true })
+    const results = calcAll(settings, directors, [feb, mar], {})
+    const wlMar = results[1].dirRes.find((d) => d.id === 'WL')!
+    expect(wlMar.advanceOffset).toBe(740.63)
+    expect(wlMar.billingDeduct).toBe(5046.88)
+    // −8343.75 + 740.63 + 5046.88 = −2556.24
+    expect(r2(wlMar.accumulated + billingDeductAdjustment('WL', 'm2', results))).toBe(-2556.24)
+  })
+
+  it('a later Vr KPI surplus still sees the billing-repaid old debt', () => {
+    const feb = mkMonth('m1', '2026-02-01', { salary: 40000, kpi: 0, allowance: 0 })
+    const mar = mkMonth('m2', '2026-03-01', { salary: 75000, kpi: 0, allowance: 0 }, { billingDeductAdv: true })
+    const apr = mkMonth('m3', '2026-04-01', { salary: 100000, kpi: 0, allowance: 0 })
+    const results = calcAll(settings, directors, [feb, mar, apr], {})
+    const wlApr = results[2].dirRes.find((d) => d.id === 'WL')!
+    // True debt after Mar = −7603.12; Apr surplus 740.63 offsets, no re-collect.
+    expect(wlApr.advanceOffset).toBe(740.63)
+    expect(r2(wlApr.accumulated + billingDeductAdjustment('WL', 'm3', results))).toBe(-6862.49)
+  })
+})
+
+describe('billingAccum — net accumulation for deduct months (user ruling 2026-08-03, option 2)', () => {
+  it('a flagged month before 2026-07 is consumed whole (legacy — June stays settled)', () => {
+    // WL Feb: billing 3785.16, deduct only 3044.53 — but the month is before
+    // the cutoff, so NONE of it accumulates.
+    const feb = mkMonth('m1', '2026-02-01', { salary: 75000, kpi: 0, allowance: 0 }, { billingDeductAdv: true })
+    const results = calcAll(settings, directors, [feb], {})
+    expect(results[0].dirRes.find((d) => d.id === 'WL')!.billingDeduct).toBe(3044.53)
+    expect(billingAccum('WL', 'm1', results, {}, settings)).toBe(0)
+  })
+
+  it('a flagged month from 2026-07 accumulates the net after deduct', () => {
+    // Same pool in July: deduct 3044.53 of the 3785.16 billing → net 740.63
+    // stays owed to the director.
+    const jul = mkMonth('m1', '2026-07-01', { salary: 75000, kpi: 0, allowance: 0 }, { billingDeductAdv: true })
+    const results = calcAll(settings, directors, [jul], {})
+    expect(results[0].dirRes.find((d) => d.id === 'WL')!.billingDeduct).toBe(3044.53)
+    expect(billingAccum('WL', 'm1', results, {}, settings)).toBe(740.63)
+  })
+
+  it('a fully-consumed flagged month from 2026-07 contributes nothing', () => {
+    // Old debt exceeds billing → deduct = whole billing → net 0.
+    const feb = mkMonth('m1', '2026-02-01', { salary: 40000, kpi: 0, allowance: 0 })
+    const jul = mkMonth('m2', '2026-07-01', { salary: 75000, kpi: 0, allowance: 0 }, { billingDeductAdv: true })
+    const results = calcAll(settings, directors, [feb, jul], {})
+    expect(results[1].dirRes.find((d) => d.id === 'WL')!.billingDeduct).toBe(3785.16)
+    // Feb (unflagged) still accumulates its 2018.75; July nets to 0.
+    expect(billingAccum('WL', 'm2', results, {}, settings)).toBe(2018.75)
+  })
+
+  it('computeContra sees the same net billing', () => {
+    const jul = mkMonth('m1', '2026-07-01', { salary: 75000, kpi: 0, allowance: 0 }, { billingDeductAdv: true })
+    const results = calcAll(settings, directors, [jul], {})
+    const wl = computeContra(results, directors, {}, [], settings).find((c) => c.code === 'WL')!
+    expect(wl.billing).toBe(740.63)
+  })
 })
 
 describe('fixed salary overrides', () => {

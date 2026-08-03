@@ -102,7 +102,9 @@ export interface DirectorMonthResult {
    *  Deducted from the HR payout alongside advanceOffset. */
   statFromSurplus: number
   /** This month's billing-deduct repayment (billingDeductAdv months):
-   *  min(this month's advance additions, this month's 25% billing total). */
+   *  min(total outstanding debt incl. prior months, this month's 25% billing
+   *  total). Leftover billing beyond this month's additions pays down the old
+   *  accumulated advance (user ruling 2026-08-03, WL July). */
   billingDeduct: number
   prevAccum: number
   advanceSurplus: number
@@ -291,19 +293,21 @@ export function calcAll(
         advanceSurplus = r2(Math.max(0, advanceSurplus - statFromSurplus))
       }
 
-      // Billing-deduct month: this month's advance additions are repaid from
-      // the month's 25% billing total (mirrors billingRow). Tracked so later
+      // Billing-deduct month: repay from the month's 25% billing total
+      // (mirrors billingRow) — this month's advance additions first, then any
+      // older outstanding debt (user ruling 2026-08-03, WL July: leftover
+      // billing pays down the old accumulated advance too). Tracked so later
       // months' Vr KPI offsets see the true remaining debt.
       if (month.billingDeductAdv) {
-        const totalAdv = r2(Math.abs(advThisMonth) + r2(advStatAmount + allowStatAmount) - statFromSurplus)
-        if (totalAdv > 0) {
+        const outstanding = r2(Math.max(0, -(accumulated[d.id] + billingRepaid[d.id])))
+        if (outstanding > 0) {
           const dedStatSal = month.fullPayout ? 0 : n(inp.billingStat)
           const dedStatAl =
             month.fullPayout || !showAllowStat(month.month, settings) ? 0 : n(inp.allowBillingStat)
           const dedSalSys = month.fullPayout ? 0 : salKpiBillInv
           const dedAlSys = month.fullPayout ? 0 : allowBillInv
           const billTotal = r2(dedSalSys + dedStatSal + dedAlSys + dedStatAl)
-          billingDeduct = r2(Math.min(totalAdv, billTotal))
+          billingDeduct = r2(Math.min(outstanding, billTotal))
           billingRepaid[d.id] = r2(billingRepaid[d.id] + billingDeduct)
         }
       }
@@ -409,9 +413,19 @@ export function billingRow(
 }
 
 /**
+ * Billing-deduct months BEFORE this date keep the legacy card rule: the whole
+ * month's billing is consumed regardless of how much actually repaid advance
+ * (Jun 2026 stays settled as-is). From this month onwards only the deducted
+ * part is consumed — the net remainder stays owed to the director and keeps
+ * accumulating (user ruling 2026-08-03, option 2: June not clawed back).
+ */
+export const BILLING_NET_ACCUM_FROM = '2026-07-01'
+
+/**
  * Accumulated 25% billing for a director up to a month (inclusive), before
- * contra. Skips full-payout / include-billing / billing-deduct-adv months and
- * months before billing_start_month — same rules as the HTML dashboard.
+ * contra. Skips full-payout / include-billing months and months before
+ * billing_start_month. Billing-deduct-adv months: skipped entirely before
+ * BILLING_NET_ACCUM_FROM (legacy), net of billingDeduct from then on.
  */
 export function billingAccum(
   directorId: string,
@@ -428,10 +442,16 @@ export function billingAccum(
   let sum = 0
   results.slice(0, uptoIdx + 1).forEach((m, i) => {
     if (startIdx >= 0 && i < startIdx) return
-    if (m.fullPayout || m.includeBilling || m.billingDeductAdv) return
+    if (m.fullPayout || m.includeBilling) return
     const d = m.dirRes.find((x) => x.id === directorId)
     if (!d) return
-    sum += billingRow(m, d, dirInputs, settings).total
+    const total = billingRow(m, d, dirInputs, settings).total
+    if (m.billingDeductAdv) {
+      if (m.month < BILLING_NET_ACCUM_FROM) return
+      sum += r2(Math.max(0, total - d.billingDeduct))
+    } else {
+      sum += total
+    }
   })
   return r2(sum)
 }
@@ -522,10 +542,18 @@ export function computeContra(
   return directors.map((dir) => {
     let accumBill = 0
     results.forEach((m) => {
-      if (m.fullPayout || m.includeBilling || m.billingDeductAdv) return
+      if (m.fullPayout || m.includeBilling) return
       const d = m.dirRes.find((x) => x.id === dir.id)
       if (!d) return
-      accumBill += d.salKpiBillInv + n(dirInputs[d.statKey]?.billingStat) + d.allowBillInv
+      const base = d.salKpiBillInv + n(dirInputs[d.statKey]?.billingStat) + d.allowBillInv
+      if (m.billingDeductAdv) {
+        // Same rule as billingAccum: legacy months fully consumed, from
+        // BILLING_NET_ACCUM_FROM only the deducted part is consumed.
+        if (m.month < BILLING_NET_ACCUM_FROM) return
+        accumBill += Math.max(0, r2(base - d.billingDeduct))
+      } else {
+        accumBill += base
+      }
     })
     const prevContra = contra
       .filter((ev) => ev.directorId === dir.id)

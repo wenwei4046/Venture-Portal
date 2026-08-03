@@ -306,9 +306,12 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
                       <div className="row"><span>{bi}% Statutory (Allow 自己填)</span><span className="amt">RM {fmt(statAlVal)}</span></div>
                     )}
                     <div className="row b pos"><span>Total {bi}% Billing Invoice</span><span className="amt">RM {fmt(total25)}</span></div>
-                    {m.billingDeductAdv && totalAdvBox > 0 && (
+                    {m.billingDeductAdv && (totalAdvBox > 0 || d.billingDeduct > 0) && (
                       <>
                         <div className="row neg"><span>(-) Total Advance Deduct{totalAdvBox > total25 ? ' (capped at billing)' : ''}</span><span className="amt">- RM {fmt(d.billingDeduct)}</span></div>
+                        {d.billingDeduct > totalAdvBox && (
+                          <div className="row pos"><span>↳ 含还旧账 (Old Advance Repaid)</span><span className="amt">RM {fmt(r2(d.billingDeduct - totalAdvBox))}</span></div>
+                        )}
                         {totalAdvBox > d.billingDeduct && (
                           <div className="row neg"><span>⚠️ Remaining → Accum. Advance</span><span className="amt">RM {fmt(r2(totalAdvBox - d.billingDeduct))}</span></div>
                         )}
