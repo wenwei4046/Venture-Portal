@@ -1927,7 +1927,28 @@ export async function approveInvoicesForPeriod(formData: FormData) {
         }
       }
     } else {
-      const revenueCode = await resolveRevenueGlCode(supabase, row.category_code, row.billing_mode)
+      // Mig 275 parity with the SINGLE issue path: multi-line invoices credit
+      // per line by each line's category_code. The bulk path predated that and
+      // credited everything to the mode default — the allocator invoices'
+      // hand-set 9095/7012 lines all landed in 5000 (user caught it
+      // 2026-08-01). Legacy single-credit stays for invoices with no lines.
+      const { data: rowLines } = await supabase
+        .from('invoice_lines')
+        .select('line_no, description, amount, category_code')
+        .eq('invoice_id', row.id)
+        .order('line_no')
+      const jeLines: Array<{ accountCode: string; debit?: number; credit?: number; description: string }> = [
+        { accountCode: '3030', debit: amount, description: `AR — invoice ${row.invoice_no ?? ''}`.trim() },
+      ]
+      if (rowLines && rowLines.length > 0) {
+        for (const ln of rowLines) {
+          const code = await resolveRevenueGlCode(supabase, ln.category_code, row.billing_mode)
+          jeLines.push({ accountCode: code, credit: Number(ln.amount), description: ln.description ?? 'Line item' })
+        }
+      } else {
+        const revenueCode = await resolveRevenueGlCode(supabase, row.category_code, row.billing_mode)
+        jeLines.push({ accountCode: revenueCode, credit: amount, description: 'Service billing revenue recognised' })
+      }
       try {
         await postJournalEntry(supabase, {
           transactionDate: txnDate,
@@ -1935,10 +1956,7 @@ export async function approveInvoicesForPeriod(formData: FormData) {
           referenceType: 'invoice',
           referenceId: row.id,
           createdBy: user.id,
-          lines: [
-            { accountCode: '3030', debit: amount, description: `AR — invoice ${row.invoice_no ?? ''}`.trim() },
-            { accountCode: revenueCode, credit: amount, description: 'Service billing revenue recognised' },
-          ],
+          lines: jeLines,
         })
       } catch (jeErr) {
         const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
