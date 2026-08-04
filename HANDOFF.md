@@ -72,6 +72,23 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+## Payroll funding destination bank is selectable (2026-08-04)
+
+User: "hr request fund 我没办法设定他是转去什么银行" — the funding PV's
+destination was hardcoded Alliance (GL 3010). Now:
+ - GeneratePvForm has a **to bank** select (default = the GL-3010 bank, so the
+   old behaviour is the default); source==dest blocked in UI and action.
+ - generatePvFromRequest takes destBankId; the PVS rows carry the CHOSEN
+   bank's gl_account_code (was literal '3010'); payee_name names the dest.
+ - Everything downstream already keys off the PVS rows (credit_dest_bank
+   trigger, its void mirror, both batch approvers) EXCEPT approve_single_voucher,
+   which resolved v_dest_bank by a hardcoded gl='3010' lookup — mig
+   `20260804000000_payroll_funding_dest_bank` patches it to resolve the
+   destination from the voucher's own PVS account_code (3010 fallback for
+   legacy vouchers), so the staging JE debits the chosen bank.
+ - The old "source is already Alliance" guard became "source ≠ destination",
+   which also unlocks reverse transfers (Alliance → HL) when ever needed.
+
 Follow-up 8 (2026-08-01, bulk-issue COA bug): user bulk-issued both Aug
 batches and caught that every JE credited **5000** while the invoice lines
 said 9095/7012 — `approveInvoicesForPeriod`'s non-consolidated branch predated

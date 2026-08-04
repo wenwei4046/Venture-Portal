@@ -43,6 +43,7 @@ export interface PayrollPoolSource {
 export async function generatePvFromRequest(
   requestId: string,
   sourceBankId: string,
+  destBankId: string,
   sources: PayrollPoolSource[],
   paymentDate: string,
 ): Promise<string> {
@@ -135,10 +136,24 @@ export async function generatePvFromRequest(
   if (bankErr) throw new Error(`Failed to read bank: ${bankErr.message}`)
   if (!bank) throw new Error('Source bank not found')
   if (bank.status !== 'active') throw new Error(`Bank ${bank.bank_name} is not active`)
-  if (bank.gl_account_code === '3010') {
-    throw new Error(
-      `${bank.bank_name} is the Alliance payroll destination — pick the bank the cash comes FROM.`,
-    )
+
+  // Destination is Finance's pick now (was hardcoded Alliance/3010 — user
+  // 2026-08-04). The PVS rows carry its GL code, which is what the approval
+  // JE, the credit_dest_bank trigger and the void mirror all key off.
+  const { data: destBank, error: destErr } = await supabase
+    .from('bank_accounts')
+    .select('id, bank_name, status, gl_account_code')
+    .eq('id', destBankId)
+    .maybeSingle()
+  if (destErr) throw new Error(`Failed to read destination bank: ${destErr.message}`)
+  if (!destBank) throw new Error('Destination bank not found')
+  if (destBank.status !== 'active') throw new Error(`Bank ${destBank.bank_name} is not active`)
+  const destGlCode = destBank.gl_account_code
+  if (!destGlCode) {
+    throw new Error(`${destBank.bank_name} has no GL account code — set it in Settings first`)
+  }
+  if (destBank.id === bank.id) {
+    throw new Error('来源和目的不能同一家银行 — the transfer must move between two banks.')
   }
   // Mig 20260720: the funding PV moves real cash at approval (HL → Alliance
   // staging transfer), so this round must fit in the source bank. Approval
@@ -171,7 +186,7 @@ export async function generatePvFromRequest(
       amount: roundAmount,
       currency: 'MYR',
       bank_account_id: sourceBankId,
-      payee_name: 'HOUZS Venture — Payroll staging (Alliance Bank)',
+      payee_name: `HOUZS Venture — Payroll staging (${destBank.bank_name})`,
       description: `${isDirector ? 'Director salary' : 'Payroll'} bank transfer — ${periodLabel}${isPartial ? ' (partial)' : ''}`,
       payment_method: 'bank_transfer',
       payment_date: payDate,
@@ -188,8 +203,8 @@ export async function generatePvFromRequest(
 
   // ── Insert source pool allocations (up to 5 rows) ─────────────────────────
   // Mig 20260720160000: the funding PV is a PURE fund transfer (no expense —
-  // Finance books the month-end accrual JVs). account_code 3010 = the Alliance
-  // destination: the credit_dest_bank_on_bank_transfer trigger credits that
+  // Finance books the month-end accrual JVs). account_code = the DESTINATION
+  // bank's GL code: the credit_dest_bank_on_bank_transfer trigger credits that
   // bank at approval (same mechanism as internal_transfer), and the PV detail
   // shows the rows as bank staging rather than Salary Expense.
   const { error: srcErr } = await supabase
@@ -199,7 +214,7 @@ export async function generatePvFromRequest(
         voucher_id: voucher.id,
         pool: s.pool,
         amount: s.amount,
-        account_code: '3010',
+        account_code: destGlCode,
       })),
     )
 

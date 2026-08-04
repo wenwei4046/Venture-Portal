@@ -8,6 +8,7 @@ interface Bank {
   id: string
   bank_name: string
   current_balance: number
+  gl_account_code: string
 }
 
 export interface PoolBreakdownRow {
@@ -58,6 +59,14 @@ export default function GeneratePvForm({
   defaultDate,
 }: Props) {
   const [bankId, setBankId] = useState<string>(banks[0]?.id ?? '')
+  // Destination is Finance's choice now ("hr request fund 我没办法设定他是转去
+  // 什么银行", user 2026-08-04) — default keeps the old behaviour: the Alliance
+  // payroll account (GL 3010), else the first bank that isn't the source.
+  const [destBankId, setDestBankId] = useState<string>(
+    banks.find(b => b.gl_account_code === '3010')?.id ??
+      banks.find(b => b.id !== (banks[0]?.id ?? ''))?.id ??
+      '',
+  )
   const [payDate, setPayDate] = useState<string>(defaultDate)
   // Default each department to what it still owes (required − already funded).
   const [amounts, setAmounts] = useState<Record<string, string>>(() =>
@@ -97,11 +106,14 @@ export default function GeneratePvForm({
   // warning not a block) and moves the round's cash to Alliance, parked in the
   // HR custody pool. The round must also fit inside the source bank.
   const selectedBank = banks.find(b => b.id === bankId)
+  const destBank = banks.find(b => b.id === destBankId)
   const bankShort =
     !!selectedBank && summary.sumInput > selectedBank.current_balance + 0.005
+  const sameBank = !!bankId && bankId === destBankId
 
   const canSubmit =
-    summary.canSubmit && !!bankId && !bankShort && /^\d{4}-\d{2}-\d{2}$/.test(payDate)
+    summary.canSubmit && !!bankId && !!destBankId && !sameBank && !bankShort &&
+    /^\d{4}-\d{2}-\d{2}$/.test(payDate)
 
   function updateAmount(key: string, raw: string) {
     const clean = raw.replace(/[^\d.]/g, '')
@@ -120,7 +132,7 @@ export default function GeneratePvForm({
 
     startTransition(async () => {
       try {
-        await generatePvFromRequest(requestId, bankId, sources, payDate)
+        await generatePvFromRequest(requestId, bankId, destBankId, sources, payDate)
       } catch (err) {
         // A successful generate ends in redirect() → NEXT_REDIRECT. Re-throw it so
         // Next performs the navigation (swallowing it leaves the spinner stuck).
@@ -154,6 +166,21 @@ export default function GeneratePvForm({
           </select>
         </label>
         <label className="flex items-center gap-1.5 font-sans text-xs text-graphite">
+          <span className="text-muted">to bank</span>
+          <select
+            value={destBankId}
+            onChange={e => setDestBankId(e.target.value)}
+            disabled={isPending}
+            className="bg-paper border border-hairline rounded-md px-2 py-1 text-xs font-sans text-ink focus:outline-none focus:border-accent-border"
+          >
+            {banks.map(b => (
+              <option key={b.id} value={b.id}>
+                {b.bank_name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-1.5 font-sans text-xs text-graphite">
           <span className="text-muted">date</span>
           <input
             type="date"
@@ -165,7 +192,7 @@ export default function GeneratePvForm({
         </label>
         <span className="font-serif italic text-muted text-xs">
           approval deducts each department&apos;s contribution, parks the round in the
-          HR custody pool, and moves the cash to the Alliance payroll account
+          HR custody pool, and moves the cash to the selected payroll account
         </span>
       </div>
 
@@ -287,10 +314,16 @@ export default function GeneratePvForm({
           allowed; the pool is topped up later by billing.
         </div>
       ) : null}
+      {sameBank ? (
+        <div className="font-serif italic text-danger text-xs">
+          来源和目的不能同一家银行 — pick a different destination.
+        </div>
+      ) : null}
       {bankShort && selectedBank ? (
         <div className="font-serif italic text-danger text-xs">
           {selectedBank.bank_name} holds RM {fmt(selectedBank.current_balance)} but this round moves RM{' '}
-          {fmt(summary.sumInput)} to Alliance — fund a smaller round now and the rest when cash arrives.
+          {fmt(summary.sumInput)} to {destBank?.bank_name ?? 'the destination bank'} — fund a smaller
+          round now and the rest when cash arrives.
         </div>
       ) : null}
       {error ? <div className="font-serif italic text-danger text-xs">{error}</div> : null}

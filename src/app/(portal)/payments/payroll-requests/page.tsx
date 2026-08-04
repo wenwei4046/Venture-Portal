@@ -74,6 +74,7 @@ export default async function PayrollRequestsPage() {
     id: b.id,
     bank_name: b.bank_name,
     current_balance: Number(b.current_balance ?? 0),
+    gl_account_code: (b.gl_account_code as string | null) ?? '',
   }))
 
   // Per-request: dept breakdown (required + current pool balance) + what's already
