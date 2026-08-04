@@ -71,3 +71,6 @@ visual-*.png
 .gstack/
 
 .env.local.shared
+
+# Local backup copies (Windows "Name - Copy") must never ship
+src/**/*\ -\ Copy.*
