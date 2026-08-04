@@ -88,6 +88,17 @@ destination was hardcoded Alliance (GL 3010). Now:
    legacy vouchers), so the staging JE debits the chosen bank.
  - The old "source is already Alliance" guard became "source ≠ destination",
    which also unlocks reverse transfers (Alliance → HL) when ever needed.
+ - **Same-day follow-up: source = destination is now ALLOWED** (user: "为什么
+   来源不能选同个银行? 因为这只是inter fund transfer"). When payroll pays out
+   of the bank the cash already sits in, no real transfer happens — the funding
+   PV still must run for the pool bookkeeping (drain dept pools → park in HR
+   custody) and to flip the request to funded. Verified all bank-side effects
+   self-net with source = dest: staging JE Dr/Cr the same GL, source cache −X
+   cancels the credit_dest_bank trigger's +X, void mirror symmetric. Mig
+   `20260804010000_payroll_funding_same_bank` drops the guard from
+   approve_single_voucher (only place that had it); form shows an informational
+   同一家银行 note instead of an error. The sufficient-balance check stays —
+   salaries genuinely drain that bank.
 
 Follow-up 8 (2026-08-01, bulk-issue COA bug): user bulk-issued both Aug
 batches and caught that every JE credited **5000** while the invoice lines

@@ -109,10 +109,13 @@ export default function GeneratePvForm({
   const destBank = banks.find(b => b.id === destBankId)
   const bankShort =
     !!selectedBank && summary.sumInput > selectedBank.current_balance + 0.005
+  // Same bank is fine (2026-08-04): payroll can pay out of the bank the cash
+  // already sits in — the staging JE self-nets; only the pool bookkeeping has
+  // net effect. Shown as an informational note, not an error.
   const sameBank = !!bankId && bankId === destBankId
 
   const canSubmit =
-    summary.canSubmit && !!bankId && !!destBankId && !sameBank && !bankShort &&
+    summary.canSubmit && !!bankId && !!destBankId && !bankShort &&
     /^\d{4}-\d{2}-\d{2}$/.test(payDate)
 
   function updateAmount(key: string, raw: string) {
@@ -191,8 +194,9 @@ export default function GeneratePvForm({
           />
         </label>
         <span className="font-serif italic text-muted text-xs">
-          approval deducts each department&apos;s contribution, parks the round in the
-          HR custody pool, and moves the cash to the selected payroll account
+          {sameBank
+            ? 'same bank — no real transfer: approval only deducts each department’s contribution and parks the round in the HR custody pool'
+            : 'approval deducts each department’s contribution, parks the round in the HR custody pool, and moves the cash to the selected payroll account'}
         </span>
       </div>
 
@@ -314,16 +318,21 @@ export default function GeneratePvForm({
           allowed; the pool is topped up later by billing.
         </div>
       ) : null}
-      {sameBank ? (
-        <div className="font-serif italic text-danger text-xs">
-          来源和目的不能同一家银行 — pick a different destination.
+      {sameBank && selectedBank ? (
+        <div className="font-serif italic text-graphite text-xs">
+          同一家银行 — 不会有真实转账：只扣各部门 pool、park 进 HR 托管，账上一借一贷自动抵消，
+          {selectedBank.bank_name} 余额不变。
         </div>
       ) : null}
       {bankShort && selectedBank ? (
         <div className="font-serif italic text-danger text-xs">
-          {selectedBank.bank_name} holds RM {fmt(selectedBank.current_balance)} but this round moves RM{' '}
-          {fmt(summary.sumInput)} to {destBank?.bank_name ?? 'the destination bank'} — fund a smaller
-          round now and the rest when cash arrives.
+          {selectedBank.bank_name} holds RM {fmt(selectedBank.current_balance)} but this round{' '}
+          {sameBank ? (
+            <>parks RM {fmt(summary.sumInput)} for payroll</>
+          ) : (
+            <>moves RM {fmt(summary.sumInput)} to {destBank?.bank_name ?? 'the destination bank'}</>
+          )}{' '}
+          — fund a smaller round now and the rest when cash arrives.
         </div>
       ) : null}
       {error ? <div className="font-serif italic text-danger text-xs">{error}</div> : null}

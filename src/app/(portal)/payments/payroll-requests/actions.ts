@@ -152,9 +152,11 @@ export async function generatePvFromRequest(
   if (!destGlCode) {
     throw new Error(`${destBank.bank_name} has no GL account code — set it in Settings first`)
   }
-  if (destBank.id === bank.id) {
-    throw new Error('来源和目的不能同一家银行 — the transfer must move between two banks.')
-  }
+  // Same bank IS allowed (2026-08-04, user: "这只是inter fund transfer"): when
+  // payroll pays out of the bank the cash already sits in, no real transfer
+  // happens — the staging JE debits and credits the same GL and the two cache
+  // moves cancel; only the pool bookkeeping (drain dept pools → park in
+  // custody) has net effect.
   // Mig 20260720: the funding PV moves real cash at approval (HL → Alliance
   // staging transfer), so this round must fit in the source bank. Approval
   // re-checks with a row lock; this early check just fails fast for Finance.
