@@ -17,7 +17,6 @@ export interface SingleItem {
   amount: number | null
   createdAt: string
   submitterName: string
-  isSelf: boolean
   href: string
 }
 
@@ -33,7 +32,6 @@ export interface GroupItem {
   }>
   submitterName: string
   createdAt: string
-  isSelfSubmitted: boolean
 }
 
 type PendingItem = SingleItem | GroupItem
@@ -51,10 +49,9 @@ export default function PendingApprovals({ items }: { items: PendingItem[] }) {
     () => items.filter((i): i is SingleItem => i.kind === 'single'),
     [items]
   )
-  const selectableIds = useMemo(
-    () => singles.filter((s) => !s.isSelf).map((s) => s.id),
-    [singles]
-  )
+  // Self-approval allowed (user 2026-08-06: "principal submit 要自己能
+  // approve") — own submissions are selectable like any other.
+  const selectableIds = useMemo(() => singles.map((s) => s.id), [singles])
   const hasSelectable = selectableIds.length > 0
   const allSelected =
     hasSelectable && selectableIds.every((id) => selected.has(id))
@@ -218,7 +215,6 @@ export default function PendingApprovals({ items }: { items: PendingItem[] }) {
                   items={item.items}
                   submitterName={item.submitterName}
                   createdAt={item.createdAt}
-                  isSelfSubmitted={item.isSelfSubmitted}
                 />
               </div>
             ) : (
@@ -231,30 +227,17 @@ export default function PendingApprovals({ items }: { items: PendingItem[] }) {
                     : 'border-hairline bg-surface'
                 }`}
               >
-                {item.isSelf ? (
-                  <div
-                    className="flex items-center pl-4 pr-1"
-                    title="You submitted this — you can't approve your own request"
-                  >
-                    <input
-                      type="checkbox"
-                      disabled
-                      className="h-4 w-4 opacity-25"
-                    />
-                  </div>
-                ) : (
-                  <label
-                    className="flex items-center pl-4 pr-1 cursor-pointer"
-                    title="Select for bulk approval"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected.has(item.id)}
-                      onChange={() => toggle(item.id)}
-                      className="h-4 w-4 accent-[var(--accent)]"
-                    />
-                  </label>
-                )}
+                <label
+                  className="flex items-center pl-4 pr-1 cursor-pointer"
+                  title="Select for bulk approval"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.has(item.id)}
+                    onChange={() => toggle(item.id)}
+                    className="h-4 w-4 accent-[var(--accent)]"
+                  />
+                </label>
 
                 <Link
                   href={item.href}

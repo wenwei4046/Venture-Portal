@@ -14,12 +14,13 @@ interface GroupItem {
   reference_table: string | null
 }
 
+// Self-approval allowed (user 2026-08-06: "principal submit 要自己能approve")
+// — the old isSelfSubmitted prop and its blocking banner are gone.
 interface Props {
   groupId: string
   items: GroupItem[]
   submitterName: string
   createdAt: string
-  isSelfSubmitted: boolean
 }
 
 export default function CombinedApprovalCard({
@@ -27,7 +28,6 @@ export default function CombinedApprovalCard({
   items,
   submitterName,
   createdAt,
-  isSelfSubmitted,
 }: Props) {
   const [showReject, setShowReject] = useState(false)
   const [rejectNotes, setRejectNotes] = useState('')
@@ -146,7 +146,7 @@ export default function CombinedApprovalCard({
               onClick={() => setShowDetails(true)}
               className="mt-1 text-xs font-serif italic text-accent hover:text-accent-hover"
             >
-              {isSelfSubmitted || hasNonVoucher ? 'View details →' : 'Review per row →'}
+              {hasNonVoucher ? 'View details →' : 'Review per row →'}
             </button>
           ) : null}
         </div>
@@ -157,19 +157,13 @@ export default function CombinedApprovalCard({
           groupId={groupId}
           open={showDetails}
           onClose={() => setShowDetails(false)}
-          actionable={!isSelfSubmitted && !hasNonVoucher}
+          actionable={!hasNonVoucher}
           contextItems={contextItems}
         />
       ) : null}
 
       {/* Actions */}
-      {isSelfSubmitted ? (
-        <div className="bg-alert-bg border border-alert rounded-md p-3">
-          <p className="font-serif italic text-alert text-sm">
-            You submitted this request and cannot approve your own submission.
-          </p>
-        </div>
-      ) : showReject ? (
+      {showReject ? (
         <div className="space-y-3">
           <textarea
             aria-label="Rejection reason"

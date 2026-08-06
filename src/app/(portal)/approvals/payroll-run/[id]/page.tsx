@@ -102,7 +102,8 @@ export default async function PayrollRunApprovalPage({ params }: PageProps) {
     })
   }
 
-  const canAct = user.role === 'principal' && run.status === 'submitted' && run.submitted_by !== user.id
+  // Self-approval allowed (user 2026-08-06: "principal submit 要自己能approve")
+  const canAct = user.role === 'principal' && run.status === 'submitted'
 
   return (
     <div>

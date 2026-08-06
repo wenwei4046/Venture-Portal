@@ -101,7 +101,6 @@ export default async function ApprovalDetailPage({ params }: Props) {
     voucherContext.bank.current_balance < Number(voucherContext.voucher.amount)
 
   const isPending = approval.status === 'pending'
-  const isSelfSubmitted = approval.submitted_by === user.id
 
   return (
     <div>
@@ -390,13 +389,9 @@ export default async function ApprovalDetailPage({ params }: Props) {
               Awaiting Principal sign-off. <em>You can track the status here.</em>
             </p>
           </div>
-        ) : isSelfSubmitted ? (
-          <div className="bg-alert-bg border border-alert rounded-md p-4 max-w-3xl">
-            <p className="font-serif italic text-alert text-sm">
-              You submitted this request and cannot approve your own submission.
-            </p>
-          </div>
         ) : (
+          // Self-approval allowed (user 2026-08-06: "principal submit 要自己
+          // 能approve") — no more own-submission banner.
           <ApprovalActions
             approvalId={approval.id}
             requestType={approval.request_type as ApprovalRequestTypeLocal}
