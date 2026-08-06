@@ -173,6 +173,7 @@ const navEntries: NavEntry[] = [
       { href: '/reports/claims', label: 'Claims Report', visible: canAccessReports },
       { href: '/reports/debtor-aging', label: 'Debtor Aging', visible: canAccessDeptReports },
       { href: '/reports/loan-aging', label: 'Loan Monitor', visible: canAccessReports },
+      { href: '/reports/company-statement', label: 'Company Statement', visible: canAccessReports },
     ],
   },
   { href: '/reconciliation', label: 'Reconciliation', section: 'Reports & Admin', notPaths: ['/reconciliation/journal-entries'], visible: canAccessTreasury },
