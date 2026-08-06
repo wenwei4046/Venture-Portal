@@ -72,6 +72,23 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+## Payments page shows ALL money out (2026-08-06)
+
+User couldn't find repayment PVs ("做repayment for loan in 无法找到那个payment
+voucher") — two fixes:
+ 1. The Type=Loan repayment filter matched voucher_type, which NO voucher has
+    (repayment PVs are typed 'expense'; the fund_source_id link is what makes
+    them repayments). Filter now matches the link; Category cell prefixes
+    还款 ·; text search hits "loan repayment / 还款".
+ 2. "不能像reciept 这样显示全部吗?" → new `lib/payment-extras.ts` mirroring
+    receipt-extras: /payments (and its export) now interleaves synthetic rows
+    for (a) direct fund-source repayments recorded WITHOUT a PV
+    (payment_voucher_id IS NULL — 87 rows / RM 233k live; PV-driven rows are
+    skipped, verified zero overlap) and (b) Loan OUT disbursements with no
+    non-voided reference_type='loan' PV (26 of 34 loans). Rows link to their
+    fund-in/fund-out detail pages; summary tile reads
+    "N PVS · n 还款 · m LOAN OUT" and Total paid includes them.
+
 ## Company Statement report (2026-08-06)
 
 User: "我要有一个新的report 或statement 关于这个公司我还要还多少和我还要收多少

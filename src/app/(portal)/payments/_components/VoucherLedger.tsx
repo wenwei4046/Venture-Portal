@@ -4,6 +4,7 @@ import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/paginate'
 import { fetchReceiptExtras, filterReceiptExtras } from '@/lib/receipt-extras'
+import { fetchPaymentExtras } from '@/lib/payment-extras'
 import { formatMoney } from '@/lib/utils'
 import PaymentTabs from './PaymentTabs'
 import PaymentFilters from './PaymentFilters'
@@ -103,11 +104,14 @@ export default async function VoucherLedger({
     }
   }
 
-  // ── Receipts side only: money received OUTSIDE the OR voucher flow ──
-  // Direct loan repayments + Fund IN capital, deduped against OR-driven
-  // rows. Shared with /payments/export via lib/receipt-extras. User request
-  // 2026-07-24: "把收到repayment的钱和fund in 的钱全部都显示在receipt这边".
-  const extraRows: VoucherRow[] = isReceipts ? await fetchReceiptExtras(supabase) : []
+  // ── Money that moved OUTSIDE the voucher flow, both sides ──
+  // Receipts: direct loan repayments + Fund IN capital (user 2026-07-24: "把
+  // 收到repayment的钱和fund in 的钱全部都显示在receipt这边"). Payments: direct
+  // fund-source repayments (no PV) + Loan OUT disbursements (user 2026-08-06:
+  // "不能像reciept 这样显示全部吗？"). Shared with /payments/export.
+  const extraRows: VoucherRow[] = isReceipts
+    ? await fetchReceiptExtras(supabase)
+    : await fetchPaymentExtras(supabase)
 
   const all = vouchers ?? []
   const tab = statusFilter ?? 'all'
@@ -159,10 +163,12 @@ export default async function VoucherLedger({
     voided: all.filter((v) => v.status === 'voided').length,
   }
 
-  // Receipts: settled money = paid ORs + direct repayments + fund-in capital.
+  // Settled money = executed vouchers + the outside-the-flow rows.
   const extraTotal = extraRows.reduce((sum, r) => sum + r.amount, 0)
   const nRepayments = extraRows.filter((r) => r.id.startsWith('rpy-')).length
   const nFundIn = extraRows.filter((r) => r.id.startsWith('fin-')).length
+  const nFsRepay = extraRows.filter((r) => r.id.startsWith('fsr-')).length
+  const nLoanOut = extraRows.filter((r) => r.id.startsWith('lout-')).length
   const totalPaid = all
     .filter((v) => v.status === 'paid')
     .reduce((sum, v) => sum + Number(v.amount), 0) + extraTotal
@@ -262,8 +268,10 @@ export default async function VoucherLedger({
           </div>
           <div className="font-serif text-3xl text-num-ink tabular">{formatMoney(totalPaid)}</div>
           <div className="font-mono text-[11.5px] text-graphite mt-1.5 tracking-[0.02em] font-medium">
-            {isReceipts && extraRows.length > 0
-              ? `${counts.paid} RECEIPTS · ${nRepayments} LOAN RPY · ${nFundIn} FUND IN`
+            {extraRows.length > 0
+              ? isReceipts
+                ? `${counts.paid} RECEIPTS · ${nRepayments} LOAN RPY · ${nFundIn} FUND IN`
+                : `${counts.paid} PVS · ${nFsRepay} 还款 · ${nLoanOut} LOAN OUT`
               : `${counts.paid} ${noun.toUpperCase()}${counts.paid === 1 ? '' : 'S'} EXECUTED`}
           </div>
         </div>

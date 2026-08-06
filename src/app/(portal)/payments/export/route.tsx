@@ -4,6 +4,7 @@ import { requireRole } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { fetchReceiptExtras, filterReceiptExtras } from '@/lib/receipt-extras'
+import { fetchPaymentExtras } from '@/lib/payment-extras'
 import { buildVouchersXlsx } from './_format/xlsx'
 import { VouchersPdf } from './_format/pdf'
 import dayjs from 'dayjs'
@@ -153,21 +154,27 @@ export async function GET(req: Request) {
     }
   })
 
-  // Receipts export mirrors the /receipts page: direct loan repayments +
-  // Fund IN capital ride along, deduped and filtered by the same rules.
-  if (directionFilter === 'credit') {
-    const extras = filterReceiptExtras(await fetchReceiptExtras(supabase), {
-      tab, typeFilter, poolFilter, fromFilter, toFilter, minFilter, maxFilter, qFilter,
-    })
+  // Exports mirror their pages: outside-the-voucher-flow rows ride along,
+  // deduped and filtered by the same rules. Receipts: direct loan repayments +
+  // Fund IN capital. Payments: direct fund-source repayments + Loan OUT
+  // disbursements (user 2026-08-06: "不能像reciept 这样显示全部吗？").
+  if (directionFilter === 'credit' || directionFilter === 'debit') {
+    const isCredit = directionFilter === 'credit'
+    const extras = filterReceiptExtras(
+      isCredit ? await fetchReceiptExtras(supabase) : await fetchPaymentExtras(supabase),
+      { tab, typeFilter, poolFilter, fromFilter, toFilter, minFilter, maxFilter, qFilter },
+    )
     for (const r of extras) {
       dated.push({
         raw: r.paymentOrCreatedDate,
         row: {
           voucher_no: null,
           date: dayjs(r.paymentOrCreatedDate).format('DD/MM/YYYY'),
-          direction: 'credit',
-          type: r.id.startsWith('rpy-') ? 'loan repayment' : 'fund in',
-          status: 'received',
+          direction: directionFilter,
+          type: isCredit
+            ? r.id.startsWith('rpy-') ? 'loan repayment' : 'fund in'
+            : r.id.startsWith('fsr-') ? 'loan repayment' : 'loan out',
+          status: isCredit ? 'received' : 'paid',
           payee_name: r.payee_name,
           amount: r.amount,
           catLabel: r.catLabel,
