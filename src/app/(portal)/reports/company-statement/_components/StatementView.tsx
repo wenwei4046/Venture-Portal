@@ -74,11 +74,19 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
     { principal: 0, paid: 0, outstanding: 0, interest: 0 },
   )
   return (
-    <div>
+    // 用格子围起来 + 底色分色 (user 2026-08-06): 要收绿底, 要还橙底 — 一眼分清.
+    <div
+      className={
+        'rounded-md border p-3 ' +
+        (side === 'collect' ? 'border-ledger/40 bg-ledger/[0.06]' : 'border-alert/40 bg-alert/[0.06]')
+      }
+    >
       <div
         className={
           'font-mono text-[10px] uppercase tracking-wider inline-block rounded px-1.5 py-0.5 mb-1.5 border ' +
-          (side === 'collect' ? 'text-ledger border-ledger/40' : 'text-alert border-alert/40')
+          (side === 'collect'
+            ? 'text-ledger border-ledger/40 bg-ledger/10'
+            : 'text-alert border-alert/40 bg-alert/10')
         }
       >
         {side === 'collect' ? '要收' : '要还'} · {items.length} 笔
