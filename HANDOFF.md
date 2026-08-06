@@ -72,6 +72,25 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+## Company Statement round 2 (2026-08-06)
+
+Polish batch 1: summary tiles (要收/要还/净额), counterparty search (footer
+re-sums the filtered rows), expand/collapse-all, per-position View → links to
+fund-in/fund-out detail. Batch 2 (user: "帮我对齐，然后要导出"):
+ - Header alignment: table.ledger-table's `thead th` rule out-specifies
+   Tailwind text-* utilities — number headers need ledger-table's own `right`
+   class (group headers centered inline). Remember this for ANY ledger-table.
+ - Export Excel / Export PDF buttons → /reports/company-statement/export
+   (?format=xlsx|pdf), bank-statement layout: section per counterparty with
+   net in the title, position rows, TOTAL section. Data extracted to
+   `lib/counterparty-statement-data.fetchCounterpartyStatement` — page and
+   export share ONE builder.
+ - SC badge on positions = the loan's 资金来源 remark parsed from
+   repayment_terms (fundingSourceFromTerms; display-only). User asked what it
+   is; also asked to "加这笔是借给谁" — pending their pick of mechanism
+   (fund-source notes remark vs auto-match — auto-match is against the
+   parser's display-only contract).
+
 ## Select-all covers combined cards (2026-08-06)
 
 User: "明明有5张我要approve, 按select all只选三张" — the 5 pending ITEMS were

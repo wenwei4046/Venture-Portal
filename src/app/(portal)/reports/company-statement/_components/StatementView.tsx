@@ -220,26 +220,36 @@ export default function StatementView({
 
       <div className="overflow-x-auto">
       <table className="ledger-table">
+        {/* ledger-table's own `thead th` rule out-specifies Tailwind's
+            text-* utilities — use its `right` class / inline centering. */}
         <thead>
           <tr className="text-[11px] uppercase tracking-wide text-muted font-sans">
-            <th className="text-left py-2 px-3 font-medium" rowSpan={2}>
+            <th className="py-2 px-3 font-medium" rowSpan={2}>
               对象
             </th>
-            <th className="text-center py-1 px-3 font-medium border-b border-hairline" colSpan={2}>
+            <th
+              className="py-1 px-3 font-medium border-b border-hairline"
+              style={{ textAlign: 'center' }}
+              colSpan={2}
+            >
               我还要收
             </th>
-            <th className="text-center py-1 px-3 font-medium border-b border-hairline" colSpan={2}>
+            <th
+              className="py-1 px-3 font-medium border-b border-hairline"
+              style={{ textAlign: 'center' }}
+              colSpan={2}
+            >
               我还要还
             </th>
-            <th className="text-right py-2 px-3 font-medium" rowSpan={2}>
+            <th className="right py-2 px-3 font-medium" rowSpan={2}>
               净额
             </th>
           </tr>
           <tr className="text-[11px] uppercase tracking-wide text-muted font-sans border-b border-hairline">
-            <th className="text-right py-1 px-3 font-medium">本金</th>
-            <th className="text-right py-1 px-3 font-medium">利息</th>
-            <th className="text-right py-1 px-3 font-medium">本金</th>
-            <th className="text-right py-1 px-3 font-medium">利息</th>
+            <th className="right py-1 px-3 font-medium">本金</th>
+            <th className="right py-1 px-3 font-medium">利息</th>
+            <th className="right py-1 px-3 font-medium">本金</th>
+            <th className="right py-1 px-3 font-medium">利息</th>
           </tr>
         </thead>
         <tbody>
