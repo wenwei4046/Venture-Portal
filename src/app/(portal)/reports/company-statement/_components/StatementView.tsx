@@ -40,7 +40,7 @@ function kindLabel(item: PositionRow): string {
   return `${item.tenureMonths}期`
 }
 
-function finishCell(item: PositionRow) {
+function finishCell(item: PositionRow, verb: string) {
   if (item.kind === 'no_term') {
     return (
       <span className="font-mono text-xs text-muted">
@@ -53,74 +53,115 @@ function finishCell(item: PositionRow) {
   }
   return (
     <span className="font-mono text-xs text-ink">
-      剩 {item.remainingPeriods} 期{item.finishYM ? ` · ${item.finishYM} 还完` : ''}
+      剩 {item.remainingPeriods} 期{item.finishYM ? ` · ${item.finishYM} ${verb}完` : ''}
     </span>
   )
 }
 
-function DetailTable({ items }: { items: PositionRow[] }) {
+// One side's positions with side-appropriate wording (已收/未收/几时收完 vs
+// 已还/未还/几时还完 — user 2026-08-06: "展开只是会显示要还的…要收的看没有")
+// and its own subtotal that ties back to the summary row.
+function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' | 'repay' }) {
+  const verb = side === 'collect' ? '收' : '还'
+  const r2 = (n: number) => Math.round(n * 100) / 100
+  const sub = items.reduce(
+    (acc, i) => ({
+      principal: r2(acc.principal + i.principal),
+      paid: r2(acc.paid + i.principalPaid),
+      outstanding: r2(acc.outstanding + i.principalOutstanding),
+      interest: r2(acc.interest + i.interestOutstanding),
+    }),
+    { principal: 0, paid: 0, outstanding: 0, interest: 0 },
+  )
   return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr className="text-[11px] uppercase tracking-wide text-muted font-sans border-b border-hairline">
-          <th className="text-left py-1.5 px-3 font-medium">Position</th>
-          <th className="text-right py-1.5 px-3 font-medium">原额</th>
-          <th className="text-right py-1.5 px-3 font-medium">已还本金</th>
-          <th className="text-right py-1.5 px-3 font-medium">未还本金</th>
-          <th className="text-right py-1.5 px-3 font-medium">利息</th>
-          <th className="text-right py-1.5 px-3 font-medium">几时还完</th>
-          <th className="py-1.5 px-3" />
-        </tr>
-      </thead>
-      <tbody>
-        {items.map(item => (
-          <tr key={item.id} className="border-b border-hairline/60 last:border-0">
-            <td className="py-1.5 px-3">
-              <span
-                className={
-                  'font-mono text-[10px] uppercase tracking-wider rounded px-1.5 py-0.5 mr-2 ' +
-                  (item.side === 'collect'
-                    ? 'text-ledger border border-ledger/40'
-                    : 'text-alert border border-alert/40')
-                }
-              >
-                {item.side === 'collect' ? '要收' : '要还'}
-              </span>
-              <span className="font-serif text-ink">
-                {pct(item.monthlyRate)} · {kindLabel(item)}
-                {item.startYM ? ` · ${item.startYM} 起` : ''}
-              </span>
-              <SourceBadge source={item.source} side={item.side} />
-            </td>
+    <div>
+      <div
+        className={
+          'font-mono text-[10px] uppercase tracking-wider inline-block rounded px-1.5 py-0.5 mb-1.5 border ' +
+          (side === 'collect' ? 'text-ledger border-ledger/40' : 'text-alert border-alert/40')
+        }
+      >
+        {side === 'collect' ? '要收' : '要还'} · {items.length} 笔
+      </div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-[11px] uppercase tracking-wide text-muted font-sans border-b border-hairline">
+            <th className="text-left py-1.5 px-3 font-medium">Position</th>
+            <th className="text-right py-1.5 px-3 font-medium">原额</th>
+            <th className="text-right py-1.5 px-3 font-medium">已{verb}本金</th>
+            <th className="text-right py-1.5 px-3 font-medium">未{verb}本金</th>
+            <th className="text-right py-1.5 px-3 font-medium">利息</th>
+            <th className="text-right py-1.5 px-3 font-medium">几时{verb}完</th>
+            <th className="py-1.5 px-3" />
+          </tr>
+        </thead>
+        <tbody>
+          {items.map(item => (
+            <tr key={item.id} className="border-b border-hairline/60">
+              <td className="py-1.5 px-3">
+                <span className="font-serif text-ink">
+                  {pct(item.monthlyRate)} · {kindLabel(item)}
+                  {item.startYM ? ` · ${item.startYM} 起` : ''}
+                </span>
+                <SourceBadge source={item.source} side={item.side} />
+              </td>
+              <td className="py-1.5 px-3 text-right font-mono tabular text-graphite">
+                {formatMoneyBare(item.principal)}
+              </td>
+              <td className="py-1.5 px-3 text-right font-mono tabular text-muted">
+                {formatMoneyBare(item.principalPaid)}
+              </td>
+              <td className="py-1.5 px-3 text-right font-mono tabular text-ink">
+                {formatMoneyBare(item.principalOutstanding)}
+              </td>
+              <td className="py-1.5 px-3 text-right font-mono tabular text-graphite">
+                {item.kind === 'no_term' ? (
+                  <span className="text-muted">—</span>
+                ) : (
+                  formatMoneyBare(item.interestOutstanding)
+                )}
+              </td>
+              <td className="py-1.5 px-3 text-right">{finishCell(item, verb)}</td>
+              <td className="py-1.5 px-3 text-right">
+                <Link
+                  href={item.side === 'collect' ? `/fund-out/${item.id}` : `/fund-in/${item.id}`}
+                  className="text-xs text-accent hover:text-accent-hover font-serif italic whitespace-nowrap"
+                >
+                  View →
+                </Link>
+              </td>
+            </tr>
+          ))}
+          <tr className="bg-surface/40">
+            <td className="py-1.5 px-3 font-serif italic text-graphite">小计 · 要{verb}</td>
             <td className="py-1.5 px-3 text-right font-mono tabular text-graphite">
-              {formatMoneyBare(item.principal)}
+              {formatMoneyBare(sub.principal)}
             </td>
             <td className="py-1.5 px-3 text-right font-mono tabular text-muted">
-              {formatMoneyBare(item.principalPaid)}
+              {formatMoneyBare(sub.paid)}
             </td>
-            <td className="py-1.5 px-3 text-right font-mono tabular text-ink">
-              {formatMoneyBare(item.principalOutstanding)}
+            <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink">
+              {formatMoneyBare(sub.outstanding)}
             </td>
-            <td className="py-1.5 px-3 text-right font-mono tabular text-graphite">
-              {item.kind === 'no_term' ? (
-                <span className="text-muted">—</span>
-              ) : (
-                formatMoneyBare(item.interestOutstanding)
-              )}
+            <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink">
+              {formatMoneyBare(sub.interest)}
             </td>
-            <td className="py-1.5 px-3 text-right">{finishCell(item)}</td>
-            <td className="py-1.5 px-3 text-right">
-              <Link
-                href={item.side === 'collect' ? `/fund-out/${item.id}` : `/fund-in/${item.id}`}
-                className="text-xs text-accent hover:text-accent-hover font-serif italic whitespace-nowrap"
-              >
-                View →
-              </Link>
-            </td>
+            <td className="py-1.5 px-3" colSpan={2} />
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function DetailTable({ items }: { items: PositionRow[] }) {
+  const collect = items.filter(i => i.side === 'collect')
+  const repay = items.filter(i => i.side === 'repay')
+  return (
+    <div className="space-y-4 py-1">
+      {collect.length > 0 ? <DetailSection items={collect} side="collect" /> : null}
+      {repay.length > 0 ? <DetailSection items={repay} side="repay" /> : null}
+    </div>
   )
 }
 
