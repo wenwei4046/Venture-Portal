@@ -118,9 +118,19 @@ export default async function VoucherLedger({
 
   // Apply all filters in-memory. Summary stats below use `all` (unfiltered
   // context), only the table uses `filtered`.
+  // A repayment PV is typed 'expense' in the DB — what marks it as a loan
+  // repayment is the fund_source_id / legacy loan_id link. The "Loan
+  // repayment" type filter matched voucher_type only, which NO voucher has,
+  // so it always came back empty (user 2026-08-06: "无法找到那个payment
+  // voucher"). Match the link instead.
+  const isLoanRepay = (v: { fund_source_id?: string | null; loan_id?: string | null; voucher_type?: string | null }) =>
+    v.fund_source_id != null || v.loan_id != null || v.voucher_type === 'loan_repayment'
+
   const filtered = all.filter((v) => {
     if (tab !== 'all' && v.status !== tab) return false
-    if (typeFilter && v.voucher_type !== typeFilter) return false
+    if (typeFilter === 'loan_repayment') {
+      if (!isLoanRepay(v)) return false
+    } else if (typeFilter && v.voucher_type !== typeFilter) return false
     if (poolFilter) {
       if (v.direction === 'credit') {
         if (v.target_pool !== poolFilter) return false
@@ -134,7 +144,7 @@ export default async function VoucherLedger({
     if (minFilter !== null && Number(v.amount) < minFilter) return false
     if (maxFilter !== null && Number(v.amount) > maxFilter) return false
     if (qFilter) {
-      const hay = `${v.voucher_no ?? ''} ${v.description ?? ''} ${v.payee_name ?? ''}`.toLowerCase()
+      const hay = `${v.voucher_no ?? ''} ${v.description ?? ''} ${v.payee_name ?? ''}${isLoanRepay(v) ? ' loan repayment 还款' : ''}`.toLowerCase()
       if (!hay.includes(qFilter)) return false
     }
     return true
@@ -315,7 +325,11 @@ export default async function VoucherLedger({
               <VouchersTable
                 rows={[...filtered.map<VoucherRow>((v) => {
                   const cats = categoriesByVoucher.get(v.id) ?? []
-                  const catLabel = cats.length > 0 ? cats.join(' + ') : '—'
+                  // 还款 · prefix keeps repayment PVs recognizable (and
+                  // searchable/filterable by the Category column) even though
+                  // their voucher_type is plain 'expense'.
+                  const baseCat = cats.length > 0 ? cats.join(' + ') : '—'
+                  const catLabel = isLoanRepay(v) ? `还款 · ${baseCat === '—' ? 'Loan' : baseCat}` : baseCat
                   let poolLabel = '—'
                   if (v.direction === 'credit') {
                     poolLabel = v.target_pool
