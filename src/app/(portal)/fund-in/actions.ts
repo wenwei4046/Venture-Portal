@@ -450,6 +450,29 @@ export async function setFundSourceRepaymentStart(
   return undefined
 }
 
+// Notes are Finance self-service (user 2026-08-06: 「借给: X」 remark drives
+// the Company Statement's repay-side badge). Terms amendment stays
+// principal-only; this touches notes ONLY, via the mirror RPC.
+export async function setFundSourceNotes(
+  id: string,
+  notes: string
+): Promise<{ error: string } | undefined> {
+  await requireRole(['finance', 'principal'])
+  const supabase = await createClient()
+
+  if (!id) return { error: 'Fund source id is required' }
+
+  const { error } = await supabase.rpc('set_fund_source_notes' as never, {
+    p_fund_source_id: id,
+    p_notes: notes,
+  } as never)
+  if (error) return { error: `保存失败: ${error.message}` }
+
+  revalidatePath(`/fund-in/${id}`)
+  revalidatePath('/reports/company-statement')
+  return undefined
+}
+
 // ─── Cancel Fund Source (requires Principal approval) ────────────────────────
 
 export async function cancelFundSource(formData: FormData) {

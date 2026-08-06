@@ -9,6 +9,7 @@ import { cancelFundSource } from '../actions'
 import { ConfirmButton } from './_components/ConfirmButton'
 import WithdrawButton from './_components/WithdrawButton'
 import RepaymentStartEditor from './_components/RepaymentStartEditor'
+import NotesEditor from './_components/NotesEditor'
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
   subsidiary: 'Subsidiary',
@@ -428,6 +429,8 @@ export default async function FundSourceDetailPage({ params }: Props) {
             : '收款次月'
         }
       />
+
+      <NotesEditor sourceId={source.id} current={(source.notes as string | null) ?? null} />
 
       {/* ───────── Actions (Finance only) ───────── */}
       {pendingCancel ? (
