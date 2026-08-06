@@ -14,12 +14,13 @@ interface GroupItem {
   reference_table: string | null
 }
 
+// Self-approval allowed (user 2026-08-06: "principal submit 要自己能approve")
+// — the old isSelfSubmitted prop and its blocking banner are gone.
 interface Props {
   groupId: string
   items: GroupItem[]
   submitterName: string
   createdAt: string
-  isSelfSubmitted: boolean
 }
 
 export default function CombinedApprovalCard({
@@ -27,7 +28,6 @@ export default function CombinedApprovalCard({
   items,
   submitterName,
   createdAt,
-  isSelfSubmitted,
 }: Props) {
   const [showReject, setShowReject] = useState(false)
   const [rejectNotes, setRejectNotes] = useState('')
@@ -139,9 +139,6 @@ export default function CombinedApprovalCard({
             <span className="font-serif italic text-graphite">
               {submitterName}
             </span>
-            {isSelfSubmitted ? (
-              <span className="font-serif italic text-graphite"> (you)</span>
-            ) : null}
           </div>
           {hasVouchers ? (
             <button
@@ -165,7 +162,7 @@ export default function CombinedApprovalCard({
         />
       ) : null}
 
-      {/* Actions — Principal may approve their own submission (mig 20260806000000) */}
+      {/* Actions */}
       {showReject ? (
         <div className="space-y-3">
           <textarea

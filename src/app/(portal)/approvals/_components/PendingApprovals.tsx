@@ -17,7 +17,6 @@ export interface SingleItem {
   amount: number | null
   createdAt: string
   submitterName: string
-  isSelf: boolean
   href: string
 }
 
@@ -33,7 +32,6 @@ export interface GroupItem {
   }>
   submitterName: string
   createdAt: string
-  isSelfSubmitted: boolean
 }
 
 type PendingItem = SingleItem | GroupItem
@@ -51,12 +49,9 @@ export default function PendingApprovals({ items }: { items: PendingItem[] }) {
     () => items.filter((i): i is SingleItem => i.kind === 'single'),
     [items]
   )
-  const selectableIds = useMemo(
-    // Self-submitted rows are selectable too — Principal may approve their own
-    // submission since mig 20260806000000.
-    () => singles.map((s) => s.id),
-    [singles]
-  )
+  // Self-approval allowed (user 2026-08-06: "principal submit 要自己能
+  // approve") — own submissions are selectable like any other.
+  const selectableIds = useMemo(() => singles.map((s) => s.id), [singles])
   const hasSelectable = selectableIds.length > 0
   const allSelected =
     hasSelectable && selectableIds.every((id) => selected.has(id))
@@ -220,7 +215,6 @@ export default function PendingApprovals({ items }: { items: PendingItem[] }) {
                   items={item.items}
                   submitterName={item.submitterName}
                   createdAt={item.createdAt}
-                  isSelfSubmitted={item.isSelfSubmitted}
                 />
               </div>
             ) : (
@@ -235,11 +229,7 @@ export default function PendingApprovals({ items }: { items: PendingItem[] }) {
               >
                 <label
                   className="flex items-center pl-4 pr-1 cursor-pointer"
-                  title={
-                    item.isSelf
-                      ? 'You submitted this — select for bulk approval'
-                      : 'Select for bulk approval'
-                  }
+                  title="Select for bulk approval"
                 >
                   <input
                     type="checkbox"

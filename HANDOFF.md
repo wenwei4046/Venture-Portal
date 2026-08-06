@@ -72,6 +72,21 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+## Principal can self-approve (2026-08-06)
+
+User: "principal submit 要自己能approve". Approvers were already
+principal-only (every approve action requireRole(['principal'])), so the rule
+change = drop every "cannot approve your own submission" block:
+ - approvals/actions.ts: single approve, bulk approve, combined-group approve.
+ - payroll-run actions: approve + reject self-guards.
+ - UI: PendingApprovals no longer disables own rows' checkboxes (select-all
+   includes them); CombinedApprovalCard lost its isSelfSubmitted prop/banner
+   and its BatchDetailsModal is always actionable; approvals/[id] page banner
+   removed; payroll-run page canAct no longer excludes the submitter.
+ - DB: NO change needed — approval_requests has no self-approval CHECK (the
+   old code comment overstated), and approve_payroll_run's guard was already
+   a no-op (IF ... THEN NULL).
+
 ## Payments page shows ALL money out (2026-08-06)
 
 User couldn't find repayment PVs ("做repayment for loan in 无法找到那个payment

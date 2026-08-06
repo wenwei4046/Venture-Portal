@@ -390,6 +390,8 @@ export default async function ApprovalDetailPage({ params }: Props) {
             </p>
           </div>
         ) : (
+          // Self-approval allowed (user 2026-08-06: "principal submit 要自己
+          // 能approve") — no more own-submission banner.
           <ApprovalActions
             approvalId={approval.id}
             requestType={approval.request_type as ApprovalRequestTypeLocal}

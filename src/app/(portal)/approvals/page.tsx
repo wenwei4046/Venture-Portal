@@ -20,7 +20,7 @@ interface ApprovalRow {
 }
 
 export default async function ApprovalsPage() {
-  const user = await requireRole(['principal'])
+  await requireRole(['principal'])
   const supabase = await createClient()
 
   const [
@@ -111,7 +111,6 @@ export default async function ApprovalsPage() {
           submitterName:
             submitterMap.get(item.items[0].submitted_by) ?? 'Unknown',
           createdAt: item.createdAt,
-          isSelfSubmitted: item.items.some((r) => r.submitted_by === user.id),
         }
       : {
           kind: 'single' as const,
@@ -123,7 +122,6 @@ export default async function ApprovalsPage() {
           createdAt: item.row.created_at,
           submitterName:
             submitterMap.get(item.row.submitted_by) ?? 'Unknown',
-          isSelf: item.row.submitted_by === user.id,
           href: approvalHref(item.row),
         }
   )

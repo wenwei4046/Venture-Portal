@@ -102,7 +102,7 @@ export default async function PayrollRunApprovalPage({ params }: PageProps) {
     })
   }
 
-  // Self-submitted runs are actionable too (mig 20260806000000).
+  // Self-approval allowed (user 2026-08-06: "principal submit 要自己能approve")
   const canAct = user.role === 'principal' && run.status === 'submitted'
 
   return (
