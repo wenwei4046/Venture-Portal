@@ -72,6 +72,31 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+## Company Statement report (2026-08-06)
+
+User: "我要有一个新的report 或statement 关于这个公司我还要还多少和我还要收多少
+… 类似银行会给的一个statement". New `/reports/company-statement`
+(finance+principal), tile added on the Reports index.
+
+ - One row per counterparty (companies by short_code both sides so directions
+   merge; departments/directors/freetext by name): 我还要收 (active loans lent
+   out) vs 我还要还 (active fund sources), principal and interest in SEPARATE
+   columns (user's pick), net = collect − repay. Click a row → bank-statement
+   detail per position: 原额@rate·期数, 已还本金, 未还本金, 利息, 几时还完.
+ - Maths in `src/lib/counterparty-statement.ts` (pure, 8 unit tests) reusing
+   treasury-schedule/loan-monitor conventions — figures TIE to Loan Monitor:
+   principal outstanding from the loan_outstanding / fund_source_outstanding
+   views (principal-type repayments only); flat interest = remaining periods ×
+   原额×月息; 利滚利 accrued = compounded balance − outstanding (roll-forward
+   with all-type paymentsByMonth); no-term rows carry 0 interest in totals and
+   show ~RM x/月 as reference. 几时还完: on/ahead of agreed schedule →
+   contractual finish (startYM + tenure − 1); behind → currentYM + remaining−1.
+ - User scoping answers (AskUserQuestion 2026-08-06): 总表每家一行 expandable;
+   本金+利息分开两栏; 要收只算 loans (NOT unpaid invoices — Debtor Aging covers
+   those); detail like a bank statement (outstanding + payoff month), no aging
+   buckets, no chasing features (standing 别理欠款 directive stays respected —
+   display only).
+
 ## Payroll funding destination bank is selectable (2026-08-04)
 
 User: "hr request fund 我没办法设定他是转去什么银行" — the funding PV's

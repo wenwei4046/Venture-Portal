@@ -52,6 +52,11 @@ const reports = [
     title: 'Loan Monitor',
     description: 'This-month dues not yet settled (both ways) + outstanding balances, scheduled vs undecided.',
   },
+  {
+    href: '/reports/company-statement',
+    title: 'Company Statement',
+    description: '每家往来对象：我还要还 / 我还要收 — 本金利息分开，明细像银行 statement，显示几时还完。',
+  },
 ]
 
 export default async function ReportsPage() {
