@@ -42,8 +42,10 @@ export async function approveClaim(claimId: string) {
   if (!claim) throw new Error('Claim not found')
   if (claim.status !== 'pending') throw new Error('Claim is not pending')
 
-  // Security: prevent self-approval (defense in depth — RLS enforces too)
-  if (claim.created_by === user.id) {
+  // Security: prevent self-approval (defense in depth — RLS enforces too).
+  // Principal is exempt (mig 20260806000000): they are the top of the chain, so
+  // blocking them just leaves the claim unapprovable by anyone.
+  if (user.role !== 'principal' && claim.created_by === user.id) {
     throw new Error('Cannot approve your own claim')
   }
 

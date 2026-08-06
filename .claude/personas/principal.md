@@ -22,14 +22,14 @@ role: principal
 - Pending approvals count on dashboard = actual `/approvals` list length
 
 ## Guardrails (enforced)
-- **Cannot self-approve** — `approvals/actions.ts:39`, `approve_single_voucher: cannot approve own submission`
+- **CAN self-approve** — lifted mig `20260806000000`. Principal is the sole approver and View-as makes self-submission routine; blocking it left cards nobody could approve OR reject. Approve buttons on own-submitted rows are CORRECT, not a leak.
 - **Period lock** — approving across a closed period raises
 
 ## Failure modes to watch
 - Dashboard `dashboard_summary` RPC > 3s load
 - Pending-approvals count mismatch between hero card and queue page
 - `approval_requests.status` flipped to 'approved' but downstream (loans / dept_pools / venture_pool) didn't move — means a trigger or side-effect skipped
-- Approve button showing on own-submitted row (self-approval leak)
+- A pending card with NO actionable button for anyone (the pre-20260806000000 deadlock)
 
 ## GL ledger expectations (post Stage 2 — mig 195-203)
 After approving any action that moves money, a `journal_entries` row must exist with `SUM(debit) = SUM(credit)`. If missing or unbalanced → drift.
