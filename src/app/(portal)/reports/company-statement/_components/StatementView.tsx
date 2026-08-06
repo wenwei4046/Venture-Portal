@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useState } from 'react'
+import Link from 'next/link'
 import { formatMoneyBare } from '@/lib/utils'
 import type {
   CounterpartyRow,
@@ -64,6 +65,7 @@ function DetailTable({ items }: { items: PositionRow[] }) {
           <th className="text-right py-1.5 px-3 font-medium">未还本金</th>
           <th className="text-right py-1.5 px-3 font-medium">利息</th>
           <th className="text-right py-1.5 px-3 font-medium">几时还完</th>
+          <th className="py-1.5 px-3" />
         </tr>
       </thead>
       <tbody>
@@ -103,6 +105,14 @@ function DetailTable({ items }: { items: PositionRow[] }) {
               )}
             </td>
             <td className="py-1.5 px-3 text-right">{finishCell(item)}</td>
+            <td className="py-1.5 px-3 text-right">
+              <Link
+                href={item.side === 'collect' ? `/fund-out/${item.id}` : `/fund-in/${item.id}`}
+                className="text-xs text-accent hover:text-accent-hover font-serif italic whitespace-nowrap"
+              >
+                View →
+              </Link>
+            </td>
           </tr>
         ))}
       </tbody>
@@ -118,6 +128,7 @@ export default function StatementView({
   totals: StatementTotals
 }) {
   const [open, setOpen] = useState<Record<string, boolean>>({})
+  const [q, setQ] = useState('')
 
   if (rows.length === 0) {
     return (
@@ -127,8 +138,87 @@ export default function StatementView({
     )
   }
 
+  const needle = q.trim().toLowerCase()
+  const shown = needle
+    ? rows.filter(g => g.counterparty.toLowerCase().includes(needle))
+    : rows
+  // Filtered view sums what's on screen so the footer always ties to the
+  // rows above it; with no search this equals the server totals.
+  const shownTotals: StatementTotals = needle
+    ? shown.reduce(
+        (acc, g) => ({
+          collectPrincipal: acc.collectPrincipal + g.collectPrincipal,
+          collectInterest: acc.collectInterest + g.collectInterest,
+          repayPrincipal: acc.repayPrincipal + g.repayPrincipal,
+          repayInterest: acc.repayInterest + g.repayInterest,
+          net: acc.net + g.net,
+        }),
+        { collectPrincipal: 0, collectInterest: 0, repayPrincipal: 0, repayInterest: 0, net: 0 },
+      )
+    : totals
+  const allOpen = shown.length > 0 && shown.every(g => open[g.counterparty])
+
   return (
-    <div className="overflow-x-auto">
+    <div>
+      {/* ── Summary tiles ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+        <div className="border border-hairline rounded-md bg-surface p-5">
+          <div className="font-serif italic text-ledger text-sm mb-1">我还要收</div>
+          <div className="font-serif text-2xl text-num-ink tabular">
+            RM {formatMoneyBare(totals.collectPrincipal + totals.collectInterest)}
+          </div>
+          <div className="font-mono text-[11px] text-graphite mt-1.5">
+            本金 {formatMoneyBare(totals.collectPrincipal)} · 利息 {formatMoneyBare(totals.collectInterest)}
+          </div>
+        </div>
+        <div className="border border-hairline rounded-md bg-surface p-5">
+          <div className="font-serif italic text-alert text-sm mb-1">我还要还</div>
+          <div className="font-serif text-2xl text-num-ink tabular">
+            RM {formatMoneyBare(totals.repayPrincipal + totals.repayInterest)}
+          </div>
+          <div className="font-mono text-[11px] text-graphite mt-1.5">
+            本金 {formatMoneyBare(totals.repayPrincipal)} · 利息 {formatMoneyBare(totals.repayInterest)}
+          </div>
+        </div>
+        <div className="border border-hairline rounded-md bg-surface p-5">
+          <div className="font-serif italic text-graphite text-sm mb-1">净额</div>
+          <div
+            className={`font-serif text-2xl tabular ${totals.net >= 0 ? 'text-ledger' : 'text-danger'}`}
+          >
+            {totals.net >= 0 ? '收 ' : '还 '}RM {formatMoneyBare(Math.abs(totals.net))}
+          </div>
+          <div className="font-mono text-[11px] text-graphite mt-1.5">
+            {rows.length} 个往来对象
+          </div>
+        </div>
+      </div>
+
+      {/* ── Search + expand-all ── */}
+      <div className="flex items-center gap-3 mb-3 flex-wrap">
+        <input
+          type="text"
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder="搜索对象…"
+          className="bg-paper border border-hairline rounded-md px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border w-56"
+        />
+        <button
+          type="button"
+          onClick={() =>
+            setOpen(allOpen ? {} : Object.fromEntries(shown.map(g => [g.counterparty, true])))
+          }
+          className="text-xs font-sans text-graphite hover:text-ink border border-hairline rounded-md px-3 py-1.5 bg-surface hover:bg-surface-2 transition-colors"
+        >
+          {allOpen ? '收起全部' : '展开全部'}
+        </button>
+        {needle ? (
+          <span className="font-mono text-xs text-muted">
+            {shown.length} / {rows.length} 家
+          </span>
+        ) : null}
+      </div>
+
+      <div className="overflow-x-auto">
       <table className="ledger-table">
         <thead>
           <tr className="text-[11px] uppercase tracking-wide text-muted font-sans">
@@ -153,7 +243,14 @@ export default function StatementView({
           </tr>
         </thead>
         <tbody>
-          {rows.map(g => {
+          {shown.length === 0 ? (
+            <tr>
+              <td colSpan={6} className="py-6 px-3 text-center font-serif italic text-muted">
+                没有对象匹配「{q.trim()}」
+              </td>
+            </tr>
+          ) : null}
+          {shown.map(g => {
             const isOpen = !!open[g.counterparty]
             return (
               <Fragment key={g.counterparty}>
@@ -192,28 +289,31 @@ export default function StatementView({
             )
           })}
           <tr className="bg-surface/40">
-            <td className="py-2.5 px-3 font-serif italic text-accent">Total</td>
-            <td className="py-2.5 px-3 text-right font-mono tabular font-semibold text-ink">
-              {formatMoneyBare(totals.collectPrincipal)}
+            <td className="py-2.5 px-3 font-serif italic text-accent">
+              Total{needle ? '（筛选后）' : ''}
             </td>
             <td className="py-2.5 px-3 text-right font-mono tabular font-semibold text-ink">
-              {formatMoneyBare(totals.collectInterest)}
+              {formatMoneyBare(shownTotals.collectPrincipal)}
             </td>
             <td className="py-2.5 px-3 text-right font-mono tabular font-semibold text-ink">
-              {formatMoneyBare(totals.repayPrincipal)}
+              {formatMoneyBare(shownTotals.collectInterest)}
             </td>
             <td className="py-2.5 px-3 text-right font-mono tabular font-semibold text-ink">
-              {formatMoneyBare(totals.repayInterest)}
+              {formatMoneyBare(shownTotals.repayPrincipal)}
+            </td>
+            <td className="py-2.5 px-3 text-right font-mono tabular font-semibold text-ink">
+              {formatMoneyBare(shownTotals.repayInterest)}
             </td>
             <td className="py-2.5 px-3 text-right font-mono tabular font-semibold">
-              <span className={totals.net >= 0 ? 'text-ledger' : 'text-danger'}>
-                {totals.net >= 0 ? '收 ' : '还 '}
-                {formatMoneyBare(Math.abs(totals.net))}
+              <span className={shownTotals.net >= 0 ? 'text-ledger' : 'text-danger'}>
+                {shownTotals.net >= 0 ? '收 ' : '还 '}
+                {formatMoneyBare(Math.abs(shownTotals.net))}
               </span>
             </td>
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
   )
 }
