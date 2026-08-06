@@ -152,9 +152,12 @@ export async function fetchCounterpartyStatement(
       principalPaid: Number(out?.total_principal_paid ?? 0),
       outstanding: Number(out?.outstanding ?? s.amount),
       paymentsByMonth: fsPayByMonth.get(s.id as string) ?? {},
-      // 借给 remark from the fund source's notes (user maintains it there) —
-      // renders as the repay-side badge, mirror of the loans' SC tag.
-      source: lentToFromNotes(s.notes as string | null),
+      // Loan-to tag from the fund source's notes. 「借给: X」 parses to X, but
+      // Finance fills plain labels too ("Conts - 60k", "Hookka" — 11 HC rows
+      // 2026-08-06), so a note without the prefix IS the tag, verbatim.
+      source:
+        lentToFromNotes(s.notes as string | null) ??
+        (((s.notes as string | null) ?? '').trim().slice(0, 60) || null),
     })
   }
 
