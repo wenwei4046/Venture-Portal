@@ -235,6 +235,7 @@ export default async function FundInPage({ searchParams }: Props) {
                   lockInMonths: source.lock_in_months,
                   maturityDate: source.maturity_date,
                   status: source.status,
+                  notes: source.notes,
                 }))}
               />
             </div>

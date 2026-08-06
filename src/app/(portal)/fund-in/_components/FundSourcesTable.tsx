@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, lentToFromNotes } from '@/lib/utils'
 import SortableTable from '@/components/SortableTable'
 
 export type FundSourceStatus = 'pending_approval' | 'active' | 'matured' | 'repaid' | 'cancelled'
@@ -19,6 +19,9 @@ export interface FundSourceRow {
   lockInMonths: number | null
   maturityDate: string | null
   status: FundSourceStatus
+  /** Free-text notes — a 「借给: X」 remark renders as a badge under From
+   *  (user 2026-08-06), other notes show truncated. */
+  notes: string | null
 }
 
 function StatusLabel({ status, maturityDate }: { status: FundSourceStatus; maturityDate: string | null }) {
@@ -52,8 +55,8 @@ export default function FundSourcesTable({ rows }: { rows: FundSourceRow[] }) {
       rows={rows}
       getRowKey={(s) => s.id}
       defaultSort={{ key: 'effectiveDate', dir: 'desc' }}
-      searchKeys={['fromLabel', 'typeLabel']}
-      searchPlaceholder="Search from / type…"
+      searchKeys={['fromLabel', 'typeLabel', 'notes']}
+      searchPlaceholder="Search from / type / notes…"
       columns={[
         {
           key: 'typeLabel',
@@ -66,7 +69,29 @@ export default function FundSourcesTable({ rows }: { rows: FundSourceRow[] }) {
         {
           key: 'fromLabel',
           label: 'From',
-          render: (s) => s.fromLabel,
+          render: (s) => {
+            const lentTo = lentToFromNotes(s.notes)
+            return (
+              <div>
+                <div>{s.fromLabel}</div>
+                {lentTo ? (
+                  <span
+                    className="inline-block mt-0.5 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
+                    title={s.notes ?? undefined}
+                  >
+                    借给 {lentTo}
+                  </span>
+                ) : s.notes ? (
+                  <div
+                    className="font-serif italic text-muted text-xs mt-0.5 max-w-[220px] truncate"
+                    title={s.notes}
+                  >
+                    {s.notes}
+                  </div>
+                ) : null}
+              </div>
+            )
+          },
           sortValue: (s) => s.fromLabel,
           cellClassName: 'font-serif text-[15px] text-ink',
         },
