@@ -86,10 +86,12 @@ fund-in/fund-out detail. Batch 2 (user: "帮我对齐，然后要导出"):
    `lib/counterparty-statement-data.fetchCounterpartyStatement` — page and
    export share ONE builder.
  - SC badge on positions = the loan's 资金来源 remark parsed from
-   repayment_terms (fundingSourceFromTerms; display-only). User asked what it
-   is; also asked to "加这笔是借给谁" — pending their pick of mechanism
-   (fund-source notes remark vs auto-match — auto-match is against the
-   parser's display-only contract).
+   repayment_terms (fundingSourceFromTerms; display-only).
+ - 借给 badge (repay side) — user picked the notes-remark mechanism ("这笔是
+   借给谁我自己加"): they write 「借给: X」 (借去/转借给 accepted) in the fund
+   source's NOTES; lentToFromNotes (lib/utils, display-only, unit-tested)
+   parses it and the statement + export show it as the repay-side badge —
+   mirror of SC. Never auto-match SC strings to data.
 
 ## Select-all covers combined cards (2026-08-06)
 
