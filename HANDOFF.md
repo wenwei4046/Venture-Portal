@@ -72,6 +72,19 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+## Company Statement round 3 (2026-08-06)
+
+ - **PDF exports must be ASCII/English-only** — react-pdf's base font has no
+   CJK glyphs; Chinese labels rendered as mojibake (user: "导出的pdf 会乱").
+   Export labels now English (Collect/Repay, compounding, no fixed term,
+   N left · by YYYY-MM, TOTAL·TO COLLECT/REPAY, lent to X); xlsx shares the
+   same rows. Remember for ANY future react-pdf export.
+ - Every export row carries a From column (user: "这里没有显示from") and the
+   PDF went landscape for the 7 columns.
+ - ?cp=HC,2990 filters the export to chosen counterparties; totals re-sum the
+   subset; single-cp filename gets the name. UI: checkbox per counterparty row
+   → 「已选 n 家 · 导出: Excel / PDF」 bar (top buttons still export all).
+
 ## Company Statement round 2 (2026-08-06)
 
 Polish batch 1: summary tiles (要收/要还/净额), counterparty search (footer

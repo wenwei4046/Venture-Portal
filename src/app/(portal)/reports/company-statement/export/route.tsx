@@ -2,6 +2,14 @@
 // per counterparty (title carries the net), position rows beneath, grand
 // totals at the end. Data comes from the SAME builder as the page
 // (lib/counterparty-statement-data) so screen and file always agree.
+//
+// File labels are ENGLISH ONLY — the react-pdf base font has no CJK glyphs,
+// so Chinese labels rendered as mojibake (user 2026-08-06: "导出的pdf 会乱").
+// Every row also carries a From column so positions stay identifiable across
+// page breaks (user: "这里没有显示from").
+//
+// ?cp=HC,2990 exports only those counterparties (user: "自己选择要导出的") —
+// names must match the statement's labels exactly.
 
 import React from 'react'
 import dayjs from 'dayjs'
@@ -19,43 +27,65 @@ const money = (n: number) =>
 
 function positionLabel(item: PositionRow): string {
   const kind =
-    item.kind === 'compound' ? '利滚利' : item.kind === 'no_term' ? '无固定期' : `${item.tenureMonths}期`
+    item.kind === 'compound'
+      ? 'compounding'
+      : item.kind === 'no_term'
+        ? 'no fixed term'
+        : `${item.tenureMonths}mo`
   const bits = [
-    item.side === 'collect' ? '要收' : '要还',
+    item.side === 'collect' ? 'Collect' : 'Repay',
     `${(item.monthlyRate * 100).toFixed(3)}%/mo`,
     kind,
   ]
-  if (item.startYM) bits.push(`${item.startYM} 起`)
-  // collect: SC = 资金来源; repay: 借给 = where the money was lent onward.
-  if (item.source) bits.push(item.side === 'collect' ? `SC ${item.source}` : `借给 ${item.source}`)
+  if (item.startYM) bits.push(`starts ${item.startYM}`)
+  // collect: SC = funding source remark; repay: where the money was lent on.
+  if (item.source) bits.push(item.side === 'collect' ? `SC ${item.source}` : `lent to ${item.source}`)
   return bits.join(' · ')
 }
 
 function payoffLabel(item: PositionRow): string {
-  if (item.kind === 'no_term') return `未定 · ~RM ${money(item.monthlyInterest)}/月息`
-  if (item.kind === 'compound') return '未定 · 利息逐月滚入'
-  return `剩 ${item.remainingPeriods} 期${item.finishYM ? ` · ${item.finishYM}` : ''}`
+  if (item.kind === 'no_term') return `TBD · ~RM ${money(item.monthlyInterest)}/mo interest`
+  if (item.kind === 'compound') return 'TBD · compounds monthly'
+  return `${item.remainingPeriods} left${item.finishYM ? ` · by ${item.finishYM}` : ''}`
 }
 
 export async function GET(request: Request) {
   await requireRole(['finance', 'principal'])
   const supabase = (await createClient()) as unknown as SupabaseClient
-  const { rows: cpRows, totals } = await fetchCounterpartyStatement(supabase)
+  const { rows: allRows } = await fetchCounterpartyStatement(supabase)
 
   const url = new URL(request.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
+  const cpParam = (url.searchParams.get('cp') ?? '').trim()
+  const wanted = cpParam
+    ? new Set(cpParam.split(',').map(s => s.trim()).filter(Boolean))
+    : null
+  const cpRows = wanted ? allRows.filter(g => wanted.has(g.counterparty)) : allRows
+
+  // Totals over what's actually in the file (matters when ?cp filters).
+  const totals = cpRows.reduce(
+    (acc, g) => ({
+      collectPrincipal: acc.collectPrincipal + g.collectPrincipal,
+      collectInterest: acc.collectInterest + g.collectInterest,
+      repayPrincipal: acc.repayPrincipal + g.repayPrincipal,
+      repayInterest: acc.repayInterest + g.repayInterest,
+      net: acc.net + g.net,
+    }),
+    { collectPrincipal: 0, collectInterest: 0, repayPrincipal: 0, repayInterest: 0, net: 0 },
+  )
 
   // Flatten: section per counterparty, then grand totals.
-  const headerRow = ['Position', '原额', '已还本金', '未还本金', '利息', '几时还完']
+  const headerRow = ['From', 'Position', 'Original', 'Paid', 'Outstanding', 'Interest', 'Payoff']
   const rows: (string | number | null)[][] = []
   const sectionBreaks: XlsxSectionBreak[] = []
   for (const g of cpRows) {
     sectionBreaks.push({
       afterRow: rows.length,
-      title: `${g.counterparty} · 净${g.net >= 0 ? '收' : '还'} RM ${money(Math.abs(g.net))}`,
+      title: `${g.counterparty} · NET ${g.net >= 0 ? 'COLLECT' : 'REPAY'} RM ${money(Math.abs(g.net))}`,
     })
     for (const item of g.items) {
       rows.push([
+        g.counterparty,
         positionLabel(item),
         item.principal,
         item.principalPaid,
@@ -66,10 +96,11 @@ export async function GET(request: Request) {
     }
   }
   sectionBreaks.push({ afterRow: rows.length, title: 'TOTAL' })
-  rows.push(['合计 · 我还要收', null, null, totals.collectPrincipal, totals.collectInterest, null])
-  rows.push(['合计 · 我还要还', null, null, totals.repayPrincipal, totals.repayInterest, null])
+  rows.push(['', 'TOTAL · TO COLLECT', null, null, totals.collectPrincipal, totals.collectInterest, null])
+  rows.push(['', 'TOTAL · TO REPAY', null, null, totals.repayPrincipal, totals.repayInterest, null])
   rows.push([
-    `净额 · ${totals.net >= 0 ? '收' : '还'}`,
+    '',
+    `NET · ${totals.net >= 0 ? 'TO COLLECT' : 'TO REPAY'}`,
     null,
     null,
     Math.abs(totals.net),
@@ -77,7 +108,8 @@ export async function GET(request: Request) {
     null,
   ])
 
-  const filename = `company-statement-${dayjs().format('YYYYMMDD')}`
+  const single = wanted && wanted.size === 1 ? [...wanted][0].replace(/[^\w-]+/g, '_') : null
+  const filename = `company-statement-${single ? `${single}-` : ''}${dayjs().format('YYYYMMDD')}`
 
   if (format === 'xlsx') {
     return exportXlsxResponse({
@@ -87,13 +119,13 @@ export async function GET(request: Request) {
         headerRow,
         rows,
         sectionBreaks,
-        columnWidths: [44, 14, 14, 14, 14, 24],
+        columnWidths: [14, 42, 14, 14, 14, 12, 24],
       }),
     })
   }
 
   // PDF: interleave uppercase section markers into the flat rows (same
-  // pattern as the GL statement export).
+  // pattern as the GL statement export). Landscape — seven columns.
   const blank = Array<null>(headerRow.length - 1).fill(null)
   const pdfRows: (string | number | null)[][] = []
   let nextBreak = 0
@@ -105,13 +137,15 @@ export async function GET(request: Request) {
     if (i < rows.length) pdfRows.push(rows[i])
   }
 
+  // A4 landscape usable ≈ 760pt.
   const columns: PdfColumn[] = [
-    { label: 'Position', width: 175 },
-    { label: '原额', width: 70, align: 'right' },
-    { label: '已还本金', width: 70, align: 'right' },
-    { label: '未还本金', width: 70, align: 'right' },
-    { label: '利息', width: 60, align: 'right' },
-    { label: '几时还完', width: 75, align: 'right' },
+    { label: 'From', width: 75 },
+    { label: 'Position', width: 220 },
+    { label: 'Original', width: 85, align: 'right' },
+    { label: 'Paid', width: 85, align: 'right' },
+    { label: 'Outstanding', width: 85, align: 'right' },
+    { label: 'Interest', width: 75, align: 'right' },
+    { label: 'Payoff', width: 130, align: 'right' },
   ]
 
   return exportPdfResponse({
@@ -120,6 +154,7 @@ export async function GET(request: Request) {
       <PdfDocument
         title="Company Statement"
         periodLabel={`As at ${dayjs().format('D MMM YYYY')}`}
+        orientation="landscape"
       >
         <PdfTable columns={columns} rows={pdfRows} numberFormat="money" />
       </PdfDocument>

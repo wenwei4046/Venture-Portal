@@ -133,6 +133,8 @@ export default function StatementView({
 }) {
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const [q, setQ] = useState('')
+  // 勾选对象 → 只导出那几家 (user 2026-08-06: "自己选择要导出的").
+  const [sel, setSel] = useState<Set<string>>(new Set())
 
   if (rows.length === 0) {
     return (
@@ -220,6 +222,30 @@ export default function StatementView({
             {shown.length} / {rows.length} 家
           </span>
         ) : null}
+        {sel.size > 0 ? (
+          <span className="flex items-center gap-2 text-xs font-sans text-graphite border border-accent/40 bg-surface rounded-md px-3 py-1.5">
+            已选 {sel.size} 家 · 导出:
+            <a
+              href={`/reports/company-statement/export?format=xlsx&cp=${encodeURIComponent([...sel].join(','))}`}
+              className="text-accent hover:text-accent-hover font-mono"
+            >
+              Excel
+            </a>
+            <a
+              href={`/reports/company-statement/export?format=pdf&cp=${encodeURIComponent([...sel].join(','))}`}
+              className="text-accent hover:text-accent-hover font-mono"
+            >
+              PDF
+            </a>
+            <button
+              type="button"
+              onClick={() => setSel(new Set())}
+              className="text-muted hover:text-ink transition-colors"
+            >
+              清除
+            </button>
+          </span>
+        ) : null}
       </div>
 
       <div className="overflow-x-auto">
@@ -273,6 +299,22 @@ export default function StatementView({
                   className="border-b border-hairline cursor-pointer hover:bg-surface-2/40 transition-colors"
                 >
                   <td className="py-2 px-3">
+                    <span className="mr-2" onClick={e => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={sel.has(g.counterparty)}
+                        onChange={() =>
+                          setSel(prev => {
+                            const next = new Set(prev)
+                            if (next.has(g.counterparty)) next.delete(g.counterparty)
+                            else next.add(g.counterparty)
+                            return next
+                          })
+                        }
+                        title="勾选后可只导出所选对象"
+                        className="h-3.5 w-3.5 accent-[var(--accent)] align-middle"
+                      />
+                    </span>
                     <span className="font-mono text-[10px] text-muted mr-2">
                       {isOpen ? '▾' : '▸'}
                     </span>
