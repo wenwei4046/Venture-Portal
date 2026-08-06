@@ -7,7 +7,7 @@ import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/paginate'
 import { isLoanUnscheduled } from '@/lib/treasury-schedule'
-import { fundingSourceFromTerms } from '@/lib/utils'
+import { fundingSourceFromTerms, lentToFromNotes } from '@/lib/utils'
 import {
   buildPositionRow,
   groupStatement,
@@ -57,7 +57,7 @@ export async function fetchCounterpartyStatement(
     supabase
       .from('fund_sources')
       .select(
-        'id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, status, compound_interest, repayment_start_month',
+        'id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, status, compound_interest, repayment_start_month, notes',
       )
       .in('status', ['active', 'matured']),
     supabase.from('fund_source_outstanding').select('fund_source_id, outstanding, total_principal_paid'),
@@ -152,6 +152,9 @@ export async function fetchCounterpartyStatement(
       principalPaid: Number(out?.total_principal_paid ?? 0),
       outstanding: Number(out?.outstanding ?? s.amount),
       paymentsByMonth: fsPayByMonth.get(s.id as string) ?? {},
+      // 借给 remark from the fund source's notes (user maintains it there) —
+      // renders as the repay-side badge, mirror of the loans' SC tag.
+      source: lentToFromNotes(s.notes as string | null),
     })
   }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatMoney, formatMoneyBare, formatRate, cn, fundingSourceFromTerms } from './utils'
+import { formatMoney, formatMoneyBare, formatRate, cn, fundingSourceFromTerms, lentToFromNotes } from './utils'
 
 describe('fundingSourceFromTerms', () => {
   it('extracts 资金来源: value up to the next · separator', () => {
@@ -17,6 +17,22 @@ describe('fundingSourceFromTerms', () => {
     expect(fundingSourceFromTerms('EMI 分期 · 月息4% · 6期')).toBeNull()
     expect(fundingSourceFromTerms(null)).toBeNull()
     expect(fundingSourceFromTerms('')).toBeNull()
+  })
+})
+
+describe('lentToFromNotes', () => {
+  it('extracts 借给: value up to the next separator', () => {
+    expect(lentToFromNotes('HC 定存 · 借给: 2990')).toBe('2990')
+    expect(lentToFromNotes('借给：CONTS · 2026-07 收')).toBe('CONTS')
+  })
+  it('accepts 借去 / 转借给 and the no-colon form', () => {
+    expect(lentToFromNotes('这笔借去 2990')).toBe('2990')
+    expect(lentToFromNotes('转借给: CAR')).toBe('CAR')
+  })
+  it('returns null when no remark', () => {
+    expect(lentToFromNotes('普通存款,没转借')).toBeNull()
+    expect(lentToFromNotes(null)).toBeNull()
+    expect(lentToFromNotes('')).toBeNull()
   })
 })
 

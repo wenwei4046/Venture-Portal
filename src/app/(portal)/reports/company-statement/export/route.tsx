@@ -26,7 +26,8 @@ function positionLabel(item: PositionRow): string {
     kind,
   ]
   if (item.startYM) bits.push(`${item.startYM} 起`)
-  if (item.source) bits.push(`SC ${item.source}`)
+  // collect: SC = 资金来源; repay: 借给 = where the money was lent onward.
+  if (item.source) bits.push(item.side === 'collect' ? `SC ${item.source}` : `借给 ${item.source}`)
   return bits.join(' · ')
 }
 

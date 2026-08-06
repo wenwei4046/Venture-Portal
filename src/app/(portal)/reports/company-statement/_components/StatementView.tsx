@@ -14,14 +14,18 @@ function num(v: number, opts?: { danger?: boolean }) {
   return <span className={'num ' + (opts?.danger ? 'text-danger' : '')}>{formatMoneyBare(v)}</span>
 }
 
-function SourceBadge({ source }: { source?: string | null }) {
+// collect side: SC = the loan's 资金来源 remark (from repayment_terms).
+// repay side: 借给 = where the borrowed-in money was lent onward (user writes
+// 「借给: X」 in the fund source's notes — 2026-08-06).
+function SourceBadge({ source, side }: { source?: string | null; side: 'collect' | 'repay' }) {
   if (!source) return null
+  const label = side === 'collect' ? `SC ${source}` : `借给 ${source}`
   return (
     <span
       className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
-      title={`资金来源: ${source}`}
+      title={side === 'collect' ? `资金来源: ${source}` : `转借去: ${source}`}
     >
-      SC {source}
+      {label}
     </span>
   )
 }
@@ -86,7 +90,7 @@ function DetailTable({ items }: { items: PositionRow[] }) {
                 {pct(item.monthlyRate)} · {kindLabel(item)}
                 {item.startYM ? ` · ${item.startYM} 起` : ''}
               </span>
-              <SourceBadge source={item.source} />
+              <SourceBadge source={item.source} side={item.side} />
             </td>
             <td className="py-1.5 px-3 text-right font-mono tabular text-graphite">
               {formatMoneyBare(item.principal)}

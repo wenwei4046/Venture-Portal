@@ -67,3 +67,13 @@ export function fundingSourceFromTerms(terms: string | null | undefined): string
   if (from?.[1]) return from[1].trim() || null
   return null
 }
+
+// Mirror remark for the OTHER direction (user 2026-08-06: "这笔是借给谁我自己
+// 加"): Finance writes 「借给: 2990」 (or 借去/转借给) in a fund source's notes
+// to record where borrowed-in money was lent onward. e.g.
+// "HC 定存 · 借给: 2990" → "2990". Display-only — never used to match data.
+export function lentToFromNotes(notes: string | null | undefined): string | null {
+  if (!notes) return null
+  const m = notes.match(/(?:转?借给|借去)[:：]?\s*([^·\n,，;；]+)/)
+  return m?.[1]?.trim() || null
+}
