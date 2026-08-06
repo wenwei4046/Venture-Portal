@@ -72,6 +72,18 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+## Select-all covers combined cards (2026-08-06)
+
+User: "明明有5张我要approve, 按select all只选三张" — the 5 pending ITEMS were
+3 singles + 2 combined groups, and groups were one-card-one-action only.
+Now combined cards carry a checkbox (g:<groupId> keys in the selection set):
+select-all picks every card, the floating bar total adds each group's
+voucher-only sum (same dedupe as the card's Total disbursement), and
+approveRequestsBulk gained groupIds — the combined-group core was extracted
+to performGroupApproval (returns requests approved; approveRequestGroup is
+now parse → helper → redirect) so bulk approves groups all-or-nothing per
+group and reports per-group failures without stopping the sweep.
+
 ## Principal can self-approve (2026-08-06)
 
 User: "principal submit 要自己能approve". Approvers were already

@@ -49,21 +49,41 @@ export default function PendingApprovals({ items }: { items: PendingItem[] }) {
     () => items.filter((i): i is SingleItem => i.kind === 'single'),
     [items]
   )
-  // Self-approval allowed (user 2026-08-06: "principal submit 要自己能
-  // approve") — own submissions are selectable like any other.
-  const selectableIds = useMemo(() => singles.map((s) => s.id), [singles])
+  const groups = useMemo(
+    () => items.filter((i): i is GroupItem => i.kind === 'group'),
+    [items]
+  )
+  // Combined cards join the selection set under a g: key (user 2026-08-06:
+  // "明明有5张我要approve, 按select all只选三张" — select-all must cover
+  // groups too). Self-approval allowed, so every card is selectable.
+  const groupKey = (g: GroupItem) => `g:${g.groupId}`
+  // Same dedupe rule as the card's Total disbursement: cash out = the
+  // payment_voucher amounts (a Loan OUT combo's new_loan duplicates its PV).
+  const groupTotal = (g: GroupItem) => {
+    const vouchers = g.items.filter((it) => it.request_type === 'payment_voucher')
+    return (vouchers.length > 0 ? vouchers : g.items).reduce(
+      (s, it) => s + (it.amount ?? 0),
+      0
+    )
+  }
+  const selectableIds = useMemo(
+    () => [...singles.map((s) => s.id), ...groups.map(groupKey)],
+    [singles, groups]
+  )
   const hasSelectable = selectableIds.length > 0
   const allSelected =
     hasSelectable && selectableIds.every((id) => selected.has(id))
 
   const selectedSingles = singles.filter((s) => selected.has(s.id))
-  const selectedTotal = selectedSingles.reduce(
-    (sum, s) => sum + (s.amount ?? 0),
-    0
-  )
-  const selectedHasVoucher = selectedSingles.some(
-    (s) => s.requestType === 'payment_voucher'
-  )
+  const selectedGroups = groups.filter((g) => selected.has(groupKey(g)))
+  const selectedTotal =
+    selectedSingles.reduce((sum, s) => sum + (s.amount ?? 0), 0) +
+    selectedGroups.reduce((sum, g) => sum + groupTotal(g), 0)
+  const selectedHasVoucher =
+    selectedSingles.some((s) => s.requestType === 'payment_voucher') ||
+    selectedGroups.some((g) =>
+      g.items.some((it) => it.request_type === 'payment_voucher')
+    )
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -90,12 +110,15 @@ export default function PendingApprovals({ items }: { items: PendingItem[] }) {
   }
 
   function handleApprove() {
-    const ids = [...selected]
-    if (ids.length === 0) return
+    const keys = [...selected]
+    const ids = keys.filter((k) => !k.startsWith('g:'))
+    const groupIds = keys.filter((k) => k.startsWith('g:')).map((k) => k.slice(2))
+    if (ids.length + groupIds.length === 0) return
     startTransition(async () => {
       try {
         const res = await approveRequestsBulk({
           ids,
+          groupIds,
           notes: notes.trim() || undefined,
           allowOverdraw,
         })
@@ -215,6 +238,8 @@ export default function PendingApprovals({ items }: { items: PendingItem[] }) {
                   items={item.items}
                   submitterName={item.submitterName}
                   createdAt={item.createdAt}
+                  selected={selected.has(groupKey(item))}
+                  onToggleSelect={() => toggle(groupKey(item))}
                 />
               </div>
             ) : (

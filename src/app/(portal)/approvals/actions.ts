@@ -395,6 +395,9 @@ export interface BulkApproveResult {
 
 export async function approveRequestsBulk(args: {
   ids: string[]
+  /** Combined-approval group_ids — approved whole via performGroupApproval
+   *  (user 2026-08-06: select-all must cover the combined cards too). */
+  groupIds?: string[]
   notes?: string
   allowOverdraw?: boolean
 }): Promise<BulkApproveResult> {
@@ -402,7 +405,8 @@ export async function approveRequestsBulk(args: {
   const supabase = await createClient()
 
   const ids = Array.from(new Set((args.ids ?? []).filter(Boolean)))
-  if (ids.length === 0) throw new Error('No approvals selected')
+  const groupIds = Array.from(new Set((args.groupIds ?? []).filter(Boolean)))
+  if (ids.length === 0 && groupIds.length === 0) throw new Error('No approvals selected')
 
   // Approving moves money — block the whole batch if today's period is locked.
   await assertPeriodOpen(supabase, new Date())
@@ -446,6 +450,25 @@ export async function approveRequestsBulk(args: {
       result.failed.push({
         id,
         description: label,
+        error: e instanceof Error ? e.message : 'Unknown error',
+      })
+    }
+  }
+
+  // Combined groups ride the same sweep — whole-group per card, all-or-nothing
+  // per group (a failed group reports once and doesn't stop the rest).
+  for (const gid of groupIds) {
+    try {
+      result.approved += await performGroupApproval(
+        supabase,
+        user,
+        gid,
+        args.notes?.trim() ? args.notes.trim() : null,
+      )
+    } catch (e) {
+      result.failed.push({
+        id: gid,
+        description: 'Combined approval',
         error: e instanceof Error ? e.message : 'Unknown error',
       })
     }
@@ -585,7 +608,21 @@ export async function approveRequestGroup(formData: FormData) {
   if (!groupId) throw new Error('group_id is required')
 
   await assertPeriodOpen(supabase, new Date())
+  await performGroupApproval(supabase, user, groupId, notes)
+  redirect('/approvals')
+}
 
+// Core of the combined-group approval (batch disbursement + Loan OUT modes),
+// shared by the card's approveRequestGroup and the multi-select
+// approveRequestsBulk (user 2026-08-06: "按select all只选三张" — combined
+// cards must join the bulk sweep). Returns the number of requests approved.
+// Callers own the period-lock check and any redirect.
+async function performGroupApproval(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  user: { id: string; name: string },
+  groupId: string,
+  notes: string | null,
+): Promise<number> {
   // Fetch both approval_requests in the group
   const { data: group, error: fetchError } = await supabase
     .from('approval_requests')
@@ -642,7 +679,7 @@ export async function approveRequestGroup(formData: FormData) {
     revalidatePath('/payments')
     revalidatePath('/dashboard')
     revalidatePath('/hr-costing/payment')
-    redirect('/approvals')
+    return processed
   }
 
   // ── Loan OUT mode: 1 new_loan + 1 payment_voucher ─────────────────────────
@@ -825,7 +862,7 @@ export async function approveRequestGroup(formData: FormData) {
   revalidatePath('/fund-out')
   revalidatePath('/payments')
   revalidatePath('/dashboard')
-  redirect('/approvals')
+  return group.length
 }
 
 // ─── Reject combined group (Principal) — Phase 7 Step 9 ──────────────────────

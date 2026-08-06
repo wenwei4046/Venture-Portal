@@ -21,6 +21,11 @@ interface Props {
   items: GroupItem[]
   submitterName: string
   createdAt: string
+  /** Multi-select membership (user 2026-08-06: select-all covers combined
+   *  cards too). When provided, the header grows a checkbox and the card can
+   *  ride the bulk Approve N selected sweep. */
+  selected?: boolean
+  onToggleSelect?: () => void
 }
 
 export default function CombinedApprovalCard({
@@ -28,6 +33,8 @@ export default function CombinedApprovalCard({
   items,
   submitterName,
   createdAt,
+  selected = false,
+  onToggleSelect,
 }: Props) {
   const [showReject, setShowReject] = useState(false)
   const [rejectNotes, setRejectNotes] = useState('')
@@ -94,11 +101,26 @@ export default function CombinedApprovalCard({
     <div
       data-testid="combined-approval-card"
       data-group-id={groupId}
-      className="border border-accent/40 rounded-md bg-surface p-5 shadow-sm"
+      className={`border rounded-md bg-surface p-5 shadow-sm transition-colors ${
+        selected ? 'border-accent/70 bg-accent/[0.04]' : 'border-accent/40'
+      }`}
     >
       {/* Header */}
       <div className="flex items-baseline justify-between mb-3">
         <div className="flex items-baseline gap-2">
+          {onToggleSelect ? (
+            <label
+              className="flex items-center cursor-pointer pr-1"
+              title="Select for bulk approval"
+            >
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={onToggleSelect}
+                className="h-4 w-4 accent-[var(--accent)]"
+              />
+            </label>
+          ) : null}
           <span className="text-xs font-sans font-semibold uppercase tracking-wider text-accent">
             COMBINED APPROVAL
           </span>
