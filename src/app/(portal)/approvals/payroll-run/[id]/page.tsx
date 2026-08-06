@@ -102,7 +102,8 @@ export default async function PayrollRunApprovalPage({ params }: PageProps) {
     })
   }
 
-  const canAct = user.role === 'principal' && run.status === 'submitted' && run.submitted_by !== user.id
+  // Self-submitted runs are actionable too (mig 20260806000000).
+  const canAct = user.role === 'principal' && run.status === 'submitted'
 
   return (
     <div>

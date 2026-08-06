@@ -23,7 +23,7 @@ export async function approvePayrollRun(runId: string): Promise<void> {
     .maybeSingle()
 
   if (readErr || !run) throw new Error('Payroll run not found')
-  if (run.submitted_by === user.id) throw new Error('Cannot approve your own submission')
+  // Principal may approve a run they submitted themselves (mig 20260806000000).
   if (run.status !== 'submitted') throw new Error(`Run status is ${run.status}, not submitted`)
 
   // Period-lock gate (voucher fan-out writes against today's period)
@@ -62,7 +62,7 @@ export async function rejectPayrollRun(runId: string, reason: string): Promise<v
     .maybeSingle()
 
   if (readErr || !run) throw new Error('Payroll run not found')
-  if (run.submitted_by === user.id) throw new Error('Cannot reject your own submission')
+  // Principal may reject a run they submitted themselves (mig 20260806000000).
   if (run.status !== 'submitted') throw new Error(`Run status is ${run.status}, not submitted`)
 
   const { error } = await supabase.rpc('reject_payroll_run', {

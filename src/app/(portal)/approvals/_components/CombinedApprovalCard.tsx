@@ -139,6 +139,9 @@ export default function CombinedApprovalCard({
             <span className="font-serif italic text-graphite">
               {submitterName}
             </span>
+            {isSelfSubmitted ? (
+              <span className="font-serif italic text-graphite"> (you)</span>
+            ) : null}
           </div>
           {hasVouchers ? (
             <button
@@ -146,7 +149,7 @@ export default function CombinedApprovalCard({
               onClick={() => setShowDetails(true)}
               className="mt-1 text-xs font-serif italic text-accent hover:text-accent-hover"
             >
-              {isSelfSubmitted || hasNonVoucher ? 'View details →' : 'Review per row →'}
+              {hasNonVoucher ? 'View details →' : 'Review per row →'}
             </button>
           ) : null}
         </div>
@@ -157,19 +160,13 @@ export default function CombinedApprovalCard({
           groupId={groupId}
           open={showDetails}
           onClose={() => setShowDetails(false)}
-          actionable={!isSelfSubmitted && !hasNonVoucher}
+          actionable={!hasNonVoucher}
           contextItems={contextItems}
         />
       ) : null}
 
-      {/* Actions */}
-      {isSelfSubmitted ? (
-        <div className="bg-alert-bg border border-alert rounded-md p-3">
-          <p className="font-serif italic text-alert text-sm">
-            You submitted this request and cannot approve your own submission.
-          </p>
-        </div>
-      ) : showReject ? (
+      {/* Actions — Principal may approve their own submission (mig 20260806000000) */}
+      {showReject ? (
         <div className="space-y-3">
           <textarea
             aria-label="Rejection reason"

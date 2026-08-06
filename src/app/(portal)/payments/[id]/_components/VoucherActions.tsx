@@ -134,31 +134,21 @@ export default function VoucherActions({
     <section className="border-t border-hairline pt-8 max-w-3xl">
       <h2 className="font-serif text-xl text-ink mb-4">Actions</h2>
 
-      {/* Draft: Finance can edit, submit or void. Principal may edit/void but
-          NOT submit — submitted_by would be Principal and no_self_approval
-          leaves nobody able to approve the card (exactly how PV-0111 got
-          stuck three times on 2026-07-24). */}
+      {/* Draft: Finance and Principal can edit, submit or void. Principal used
+          to be blocked from Submit because no_self_approval left the card
+          unapprovable (PV-0111, 2026-07-24) — mig 20260806000000 lifted that,
+          so Principal may now submit and approve their own voucher. */}
       {status === 'draft' && isFinance ? (
         <div>
-          {isPrincipal ? (
-            <div className="mb-4 p-3 rounded-md text-sm bg-surface border border-alert/40">
-              <span className="font-serif italic text-alert">
-                你现在是 Principal 账号 — 自己 submit 的单没有人能批(不能自审自批)。
-                请用 Finance 账号打开这页再点 Submit。
-              </span>
-            </div>
-          ) : null}
           <div className="flex flex-wrap items-center gap-3">
-            {!isPrincipal ? (
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={() => handleAction(submitForApproval)}
-                className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50"
-              >
-                {isPending ? 'Submitting…' : 'Submit for approval'}
-              </button>
-            ) : null}
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => handleAction(submitForApproval)}
+              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50"
+            >
+              {isPending ? 'Submitting…' : 'Submit for approval'}
+            </button>
             <Link
               href={`/payments/${voucherId}/edit`}
               className="border border-hairline text-graphite hover:text-ink hover:bg-surface text-sm font-serif italic px-4 py-2 rounded-md transition-colors"

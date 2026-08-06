@@ -52,7 +52,9 @@ export default function PendingApprovals({ items }: { items: PendingItem[] }) {
     [items]
   )
   const selectableIds = useMemo(
-    () => singles.filter((s) => !s.isSelf).map((s) => s.id),
+    // Self-submitted rows are selectable too — Principal may approve their own
+    // submission since mig 20260806000000.
+    () => singles.map((s) => s.id),
     [singles]
   )
   const hasSelectable = selectableIds.length > 0
@@ -231,30 +233,21 @@ export default function PendingApprovals({ items }: { items: PendingItem[] }) {
                     : 'border-hairline bg-surface'
                 }`}
               >
-                {item.isSelf ? (
-                  <div
-                    className="flex items-center pl-4 pr-1"
-                    title="You submitted this — you can't approve your own request"
-                  >
-                    <input
-                      type="checkbox"
-                      disabled
-                      className="h-4 w-4 opacity-25"
-                    />
-                  </div>
-                ) : (
-                  <label
-                    className="flex items-center pl-4 pr-1 cursor-pointer"
-                    title="Select for bulk approval"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected.has(item.id)}
-                      onChange={() => toggle(item.id)}
-                      className="h-4 w-4 accent-[var(--accent)]"
-                    />
-                  </label>
-                )}
+                <label
+                  className="flex items-center pl-4 pr-1 cursor-pointer"
+                  title={
+                    item.isSelf
+                      ? 'You submitted this — select for bulk approval'
+                      : 'Select for bulk approval'
+                  }
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.has(item.id)}
+                    onChange={() => toggle(item.id)}
+                    className="h-4 w-4 accent-[var(--accent)]"
+                  />
+                </label>
 
                 <Link
                   href={item.href}

@@ -361,10 +361,9 @@ export async function approveRequest(formData: FormData) {
     throw new Error('This request is part of a combined approval — use the combined card to approve both together.')
   }
 
-  // Security: prevent self-approval (defense in depth — CHECK constraint enforces too)
-  if (approval.submitted_by === user.id) {
-    throw new Error('Cannot approve your own submission')
-  }
+  // Self-approval is allowed for Principal (mig 20260806000000). Principal is
+  // the sole approver, and View-as makes self-submission routine — blocking it
+  // left cards nobody could approve OR reject.
 
   // Approving moves money (loan disbursement, voucher exec, pool release) — block if today's period is locked
   await assertPeriodOpen(supabase, new Date())
@@ -432,14 +431,6 @@ export async function approveRequestsBulk(args: {
         id,
         description: label,
         error: 'Part of a combined approval — approve it from its card',
-      })
-      continue
-    }
-    if (approval.submitted_by === user.id) {
-      result.failed.push({
-        id,
-        description: label,
-        error: 'Cannot approve your own submission',
       })
       continue
     }
@@ -604,10 +595,8 @@ export async function approveRequestGroup(formData: FormData) {
     throw new Error('Approval group not found or already processed')
   }
 
-  // Self-approval guard — applies if ANY request in the group is self-submitted
-  if (group.some((r) => r.submitted_by === user.id)) {
-    throw new Error('Cannot approve your own submission')
-  }
+  // No self-approval guard: Principal may approve a group they submitted
+  // themselves (mig 20260806000000).
 
   const loanApproval = group.find((r) => r.request_type === 'new_loan')
   const voucherApprovals = group.filter((r) => r.request_type === 'payment_voucher')

@@ -87,7 +87,8 @@ Credit states: `paid` on creation (auto-complete) → `voided` via `voidPaidRece
 5. Invoice → `paid` / `paid_via_netting`.
 
 ### Approve (debit) — `approve_single_voucher` RPC (latest: mig 20260611020000)
-Single atomic Postgres tx. Principal-only, period-open check, self-approval block,
+Single atomic Postgres tx. Principal-only, period-open check, no self-approval block
+(lifted mig 20260806000000 — Principal may approve their own submission),
 no group_id (groups use `approve_voucher_batch[_partial]`, mig 171/182 — same logic
 per voucher, aggregate bank pre-check, per-row approve/reject).
 **Dates (mig 20260611020000):** GL transaction_date / period_month / JE-YYYYMM
