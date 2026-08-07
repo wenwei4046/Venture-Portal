@@ -83,7 +83,7 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
     >
       <div
         className={
-          'font-mono text-[10px] uppercase tracking-wider inline-block rounded px-1.5 py-0.5 mb-1.5 border ' +
+          'font-mono text-sm font-semibold uppercase tracking-wider inline-block rounded px-2.5 py-1 mb-2 border ' +
           (side === 'collect'
             ? 'text-ledger border-ledger/40 bg-ledger/10'
             : 'text-alert border-alert/40 bg-alert/10')
