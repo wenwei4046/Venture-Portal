@@ -27,9 +27,10 @@ export default async function EditJournalVoucherPage({
       .order('code'),
   ])
 
-  // Only manual vouchers are editable — auto-posted entries (payments,
-  // repayments, etc.) must not be touched through this form.
-  if (!entry || entry.reference_type !== 'manual_jv') {
+  // Manual vouchers AND the auto payroll accruals are editable here (user
+  // 2026-08-07: "万一有错我还可以更改"); other auto-posted entries (payments,
+  // repayments, etc.) stay untouchable through this form.
+  if (!entry || !['manual_jv', 'payroll_accrual'].includes(entry.reference_type as string)) {
     notFound()
   }
 

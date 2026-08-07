@@ -48,7 +48,7 @@ export default async function NewJournalVoucherPage({
         .eq('entry_id', from)
         .order('created_at'),
     ])
-    if (src && src.reference_type === 'manual_jv') {
+    if (src && ['manual_jv', 'payroll_accrual'].includes(src.reference_type as string)) {
       prefill = {
         description: src.description ?? '',
         segment: (src.segment as string) ?? 'unallocated',

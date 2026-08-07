@@ -94,24 +94,20 @@ export default function JvList({ rows }: { rows: JvRow[] }) {
             {filtered.map((entry) => (
               <tr key={entry.id}>
                 <td>
+                  <Link
+                    href={`/reconciliation/journal-entries/${entry.id}/edit`}
+                    className="font-mono text-[12px] text-accent hover:underline"
+                  >
+                    {entry.entry_no}
+                  </Link>
                   {entry.auto ? (
-                    <span className="font-mono text-[12px] text-ink">
-                      {entry.entry_no}
-                      <span
-                        className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
-                        title="System-posted payroll accrual — reverse it instead of editing"
-                      >
-                        AUTO
-                      </span>
-                    </span>
-                  ) : (
-                    <Link
-                      href={`/reconciliation/journal-entries/${entry.id}/edit`}
-                      className="font-mono text-[12px] text-accent hover:underline"
+                    <span
+                      className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
+                      title="System-posted payroll accrual — click to view details or fix mistakes"
                     >
-                      {entry.entry_no}
-                    </Link>
-                  )}
+                      AUTO
+                    </span>
+                  ) : null}
                   <div className="font-mono text-[11px] text-graphite mt-0.5">
                     {entry.lineCount} {entry.lineCount === 1 ? 'line' : 'lines'}
                   </div>
@@ -125,11 +121,7 @@ export default function JvList({ rows }: { rows: JvRow[] }) {
                 </td>
                 <td className="num">{formatMoney(Number(entry.total_amount))}</td>
                 <td>
-                  {entry.auto ? (
-                    <span className="font-serif italic text-muted text-xs">auto · read-only</span>
-                  ) : (
-                    <JvRowActions id={entry.id} entryNo={entry.entry_no} />
-                  )}
+                  <JvRowActions id={entry.id} entryNo={entry.entry_no} />
                 </td>
               </tr>
             ))}
