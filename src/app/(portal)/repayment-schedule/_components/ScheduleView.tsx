@@ -241,7 +241,7 @@ function SourceChip({ source }: { source?: string | null }) {
   return (
     <span
       className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
-      title={`资金来源: ${source}`}
+      title={`Source of capital: ${source}`}
     >
       SC {source}
     </span>

@@ -74,6 +74,7 @@ export function fundingSourceFromTerms(terms: string | null | undefined): string
 // "HC 定存 · 借给: 2990" → "2990". Display-only — never used to match data.
 export function lentToFromNotes(notes: string | null | undefined): string | null {
   if (!notes) return null
-  const m = notes.match(/(?:转?借给|借去)[:：]?\s*([^·\n,，;；]+)/)
+  // English UI (2026-08-06) writes "lent to: X"; legacy notes use 借给/借去.
+  const m = notes.match(/(?:转?借给|借去|lent to)[:：]?\s*([^·\n,，;；]+)/i)
   return m?.[1]?.trim() || null
 }

@@ -181,7 +181,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
               href={`/fund-in/${source.id}/edit`}
               className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
             >
-              修改条款 · Amend
+              Amend terms
             </Link>
           ) : null}
           <StatusBadge status={source.status} />
@@ -426,7 +426,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
         defaultHint={
           source.effective_date
             ? dayjs(`${(source.effective_date as string).slice(0, 7)}-01`).add(1, 'month').format('YYYY-MM')
-            : '收款次月'
+            : 'the month after receipt'
         }
       />
 
@@ -438,7 +438,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
         <section className="border-t border-hairline pt-8">
           <div className="border border-alert/30 bg-alert/5 rounded-md px-4 py-3">
             <div className="text-sm text-alert font-sans font-medium">
-              ⏳ 取消申请审批中 · Cancellation pending Principal approval
+              ⏳ Cancellation pending Principal approval
             </div>
             <p className="text-xs text-muted mt-1 italic font-serif">
               Requested by {((pendingCancel.users as { name?: string } | null)?.name) ?? 'Finance'} on{' '}
@@ -465,7 +465,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
           </div>
           <p className="text-xs text-muted mt-2 italic font-serif">
             Fix typos, wrong amount, wrong rate, or wrong dates while the request is still pending. Locks once Principal approves.
-            Submit 错了整笔不要的话,直接撤回 — 不用等 Principal。
+            Submitted the whole thing by mistake? Withdraw it directly — no Principal needed.
           </p>
         </section>
       ) : canFinanceEdit && isActive ? (

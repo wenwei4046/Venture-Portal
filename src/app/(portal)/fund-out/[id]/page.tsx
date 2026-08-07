@@ -120,7 +120,7 @@ export default async function LoanDetailPage({ params }: Props) {
               href={`/fund-out/${loan.id}/edit`}
               className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
             >
-              修改条款 · Amend
+              Amend terms
             </Link>
           ) : null}
           <LoanStatus status={loan.status} />
@@ -180,11 +180,11 @@ export default async function LoanDetailPage({ params }: Props) {
               Tenure
             </div>
             <div className="font-serif text-xl text-num-ink tabular">
-              {noFixedTerm ? '无固定期限' : `${tenureMonths} ${tenureMonths === 1 ? 'month' : 'months'}`}
+              {noFixedTerm ? 'No fixed term' : `${tenureMonths} ${tenureMonths === 1 ? 'month' : 'months'}`}
             </div>
             {noFixedTerm ? (
               <div className="font-serif italic text-graphite text-xs mt-2">
-                利息从放款日起算 · 还款日未定 — interest accrues monthly, no maturity
+                Interest accrues monthly from disbursement — no maturity date
               </div>
             ) : maturityDate ? (
               <div className="font-mono text-[11.5px] text-graphite mt-2 tracking-[0.02em] font-medium">
@@ -246,7 +246,7 @@ export default async function LoanDetailPage({ params }: Props) {
           // open /approvals, so this is their only window into the status).
           <div className="mt-5 border border-alert/30 bg-alert/5 rounded-md px-4 py-3">
             <div className="text-sm text-alert font-sans font-medium">
-              ⏳ 取消申请审批中 · Cancellation pending Principal approval
+              ⏳ Cancellation pending Principal approval
             </div>
             <p className="text-xs text-muted mt-1 italic font-serif">
               Requested by {((pendingCancel.users as { name?: string } | null)?.name) ?? 'Finance'} on{' '}
@@ -315,7 +315,7 @@ export default async function LoanDetailPage({ params }: Props) {
           defaultHint={
             loan.disbursement_date
               ? dayjs(`${(loan.disbursement_date as string).slice(0, 7)}-01`).add(1, 'month').format('YYYY-MM')
-              : '放款次月'
+              : 'the month after disbursement'
           }
         />
       </section>

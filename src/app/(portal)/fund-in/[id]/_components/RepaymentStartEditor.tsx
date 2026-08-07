@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { setFundSourceRepaymentStart } from '../../actions'
 
 // Finance self-service: agreed first-repayment month (还款起始月) for a fund
-// source — drives the Loan Monitor's 本月应付. Unset = effective month +1.
+// source — drives the Loan Monitor's due-this-month. Unset = effective month +1.
 export default function RepaymentStartEditor({
   sourceId,
   current,
@@ -22,7 +22,7 @@ export default function RepaymentStartEditor({
   return (
     <div className="mb-8">
       <div className="text-xs uppercase tracking-wide text-muted font-sans mb-1">
-        还款起始月 · Repayment starts
+        Repayment starts
       </div>
       <div className="flex items-center gap-2">
         <input
@@ -45,12 +45,13 @@ export default function RepaymentStartEditor({
           }
           className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white rounded-md text-xs font-sans transition-colors disabled:opacity-50"
         >
-          {isPending ? '保存中…' : '保存'}
+          {isPending ? 'Saving…' : 'Save'}
         </button>
-        {saved && !isPending ? <span className="text-xs font-sans text-ledger">已保存 ✓</span> : null}
+        {saved && !isPending ? <span className="text-xs font-sans text-ledger">Saved ✓</span> : null}
       </div>
       <p className="font-serif italic text-muted text-xs mt-1.5">
-        第一期落在哪个月。没设的话默认 {defaultHint} 起。Loan Monitor 的「本月应付」按这个算。
+        Which month the first installment falls in. Unset defaults to {defaultHint}. The Loan
+        Monitor&apos;s due-this-month follows this.
       </p>
       {error ? <p className="text-xs font-sans text-danger mt-1.5">{error}</p> : null}
     </div>

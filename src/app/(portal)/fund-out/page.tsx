@@ -89,7 +89,7 @@ export default async function FundOutPage({ searchParams }: Props) {
             href="/repayment-schedule"
             className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
           >
-            本月还款排程
+            Repayment Schedule
           </Link>
           <ExportCSVButton />
           <Link

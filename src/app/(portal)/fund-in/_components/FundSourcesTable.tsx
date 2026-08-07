@@ -79,7 +79,7 @@ export default function FundSourcesTable({ rows }: { rows: FundSourceRow[] }) {
                     className="inline-block mt-0.5 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
                     title={s.notes ?? undefined}
                   >
-                    借给 {lentTo}
+                    LENT TO {lentTo}
                   </span>
                 ) : s.notes ? (
                   <div
