@@ -72,6 +72,21 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+## Same-bank funding CLOBBERED the bank cache (2026-08-07, mig 20260807010000)
+
+Principal "approve 不到" → HL cache said 149.01 while GL said 165,214.03
+(user's own sum was right). Short by EXACTLY the two same-bank HL→HL funding
+PVs (99,755.35 + 65,309.67). Root cause: approvers read current_balance
+early, the paid-status flip fires credit_dest_bank_on_bank_transfer
+(+amount), then the approver writes an ABSOLUTE balance from the stale read —
+same-bank means same row, so the trigger's credit gets erased and the cache
+drains by the full amount. **The 20260804010000 entry's claim that same-bank
+"cache moves cancel" was WRONG** — they only cancel now that mig
+`20260807010000_same_bank_cache_fix` made all three approvers
+(single/batch/batch_partial) write RELATIVE (current_balance ± amount) and
+re-synced every active bank's cache to GL. Lesson: any cache write in a
+trigger-adjacent path must be relative, never absolute-from-a-read.
+
 ## 53,613.75 triangle contra (2026-08-07, DATA ops — no code)
 
 User-confirmed story: the [BI#32] fund-in "2990 → HV 53,613.75" is really
