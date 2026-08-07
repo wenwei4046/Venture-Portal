@@ -23,7 +23,7 @@ function SourceBadge({ source }: { source?: string | null }) {
   return (
     <span
       className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
-      title={`资金来源: ${source}`}
+      title={`Source of capital: ${source}`}
     >
       SC {source}
     </span>
@@ -31,17 +31,17 @@ function SourceBadge({ source }: { source?: string | null }) {
 }
 
 const BUCKETS = [
-  { key: 'current', label: '本月到期' },
-  { key: 'm1', label: '逾期 1 个月' },
-  { key: 'm2', label: '逾期 2 个月' },
-  { key: 'm3', label: '逾期 3 个月+' },
+  { key: 'current', label: 'Due this month' },
+  { key: 'm1', label: '1 mo late' },
+  { key: 'm2', label: '2 mo late' },
+  { key: 'm3', label: '3+ mo late' },
 ] as const
 
-function DueTable({ side, verb }: { side: MonitorSide; verb: '收' | '付' }) {
+function DueTable({ side, verb }: { side: MonitorSide; verb: 'collected' | 'paid' }) {
   if (side.due.length === 0) {
     return (
       <div className="border border-hairline rounded-md bg-surface p-6 text-center mb-6">
-        <p className="font-serif italic text-ledger text-sm">全部{verb}清 — 没有到期未{verb}项 🎉</p>
+        <p className="font-serif italic text-ledger text-sm">All {verb} — nothing overdue 🎉</p>
       </div>
     )
   }
@@ -54,7 +54,7 @@ function DueTable({ side, verb }: { side: MonitorSide; verb: '收' | '付' }) {
             {BUCKETS.map((b) => (
               <th key={b.key} className="num">{b.label}</th>
             ))}
-            <th className="num">合计未{verb}</th>
+            <th className="num">Total due</th>
           </tr>
         </thead>
         <tbody>
@@ -89,7 +89,7 @@ function OutstandingTables({ side }: { side: MonitorSide }) {
     <div className="space-y-6">
       <div>
         <div className="flex items-baseline justify-between mb-2">
-          <h3 className="font-serif italic text-graphite text-sm">定好日期的 · fixed schedule</h3>
+          <h3 className="font-serif italic text-graphite text-sm">Fixed schedule</h3>
           <span className="font-mono text-[11px] text-graphite">SUBTOTAL {formatMoney(side.scheduledTotal)}</span>
         </div>
         {side.scheduled.length === 0 ? (
@@ -100,7 +100,7 @@ function OutstandingTables({ side }: { side: MonitorSide }) {
               <thead>
                 <tr>
                   <th>Counterparty</th>
-                  <th className="num">还款起始</th>
+                  <th className="num">Starts</th>
                   <th className="num">Outstanding</th>
                 </tr>
               </thead>
@@ -124,7 +124,7 @@ function OutstandingTables({ side }: { side: MonitorSide }) {
 
       <div>
         <div className="flex items-baseline justify-between mb-2">
-          <h3 className="font-serif italic text-graphite text-sm">还没定好的 · no fixed term / 利滚利</h3>
+          <h3 className="font-serif italic text-graphite text-sm">No fixed term / compounding</h3>
           <span className="font-mono text-[11px] text-graphite">SUBTOTAL {formatMoney(side.noTermTotal)}</span>
         </div>
         {side.noTerm.length === 0 ? (
@@ -182,8 +182,10 @@ export default async function LoanMonitorPage() {
           </div>
           <h1 className="page-title">Loan Monitor</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
-            按「还款起始月」排期:到期未清的按逾期月数分桶(清了的期数自动消失)·
-            Outstanding 总览在下面 · 起始月在各笔详情页设定,没设的默认放款/收款次月起
+            Scheduled by the agreed start month: unpaid installments bucket by
+            months late (settled months drop off) · Outstanding overview below ·
+            set the start month on each position&apos;s detail page; unset
+            defaults to the month after disbursement/receipt
           </p>
         </div>
         <div className="flex flex-col gap-1.5 shrink-0 text-right">
@@ -211,25 +213,25 @@ export default async function LoanMonitorPage() {
 
       <section className="mb-12">
         <div className="sect-head">
-          <h2>应收 aging · To collect — Fund OUT</h2>
+          <h2>To Collect · aging — Fund OUT</h2>
           <span className="rule" aria-hidden />
           <span className="count">{data.collect.due.length} UNSETTLED</span>
         </div>
-        <DueTable side={data.collect} verb="收" />
+        <DueTable side={data.collect} verb="collected" />
       </section>
 
       <section className="mb-12">
         <div className="sect-head">
-          <h2>应付 aging · To repay — Fund IN</h2>
+          <h2>To Repay · aging — Fund IN</h2>
           <span className="rule" aria-hidden />
           <span className="count">{data.repay.due.length} UNSETTLED</span>
         </div>
-        <DueTable side={data.repay} verb="付" />
+        <DueTable side={data.repay} verb="paid" />
       </section>
 
       <section className="mb-12">
         <div className="sect-head">
-          <h2>Outstanding · 应收结欠 — Fund OUT</h2>
+          <h2>Outstanding · To Collect — Fund OUT</h2>
           <span className="rule" aria-hidden />
           <span className="count">{formatMoney(data.collect.grandTotal)}</span>
         </div>
@@ -238,7 +240,7 @@ export default async function LoanMonitorPage() {
 
       <section className="mb-12">
         <div className="sect-head">
-          <h2>Outstanding · 应付结欠 — Fund IN</h2>
+          <h2>Outstanding · To Repay — Fund IN</h2>
           <span className="rule" aria-hidden />
           <span className="count">{formatMoney(data.repay.grandTotal)}</span>
         </div>

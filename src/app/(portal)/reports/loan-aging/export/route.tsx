@@ -18,18 +18,16 @@ export const dynamic = 'force-dynamic'
 
 const m = (v: number) => (v ? formatMoneyBare(v) : '—')
 
-// The PDF kit's font has no CJK glyphs (Chinese overlaps into garbage) and
-// long labels wrap — exports use compact ASCII-only labels; the HTML page
-// keeps the Chinese copy.
+// The PDF kit's font has no CJK glyphs and long labels wrap — exports use
+// compact labels. lib/loan-monitor is English-only since 2026-08-06, so this
+// just shortens.
 const compact = (s: string) =>
   s
     .replace(/^RM /, '')
     .replace('.00 @', ' @')
     .replace('%/mo', '%')
-    .replace('利滚利 compounding', 'compounding')
 
-const startEn = (s: string) =>
-  s === '未定' ? '—' : s.replace(' 起 (默认)', ' (default)').replace(' 起', '')
+const startEn = (s: string) => (s === 'TBD' ? '—' : s.replace(/^starts /, ''))
 
 // SC gets its own column (user 2026-07-24: "SC 可以弄成类似标记") — a PDF
 // table can't render the web chip, a dedicated column is the print equivalent.

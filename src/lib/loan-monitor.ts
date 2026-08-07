@@ -120,8 +120,10 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
     paidByFs.set(id, r2((paidByFs.get(id) ?? 0) + Number(rp.amount)))
   }
 
+  // English-only labels (user 2026-08-06: "整体显示英文") — the exports no
+  // longer need to transliterate.
   const startLabel = (startMonth: string | null, firstDueYM: string | null) =>
-    startMonth ? `${startMonth.slice(0, 7)} 起` : firstDueYM ? `${firstDueYM} 起 (默认)` : '—'
+    startMonth ? `starts ${startMonth.slice(0, 7)}` : firstDueYM ? `starts ${firstDueYM} (default)` : '—'
 
   // ── 应收 side ──
   const collectDue: DueRow[] = []
@@ -146,10 +148,10 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
         collectNoTerm.push({
           key: l.id as string,
           counterparty,
-          detail: `RM ${money(principal)} @ ${(rate * 100).toFixed(3)}%/mo · ${compounding ? '利滚利 compounding' : 'no fixed term'}`,
+          detail: `RM ${money(principal)} @ ${(rate * 100).toFixed(3)}%/mo · ${compounding ? 'compounding' : 'no fixed term'}`,
           source,
           outstanding,
-          startLabel: '未定',
+          startLabel: 'TBD',
         })
       }
       continue
@@ -215,9 +217,9 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
         repayNoTerm.push({
           key: s.id as string,
           counterparty: from as string,
-          detail: `RM ${money(amount)} @ ${(rate * 100).toFixed(3)}%/mo · ${compounding ? '利滚利 compounding' : 'no fixed term'}${s.status === 'matured' ? ' · matured' : ''}`,
+          detail: `RM ${money(amount)} @ ${(rate * 100).toFixed(3)}%/mo · ${compounding ? 'compounding' : 'no fixed term'}${s.status === 'matured' ? ' · matured' : ''}`,
           outstanding,
-          startLabel: '未定',
+          startLabel: 'TBD',
         })
       }
       continue
