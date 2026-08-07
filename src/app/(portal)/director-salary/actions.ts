@@ -13,6 +13,8 @@ import {
   type PayoutMode,
 } from '@/lib/salary'
 import { notifyDirectorSalaryCalculated } from '@/lib/slack'
+import { postPayrollAccrualJVs } from '@/lib/payroll-accrual'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import dayjs from 'dayjs'
 
 // ─── Save CTC ──────────────────────────────────────────────────────
@@ -663,6 +665,21 @@ export async function submitDirectorSalaryToFinance(period: string) {
   })
 
   if (error) throw new Error(`Submit failed: ${error.message}`)
+
+  // Auto payroll accrual JV (user 2026-08-07): submitting director salary to
+  // Finance books the Director segment's salary JV, dated back to the payroll
+  // month-end. The submission stands even if the JV fails — surface loudly.
+  try {
+    await postPayrollAccrualJVs(supabase as unknown as SupabaseClient, {
+      periodMonth: periodNorm,
+      kind: 'director',
+      userId: user.id,
+    })
+  } catch (e) {
+    throw new Error(
+      `Submitted ✓ but the auto accrual JV failed: ${e instanceof Error ? e.message : 'unknown'}`,
+    )
+  }
 
   revalidatePath('/director-salary')
   revalidatePath('/billing')

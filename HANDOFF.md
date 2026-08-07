@@ -72,6 +72,29 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+## Auto payroll accrual JVs (2026-08-07)
+
+User: "HR submit payroll fund request 给我, 我希望同时直接帮我开jv" → trigger
+refined via AskUserQuestion: STAFF JVs post when the payroll RUN is approved
+(approvePayrollRun), DIRECTOR JV posts when HR submits director salary to
+Finance (submitDirectorSalaryToFinance) — both dated BACK to the payroll
+month-end ("要放回去对的月份").
+ - `lib/payroll-accrual.ts` (+3 tests): mapping REVERSE-ENGINEERED from
+   Finance's manual May/June JVs and verified to the sen on both tables:
+   Dr 9030 = gross − non_stat_allowance · Dr 9084 = non_stat · Dr 9081/82/83 =
+   ER EPF/SOCSO/EIS · Cr 4070 net · 4071 EPF both · 4072 SOCSO both · 4072
+   (2nd line) SKBBK · 4073 EIS both · 4074 PCB. Staff = hr_monthly_payroll
+   grouped via hr_staff_costs→departments (NOT "staff" — that table doesn't
+   exist); director = director_monthly_payroll, one 'director'-segment JV.
+ - Idempotent per (period, segment) via reference_type='payroll_accrual';
+   same total → skip, DIFFERENT total → throws "reverse the old JV first" —
+   never silently double-books (covers HR reopen→resubmit).
+ - Failures after the RPC surface as "approved ✓ but auto JV failed: …" —
+   the approval/submission stands.
+ - July 2026 BACKFILLED by hand (user asked): JE-202607-0386..0390, five
+   segments, each ties EXACTLY to its funding-request total (HR 21,803.06 /
+   Fin 24,355.35 / Mkt 47,030.69 / DO 6,566.25 / Director 65,309.67).
+
 ## Same-bank funding CLOBBERED the bank cache (2026-08-07, mig 20260807010000)
 
 Principal "approve 不到" → HL cache said 149.01 while GL said 165,214.03

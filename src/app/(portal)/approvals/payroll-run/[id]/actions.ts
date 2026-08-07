@@ -2,9 +2,11 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
+import { postPayrollAccrualJVs } from '@/lib/payroll-accrual'
 
 /**
  * Principal approves a submitted payroll_run.
@@ -36,6 +38,23 @@ export async function approvePayrollRun(runId: string): Promise<void> {
   })
 
   if (error) throw new Error(`Approve failed: ${error.message}`)
+
+  // Auto payroll accrual JVs (user 2026-08-07): approving the run books the
+  // month's per-department salary JVs, dated back to the payroll month-end.
+  // The run IS approved at this point — an accrual failure surfaces loudly but
+  // doesn't undo the approval.
+  try {
+    await postPayrollAccrualJVs(supabase as unknown as SupabaseClient, {
+      periodMonth: run.period_month,
+      kind: 'staff',
+      runId,
+      userId: user.id,
+    })
+  } catch (e) {
+    throw new Error(
+      `Run approved ✓ but the auto accrual JV failed: ${e instanceof Error ? e.message : 'unknown'}`,
+    )
+  }
 
   revalidatePath(`/approvals/payroll-run/${runId}`)
   revalidatePath('/approvals')
