@@ -158,16 +158,19 @@ const SECTION_STYLES: Record<string, { bg: string; color: string }> = {
 }
 
 export function PdfTable({
-  columns, rows, numberFormat = 'plain', rowKinds,
+  columns, rows, numberFormat = 'plain', rowKinds, repeatHeader = false,
 }: {
   columns: PdfColumn[]
   rows: (string | number | null)[][]
   numberFormat?: 'money' | 'plain'
   rowKinds?: PdfRowKind[]
+  /** Repeat the column-header row at the top of every page (react-pdf
+   *  `fixed`), not just the first. */
+  repeatHeader?: boolean
 }): React.ReactElement {
   return (
     <View style={styles.table}>
-      <View style={[styles.row, styles.headerRow]}>
+      <View style={[styles.row, styles.headerRow]} fixed={repeatHeader}>
         {columns.map((c, i) => (
           <View key={i} style={{ width: c.width, padding: 4 }}>
             <Text style={{ textAlign: c.align ?? 'left', fontSize: 8.5 }}>{c.label}</Text>

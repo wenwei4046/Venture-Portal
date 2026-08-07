@@ -180,7 +180,7 @@ export async function GET(request: Request) {
         periodLabel={`As at ${dayjs().format('D MMM YYYY')}`}
         orientation="landscape"
       >
-        <PdfTable columns={columns} rows={pdfRows} numberFormat="money" rowKinds={rowKinds} />
+        <PdfTable columns={columns} rows={pdfRows} numberFormat="money" rowKinds={rowKinds} repeatHeader />
       </PdfDocument>
     ),
   })
