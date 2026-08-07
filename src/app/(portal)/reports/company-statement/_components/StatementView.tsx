@@ -63,15 +63,23 @@ function finishCell(item: PositionRow, verb: string) {
 // and its own subtotal that ties back to the summary row.
 function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' | 'repay' }) {
   const verb = side === 'collect' ? '收' : '还'
+  // Column set per user 2026-08-06: 原额 + 总利息 (the whole deal), a divider,
+  // then what's still owed (本金 / 利息 / 总额) and the payoff month. 总利息
+  // only exists for fixed-term flat deals — compounding/no-term are open-ended.
+  const oweLabel = side === 'collect' ? '未收' : '还欠'
   const r2 = (n: number) => Math.round(n * 100) / 100
+  const totalInterestOf = (i: PositionRow) =>
+    i.kind === 'flat' && i.tenureMonths ? r2(i.tenureMonths * i.monthlyInterest) : null
+  const oweTotalOf = (i: PositionRow) => r2(i.principalOutstanding + i.interestOutstanding)
   const sub = items.reduce(
     (acc, i) => ({
       principal: r2(acc.principal + i.principal),
-      paid: r2(acc.paid + i.principalPaid),
+      totalInterest: r2(acc.totalInterest + (totalInterestOf(i) ?? 0)),
       outstanding: r2(acc.outstanding + i.principalOutstanding),
       interest: r2(acc.interest + i.interestOutstanding),
+      oweTotal: r2(acc.oweTotal + oweTotalOf(i)),
     }),
-    { principal: 0, paid: 0, outstanding: 0, interest: 0 },
+    { principal: 0, totalInterest: 0, outstanding: 0, interest: 0, oweTotal: 0 },
   )
   return (
     // 用格子围起来 + 底色分色 (user 2026-08-06): 要收绿底, 要还橙底 — 一眼分清.
@@ -96,63 +104,79 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
           <tr className="text-[11px] uppercase tracking-wide text-muted font-sans border-b border-hairline">
             <th className="text-left py-1.5 px-3 font-medium">Position</th>
             <th className="text-right py-1.5 px-3 font-medium">原额</th>
-            <th className="text-right py-1.5 px-3 font-medium">已{verb}本金</th>
-            <th className="text-right py-1.5 px-3 font-medium">未{verb}本金</th>
-            <th className="text-right py-1.5 px-3 font-medium">利息</th>
+            <th className="text-right py-1.5 px-3 font-medium">总利息</th>
+            <th className="text-right py-1.5 px-3 font-medium border-l border-hairline">
+              {oweLabel}本金
+            </th>
+            <th className="text-right py-1.5 px-3 font-medium">{oweLabel}利息</th>
+            <th className="text-right py-1.5 px-3 font-medium">{oweLabel}总额</th>
             <th className="text-right py-1.5 px-3 font-medium">几时{verb}完</th>
             <th className="py-1.5 px-3" />
           </tr>
         </thead>
         <tbody>
-          {items.map(item => (
-            <tr key={item.id} className="border-b border-hairline/60">
-              <td className="py-1.5 px-3">
-                <span className="font-serif text-ink">
-                  {pct(item.monthlyRate)} · {kindLabel(item)}
-                  {item.startYM ? ` · ${item.startYM} 起` : ''}
-                </span>
-                <SourceBadge source={item.source} side={item.side} />
-              </td>
-              <td className="py-1.5 px-3 text-right font-mono tabular text-graphite">
-                {formatMoneyBare(item.principal)}
-              </td>
-              <td className="py-1.5 px-3 text-right font-mono tabular text-muted">
-                {formatMoneyBare(item.principalPaid)}
-              </td>
-              <td className="py-1.5 px-3 text-right font-mono tabular text-ink">
-                {formatMoneyBare(item.principalOutstanding)}
-              </td>
-              <td className="py-1.5 px-3 text-right font-mono tabular text-graphite">
-                {item.kind === 'no_term' ? (
-                  <span className="text-muted">—</span>
-                ) : (
-                  formatMoneyBare(item.interestOutstanding)
-                )}
-              </td>
-              <td className="py-1.5 px-3 text-right">{finishCell(item, verb)}</td>
-              <td className="py-1.5 px-3 text-right">
-                <Link
-                  href={item.side === 'collect' ? `/fund-out/${item.id}` : `/fund-in/${item.id}`}
-                  className="text-xs text-accent hover:text-accent-hover font-serif italic whitespace-nowrap"
-                >
-                  View →
-                </Link>
-              </td>
-            </tr>
-          ))}
+          {items.map(item => {
+            const totalInterest = totalInterestOf(item)
+            return (
+              <tr key={item.id} className="border-b border-hairline/60">
+                <td className="py-1.5 px-3">
+                  <span className="font-serif text-ink">
+                    {pct(item.monthlyRate)} · {kindLabel(item)}
+                    {item.startYM ? ` · ${item.startYM} 起` : ''}
+                  </span>
+                  <SourceBadge source={item.source} side={item.side} />
+                </td>
+                <td className="py-1.5 px-3 text-right font-mono tabular text-graphite">
+                  {formatMoneyBare(item.principal)}
+                </td>
+                <td className="py-1.5 px-3 text-right font-mono tabular text-graphite">
+                  {totalInterest == null ? (
+                    <span className="text-muted">—</span>
+                  ) : (
+                    formatMoneyBare(totalInterest)
+                  )}
+                </td>
+                <td className="py-1.5 px-3 text-right font-mono tabular text-ink border-l border-hairline">
+                  {formatMoneyBare(item.principalOutstanding)}
+                </td>
+                <td className="py-1.5 px-3 text-right font-mono tabular text-graphite">
+                  {item.kind === 'no_term' ? (
+                    <span className="text-muted">—</span>
+                  ) : (
+                    formatMoneyBare(item.interestOutstanding)
+                  )}
+                </td>
+                <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink">
+                  {formatMoneyBare(oweTotalOf(item))}
+                </td>
+                <td className="py-1.5 px-3 text-right">{finishCell(item, verb)}</td>
+                <td className="py-1.5 px-3 text-right">
+                  <Link
+                    href={item.side === 'collect' ? `/fund-out/${item.id}` : `/fund-in/${item.id}`}
+                    className="text-xs text-accent hover:text-accent-hover font-serif italic whitespace-nowrap"
+                  >
+                    View →
+                  </Link>
+                </td>
+              </tr>
+            )
+          })}
           <tr className="bg-surface/40">
             <td className="py-1.5 px-3 font-serif italic text-graphite">小计 · 要{verb}</td>
             <td className="py-1.5 px-3 text-right font-mono tabular text-graphite">
               {formatMoneyBare(sub.principal)}
             </td>
-            <td className="py-1.5 px-3 text-right font-mono tabular text-muted">
-              {formatMoneyBare(sub.paid)}
+            <td className="py-1.5 px-3 text-right font-mono tabular text-graphite">
+              {formatMoneyBare(sub.totalInterest)}
             </td>
-            <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink">
+            <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink border-l border-hairline">
               {formatMoneyBare(sub.outstanding)}
             </td>
             <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink">
               {formatMoneyBare(sub.interest)}
+            </td>
+            <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink">
+              {formatMoneyBare(sub.oweTotal)}
             </td>
             <td className="py-1.5 px-3" colSpan={2} />
           </tr>
