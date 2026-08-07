@@ -72,6 +72,26 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+## 53,613.75 triangle contra (2026-08-07, DATA ops — no code)
+
+User-confirmed story: the [BI#32] fund-in "2990 → HV 53,613.75" is really
+HC's debt chain (HC owed HV 53,613.75, sitting inside GL 3056), and the HC
+45,000 fund-in "Contra with 2990" was HC REPAYING that debt, mis-recorded as
+a borrowing. Two non-cash nettings booked (both interest-waived per user):
+ 1. LO#29 (2990 owed HV 45,000, funded by that HC 45k) netted against
+    [BI#32] → HV now owes 2990 **8,613.75**; LO#29 fully_repaid.
+    Rows: repayments type='principal' (loan_outstanding only counts
+    'principal'!) + fund_source_repayments type='netting' (fs view counts
+    principal+netting) + JE-202608-0448 Dr 4051 / Cr 3054 45,000.
+ 2. HC 45k fund-in closed as HC's repayment → HC now owes HV **8,613.75**
+    of this chain (inside 3056 = 150,156.32 total; the other ~141,542.57 is
+    the user's own legacy items — untouched). fund_source_repayments
+    type='netting' + JE Dr 4052 / Cr 3056 45,000; status flipped to repaid
+    MANUALLY — trg check_fund_source_fully_repaid only fires on 'principal'.
+End state (user: "那就对了"): 欠 2990 8,613.75 ↔ HC 欠 8,613.75 mirror
+tails; banks untouched; TB 0.00. Netting conventions above are the precedent
+for future contras.
+
 ## Bank BA registry + calculator (2026-08-07)
 
 User: "calculate ba interest的function. 先别做，先确定流程" — flow pinned over
