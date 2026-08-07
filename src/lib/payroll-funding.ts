@@ -18,6 +18,28 @@ export function round2(n: number): number {
   return Math.round((Number.isFinite(n) ? n : 0) * 100) / 100
 }
 
+export interface PaymentHeroInputs {
+  /** payroll_runs.total_amount — staff-only CTC since the v2 InfoTech flow
+   *  (director_salary_total is 0; directors fund via their own run-less
+   *  request, mig 20260727100000). null when no run exists yet. */
+  runTotal: number | null
+  staffGross: number
+  /** Staff EPF + SOCSO + EIS employer shares. */
+  staffErStat: number
+  directorGross: number
+  /** Director EPF + SOCSO + EIS employer shares. */
+  directorErStat: number
+}
+
+/**
+ * Hero "Total amount this month" on the HR Payment page: staff CTC + director
+ * CTC, so it spans the same people as the "N staff · RM x net" subtitle.
+ */
+export function paymentHeroTotal(i: PaymentHeroInputs): number {
+  const staffCtc = i.runTotal ?? round2(i.staffGross + i.staffErStat)
+  return round2(staffCtc + i.directorGross + i.directorErStat)
+}
+
 export interface FundingRow {
   pool_key: string
   dept_name: string

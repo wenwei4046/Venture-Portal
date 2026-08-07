@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { deptRemaining, summariseRound, round2, type RoundLine } from './payroll-funding'
+import {
+  deptRemaining,
+  summariseRound,
+  round2,
+  paymentHeroTotal,
+  type RoundLine,
+} from './payroll-funding'
 
 function line(partial: Partial<RoundLine>): RoundLine {
   return {
@@ -19,6 +25,46 @@ describe('round2', () => {
     expect(round2(1.016)).toBe(1.02)
     expect(round2(10.004)).toBe(10)
     expect(round2(NaN)).toBe(0)
+  })
+})
+
+describe('paymentHeroTotal', () => {
+  // July 2026 actuals: run total 99,755.35 (staff CTC) + directors
+  // 57,933.47 gross + 7,376.20 ER statutory = 65,309.67 director CTC.
+  it('adds director CTC on top of the run total (staff-only)', () => {
+    expect(
+      paymentHeroTotal({
+        runTotal: 99755.35,
+        staffGross: 88066.25,
+        staffErStat: 11689.1,
+        directorGross: 57933.47,
+        directorErStat: 7376.2,
+      }),
+    ).toBe(165065.02)
+  })
+
+  it('falls back to staff gross + ER statutory when no run exists yet', () => {
+    expect(
+      paymentHeroTotal({
+        runTotal: null,
+        staffGross: 88066.25,
+        staffErStat: 11689.1,
+        directorGross: 57933.47,
+        directorErStat: 7376.2,
+      }),
+    ).toBe(165065.02)
+  })
+
+  it('is staff-only when the month has no director rows', () => {
+    expect(
+      paymentHeroTotal({
+        runTotal: 99755.35,
+        staffGross: 88066.25,
+        staffErStat: 11689.1,
+        directorGross: 0,
+        directorErStat: 0,
+      }),
+    ).toBe(99755.35)
   })
 })
 

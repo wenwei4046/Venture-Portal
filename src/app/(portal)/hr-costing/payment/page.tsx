@@ -3,7 +3,7 @@ import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney, formatMoneyBare, getPeriodMonth } from '@/lib/utils'
-import { round2 } from '@/lib/payroll-funding'
+import { paymentHeroTotal, round2 } from '@/lib/payroll-funding'
 import RequestPayrollPaymentButton, {
   type RequestState,
 } from '../payroll/_components/RequestPayrollPaymentButton'
@@ -93,7 +93,19 @@ export default async function HRPaymentPage({
   const directorGross = dRows.reduce((s, d) => s + Number(d.gross ?? 0), 0)
   const totalNet = staffNet + directorNet
   const totalGross = staffGross + directorGross
-  const totalAmount = Number(run?.total_amount ?? totalGross)
+  const erStat = (r: { epf_er?: unknown; socso_er?: unknown; eis_er?: unknown }) =>
+    Number(r.epf_er ?? 0) + Number(r.socso_er ?? 0) + Number(r.eis_er ?? 0)
+  // Hero spans staff + directors, same口径 as the "N staff · net" subtitle.
+  // The staff funding request stays run.total_amount (staff-only) — directors
+  // fund via their own run-less request (mig 20260727100000).
+  const totalAmount = paymentHeroTotal({
+    runTotal: run ? Number(run.total_amount) : null,
+    staffGross,
+    staffErStat: rows.reduce((s, r) => s + erStat(r), 0),
+    directorGross,
+    directorErStat: dRows.reduce((s, d) => s + erStat(d), 0),
+  })
+  const staffFundingAmount = Number(run?.total_amount ?? 0)
   const staffCount = rows.length + dRows.length
   const hasPayroll = staffCount > 0
 
@@ -469,13 +481,14 @@ export default async function HRPaymentPage({
                 {phase === 'approved-ready' ? (
                   <>
                     No active funding request — the previous one was cancelled. Re-file the{' '}
-                    <strong className="num text-num-ink">RM {formatMoneyBare(totalAmount)}</strong> request below.
+                    <strong className="num text-num-ink">RM {formatMoneyBare(staffFundingAmount)}</strong> staff request below.
                     Finance generates the Payment Voucher; Principal approves it, which books each department&apos;s
                     salary cost and moves the cash into the Alliance payroll account.
                   </>
                 ) : (
                   <>
-                    The funding request for <strong className="num text-num-ink">RM {formatMoneyBare(totalAmount)}</strong> is filed automatically when you submit the payroll.
+                    The staff funding request for <strong className="num text-num-ink">RM {formatMoneyBare(staffFundingAmount)}</strong> is filed automatically when you submit the payroll
+                    (directors fund separately from the Director Salary submission).
                     Finance generates the Payment Voucher; Principal approves it, which books each department&apos;s
                     salary cost and moves the cash from Hong Leong into the Alliance payroll account.
                   </>
@@ -483,7 +496,7 @@ export default async function HRPaymentPage({
               </p>
               <RequestPayrollPaymentButton
                 runId={run.id}
-                totalAmount={totalAmount}
+                totalAmount={staffFundingAmount}
                 state={requestState}
               />
             </div>
