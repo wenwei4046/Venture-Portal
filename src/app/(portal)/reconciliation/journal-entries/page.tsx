@@ -7,12 +7,14 @@ export default async function JournalEntriesPage() {
   await requireRole(['principal', 'finance'])
   const supabase = await createClient()
 
-  // Manual journal vouchers only (auto-posted entries live on the read-only GL
-  // page). Reversed vouchers are hidden from the editable list.
+  // Manual journal vouchers + the auto payroll accrual JVs (user 2026-08-07:
+  // "为什么我看没有的" — the auto ones must show HERE where Finance reviews
+  // salary JVs; they render read-only with an AUTO badge). Reversed vouchers
+  // stay hidden.
   const { data: entries } = await supabase
     .from('journal_entries')
     .select('*')
-    .eq('reference_type', 'manual_jv')
+    .in('reference_type', ['manual_jv', 'payroll_accrual'])
     .eq('is_reversed', false)
     .order('transaction_date', { ascending: false })
     .order('created_at', { ascending: false })
@@ -44,6 +46,7 @@ export default async function JournalEntriesPage() {
     segment: (e.segment as string | null) ?? null,
     total_amount: Number(e.total_amount),
     lineCount: lineCounts.get(e.id) ?? 0,
+    auto: e.reference_type === 'payroll_accrual',
   }))
 
   return (
