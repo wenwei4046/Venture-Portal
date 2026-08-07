@@ -19,12 +19,15 @@ import { requireRole } from '@/lib/auth'
 import { fetchCounterpartyStatement } from '@/lib/counterparty-statement-data'
 import type { PositionRow } from '@/lib/counterparty-statement'
 import { buildXlsxBuffer, type XlsxSectionBreak } from '@/lib/export/excel'
-import { PdfDocument, PdfTable, type PdfColumn } from '@/lib/export/pdf'
+import { PdfDocument, PdfTable, type PdfColumn, type PdfRowKind } from '@/lib/export/pdf'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 
 const money = (n: number) =>
   n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
+// Compact one-line labels (user 2026-08-06: rows must not wrap — "尽量弄成同
+// 一排"): the side word lives on the TO COLLECT / TO REPAY section rows, the
+// rate drops trailing zeros, and long lent-to notes are capped.
 function positionLabel(item: PositionRow): string {
   const kind =
     item.kind === 'compound'
@@ -32,20 +35,19 @@ function positionLabel(item: PositionRow): string {
       : item.kind === 'no_term'
         ? 'no fixed term'
         : `${item.tenureMonths}mo`
-  const bits = [
-    item.side === 'collect' ? 'Collect' : 'Repay',
-    `${(item.monthlyRate * 100).toFixed(3)}%/mo`,
-    kind,
-  ]
+  const bits = [`${parseFloat((item.monthlyRate * 100).toFixed(3))}%/mo`, kind]
   if (item.startYM) bits.push(`starts ${item.startYM}`)
   // collect: SC = funding source remark; repay: where the money was lent on.
-  if (item.source) bits.push(item.side === 'collect' ? `SC ${item.source}` : `lent to ${item.source}`)
+  if (item.source) {
+    const src = item.source.length > 24 ? `${item.source.slice(0, 24)}…` : item.source
+    bits.push(item.side === 'collect' ? `SC ${src}` : `lent to ${src}`)
+  }
   return bits.join(' · ')
 }
 
 function payoffLabel(item: PositionRow): string {
-  if (item.kind === 'no_term') return `TBD · ~RM ${money(item.monthlyInterest)}/mo interest`
-  if (item.kind === 'compound') return 'TBD · compounds monthly'
+  if (item.kind === 'no_term') return `TBD · ~${money(item.monthlyInterest)}/mo`
+  if (item.kind === 'compound') return 'TBD · compounding'
   return `${item.remainingPeriods} left${item.finishYM ? ` · by ${item.finishYM}` : ''}`
 }
 
@@ -74,39 +76,44 @@ export async function GET(request: Request) {
     { collectPrincipal: 0, collectInterest: 0, repayPrincipal: 0, repayInterest: 0, net: 0 },
   )
 
-  // Flatten: section per counterparty, then grand totals.
+  // Flatten: per counterparty a NET header, then a TO COLLECT part and a
+  // TO REPAY part (user 2026-08-06: "export 出来也需要分collect part 和repay
+  // part"), then grand totals.
   const headerRow = ['From', 'Position', 'Original', 'Paid', 'Outstanding', 'Interest', 'Payoff']
   const rows: (string | number | null)[][] = []
   const sectionBreaks: XlsxSectionBreak[] = []
+  const positionRow = (g: (typeof cpRows)[number], item: PositionRow): (string | number | null)[] => [
+    g.counterparty,
+    positionLabel(item),
+    item.principal,
+    item.principalPaid,
+    item.principalOutstanding,
+    item.kind === 'no_term' ? null : item.interestOutstanding,
+    payoffLabel(item),
+  ]
   for (const g of cpRows) {
     sectionBreaks.push({
       afterRow: rows.length,
       title: `${g.counterparty} · NET ${g.net >= 0 ? 'COLLECT' : 'REPAY'} RM ${money(Math.abs(g.net))}`,
     })
-    for (const item of g.items) {
-      rows.push([
-        g.counterparty,
-        positionLabel(item),
-        item.principal,
-        item.principalPaid,
-        item.principalOutstanding,
-        item.kind === 'no_term' ? null : item.interestOutstanding,
-        payoffLabel(item),
-      ])
+    const collect = g.items.filter(i => i.side === 'collect')
+    const repay = g.items.filter(i => i.side === 'repay')
+    if (collect.length > 0) {
+      sectionBreaks.push({ afterRow: rows.length, title: `TO COLLECT (${collect.length})` })
+      for (const item of collect) rows.push(positionRow(g, item))
+    }
+    if (repay.length > 0) {
+      sectionBreaks.push({ afterRow: rows.length, title: `TO REPAY (${repay.length})` })
+      for (const item of repay) rows.push(positionRow(g, item))
     }
   }
   sectionBreaks.push({ afterRow: rows.length, title: 'TOTAL' })
-  rows.push(['', 'TOTAL · TO COLLECT', null, null, totals.collectPrincipal, totals.collectInterest, null])
-  rows.push(['', 'TOTAL · TO REPAY', null, null, totals.repayPrincipal, totals.repayInterest, null])
-  rows.push([
-    '',
-    `NET · ${totals.net >= 0 ? 'TO COLLECT' : 'TO REPAY'}`,
-    null,
-    null,
-    Math.abs(totals.net),
-    null,
-    null,
-  ])
+  const totalRows: (string | number | null)[][] = [
+    ['', 'TOTAL · TO COLLECT', null, null, totals.collectPrincipal, totals.collectInterest, null],
+    ['', 'TOTAL · TO REPAY', null, null, totals.repayPrincipal, totals.repayInterest, null],
+    ['', `NET · ${totals.net >= 0 ? 'TO COLLECT' : 'TO REPAY'}`, null, null, Math.abs(totals.net), null, null],
+  ]
+  rows.push(...totalRows)
 
   const single = wanted && wanted.size === 1 ? [...wanted][0].replace(/[^\w-]+/g, '_') : null
   const filename = `company-statement-${single ? `${single}-` : ''}${dayjs().format('YYYYMMDD')}`
@@ -124,28 +131,34 @@ export async function GET(request: Request) {
     })
   }
 
-  // PDF: interleave uppercase section markers into the flat rows (same
-  // pattern as the GL statement export). Landscape — seven columns.
+  // PDF: section titles become shaded 'group' rows, positions are plain
+  // white 'detail' rows (no zebra — user 2026-08-06: "detail background 不要
+  // 灰白灰白"), totals get the heavy 'total' band.
   const blank = Array<null>(headerRow.length - 1).fill(null)
   const pdfRows: (string | number | null)[][] = []
+  const rowKinds: PdfRowKind[] = []
   let nextBreak = 0
   for (let i = 0; i <= rows.length; i++) {
     while (nextBreak < sectionBreaks.length && sectionBreaks[nextBreak].afterRow === i) {
       pdfRows.push([sectionBreaks[nextBreak].title, ...blank])
+      rowKinds.push('group')
       nextBreak += 1
     }
-    if (i < rows.length) pdfRows.push(rows[i])
+    if (i < rows.length) {
+      pdfRows.push(rows[i])
+      rowKinds.push(i >= rows.length - totalRows.length ? 'total' : 'detail')
+    }
   }
 
   // A4 landscape usable ≈ 760pt.
   const columns: PdfColumn[] = [
-    { label: 'From', width: 75 },
-    { label: 'Position', width: 220 },
-    { label: 'Original', width: 85, align: 'right' },
-    { label: 'Paid', width: 85, align: 'right' },
+    { label: 'From', width: 70 },
+    { label: 'Position', width: 250 },
+    { label: 'Original', width: 80, align: 'right' },
+    { label: 'Paid', width: 75, align: 'right' },
     { label: 'Outstanding', width: 85, align: 'right' },
     { label: 'Interest', width: 75, align: 'right' },
-    { label: 'Payoff', width: 130, align: 'right' },
+    { label: 'Payoff', width: 115, align: 'right' },
   ]
 
   return exportPdfResponse({
@@ -156,7 +169,7 @@ export async function GET(request: Request) {
         periodLabel={`As at ${dayjs().format('D MMM YYYY')}`}
         orientation="landscape"
       >
-        <PdfTable columns={columns} rows={pdfRows} numberFormat="money" />
+        <PdfTable columns={columns} rows={pdfRows} numberFormat="money" rowKinds={rowKinds} />
       </PdfDocument>
     ),
   })
