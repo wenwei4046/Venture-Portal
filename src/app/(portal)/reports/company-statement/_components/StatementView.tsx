@@ -109,7 +109,9 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
               {oweLabel}本金
             </th>
             <th className="text-right py-1.5 px-3 font-medium">{oweLabel}利息</th>
-            <th className="text-right py-1.5 px-3 font-medium">{oweLabel}总额</th>
+            <th className="text-right py-1.5 px-3 font-medium border-l border-hairline">
+              {oweLabel}总额
+            </th>
             <th className="text-right py-1.5 px-3 font-medium">几时{verb}完</th>
             <th className="py-1.5 px-3" />
           </tr>
@@ -146,7 +148,7 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
                     formatMoneyBare(item.interestOutstanding)
                   )}
                 </td>
-                <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink">
+                <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink border-l border-hairline">
                   {formatMoneyBare(oweTotalOf(item))}
                 </td>
                 <td className="py-1.5 px-3 text-right">{finishCell(item, verb)}</td>
@@ -175,7 +177,7 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
             <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink">
               {formatMoneyBare(sub.interest)}
             </td>
-            <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink">
+            <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink border-l border-hairline">
               {formatMoneyBare(sub.oweTotal)}
             </td>
             <td className="py-1.5 px-3" colSpan={2} />
