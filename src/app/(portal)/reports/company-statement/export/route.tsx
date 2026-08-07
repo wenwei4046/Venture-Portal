@@ -81,7 +81,9 @@ export async function GET(request: Request) {
   // part"), then grand totals.
   const headerRow = ['From', 'Position', 'Original', 'Paid', 'Outstanding', 'Interest', 'Payoff']
   const rows: (string | number | null)[][] = []
-  const sectionBreaks: XlsxSectionBreak[] = []
+  // Local breaks carry a PDF row kind (counterparty band vs green TO COLLECT
+  // vs amber TO REPAY); xlsx consumes just {afterRow, title}.
+  const sectionBreaks: Array<XlsxSectionBreak & { kind: PdfRowKind }> = []
   const positionRow = (g: (typeof cpRows)[number], item: PositionRow): (string | number | null)[] => [
     g.counterparty,
     positionLabel(item),
@@ -95,19 +97,28 @@ export async function GET(request: Request) {
     sectionBreaks.push({
       afterRow: rows.length,
       title: `${g.counterparty} · NET ${g.net >= 0 ? 'COLLECT' : 'REPAY'} RM ${money(Math.abs(g.net))}`,
+      kind: 'section',
     })
     const collect = g.items.filter(i => i.side === 'collect')
     const repay = g.items.filter(i => i.side === 'repay')
     if (collect.length > 0) {
-      sectionBreaks.push({ afterRow: rows.length, title: `TO COLLECT (${collect.length})` })
+      sectionBreaks.push({
+        afterRow: rows.length,
+        title: `TO COLLECT (${collect.length})`,
+        kind: 'sectionPositive',
+      })
       for (const item of collect) rows.push(positionRow(g, item))
     }
     if (repay.length > 0) {
-      sectionBreaks.push({ afterRow: rows.length, title: `TO REPAY (${repay.length})` })
+      sectionBreaks.push({
+        afterRow: rows.length,
+        title: `TO REPAY (${repay.length})`,
+        kind: 'sectionWarning',
+      })
       for (const item of repay) rows.push(positionRow(g, item))
     }
   }
-  sectionBreaks.push({ afterRow: rows.length, title: 'TOTAL' })
+  sectionBreaks.push({ afterRow: rows.length, title: 'TOTAL', kind: 'section' })
   const totalRows: (string | number | null)[][] = [
     ['', 'TOTAL · TO COLLECT', null, null, totals.collectPrincipal, totals.collectInterest, null],
     ['', 'TOTAL · TO REPAY', null, null, totals.repayPrincipal, totals.repayInterest, null],
@@ -141,7 +152,7 @@ export async function GET(request: Request) {
   for (let i = 0; i <= rows.length; i++) {
     while (nextBreak < sectionBreaks.length && sectionBreaks[nextBreak].afterRow === i) {
       pdfRows.push([sectionBreaks[nextBreak].title, ...blank])
-      rowKinds.push('group')
+      rowKinds.push(sectionBreaks[nextBreak].kind)
       nextBreak += 1
     }
     if (i < rows.length) {

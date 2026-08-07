@@ -139,7 +139,23 @@ export function PdfSectionHead({ label }: { label: string }): React.ReactElement
 // (e.g. a customer); 'detail' = a plain white sub-row under it; 'total' = the
 // heavy grand-total row. When rowKinds is omitted the table falls back to plain
 // zebra striping.
-export type PdfRowKind = 'group' | 'detail' | 'total'
+// The 'section*' kinds render row[0] as ONE full-width band (no column cells,
+// so long titles never wrap inside the first column): 'section' = neutral,
+// 'sectionPositive' = green (e.g. TO COLLECT), 'sectionWarning' = amber
+// (e.g. TO REPAY).
+export type PdfRowKind =
+  | 'group'
+  | 'detail'
+  | 'total'
+  | 'section'
+  | 'sectionPositive'
+  | 'sectionWarning'
+
+const SECTION_STYLES: Record<string, { bg: string; color: string }> = {
+  section: { bg: '#dde3ea', color: '#2c3540' },
+  sectionPositive: { bg: '#e3efe4', color: '#2f5d33' },
+  sectionWarning: { bg: '#f6ead9', color: '#8a5a1f' },
+}
 
 export function PdfTable({
   columns, rows, numberFormat = 'plain', rowKinds,
@@ -160,6 +176,21 @@ export function PdfTable({
       </View>
       {rows.map((row, ri) => {
         const kind = rowKinds?.[ri]
+        if (kind && SECTION_STYLES[kind]) {
+          const s = SECTION_STYLES[kind]
+          return (
+            <View
+              key={ri}
+              style={[styles.row, { backgroundColor: s.bg, borderBottom: '0.5pt solid #b0b4ba' }]}
+            >
+              <View style={{ padding: 4, width: columns.reduce((w, c) => w + c.width, 0) }}>
+                <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: s.color }}>
+                  {String(row[0] ?? '')}
+                </Text>
+              </View>
+            </View>
+          )
+        }
         const rowStyle =
           kind === 'group'
             ? { backgroundColor: '#e3e6ea', borderBottom: '0.5pt solid #b0b4ba' }
