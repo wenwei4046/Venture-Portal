@@ -115,6 +115,7 @@ const navEntries: NavEntry[] = [
   // ── Fund In / Out (its own section, flat — user 2026-06-10) ──
   { href: '/fund-in', label: 'Fund IN', section: 'Fund In / Out', visible: canAccessTreasury },
   { href: '/fund-out', label: 'Fund OUT', section: 'Fund In / Out', visible: canAccessTreasury },
+  { href: '/ba', label: 'Bank BA', section: 'Fund In / Out', visible: canAccessTreasury },
   { href: '/overdue', label: 'Overdue', section: 'Fund In / Out', visible: canAccessTreasury },
   { href: '/repayment-schedule', label: 'Repayment Schedule', section: 'Fund In / Out', visible: canAccessTreasury },
   { href: '/statements/monthly', label: 'Statements', section: 'Fund In / Out', visible: canAccessTreasury },

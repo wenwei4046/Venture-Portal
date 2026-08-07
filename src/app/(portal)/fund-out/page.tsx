@@ -86,6 +86,12 @@ export default async function FundOutPage({ searchParams }: Props) {
         </div>
         <div className="flex items-center gap-3">
           <Link
+            href="/ba?calc=1"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-graphite hover:text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+          >
+            BA Calculator
+          </Link>
+          <Link
             href="/repayment-schedule"
             className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
           >

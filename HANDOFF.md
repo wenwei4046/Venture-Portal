@@ -72,6 +72,27 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+## Bank BA registry + calculator (2026-08-07)
+
+User: "calculate ba interest的function. 先别做，先确定流程" — flow pinned over
+three AskUserQuestion rounds:
+ - The BA is HOUZS CENTURY's facility with the bank — HV never owes the bank;
+   bank interest (face × annual × days/365) is REFERENCE only (HC's cost).
+ - HV owes HC face × 1.5%/mo × days/30; HV charges the borrowing sub
+   face × 2.5%/mo × days/30 (both rates editable per BA, both prorate by
+   days); HV margin = spread.
+ - 入账 (my recommendation, user accepted "或你有好的意见告诉我"): REAL money
+   keeps booking through Fund In (owe HC) + Fund Out (loan to sub) — the BA
+   page is a registry/calculator layer with optional fund_source_id/loan_id
+   link columns, NO JEs of its own, so nothing double-books.
+Built: mig `20260807000000_ba_facilities` (RLS finance+principal; maturity
+GENERATED from start+tenor); `lib/ba.ts` calcBa/daysBetween (5 tests);
+`/ba` page (summary tiles, Record BA form with live calc, list with
+charge/owe/margin + matures-in/overdue status + Mark settled/Reopen,
+calculator modal — /ba?calc=1 opens it); BA Calculator buttons on Fund In +
+Fund Out; sidebar "Bank BA". English UI. Untyped-client convention (table
+absent from database.types.ts).
+
 ## Company Statement round 3 (2026-08-06)
 
  - **PDF exports must be ASCII/English-only** — react-pdf's base font has no
