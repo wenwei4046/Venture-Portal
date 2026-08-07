@@ -1,5 +1,7 @@
 import Link from 'next/link'
+import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
+import { fundingSourceFromTerms } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
 import type { AccountType } from '@/lib/coa'
 import NewPaymentForm from '../_components/NewPaymentForm'
@@ -33,7 +35,7 @@ export default async function NewPaymentPage({ searchParams }: Props) {
   // Dedicated flow: record a loan repayment RECEIVED (sub → HV).
   if (mode === 'loan_repayment') {
     const [{ data: loans }, { data: loanOut }, { data: cos }, { data: banks }, { data: suspenseAccts }, { data: suspenseLines }] = await Promise.all([
-      supabase.from('loans').select('id, company_id, principal, effective_rate, tenure_months').eq('status', 'active'),
+      supabase.from('loans').select('id, company_id, principal, effective_rate, tenure_months, repayment_terms, disbursement_date').eq('status', 'active'),
       supabase.from('loan_outstanding').select('loan_id, outstanding'),
       supabase.from('companies').select('id, short_code, name'),
       supabase.from('bank_accounts').select('id, bank_name, account_number, current_balance').eq('status', 'active').order('is_primary', { ascending: false }),
@@ -67,10 +69,16 @@ export default async function NewPaymentPage({ searchParams }: Props) {
         const co = l.company_id ? coMap.get(l.company_id as string) : null
         const outstanding = outMap.get(l.id as string) ?? Number(l.principal)
         const susp = suspenseFor(co)
+        // Same-company loans look identical — the SC (funding source) remark
+        // and disbursement date tell them apart (user 2026-08-07: "不然我不
+        // 知道要clear哪里一个").
+        const src = fundingSourceFromTerms((l as { repayment_terms?: string | null }).repayment_terms ?? null)
+        const disb = (l as { disbursement_date?: string | null }).disbursement_date
+        const idBits = `${src ? ` · SC ${src}` : ''}${disb ? ` · ${dayjs(disb).format('D MMM YY')}` : ''}`
         return {
           id: l.id as string,
           outstanding,
-          label: `${co?.short_code ?? co?.name ?? '—'} · RM ${Number(l.principal).toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(Number(l.effective_rate) * 100).toFixed(3)}%/mo · 欠 ${outstanding.toLocaleString('en-MY', { minimumFractionDigits: 2 })}`,
+          label: `${co?.short_code ?? co?.name ?? '—'} · RM ${Number(l.principal).toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(Number(l.effective_rate) * 100).toFixed(3)}%/mo · 欠 ${outstanding.toLocaleString('en-MY', { minimumFractionDigits: 2 })}${idBits}`,
           // Offer the suspense route only when that leaf actually holds a balance.
           suspenseCode: susp && (suspenseBalance.get(susp.code as string) ?? 0) > 0.005 ? (susp.code as string) : null,
           suspenseName: susp?.name as string | undefined,
