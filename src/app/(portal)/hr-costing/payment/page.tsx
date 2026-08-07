@@ -85,6 +85,20 @@ export default async function HRPaymentPage({
         .maybeSingle()
     : { data: null }
   const poolBal = Number(poolRow?.balance ?? 0)
+
+  // Director custody is parked in dept_pool_director, NOT here (mig
+  // 20260727100000: run-less director funding request, target_pool
+  // dept_pool_director) — surface it under the HR figure so the card
+  // covers both custody pots.
+  const { data: directorFunding } = await supabase
+    .from('payroll_payment_requests')
+    .select('amount, status')
+    .is('payroll_run_id', null)
+    .eq('period_month', period)
+    .in('status', ['submitted', 'pv_generated', 'completed'])
+    .order('requested_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
   const rows = payrollRows ?? []
   const dRows = (directorRows ?? []).filter(d => Number(d.net ?? 0) > 0)
   const staffNet = rows.reduce((s, r) => s + Number(r.net), 0)
@@ -382,6 +396,16 @@ export default async function HRPaymentPage({
           <div className="font-mono text-xs text-muted mt-2">
             Departments&apos; contributions held here until payout
           </div>
+          {directorFunding && (
+            <div className="font-mono text-xs text-muted mt-1">
+              Director custody {formatMoney(Number(directorFunding.amount))} · held in Director Pool
+              {directorFunding.status === 'completed'
+                ? ' · funds staged'
+                : directorFunding.status === 'pv_generated'
+                  ? ' · awaiting Principal'
+                  : ' · awaiting Finance'}
+            </div>
+          )}
         </div>
       </div>
 
