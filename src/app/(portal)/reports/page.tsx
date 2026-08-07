@@ -55,7 +55,7 @@ const reports = [
   {
     href: '/reports/company-statement',
     title: 'Company Statement',
-    description: '每家往来对象：我还要还 / 我还要收 — 本金利息分开，明细像银行 statement，显示几时还完。',
+    description: 'Per-counterparty two-way statement — to collect vs to repay, principal and interest split, payoff months, bank-statement export.',
   },
 ]
 

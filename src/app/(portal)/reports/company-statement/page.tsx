@@ -54,10 +54,14 @@ export default async function CompanyStatementPage() {
       </div>
 
       <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
-        每家往来对象一行：我还要收（借出去的 loans）对 我还要还（收进来的 fund
-        sources）。利息 — 定了期数的按剩余期数算到还完（原额 × 月息 × 剩余期）；
-        利滚利显示到今天已滚未付；没定期限的不入总数，只按月息做参考。几时还完 —
-        按时还的显示合约到期月，落后的按每月补一期推算。点一行展开明细。
+        One row per counterparty: to collect (loans lent out) vs to repay (fund
+        sources taken in). Interest — fixed-term deals count remaining
+        installments to payoff (original × monthly rate × periods left);
+        compounding positions show what has accrued unpaid to date; no-term
+        positions stay out of the totals and carry monthly interest as
+        reference only. Payoff — on schedule shows the contractual finish
+        month, behind schedule projects one catch-up a month. Click a row to
+        expand.
       </p>
 
       <StatementView rows={rows} totals={totals} />

@@ -15,15 +15,16 @@ function num(v: number, opts?: { danger?: boolean }) {
 }
 
 // collect side: SC = the loan's 资金来源 remark (from repayment_terms).
-// repay side: 借给 = where the borrowed-in money was lent onward (user writes
-// 「借给: X」 in the fund source's notes — 2026-08-06).
+// repay side: LENT TO = where the borrowed-in money was lent onward (the fund
+// source's notes — user 2026-08-06). UI is English-only per user 2026-08-06
+// ("整体显示英文，不要华语"), matching the exports.
 function SourceBadge({ source, side }: { source?: string | null; side: 'collect' | 'repay' }) {
   if (!source) return null
-  const label = side === 'collect' ? `SC ${source}` : `借给 ${source}`
+  const label = side === 'collect' ? `SC ${source}` : `LENT TO ${source}`
   return (
     <span
       className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
-      title={side === 'collect' ? `资金来源: ${source}` : `转借去: ${source}`}
+      title={side === 'collect' ? `Source of capital: ${source}` : `Lent to: ${source}`}
     >
       {label}
     </span>
@@ -35,25 +36,25 @@ function pct(rate: number): string {
 }
 
 function kindLabel(item: PositionRow): string {
-  if (item.kind === 'compound') return '利滚利'
-  if (item.kind === 'no_term') return '无固定期'
-  return `${item.tenureMonths}期`
+  if (item.kind === 'compound') return 'compounding'
+  if (item.kind === 'no_term') return 'no fixed term'
+  return `${item.tenureMonths}mo`
 }
 
-function finishCell(item: PositionRow, verb: string) {
+function finishCell(item: PositionRow) {
   if (item.kind === 'no_term') {
     return (
       <span className="font-mono text-xs text-muted">
-        未定 · ~RM {formatMoneyBare(item.monthlyInterest)}/月息
+        TBD · ~RM {formatMoneyBare(item.monthlyInterest)}/mo interest
       </span>
     )
   }
   if (item.kind === 'compound') {
-    return <span className="font-mono text-xs text-muted">未定 · 利息逐月滚入</span>
+    return <span className="font-mono text-xs text-muted">TBD · compounds monthly</span>
   }
   return (
     <span className="font-mono text-xs text-ink">
-      剩 {item.remainingPeriods} 期{item.finishYM ? ` · ${item.finishYM} ${verb}完` : ''}
+      {item.remainingPeriods} left{item.finishYM ? ` · by ${item.finishYM}` : ''}
     </span>
   )
 }
@@ -62,11 +63,10 @@ function finishCell(item: PositionRow, verb: string) {
 // 已还/未还/几时还完 — user 2026-08-06: "展开只是会显示要还的…要收的看没有")
 // and its own subtotal that ties back to the summary row.
 function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' | 'repay' }) {
-  const verb = side === 'collect' ? '收' : '还'
-  // Column set per user 2026-08-06: 原额 + 总利息 (the whole deal), a divider,
-  // then what's still owed (本金 / 利息 / 总额) and the payoff month. 总利息
-  // only exists for fixed-term flat deals — compounding/no-term are open-ended.
-  const oweLabel = side === 'collect' ? '未收' : '还欠'
+  // Column set per user 2026-08-06: original + whole-deal interest, a divider,
+  // then what's still owed (principal / interest / total) and the payoff.
+  // Total Interest only exists for fixed-term flat deals — compounding and
+  // no-term positions are open-ended.
   const r2 = (n: number) => Math.round(n * 100) / 100
   const totalInterestOf = (i: PositionRow) =>
     i.kind === 'flat' && i.tenureMonths ? r2(i.tenureMonths * i.monthlyInterest) : null
@@ -97,22 +97,22 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
             : 'text-alert border-alert/40 bg-alert/10')
         }
       >
-        {side === 'collect' ? '要收' : '要还'} · {items.length} 笔
+        {side === 'collect' ? 'TO COLLECT' : 'TO REPAY'} · {items.length}
       </div>
       <table className="w-full text-sm">
         <thead>
           <tr className="text-[11px] uppercase tracking-wide text-muted font-sans border-b border-hairline">
             <th className="text-left py-1.5 px-3 font-medium">Position</th>
-            <th className="text-right py-1.5 px-3 font-medium">原额</th>
-            <th className="text-right py-1.5 px-3 font-medium">总利息</th>
+            <th className="text-right py-1.5 px-3 font-medium">Original</th>
+            <th className="text-right py-1.5 px-3 font-medium">Total Interest</th>
             <th className="text-right py-1.5 px-3 font-medium border-l border-hairline">
-              {oweLabel}本金
+              Principal Due
             </th>
-            <th className="text-right py-1.5 px-3 font-medium">{oweLabel}利息</th>
+            <th className="text-right py-1.5 px-3 font-medium">Interest Due</th>
             <th className="text-right py-1.5 px-3 font-medium border-l border-hairline">
-              {oweLabel}总额
+              Total Due
             </th>
-            <th className="text-right py-1.5 px-3 font-medium">几时{verb}完</th>
+            <th className="text-right py-1.5 px-3 font-medium">Payoff</th>
             <th className="py-1.5 px-3" />
           </tr>
         </thead>
@@ -124,7 +124,7 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
                 <td className="py-1.5 px-3">
                   <span className="font-serif text-ink">
                     {pct(item.monthlyRate)} · {kindLabel(item)}
-                    {item.startYM ? ` · ${item.startYM} 起` : ''}
+                    {item.startYM ? ` · starts ${item.startYM}` : ''}
                   </span>
                   <SourceBadge source={item.source} side={item.side} />
                 </td>
@@ -151,7 +151,7 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
                 <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink border-l border-hairline">
                   {formatMoneyBare(oweTotalOf(item))}
                 </td>
-                <td className="py-1.5 px-3 text-right">{finishCell(item, verb)}</td>
+                <td className="py-1.5 px-3 text-right">{finishCell(item)}</td>
                 <td className="py-1.5 px-3 text-right">
                   <Link
                     href={item.side === 'collect' ? `/fund-out/${item.id}` : `/fund-in/${item.id}`}
@@ -164,7 +164,7 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
             )
           })}
           <tr className="bg-surface/40">
-            <td className="py-1.5 px-3 font-serif italic text-graphite">小计 · 要{verb}</td>
+            <td className="py-1.5 px-3 font-serif italic text-graphite">Subtotal</td>
             <td className="py-1.5 px-3 text-right font-mono tabular text-graphite">
               {formatMoneyBare(sub.principal)}
             </td>
@@ -208,13 +208,13 @@ export default function StatementView({
 }) {
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const [q, setQ] = useState('')
-  // 勾选对象 → 只导出那几家 (user 2026-08-06: "自己选择要导出的").
+  // Ticked counterparties → export only those (user 2026-08-06).
   const [sel, setSel] = useState<Set<string>>(new Set())
 
   if (rows.length === 0) {
     return (
       <div className="border border-hairline rounded-md bg-surface p-8 text-center">
-        <p className="font-serif italic text-ledger text-base">两清 — 没有未结的往来。</p>
+        <p className="font-serif italic text-ledger text-base">All square — nothing outstanding.</p>
       </div>
     )
   }
@@ -244,32 +244,32 @@ export default function StatementView({
       {/* ── Summary tiles ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
         <div className="border border-hairline rounded-md bg-surface p-5">
-          <div className="font-serif italic text-ledger text-sm mb-1">我还要收</div>
+          <div className="font-serif italic text-ledger text-sm mb-1">To Collect</div>
           <div className="font-serif text-2xl text-num-ink tabular">
             RM {formatMoneyBare(totals.collectPrincipal + totals.collectInterest)}
           </div>
           <div className="font-mono text-[11px] text-graphite mt-1.5">
-            本金 {formatMoneyBare(totals.collectPrincipal)} · 利息 {formatMoneyBare(totals.collectInterest)}
+            Principal {formatMoneyBare(totals.collectPrincipal)} · Interest {formatMoneyBare(totals.collectInterest)}
           </div>
         </div>
         <div className="border border-hairline rounded-md bg-surface p-5">
-          <div className="font-serif italic text-alert text-sm mb-1">我还要还</div>
+          <div className="font-serif italic text-alert text-sm mb-1">To Repay</div>
           <div className="font-serif text-2xl text-num-ink tabular">
             RM {formatMoneyBare(totals.repayPrincipal + totals.repayInterest)}
           </div>
           <div className="font-mono text-[11px] text-graphite mt-1.5">
-            本金 {formatMoneyBare(totals.repayPrincipal)} · 利息 {formatMoneyBare(totals.repayInterest)}
+            Principal {formatMoneyBare(totals.repayPrincipal)} · Interest {formatMoneyBare(totals.repayInterest)}
           </div>
         </div>
         <div className="border border-hairline rounded-md bg-surface p-5">
-          <div className="font-serif italic text-graphite text-sm mb-1">净额</div>
+          <div className="font-serif italic text-graphite text-sm mb-1">Net</div>
           <div
             className={`font-serif text-2xl tabular ${totals.net >= 0 ? 'text-ledger' : 'text-danger'}`}
           >
-            {totals.net >= 0 ? '收 ' : '还 '}RM {formatMoneyBare(Math.abs(totals.net))}
+            {totals.net >= 0 ? 'Collect ' : 'Repay '}RM {formatMoneyBare(Math.abs(totals.net))}
           </div>
           <div className="font-mono text-[11px] text-graphite mt-1.5">
-            {rows.length} 个往来对象
+            {rows.length} counterparties
           </div>
         </div>
       </div>
@@ -280,7 +280,7 @@ export default function StatementView({
           type="text"
           value={q}
           onChange={e => setQ(e.target.value)}
-          placeholder="搜索对象…"
+          placeholder="Search counterparty…"
           className="bg-paper border border-hairline rounded-md px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border w-56"
         />
         <button
@@ -290,16 +290,16 @@ export default function StatementView({
           }
           className="text-xs font-sans text-graphite hover:text-ink border border-hairline rounded-md px-3 py-1.5 bg-surface hover:bg-surface-2 transition-colors"
         >
-          {allOpen ? '收起全部' : '展开全部'}
+          {allOpen ? 'Collapse all' : 'Expand all'}
         </button>
         {needle ? (
           <span className="font-mono text-xs text-muted">
-            {shown.length} / {rows.length} 家
+            {shown.length} / {rows.length} shown
           </span>
         ) : null}
         {sel.size > 0 ? (
           <span className="flex items-center gap-2 text-xs font-sans text-graphite border border-accent/40 bg-surface rounded-md px-3 py-1.5">
-            已选 {sel.size} 家 · 导出:
+            {sel.size} selected · Export:
             <a
               href={`/reports/company-statement/export?format=xlsx&cp=${encodeURIComponent([...sel].join(','))}`}
               className="text-accent hover:text-accent-hover font-mono"
@@ -317,7 +317,7 @@ export default function StatementView({
               onClick={() => setSel(new Set())}
               className="text-muted hover:text-ink transition-colors"
             >
-              清除
+              Clear
             </button>
           </span>
         ) : null}
@@ -330,38 +330,38 @@ export default function StatementView({
         <thead>
           <tr className="text-[11px] uppercase tracking-wide text-muted font-sans">
             <th className="py-2 px-3 font-medium" rowSpan={2}>
-              对象
+              Counterparty
             </th>
             <th
               className="py-1 px-3 font-medium border-b border-hairline"
               style={{ textAlign: 'center' }}
               colSpan={2}
             >
-              我还要收
+              To Collect
             </th>
             <th
               className="py-1 px-3 font-medium border-b border-hairline"
               style={{ textAlign: 'center' }}
               colSpan={2}
             >
-              我还要还
+              To Repay
             </th>
             <th className="right py-2 px-3 font-medium" rowSpan={2}>
-              净额
+              Net
             </th>
           </tr>
           <tr className="text-[11px] uppercase tracking-wide text-muted font-sans border-b border-hairline">
-            <th className="right py-1 px-3 font-medium">本金</th>
-            <th className="right py-1 px-3 font-medium">利息</th>
-            <th className="right py-1 px-3 font-medium">本金</th>
-            <th className="right py-1 px-3 font-medium">利息</th>
+            <th className="right py-1 px-3 font-medium">Principal</th>
+            <th className="right py-1 px-3 font-medium">Interest</th>
+            <th className="right py-1 px-3 font-medium">Principal</th>
+            <th className="right py-1 px-3 font-medium">Interest</th>
           </tr>
         </thead>
         <tbody>
           {shown.length === 0 ? (
             <tr>
               <td colSpan={6} className="py-6 px-3 text-center font-serif italic text-muted">
-                没有对象匹配「{q.trim()}」
+                No counterparty matches &ldquo;{q.trim()}&rdquo;
               </td>
             </tr>
           ) : null}
@@ -386,7 +386,7 @@ export default function StatementView({
                             return next
                           })
                         }
-                        title="勾选后可只导出所选对象"
+                        title="Tick to export only selected counterparties"
                         className="h-3.5 w-3.5 accent-[var(--accent)] align-middle"
                       />
                     </span>
@@ -395,7 +395,7 @@ export default function StatementView({
                     </span>
                     <span className="font-serif text-ink">{g.counterparty}</span>
                     <span className="font-mono text-[10px] text-muted ml-2">
-                      {g.items.length} 笔
+                      {g.items.length} positions
                     </span>
                   </td>
                   <td className="py-2 px-3 text-right font-mono tabular">{num(g.collectPrincipal)}</td>
@@ -404,7 +404,7 @@ export default function StatementView({
                   <td className="py-2 px-3 text-right font-mono tabular">{num(g.repayInterest)}</td>
                   <td className="py-2 px-3 text-right font-mono tabular font-semibold">
                     <span className={g.net >= 0 ? 'text-ledger' : 'text-danger'}>
-                      {g.net >= 0 ? '收 ' : '还 '}
+                      {g.net >= 0 ? 'Collect ' : 'Repay '}
                       {formatMoneyBare(Math.abs(g.net))}
                     </span>
                   </td>
@@ -421,7 +421,7 @@ export default function StatementView({
           })}
           <tr className="bg-surface/40">
             <td className="py-2.5 px-3 font-serif italic text-accent">
-              Total{needle ? '（筛选后）' : ''}
+              Total{needle ? ' (filtered)' : ''}
             </td>
             <td className="py-2.5 px-3 text-right font-mono tabular font-semibold text-ink">
               {formatMoneyBare(shownTotals.collectPrincipal)}
@@ -437,7 +437,7 @@ export default function StatementView({
             </td>
             <td className="py-2.5 px-3 text-right font-mono tabular font-semibold">
               <span className={shownTotals.net >= 0 ? 'text-ledger' : 'text-danger'}>
-                {shownTotals.net >= 0 ? '收 ' : '还 '}
+                {shownTotals.net >= 0 ? 'Collect ' : 'Repay '}
                 {formatMoneyBare(Math.abs(shownTotals.net))}
               </span>
             </td>
