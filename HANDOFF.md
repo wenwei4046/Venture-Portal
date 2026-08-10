@@ -72,6 +72,30 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+## Bank reconciliation rebuild (2026-08-08, mig 20260808000000)
+
+User: "bank reconciliation 我希望我是upload pdf 或excel 后自动对账 · 存起来
+每月一份 · 金额，名字等等，日期其次 · 对不上就问我".
+ - Tables bank_recon_sessions (UNIQUE bank+month) + bank_recon_lines
+   (signed amount, matched_journal_line_id → journal_lines, match_kind
+   auto/manual/ignored). RLS finance+principal.
+ - `lib/bank-recon.ts` (9 tests): header-detection parser for CSV/xlsx rows
+   (MY formats: DD/MM/YYYY, (1,234.56), CR/DR suffixes, letterhead rows
+   skipped), autoMatch = equal-amount buckets → greedy by name-token
+   similarity, date proximity only tie-breaks, leftovers stay unmatched.
+ - /reconciliation rebuilt: Bank vs GL table kept; upload form (bank+month+
+   file) → session created → auto-matched → redirect to
+   /reconciliation/[sessionId] review page: summary tiles, side-by-side
+   unmatched statement vs unmatched book lines (click one each → Match,
+   equal amounts enforced), ignore/restore, matched list with Unmatch,
+   Mark done / Delete on the index. Legacy CSVUpload + old count-only
+   action removed.
+ - Book lines window = month ±10 days on the bank's GL code, excluding
+   journal_lines already claimed by ANY session.
+ - **PDF: not parsed yet** — needs the user's real statement sample per bank
+   (they said they'll send; upload of .pdf returns a clear message). When the
+   sample arrives, add a per-bank template feeding the same parse shape.
+
 ## Auto payroll accrual JVs (2026-08-07)
 
 User: "HR submit payroll fund request 给我, 我希望同时直接帮我开jv" → trigger
