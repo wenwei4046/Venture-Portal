@@ -17,6 +17,7 @@ import {
   autoMatch, csvToRows, parseStatementRows,
   type BookLine, type StatementLine,
 } from '@/lib/bank-recon'
+import { looksLikeHlb, parseHlbPdf, type PdfPageItems } from '@/lib/bank-recon-pdf'
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 
@@ -76,25 +77,56 @@ export async function uploadStatement(formData: FormData): Promise<{ error: stri
   const periodMonth = `${month}-01`
 
   const name = file.name.toLowerCase()
-  let rows: unknown[][]
+  let parsed: { lines: Array<{ date: string; description: string; amount: number }>; skipped: number }
+  let statementOpening: number | null = null
+  let statementClosing: number | null = null
+
   if (name.endsWith('.pdf')) {
-    return {
-      error:
-        'PDF 解析还没配你银行的排版 — 把这份 statement 发给我（chat 里传给 Claude），我照它的格式加模板。先用网银 export 的 Excel/CSV 就能直接对。',
+    // Coordinate-based per-bank templates (HLB tuned on the user's real
+    // Apr'26 statement, 47/47 lines, balance tie-out enforced inside).
+    const buf = Buffer.from(await file.arrayBuffer())
+    const { default: PDFParser } = await import('pdf2json')
+    const data = await new Promise<{ Pages: Array<{ Texts: Array<{ x: number; y: number; R: Array<{ T: string }> }> }> }>(
+      (resolve, reject) => {
+        const parser = new PDFParser()
+        parser.on('pdfParser_dataError', (e: { parserError?: Error }) =>
+          reject(new Error(e.parserError?.message ?? 'PDF parse failed')),
+        )
+        parser.on('pdfParser_dataReady', resolve)
+        parser.parseBuffer(buf)
+      },
+    ).catch((e: Error) => e)
+    if (data instanceof Error) return { error: `Could not read the PDF: ${data.message}` }
+    const pages: PdfPageItems[] = data.Pages.map(pg => ({
+      items: pg.Texts.map(t => ({ x: t.x, y: t.y, text: decodeURIComponent(t.R[0]?.T ?? '') })),
+    }))
+    if (!looksLikeHlb(pages)) {
+      return {
+        error:
+          'Only Hong Leong PDF statements have a template so far — send this bank\'s statement to Claude and its layout will be added. Excel/CSV works for any bank.',
+      }
     }
+    const pdfParsed = parseHlbPdf(pages)
+    if ('error' in pdfParsed) return { error: pdfParsed.error }
+    parsed = { lines: pdfParsed.lines, skipped: pdfParsed.skipped }
+    statementOpening = pdfParsed.opening
+    statementClosing = pdfParsed.closing
   } else if (name.endsWith('.csv') || name.endsWith('.txt')) {
-    rows = csvToRows(await file.text())
+    const p = parseStatementRows(csvToRows(await file.text()))
+    if ('error' in p) return { error: p.error }
+    parsed = p
   } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
     const buf = Buffer.from(await file.arrayBuffer())
     const wb = XLSX.read(buf, { type: 'buffer', cellDates: true })
     const sheet = wb.Sheets[wb.SheetNames[0]]
-    rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null }) as unknown[][]
+    const p = parseStatementRows(
+      XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null }) as unknown[][],
+    )
+    if ('error' in p) return { error: p.error }
+    parsed = p
   } else {
-    return { error: 'Unsupported file type — use .xlsx, .csv or .pdf' }
+    return { error: 'Unsupported file type — use .pdf, .xlsx or .csv' }
   }
-
-  const parsed = parseStatementRows(rows)
-  if ('error' in parsed) return { error: parsed.error }
 
   const { data: bank, error: bankErr } = await supabase
     .from('bank_accounts')
@@ -110,6 +142,8 @@ export async function uploadStatement(formData: FormData): Promise<{ error: stri
       bank_account_id: bankAccountId,
       period_month: periodMonth,
       source_filename: file.name,
+      statement_opening: statementOpening,
+      statement_closing: statementClosing,
       created_by: user.id,
     })
     .select('id')

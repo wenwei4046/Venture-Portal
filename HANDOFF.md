@@ -92,9 +92,18 @@ User: "bank reconciliation 我希望我是upload pdf 或excel 后自动对账 ·
    action removed.
  - Book lines window = month ±10 days on the bank's GL code, excluding
    journal_lines already claimed by ANY session.
- - **PDF: not parsed yet** — needs the user's real statement sample per bank
-   (they said they'll send; upload of .pdf returns a clear message). When the
-   sample arrives, add a per-bank template feeding the same parse shape.
+ - **PDF: HLB template LIVE** (user sent "Venture - Apr'26.pdf" same day).
+   `lib/bank-recon-pdf.ts` (3 tests) parses via pdf2json COORDINATES — the
+   flat text layer glues Deposit/Withdrawal/Balance together, so numbers are
+   classified by nearest column-header x (calibrated per page). Continuation
+   lines (remark · PV no · counterparty) join into the description = strong
+   name-matching signal; bank refs (20260401HLBB…) and page artifacts
+   filtered. FAIL-SAFE: opening + Σmovements must equal closing to the sen or
+   the parse refuses. Real-file e2e: 47/47 lines, 0 skipped, tie-out exact.
+   statement_opening/closing stored on the session and shown on the review
+   tile. Non-HLB PDFs still return the ask-for-sample message (add the next
+   bank's template beside parseHlbPdf). Dep added: pdf2json (dynamic import
+   in the action).
 
 ## Auto payroll accrual JVs (2026-08-07)
 

@@ -24,7 +24,7 @@ export default async function ReconSessionPage({
 
   const { data: session } = await supabase
     .from('bank_recon_sessions')
-    .select('id, bank_account_id, period_month, source_filename, status')
+    .select('id, bank_account_id, period_month, source_filename, status, statement_opening, statement_closing')
     .eq('id', sessionId)
     .maybeSingle()
   if (!session) notFound()
@@ -148,6 +148,8 @@ export default async function ReconSessionPage({
         statementLines={statementLines}
         unmatchedBook={unmatchedBook}
         bookInfo={Object.fromEntries(bookInfoById)}
+        statementOpening={session.statement_opening != null ? Number(session.statement_opening) : null}
+        statementClosing={session.statement_closing != null ? Number(session.statement_closing) : null}
       />
     </div>
   )

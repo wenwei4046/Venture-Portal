@@ -34,10 +34,14 @@ export default function ReconReview({
   statementLines,
   unmatchedBook,
   bookInfo,
+  statementOpening = null,
+  statementClosing = null,
 }: {
   statementLines: ReviewStatementLine[]
   unmatchedBook: ReviewBookLine[]
   bookInfo: Record<string, ReviewBookLine>
+  statementOpening?: number | null
+  statementClosing?: number | null
 }) {
   const router = useRouter()
   const [selS, setSelS] = useState<string | null>(null)
@@ -78,6 +82,11 @@ export default function ReconReview({
           <div className="font-mono tabular text-sm">
             {money(Math.round(totalIn * 100) / 100)} · {money(Math.round(totalOut * 100) / 100)}
           </div>
+          {statementOpening != null && statementClosing != null ? (
+            <div className="font-mono text-[11px] text-muted mt-1">
+              {formatMoneyBare(statementOpening)} → {formatMoneyBare(statementClosing)}
+            </div>
+          ) : null}
         </div>
         <div className="border border-hairline rounded-md bg-surface p-4">
           <div className="font-serif italic text-graphite text-sm mb-1">Matched</div>
