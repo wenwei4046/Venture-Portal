@@ -30,7 +30,7 @@ export default async function ReconciliationPage() {
         .from('bank_recon_sessions')
         .select('id, bank_account_id, period_month, source_filename, status, created_at')
         .order('period_month', { ascending: false }),
-      supabase.from('bank_recon_lines').select('session_id, match_kind, matched_journal_line_id'),
+      supabase.from('bank_recon_lines').select('session_id, match_kind'),
     ])
 
   const banks = (bankAccounts ?? []) as Array<{
@@ -53,11 +53,10 @@ export default async function ReconciliationPage() {
   for (const l of (lineRows ?? []) as Array<{
     session_id: string
     match_kind: string | null
-    matched_journal_line_id: string | null
   }>) {
     const c = countsBySession.get(l.session_id) ?? { total: 0, matched: 0, ignored: 0 }
     c.total++
-    if (l.matched_journal_line_id) c.matched++
+    if (l.match_kind === 'auto' || l.match_kind === 'manual') c.matched++
     else if (l.match_kind === 'ignored') c.ignored++
     countsBySession.set(l.session_id, c)
   }

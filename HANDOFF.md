@@ -72,6 +72,24 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+## Bank recon round 2 (2026-08-08, mig 20260808010000)
+
+ - **One-to-many matching** (user: "银行是收一笔，但是gl 记录是多笔"):
+   junction table bank_recon_matches (UNIQUE journal_line_id) replaces the
+   single matched_journal_line_id column (backfilled, column nulled/dormant).
+   manualMatch(lineId, journalLineIds[]) enforces Σ(selected book) == the
+   statement line; the review page's book table is MULTI-select with a live
+   Σ/off-by readout; auto-match stays conservative 1:1. Counts key off
+   match_kind now.
+ - **Internal flips excluded** (user: "interbilling 的别出现哦…银行不会有
+   transaction"): any JE that both debits AND credits the same bank code
+   (inter-billing dept transfers, same-bank payroll staging) is dropped from
+   the book side — no real bank movement exists to match.
+ - Review tables rebuilt full-width (Date | Entry | Description | In | Out,
+   per-table filter, sticky match bar) after the cramped side-by-side lists;
+   book window is month −10d..month-end (NO forward days — "upload 6 月就不
+   应该出现7月的payment").
+
 ## Bank reconciliation rebuild (2026-08-08, mig 20260808000000)
 
 User: "bank reconciliation 我希望我是upload pdf 或excel 后自动对账 · 存起来

@@ -41,23 +41,30 @@ async function loadBookLines(
   const [{ data: lines, error }, { data: claimed }] = await Promise.all([
     supabase
       .from('journal_lines')
-      .select('id, debit, credit, description, journal_entries!inner(transaction_date, description, is_reversed)')
+      .select('id, entry_id, debit, credit, description, journal_entries!inner(transaction_date, description, is_reversed)')
       .eq('account_code', glCode)
       .gte('journal_entries.transaction_date', from)
       .lte('journal_entries.transaction_date', to)
       .eq('journal_entries.is_reversed', false),
-    supabase.from('bank_recon_lines').select('matched_journal_line_id').not('matched_journal_line_id', 'is', null),
+    supabase.from('bank_recon_matches').select('journal_line_id'),
   ])
   if (error) throw new Error(`Failed to load book lines: ${error.message}`)
-  const claimedSet = new Set((claimed ?? []).map((c: { matched_journal_line_id: string }) => c.matched_journal_line_id))
-  return ((lines ?? []) as unknown as Array<{
+  const claimedSet = new Set((claimed ?? []).map((c: { journal_line_id: string }) => c.journal_line_id))
+  const raw = (lines ?? []) as unknown as Array<{
     id: string
+    entry_id: string
     debit: number | null
     credit: number | null
     description: string | null
     journal_entries: { transaction_date: string; description: string | null }
-  }>)
-    .filter(l => !claimedSet.has(l.id))
+  }>
+  // Internal transfers (inter-billing dept flips, same-bank payroll staging)
+  // debit AND credit the SAME bank code inside one JE — the bank never sees a
+  // transaction, so those lines must not appear (user 2026-08-08:
+  // "interbilling 的别出现哦…银行不会有transaction的").
+  const internalEntries = internalFlipEntries(raw)
+  return raw
+    .filter(l => !claimedSet.has(l.id) && !internalEntries.has(l.entry_id))
     .map(l => ({
       key: l.id,
       date: l.journal_entries.transaction_date,
@@ -65,6 +72,21 @@ async function loadBookLines(
       amount: r2(Number(l.debit ?? 0) - Number(l.credit ?? 0)),
     }))
     .filter(l => l.amount !== 0)
+}
+
+/** Entry ids whose bank-code lines include BOTH a debit and a credit — pure
+ *  internal flips with no real bank movement. */
+function internalFlipEntries(
+  rows: Array<{ entry_id: string; debit: number | null; credit: number | null }>,
+): Set<string> {
+  const byEntry = new Map<string, { hasDr: boolean; hasCr: boolean }>()
+  for (const l of rows) {
+    const e = byEntry.get(l.entry_id) ?? { hasDr: false, hasCr: false }
+    if (Number(l.debit ?? 0) > 0) e.hasDr = true
+    if (Number(l.credit ?? 0) > 0) e.hasCr = true
+    byEntry.set(l.entry_id, e)
+  }
+  return new Set([...byEntry.entries()].filter(([, e]) => e.hasDr && e.hasCr).map(([id]) => id))
 }
 
 export async function uploadStatement(formData: FormData): Promise<{ error: string } | void> {
@@ -185,46 +207,62 @@ export async function uploadStatement(formData: FormData): Promise<{ error: stri
   )
   const bookLines = await loadBookLines(supabase, bank.gl_account_code as string, periodMonth)
   const result = autoMatch(statementLines, bookLines)
-  for (const pair of result.pairs) {
+  if (result.pairs.length > 0) {
+    await supabase.from('bank_recon_matches').insert(
+      result.pairs.map(p => ({ statement_line_id: p.statementKey, journal_line_id: p.bookKey })),
+    )
     await supabase
       .from('bank_recon_lines')
-      .update({ matched_journal_line_id: pair.bookKey, match_kind: 'auto' })
-      .eq('id', pair.statementKey)
+      .update({ match_kind: 'auto' })
+      .in('id', result.pairs.map(p => p.statementKey))
   }
 
   revalidatePath('/reconciliation')
   redirect(`/reconciliation/${session.id}`)
 }
 
+/** Match ONE statement line to ONE OR MORE journal lines whose signed amounts
+ *  SUM to it exactly (user 2026-08-08: "银行是收一笔，但是gl 记录是多笔"). */
 export async function manualMatch(
   lineId: string,
-  journalLineId: string,
+  journalLineIds: string[],
 ): Promise<{ error?: string }> {
   await requireRole(['finance', 'principal'])
   const supabase = await reconClient()
 
-  const [{ data: line }, { data: jl }] = await Promise.all([
+  const ids = Array.from(new Set(journalLineIds.filter(Boolean)))
+  if (ids.length === 0) return { error: 'Pick at least one book line' }
+
+  const [{ data: line }, { data: jls }, { data: claimed }] = await Promise.all([
     supabase.from('bank_recon_lines').select('id, amount').eq('id', lineId).maybeSingle(),
-    supabase.from('journal_lines').select('id, debit, credit').eq('id', journalLineId).maybeSingle(),
+    supabase.from('journal_lines').select('id, debit, credit').in('id', ids),
+    supabase.from('bank_recon_matches').select('journal_line_id').in('journal_line_id', ids),
   ])
   if (!line) return { error: 'Statement line not found' }
-  if (!jl) return { error: 'Journal line not found' }
-  const bookAmount = r2(Number(jl.debit ?? 0) - Number(jl.credit ?? 0))
-  if (Math.abs(bookAmount - Number(line.amount)) > 0.005) {
+  if ((jls ?? []).length !== ids.length) return { error: 'Some journal lines were not found' }
+  if ((claimed ?? []).length > 0) {
+    return { error: 'Some of those journal lines are already matched elsewhere' }
+  }
+  const bookSum = r2(
+    (jls ?? []).reduce(
+      (s: number, jl: { debit: number | null; credit: number | null }) =>
+        s + Number(jl.debit ?? 0) - Number(jl.credit ?? 0),
+      0,
+    ),
+  )
+  if (Math.abs(bookSum - Number(line.amount)) > 0.005) {
     return {
-      error: `Amounts differ — statement ${Number(line.amount).toFixed(2)} vs book ${bookAmount.toFixed(2)}. Only equal amounts can be matched.`,
+      error: `Amounts differ — statement ${Number(line.amount).toFixed(2)} vs selected book total ${bookSum.toFixed(2)}. The selection must sum to the statement line.`,
     }
   }
-  const { data: claimed } = await supabase
-    .from('bank_recon_lines')
-    .select('id')
-    .eq('matched_journal_line_id', journalLineId)
-    .limit(1)
-  if ((claimed ?? []).length > 0) return { error: 'That journal line is already matched to another statement line' }
 
+  const { error: insErr } = await supabase
+    .from('bank_recon_matches')
+    .insert(ids.map(id => ({ statement_line_id: lineId, journal_line_id: id })))
+  if (insErr) return { error: insErr.message }
   const { error } = await supabase
     .from('bank_recon_lines')
-    .update({ matched_journal_line_id: journalLineId, match_kind: 'manual' })
+    .update({ match_kind: 'manual' })
     .eq('id', lineId)
   if (error) return { error: error.message }
   revalidatePath('/reconciliation')
@@ -234,9 +272,14 @@ export async function manualMatch(
 export async function unmatchLine(lineId: string): Promise<{ error?: string }> {
   await requireRole(['finance', 'principal'])
   const supabase = await reconClient()
+  const { error: delErr } = await supabase
+    .from('bank_recon_matches')
+    .delete()
+    .eq('statement_line_id', lineId)
+  if (delErr) return { error: delErr.message }
   const { error } = await supabase
     .from('bank_recon_lines')
-    .update({ matched_journal_line_id: null, match_kind: null })
+    .update({ match_kind: null })
     .eq('id', lineId)
   if (error) return { error: error.message }
   revalidatePath('/reconciliation')
@@ -246,13 +289,17 @@ export async function unmatchLine(lineId: string): Promise<{ error?: string }> {
 export async function setLineIgnored(lineId: string, ignored: boolean): Promise<{ error?: string }> {
   await requireRole(['finance', 'principal'])
   const supabase = await reconClient()
+  if (ignored) {
+    // An ignored line holds no matches.
+    const { error: delErr } = await supabase
+      .from('bank_recon_matches')
+      .delete()
+      .eq('statement_line_id', lineId)
+    if (delErr) return { error: delErr.message }
+  }
   const { error } = await supabase
     .from('bank_recon_lines')
-    .update(
-      ignored
-        ? { matched_journal_line_id: null, match_kind: 'ignored' }
-        : { match_kind: null },
-    )
+    .update({ match_kind: ignored ? 'ignored' : null })
     .eq('id', lineId)
   if (error) return { error: error.message }
   revalidatePath('/reconciliation')

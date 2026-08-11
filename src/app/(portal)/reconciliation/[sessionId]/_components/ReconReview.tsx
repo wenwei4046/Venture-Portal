@@ -11,7 +11,8 @@ export interface ReviewStatementLine {
   date: string
   description: string
   amount: number
-  matchedJournalLineId: string | null
+  /** One or MORE journal lines summing to this statement line. */
+  matchedJournalLineIds: string[]
   matchKind: string | null
 }
 
@@ -45,15 +46,21 @@ export default function ReconReview({
 }) {
   const router = useRouter()
   const [selS, setSelS] = useState<string | null>(null)
-  const [selB, setSelB] = useState<string | null>(null)
+  // Book side is MULTI-select — one bank line can equal several GL lines
+  // (user 2026-08-08: "银行是收一笔，但是gl 记录是多笔").
+  const [selB, setSelB] = useState<Set<string>>(new Set())
   const [qS, setQS] = useState('')
   const [qB, setQB] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  const matched = statementLines.filter(l => l.matchedJournalLineId)
-  const ignored = statementLines.filter(l => !l.matchedJournalLineId && l.matchKind === 'ignored')
-  const openS = statementLines.filter(l => !l.matchedJournalLineId && l.matchKind !== 'ignored')
+  const matched = statementLines.filter(l => l.matchedJournalLineIds.length > 0)
+  const ignored = statementLines.filter(
+    l => l.matchedJournalLineIds.length === 0 && l.matchKind === 'ignored',
+  )
+  const openS = statementLines.filter(
+    l => l.matchedJournalLineIds.length === 0 && l.matchKind !== 'ignored',
+  )
 
   const needleS = qS.trim().toLowerCase()
   const needleB = qB.trim().toLowerCase()
@@ -67,8 +74,17 @@ export default function ReconReview({
     : unmatchedBook
 
   const sSel = openS.find(l => l.id === selS) ?? null
-  const bSel = unmatchedBook.find(l => l.id === selB) ?? null
-  const amountsEqual = !!sSel && !!bSel && Math.abs(sSel.amount - bSel.amount) <= 0.005
+  const bSelLines = unmatchedBook.filter(l => selB.has(l.id))
+  const bSum = Math.round(bSelLines.reduce((s, l) => s + l.amount, 0) * 100) / 100
+  const amountsEqual = !!sSel && bSelLines.length > 0 && Math.abs(sSel.amount - bSum) <= 0.005
+
+  const toggleB = (id: string) =>
+    setSelB(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
 
   const run = (fn: () => Promise<{ error?: string }>) => {
     setError(null)
@@ -77,7 +93,7 @@ export default function ReconReview({
       if (r.error) setError(r.error)
       else {
         setSelS(null)
-        setSelB(null)
+        setSelB(new Set())
         router.refresh()
       }
     })
@@ -130,21 +146,27 @@ export default function ReconReview({
                   Statement: {formatMoneyBare(sSel.amount)}
                 </span>
               ) : null}
-              {bSel ? (
-                <span className="font-mono text-xs text-graphite">Book: {formatMoneyBare(bSel.amount)}</span>
+              {bSelLines.length > 0 ? (
+                <span
+                  className={`font-mono text-xs ${sSel && !amountsEqual ? 'text-danger' : 'text-graphite'}`}
+                >
+                  Book Σ ({bSelLines.length}): {formatMoneyBare(bSum)}
+                  {sSel && !amountsEqual ? ` · off by ${formatMoneyBare(Math.round((sSel.amount - bSum) * 100) / 100)}` : ''}
+                  {sSel && amountsEqual ? ' ✓' : ''}
+                </span>
               ) : null}
               <button
                 type="button"
                 disabled={!amountsEqual || isPending}
-                onClick={() => sSel && bSel && run(() => manualMatch(sSel.id, bSel.id))}
+                onClick={() => sSel && run(() => manualMatch(sSel.id, bSelLines.map(l => l.id)))}
                 className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-40"
                 title={
-                  sSel && bSel && !amountsEqual
-                    ? 'Amounts differ — only equal amounts can match'
-                    : 'Match the selected pair'
+                  sSel && bSelLines.length > 0 && !amountsEqual
+                    ? 'Selected book lines must SUM to the statement amount'
+                    : 'Match: one statement line ↔ one or more book lines'
                 }
               >
-                {isPending ? 'Working…' : 'Match selected pair →'}
+                {isPending ? 'Working…' : `Match 1 ↔ ${bSelLines.length || '…'} →`}
               </button>
             </div>
           </div>
@@ -250,9 +272,9 @@ export default function ReconReview({
                   {filteredB.map(l => (
                     <tr
                       key={l.id}
-                      onClick={() => setSelB(prev => (prev === l.id ? null : l.id))}
+                      onClick={() => toggleB(l.id)}
                       className={`border-b border-hairline/60 cursor-pointer ${
-                        selB === l.id ? 'bg-accent/15' : 'hover:bg-surface-2/50'
+                        selB.has(l.id) ? 'bg-accent/15' : 'hover:bg-surface-2/50'
                       }`}
                     >
                       <td className="py-1.5 px-3 font-mono text-[11px] text-graphite whitespace-nowrap">
@@ -306,7 +328,9 @@ export default function ReconReview({
               </thead>
               <tbody>
                 {matched.map(l => {
-                  const b = l.matchedJournalLineId ? bookInfo[l.matchedJournalLineId] : undefined
+                  const books = l.matchedJournalLineIds
+                    .map(id => bookInfo[id])
+                    .filter(Boolean)
                   return (
                     <tr key={l.id}>
                       <td>
@@ -317,13 +341,22 @@ export default function ReconReview({
                       </td>
                       <td className="num">{money(l.amount)}</td>
                       <td>
-                        {b ? (
-                          <>
-                            <span className="font-mono text-[11px] text-muted mr-2">{b.entryNo}</span>
-                            <span className="font-serif text-[14px] text-graphite">{b.description}</span>
-                          </>
-                        ) : (
+                        {books.length === 0 ? (
                           '—'
+                        ) : (
+                          <div className="space-y-0.5">
+                            {books.map(b => (
+                              <div key={b.id}>
+                                <span className="font-mono text-[11px] text-muted mr-2">{b.entryNo}</span>
+                                <span className="font-serif text-[14px] text-graphite">{b.description}</span>
+                                {books.length > 1 ? (
+                                  <span className="font-mono text-[11px] text-graphite ml-2">
+                                    {formatMoneyBare(b.amount)}
+                                  </span>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </td>
                       <td>

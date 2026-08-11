@@ -37,25 +37,39 @@ export default async function ReconSessionPage({
       .maybeSingle(),
     supabase
       .from('bank_recon_lines')
-      .select('id, txn_date, description, amount, matched_journal_line_id, match_kind')
+      .select('id, txn_date, description, amount, match_kind')
       .eq('session_id', sessionId)
       .order('txn_date'),
   ])
   if (!bank?.gl_account_code) notFound()
+
+  const lineIds = ((lines ?? []) as Array<{ id: string }>).map(l => l.id)
+  const { data: matchRows } =
+    lineIds.length > 0
+      ? await supabase
+          .from('bank_recon_matches')
+          .select('statement_line_id, journal_line_id')
+          .in('statement_line_id', lineIds)
+      : { data: [] }
+  const matchesByLine = new Map<string, string[]>()
+  for (const m of (matchRows ?? []) as Array<{ statement_line_id: string; journal_line_id: string }>) {
+    const list = matchesByLine.get(m.statement_line_id) ?? []
+    list.push(m.journal_line_id)
+    matchesByLine.set(m.statement_line_id, list)
+  }
 
   const statementLines: ReviewStatementLine[] = ((lines ?? []) as Array<{
     id: string
     txn_date: string
     description: string | null
     amount: number
-    matched_journal_line_id: string | null
     match_kind: string | null
   }>).map(l => ({
     id: l.id,
     date: l.txn_date,
     description: l.description ?? '',
     amount: Number(l.amount),
-    matchedJournalLineId: l.matched_journal_line_id,
+    matchedJournalLineIds: matchesByLine.get(l.id) ?? [],
     matchKind: l.match_kind,
   }))
 
@@ -66,34 +80,50 @@ export default async function ReconSessionPage({
   const [{ data: bookRaw }, { data: claimedRows }] = await Promise.all([
     supabase
       .from('journal_lines')
-      .select('id, debit, credit, description, journal_entries!inner(entry_no, transaction_date, description, is_reversed)')
+      .select('id, entry_id, debit, credit, description, journal_entries!inner(entry_no, transaction_date, description, is_reversed)')
       .eq('account_code', bank.gl_account_code)
       .gte('journal_entries.transaction_date', from)
       .lte('journal_entries.transaction_date', to)
       .eq('journal_entries.is_reversed', false),
-    supabase
-      .from('bank_recon_lines')
-      .select('matched_journal_line_id')
-      .not('matched_journal_line_id', 'is', null),
+    supabase.from('bank_recon_matches').select('journal_line_id'),
   ])
   const claimed = new Set(
-    ((claimedRows ?? []) as Array<{ matched_journal_line_id: string }>).map(c => c.matched_journal_line_id),
+    ((claimedRows ?? []) as Array<{ journal_line_id: string }>).map(c => c.journal_line_id),
   )
-  const matchedHere = new Set(statementLines.map(l => l.matchedJournalLineId).filter(Boolean) as string[])
+  const matchedHere = new Set(statementLines.flatMap(l => l.matchedJournalLineIds))
 
-  const allBook = ((bookRaw ?? []) as unknown as Array<{
+  const bookRows = (bookRaw ?? []) as unknown as Array<{
     id: string
+    entry_id: string
     debit: number | null
     credit: number | null
     description: string | null
     journal_entries: { entry_no: string | null; transaction_date: string; description: string | null }
-  }>).map(l => ({
-    id: l.id,
-    date: l.journal_entries.transaction_date,
-    entryNo: l.journal_entries.entry_no ?? '—',
-    description: `${l.journal_entries.description ?? ''}${l.description ? ` · ${l.description}` : ''}`.trim(),
-    amount: r2(Number(l.debit ?? 0) - Number(l.credit ?? 0)),
-  })).filter(l => l.amount !== 0)
+  }>
+  // Internal flips (inter-billing dept transfers, same-bank staging): the JE
+  // debits AND credits this bank code — no real bank transaction, keep out
+  // (user 2026-08-08: "interbilling 的别出现哦").
+  const flip = new Map<string, { dr: boolean; cr: boolean }>()
+  for (const l of bookRows) {
+    const e = flip.get(l.entry_id) ?? { dr: false, cr: false }
+    if (Number(l.debit ?? 0) > 0) e.dr = true
+    if (Number(l.credit ?? 0) > 0) e.cr = true
+    flip.set(l.entry_id, e)
+  }
+  const internalEntries = new Set(
+    [...flip.entries()].filter(([, e]) => e.dr && e.cr).map(([id]) => id),
+  )
+
+  const allBook = bookRows
+    .filter(l => !internalEntries.has(l.entry_id))
+    .map(l => ({
+      id: l.id,
+      date: l.journal_entries.transaction_date,
+      entryNo: l.journal_entries.entry_no ?? '—',
+      description: `${l.journal_entries.description ?? ''}${l.description ? ` · ${l.description}` : ''}`.trim(),
+      amount: r2(Number(l.debit ?? 0) - Number(l.credit ?? 0)),
+    }))
+    .filter(l => l.amount !== 0)
 
   // For the matched table we need info on lines matched HERE; for the
   // unmatched book side we exclude anything claimed by ANY session.
