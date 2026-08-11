@@ -48,15 +48,26 @@ export default async function ReconSessionPage({
     lineIds.length > 0
       ? await supabase
           .from('bank_recon_matches')
-          .select('statement_line_id, journal_line_id')
+          .select('statement_line_id, journal_line_id, match_group')
           .in('statement_line_id', lineIds)
       : { data: [] }
-  const matchesByLine = new Map<string, string[]>()
-  for (const m of (matchRows ?? []) as Array<{ statement_line_id: string; journal_line_id: string }>) {
-    const list = matchesByLine.get(m.statement_line_id) ?? []
-    list.push(m.journal_line_id)
-    matchesByLine.set(m.statement_line_id, list)
+  // Groups: N statement lines ↔ M journal lines with equal totals.
+  const groupMap = new Map<string, { statementLineIds: Set<string>; journalLineIds: string[] }>()
+  for (const m of (matchRows ?? []) as Array<{
+    statement_line_id: string
+    journal_line_id: string | null
+    match_group: string
+  }>) {
+    const g = groupMap.get(m.match_group) ?? { statementLineIds: new Set<string>(), journalLineIds: [] }
+    g.statementLineIds.add(m.statement_line_id)
+    if (m.journal_line_id) g.journalLineIds.push(m.journal_line_id)
+    groupMap.set(m.match_group, g)
   }
+  const groups = [...groupMap.entries()].map(([id, g]) => ({
+    id,
+    statementLineIds: [...g.statementLineIds],
+    journalLineIds: g.journalLineIds,
+  }))
 
   const statementLines: ReviewStatementLine[] = ((lines ?? []) as Array<{
     id: string
@@ -69,7 +80,6 @@ export default async function ReconSessionPage({
     date: l.txn_date,
     description: l.description ?? '',
     amount: Number(l.amount),
-    matchedJournalLineIds: matchesByLine.get(l.id) ?? [],
     matchKind: l.match_kind,
   }))
 
@@ -88,9 +98,11 @@ export default async function ReconSessionPage({
     supabase.from('bank_recon_matches').select('journal_line_id'),
   ])
   const claimed = new Set(
-    ((claimedRows ?? []) as Array<{ journal_line_id: string }>).map(c => c.journal_line_id),
+    ((claimedRows ?? []) as Array<{ journal_line_id: string | null }>)
+      .map(c => c.journal_line_id)
+      .filter(Boolean),
   )
-  const matchedHere = new Set(statementLines.flatMap(l => l.matchedJournalLineIds))
+  const matchedHere = new Set(groups.flatMap(g => g.journalLineIds))
 
   const bookRows = (bookRaw ?? []) as unknown as Array<{
     id: string
@@ -178,6 +190,7 @@ export default async function ReconSessionPage({
 
       <ReconReview
         statementLines={statementLines}
+        groups={groups}
         unmatchedBook={unmatchedBook}
         bookInfo={Object.fromEntries(bookInfoById)}
         statementOpening={session.statement_opening != null ? Number(session.statement_opening) : null}

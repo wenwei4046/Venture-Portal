@@ -72,6 +72,21 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+## Bank recon round 3 — N↔M groups (2026-08-08, mig 20260808020000)
+
+User hit the reverse case ("bank statement 可能是两笔加起来等于gl 的", real
+example: stmt 31,000+10,333.33 ↔ GL 33,333.33+8,000). Matching generalised to
+MATCH GROUPS: bank_recon_matches gains match_group uuid, journal_line_id is
+now nullable (a group with fewer JEs than statement lines pads rows with NULL
+so every statement line keeps ≥1 row); existing 1:N matches were backfilled
+as groups keyed by their statement line. manualMatch(statementLineIds[],
+journalLineIds[]) validates Σ==Σ; unmatchLine dissolves the WHOLE group.
+"Matched" now keys off match_kind everywhere (not junction presence). Review
+page: BOTH tables multi-select, sticky bar shows Statement Σ vs Book Σ with
+off-by readout, Matched section renders per GROUP (N↔M tag). Book table
+sorts date→entry. Also this session: internal-flip exclusion + no-forward
+window + full-width tables (round 2 entries below).
+
 ## Bank recon round 2 (2026-08-08, mig 20260808010000)
 
  - **One-to-many matching** (user: "银行是收一笔，但是gl 记录是多笔"):
