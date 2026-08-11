@@ -104,6 +104,21 @@ export default async function ReconSessionPage({
   )
   const matchedHere = new Set(groups.flatMap(g => g.journalLineIds))
 
+  // GL balance on this bank code at month-end — shown next to the statement
+  // closing so 银行数 vs GL 数 read apart at a glance (user 2026-08-08).
+  const { data: glAll } = await supabase
+    .from('journal_lines')
+    .select('debit, credit, journal_entries!inner(transaction_date, is_reversed)')
+    .eq('account_code', bank.gl_account_code)
+    .lte('journal_entries.transaction_date', to)
+    .eq('journal_entries.is_reversed', false)
+  const glClosing = r2(
+    ((glAll ?? []) as unknown as Array<{ debit: number | null; credit: number | null }>).reduce(
+      (s, l) => s + Number(l.debit ?? 0) - Number(l.credit ?? 0),
+      0,
+    ),
+  )
+
   const bookRows = (bookRaw ?? []) as unknown as Array<{
     id: string
     entry_id: string
@@ -189,12 +204,14 @@ export default async function ReconSessionPage({
       </div>
 
       <ReconReview
+        periodMonth={session.period_month}
         statementLines={statementLines}
         groups={groups}
         unmatchedBook={unmatchedBook}
         bookInfo={Object.fromEntries(bookInfoById)}
         statementOpening={session.statement_opening != null ? Number(session.statement_opening) : null}
         statementClosing={session.statement_closing != null ? Number(session.statement_closing) : null}
+        glClosing={glClosing}
       />
     </div>
   )

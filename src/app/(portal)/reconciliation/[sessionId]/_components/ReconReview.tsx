@@ -37,19 +37,25 @@ const money = (n: number) => (
 )
 
 export default function ReconReview({
+  periodMonth,
   statementLines,
   groups,
   unmatchedBook,
   bookInfo,
   statementOpening = null,
   statementClosing = null,
+  glClosing = null,
 }: {
+  /** First day of the statement month (YYYY-MM-DD). */
+  periodMonth: string
   statementLines: ReviewStatementLine[]
   groups: ReviewMatchGroup[]
   unmatchedBook: ReviewBookLine[]
   bookInfo: Record<string, ReviewBookLine>
   statementOpening?: number | null
   statementClosing?: number | null
+  /** GL balance on the bank's account code at the statement month-end. */
+  glClosing?: number | null
 }) {
   const router = useRouter()
   // BOTH sides multi-select — N statement lines ↔ M book lines with equal
@@ -66,16 +72,24 @@ export default function ReconReview({
   const ignored = statementLines.filter(l => l.matchKind === 'ignored')
   const openS = statementLines.filter(l => l.matchKind == null)
 
+  // Prior-month buffer rows (in-transit candidates) hide behind a toggle —
+  // once earlier months are settled they are pure noise here (user
+  // 2026-08-08: "三月之前的就可以不用显示了吧").
+  const [showPrior, setShowPrior] = useState(false)
+  const priorBook = unmatchedBook.filter(l => l.date < periodMonth)
+  const monthBook = unmatchedBook.filter(l => l.date >= periodMonth)
+  const visibleBook = showPrior ? unmatchedBook : monthBook
+
   const needleS = qS.trim().toLowerCase()
   const needleB = qB.trim().toLowerCase()
   const filteredS = needleS
     ? openS.filter(l => `${l.description} ${l.amount} ${l.date}`.toLowerCase().includes(needleS))
     : openS
   const filteredB = needleB
-    ? unmatchedBook.filter(l =>
+    ? visibleBook.filter(l =>
         `${l.description} ${l.entryNo} ${l.amount} ${l.date}`.toLowerCase().includes(needleB),
       )
-    : unmatchedBook
+    : visibleBook
 
   const sSelLines = openS.filter(l => selS.has(l.id))
   const sSum = Math.round(sSelLines.reduce((s, l) => s + l.amount, 0) * 100) / 100
@@ -115,15 +129,32 @@ export default function ReconReview({
       {/* ── Summary ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="border border-hairline rounded-md bg-surface p-4">
-          <div className="font-serif italic text-graphite text-sm mb-1">Statement in / out</div>
-          <div className="font-mono tabular text-sm">
-            {money(Math.round(totalIn * 100) / 100)} · {money(Math.round(totalOut * 100) / 100)}
-          </div>
+          <div className="font-serif italic text-graphite text-sm mb-1">Bank vs GL (month-end)</div>
           {statementOpening != null && statementClosing != null ? (
-            <div className="font-mono text-[11px] text-muted mt-1">
-              {formatMoneyBare(statementOpening)} → {formatMoneyBare(statementClosing)}
+            <div className="font-mono text-[12px] tabular">
+              <span className="text-muted">Bank:</span> {formatMoneyBare(statementOpening)} →{' '}
+              <span className="text-ink font-semibold">{formatMoneyBare(statementClosing)}</span>
             </div>
           ) : null}
+          {glClosing != null ? (
+            <div className="font-mono text-[12px] tabular mt-0.5">
+              <span className="text-muted">GL:</span>{' '}
+              <span className="text-ink font-semibold">{formatMoneyBare(glClosing)}</span>
+              {statementClosing != null ? (
+                Math.abs(glClosing - statementClosing) <= 0.005 ? (
+                  <span className="text-ledger ml-2">✓ tie</span>
+                ) : (
+                  <span className="text-danger ml-2">
+                    diff {formatMoneyBare(Math.round((statementClosing - glClosing) * 100) / 100)}
+                  </span>
+                )
+              ) : null}
+            </div>
+          ) : null}
+          <div className="font-mono text-[11px] text-muted mt-1">
+            in {formatMoneyBare(Math.round(totalIn * 100) / 100)} · out{' '}
+            {formatMoneyBare(Math.round(Math.abs(totalOut) * 100) / 100)}
+          </div>
         </div>
         <div className="border border-hairline rounded-md bg-surface p-4">
           <div className="font-serif italic text-graphite text-sm mb-1">Matched</div>
@@ -137,7 +168,10 @@ export default function ReconReview({
         </div>
         <div className="border border-hairline rounded-md bg-surface p-4">
           <div className="font-serif italic text-alert text-sm mb-1">Book unmatched</div>
-          <div className="font-serif text-xl text-num-ink tabular">{unmatchedBook.length}</div>
+          <div className="font-serif text-xl text-num-ink tabular">{monthBook.length}</div>
+          {priorBook.length > 0 ? (
+            <div className="font-mono text-[11px] text-muted mt-1">+{priorBook.length} earlier</div>
+          ) : null}
         </div>
       </div>
 
@@ -259,15 +293,29 @@ export default function ReconReview({
           <div className="border border-info/40 rounded-md overflow-hidden">
             <div className="flex items-center justify-between gap-3 px-3 py-2 bg-info/[0.06]">
               <span className="font-mono text-xs uppercase tracking-wider text-info">
-                Book (GL) — not on statement ({unmatchedBook.length})
+                Book (GL) — not on statement ({monthBook.length})
               </span>
-              <input
-                type="text"
-                value={qB}
-                onChange={e => setQB(e.target.value)}
-                placeholder="Filter…"
-                className="bg-paper border border-hairline rounded px-2 py-1 text-xs text-ink w-48 focus:outline-none focus:border-accent-border"
-              />
+              <span className="flex items-center gap-2">
+                {priorBook.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowPrior(v => !v)}
+                    className={`text-xs font-sans border border-hairline rounded px-2 py-1 transition-colors ${
+                      showPrior ? 'bg-surface-2 text-ink' : 'bg-paper text-muted hover:text-ink'
+                    }`}
+                    title="Prior-month entries in the buffer window — usually settled by their own month's statement"
+                  >
+                    {showPrior ? 'Hide' : 'Show'} earlier items ({priorBook.length})
+                  </button>
+                ) : null}
+                <input
+                  type="text"
+                  value={qB}
+                  onChange={e => setQB(e.target.value)}
+                  placeholder="Filter…"
+                  className="bg-paper border border-hairline rounded px-2 py-1 text-xs text-ink w-48 focus:outline-none focus:border-accent-border"
+                />
+              </span>
             </div>
             <div className="max-h-[440px] overflow-y-auto">
               <table className="w-full text-sm">
@@ -305,7 +353,9 @@ export default function ReconReview({
                   {filteredB.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="py-4 px-3 text-center font-serif italic text-muted">
-                        {unmatchedBook.length === 0 ? 'Every book line is on the statement ✓' : 'No rows match the filter'}
+                        {visibleBook.length === 0
+                          ? 'Every book line is on the statement ✓'
+                          : 'No rows match the filter'}
                       </td>
                     </tr>
                   ) : null}
