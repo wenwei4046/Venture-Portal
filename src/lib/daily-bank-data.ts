@@ -11,9 +11,11 @@
 //   Receipts D = credit vouchers (OR) with payment_date = D per bank
 // Timestamps are anchored to Malaysia time (+08:00, no DST).
 
+import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/paginate'
 import {
+  applyPoolAdjust,
   buildBankDay,
   columnForPool,
   columnForSegment,
@@ -21,6 +23,7 @@ import {
   addAmounts,
   totalsAcrossBanks,
   type BankDay,
+  type DbColumn,
   type PendingItem,
   type ReceiptItem,
   type SegAmounts,
@@ -165,7 +168,7 @@ export async function fetchDailyBank(
       if (srcs.length > 0) {
         for (const s of srcs) addAmounts(amounts, columnForPool(s.pool), s.amount)
       } else {
-        addAmounts(amounts, 'unassigned', Number(v.amount))
+        addAmounts(amounts, 'venture', Number(v.amount))
       }
       const item: PendingItem = {
         voucherNo: v.voucher_no ?? '—',
@@ -206,7 +209,7 @@ export async function fetchDailyBank(
     receiptsByBank.set(r.bank_account_id, list)
   }
 
-  const days = banks.map(b => {
+  let days = banks.map(b => {
     const bucket = byCode.get(b.gl_account_code as string) ?? {
       bf: emptyAmounts(),
       inToday: emptyAmounts(),
@@ -223,6 +226,42 @@ export async function fetchDailyBank(
       receipts: receiptsByBank.get(b.id) ?? [],
     })
   })
+
+  // TODAY only: fold the inter-billing pool-vs-GL gap into the primary bank —
+  // the dept-pool page's own algorithm — so each department column equals the
+  // "By department" cash the user already trusts (user 2026-08-11: 直接拿现有
+  // department 的 cash 当做 opening). Past dates stay GL-only (pool history is
+  // not date-sliced), stated in the legend.
+  if (date === dayjs().format('YYYY-MM-DD')) {
+    const [{ data: balances }, { data: deptRows }] = await Promise.all([
+      supabase.from('dept_pool_balances').select('department_id, balance'),
+      supabase.from('departments').select('id, name, is_internal'),
+    ])
+    const balanceByDept = new Map(
+      ((balances ?? []) as Array<{ department_id: string; balance: number }>).map(b => [
+        b.department_id,
+        Number(b.balance),
+      ]),
+    )
+    const nameToCol: Record<string, DbColumn> = {
+      Director: 'director',
+      'Director Office': 'director_office',
+      Finance: 'finance',
+      HR: 'hr',
+      Marketing: 'marketing',
+    }
+    const targets: Partial<Record<DbColumn, number>> = {}
+    let ventureOverlay = 0
+    for (const d of ((deptRows ?? []) as Array<{ id: string; name: string; is_internal: boolean }>)) {
+      if (d.is_internal && d.name === 'Venture Office') {
+        ventureOverlay = balanceByDept.get(d.id) ?? 0
+        continue
+      }
+      const col = nameToCol[d.name]
+      if (col) targets[col] = balanceByDept.get(d.id) ?? 0
+    }
+    days = applyPoolAdjust(days, targets, ventureOverlay, banks[0]?.id ?? '')
+  }
 
   return { date, banks: days, totals: totalsAcrossBanks(days) }
 }

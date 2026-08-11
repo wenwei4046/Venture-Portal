@@ -167,14 +167,16 @@ export default function DailyBankView({ data, today }: { data: DailyBankData; to
         {view === 'matrix' ? <MatrixView data={data} /> : <BanksView data={data} />}
 
         <p className="font-sans text-[11px] text-muted leading-relaxed px-5 py-3 border border-t-0 border-hairline rounded-b-md">
-          Each department column reads top→bottom: <b>Balance B/F</b> (GL balance up to the day
+          Each department column reads top→bottom: <b>Balance B/F</b> (balance up to the day
           before) → <b>Received today</b> (green) → <b>Pending</b> unpaid items (orange · payee +
-          PV, submitted and awaiting the Principal) → <b>Available balance</b> (green) = current
-          balance − pending. <b>Paid items are already deducted</b> from the balance (not listed
-          separately). <b>Unassigned</b> = anything not tagged to a department (incl.
-          treasury/transfers). The bottom <b>Total available</b> adds up every bank&apos;s
-          available across departments — the cash truly free. Past dates: balances are GL-exact;
-          the pending list is rebuilt from submit/approve timestamps and can be approximate.
+          PV, submitted and awaiting the Principal, deducted from the department set on the PV) →
+          <b>Available balance</b> (green) = current balance − pending. <b>Paid items are already
+          deducted</b> from the balance (not listed separately). <b>Venture</b> covers corporate +
+          treasury (fund in/out) + anything untagged. Today&apos;s columns tie to the Dept Pool
+          page&apos;s per-bank breakdown — the inter-billing gap is folded into the primary bank.
+          The bottom <b>Total available</b> adds up every bank&apos;s available across departments
+          — the cash truly free. Past dates are GL-only (no inter-billing fold-in) with the
+          pending list rebuilt from submit/approve timestamps — both approximate.
         </p>
       </div>
     </div>

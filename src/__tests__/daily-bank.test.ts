@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  applyPoolAdjust,
   buildBankDay,
   columnForPool,
   columnForSegment,
@@ -13,25 +14,25 @@ import {
 const amounts = (patch: Partial<SegAmounts>): SegAmounts => ({ ...emptyAmounts(), ...patch })
 
 describe('column mapping', () => {
-  it('maps JE segments — corporate is Venture, oddballs land in Unassigned', () => {
+  it('maps JE segments — corporate/treasury/untagged all land in Venture (dept-pool page parity)', () => {
     expect(columnForSegment('corporate')).toBe('venture')
+    expect(columnForSegment('treasury')).toBe('venture')
+    expect(columnForSegment('unallocated')).toBe('venture')
+    expect(columnForSegment(null)).toBe('venture')
     expect(columnForSegment('director')).toBe('director')
     expect(columnForSegment('director_office')).toBe('director_office')
     expect(columnForSegment('finance')).toBe('finance')
     expect(columnForSegment('hr')).toBe('hr')
     expect(columnForSegment('marketing')).toBe('marketing')
-    expect(columnForSegment('treasury')).toBe('unassigned')
-    expect(columnForSegment('unallocated')).toBe('unassigned')
-    expect(columnForSegment(null)).toBe('unassigned')
   })
 
-  it('maps PVS pools — both venture pools collapse into Venture', () => {
+  it('maps PVS pools — venture pools and unknowns collapse into Venture', () => {
     expect(columnForPool('venture_pool')).toBe('venture')
     expect(columnForPool('dept_pool_venture_office')).toBe('venture')
+    expect(columnForPool('corporate')).toBe('venture')
+    expect(columnForPool(null)).toBe('venture')
     expect(columnForPool('dept_pool_director')).toBe('director')
     expect(columnForPool('dept_pool_marketing')).toBe('marketing')
-    expect(columnForPool('corporate')).toBe('unassigned')
-    expect(columnForPool(null)).toBe('unassigned')
   })
 })
 
@@ -82,7 +83,7 @@ describe('buildBankDay', () => {
       bankName: 'HL',
       glCode: '3000',
       bf: emptyAmounts(),
-      inToday: amounts({ venture: 500, unassigned: 250 }),
+      inToday: amounts({ venture: 500, hr: 250 }),
       outToday: emptyAmounts(),
       pending: [],
       receipts: [{ voucherNo: 'HV-OR-2', payer: 'HC', description: '', amount: 500 }],
@@ -102,6 +103,63 @@ describe('buildBankDay', () => {
       receipts: [],
     })
     expect(day.current.finance).toBe(0.3)
+  })
+})
+
+describe('applyPoolAdjust', () => {
+  it('folds each dept pool-vs-GL gap and the venture overlay into the primary bank only', () => {
+    const hl = buildBankDay({
+      bankId: 'hl',
+      bankName: 'HL',
+      glCode: '3000',
+      bf: amounts({ hr: 20000, venture: 100000 }),
+      inToday: emptyAmounts(),
+      outToday: emptyAmounts(),
+      pending: [
+        {
+          voucherNo: 'PV-1',
+          payee: 'X',
+          description: '',
+          amounts: amounts({ hr: 1000 }),
+          total: 1000,
+        },
+      ],
+      receipts: [],
+    })
+    const alliance = buildBankDay({
+      bankId: 'al',
+      bankName: 'Alliance',
+      glCode: '3010',
+      bf: amounts({ hr: 300 }),
+      inToday: emptyAmounts(),
+      outToday: emptyAmounts(),
+      pending: [],
+      receipts: [],
+    })
+    // Pool says HR really holds 24,220.27 (GL slice across banks = 20,300)
+    const out = applyPoolAdjust([hl, alliance], { hr: 24220.27 }, 11949.9, 'hl')
+    const outHl = out[0]
+    const outAl = out[1]
+    expect(outHl.current.hr).toBe(23920.27) // 20,000 + gap 3,920.27
+    expect(outHl.bf.hr).toBe(23920.27)
+    expect(outHl.available.hr).toBe(22920.27) // − pending 1,000
+    expect(outHl.current.venture).toBe(111949.9) // + overlay
+    expect(outAl.current.hr).toBe(300) // untouched
+    expect(outHl.current.hr + outAl.current.hr).toBe(24220.27) // ties to pool
+  })
+
+  it('returns banks unchanged when the primary bank id is unknown', () => {
+    const hl = buildBankDay({
+      bankId: 'hl',
+      bankName: 'HL',
+      glCode: '3000',
+      bf: amounts({ finance: 10 }),
+      inToday: emptyAmounts(),
+      outToday: emptyAmounts(),
+      pending: [],
+      receipts: [],
+    })
+    expect(applyPoolAdjust([hl], { finance: 999 }, 0, 'nope')).toEqual([hl])
   })
 })
 
