@@ -1,4 +1,44 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-07-30 · Cash Flow revamp)
+# HOUZS Venture Portal — Session Handoff (checkpoint 2026-08-08 · Bank Recon live)
+
+## ═══ CHECKPOINT 2026-08-08 — read this first ═══
+
+**Where things stand** (everything below is DEPLOYED, tests 520 passing, all
+migrations applied live + archived; detailed sections follow this block):
+
+1. **Bank Reconciliation is the active workstream.** User is mid-recon:
+   April = matched/done, **May = in progress**, June = uploaded EARLY with old
+   auto-match rules → **tell the user to Delete + re-upload June** before
+   working it. Features all live: HLB PDF template (coordinate-based,
+   fail-safe balance tie-out), Excel/CSV any bank, auto-match
+   (amount→name→date), N↔M match groups, book-only CONTRA groups (Σ=0),
+   ignore, earlier-items toggle, Bank-vs-GL month-end tile, no-forward
+   window. **Alliance PDF template PENDING — waiting for the user to send a
+   sample statement.** One-sided "per-bank cleanup" GL lines must NOT be
+   contra'd (they explain Bank-vs-GL diff).
+2. **Approvals pending in-app**: 90,000 loan to CONTS + 4 director-salary PVs
+   (43,135.67) — all now payable from HL (165,214.03 after the same-bank
+   cache-clobber fix, mig 20260807010000). Principal just needs to approve.
+3. **Auto payroll accrual JVs live** (staff → at run approval; director → at
+   HR submit; dated back to payroll month-end). July was backfilled
+   (JE-202607-0386..0390). AUTO JVs are visible + editable on the Journal
+   Entries page (AUTO badge).
+4. **Bank BA registry + calculator live** (/ba): HC's facility, HV owes HC
+   1.5%/mo × days/30, charges sub 2.5%/mo × days/30, bank interest reference
+   only; registry-only, real money via Fund In/Out. User hasn't recorded a
+   real BA yet.
+5. **Company Statement**: scope is fund in/out ONLY (user's explicit choice —
+   never propose adding invoices/GL receivables). English UI everywhere
+   (Reports + Treasury). Exports English-only (react-pdf has no CJK).
+6. **Open tails the user manages**: 欠2990 8,613.75 ↔ HC欠 8,613.75 mirror
+   (53,613.75 triangle, contra'd 2026-08-07); HC 220k deposit → 80k lent +
+   90k pending loan + 50k unallocated; GL4052-vs-module diff ~141.5k
+   (user's legacy items, hands off); dormant HC/4052 + 4070 display items.
+7. **Conventions to remember**: relative bank-cache writes only (never
+   absolute-from-read); ledger-table th needs its own `right` class; PDF
+   exports ASCII-only; alloc_/ba_/bank_recon_ tables = untyped-client casts;
+   staff table is `hr_staff_costs` (no `staff` table); dept staff→segment map
+   HR/Finance/Marketing/Director Office (+director from director_monthly_
+   payroll); 还款 PVs are typed 'expense' with fund_source_id links.
 
 ## Billing Allocator (2026-08-01, port of the user's Apps Script — SHIPPED)
 
