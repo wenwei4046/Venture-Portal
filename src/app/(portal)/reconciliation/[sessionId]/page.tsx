@@ -124,6 +124,7 @@ export default async function ReconSessionPage({
       amount: r2(Number(l.debit ?? 0) - Number(l.credit ?? 0)),
     }))
     .filter(l => l.amount !== 0)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.entryNo.localeCompare(b.entryNo))
 
   // For the matched table we need info on lines matched HERE; for the
   // unmatched book side we exclude anything claimed by ANY session.
