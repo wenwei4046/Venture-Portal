@@ -524,6 +524,121 @@ function LimitsSection({ limits }: { limits: LimitRow[] }) {
   )
 }
 
+// ── Per-company limit cards (user 2026-08-11: "我要类似这样的limit control") ──
+// Glanceable, bank-app style: outstanding vs limit with a % bar, available,
+// weighted avg bank rate, and the soonest maturities. Values to SET live in
+// the Limits table; these cards are the display.
+function LimitCards({ rows, limits }: { rows: BaRow[]; limits: LimitRow[] }) {
+  const cards = useMemo(() => {
+    return limits
+      .filter(l => l.limit > 0 || l.used > 0)
+      .map(l => {
+        const active = rows
+          .filter(r => r.status === 'active' && r.borrowerCompanyId === l.companyId)
+          .sort((a, b) => a.maturityDate.localeCompare(b.maturityDate))
+        const rated = active.filter(r => r.bankAnnualRate > 0)
+        const ratedFace = rated.reduce((s, r) => s + r.faceAmount, 0)
+        const avgRatePa =
+          ratedFace > 0
+            ? rated.reduce((s, r) => s + r.faceAmount * r.bankAnnualRate, 0) / ratedFace
+            : null
+        const pct = l.limit > 0 ? (l.used / l.limit) * 100 : null
+        return {
+          ...l,
+          active,
+          avgRatePa,
+          pct,
+          available: Math.round((l.limit - l.used) * 100) / 100,
+        }
+      })
+  }, [rows, limits])
+
+  if (cards.length === 0) return null
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      {cards.map(c => {
+        const tone =
+          c.pct == null
+            ? '--graphite'
+            : c.pct >= 100
+              ? '--danger'
+              : c.pct >= 70
+                ? '--alert'
+                : '--ledger'
+        return (
+          <div key={c.companyId} className="border border-hairline rounded-md bg-surface p-4">
+            <div className="flex items-baseline justify-between mb-1">
+              <div className="font-serif text-base text-ink">
+                {c.label} <span className="font-serif italic text-muted text-xs">BA limit</span>
+              </div>
+              {c.pct != null ? (
+                <span
+                  className="font-mono text-xs font-semibold"
+                  style={{ color: `rgb(var(${tone}))` }}
+                >
+                  {Math.round(c.pct)}% of limit
+                </span>
+              ) : (
+                <span className="font-serif italic text-muted text-xs">no limit set</span>
+              )}
+            </div>
+            <div className="font-serif text-2xl text-num-ink tabular mb-1">RM {money(c.used)}</div>
+            <div className="font-mono text-[11px] text-muted mb-2">
+              outstanding · limit {c.limit > 0 ? `RM ${money(c.limit)}` : '—'} ·{' '}
+              <span className={c.available < 0 ? 'text-danger font-semibold' : ''}>
+                available {c.limit > 0 ? `RM ${money(c.available)}` : '—'}
+              </span>
+              {c.avgRatePa != null
+                ? ` · avg rate ${parseFloat((c.avgRatePa * 100).toFixed(2))}% p.a.`
+                : ''}
+            </div>
+            {c.pct != null ? (
+              <div className="h-2 rounded-full bg-surface-2 border border-hairline overflow-hidden mb-2">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${Math.min(100, Math.max(2, c.pct))}%`,
+                    backgroundColor: `rgb(var(${tone}))`,
+                  }}
+                />
+              </div>
+            ) : null}
+            {c.active.slice(0, 2).map(r => {
+              const daysLeft = dayjs(r.maturityDate).diff(dayjs(), 'day')
+              return (
+                <div
+                  key={r.id}
+                  className={`font-mono text-[11px] rounded-md px-2 py-1 mt-1 ${
+                    daysLeft < 0 ? 'text-danger' : daysLeft <= 14 ? 'text-alert' : 'text-graphite'
+                  }`}
+                  style={{
+                    backgroundColor: `rgb(var(${
+                      daysLeft < 0 ? '--danger-bg' : daysLeft <= 14 ? '--alert-bg' : '--surface-2'
+                    }))`,
+                  }}
+                >
+                  ⏰ RM {money(r.faceAmount)}
+                  {r.bankName ? ` — ${r.bankName}` : ''}{' '}
+                  {daysLeft < 0
+                    ? `overdue ${-daysLeft}d`
+                    : `matures ${dayjs(r.maturityDate).format('D MMM YYYY')} (${daysLeft}d)`}
+                  {r.baNo ? ` · ${r.baNo}` : ''}
+                </div>
+              )
+            })}
+            {c.active.length > 2 ? (
+              <div className="font-mono text-[11px] text-muted mt-1">
+                +{c.active.length - 2} more active
+              </div>
+            ) : null}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Generate-PV modal (pick bank + date) ────────────────────────────────────
 function PvModal({
   row,
@@ -806,6 +921,8 @@ export default function BaView({
           <div className="font-serif text-xl text-ledger tabular">RM {money(totals.margin)}</div>
         </div>
       </div>
+
+      <LimitCards rows={rows} limits={limits} />
 
       <div className="flex items-center gap-3 mb-4">
         <button
