@@ -74,6 +74,15 @@ partial receipts only ever hang off invoice_id.
  - Debtor Aging (page + export) now reports total − receipts via the shared
    lib/debtor-aging-data.fetchPaidByInvoice, tags rows "part-paid RM X",
    drops fully-covered rows.
+ - **Trigger fix (same day, mig 20260811010000)**: the user's FIRST real
+   partial (HV-OR-202608-0280, RM 6,503.38 of HV-INV-202607-0039's 27,359.20)
+   was correct on money (JE/pool/bank all partial) but the invoice still went
+   'paid' — the old mark_invoice_paid_on_voucher_insert/_paid triggers flip on
+   ANY paid voucher carrying invoice_id, bypassing the app-level skip. Both
+   functions now flip only when Σ non-voided credit receipts ≥ total − 0.005
+   (the AFTER trigger sees its own row), and the data fix put 0039 back to
+   issued (bal 20,855.82). credit_dept_pool_on_invoice_paid keys off
+   reference_type='invoice' so it never double-fired.
 
 ## Daily Bank dashboard (2026-08-11, no migration)
 
