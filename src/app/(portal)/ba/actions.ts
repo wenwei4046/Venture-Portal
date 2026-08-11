@@ -80,6 +80,100 @@ export async function createBa(input: BaInput): Promise<{ error?: string; id?: s
   }
 }
 
+// A BA with a live (non-voided) interest invoice or PV must not be edited or
+// deleted — the generated documents would silently go stale. Void/delete those
+// first, then the row unlocks.
+async function liveInterestDocs(
+  supabase: SupabaseClient,
+  baId: string,
+): Promise<string | null> {
+  const [{ data: inv }, { data: pv }] = await Promise.all([
+    supabase
+      .from('invoices')
+      .select('invoice_no, status')
+      .eq('reference_no', `BA-${baId.slice(0, 8)}`)
+      .neq('status', 'voided')
+      .maybeSingle(),
+    supabase
+      .from('payment_vouchers')
+      .select('voucher_no, status')
+      .eq('reference_type', 'ba_interest')
+      .eq('reference_id', baId)
+      .in('status', ['draft', 'pending_approval', 'approved', 'paid'])
+      .maybeSingle(),
+  ])
+  const bits: string[] = []
+  if (inv) bits.push(`invoice ${inv.invoice_no ?? ''} (${inv.status})`)
+  if (pv) bits.push(`PV ${pv.voucher_no ?? ''} (${pv.status})`)
+  return bits.length > 0 ? bits.join(' + ') : null
+}
+
+export async function updateBa(id: string, input: BaInput): Promise<{ error?: string }> {
+  try {
+    await requireRole(['finance', 'principal'])
+    const supabase = await baClient()
+
+    if (!(input.faceAmount > 0)) return { error: 'Face amount must be greater than 0' }
+    if (!(input.tenorDays > 0)) return { error: 'Tenor (days) must be greater than 0' }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.startDate)) return { error: 'Start date is required' }
+
+    const docs = await liveInterestDocs(supabase, id)
+    if (docs) return { error: `This BA already has ${docs} — void/delete those first, then edit` }
+
+    const { error } = await supabase
+      .from('ba_facilities')
+      .update({
+        ba_no: input.baNo.trim() || null,
+        bank_name: input.bankName.trim() || null,
+        face_amount: input.faceAmount,
+        bank_annual_rate: input.bankAnnualRatePct / 100,
+        start_date: input.startDate,
+        tenor_days: Math.round(input.tenorDays),
+        charge_rate_monthly: input.chargeRatePctMonthly / 100,
+        hc_rate_monthly: input.hcRatePctMonthly / 100,
+        borrower_company_id: input.borrowerCompanyId,
+        borrower_name: input.borrowerName.trim() || null,
+        notes: input.notes.trim() || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+    if (error) return { error: `Update failed: ${error.message}` }
+
+    revalidatePath('/ba')
+    return {}
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Update failed' }
+  }
+}
+
+export async function deleteBa(id: string): Promise<{ error?: string }> {
+  try {
+    await requireRole(['finance', 'principal'])
+    const supabase = await baClient()
+
+    const docs = await liveInterestDocs(supabase, id)
+    if (docs) return { error: `This BA already has ${docs} — void/delete those first, then delete` }
+
+    // Clean the stored documents, then the row (ba_attachments rows cascade).
+    const { data: atts } = await supabase
+      .from('ba_attachments')
+      .select('storage_path')
+      .eq('ba_id', id)
+    const paths = ((atts ?? []) as Array<{ storage_path: string }>).map(a => a.storage_path)
+    if (paths.length > 0) {
+      await supabase.storage.from('payment-attachments').remove(paths).catch(() => {})
+    }
+
+    const { error } = await supabase.from('ba_facilities').delete().eq('id', id)
+    if (error) return { error: `Delete failed: ${error.message}` }
+
+    revalidatePath('/ba')
+    return {}
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Delete failed' }
+  }
+}
+
 export async function setBaStatus(
   id: string,
   status: 'active' | 'settled' | 'cancelled',

@@ -7,6 +7,8 @@ import { formatMoneyBare } from '@/lib/utils'
 import SortableTable from '@/components/SortableTable'
 import {
   createBa,
+  updateBa,
+  deleteBa,
   setBaStatus,
   setBaLimit,
   uploadBaAttachment,
@@ -239,24 +241,42 @@ function CalculatorModal({ open, onClose }: { open: boolean; onClose: () => void
   )
 }
 
-// ── Record form ─────────────────────────────────────────────────────────────
+// ── Record / edit form ──────────────────────────────────────────────────────
+const pct = (rate: number) => String(parseFloat((rate * 100).toFixed(3)))
+
 function RecordForm({
   companies,
   limits,
   autoReadAvailable,
+  editing,
   onDone,
 }: {
   companies: CompanyOption[]
   limits: LimitRow[]
   autoReadAvailable: boolean
+  editing: BaRow | null
   onDone: () => void
 }) {
-  const [f, setF] = useState<CalcFields>(emptyCalc())
-  const [baNo, setBaNo] = useState('')
-  const [bankName, setBankName] = useState('')
-  const [borrowerCompanyId, setBorrowerCompanyId] = useState('')
-  const [borrowerName, setBorrowerName] = useState('')
-  const [notes, setNotes] = useState('')
+  const [f, setF] = useState<CalcFields>(
+    editing
+      ? {
+          face: String(editing.faceAmount),
+          bankRatePct: editing.bankAnnualRate > 0 ? pct(editing.bankAnnualRate) : '',
+          startDate: editing.startDate,
+          endDate: '',
+          days: String(editing.tenorDays),
+          chargePct: pct(editing.chargeRateMonthly),
+          hcPct: pct(editing.hcRateMonthly),
+        }
+      : emptyCalc(),
+  )
+  const [baNo, setBaNo] = useState(editing?.baNo ?? '')
+  const [bankName, setBankName] = useState(editing?.bankName ?? '')
+  const [borrowerCompanyId, setBorrowerCompanyId] = useState(editing?.borrowerCompanyId ?? '')
+  const [borrowerName, setBorrowerName] = useState(
+    editing && !editing.borrowerCompanyId ? editing.borrower : '',
+  )
+  const [notes, setNotes] = useState(editing?.notes ?? '')
   const [file, setFile] = useState<File | null>(null)
   const [readNote, setReadNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -265,16 +285,21 @@ function RecordForm({
   const c = useCalc(f)
 
   // Over-limit check — WARNS only, never blocks (user 2026-08-11: 超了警告但不挡).
+  // When editing an active BA, its own face is already inside `used`.
   const limitWarning = useMemo(() => {
     if (!borrowerCompanyId) return null
     const l = limits.find(x => x.companyId === borrowerCompanyId)
     if (!l || l.limit <= 0) return null
     const face = Number(f.face) || 0
     if (face <= 0) return null
-    const after = l.used + face
+    const own =
+      editing && editing.status === 'active' && editing.borrowerCompanyId === borrowerCompanyId
+        ? editing.faceAmount
+        : 0
+    const after = l.used - own + face
     if (after <= l.limit) return null
-    return `Over limit: ${l.label} has RM ${money(l.used)} active of RM ${money(l.limit)} — this BA takes it to RM ${money(after)}`
-  }, [borrowerCompanyId, f.face, limits])
+    return `Over limit: ${l.label} has RM ${money(l.used - own)} active of RM ${money(l.limit)} — this BA takes it to RM ${money(after)}`
+  }, [borrowerCompanyId, f.face, limits, editing])
 
   const autoRead = () => {
     if (!file) return
@@ -325,15 +350,26 @@ function RecordForm({
       notes,
     }
     startTransition(async () => {
-      const r = await createBa(input)
-      if (r.error) {
-        setError(r.error)
-        return
+      let savedId: string | null = null
+      if (editing) {
+        const r = await updateBa(editing.id, input)
+        if (r.error) {
+          setError(r.error)
+          return
+        }
+        savedId = editing.id
+      } else {
+        const r = await createBa(input)
+        if (r.error) {
+          setError(r.error)
+          return
+        }
+        savedId = r.id ?? null
       }
-      if (file && r.id) {
+      if (file && savedId) {
         const fd = new FormData()
         fd.set('file', file)
-        const up = await uploadBaAttachment(r.id, fd)
+        const up = await uploadBaAttachment(savedId, fd)
         if (up.error) {
           setError(`BA saved, but the document upload failed: ${up.error}`)
           return
@@ -345,7 +381,16 @@ function RecordForm({
 
   return (
     <div className="border border-hairline rounded-md bg-surface p-5 mb-8">
-      <h2 className="font-serif text-lg text-ink mb-4">Record BA</h2>
+      <h2 className="font-serif text-lg text-ink mb-4">
+        {editing ? (
+          <>
+            Editing — {editing.baNo ?? editing.id.slice(0, 8)}{' '}
+            <span className="font-serif italic text-alert text-sm">saving overwrites this BA</span>
+          </>
+        ) : (
+          'Record BA'
+        )}
+      </h2>
 
       {/* ── Bank document: attach + auto-read ── */}
       <div className="border border-hairline rounded-md bg-paper p-3 mb-4 flex flex-wrap items-center gap-3">
@@ -412,7 +457,7 @@ function RecordForm({
             onClick={submit}
             className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50"
           >
-            {isPending ? 'Saving…' : 'Save BA →'}
+            {isPending ? 'Saving…' : editing ? 'Save changes →' : 'Save BA →'}
           </button>
           {error ? <p className="text-xs font-sans text-danger">{error}</p> : null}
           <p className="font-serif italic text-muted text-xs">
@@ -875,9 +920,16 @@ export default function BaView({
   const [showCalc, setShowCalc] = useState(openCalc)
   const [showForm, setShowForm] = useState(false)
   const [showLimits, setShowLimits] = useState(false)
+  const [editing, setEditing] = useState<BaRow | null>(null)
   const [pvRow, setPvRow] = useState<BaRow | null>(null)
   const [banner, setBanner] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  const startEdit = (r: BaRow) => {
+    setEditing(r)
+    setShowForm(true)
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   const active = rows.filter(r => r.status === 'active')
   const totals = active.reduce(
@@ -927,7 +979,15 @@ export default function BaView({
       <div className="flex items-center gap-3 mb-4">
         <button
           type="button"
-          onClick={() => setShowForm(v => !v)}
+          onClick={() => {
+            if (showForm) {
+              setShowForm(false)
+              setEditing(null)
+            } else {
+              setEditing(null)
+              setShowForm(true)
+            }
+          }}
           className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
         >
           {showForm ? 'Close form' : 'Record BA'}
@@ -964,10 +1024,15 @@ export default function BaView({
       {showLimits ? <LimitsSection limits={limits} /> : null}
       {showForm ? (
         <RecordForm
+          key={editing?.id ?? 'new'}
           companies={companies}
           limits={limits}
           autoReadAvailable={autoReadAvailable}
-          onDone={() => setShowForm(false)}
+          editing={editing}
+          onDone={() => {
+            setShowForm(false)
+            setEditing(null)
+          }}
         />
       ) : null}
 
@@ -1106,35 +1171,68 @@ export default function BaView({
                 label: '',
                 sortable: false,
                 align: 'right',
-                render: r =>
-                  r.status === 'active' ? (
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      onClick={() =>
-                        startTransition(async () => {
-                          await setBaStatus(r.id, 'settled')
-                        })
-                      }
-                      className="text-xs text-accent hover:text-accent-hover font-serif italic disabled:opacity-50"
-                      title="Mark settled once collected from the borrower and repaid to HC — releases the limit"
-                    >
-                      Mark settled
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      onClick={() =>
-                        startTransition(async () => {
-                          await setBaStatus(r.id, 'active')
-                        })
-                      }
-                      className="text-xs text-muted hover:text-ink font-serif italic disabled:opacity-50"
-                    >
-                      Reopen
-                    </button>
-                  ),
+                render: r => (
+                  <div className="flex flex-col items-end gap-0.5">
+                    {r.status === 'active' ? (
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() =>
+                          startTransition(async () => {
+                            await setBaStatus(r.id, 'settled')
+                          })
+                        }
+                        className="text-xs text-accent hover:text-accent-hover font-serif italic disabled:opacity-50"
+                        title="Mark settled once collected from the borrower and repaid to HC — releases the limit"
+                      >
+                        Mark settled
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() =>
+                          startTransition(async () => {
+                            await setBaStatus(r.id, 'active')
+                          })
+                        }
+                        className="text-xs text-muted hover:text-ink font-serif italic disabled:opacity-50"
+                      >
+                        Reopen
+                      </button>
+                    )}
+                    <span className="inline-flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => startEdit(r)}
+                        title={
+                          r.interestInvoice || r.interestPv
+                            ? 'Void/delete the generated invoice/PV first, then edit'
+                            : 'Load this BA into the form to correct it'
+                        }
+                        className="text-xs text-muted hover:text-accent font-serif italic disabled:opacity-50"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => {
+                          if (!confirm(`Delete BA ${r.baNo ?? r.id.slice(0, 8)}? Its filed documents are removed too.`)) return
+                          startTransition(async () => {
+                            const res = await deleteBa(r.id)
+                            if (res.error) alert(res.error)
+                          })
+                        }}
+                        title="Delete this BA (blocked while a generated invoice/PV exists)"
+                        className="text-xs text-muted hover:text-danger font-serif italic disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    </span>
+                  </div>
+                ),
               },
             ]}
           />
