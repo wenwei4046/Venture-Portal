@@ -574,6 +574,7 @@ function LimitsSection({ limits }: { limits: LimitRow[] }) {
 // weighted avg bank rate, and the soonest maturities. Values to SET live in
 // the Limits table; these cards are the display.
 function LimitCards({ rows, limits }: { rows: BaRow[]; limits: LimitRow[] }) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const cards = useMemo(() => {
     return limits
       .filter(l => l.limit > 0 || l.used > 0)
@@ -649,7 +650,7 @@ function LimitCards({ rows, limits }: { rows: BaRow[]; limits: LimitRow[] }) {
                 />
               </div>
             ) : null}
-            {c.active.slice(0, 2).map(r => {
+            {(expanded[c.companyId] ? c.active : c.active.slice(0, 2)).map(r => {
               const daysLeft = dayjs(r.maturityDate).diff(dayjs(), 'day')
               return (
                 <div
@@ -673,9 +674,15 @@ function LimitCards({ rows, limits }: { rows: BaRow[]; limits: LimitRow[] }) {
               )
             })}
             {c.active.length > 2 ? (
-              <div className="font-mono text-[11px] text-muted mt-1">
-                +{c.active.length - 2} more active
-              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setExpanded(prev => ({ ...prev, [c.companyId]: !prev[c.companyId] }))
+                }
+                className="font-mono text-[11px] text-accent hover:text-accent-hover mt-1"
+              >
+                {expanded[c.companyId] ? 'Show less ↑' : `+${c.active.length - 2} more active ↓`}
+              </button>
             ) : null}
           </div>
         )
