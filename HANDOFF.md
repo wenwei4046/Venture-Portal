@@ -72,6 +72,11 @@ that warn but never block.
  - **Limits** (ba_limits, company_id UNIQUE): used = Σ active BA face,
    settled releases; over-limit shows a red warning on the Record form and a ⚠
    in the Limits table but SAVING IS NEVER BLOCKED (user's explicit choice).
+   **Limit CARDS** (same day, user showed a bank-app screenshot): per-company
+   glanceable card above the list — outstanding vs limit %-bar (green <70 /
+   amber 70-99 / red ≥100), available, face-weighted avg bank rate p.a., two
+   soonest maturities with ⏰ day countdowns. Cards = display; Limits table =
+   where values are set. Freetext-borrower BAs count toward no card.
  - **Attachments** (ba_attachments): reuses the payment-attachments bucket
    under `ba/<ba_id>/` (no new storage policies); chips on the Ref column,
    signed-URL open, upload on save or later, delete with confirm.
