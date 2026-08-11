@@ -44,6 +44,37 @@ migrations applied live + archived; detailed sections follow this block):
    HR/Finance/Marketing/Director Office (+director from director_monthly_
    payroll); 还款 PVs are typed 'expense' with fund_source_id links.
 
+## Daily Bank dashboard (2026-08-11, no migration)
+
+User showed screenshots of their OTHER system's daily board and wants the same
+here (scope pinned by AskUserQuestion: BOTH views · pending = pending_approval
+only, NOT draft · any-date lookback · PNG + PDF export). New /daily-bank
+(sidebar Fund In / Out, first item; finance+principal).
+
+ - **Two views, one dark-banner capture area**: BANK × DEPARTMENT matrix
+   (bank rows × Venture/Director/Director Office/Finance/HR/Marketing/
+   Unassigned columns) and a simpler By-bank list (PAY TO | PV | DESC |
+   RECEIVED | PENDING). Per bank: Balance B/F → Received today (green,
+   itemised by OR vouchers + "Other (JV/transfer)" remainder) → Pending
+   orange rows (payee + PV no + desc + badge) → Available (green tint) =
+   current − pending; grand Total available row.
+ - **Column mapping** (lib/daily-bank.ts, pure, 6 tests): JE segment
+   corporate→Venture, treasury/unallocated/NULL→Unassigned, others→own
+   column; PVS pool venture_pool + dept_pool_venture_office→Venture,
+   dept_pool_*→own column; mirror rows excluded; PV with no PVS rows →
+   Unassigned at full amount.
+ - **Numbers are GL-true** (not the bank cache): B/F = Σ lines < D,
+   in/out = D's debits/credits by segment, all through fetchAllRows.
+   current = bf + in − out; available = current − pending.
+ - **Any-date lookback**: ‹ date › + Today + date input (?date= param).
+   Historical pending is rebuilt from approval_requests timestamps
+   (created_at ≤ D end-of-day MYT +08:00, approved_at missing-or-later;
+   rejected/voided disappearance ≈ updated_at) — legend states it's
+   approximate; today's list is exact.
+ - **Exports**: Get image (clipboard PNG via html-to-image, new dep — paste
+   into WhatsApp), PNG download (pixelRatio 2), PDF (/daily-bank/export?date=,
+   landscape, English). Legend footer mirrors the other system's wording.
+
 ## BA v2 — the interest is real (2026-08-11, mig 20260811000000_ba_v2)
 
 User corrected the v1 model: "不会真实过银行，但是那些算的利息我是真的要去 bill

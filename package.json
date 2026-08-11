@@ -24,6 +24,7 @@
     "@types/bcryptjs": "^2.4.6",
     "bcryptjs": "^3.0.3",
     "dayjs": "^1.11.13",
+    "html-to-image": "^1.11.13",
     "next": "^15.0.0",
     "nextjs-toploader": "^3.9.17",
     "pdf2json": "^3.1.5",
