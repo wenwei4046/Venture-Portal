@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import { formatMoneyBare } from '@/lib/utils'
-import { manualMatch, setLineIgnored, unmatchLine } from '../../actions'
+import { contraBookLines, dissolveGroup, manualMatch, setLineIgnored, unmatchLine } from '../../actions'
 
 export interface ReviewStatementLine {
   id: string
@@ -37,19 +37,24 @@ const money = (n: number) => (
 )
 
 export default function ReconReview({
+  sessionId,
   periodMonth,
   statementLines,
   groups,
+  contraGroups,
   unmatchedBook,
   bookInfo,
   statementOpening = null,
   statementClosing = null,
   glClosing = null,
 }: {
+  sessionId: string
   /** First day of the statement month (YYYY-MM-DD). */
   periodMonth: string
   statementLines: ReviewStatementLine[]
   groups: ReviewMatchGroup[]
+  /** Book-only Dr/Cr sets that never hit the bank (Σ = 0). */
+  contraGroups: Array<{ id: string; journalLineIds: string[] }>
   unmatchedBook: ReviewBookLine[]
   bookInfo: Record<string, ReviewBookLine>
   statementOpening?: number | null
@@ -214,6 +219,17 @@ export default function ReconReview({
               >
                 {isPending ? 'Working…' : `Match ${sSelLines.length || '…'} ↔ ${bSelLines.length || '…'} →`}
               </button>
+              {sSelLines.length === 0 && bSelLines.length >= 2 ? (
+                <button
+                  type="button"
+                  disabled={Math.abs(bSum) > 0.005 || isPending}
+                  onClick={() => run(() => contraBookLines(sessionId, bSelLines.map(l => l.id)))}
+                  className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-40"
+                  title="Book-only Dr/Cr that never hit the bank — selection must sum to 0.00"
+                >
+                  Mark contra (Σ=0) →
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -466,6 +482,49 @@ export default function ReconReview({
           </div>
         )}
       </section>
+
+      {/* ── Contra — book Dr/Cr with no bank movement ── */}
+      {contraGroups.length > 0 ? (
+        <section className="mb-10">
+          <h2 className="font-serif text-xl text-ink mb-2">
+            Contra — no bank movement ({contraGroups.length})
+          </h2>
+          <div className="space-y-2 max-w-4xl">
+            {contraGroups.map(g => {
+              const books = g.journalLineIds.map(id => bookInfo[id]).filter(Boolean)
+              return (
+                <div
+                  key={g.id}
+                  className="flex items-start justify-between gap-4 border border-hairline rounded-md bg-surface px-3 py-2"
+                >
+                  <div className="space-y-0.5">
+                    {books.map(b => (
+                      <div key={b.id} className="text-sm">
+                        <span className="font-mono text-[11px] text-graphite mr-2">
+                          {dayjs(b.date).format('D MMM')}
+                        </span>
+                        <span className="font-mono text-[11px] text-muted mr-2">{b.entryNo}</span>
+                        <span className="font-serif text-graphite">{b.description}</span>
+                        <span className="font-mono text-[11px] text-ink ml-2">
+                          {formatMoneyBare(b.amount)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => run(() => dissolveGroup(g.id))}
+                    className="font-serif italic text-xs text-muted hover:text-danger shrink-0"
+                  >
+                    Dissolve
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      ) : null}
 
       {/* ── Ignored ── */}
       {ignored.length > 0 ? (

@@ -44,13 +44,28 @@ export default async function ReconSessionPage({
   if (!bank?.gl_account_code) notFound()
 
   const lineIds = ((lines ?? []) as Array<{ id: string }>).map(l => l.id)
-  const { data: matchRows } =
+  const [{ data: matchRows }, { data: contraRows }] = await Promise.all([
     lineIds.length > 0
-      ? await supabase
+      ? supabase
           .from('bank_recon_matches')
           .select('statement_line_id, journal_line_id, match_group')
           .in('statement_line_id', lineIds)
-      : { data: [] }
+      : Promise.resolve({ data: [] }),
+    supabase
+      .from('bank_recon_matches')
+      .select('journal_line_id, match_group')
+      .eq('session_id', sessionId)
+      .is('statement_line_id', null),
+  ])
+  // Book-only contra groups (Dr/Cr pairs that never hit the bank).
+  const contraMap = new Map<string, string[]>()
+  for (const c of (contraRows ?? []) as Array<{ journal_line_id: string | null; match_group: string }>) {
+    if (!c.journal_line_id) continue
+    const list = contraMap.get(c.match_group) ?? []
+    list.push(c.journal_line_id)
+    contraMap.set(c.match_group, list)
+  }
+  const contraGroups = [...contraMap.entries()].map(([id, journalLineIds]) => ({ id, journalLineIds }))
   // Groups: N statement lines ↔ M journal lines with equal totals.
   const groupMap = new Map<string, { statementLineIds: Set<string>; journalLineIds: string[] }>()
   for (const m of (matchRows ?? []) as Array<{
@@ -102,7 +117,10 @@ export default async function ReconSessionPage({
       .map(c => c.journal_line_id)
       .filter(Boolean),
   )
-  const matchedHere = new Set(groups.flatMap(g => g.journalLineIds))
+  const matchedHere = new Set([
+    ...groups.flatMap(g => g.journalLineIds),
+    ...contraGroups.flatMap(g => g.journalLineIds),
+  ])
 
   // GL balance on this bank code at month-end — shown next to the statement
   // closing so 银行数 vs GL 数 read apart at a glance (user 2026-08-08).
@@ -204,9 +222,11 @@ export default async function ReconSessionPage({
       </div>
 
       <ReconReview
+        sessionId={sessionId}
         periodMonth={session.period_month}
         statementLines={statementLines}
         groups={groups}
+        contraGroups={contraGroups}
         unmatchedBook={unmatchedBook}
         bookInfo={Object.fromEntries(bookInfoById)}
         statementOpening={session.statement_opening != null ? Number(session.statement_opening) : null}

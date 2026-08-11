@@ -302,6 +302,81 @@ export async function manualMatch(
   return {}
 }
 
+/** Mark a set of BOOK lines as contra — Dr/Cr that never hit the bank (e.g.
+ *  a fund-in and its pass-through loan-out booked through the bank code with
+ *  no real transaction). The selection must sum to ZERO. */
+export async function contraBookLines(
+  sessionId: string,
+  journalLineIds: string[],
+): Promise<{ error?: string }> {
+  await requireRole(['finance', 'principal'])
+  const supabase = await reconClient()
+
+  const jIds = Array.from(new Set(journalLineIds.filter(Boolean)))
+  if (jIds.length < 2) return { error: 'Pick at least two book lines that cancel out' }
+
+  const [{ data: jls }, { data: claimed }] = await Promise.all([
+    supabase.from('journal_lines').select('id, debit, credit').in('id', jIds),
+    supabase.from('bank_recon_matches').select('journal_line_id').in('journal_line_id', jIds),
+  ])
+  if ((jls ?? []).length !== jIds.length) return { error: 'Some journal lines were not found' }
+  if ((claimed ?? []).length > 0) return { error: 'Some of those lines are already matched/contra elsewhere' }
+  const sum = r2(
+    (jls ?? []).reduce(
+      (s: number, jl: { debit: number | null; credit: number | null }) =>
+        s + Number(jl.debit ?? 0) - Number(jl.credit ?? 0),
+      0,
+    ),
+  )
+  if (Math.abs(sum) > 0.005) {
+    return { error: `Contra selection must sum to 0.00 — currently ${sum.toFixed(2)}` }
+  }
+
+  const groupId = crypto.randomUUID()
+  const { error } = await supabase.from('bank_recon_matches').insert(
+    jIds.map(id => ({
+      statement_line_id: null,
+      journal_line_id: id,
+      match_group: groupId,
+      session_id: sessionId,
+    })),
+  )
+  if (error) return { error: error.message }
+  revalidatePath('/reconciliation')
+  return {}
+}
+
+/** Dissolve a whole match/contra group by its group id. */
+export async function dissolveGroup(groupId: string): Promise<{ error?: string }> {
+  await requireRole(['finance', 'principal'])
+  const supabase = await reconClient()
+  const { data: members } = await supabase
+    .from('bank_recon_matches')
+    .select('statement_line_id')
+    .eq('match_group', groupId)
+  const memberIds = Array.from(
+    new Set(
+      ((members ?? []) as Array<{ statement_line_id: string | null }>)
+        .map(m => m.statement_line_id)
+        .filter(Boolean) as string[],
+    ),
+  )
+  const { error: delErr } = await supabase
+    .from('bank_recon_matches')
+    .delete()
+    .eq('match_group', groupId)
+  if (delErr) return { error: delErr.message }
+  if (memberIds.length > 0) {
+    const { error } = await supabase
+      .from('bank_recon_lines')
+      .update({ match_kind: null })
+      .in('id', memberIds)
+    if (error) return { error: error.message }
+  }
+  revalidatePath('/reconciliation')
+  return {}
+}
+
 /** Unmatch the WHOLE group containing this statement line. */
 export async function unmatchLine(lineId: string): Promise<{ error?: string }> {
   await requireRole(['finance', 'principal'])

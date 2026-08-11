@@ -72,6 +72,23 @@ Rental (percentage, 11,000, Rental, preset CAR 100%), Others (percentage, 0,
 Others). Categories: Rental / Utilities / Upkeep of Office / Others (no COA
 codes yet — lines fall back to 5000 at issue until the user maps them).
 
+## Bank recon round 4 — contra + polish (2026-08-08, mig 20260808030000)
+
+ - **Contra groups** (user: "我会做transaction，但是其实银行没过账，他会debit
+   contra credit" — e.g. fund-in +98k & pass-through loan-out −98k, per-bank
+   cleanup entries): select ≥2 book lines with NO statement selection, if they
+   Σ to 0.00 → "Mark contra (Σ=0)". Rows get statement_line_id NULL +
+   session_id (both columns via mig); shown in a Contra section, Dissolve
+   undoes. contraBookLines/dissolveGroup actions.
+ - Prior-month buffer rows hide behind "Show earlier items (n)" (user: "三月
+   之前的就可以不用显示了吧") — settled months make them noise; toggle keeps
+   cross-month matching possible.
+ - Summary tile relabelled **Bank vs GL (month-end)**: Bank opening→closing
+   vs GL balance at month-end with ✓ tie / diff readout (user asked which
+   number is bank vs GL).
+ - NOTE: one-sided "per-bank cleanup" lines that DON'T net to zero within a
+   bank are real GL-vs-bank explanation items — leave visible, don't contra.
+
 ## Bank recon round 3 — N↔M groups (2026-08-08, mig 20260808020000)
 
 User hit the reverse case ("bank statement 可能是两笔加起来等于gl 的", real
