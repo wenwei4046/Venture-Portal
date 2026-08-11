@@ -7,6 +7,8 @@ import { notFound } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/paginate'
+import { windowStart } from '@/lib/recon-report'
 import ReconReview, { type ReviewBookLine, type ReviewStatementLine } from './_components/ReconReview'
 
 export const dynamic = 'force-dynamic'
@@ -98,22 +100,41 @@ export default async function ReconSessionPage({
     matchKind: l.match_kind,
   }))
 
-  // Book lines in the statement window on this bank's GL code — backward
-  // buffer only; future-month entries never belong to this statement.
-  const from = dayjs(session.period_month).subtract(10, 'day').format('YYYY-MM-DD')
+  // Book lines on this bank's GL code: −10d buffer, extended back to the
+  // bank's FIRST recon month so earlier months' unpresented lines stay
+  // matchable (user 2026-08-11: June must show May's in-transit items — the
+  // 20 May BIG MATRIX pair sat outside the old 10-day buffer). Anything
+  // before the recon era stays out (旧系统已对完); future-month entries never
+  // belong to this statement.
+  const { data: firstSess } = await supabase
+    .from('bank_recon_sessions')
+    .select('period_month')
+    .eq('bank_account_id', session.bank_account_id)
+    .order('period_month', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  const from = windowStart(session.period_month, firstSess?.period_month ?? null)
   const to = dayjs(session.period_month).endOf('month').format('YYYY-MM-DD')
-  const [{ data: bookRaw }, { data: claimedRows }] = await Promise.all([
-    supabase
-      .from('journal_lines')
-      .select('id, entry_id, debit, credit, description, journal_entries!inner(entry_no, transaction_date, description, is_reversed)')
-      .eq('account_code', bank.gl_account_code)
-      .gte('journal_entries.transaction_date', from)
-      .lte('journal_entries.transaction_date', to)
-      .eq('journal_entries.is_reversed', false),
-    supabase.from('bank_recon_matches').select('journal_line_id'),
+  // Paged reads — PostgREST silently caps unranged selects at 1000 rows, and
+  // both of these grow without bound (Trial Balance regression class).
+  const [bookRaw, claimedRows] = await Promise.all([
+    fetchAllRows((lo, hi) =>
+      supabase
+        .from('journal_lines')
+        .select('id, entry_id, debit, credit, description, journal_entries!inner(entry_no, transaction_date, description, is_reversed)')
+        .eq('account_code', bank.gl_account_code)
+        .gte('journal_entries.transaction_date', from)
+        .lte('journal_entries.transaction_date', to)
+        .eq('journal_entries.is_reversed', false)
+        .order('id')
+        .range(lo, hi),
+    ),
+    fetchAllRows((lo, hi) =>
+      supabase.from('bank_recon_matches').select('journal_line_id').order('id').range(lo, hi),
+    ),
   ])
   const claimed = new Set(
-    ((claimedRows ?? []) as Array<{ journal_line_id: string | null }>)
+    (claimedRows as Array<{ journal_line_id: string | null }>)
       .map(c => c.journal_line_id)
       .filter(Boolean),
   )
@@ -124,20 +145,24 @@ export default async function ReconSessionPage({
 
   // GL balance on this bank code at month-end — shown next to the statement
   // closing so 银行数 vs GL 数 read apart at a glance (user 2026-08-08).
-  const { data: glAll } = await supabase
-    .from('journal_lines')
-    .select('debit, credit, journal_entries!inner(transaction_date, is_reversed)')
-    .eq('account_code', bank.gl_account_code)
-    .lte('journal_entries.transaction_date', to)
-    .eq('journal_entries.is_reversed', false)
+  const glAll = await fetchAllRows((lo, hi) =>
+    supabase
+      .from('journal_lines')
+      .select('debit, credit, journal_entries!inner(transaction_date, is_reversed)')
+      .eq('account_code', bank.gl_account_code)
+      .lte('journal_entries.transaction_date', to)
+      .eq('journal_entries.is_reversed', false)
+      .order('id')
+      .range(lo, hi),
+  )
   const glClosing = r2(
-    ((glAll ?? []) as unknown as Array<{ debit: number | null; credit: number | null }>).reduce(
+    (glAll as unknown as Array<{ debit: number | null; credit: number | null }>).reduce(
       (s, l) => s + Number(l.debit ?? 0) - Number(l.credit ?? 0),
       0,
     ),
   )
 
-  const bookRows = (bookRaw ?? []) as unknown as Array<{
+  const bookRows = bookRaw as unknown as Array<{
     id: string
     entry_id: string
     debit: number | null
@@ -219,6 +244,12 @@ export default async function ReconSessionPage({
             equal to match; name and date guide the pairing.
           </p>
         </div>
+        <Link
+          href={`/reconciliation/${sessionId}/report`}
+          className="text-sm text-accent hover:text-accent-hover font-serif italic"
+        >
+          Reconciliation Report →
+        </Link>
       </div>
 
       <ReconReview

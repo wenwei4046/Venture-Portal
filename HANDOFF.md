@@ -5,10 +5,11 @@
 **Where things stand** (everything below is DEPLOYED, tests 520 passing, all
 migrations applied live + archived; detailed sections follow this block):
 
-1. **Bank Reconciliation is the active workstream.** User is mid-recon:
-   April = matched/done, **May = in progress**, June = uploaded EARLY with old
-   auto-match rules → **tell the user to Delete + re-upload June** before
-   working it. Features all live: HLB PDF template (coordinate-based,
+1. **Bank Reconciliation is the active workstream.** (updated 2026-08-11)
+   April + May = done (May ties: 81,019.05 − 1,910.90 outstanding = GL
+   79,108.15). June = re-uploaded, 58/60 matched — the last 2 statement lines
+   are the 20-May BIG MATRIX payments, matchable since the window fix (round
+   5 below). Features all live: HLB PDF template (coordinate-based,
    fail-safe balance tie-out), Excel/CSV any bank, auto-match
    (amount→name→date), N↔M match groups, book-only CONTRA groups (Σ=0),
    ignore, earlier-items toggle, Bank-vs-GL month-end tile, no-forward
@@ -39,6 +40,40 @@ migrations applied live + archived; detailed sections follow this block):
    staff table is `hr_staff_costs` (no `staff` table); dept staff→segment map
    HR/Finance/Marketing/Director Office (+director from director_monthly_
    payroll); 还款 PVs are typed 'expense' with fund_source_id links.
+
+## Bank recon round 5 — Reconciliation Report + cross-month carry-forward (2026-08-11)
+
+User (May done): "我要对完了后我要reconciliation report… 我做6月时，我看没有5月
+还没recon的transaction". Spec: docs/superpowers/specs/2026-08-11-recon-report-
+carryforward-design.md. NO DB migration — display/report layer only.
+
+ - **Carry-forward window fix**: session-page book window start is now
+   `windowStart()` = min(month −10d, bank's FIRST recon-session month). June
+   reaches back to Apr 1, so the 20-May BIG MATRIX lines (−430.43/−1,067.30/
+   −413.17, cleared by bank 1 Jun as −843.60 + −1,067.30) finally appear.
+   Pre-baseline (pre-Apr) legacy NEVER enters — user 2026-08-11: "四月之前的…
+   旧系统已对完，不想再对了" (~35 unclaimed Feb/Mar lines stay out). First
+   session of a bank keeps the −10d buffer. ReconReview `showPrior` now
+   defaults TRUE (earlier items are only genuine in-transit candidates now).
+ - **Reconciliation Report** per session: /reconciliation/[id]/report +
+   Export Excel/PDF (?format=) via lib/export/*, links on the review page and
+   the index rows. Classic statement: bank closing + outstanding book items −
+   statement items not in books = GL at month-end, ✓/✗ tie badge, item lists
+   (Date | Entry | Description | Amount). English-only incl. PDF. User chose:
+   NO matched-pair detail anywhere ("都不要"); contra groups excluded (Σ=0
+   can't move the maths). Works on OPEN sessions too.
+ - **Maths (lib/recon-report.ts, pure, 12 tests)**: identity verified live to
+   the sen for Apr (45,890.89 = GL, zero items), May and open June
+   (16,933.98 − 7,198.37 + 1,910.90 = 11,646.51). Baseline absorbs pre-era
+   history — proven: Apr statement opening 26,422.51 == Σ pre-Apr unclaimed
+   exactly. **As-at rule**: a book line claimed by a session whose month > the
+   report month stays on that report forever (after the user matches BIG
+   MATRIX inside June, May's report still shows them outstanding — finished
+   months never drift). Data layer lib/recon-report-data.ts is shared by the
+   page and both exports.
+ - **Pagination hardening**: the session page's three unranged reads (book
+   window, claimed matches, GL-closing sum) + all report reads now go through
+   fetchAllRows — same 1000-row-cap class as the 2026-06-16 Trial Balance bug.
 
 ## Billing Allocator (2026-08-01, port of the user's Apps Script — SHIPPED)
 

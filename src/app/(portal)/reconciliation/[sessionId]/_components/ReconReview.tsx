@@ -77,10 +77,11 @@ export default function ReconReview({
   const ignored = statementLines.filter(l => l.matchKind === 'ignored')
   const openS = statementLines.filter(l => l.matchKind == null)
 
-  // Prior-month buffer rows (in-transit candidates) hide behind a toggle —
-  // once earlier months are settled they are pure noise here (user
-  // 2026-08-08: "三月之前的就可以不用显示了吧").
-  const [showPrior, setShowPrior] = useState(false)
+  // Prior-month rows: the window reaches only back to the bank's first recon
+  // month (pre-era legacy is excluded at the query — user 2026-08-11: "四月
+  // 之前的…旧系统已对完"), so whatever lands here is a genuine in-transit
+  // candidate — visible by default, Hide stays available.
+  const [showPrior, setShowPrior] = useState(true)
   const priorBook = unmatchedBook.filter(l => l.date < periodMonth)
   const monthBook = unmatchedBook.filter(l => l.date >= periodMonth)
   const visibleBook = showPrior ? unmatchedBook : monthBook

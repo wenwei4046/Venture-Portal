@@ -190,6 +190,12 @@ export default async function ReconciliationPage() {
                         >
                           Open →
                         </Link>
+                        <Link
+                          href={`/reconciliation/${s.id}/report`}
+                          className="text-sm text-accent hover:text-accent-hover font-serif italic mr-3"
+                        >
+                          Report
+                        </Link>
                         <SessionRowActions sessionId={s.id} status={s.status as 'open' | 'done'} />
                       </td>
                     </tr>
