@@ -1,11 +1,22 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useRef, useState, useTransition } from 'react'
 import dayjs from 'dayjs'
 import { calcBa, daysBetween } from '@/lib/ba'
 import { formatMoneyBare } from '@/lib/utils'
 import SortableTable from '@/components/SortableTable'
-import { createBa, setBaStatus, type BaInput } from '../actions'
+import {
+  createBa,
+  setBaStatus,
+  setBaLimit,
+  uploadBaAttachment,
+  getBaAttachmentUrl,
+  deleteBaAttachment,
+  extractBaFromDocument,
+  generateBaInvoice,
+  generateBaPv,
+  type BaInput,
+} from '../actions'
 
 export interface BaRow {
   id: string
@@ -19,13 +30,29 @@ export interface BaRow {
   chargeRateMonthly: number
   hcRateMonthly: number
   borrower: string
+  borrowerCompanyId: string | null
   status: 'active' | 'settled' | 'cancelled'
   notes: string | null
+  interestInvoice: { no: string | null; status: string } | null
+  interestPv: { no: string | null; status: string } | null
+  attachments: Array<{ id: string; name: string }>
 }
 
 export interface CompanyOption {
   id: string
   label: string
+}
+
+export interface BankOption {
+  id: string
+  label: string
+}
+
+export interface LimitRow {
+  companyId: string
+  label: string
+  limit: number
+  used: number
 }
 
 const money = (n: number) => formatMoneyBare(n)
@@ -215,9 +242,13 @@ function CalculatorModal({ open, onClose }: { open: boolean; onClose: () => void
 // ── Record form ─────────────────────────────────────────────────────────────
 function RecordForm({
   companies,
+  limits,
+  autoReadAvailable,
   onDone,
 }: {
   companies: CompanyOption[]
+  limits: LimitRow[]
+  autoReadAvailable: boolean
   onDone: () => void
 }) {
   const [f, setF] = useState<CalcFields>(emptyCalc())
@@ -226,9 +257,57 @@ function RecordForm({
   const [borrowerCompanyId, setBorrowerCompanyId] = useState('')
   const [borrowerName, setBorrowerName] = useState('')
   const [notes, setNotes] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [readNote, setReadNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [isReading, startReading] = useTransition()
   const c = useCalc(f)
+
+  // Over-limit check — WARNS only, never blocks (user 2026-08-11: 超了警告但不挡).
+  const limitWarning = useMemo(() => {
+    if (!borrowerCompanyId) return null
+    const l = limits.find(x => x.companyId === borrowerCompanyId)
+    if (!l || l.limit <= 0) return null
+    const face = Number(f.face) || 0
+    if (face <= 0) return null
+    const after = l.used + face
+    if (after <= l.limit) return null
+    return `Over limit: ${l.label} has RM ${money(l.used)} active of RM ${money(l.limit)} — this BA takes it to RM ${money(after)}`
+  }, [borrowerCompanyId, f.face, limits])
+
+  const autoRead = () => {
+    if (!file) return
+    setError(null)
+    setReadNote(null)
+    const fd = new FormData()
+    fd.set('file', file)
+    startReading(async () => {
+      const r = await extractBaFromDocument(fd)
+      if (r.error) {
+        setError(r.error)
+        return
+      }
+      const x = r.fields
+      if (!x) return
+      // Prefill ONLY what the reader saw — the user reviews before saving
+      // (user: "我会检查对不对才储存开invoice").
+      if (x.baNo) setBaNo(x.baNo)
+      if (x.bankName) setBankName(x.bankName)
+      if (x.borrowerName) setBorrowerName(x.borrowerName)
+      setF(prev => ({
+        ...prev,
+        face: x.faceAmount != null ? String(x.faceAmount) : prev.face,
+        bankRatePct: x.bankAnnualRatePct != null ? String(x.bankAnnualRatePct) : prev.bankRatePct,
+        startDate: x.startDate ?? prev.startDate,
+        endDate: x.maturityDate ?? prev.endDate,
+        days: x.maturityDate ? prev.days : x.tenorDays != null ? String(x.tenorDays) : prev.days,
+      }))
+      setReadNote(
+        `Read ✓ — check every field before saving${x.remarks ? ` · reader notes: ${x.remarks}` : ''}`,
+      )
+    })
+  }
 
   const submit = () => {
     setError(null)
@@ -247,14 +326,54 @@ function RecordForm({
     }
     startTransition(async () => {
       const r = await createBa(input)
-      if (r.error) setError(r.error)
-      else onDone()
+      if (r.error) {
+        setError(r.error)
+        return
+      }
+      if (file && r.id) {
+        const fd = new FormData()
+        fd.set('file', file)
+        const up = await uploadBaAttachment(r.id, fd)
+        if (up.error) {
+          setError(`BA saved, but the document upload failed: ${up.error}`)
+          return
+        }
+      }
+      onDone()
     })
   }
 
   return (
     <div className="border border-hairline rounded-md bg-surface p-5 mb-8">
       <h2 className="font-serif text-lg text-ink mb-4">Record BA</h2>
+
+      {/* ── Bank document: attach + auto-read ── */}
+      <div className="border border-hairline rounded-md bg-paper p-3 mb-4 flex flex-wrap items-center gap-3">
+        <input
+          type="file"
+          accept="application/pdf,image/png,image/jpeg,image/webp,image/gif"
+          onChange={e => setFile(e.target.files?.[0] ?? null)}
+          className="text-xs font-sans text-graphite"
+        />
+        <button
+          type="button"
+          disabled={!file || isReading}
+          onClick={autoRead}
+          title={
+            autoReadAvailable
+              ? 'Read the BA document and prefill the fields — you review before saving'
+              : 'Needs ANTHROPIC_API_KEY in the environment'
+          }
+          className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-xs px-3 py-1.5 rounded-md transition-colors disabled:opacity-50"
+        >
+          {isReading ? 'Reading…' : 'Auto-read →'}
+        </button>
+        <span className="font-serif italic text-muted text-xs">
+          PDF or photo of the bank&apos;s BA advice — filed with the record on save.
+        </span>
+        {readNote ? <span className="font-sans text-xs text-ledger">{readNote}</span> : null}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -284,6 +403,11 @@ function RecordForm({
         </div>
         <div className="space-y-3">
           <CalcResults c={c} />
+          {limitWarning ? (
+            <p className="text-xs font-sans text-danger border border-danger/40 rounded-md px-3 py-2">
+              ⚠ {limitWarning} — saving is still allowed.
+            </p>
+          ) : null}
           <button
             type="button"
             disabled={isPending || !(Number(f.face) > 0) || c.days <= 0}
@@ -294,11 +418,327 @@ function RecordForm({
           </button>
           {error ? <p className="text-xs font-sans text-danger">{error}</p> : null}
           <p className="font-serif italic text-muted text-xs">
-            Registry only — record the actual cash as a Fund In (owe HC) and a Fund Out
-            (loan to the borrower) as usual.
+            Registry + interest only — the principal never moves through HV&apos;s bank. Bill the
+            borrower / pay HC from the row after saving.
           </p>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Limits section ──────────────────────────────────────────────────────────
+function LimitsSection({ limits }: { limits: LimitRow[] }) {
+  const [open, setOpen] = useState(false)
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [msg, setMsg] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  const withLimitOrUse = limits.filter(l => l.limit > 0 || l.used > 0)
+  const shown = open ? limits : withLimitOrUse
+
+  const save = (companyId: string) => {
+    const v = Number(drafts[companyId])
+    if (Number.isNaN(v) || v < 0) {
+      setMsg('Limit must be a number ≥ 0')
+      return
+    }
+    setMsg(null)
+    startTransition(async () => {
+      const r = await setBaLimit(companyId, v)
+      setMsg(r.error ? r.error : 'Saved ✓')
+    })
+  }
+
+  return (
+    <div className="border border-hairline rounded-md bg-surface p-5 mb-8">
+      <div className="flex items-baseline justify-between mb-3">
+        <h2 className="font-serif text-lg text-ink">
+          Limits <span className="font-serif italic text-muted text-sm">per borrower — active face counts, settled releases; over-limit warns but never blocks</span>
+        </h2>
+        <button
+          type="button"
+          onClick={() => setOpen(v => !v)}
+          className="text-xs text-accent hover:text-accent-hover font-serif italic"
+        >
+          {open ? 'Show set only' : `Show all companies (${limits.length})`}
+        </button>
+      </div>
+      {shown.length === 0 ? (
+        <p className="font-serif italic text-muted text-sm">
+          No limits set yet — Show all companies and give each borrower a limit.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="ledger-table">
+            <thead>
+              <tr>
+                <th>Company</th>
+                <th className="num">Limit</th>
+                <th className="num">Active (used)</th>
+                <th className="num">Available</th>
+                <th className="right">Set</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map(l => {
+                const available = Math.round((l.limit - l.used) * 100) / 100
+                const over = l.limit > 0 && l.used > l.limit
+                return (
+                  <tr key={l.companyId}>
+                    <td className="font-serif text-[15px] text-ink">{l.label}</td>
+                    <td className="num">{l.limit > 0 ? money(l.limit) : '—'}</td>
+                    <td className={`num ${over ? 'text-danger font-semibold' : ''}`}>
+                      {money(l.used)}
+                      {over ? ' ⚠' : ''}
+                    </td>
+                    <td className={`num ${available < 0 ? 'text-danger' : 'text-ledger'}`}>
+                      {l.limit > 0 ? money(available) : '—'}
+                    </td>
+                    <td className="text-right whitespace-nowrap">
+                      <input
+                        type="text"
+                        placeholder={l.limit > 0 ? String(l.limit) : '0'}
+                        value={drafts[l.companyId] ?? ''}
+                        onChange={e =>
+                          setDrafts(prev => ({ ...prev, [l.companyId]: e.target.value }))
+                        }
+                        className="w-28 px-2 py-1 bg-paper border border-hairline rounded-md text-xs font-mono tabular text-ink text-right focus:outline-none focus:border-accent-border mr-2"
+                      />
+                      <button
+                        type="button"
+                        disabled={isPending || !(drafts[l.companyId] ?? '').trim()}
+                        onClick={() => save(l.companyId)}
+                        className="text-xs text-accent hover:text-accent-hover font-serif italic disabled:opacity-50"
+                      >
+                        Save
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {msg ? <p className="text-xs font-sans text-graphite mt-2">{msg}</p> : null}
+    </div>
+  )
+}
+
+// ── Generate-PV modal (pick bank + date) ────────────────────────────────────
+function PvModal({
+  row,
+  banks,
+  onClose,
+  onDone,
+}: {
+  row: BaRow
+  banks: BankOption[]
+  onClose: () => void
+  onDone: (msg: string) => void
+}) {
+  const [bankId, setBankId] = useState(banks[0]?.id ?? '')
+  const [date, setDate] = useState(row.maturityDate)
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+  const owe = calcBa({
+    face: row.faceAmount,
+    bankAnnualRate: row.bankAnnualRate,
+    days: row.tenorDays,
+    chargeRateMonthly: row.chargeRateMonthly,
+    hcRateMonthly: row.hcRateMonthly,
+  }).oweToHc
+
+  const go = () => {
+    setError(null)
+    startTransition(async () => {
+      const r = await generateBaPv(row.id, bankId, date)
+      if (r.error) setError(r.error)
+      else onDone(`PV ${r.voucherNo ?? ''} created as draft — submit it for approval in Payments`)
+    })
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-ink/40 flex items-start justify-center pt-24 px-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-paper border border-hairline rounded-md shadow-lg max-w-md w-full p-6"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-baseline justify-between mb-4">
+          <h2 className="font-serif text-xl text-ink">Pay HC — BA {row.baNo ?? row.id.slice(0, 8)}</h2>
+          <button type="button" onClick={onClose} className="text-muted hover:text-ink text-sm font-sans">
+            ✕
+          </button>
+        </div>
+        <div className="space-y-3">
+          <p className="font-mono text-sm text-alert">
+            Interest to HOUZS Century: RM {money(owe)}
+            <span className="text-muted text-xs"> · 6001 Interest Expense - BA · venture pool</span>
+          </p>
+          <label className="block">
+            <span className="block text-xs font-sans text-graphite mb-1">Pay from bank</span>
+            <select
+              value={bankId}
+              onChange={e => setBankId(e.target.value)}
+              className="w-full px-3 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+            >
+              {banks.map(b => (
+                <option key={b.id} value={b.id}>
+                  {b.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <CalcInput label="Payment date" type="date" value={date} onChange={setDate} />
+          <button
+            type="button"
+            disabled={isPending || !bankId}
+            onClick={go}
+            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50"
+          >
+            {isPending ? 'Creating…' : 'Create PV (draft) →'}
+          </button>
+          {error ? <p className="text-xs font-sans text-danger">{error}</p> : null}
+          <p className="font-serif italic text-muted text-xs">
+            Goes through the normal flow: draft → submit → Principal approves → paid.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Attachment chips (open via signed URL, add, remove) ─────────────────────
+function AttachmentChips({ row }: { row: BaRow }) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [isPending, startTransition] = useTransition()
+
+  const open = (attachmentId: string) => {
+    startTransition(async () => {
+      const r = await getBaAttachmentUrl(attachmentId)
+      if (r.url) window.open(r.url, '_blank', 'noopener')
+      else if (r.error) alert(r.error)
+    })
+  }
+  const upload = (f: File | null) => {
+    if (!f) return
+    const fd = new FormData()
+    fd.set('file', f)
+    startTransition(async () => {
+      const r = await uploadBaAttachment(row.id, fd)
+      if (r.error) alert(r.error)
+    })
+  }
+  const remove = (attachmentId: string) => {
+    if (!confirm('Remove this document from the BA?')) return
+    startTransition(async () => {
+      const r = await deleteBaAttachment(attachmentId)
+      if (r.error) alert(r.error)
+    })
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 flex-wrap">
+      {row.attachments.map(a => (
+        <span key={a.id} className="inline-flex items-center">
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => open(a.id)}
+            title={a.name}
+            className="text-[11px] font-mono text-accent hover:text-accent-hover disabled:opacity-50"
+          >
+            📎{a.name.length > 14 ? `${a.name.slice(0, 12)}…` : a.name}
+          </button>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => remove(a.id)}
+            title="Remove document"
+            className="text-[10px] text-muted hover:text-danger ml-0.5 disabled:opacity-50"
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      <button
+        type="button"
+        disabled={isPending}
+        onClick={() => fileRef.current?.click()}
+        title="Attach the bank's BA document"
+        className="text-[11px] text-muted hover:text-accent disabled:opacity-50"
+      >
+        {row.attachments.length === 0 ? '📎+' : '+'}
+      </button>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/pdf,image/png,image/jpeg,image/webp,image/gif"
+        className="hidden"
+        onChange={e => {
+          upload(e.target.files?.[0] ?? null)
+          e.target.value = ''
+        }}
+      />
+    </span>
+  )
+}
+
+// ── Interest cell: invoice + PV status / generate buttons ───────────────────
+function InterestCell({
+  row,
+  onPv,
+  onMsg,
+}: {
+  row: BaRow
+  onPv: () => void
+  onMsg: (m: string) => void
+}) {
+  const [isPending, startTransition] = useTransition()
+
+  const invoice = () => {
+    startTransition(async () => {
+      const r = await generateBaInvoice(row.id)
+      if (r.error) onMsg(r.error)
+      else onMsg(`Invoice ${r.invoiceNo ?? ''} created as draft — review & issue it in Statements`)
+    })
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      {row.interestInvoice ? (
+        <span className="font-mono text-[11px] text-ledger" title={`Invoice status: ${row.interestInvoice.status}`}>
+          ✓ {row.interestInvoice.no ?? 'invoice'} · {row.interestInvoice.status}
+        </span>
+      ) : (
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={invoice}
+          title="Draft an invoice to the borrower for the 2.5% line (5028 Interest Income - BA)"
+          className="text-[11px] text-accent hover:text-accent-hover font-serif italic disabled:opacity-50"
+        >
+          {isPending ? '…' : 'Bill borrower →'}
+        </button>
+      )}
+      {row.interestPv ? (
+        <span className="font-mono text-[11px] text-alert" title={`PV status: ${row.interestPv.status}`}>
+          ✓ {row.interestPv.no ?? 'PV'} · {row.interestPv.status}
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={onPv}
+          title="Draft a PV to HOUZS Century for the 1.5% line (6001 Interest Expense - BA)"
+          className="text-[11px] text-accent hover:text-accent-hover font-serif italic"
+        >
+          Pay HC →
+        </button>
+      )}
     </div>
   )
 }
@@ -307,14 +747,23 @@ function RecordForm({
 export default function BaView({
   rows,
   companies,
+  banks,
+  limits,
+  autoReadAvailable,
   openCalc,
 }: {
   rows: BaRow[]
   companies: CompanyOption[]
+  banks: BankOption[]
+  limits: LimitRow[]
+  autoReadAvailable: boolean
   openCalc: boolean
 }) {
   const [showCalc, setShowCalc] = useState(openCalc)
   const [showForm, setShowForm] = useState(false)
+  const [showLimits, setShowLimits] = useState(false)
+  const [pvRow, setPvRow] = useState<BaRow | null>(null)
+  const [banner, setBanner] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const active = rows.filter(r => r.status === 'active')
@@ -375,9 +824,37 @@ export default function BaView({
         >
           Calculator
         </button>
+        <button
+          type="button"
+          onClick={() => setShowLimits(v => !v)}
+          className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+        >
+          {showLimits ? 'Hide limits' : 'Limits'}
+        </button>
       </div>
 
-      {showForm ? <RecordForm companies={companies} onDone={() => setShowForm(false)} /> : null}
+      {banner ? (
+        <div className="border border-hairline rounded-md bg-surface px-4 py-2 mb-4 flex items-center justify-between">
+          <span className="font-sans text-sm text-graphite">{banner}</span>
+          <button
+            type="button"
+            onClick={() => setBanner(null)}
+            className="text-muted hover:text-ink text-xs font-sans ml-4"
+          >
+            ✕
+          </button>
+        </div>
+      ) : null}
+
+      {showLimits ? <LimitsSection limits={limits} /> : null}
+      {showForm ? (
+        <RecordForm
+          companies={companies}
+          limits={limits}
+          autoReadAvailable={autoReadAvailable}
+          onDone={() => setShowForm(false)}
+        />
+      ) : null}
 
       {/* ── List ── */}
       {rows.length === 0 ? (
@@ -400,6 +877,7 @@ export default function BaView({
                   <div>
                     <div className="font-mono text-[12px] text-ink">{r.baNo ?? '—'}</div>
                     <div className="font-serif italic text-muted text-xs">{r.bankName ?? ''}</div>
+                    <AttachmentChips row={r} />
                   </div>
                 ),
                 sortValue: r => r.baNo ?? '',
@@ -467,21 +945,13 @@ export default function BaView({
                 cellClassName: 'font-mono tabular text-alert',
               },
               {
-                key: 'margin',
-                label: 'Margin',
+                key: 'interest',
+                label: 'Interest billing',
                 align: 'right',
-                render: r =>
-                  money(
-                    calcBa({
-                      face: r.faceAmount,
-                      bankAnnualRate: r.bankAnnualRate,
-                      days: r.tenorDays,
-                      chargeRateMonthly: r.chargeRateMonthly,
-                      hcRateMonthly: r.hcRateMonthly,
-                    }).margin,
-                  ),
-                sortValue: r => r.faceAmount * (r.chargeRateMonthly - r.hcRateMonthly) * r.tenorDays,
-                cellClassName: 'font-mono tabular font-semibold',
+                sortable: false,
+                render: r => (
+                  <InterestCell row={r} onPv={() => setPvRow(r)} onMsg={m => setBanner(m)} />
+                ),
               },
               {
                 key: 'status',
@@ -532,7 +1002,7 @@ export default function BaView({
                         })
                       }
                       className="text-xs text-accent hover:text-accent-hover font-serif italic disabled:opacity-50"
-                      title="Mark settled once collected from the borrower and repaid to HC"
+                      title="Mark settled once collected from the borrower and repaid to HC — releases the limit"
                     >
                       Mark settled
                     </button>
@@ -557,6 +1027,17 @@ export default function BaView({
       )}
 
       <CalculatorModal open={showCalc} onClose={() => setShowCalc(false)} />
+      {pvRow ? (
+        <PvModal
+          row={pvRow}
+          banks={banks}
+          onClose={() => setPvRow(null)}
+          onDone={m => {
+            setPvRow(null)
+            setBanner(m)
+          }}
+        />
+      ) : null}
     </div>
   )
 }

@@ -25,8 +25,11 @@ migrations applied live + archived; detailed sections follow this block):
    Entries page (AUTO badge).
 4. **Bank BA registry + calculator live** (/ba): HC's facility, HV owes HC
    1.5%/mo × days/30, charges sub 2.5%/mo × days/30, bank interest reference
-   only; registry-only, real money via Fund In/Out. User hasn't recorded a
-   real BA yet.
+   only. **v2 (2026-08-11): principal never touches HV's bank, but the
+   INTEREST is real** — Bill borrower → invoice (5028), Pay HC → PV (6001),
+   per-company limits (warn-only), BA-document attachments + Claude auto-read
+   (needs ANTHROPIC_API_KEY). See the BA v2 section below. User hasn't
+   recorded a real BA yet.
 5. **Company Statement**: scope is fund in/out ONLY (user's explicit choice —
    never propose adding invoices/GL receivables). English UI everywhere
    (Reports + Treasury). Exports English-only (react-pdf has no CJK).
@@ -40,6 +43,47 @@ migrations applied live + archived; detailed sections follow this block):
    staff table is `hr_staff_costs` (no `staff` table); dept staff→segment map
    HR/Finance/Marketing/Director Office (+director from director_monthly_
    payroll); 还款 PVs are typed 'expense' with fund_source_id links.
+
+## BA v2 — the interest is real (2026-08-11, mig 20260811000000_ba_v2)
+
+User corrected the v1 model: "不会真实过银行，但是那些算的利息我是真的要去 bill
+和真的要给回houzs的" — the BA PRINCIPAL never moves through HV's books/bank
+(no Fund In/Out for it), but the interest legs are real money. Scope pinned by
+AskUserQuestion: attachment-style upload + auto-read; one-click invoice with a
+DEDICATED income account; PV at maturity for the HC side; per-company limits
+that warn but never block.
+
+ - **COA**: 5028 Interest Income - BA (user: "account我要分成ba interest
+   income") + 6001 Interest Expense - BA (my symmetric addition, accepted) —
+   BA margin reads straight off the P&L as 5028 − 6001.
+ - **Bill borrower →** (per row): generateBaInvoice → the EXACT
+   createMultiLineInvoice path (same as allocator/manual), billableType
+   subsidiary (or freetext when only a name), billingMode venture_attribution,
+   reference_no `BA-<id8>` (dedupe key — refuse while a non-voided invoice
+   carries it), one line on 5028, amount = face × charge%/mo × days/30. Draft
+   → normal /statements review → issue.
+ - **Pay HC →** (per row): generateBaPv builds a FormData and calls the REAL
+   createPaymentVoucher (numbering, PVS row, approval queue): expense/debit,
+   payee = companies short_code 'HC', amount = face × hc%/mo × days/30, one
+   venture_pool source row on 6001, reference_type='ba_interest' +
+   reference_id=ba id (dedupe), payment_date defaults to maturity, bank picked
+   in a small modal. Draft → submit → approve as usual. NEXT_REDIRECT from the
+   voucher path is swallowed as success.
+ - **Limits** (ba_limits, company_id UNIQUE): used = Σ active BA face,
+   settled releases; over-limit shows a red warning on the Record form and a ⚠
+   in the Limits table but SAVING IS NEVER BLOCKED (user's explicit choice).
+ - **Attachments** (ba_attachments): reuses the payment-attachments bucket
+   under `ba/<ba_id>/` (no new storage policies); chips on the Ref column,
+   signed-URL open, upload on save or later, delete with confirm.
+ - **Auto-read**: extractBaFromDocument sends the PDF/photo to Claude
+   (`claude-opus-5`, structured output json_schema, @anthropic-ai/sdk new dep)
+   and PREFILLS the Record form — nothing saves until the user reviews (user:
+   "我会检查对不对才储存开invoice"). Needs **ANTHROPIC_API_KEY** in Vercel env
+   + .env.local; without it the button returns a setup hint and everything
+   else works. Refusal/parse failures degrade to manual entry.
+ - Conventions: ba_* tables stay on the untyped-client cast; extraction
+   validates dates/size/type server-side; BA ref for humans = ba_no, for
+   machines = `BA-<id8>` (ba_no is optional and not unique).
 
 ## Bank recon round 5 — Reconciliation Report + cross-month carry-forward (2026-08-11)
 
