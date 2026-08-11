@@ -13,6 +13,7 @@ import GenerateInvoicesButton from './GenerateInvoicesButton'
 import MarketingProjectList from './MarketingProjectList'
 import NonBillableList from './NonBillableList'
 import InvoicesList from './InvoicesList'
+import { fetchPaidByInvoice } from '@/lib/debtor-aging-data'
 import CreateInvoiceButton from './CreateInvoiceButton'
 import CreateMultiLineInvoiceButton from './CreateMultiLineInvoiceButton'
 import GenerateConsolidatedInvoicesButton from './GenerateConsolidatedInvoicesButton'
@@ -161,6 +162,15 @@ export default async function BillingView({ searchParams }: Props) {
 
   const invoiceList = invoices ?? []
   const invoiceTotal = invoiceList.reduce((acc, i) => acc + Number(i.total_amount), 0)
+
+  // Partial payments: Σ receipts per issued invoice so the list can show
+  // part-paid badges and the settle modal collects the REMAINING balance.
+  const issuedIds = invoiceList.filter((i) => i.status === 'issued').map((i) => i.id as string)
+  const paidMap = await fetchPaidByInvoice(supabase as unknown as Parameters<typeof fetchPaidByInvoice>[0], issuedIds)
+  const paidByInvoice: Record<string, number> = {}
+  for (const [id, paid] of paidMap) {
+    if (paid > 0) paidByInvoice[id] = paid
+  }
 
   // Per-mode invoice sums (shown in the cost cards).
   const marketingTotal = invoiceList
@@ -618,7 +628,7 @@ export default async function BillingView({ searchParams }: Props) {
         </section>
       )}
 
-      <InvoicesList invoices={invoiceList} companyMap={companyMap} departmentMap={departmentMap} period={period} categories={categoryList} bankAccounts={bankList} invoiceLines={linesByInvoice} />
+      <InvoicesList invoices={invoiceList} companyMap={companyMap} departmentMap={departmentMap} period={period} categories={categoryList} bankAccounts={bankList} invoiceLines={linesByInvoice} paidByInvoice={paidByInvoice} />
 
       <MarketingProjectList
         contracts={(marketingContracts ?? [])

@@ -8,6 +8,9 @@ export interface SettleableInvoice {
   company_id: string | null
   billable_to_freetext_name: string | null
   total_amount: number | string
+  /** Σ non-voided receipts already recorded against this invoice (partial
+   *  payments, user 2026-08-11). Omitted/0 = untouched invoice. */
+  paid_to_date?: number | string
 }
 
 /** Stable key identifying the payer. Subsidiary invoices key off company_id;
@@ -18,12 +21,28 @@ export function payeeKey(inv: SettleableInvoice): string {
 }
 
 export type ConsolidationCheck =
-  | { ok: true; payeeKey: string; total: number }
+  | {
+      ok: true
+      payeeKey: string
+      /** What this receipt collects: Σ remaining balances, or the partial amount. */
+      total: number
+      /** id → outstanding balance BEFORE this receipt (total − paid_to_date). */
+      remainingById: Record<string, number>
+      /** true when a partialAmount below the single invoice's balance was given —
+       *  the invoice stays open (issued) after this receipt. */
+      isPartial: boolean
+    }
   | { ok: false; error: string }
 
 /** A consolidated receipt may only cover issued, non-inter-billing invoices
- *  of a SINGLE payer. Returns the shared payee key + rounded total on success. */
-export function validateConsolidation(invoices: SettleableInvoice[]): ConsolidationCheck {
+ *  of a SINGLE payer. Collects each invoice's REMAINING balance (total −
+ *  paid_to_date); a `partialAmount` is allowed only when exactly ONE invoice
+ *  is selected and must be within its balance — below it, the receipt is a
+ *  part-payment and the invoice stays open. */
+export function validateConsolidation(
+  invoices: SettleableInvoice[],
+  opts?: { partialAmount?: number },
+): ConsolidationCheck {
   if (invoices.length === 0) return { ok: false, error: 'No invoices selected' }
   for (const i of invoices) {
     if (i.status !== 'issued') {
@@ -42,14 +61,44 @@ export function validateConsolidation(invoices: SettleableInvoice[]): Consolidat
   }
   // Sum in integer cents to avoid floating-point drift, then convert back.
   let totalCents = 0
+  const remainingById: Record<string, number> = {}
   for (const i of invoices) {
     const cents = Math.round(Number(i.total_amount) * 100)
     if (Number.isNaN(cents)) {
       return { ok: false, error: `Invoice ${i.id} has an invalid total_amount` }
     }
-    totalCents += cents
+    const paidCents = Math.round(Number(i.paid_to_date ?? 0) * 100)
+    if (Number.isNaN(paidCents)) {
+      return { ok: false, error: `Invoice ${i.id} has an invalid paid_to_date` }
+    }
+    const remainingCents = cents - paidCents
+    if (remainingCents <= 0) {
+      return { ok: false, error: `Invoice ${i.id} is already fully collected` }
+    }
+    remainingById[i.id] = remainingCents / 100
+    totalCents += remainingCents
   }
-  return { ok: true, payeeKey: [...keys][0], total: totalCents / 100 }
+
+  let isPartial = false
+  if (opts?.partialAmount != null) {
+    if (invoices.length !== 1) {
+      return { ok: false, error: 'A partial amount only works with a single invoice selected' }
+    }
+    const partialCents = Math.round(Number(opts.partialAmount) * 100)
+    if (Number.isNaN(partialCents) || partialCents <= 0) {
+      return { ok: false, error: 'Amount received must be greater than 0' }
+    }
+    if (partialCents > totalCents) {
+      return {
+        ok: false,
+        error: `Amount received exceeds the invoice balance (RM ${(totalCents / 100).toFixed(2)})`,
+      }
+    }
+    isPartial = partialCents < totalCents
+    totalCents = partialCents
+  }
+
+  return { ok: true, payeeKey: [...keys][0], total: totalCents / 100, remainingById, isPartial }
 }
 
 export interface AttributableInvoice {

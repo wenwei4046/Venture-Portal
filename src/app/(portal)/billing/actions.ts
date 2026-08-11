@@ -1073,7 +1073,11 @@ export async function settleInvoicesConsolidated(payload: {
   invoiceIds: string[]
   bankAccountId: string
   paymentDate: string // YYYY-MM-DD
-}): Promise<{ voucherId: string; voucherNo: string; settledCount: number; total: number }> {
+  /** Partial payment (user 2026-08-11): allowed only when ONE invoice is
+   *  selected. Below the balance → the invoice stays issued and further
+   *  receipts are accepted until it is fully collected. */
+  partialAmount?: number
+}): Promise<{ voucherId: string; voucherNo: string; settledCount: number; total: number; isPartial: boolean }> {
   const user = await requireRole(['finance', 'principal'])
   const supabase = await createClient()
 
@@ -1099,7 +1103,21 @@ export async function settleInvoicesConsolidated(payload: {
     .in('id', payload.invoiceIds)
   if (!invoices || invoices.length === 0) throw new Error('No invoices found')
 
-  // Same-company + issued + non-dept_pool validation (pure helper)
+  // Prior receipts per invoice (partial payments) — an issued invoice's
+  // balance is total − Σ non-voided credit vouchers linked via invoice_id.
+  const { data: priorRows } = await supabase
+    .from('payment_vouchers')
+    .select('invoice_id, amount')
+    .in('invoice_id', invoices.map((i) => i.id))
+    .eq('direction', 'credit')
+    .neq('status', 'voided')
+  const paidById = new Map<string, number>()
+  for (const r of priorRows ?? []) {
+    if (!r.invoice_id) continue
+    paidById.set(r.invoice_id, (paidById.get(r.invoice_id) ?? 0) + Number(r.amount))
+  }
+
+  // Same-company + issued + non-dept_pool + balance validation (pure helper)
   const check = validateConsolidation(
     invoices.map((i) => ({
       id: i.id,
@@ -1108,10 +1126,19 @@ export async function settleInvoicesConsolidated(payload: {
       company_id: i.company_id,
       billable_to_freetext_name: i.billable_to_freetext_name,
       total_amount: i.total_amount,
+      paid_to_date: paidById.get(i.id) ?? 0,
     })),
+    { partialAmount: payload.partialAmount },
   )
   if (!check.ok) throw new Error(check.error)
+  if (check.isPartial && invoices[0].billing_mode === 'payroll_consolidated') {
+    throw new Error('Consolidated payroll invoices must be settled in full')
+  }
   const total = check.total
+  // What this receipt collects per invoice: the partial amount, else the
+  // remaining balance (which equals total_amount for untouched invoices).
+  const collectFor = (invoiceId: string): number =>
+    check.isPartial ? check.total : check.remainingById[invoiceId]
 
   // Payee label
   const companyId = invoices[0].company_id
@@ -1135,10 +1162,14 @@ export async function settleInvoicesConsolidated(payload: {
 
   const nowIso = new Date().toISOString()
   const invoiceNos = invoices.map((i) => i.invoice_no ?? i.id.slice(0, 8)).join(', ')
-  const description = `Settle ${invoices.length} invoice(s) — ${payeeName} (${invoiceNos})`
+  const description = check.isPartial
+    ? `Partial payment — ${payeeName} (${invoiceNos}): RM ${total.toFixed(2)} of RM ${check.remainingById[invoices[0].id].toFixed(2)} balance`
+    : `Settle ${invoices.length} invoice(s) — ${payeeName} (${invoiceNos})`
 
-  // ONE Official Receipt voucher for the whole group (invoice_id NULL —
-  // the link lives on invoices.settlement_voucher_id, written below).
+  // ONE Official Receipt voucher for the whole group. Full settle: invoice_id
+  // NULL, link via invoices.settlement_voucher_id below. PARTIAL: link via
+  // invoice_id so the balance maths (Σ receipts per invoice) can find it, and
+  // the invoice deliberately keeps status 'issued'.
   const { data: pv, error: pvErr } = await supabase
     .from('payment_vouchers')
     .insert({
@@ -1152,7 +1183,7 @@ export async function settleInvoicesConsolidated(payload: {
       payee_name: payeeName,
       payee_company_id: companyId,
       bank_account_id: payload.bankAccountId,
-      invoice_id: null,
+      invoice_id: check.isPartial ? invoices[0].id : null,
       description,
       payment_method: 'bank_transfer',
       created_by: user.id,
@@ -1214,8 +1245,10 @@ export async function settleInvoicesConsolidated(payload: {
         invoiceNo: `${invNo} (${g.segment})`,
       }))
     }
+    // Partial payments: attribute what THIS receipt collects (the partial /
+    // remaining balance), never the printed invoice total.
     return poolAttributions(
-      [{ id: i.id, invoice_no: i.invoice_no, billing_mode: i.billing_mode, total_amount: i.total_amount }],
+      [{ id: i.id, invoice_no: i.invoice_no, billing_mode: i.billing_mode, total_amount: collectFor(i.id) }],
       INVOICE_BILLING_MODE_TO_POOL,
     )
   })
@@ -1244,7 +1277,7 @@ export async function settleInvoicesConsolidated(payload: {
       }
     } else {
       const seg = segmentForBillingMode(inv.billing_mode)
-      bySegment.set(seg, Math.round(((bySegment.get(seg) ?? 0) + Number(inv.total_amount)) * 100) / 100)
+      bySegment.set(seg, Math.round(((bySegment.get(seg) ?? 0) + collectFor(inv.id)) * 100) / 100)
     }
   }
   for (const [seg, segAmount] of bySegment) {
@@ -1272,24 +1305,28 @@ export async function settleInvoicesConsolidated(payload: {
   }
 
   // Mark every invoice paid + link to this voucher (race-guarded on issued).
+  // PARTIAL receipts skip this on purpose — the invoice stays 'issued' with a
+  // reduced balance until receipts cover the full total.
   // NOTE: the credit_dept_pool_on_invoice_paid trigger does NOT fire here — it
   // keys off payment_vouchers.reference_type='invoice' + reference_id, which a
   // consolidated voucher (invoice_id NULL, many invoices) deliberately leaves
   // unset. Dept-pool attribution is handled by the per-invoice adjustPool loop
   // above instead.
-  const { error: updErr } = await supabase
-    .from('invoices')
-    .update({ status: 'paid', settlement_voucher_id: pv.id } as never)
-    .in('id', invoices.map((i) => i.id))
-    .eq('status', 'issued')
-  if (updErr) throw new Error(`invoice status update failed: ${updErr.message}`)
+  if (!check.isPartial) {
+    const { error: updErr } = await supabase
+      .from('invoices')
+      .update({ status: 'paid', settlement_voucher_id: pv.id } as never)
+      .in('id', invoices.map((i) => i.id))
+      .eq('status', 'issued')
+    if (updErr) throw new Error(`invoice status update failed: ${updErr.message}`)
+  }
 
   revalidatePath('/billing')
   revalidatePath('/statements')
   revalidatePath('/payments')
   revalidatePath('/dashboard')
 
-  return { voucherId: pv.id, voucherNo, settledCount: invoices.length, total }
+  return { voucherId: pv.id, voucherNo, settledCount: invoices.length, total, isPartial: check.isPartial }
 }
 
 // ─── Approve / Issue Invoice (Finance — draft → issued) ────────────────────

@@ -48,7 +48,74 @@ describe('validateConsolidation', () => {
       inv({ id: 'a', company_id: 'c1', total_amount: 100.005 }),
       inv({ id: 'b', company_id: 'c1', total_amount: 50.1 }),
     ])
-    expect(r).toEqual({ ok: true, payeeKey: 'company:c1', total: 150.11 })
+    expect(r).toEqual({
+      ok: true,
+      payeeKey: 'company:c1',
+      total: 150.11,
+      remainingById: { a: 100.01, b: 50.1 },
+      isPartial: false,
+    })
+  })
+
+  it('collects the REMAINING balance when receipts already exist (partial payments)', () => {
+    const r = validateConsolidation([
+      inv({ id: 'a', total_amount: 100, paid_to_date: 30 }),
+      inv({ id: 'b', total_amount: 50 }),
+    ])
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.total).toBe(120)
+      expect(r.remainingById).toEqual({ a: 70, b: 50 })
+      expect(r.isPartial).toBe(false)
+    }
+  })
+
+  it('rejects an invoice that is already fully collected', () => {
+    const r = validateConsolidation([inv({ total_amount: 100, paid_to_date: 100 })])
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error).toContain('fully collected')
+  })
+
+  it('partialAmount below the balance marks the receipt partial', () => {
+    const r = validateConsolidation([inv({ id: 'a', total_amount: 100, paid_to_date: 30 })], {
+      partialAmount: 25,
+    })
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.total).toBe(25)
+      expect(r.isPartial).toBe(true)
+      expect(r.remainingById.a).toBe(70)
+    }
+  })
+
+  it('partialAmount equal to the balance is a FULL settle', () => {
+    const r = validateConsolidation([inv({ id: 'a', total_amount: 100, paid_to_date: 30 })], {
+      partialAmount: 70,
+    })
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.isPartial).toBe(false)
+  })
+
+  it('rejects partialAmount above the balance', () => {
+    const r = validateConsolidation([inv({ total_amount: 100, paid_to_date: 30 })], {
+      partialAmount: 70.01,
+    })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error).toContain('exceeds')
+  })
+
+  it('rejects partialAmount with more than one invoice selected', () => {
+    const r = validateConsolidation(
+      [inv({ id: 'a' }), inv({ id: 'b' })],
+      { partialAmount: 10 },
+    )
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error).toContain('single invoice')
+  })
+
+  it('rejects a zero or negative partialAmount', () => {
+    const r = validateConsolidation([inv({})], { partialAmount: 0 })
+    expect(r.ok).toBe(false)
   })
 
   it('rejects an invoice with no company and no freetext name', () => {
@@ -65,7 +132,13 @@ describe('validateConsolidation', () => {
 
   it('accepts a single same-company invoice', () => {
     const r = validateConsolidation([inv({ company_id: 'c1', total_amount: 42.5 })])
-    expect(r).toEqual({ ok: true, payeeKey: 'company:c1', total: 42.5 })
+    expect(r).toEqual({
+      ok: true,
+      payeeKey: 'company:c1',
+      total: 42.5,
+      remainingById: { i1: 42.5 },
+      isPartial: false,
+    })
   })
 })
 

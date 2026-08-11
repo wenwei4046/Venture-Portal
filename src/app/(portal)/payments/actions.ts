@@ -131,10 +131,14 @@ async function createPaymentVoucherInner(formData: FormData) {
   // Consolidated payroll invoices carry per-line gl_segments; when set, the
   // credit branch splits the pool credit + GL per department.
   let consolidatedGroups: SegmentAttribution[] | null = null
+  // Partial payments (user 2026-08-11): an invoice flips to paid only once
+  // its receipts cover the full total. Defaults true so non-invoice paths
+  // keep their old behaviour.
+  let invoiceFullyPaid = true
   if (voucherType === 'billing_payment' && invoiceId) {
     const { data: openInv } = await supabase
       .from('invoices')
-      .select('id, status, billing_mode')
+      .select('id, status, billing_mode, total_amount')
       .eq('id', invoiceId)
       .in('status', ['issued', 'draft'])
       .maybeSingle()
@@ -166,14 +170,30 @@ async function createPaymentVoucherInner(formData: FormData) {
       }
       consolidatedGroups = groups
     }
-    const { data: existingVoucher } = await supabase
+    // Partial payments: receipts accumulate against the invoice until the
+    // total is covered (replaces the old one-voucher-per-invoice block).
+    const invoiceTotal = Math.round(Number((openInv as { total_amount?: number | string }).total_amount ?? 0) * 100) / 100
+    const { data: priorReceipts } = await supabase
       .from('payment_vouchers')
-      .select('id, voucher_no')
+      .select('amount')
       .eq('invoice_id', invoiceId)
-      .in('status', ['draft', 'pending_approval', 'approved', 'paid'])
-      .maybeSingle()
-    if (existingVoucher) {
-      throw new Error(`Voucher ${existingVoucher.voucher_no} already exists for this invoice`)
+      .eq('direction', 'credit')
+      .neq('status', 'voided')
+    const priorPaid =
+      Math.round(
+        ((priorReceipts ?? []) as Array<{ amount: number }>).reduce(
+          (s, r) => s + Number(r.amount),
+          0,
+        ) * 100,
+      ) / 100
+    if (priorPaid + amount > invoiceTotal + 0.005) {
+      throw new Error(
+        `Receipt exceeds the invoice balance: total RM ${invoiceTotal.toFixed(2)}, already received RM ${priorPaid.toFixed(2)}, this receipt RM ${amount.toFixed(2)}`,
+      )
+    }
+    invoiceFullyPaid = priorPaid + amount >= invoiceTotal - 0.005
+    if (!invoiceFullyPaid && settleBillingMode === 'payroll_consolidated') {
+      throw new Error('Consolidated payroll invoices must be settled in full')
     }
   }
 
@@ -664,9 +684,9 @@ async function createPaymentVoucherInner(formData: FormData) {
       }
     }
 
-    // Mark the invoice as settled so the Billing list stops showing "Settle →"
-    // and guards against duplicate settlement attempts.
-    if (invoiceId) {
+    // Mark the invoice as settled — but ONLY once receipts cover the full
+    // total (partial payments leave it issued with a reduced balance).
+    if (invoiceId && invoiceFullyPaid) {
       const newInvStatus = paymentMethod === 'netting' ? 'paid_via_netting' : 'paid'
       await supabase
         .from('invoices')

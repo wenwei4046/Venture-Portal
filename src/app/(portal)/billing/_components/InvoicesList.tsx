@@ -113,19 +113,27 @@ interface Props {
   bankAccounts?: Array<{ id: string; bank_name: string; account_number: string | null }>
   /** invoice_id → line items, prefills the (create-form-mirroring) edit modal. */
   invoiceLines?: Record<string, Array<{ description: string | null; amount: number; category_code: string | null }>>
+  /** invoice_id → Σ receipts already recorded (partial payments). Issued
+   *  invoices settle for their REMAINING balance; part-paid rows get a badge. */
+  paidByInvoice?: Record<string, number>
 }
 
 // Invoices for the selected period. Populated by Step 5's generate_monthly_invoices
 // RPC. Until Step 5 ships, this section shows the empty state with an explanation.
-export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [], bankAccounts = [], invoiceLines = {} }: Props) {
+export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [], bankAccounts = [], invoiceLines = {}, paidByInvoice = {} }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showSettleModal, setShowSettleModal] = useState(false)
   const [settleBank, setSettleBank] = useState<string>('')
   const [settleDate, setSettleDate] = useState<string>(dayjs().format('YYYY-MM-DD'))
+  const [settleAmount, setSettleAmount] = useState<string>('')
   const [settleError, setSettleError] = useState<string | null>(null)
   const [settleResult, setSettleResult] = useState<string | null>(null)
+
+  // Partial payments: what an issued invoice still owes.
+  const remainingOf = (inv: Invoice) =>
+    Math.round((Number(inv.total_amount) - (paidByInvoice[inv.id] ?? 0)) * 100) / 100
 
   // Only 'issued' subsidiary/freetext invoices are batch-settleable.
   // (Drafts need approval first; paid is done; dept_pool/inter-billing
@@ -135,7 +143,9 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
   }
 
   const selectedInvoices = invoices.filter((i) => selectedIds.has(i.id) && isBatchSettleable(i))
-  const selectedTotal = selectedInvoices.reduce((s, i) => s + Number(i.total_amount), 0)
+  // Batch settle collects the REMAINING balance of each invoice, not the
+  // printed total (they differ once partial receipts exist).
+  const selectedTotal = selectedInvoices.reduce((s, i) => s + remainingOf(i), 0)
   // A consolidated receipt covers one payer only. Detect mixed selections so
   // the UI can warn + block before the server rejects.
   const selectedPayeeKeys = new Set(
@@ -180,6 +190,11 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
     setSettleResult(null)
     // Default bank to the first one (usually primary) if none chosen
     if (!settleBank && bankAccounts.length > 0) setSettleBank(bankAccounts[0].id)
+    // Single invoice → editable received amount (partial payments); default
+    // to the full remaining balance.
+    setSettleAmount(
+      selectedInvoices.length === 1 ? remainingOf(selectedInvoices[0]).toFixed(2) : '',
+    )
     setShowSettleModal(true)
   }
 
@@ -191,14 +206,28 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
     if (crossCompany) return setSettleError('一张收据只能结同一家公司的单，请只勾选同一家公司的发票')
     const ids = selectedInvoices.map((i) => i.id)
     if (ids.length === 0) return setSettleError('No settleable invoices selected')
+    let partialAmount: number | undefined
+    if (selectedInvoices.length === 1) {
+      const remaining = remainingOf(selectedInvoices[0])
+      const amt = Number(settleAmount)
+      if (!Number.isFinite(amt) || amt <= 0) return setSettleError('实收金额必须大于 0')
+      if (amt > remaining + 0.005)
+        return setSettleError(`实收金额超过发票余额 RM ${remaining.toFixed(2)}`)
+      partialAmount = amt
+    }
     startTransition(async () => {
       try {
         const res = await settleInvoicesConsolidated({
           invoiceIds: ids,
           bankAccountId: settleBank,
           paymentDate: settleDate,
+          partialAmount,
         })
-        setSettleResult(`Receipt ${res.voucherNo} — settled ${res.settledCount} invoice(s).`)
+        setSettleResult(
+          res.isPartial
+            ? `Receipt ${res.voucherNo} — 部分收款 RM ${res.total.toFixed(2)}，发票保持未结，余额还剩 RM ${(remainingOf(selectedInvoices[0]) - res.total).toFixed(2)}。`
+            : `Receipt ${res.voucherNo} — settled ${res.settledCount} invoice(s).`,
+        )
         setSelectedIds(new Set())
         setShowSettleModal(false)
         router.refresh()
@@ -420,7 +449,20 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   key: 'total_amount',
                   label: 'Amount',
                   align: 'right',
-                  render: (inv) => formatMoney(Number(inv.total_amount)),
+                  render: (inv) => {
+                    const paid = paidByInvoice[inv.id] ?? 0
+                    if (inv.status !== 'issued' || paid <= 0) {
+                      return formatMoney(Number(inv.total_amount))
+                    }
+                    return (
+                      <div>
+                        <div>{formatMoney(Number(inv.total_amount))}</div>
+                        <div className="font-mono text-[11px] text-alert">
+                          part-paid {formatMoney(paid)} · bal {formatMoney(remainingOf(inv))}
+                        </div>
+                      </div>
+                    )
+                  },
                   sortValue: (inv) => Number(inv.total_amount),
                   cellClassName: 'font-mono tabular font-medium text-ink',
                 },
@@ -565,6 +607,27 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink font-mono focus:outline-none focus:border-accent-border"
                 />
               </label>
+              {selectedInvoices.length === 1 ? (
+                <label className="block">
+                  <div className="text-xs font-sans font-medium text-graphite mb-1">
+                    实收金额 (RM) <span className="text-danger">*</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={settleAmount}
+                    onChange={(e) => setSettleAmount(e.target.value)}
+                    disabled={isPending}
+                    className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink font-mono tabular focus:outline-none focus:border-accent-border"
+                  />
+                  <p className="text-[11px] font-sans text-muted mt-1">
+                    发票余额 RM {remainingOf(selectedInvoices[0]).toFixed(2)}
+                    {paidByInvoice[selectedInvoices[0].id] ? (
+                      <>（已收 RM {(paidByInvoice[selectedInvoices[0].id] ?? 0).toFixed(2)}）</>
+                    ) : null}
+                    　·　少于余额 = 部分收款，发票保持未结，之后可以继续收。
+                  </p>
+                </label>
+              ) : null}
               <div className="text-xs font-mono text-muted">
                 Invoices to settle:
               </div>

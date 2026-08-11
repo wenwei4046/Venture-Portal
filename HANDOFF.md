@@ -44,6 +44,37 @@ migrations applied live + archived; detailed sections follow this block):
    HR/Finance/Marketing/Director Office (+director from director_monthly_
    payroll); 还款 PVs are typed 'expense' with fund_source_id links.
 
+## Partial invoice settlement (2026-08-11, no migration)
+
+User received a PART payment of an issued invoice and Settle refused ("我收到
+的钱是invoice 的partial，这样我就按不到settle了"). Model: **an issued
+invoice's balance = total_amount − Σ non-voided credit vouchers linked via
+payment_vouchers.invoice_id**; it flips to paid only when receipts cover the
+full total. Consolidated (multi-invoice) receipts still settle in full and
+link via settlement_voucher_id — so 'paid' always means fully collected, and
+partial receipts only ever hang off invoice_id.
+
+ - lib/invoice-settlement.validateConsolidation now takes paid_to_date per
+   invoice + optional { partialAmount } (single invoice only, ≤ balance;
+   below balance → isPartial). Returns remainingById; rejects fully-collected
+   invoices. 8 new tests (2 old assertions updated for the wider shape).
+ - settleInvoicesConsolidated: fetches prior receipts, settles each invoice's
+   REMAINING (not the printed total) — pool attributions + per-segment JEs +
+   voucher amount all use it. Partial: voucher carries invoice_id, invoice
+   stays issued, no settlement_voucher_id, description "Partial payment — X
+   of Y balance". payroll_consolidated stays full-only.
+ - Manual path (payments createPaymentVoucherInner billing_payment): the old
+   one-voucher-per-invoice block became a cumulative balance check (prior +
+   this ≤ total), and the end-of-flow status flip only fires when receipts
+   cover the total (netting → paid_via_netting unchanged, full only).
+ - Billing list: part-paid rows show "part-paid X · bal Y" under the amount;
+   the settle modal shows Σ remaining, and with ONE invoice selected gains an
+   实收金额 input (default = balance; less = partial, more = client+server
+   reject). BillingView passes paidByInvoice.
+ - Debtor Aging (page + export) now reports total − receipts via the shared
+   lib/debtor-aging-data.fetchPaidByInvoice, tags rows "part-paid RM X",
+   drops fully-covered rows.
+
 ## Daily Bank dashboard (2026-08-11, no migration)
 
 User showed screenshots of their OTHER system's daily board and wants the same
@@ -74,6 +105,13 @@ only, NOT draft · any-date lookback · PNG + PDF export). New /daily-bank
  - **Exports**: Get image (clipboard PNG via html-to-image, new dep — paste
    into WhatsApp), PNG download (pixelRatio 2), PDF (/daily-bank/export?date=,
    landscape, English). Legend footer mirrors the other system's wording.
+ - **Dept-cash parity fix (same day)**: user reported 部门 cash 对不上 vs the
+   dept-pool page. Unassigned column REMOVED — Venture absorbs corporate +
+   treasury + unallocated/NULL (treasury was the big miss), and for TODAY the
+   inter-billing pool-vs-GL gap is folded into the primary bank via
+   applyPoolAdjust (dept_pool_balances + the 'Venture Office' pseudo-dept
+   overlay — the dept-pool page's own algorithm), so each department column
+   equals the "By department" cash. Past dates stay GL-only (legend says so).
 
 ## BA v2 — the interest is real (2026-08-11, mig 20260811000000_ba_v2)
 
