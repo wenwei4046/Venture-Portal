@@ -78,9 +78,11 @@ that warn but never block.
  - **Auto-read**: extractBaFromDocument sends the PDF/photo to Claude
    (`claude-opus-5`, structured output json_schema, @anthropic-ai/sdk new dep)
    and PREFILLS the Record form — nothing saves until the user reviews (user:
-   "我会检查对不对才储存开invoice"). Needs **ANTHROPIC_API_KEY** in Vercel env
-   + .env.local; without it the button returns a setup hint and everything
-   else works. Refusal/parse failures degrade to manual entry.
+   "我会检查对不对才储存开invoice"). Needs **ANTHROPIC_API_KEY**. **User
+   declined the pay-per-use API (2026-08-11 "要收费我就不要了") — the button
+   is HIDDEN unless the key is configured; do NOT re-pitch it.** The free path:
+   user drops the BA document into the Claude chat, Claude reads it and fills
+   /records for them. Refusal/parse failures degrade to manual entry.
  - Conventions: ba_* tables stay on the untyped-client cast; extraction
    validates dates/size/type server-side; BA ref for humans = ba_no, for
    machines = `BA-<id8>` (ba_no is optional and not unique).

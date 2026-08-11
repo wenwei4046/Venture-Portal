@@ -355,19 +355,17 @@ function RecordForm({
           onChange={e => setFile(e.target.files?.[0] ?? null)}
           className="text-xs font-sans text-graphite"
         />
-        <button
-          type="button"
-          disabled={!file || isReading}
-          onClick={autoRead}
-          title={
-            autoReadAvailable
-              ? 'Read the BA document and prefill the fields — you review before saving'
-              : 'Needs ANTHROPIC_API_KEY in the environment'
-          }
-          className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-xs px-3 py-1.5 rounded-md transition-colors disabled:opacity-50"
-        >
-          {isReading ? 'Reading…' : 'Auto-read →'}
-        </button>
+        {autoReadAvailable ? (
+          <button
+            type="button"
+            disabled={!file || isReading}
+            onClick={autoRead}
+            title="Read the BA document and prefill the fields — you review before saving"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-xs px-3 py-1.5 rounded-md transition-colors disabled:opacity-50"
+          >
+            {isReading ? 'Reading…' : 'Auto-read →'}
+          </button>
+        ) : null}
         <span className="font-serif italic text-muted text-xs">
           PDF or photo of the bank&apos;s BA advice — filed with the record on save.
         </span>
