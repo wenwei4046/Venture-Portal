@@ -33,8 +33,11 @@ async function loadBookLines(
   glCode: string,
   periodMonth: string,
 ): Promise<BookLine[]> {
+  // Backward buffer only (user 2026-08-08: "upload 6 月就不应该出现7月的
+  // payment") — prior-month in-transit items may clear on this statement, but
+  // future-month book entries never belong here.
   const from = dayjs(periodMonth).subtract(10, 'day').format('YYYY-MM-DD')
-  const to = dayjs(periodMonth).endOf('month').add(10, 'day').format('YYYY-MM-DD')
+  const to = dayjs(periodMonth).endOf('month').format('YYYY-MM-DD')
   const [{ data: lines, error }, { data: claimed }] = await Promise.all([
     supabase
       .from('journal_lines')

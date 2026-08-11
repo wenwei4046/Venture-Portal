@@ -46,12 +46,25 @@ export default function ReconReview({
   const router = useRouter()
   const [selS, setSelS] = useState<string | null>(null)
   const [selB, setSelB] = useState<string | null>(null)
+  const [qS, setQS] = useState('')
+  const [qB, setQB] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const matched = statementLines.filter(l => l.matchedJournalLineId)
   const ignored = statementLines.filter(l => !l.matchedJournalLineId && l.matchKind === 'ignored')
   const openS = statementLines.filter(l => !l.matchedJournalLineId && l.matchKind !== 'ignored')
+
+  const needleS = qS.trim().toLowerCase()
+  const needleB = qB.trim().toLowerCase()
+  const filteredS = needleS
+    ? openS.filter(l => `${l.description} ${l.amount} ${l.date}`.toLowerCase().includes(needleS))
+    : openS
+  const filteredB = needleB
+    ? unmatchedBook.filter(l =>
+        `${l.description} ${l.entryNo} ${l.amount} ${l.date}`.toLowerCase().includes(needleB),
+      )
+    : unmatchedBook
 
   const sSel = openS.find(l => l.id === selS) ?? null
   const bSel = unmatchedBook.find(l => l.id === selB) ?? null
@@ -106,97 +119,170 @@ export default function ReconReview({
 
       {error ? <p className="text-sm font-sans text-danger mb-4">{error}</p> : null}
 
-      {/* ── Manual pairing ── */}
+      {/* ── Manual pairing — full-width tidy tables (user 2026-08-08) ── */}
       {openS.length > 0 || unmatchedBook.length > 0 ? (
         <section className="mb-10">
-          <div className="flex items-center justify-between mb-2 flex-wrap gap-3">
-            <h2 className="font-serif text-xl text-ink">Unmatched — pick one from each side</h2>
-            <button
-              type="button"
-              disabled={!amountsEqual || isPending}
-              onClick={() => sSel && bSel && run(() => manualMatch(sSel.id, bSel.id))}
-              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-40"
-              title={
-                sSel && bSel && !amountsEqual
-                  ? 'Amounts differ — only equal amounts can match'
-                  : 'Match the selected pair'
-              }
-            >
-              {isPending ? 'Working…' : 'Match selected pair →'}
-            </button>
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-3 sticky top-0 z-10 bg-paper py-2">
+            <h2 className="font-serif text-xl text-ink">Unmatched — pick one from each table</h2>
+            <div className="flex items-center gap-3">
+              {sSel ? (
+                <span className="font-mono text-xs text-graphite">
+                  Statement: {formatMoneyBare(sSel.amount)}
+                </span>
+              ) : null}
+              {bSel ? (
+                <span className="font-mono text-xs text-graphite">Book: {formatMoneyBare(bSel.amount)}</span>
+              ) : null}
+              <button
+                type="button"
+                disabled={!amountsEqual || isPending}
+                onClick={() => sSel && bSel && run(() => manualMatch(sSel.id, bSel.id))}
+                className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-40"
+                title={
+                  sSel && bSel && !amountsEqual
+                    ? 'Amounts differ — only equal amounts can match'
+                    : 'Match the selected pair'
+                }
+              >
+                {isPending ? 'Working…' : 'Match selected pair →'}
+              </button>
+            </div>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="border border-alert/40 rounded-md bg-alert/[0.04] p-3">
-              <div className="font-mono text-xs uppercase tracking-wider text-alert mb-2">
-                Bank statement ({openS.length})
-              </div>
-              <div className="space-y-1 max-h-[420px] overflow-y-auto">
-                {openS.map(l => (
-                  <div
-                    key={l.id}
-                    onClick={() => setSelS(prev => (prev === l.id ? null : l.id))}
-                    className={`flex items-baseline justify-between gap-3 px-2 py-1.5 rounded cursor-pointer text-sm ${
-                      selS === l.id ? 'bg-accent/15 border border-accent/50' : 'hover:bg-surface-2/60 border border-transparent'
-                    }`}
-                  >
-                    <span className="font-mono text-[11px] text-graphite shrink-0">
-                      {dayjs(l.date).format('D MMM')}
-                    </span>
-                    <span className="font-serif text-ink flex-1 truncate" title={l.description}>
-                      {l.description || '—'}
-                    </span>
-                    <span className="font-mono tabular text-[13px] shrink-0">{money(l.amount)}</span>
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      onClick={e => {
-                        e.stopPropagation()
-                        run(() => setLineIgnored(l.id, true))
-                      }}
-                      className="font-serif italic text-xs text-muted hover:text-ink shrink-0"
-                      title="Ignore (e.g. bank fee you will book separately)"
+
+          {/* Statement side */}
+          <div className="mb-6 border border-alert/40 rounded-md overflow-hidden">
+            <div className="flex items-center justify-between gap-3 px-3 py-2 bg-alert/[0.06]">
+              <span className="font-mono text-xs uppercase tracking-wider text-alert">
+                Bank statement — not in the books ({openS.length})
+              </span>
+              <input
+                type="text"
+                value={qS}
+                onChange={e => setQS(e.target.value)}
+                placeholder="Filter…"
+                className="bg-paper border border-hairline rounded px-2 py-1 text-xs text-ink w-48 focus:outline-none focus:border-accent-border"
+              />
+            </div>
+            <div className="max-h-[440px] overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-surface-2">
+                  <tr className="text-[11px] uppercase tracking-wide text-muted font-sans border-b border-hairline">
+                    <th className="text-left py-1.5 px-3 font-medium w-20">Date</th>
+                    <th className="text-left py-1.5 px-3 font-medium">Description</th>
+                    <th className="text-right py-1.5 px-3 font-medium w-28">In (RM)</th>
+                    <th className="text-right py-1.5 px-3 font-medium w-28">Out (RM)</th>
+                    <th className="py-1.5 px-3 w-16" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredS.map(l => (
+                    <tr
+                      key={l.id}
+                      onClick={() => setSelS(prev => (prev === l.id ? null : l.id))}
+                      className={`border-b border-hairline/60 cursor-pointer ${
+                        selS === l.id ? 'bg-accent/15' : 'hover:bg-surface-2/50'
+                      }`}
                     >
-                      ignore
-                    </button>
-                  </div>
-                ))}
-                {openS.length === 0 ? (
-                  <p className="font-serif italic text-ledger text-sm px-2 py-2">All statement lines settled ✓</p>
-                ) : null}
-              </div>
-            </div>
-            <div className="border border-info/40 rounded-md bg-info/[0.04] p-3">
-              <div className="font-mono text-xs uppercase tracking-wider text-info mb-2">
-                Book (GL) not on statement ({unmatchedBook.length})
-              </div>
-              <div className="space-y-1 max-h-[420px] overflow-y-auto">
-                {unmatchedBook.map(l => (
-                  <div
-                    key={l.id}
-                    onClick={() => setSelB(prev => (prev === l.id ? null : l.id))}
-                    className={`flex items-baseline justify-between gap-3 px-2 py-1.5 rounded cursor-pointer text-sm ${
-                      selB === l.id ? 'bg-accent/15 border border-accent/50' : 'hover:bg-surface-2/60 border border-transparent'
-                    }`}
-                  >
-                    <span className="font-mono text-[11px] text-graphite shrink-0">
-                      {dayjs(l.date).format('D MMM')}
-                    </span>
-                    <span className="font-mono text-[10px] text-muted shrink-0">{l.entryNo}</span>
-                    <span className="font-serif text-ink flex-1 truncate" title={l.description}>
-                      {l.description || '—'}
-                    </span>
-                    <span className="font-mono tabular text-[13px] shrink-0">{money(l.amount)}</span>
-                  </div>
-                ))}
-                {unmatchedBook.length === 0 ? (
-                  <p className="font-serif italic text-ledger text-sm px-2 py-2">Every book line is on the statement ✓</p>
-                ) : null}
-              </div>
+                      <td className="py-1.5 px-3 font-mono text-[11px] text-graphite whitespace-nowrap">
+                        {dayjs(l.date).format('D MMM')}
+                      </td>
+                      <td className="py-1.5 px-3 font-serif text-[13.5px] text-ink">{l.description || '—'}</td>
+                      <td className="py-1.5 px-3 text-right font-mono tabular text-ledger">
+                        {l.amount > 0 ? formatMoneyBare(l.amount) : ''}
+                      </td>
+                      <td className="py-1.5 px-3 text-right font-mono tabular text-danger">
+                        {l.amount < 0 ? formatMoneyBare(-l.amount) : ''}
+                      </td>
+                      <td className="py-1.5 px-3 text-right">
+                        <button
+                          type="button"
+                          disabled={isPending}
+                          onClick={e => {
+                            e.stopPropagation()
+                            run(() => setLineIgnored(l.id, true))
+                          }}
+                          className="font-serif italic text-xs text-muted hover:text-ink"
+                          title="Ignore (e.g. bank fee you will book separately)"
+                        >
+                          ignore
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredS.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-4 px-3 text-center font-serif italic text-muted">
+                        {openS.length === 0 ? 'All statement lines settled ✓' : 'No rows match the filter'}
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
             </div>
           </div>
+
+          {/* Book side */}
+          <div className="border border-info/40 rounded-md overflow-hidden">
+            <div className="flex items-center justify-between gap-3 px-3 py-2 bg-info/[0.06]">
+              <span className="font-mono text-xs uppercase tracking-wider text-info">
+                Book (GL) — not on statement ({unmatchedBook.length})
+              </span>
+              <input
+                type="text"
+                value={qB}
+                onChange={e => setQB(e.target.value)}
+                placeholder="Filter…"
+                className="bg-paper border border-hairline rounded px-2 py-1 text-xs text-ink w-48 focus:outline-none focus:border-accent-border"
+              />
+            </div>
+            <div className="max-h-[440px] overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-surface-2">
+                  <tr className="text-[11px] uppercase tracking-wide text-muted font-sans border-b border-hairline">
+                    <th className="text-left py-1.5 px-3 font-medium w-20">Date</th>
+                    <th className="text-left py-1.5 px-3 font-medium w-36">Entry</th>
+                    <th className="text-left py-1.5 px-3 font-medium">Description</th>
+                    <th className="text-right py-1.5 px-3 font-medium w-28">In (RM)</th>
+                    <th className="text-right py-1.5 px-3 font-medium w-28">Out (RM)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredB.map(l => (
+                    <tr
+                      key={l.id}
+                      onClick={() => setSelB(prev => (prev === l.id ? null : l.id))}
+                      className={`border-b border-hairline/60 cursor-pointer ${
+                        selB === l.id ? 'bg-accent/15' : 'hover:bg-surface-2/50'
+                      }`}
+                    >
+                      <td className="py-1.5 px-3 font-mono text-[11px] text-graphite whitespace-nowrap">
+                        {dayjs(l.date).format('D MMM')}
+                      </td>
+                      <td className="py-1.5 px-3 font-mono text-[11px] text-muted whitespace-nowrap">{l.entryNo}</td>
+                      <td className="py-1.5 px-3 font-serif text-[13.5px] text-ink">{l.description || '—'}</td>
+                      <td className="py-1.5 px-3 text-right font-mono tabular text-ledger">
+                        {l.amount > 0 ? formatMoneyBare(l.amount) : ''}
+                      </td>
+                      <td className="py-1.5 px-3 text-right font-mono tabular text-danger">
+                        {l.amount < 0 ? formatMoneyBare(-l.amount) : ''}
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredB.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-4 px-3 text-center font-serif italic text-muted">
+                        {unmatchedBook.length === 0 ? 'Every book line is on the statement ✓' : 'No rows match the filter'}
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <p className="font-serif italic text-muted text-xs mt-2">
-            Statement-only lines = money moved that the books miss (record it, then re-open here).
-            Book-only lines = uncleared / in-transit items.
+            Statement-only = money moved that the books miss (record it, come back and match).
+            Book-only = uncleared / in-transit items.
           </p>
         </section>
       ) : null}

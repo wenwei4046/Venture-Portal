@@ -59,9 +59,10 @@ export default async function ReconSessionPage({
     matchKind: l.match_kind,
   }))
 
-  // Book lines in the statement window on this bank's GL code.
+  // Book lines in the statement window on this bank's GL code — backward
+  // buffer only; future-month entries never belong to this statement.
   const from = dayjs(session.period_month).subtract(10, 'day').format('YYYY-MM-DD')
-  const to = dayjs(session.period_month).endOf('month').add(10, 'day').format('YYYY-MM-DD')
+  const to = dayjs(session.period_month).endOf('month').format('YYYY-MM-DD')
   const [{ data: bookRaw }, { data: claimedRows }] = await Promise.all([
     supabase
       .from('journal_lines')
