@@ -958,39 +958,25 @@ async function gatherTreasury(
     ...interestExpenseCodes,
   ])
 
-  const jes = await fetchAllRows((lo, hi) => supabase
-    .from('journal_entries')
-    .select('id, transaction_date, is_reversed')
-    .gte('transaction_date', from)
-    .lte('transaction_date', to)
-    .eq('is_reversed', false)
-    .order('id', { ascending: true })
-    .range(lo, hi))
-
-  const entryIds = (jes ?? []).map((j) => j.id as string)
-  if (entryIds.length === 0) {
-    return { interestIncome: 0, penaltyIncome: 0, interestExpense: 0, managedCodes }
-  }
-
   const watchCodes = Array.from(managedCodes)
   if (watchCodes.length === 0) {
     return { interestIncome: 0, penaltyIncome: 0, interestExpense: 0, managedCodes }
   }
 
-  // Paginate — PostgREST caps an unranged select at 1000 rows (see fetchTrialBalance).
-  const lines: Record<string, unknown>[] = []
-  for (let fromIdx = 0; ; fromIdx += 1000) {
-    const { data: page, error: lErr } = await supabase
-      .from('journal_lines')
-      .select('account_code, debit, credit, entry_id')
-      .in('entry_id', entryIds)
-      .in('account_code', watchCodes)
-      .order('id', { ascending: true })
-      .range(fromIdx, fromIdx + 999)
-    if (lErr) throw new Error(`cfo-reports treasury lines: ${lErr.message}`)
-    lines.push(...((page ?? []) as Record<string, unknown>[]))
-    if (!page || page.length < 1000) break
-  }
+  // Single join-filtered query. The old two-step (fetch the period's JE ids,
+  // then .in('entry_id', ids)) stuffed every id into the request URL — past a
+  // few thousand entries PostgREST rejects it with a bare 400 Bad Request
+  // (the 2026-08-13 Ledger failure class). Filtering through the embedded
+  // join keeps the URL constant-size no matter how much history exists.
+  const lines = (await fetchAllRows((lo, hi) => supabase
+    .from('journal_lines')
+    .select('account_code, debit, credit, journal_entries!inner(transaction_date, is_reversed)')
+    .in('account_code', watchCodes)
+    .gte('journal_entries.transaction_date', from)
+    .lte('journal_entries.transaction_date', to)
+    .eq('journal_entries.is_reversed', false)
+    .order('id', { ascending: true })
+    .range(lo, hi))) as Record<string, unknown>[]
 
   let interestIncome = 0
   let penaltyIncome = 0
@@ -1016,36 +1002,18 @@ async function gatherManualJvPnl(
 ): Promise<RawManualJvPnlRow[]> {
   const { from, to, managedCodes } = args
 
-  const jes = await fetchAllRows((lo, hi) => supabase
-    .from('journal_entries')
-    .select('id, segment')
-    .eq('reference_type', 'manual_jv')
-    .eq('is_reversed', false)
-    .gte('transaction_date', from)
-    .lte('transaction_date', to)
+  // Join-filtered in one query (no JE-id list in the URL — see gatherTreasury);
+  // the JE's segment rides along on the embedded join.
+  const lines = (await fetchAllRows((lo, hi) => supabase
+    .from('journal_lines')
+    .select('entry_id, account_code, debit, credit, journal_entries!inner(segment, reference_type, is_reversed, transaction_date)')
+    .eq('journal_entries.reference_type', 'manual_jv')
+    .eq('journal_entries.is_reversed', false)
+    .gte('journal_entries.transaction_date', from)
+    .lte('journal_entries.transaction_date', to)
     .order('id', { ascending: true })
-    .range(lo, hi))
-  if (!jes || jes.length === 0) return []
-
-  const segmentByEntryId = new Map<string, GlSegment>()
-  for (const j of jes) {
-    segmentByEntryId.set(j.id as string, j.segment as GlSegment)
-  }
-  const entryIds = Array.from(segmentByEntryId.keys())
-
-  // Paginate — PostgREST caps an unranged select at 1000 rows (see fetchTrialBalance).
-  const lines: Record<string, unknown>[] = []
-  for (let fromIdx = 0; ; fromIdx += 1000) {
-    const { data: page, error: lErr } = await supabase
-      .from('journal_lines')
-      .select('entry_id, account_code, debit, credit')
-      .in('entry_id', entryIds)
-      .order('id', { ascending: true })
-      .range(fromIdx, fromIdx + 999)
-    if (lErr) throw new Error(`cfo-reports manual-JV lines: ${lErr.message}`)
-    lines.push(...((page ?? []) as Record<string, unknown>[]))
-    if (!page || page.length < 1000) break
-  }
+    .range(lo, hi))) as Record<string, unknown>[]
+  if (lines.length === 0) return []
 
   const accountByCode = await fetchAccountIndex(supabase)
 
@@ -1060,7 +1028,7 @@ async function gatherManualJvPnl(
     if (managedCodes.has(code)) continue
     const account = accountByCode.get(code)
     if (!account) continue
-    const seg = segmentByEntryId.get(l.entry_id as string)
+    const seg = (l.journal_entries as { segment: GlSegment | null } | null)?.segment
     if (!seg) continue
     const t = account.accountType
     if (t !== 'revenue' && t !== 'other_income' && t !== 'expense' && t !== 'cost') continue
@@ -1279,14 +1247,14 @@ export async function fetchCashflowStatement(
   //    the manual-JV opening balances, so we must derive cash from the GL.
   const bankCodes = await fetchActiveBankCodes(supabase)
 
-  const openingJeIds = await fetchJeIdsBefore(supabase, from) // transaction_date < from
-  const closingJeIds = await fetchJeIdsOnOrBefore(supabase, to) // transaction_date <= to
-
+  // Join-filtered as-of sums (opening = the day before `from`) — the old
+  // fetchJeIdsBefore/-OnOrBefore id lists 400 once history grows.
+  const dayBeforeFrom = dayjs(from).subtract(1, 'day').format('YYYY-MM-DD')
   const openingCash = r2(
-    await sumGlNetAcrossCodes(supabase, { jeIds: openingJeIds, codes: bankCodes, sign: 'dr-cr' }),
+    await sumGlNetAcrossCodes(supabase, { asOf: dayBeforeFrom, codes: bankCodes, sign: 'dr-cr' }),
   )
   const closingCash = r2(
-    await sumGlNetAcrossCodes(supabase, { jeIds: closingJeIds, codes: bankCodes, sign: 'dr-cr' }),
+    await sumGlNetAcrossCodes(supabase, { asOf: to, codes: bankCodes, sign: 'dr-cr' }),
   )
 
   // ── Reconciliation: openingCash + netChange MUST equal closingCash.
@@ -1337,28 +1305,6 @@ async function fetchActiveBankCodes(supabase: SupabaseClient): Promise<string[]>
   )
 }
 
-async function fetchJeIdsBefore(supabase: SupabaseClient, date: string): Promise<string[]> {
-  const data = await fetchAllRows((lo, hi) => supabase
-    .from('journal_entries')
-    .select('id')
-    .lt('transaction_date', date)
-    .eq('is_reversed', false)
-    .order('id', { ascending: true })
-    .range(lo, hi))
-  return (data ?? []).map((j) => j.id as string)
-}
-
-async function fetchJeIdsOnOrBefore(supabase: SupabaseClient, date: string): Promise<string[]> {
-  const data = await fetchAllRows((lo, hi) => supabase
-    .from('journal_entries')
-    .select('id')
-    .lte('transaction_date', date)
-    .eq('is_reversed', false)
-    .order('id', { ascending: true })
-    .range(lo, hi))
-  return (data ?? []).map((j) => j.id as string)
-}
-
 // ────────────────────────────────────────────────────────────────────────────
 // Balance Sheet — point-in-time snapshot driven by chart_of_accounts type +
 // journal_lines aggregation.
@@ -1398,23 +1344,20 @@ export interface BalanceSheet {
 // equity, and revenue (normal credit balance).
 async function sumGlNetAcrossCodes(
   supabase: SupabaseClient,
-  args: { jeIds: string[]; codes: string[]; sign: 'dr-cr' | 'cr-dr' },
+  args: { asOf: string; codes: string[]; sign: 'dr-cr' | 'cr-dr' },
 ): Promise<number> {
-  const { jeIds, codes, sign } = args
-  if (jeIds.length === 0 || codes.length === 0) return 0
-  // Paginate — PostgREST caps an unranged select at 1000 rows (see fetchTrialBalance).
-  const lines: Record<string, unknown>[] = []
-  for (let fromIdx = 0; ; fromIdx += 1000) {
-    const { data: page } = await supabase
-      .from('journal_lines')
-      .select('debit, credit')
-      .in('entry_id', jeIds)
-      .in('account_code', codes)
-      .order('id', { ascending: true })
-      .range(fromIdx, fromIdx + 999)
-    lines.push(...((page ?? []) as Record<string, unknown>[]))
-    if (!page || page.length < 1000) break
-  }
+  const { asOf, codes, sign } = args
+  if (codes.length === 0) return 0
+  // Join-filtered — the old jeIds-in-the-URL version 400s once history grows
+  // past a few thousand entries (see gatherTreasury).
+  const lines = (await fetchAllRows((lo, hi) => supabase
+    .from('journal_lines')
+    .select('debit, credit, journal_entries!inner(transaction_date, is_reversed)')
+    .in('account_code', codes)
+    .lte('journal_entries.transaction_date', asOf)
+    .eq('journal_entries.is_reversed', false)
+    .order('id', { ascending: true })
+    .range(lo, hi))) as Record<string, unknown>[]
   let net = 0
   for (const l of lines ?? []) {
     const dr = Number(l.debit ?? 0)
@@ -1430,15 +1373,8 @@ export async function fetchBalanceSheet(
 ): Promise<BalanceSheet> {
   const { asOf } = args
 
-  // ── 1: Period-bounded JE id set ──
-  const jes = await fetchAllRows((lo, hi) => supabase
-    .from('journal_entries')
-    .select('id')
-    .lte('transaction_date', asOf)
-    .eq('is_reversed', false)
-    .order('id', { ascending: true })
-    .range(lo, hi))
-  const jeIds = (jes ?? []).map((j) => j.id as string)
+  // ── 1: (removed) — balances are summed via join-filtered queries keyed on
+  //    asOf; no JE id set is materialised (URL-size failure class).
 
   // ── 2: Chart of accounts grouped by type. Source of truth for the
   //    Total Assets / Total Liab / Total Equity sums (double-entry).
@@ -1485,30 +1421,30 @@ export async function fetchBalanceSheet(
         .filter((c): c is string => !!c),
     ),
   )
-  const bank = await sumGlNetAcrossCodes(supabase, { jeIds, codes: bankCodes, sign: 'dr-cr' })
+  const bank = await sumGlNetAcrossCodes(supabase, { asOf, codes: bankCodes, sign: 'dr-cr' })
 
   // ── 4: Named asset line items (post-mig 238 codes):
   //    Accounts Receivable = 3030, Loans Receivable = 3020.
   const invoiceReceivable = await sumGlNetAcrossCodes(
     supabase,
-    { jeIds, codes: [AR_CODE], sign: 'dr-cr' },
+    { asOf, codes: [AR_CODE], sign: 'dr-cr' },
   )
   const loanReceivable = await sumGlNetAcrossCodes(
     supabase,
-    { jeIds, codes: [LOANS_RECEIVABLE_CODE], sign: 'dr-cr' },
+    { asOf, codes: [LOANS_RECEIVABLE_CODE], sign: 'dr-cr' },
   )
 
   // ── 5: Fixed assets total (2xxx range, fixed_asset type).
   const fixedAssets = await sumGlNetAcrossCodes(
     supabase,
-    { jeIds, codes: codesByType.fixed_asset, sign: 'dr-cr' },
+    { asOf, codes: codesByType.fixed_asset, sign: 'dr-cr' },
   )
 
   // ── 6: Total assets across every asset-type + fixed_asset account.
   //    otherAssets = residual once named line items are subtracted.
   const currentAssetsTotal = await sumGlNetAcrossCodes(
     supabase,
-    { jeIds, codes: codesByType.asset, sign: 'dr-cr' },
+    { asOf, codes: codesByType.asset, sign: 'dr-cr' },
   )
   const totalAssets = currentAssetsTotal + fixedAssets
   const otherAssets = currentAssetsTotal - bank - invoiceReceivable - loanReceivable
@@ -1516,7 +1452,7 @@ export async function fetchBalanceSheet(
   // ── 7: Total liabilities — sum every liability-type account.
   const fundSourcesPayable = await sumGlNetAcrossCodes(
     supabase,
-    { jeIds, codes: codesByType.liability, sign: 'cr-dr' },
+    { asOf, codes: codesByType.liability, sign: 'cr-dr' },
   )
 
   // ── 8: Permanent equity balances (excl. retained earnings YTD).
@@ -1524,13 +1460,13 @@ export async function fetchBalanceSheet(
   // listed individually so the BS UI can render them in a separate section.
   const equityBalances = await sumGlNetAcrossCodes(
     supabase,
-    { jeIds, codes: realEquityCodes, sign: 'cr-dr' },
+    { asOf, codes: realEquityCodes, sign: 'cr-dr' },
   )
   const internalFundLines: InternalFundLine[] = []
   for (const acc of internalFundAccounts) {
     const balance = await sumGlNetAcrossCodes(
       supabase,
-      { jeIds, codes: [acc.code], sign: 'cr-dr' },
+      { asOf, codes: [acc.code], sign: 'cr-dr' },
     )
     internalFundLines.push({ code: acc.code, name: acc.name, balance })
   }
@@ -1992,31 +1928,20 @@ export async function fetchLedgers(
 
   // ── 2: Opening balances. Σ (Dr − Cr) for every line on a non-reversed JE
   //    with transaction_date < from. Single batched query. ──
-  const openingJes = await fetchAllRows((lo, hi) => supabase
-    .from('journal_entries')
-    .select('id')
-    .lt('transaction_date', from)
-    .eq('is_reversed', false)
-    .order('id', { ascending: true })
-    .range(lo, hi))
-  const openingJeIds = (openingJes ?? []).map((j) => j.id as string)
+  // Join-filtered in one query — the old version materialised EVERY pre-from
+  // JE id into the request URL and started 400ing ("Bad Request", found
+  // 2026-08-13) once history passed a few thousand entries.
   const openingByCode = new Map<string, number>()
-  if (openingJeIds.length > 0) {
-    // Paginate — PostgREST caps an unranged select at 1000 rows (see fetchTrialBalance).
-    const openLines: Record<string, unknown>[] = []
-    for (let fromIdx = 0; ; fromIdx += 1000) {
-      const { data: page, error: openJlErr } = await supabase
-        .from('journal_lines')
-        .select('account_code, debit, credit')
-        .in('entry_id', openingJeIds)
-        .in('account_code', leafCodes)
-        .order('id', { ascending: true })
-        .range(fromIdx, fromIdx + 999)
-      if (openJlErr) throw new Error(`fetchLedgers opening lines: ${openJlErr.message}`)
-      openLines.push(...((page ?? []) as Record<string, unknown>[]))
-      if (!page || page.length < 1000) break
-    }
-    for (const l of openLines ?? []) {
+  {
+    const openLines = (await fetchAllRows((lo, hi) => supabase
+      .from('journal_lines')
+      .select('account_code, debit, credit, journal_entries!inner(transaction_date, is_reversed)')
+      .in('account_code', leafCodes)
+      .lt('journal_entries.transaction_date', from)
+      .eq('journal_entries.is_reversed', false)
+      .order('id', { ascending: true })
+      .range(lo, hi))) as Record<string, unknown>[]
+    for (const l of openLines) {
       const code = l.account_code as string
       openingByCode.set(
         code,
@@ -2037,7 +1962,6 @@ export async function fetchLedgers(
     .order('id', { ascending: true })
     .range(lo, hi))
   const periodJes2 = periodJes ?? []
-  const periodJeIds = periodJes2.map((j) => j.id as string)
 
   // ── 4: Source-description override (invoices / payment_vouchers). ──
   const refs: Array<{ referenceType: string; referenceId: string }> = []
@@ -2087,22 +2011,19 @@ export async function fetchLedgers(
   }
   const linesByCode = new Map<string, LineWithMeta[]>()
   for (const c of leafCodes) linesByCode.set(c, [])
-  if (periodJeIds.length > 0) {
-    // Paginate — PostgREST caps an unranged select at 1000 rows (see fetchTrialBalance).
-    const lines: Record<string, unknown>[] = []
-    for (let fromIdx = 0; ; fromIdx += 1000) {
-      const { data: page, error: jlErr } = await supabase
-        .from('journal_lines')
-        .select('id, entry_id, account_code, debit, credit')
-        .in('entry_id', periodJeIds)
-        .in('account_code', leafCodes)
-        .order('id', { ascending: true })
-        .range(fromIdx, fromIdx + 999)
-      if (jlErr) throw new Error(`fetchLedgers period lines: ${jlErr.message}`)
-      lines.push(...((page ?? []) as Record<string, unknown>[]))
-      if (!page || page.length < 1000) break
-    }
-    for (const l of lines ?? []) {
+  {
+    // Join-filtered — same URL-size fix as the opening query; JE metadata
+    // still comes from jeById (built above from the period JE fetch).
+    const lines = (await fetchAllRows((lo, hi) => supabase
+      .from('journal_lines')
+      .select('id, entry_id, account_code, debit, credit, journal_entries!inner(transaction_date, is_reversed)')
+      .in('account_code', leafCodes)
+      .gte('journal_entries.transaction_date', from)
+      .lte('journal_entries.transaction_date', to)
+      .eq('journal_entries.is_reversed', false)
+      .order('id', { ascending: true })
+      .range(lo, hi))) as Record<string, unknown>[]
+    for (const l of lines) {
       const je = jeById.get(l.entry_id as string)
       if (!je) continue
       const code = l.account_code as string

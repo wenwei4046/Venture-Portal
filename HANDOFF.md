@@ -84,6 +84,29 @@ partial receipts only ever hang off invoice_id.
    issued (bal 20,855.82). credit_dept_pool_on_invoice_paid keys off
    reference_type='invoice' so it never double-fired.
 
+## FIXED 2026-08-13 — Ledger/BS/CFS 400s: JE-id lists outgrew the URL
+
+User hit "fetchLedgers opening lines: Bad Request" on /reports/ledger. Root
+cause: the two-step pattern `fetch all JE ids (< from / in range) → journal_
+lines .in('entry_id', ids)` puts every uuid into the GET query string;
+history passed a few thousand JEs and PostgREST now rejects the request
+outright (bare 400) — the whole-history variants (Ledger opening, Balance
+Sheet, Cash Flow opening/closing) died first; the in-range variants (P&L
+treasury/manual-JV, Ledger period) were next as months accumulate.
+
+Fix: every affected query now filters through the embedded join instead —
+`journal_entries!inner(transaction_date, is_reversed[, segment])` with
+gte/lte/lt + is_reversed on the joined columns, paginated via fetchAllRows
+(URL is constant-size forever). Touched in lib/cfo-reports.ts:
+gatherTreasury, gatherManualJvPnl (segment now rides the join),
+sumGlNetAcrossCodes (signature: jeIds → asOf; all 10 call sites incl.
+fetchBalanceSheet which dropped its id prefetch, and fetchCashflowStatement
+opening/closing where fetchJeIdsBefore/-OnOrBefore were deleted), and
+fetchLedgers opening + period lines. Also reconciliation/journal-entries
+page's line-counts query (unbounded JV id list). reconciliation/journal
+page keeps its .in — bounded by .limit(50). **Rule going forward: never
+put an unbounded id list into .in(); filter through the join.**
+
 ## Daily Bank dashboard (2026-08-11, no migration)
 
 User showed screenshots of their OTHER system's daily board and wants the same

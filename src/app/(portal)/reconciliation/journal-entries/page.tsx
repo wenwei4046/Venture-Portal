@@ -22,16 +22,14 @@ export default async function JournalEntriesPage() {
   const entryList = entries ?? []
 
   // Line COUNTS only — the previous `chart_of_accounts!inner` embed errored
-  // silently, so every row showed "0 lines". The list never displays line
-  // detail, so a bare entry_id select is all that's needed.
-  const entryIds = entryList.map((e) => e.id)
-  const { data: allLines } =
-    entryIds.length > 0
-      ? await supabase
-          .from('journal_lines')
-          .select('entry_id')
-          .in('entry_id', entryIds)
-      : { data: null }
+  // silently, so every row showed "0 lines". Filtered through the JE join
+  // instead of .in('entry_id', ids) — a long id list in the URL 400s once
+  // the JV history grows (the 2026-08-13 Ledger failure class).
+  const { data: allLines } = await supabase
+    .from('journal_lines')
+    .select('entry_id, journal_entries!inner(reference_type, is_reversed)')
+    .in('journal_entries.reference_type', ['manual_jv', 'payroll_accrual'])
+    .eq('journal_entries.is_reversed', false)
 
   const lineCounts = new Map<string, number>()
   for (const line of allLines ?? []) {
