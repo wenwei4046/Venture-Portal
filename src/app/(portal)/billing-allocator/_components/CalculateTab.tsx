@@ -47,7 +47,9 @@ export default function CalculateTab({
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [rows, setRows] = useState<Row[]>([blankRow(0)])
-  const [hcMode, setHcMode] = useState<'current' | 'snapshot'>('current')
+  // 'current' or a snapshot period 'YYYY-MM' — ANY saved month is pickable
+  // (user 2026-08-13: bill one month on another month's list).
+  const [hcSource, setHcSource] = useState<string>('current')
   const [error, setError] = useState<string | null>(null)
   const [nextKey, setNextKey] = useState(1)
 
@@ -75,7 +77,7 @@ export default function CalculateTab({
       pct,
       custom,
     }])
-    setHcMode(editTxn.hcPeriod ? 'snapshot' : 'current')
+    setHcSource(editTxn.hcPeriod ?? 'current')
     setError(null)
   }, [editTxn])
 
@@ -85,21 +87,22 @@ export default function CalculateTab({
     onDoneEditing()
   }
 
-  const hasSnapshot = data.snapshotPeriods.includes(data.period)
-
   // Staff splits for the client-side preview (server recomputes on save).
   // Target keys are opaque to the engine: company uuid / dept:<uuid> / null own.
-  // hcMode=snapshot uses THE PERIOD'S SNAPSHOT — the same rows the server will
+  // A snapshot source uses THAT MONTH'S rows — the same rows the server will
   // load — so the preview always matches what gets saved (user 2026-08-01:
   // "要确保是会用我选的月份的名单去计算").
   const staffSplits: StaffSplit[] = useMemo(
     () =>
-      hcMode === 'snapshot'
-        ? data.snapshotSplits.map((x) => ({ companyId: x.targetId, pct: x.pct }))
+      hcSource !== 'current'
+        ? (data.snapshotSplitsByPeriod[hcSource] ?? []).map((x) => ({
+            companyId: x.targetId,
+            pct: x.pct,
+          }))
         : data.staff
             .filter((s) => s.status === 'active')
             .flatMap((s) => s.splits.map((x) => ({ companyId: x.targetId, pct: x.pct }))),
-    [data.staff, data.snapshotSplits, hcMode],
+    [data.staff, data.snapshotSplitsByPeriod, hcSource],
   )
 
   // Billable targets = subsidiaries + departments the headcount references
@@ -161,7 +164,7 @@ export default function CalculateTab({
         const lines = allocateExpense(toInput(r), {
           companies: targets,
           staffSplits,
-          hcLabel: hcMode === 'snapshot' ? data.period : 'current',
+          hcLabel: hcSource !== 'current' ? hcSource : 'current',
         })
         out.push({ row: r, lines })
       } catch (err) {
@@ -169,7 +172,7 @@ export default function CalculateTab({
       }
     }
     return out
-  }, [rows, staffSplits, targets, hcMode, data.period])
+  }, [rows, staffSplits, targets, hcSource])
 
   const previewOk = preview.length > 0 && preview.every((p) => !p.error)
   const billedSum = preview.reduce((s, p) => s + (p.lines ? billedTotal(p.lines) : 0), 0)
@@ -178,13 +181,15 @@ export default function CalculateTab({
     setError(null)
     startTransition(async () => {
       try {
+        const hcMode = hcSource === 'current' ? ('current' as const) : ('snapshot' as const)
+        const hcPeriod = hcSource === 'current' ? undefined : hcSource
         if (editTxn) {
           const first = preview.find((p) => p.lines)
           if (!first) throw new Error('Nothing to save')
-          unwrap(await updateAllocTxn({ txnId: editTxn.id, hcMode, expense: toInput(first.row) }))
+          unwrap(await updateAllocTxn({ txnId: editTxn.id, hcMode, hcPeriod, expense: toInput(first.row) }))
         } else {
           const expenses = preview.filter((p) => p.lines).map((p) => toInput(p.row))
-          unwrap(await saveAllocBatch({ period: data.period, hcMode, expenses }))
+          unwrap(await saveAllocBatch({ period: data.period, hcMode, hcPeriod, expenses }))
         }
         setRows([blankRow(nextKey)])
         setNextKey((k) => k + 1)
@@ -209,19 +214,28 @@ export default function CalculateTab({
         </div>
       ) : null}
 
-      {/* Headcount source */}
+      {/* Headcount source — any saved month's snapshot is pickable */}
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-xs uppercase tracking-wide text-muted font-sans">Headcount 用</span>
         <select
-          value={hcMode}
-          onChange={(e) => setHcMode(e.target.value as 'current' | 'snapshot')}
+          value={hcSource}
+          onChange={(e) => setHcSource(e.target.value)}
           className={inputCls}
         >
           <option value="current">现在的名单 · current list</option>
-          <option value="snapshot" disabled={!hasSnapshot}>
-            {data.period} 快照{hasSnapshot ? '' : '(还没存 — 去名单 tab 存)'}
-          </option>
+          {data.snapshotPeriods.length === 0 ? (
+            <option value="" disabled>还没有快照 — 去名单 tab 存</option>
+          ) : (
+            data.snapshotPeriods.map((p) => (
+              <option key={p} value={p}>{p} 快照</option>
+            ))
+          )}
         </select>
+        {hcSource !== 'current' && hcSource !== data.period ? (
+          <span className="font-sans text-xs text-alert">
+            ⚠ 用 {hcSource} 的名单算 {data.period} 的账
+          </span>
+        ) : null}
       </div>
 
       {/* Expense rows */}

@@ -384,18 +384,21 @@ export interface ExpenseBatchInput {
   customSplits?: { companyId: string | null; amount: number }[]
 }
 
-/** Targets + headcount context for a period — shared by save and update. */
+/** Targets + headcount context for a period — shared by save and update.
+ *  `hcPeriod` (user 2026-08-13: "要" cross-month) picks WHICH month's snapshot
+ *  feeds the headcount — e.g. bill August on July's list; defaults to the
+ *  billing period itself. */
 async function loadCalcContext(
   supabase: SupabaseClient,
   period: string,
   hcMode: 'current' | 'snapshot',
+  hcPeriod?: string,
 ): Promise<{
   targets: { id: string; label: string }[]
   staffSplits: StaffSplit[]
   hcLabel: string
   hcPeriodCol: string | null
 }> {
-  const pd = periodDate(period)
   const [{ data: cos, error: coErr }, { data: depts, error: dErr }, { data: coSettings }] = await Promise.all([
     supabase.from('companies').select('id, short_code, name').eq('is_active', true).order('name'),
     supabase.from('departments').select('id, name'),
@@ -418,20 +421,22 @@ async function loadCalcContext(
   let hcLabel = 'current'
   let hcPeriodCol: string | null = null
   if (hcMode === 'snapshot') {
+    const hcp = hcPeriod && /^\d{4}-\d{2}$/.test(hcPeriod) ? hcPeriod : period
+    const hcpDate = periodDate(hcp)
     const { data: hist, error } = await supabase
       .from('alloc_staff_history')
       .select('company_id, department_id, pct, status')
-      .eq('period_month', pd)
+      .eq('period_month', hcpDate)
     if (error) throw new Error(error.message)
-    if (!hist || hist.length === 0) throw new Error(`No headcount snapshot for ${period} — save one on the Staff tab first`)
+    if (!hist || hist.length === 0) throw new Error(`No headcount snapshot for ${hcp} — save one on the Staff tab first`)
     staffSplits = hist
       .filter((h) => h.status === 'active')
       .map((h) => ({
         companyId: encodeTarget((h.company_id as string | null), (h.department_id as string | null)),
         pct: Number(h.pct),
       }))
-    hcLabel = period
-    hcPeriodCol = pd
+    hcLabel = hcp
+    hcPeriodCol = hcpDate
   } else {
     const [{ data: staff, error: sErr }, { data: splits, error: spErr }] = await Promise.all([
       supabase.from('alloc_staff').select('id, status'),
@@ -476,6 +481,8 @@ async function loadCalcContext(
 async function saveAllocBatchInner(payload: {
   period: string
   hcMode: 'current' | 'snapshot'
+  /** Which month's snapshot to use (YYYY-MM); defaults to `period`. */
+  hcPeriod?: string
   expenses: ExpenseBatchInput[]
 }): Promise<{ txnNos: string[] }> {
   const user = await requireRole(['finance', 'principal'])
@@ -488,7 +495,7 @@ async function saveAllocBatchInner(payload: {
   // next Generate only picks up the unbilled ones.
 
   const { targets, staffSplits, hcLabel, hcPeriodCol } = await loadCalcContext(
-    supabase, payload.period, payload.hcMode,
+    supabase, payload.period, payload.hcMode, payload.hcPeriod,
   )
 
   // Allocate everything BEFORE writing anything — one bad expense aborts all.
@@ -569,6 +576,8 @@ async function saveAllocBatchInner(payload: {
 async function updateAllocTxnInner(payload: {
   txnId: string
   hcMode: 'current' | 'snapshot'
+  /** Which month's snapshot to use (YYYY-MM); defaults to the txn's period. */
+  hcPeriod?: string
   expense: ExpenseBatchInput
 }): Promise<{ txnNo: string }> {
   await requireRole(['finance', 'principal'])
@@ -584,7 +593,7 @@ async function updateAllocTxnInner(payload: {
   await assertTxnNotBilled(supabase, txn.txn_no as string, (txn.billed_ref as string | null) ?? null)
 
   const { targets, staffSplits, hcLabel, hcPeriodCol } = await loadCalcContext(
-    supabase, period, payload.hcMode,
+    supabase, period, payload.hcMode, payload.hcPeriod,
   )
   const exp = payload.expense
   const lines = allocateExpense(

@@ -84,6 +84,22 @@ partial receipts only ever hang off invoice_id.
    issued (bal 20,855.82). credit_dept_pool_on_invoice_paid keys off
    reference_type='invoice' so it never double-fired.
 
+## Allocator: cross-month snapshots (2026-08-13)
+
+User: "为什么我快照明明有7月的了，但是选项没有" → the Calculate headcount
+dropdown only offered THE PERIOD'S OWN snapshot (v1 safety pairing). They
+want cross-month ("要") — e.g. bill August on July's list. Now:
+ - Dropdown lists 现在的名单 + EVERY saved snapshot month; picking a month ≠
+   billing period shows an amber "⚠ 用 X 的名单算 Y 的账" note (mistake still
+   visible, no longer blocked).
+ - Plumbing: hcSource ('current' | 'YYYY-MM') in CalculateTab; save/update
+   send hcMode + optional hcPeriod; loadCalcContext(period, hcMode, hcPeriod?)
+   loads that month's alloc_staff_history and stamps hc_period with it, so
+   Records show which list was actually used and edit-mode restores it.
+ - Page now fetches ALL snapshot rows once (snapshotSplitsByPeriod map keyed
+   YYYY-MM, replacing single-period snapshotSplits) — preview for any month
+   mirrors exactly what the server loads.
+
 ## FIXED 2026-08-13 — Ledger/BS/CFS 400s: JE-id lists outgrew the URL
 
 User hit "fetchLedgers opening lines: Bad Request" on /reports/ledger. Root

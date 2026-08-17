@@ -80,9 +80,10 @@ export interface AllocatorData {
   snapshotPeriods: string[]
   /** Months HR's hr_staff_allocation has data for — drives the import picker. */
   hrPeriods: string[]
-  /** THIS period's snapshot (active rows, encoded targets) so the Calculate
-   *  preview under hcMode=snapshot matches what the server will use. */
-  snapshotSplits: { targetId: string | null; pct: number }[]
+  /** EVERY saved snapshot's active rows keyed by 'YYYY-MM' — the Calculate
+   *  headcount picker can use ANY month's list (user 2026-08-13), and the
+   *  preview always mirrors the rows the server will load. */
+  snapshotSplitsByPeriod: Record<string, { targetId: string | null; pct: number }[]>
   /** Full COA for the category COA picker (AccountPicker filters itself). */
   coaAccounts: AccountOption[]
   categories: CategoryRow[]
