@@ -86,13 +86,14 @@ export default async function HRPaymentPage({
     : { data: null }
   const poolBal = Number(poolRow?.balance ?? 0)
 
-  // Director custody is parked in dept_pool_director, NOT here (mig
-  // 20260727100000: run-less director funding request, target_pool
-  // dept_pool_director) — surface it under the HR figure so the card
-  // covers both custody pots.
+  // Where the director round's custody sits depends on when it was filed:
+  // mig 20260818000000 retargets run-less director requests to dept_pool_hr
+  // (cost still drained from dept_pool_director, this pool is just the
+  // transit stop); rounds filed before that parked in dept_pool_director and
+  // are NOT part of the balance above. Read target_pool and say which.
   const { data: directorFunding } = await supabase
     .from('payroll_payment_requests')
-    .select('amount, status')
+    .select('amount, status, target_pool')
     .is('payroll_run_id', null)
     .eq('period_month', period)
     .in('status', ['submitted', 'pv_generated', 'completed'])
@@ -216,7 +217,7 @@ export default async function HRPaymentPage({
   const { data: statutoryPvsRaw } = run
     ? await supabase
         .from('payment_vouchers')
-        .select('id, voucher_no, payee_name, status, payment_date, source_pool')
+        .select('id, voucher_no, payee_name, status, payment_date, source_pool, description')
         .eq('reference_type', 'payroll_statutory')
         .eq('reference_id', run.id)
         .neq('status', 'voided')
@@ -235,26 +236,28 @@ export default async function HRPaymentPage({
     { scheme: 'PCB', payee: 'LHDN', staff: staffSum(r => n(r.pcb)), directors: dirSum(d => n(d.pcb)) },
     { scheme: 'SKBBK', payee: 'SKBBK', staff: staffSum(r => n(r.skbbk_amount)), directors: dirSum(d => n(d.skbbk_amount)) },
   ]
-  // Which of those vouchers already carry a director source row? A combined
+  // Which of those vouchers already carry the director share? A combined
   // voucher (director actuals present at generation time) needs no top-up.
-  const statutoryPvIds = (statutoryPvsRaw ?? []).map(v => v.id as string)
-  const { data: dirSourceRows } = statutoryPvIds.length
-    ? await supabase
-        .from('payment_voucher_sources')
-        .select('voucher_id')
-        .in('voucher_id', statutoryPvIds)
-        .eq('pool', 'dept_pool_director')
-    : { data: [] }
-  const dirCovered = new Set((dirSourceRows ?? []).map(r => r.voucher_id as string))
+  // Read it off the description suffix — ' (staff)' / ' (staff + directors)' /
+  // ' (directors)', kept in step with the actual shares by mig
+  // 20260731040000. Mig 20260818000000 moved the director share onto
+  // dept_pool_hr, so source_pool no longer tells the two apart; the
+  // description discriminates old and new rows alike.
+  const carriesDirectors = (v: { description?: string | null }) =>
+    /directors\)\s*$/.test(String(v.description ?? ''))
+  const isDirectorOnly = (v: { description?: string | null }) =>
+    /\(directors\)\s*$/.test(String(v.description ?? ''))
 
   const statutoryRows: StatutoryRow[] = SCHEMES.map(s => {
     // A payee can carry TWO vouchers since mig 20260731050000: the main one
-    // (source_pool dept_pool_hr — staff, or staff+directors combined) and a
-    // director-only top-up (source_pool dept_pool_director), raised when the
-    // main one was generated before the director actuals existed (Jun 2026).
+    // (staff, or staff+directors combined) and a director-only top-up, raised
+    // when the main one was generated before the director actuals existed
+    // (Jun 2026). The main one is whichever is not director-only; if the only
+    // voucher IS director-only (no staff that period) it stands as the main.
     const forPayee = (statutoryPvsRaw ?? []).filter(v => v.payee_name === s.payee)
-    const pv = forPayee.find(v => v.source_pool !== 'dept_pool_director') ?? null
-    const topup = forPayee.find(v => v.source_pool === 'dept_pool_director') ?? null
+    const pv =
+      forPayee.find(v => !isDirectorOnly(v)) ?? forPayee.find(isDirectorOnly) ?? null
+    const topup = forPayee.find(v => isDirectorOnly(v) && v.id !== pv?.id) ?? null
     const shape = (v: NonNullable<typeof pv>) => ({
       id: v.id as string,
       voucher_no: v.voucher_no,
@@ -268,7 +271,7 @@ export default async function HRPaymentPage({
       directors: Math.round(s.directors * 100) / 100,
       pv: pv ? shape(pv) : null,
       topupPv: topup ? shape(topup) : null,
-      directorsCovered: !!topup || (pv ? dirCovered.has(pv.id as string) : false),
+      directorsCovered: !!topup || (pv ? carriesDirectors(pv) : false),
     }
   })
 
@@ -398,7 +401,9 @@ export default async function HRPaymentPage({
           </div>
           {directorFunding && (
             <div className="font-mono text-xs text-muted mt-1">
-              Director custody {formatMoney(Number(directorFunding.amount))} · held in Director Pool
+              {directorFunding.target_pool === 'dept_pool_hr'
+                ? `Incl. director custody ${formatMoney(Number(directorFunding.amount))} · drawn from Director Pool`
+                : `Director custody ${formatMoney(Number(directorFunding.amount))} · held in Director Pool`}
               {directorFunding.status === 'completed'
                 ? ' · funds staged'
                 : directorFunding.status === 'pv_generated'
