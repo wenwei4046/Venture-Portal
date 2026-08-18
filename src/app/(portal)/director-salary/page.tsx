@@ -9,6 +9,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
+import {
+  calculateDirectorGap,
+  type GapSettings,
+  type GapDirector,
+} from '@/lib/director-gap'
 import dayjs from 'dayjs'
 import Link from 'next/link'
 import CTCInputGrid from './_components/CTCInputGrid'
@@ -56,6 +61,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
     { data: liveByCompany },
     { data: actualPayrollRows },
     { data: fundingRequest },
+    { data: dpSettings },
   ] = await Promise.all([
     supabase.from('directors').select('id, name, code, weightage, min_payout').eq('status', 'active').order('code'),
     supabase.from('companies').select('id, name, short_code, director_heads').eq('is_active', true).order('name'),
@@ -81,6 +87,9 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
       .order('requested_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // Saving / 75-25 split rates for the billing-vs-payroll reconciliation.
+    // Same source the /director-pool calculator reads — never hardcoded here.
+    supabase.from('dp_settings').select('saving_pct, gb_pct').eq('id', 1).maybeSingle(),
   ])
 
   // Director actual payroll (InfoTech import) — verbatim rows + director code.
@@ -243,6 +252,15 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
           hasActualPayroll={hasActualPayroll}
           hasCtc={hasCtc}
           liveTotals={liveTotals}
+          gapSettings={{
+            savingPct: Number(dpSettings?.saving_pct ?? 0),
+            gbPct: Number(dpSettings?.gb_pct ?? 0),
+          }}
+          gapDirectors={(directors ?? []).map(d => ({
+            code: d.code,
+            weightage: Number(d.weightage),
+            minPayout: Number(d.min_payout),
+          }))}
           payrollRows={actualRows}
           liveByCompany={((liveByCompany as ByCompanyRow[] | null) ?? []).map(r => ({
             ...r,
@@ -314,6 +332,8 @@ function SubmissionTab({
   hasActualPayroll,
   hasCtc,
   liveTotals,
+  gapSettings,
+  gapDirectors,
   payrollRows,
   liveByCompany,
 }: {
@@ -325,6 +345,8 @@ function SubmissionTab({
   hasActualPayroll: boolean
   hasCtc: boolean
   liveTotals: SubmissionTotals | null
+  gapSettings: GapSettings
+  gapDirectors: GapDirector[]
   payrollRows: DirectorPayrollRowData[]
   liveByCompany: ByCompanyRow[]
 }) {
@@ -370,6 +392,25 @@ function SubmissionTab({
         directors: Number(submission.director_count),
       }
     : liveTotals
+
+  // Where the billing-vs-payroll difference went. Derived on the fly from the
+  // figures already on this tab — nothing is written to the database.
+  const gap =
+    totals && byCompany.length > 0
+      ? calculateDirectorGap({
+          poolBasic: byCompany.reduce((s, r) => s + (r.basic ?? 0), 0),
+          poolKpi: byCompany.reduce((s, r) => s + (r.kpi ?? 0), 0),
+          poolAllowance: byCompany.reduce((s, r) => s + (r.allowance ?? 0), 0),
+          ctcEmployerStat: byCompany.reduce(
+            (s, r) => s + (r.epf_er ?? 0) + (r.socso_er ?? 0) + (r.eis_er ?? 0),
+            0,
+          ),
+          payrollGross: totals.payrollGross,
+          payrollEmployerStat: totals.statutoryEr,
+          settings: gapSettings,
+          directors: gapDirectors,
+        })
+      : null
 
   const missing: string[] = []
   if (!hasActualPayroll) missing.push('Import the InfoTech director payroll')
@@ -451,6 +492,181 @@ function SubmissionTab({
             <div className="num text-graphite text-md mt-1">{totals.directors}</div>
           </div>
         </div>
+      )}
+
+      {/* Billing vs Payroll reconciliation — the two lines never tally, and
+          this is where the difference goes. Derived live from the figures
+          above (rates from dp_settings); nothing is persisted. */}
+      {gap && (
+        <section className="mb-16">
+          <div className="sect-head">
+            <h2>Billing vs Payroll — Where the Difference Went</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">NOT STORED</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8 border-y border-hairline py-6">
+            <div>
+              <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
+                Billed to Subsidiaries
+              </div>
+              <div className="num text-num-ink text-xl tracking-[-0.01em] mt-1">
+                {formatMoney(gap.ctcTotal)}
+              </div>
+              <div className="font-mono text-[11px] text-muted mt-1">
+                gross {formatMoney(gap.ctcGross)} + ER stat
+              </div>
+            </div>
+            <div>
+              <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
+                Actually Paid Out
+              </div>
+              <div className="num text-num-ink text-xl tracking-[-0.01em] mt-1">
+                {formatMoney(gap.cashOut)}
+              </div>
+              <div className="font-mono text-[11px] text-muted mt-1">
+                InfoTech gross + ER stat
+              </div>
+            </div>
+            <div>
+              <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
+                Difference
+              </div>
+              <div className="num text-accent text-xl tracking-[-0.01em] mt-1">
+                {formatMoney(gap.gap)}
+              </div>
+              <div className="font-mono text-[11px] text-muted mt-1">
+                stays in the HV account
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="ledger-table [&_td.num]:whitespace-nowrap">
+              <thead>
+                <tr>
+                  <th>Bucket</th>
+                  <th>What it is</th>
+                  <th className="right">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="font-serif text-[15px] text-ink">
+                    {gap.saving > 0 ? `${gapSettings.savingPct}% Saving` : 'Saving'}
+                  </td>
+                  <td className="font-sans text-xs text-graphite">
+                    Held back on the directors&rsquo; behalf — never left HV
+                  </td>
+                  <td className="num">{formatMoney(gap.saving)}</td>
+                </tr>
+                <tr>
+                  <td className="font-serif text-[15px] text-ink">
+                    {100 - gapSettings.gbPct}% Billing Invoice
+                  </td>
+                  <td className="font-sans text-xs text-graphite">
+                    Accrues on the outsource side — not part of this payroll
+                  </td>
+                  <td className="num">{formatMoney(gap.billing25)}</td>
+                </tr>
+                <tr>
+                  <td className="font-serif text-[15px] text-ink">Advance fronted by HV</td>
+                  <td className="font-sans text-xs text-graphite">
+                    Payroll ran above the pool&rsquo;s {gapSettings.gbPct}% share (
+                    {formatMoney(gap.totalPay75)}) — HV covered the shortfall
+                  </td>
+                  <td className="num">
+                    <span className="neg">({formatMoney(gap.advanceCash)})</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="font-serif text-[15px] text-ink">Employer Statutory Surplus</td>
+                  <td className="font-sans text-xs text-graphite">
+                    ER statutory billed to subsidiaries exceeded what payroll actually paid
+                  </td>
+                  <td className="num">{formatMoney(gap.statutorySurplus)}</td>
+                </tr>
+                <tr>
+                  <td className="font-serif italic text-accent">Accounted for</td>
+                  <td />
+                  <td className="num font-semibold">
+                    {formatMoney(
+                      gap.saving + gap.billing25 - gap.advanceCash + gap.statutorySurplus,
+                    )}
+                  </td>
+                </tr>
+                {Math.abs(gap.residual) >= 0.01 && (
+                  <tr>
+                    <td className="font-serif italic text-graphite">Rounding</td>
+                    <td />
+                    <td className="num text-graphite">{formatMoney(gap.residual)}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Per-director view of the advance — the ledger figure differs from
+              the cash figure whenever someone's share clears their fixed pay. */}
+          <div className="overflow-x-auto mt-8">
+            <table className="ledger-table [&_td.num]:whitespace-nowrap">
+              <thead>
+                <tr>
+                  <th>Director</th>
+                  <th className="right">Pool share ({gapSettings.gbPct}%)</th>
+                  <th className="right">Fixed salary</th>
+                  <th className="right">Vr KPI</th>
+                  <th className="right">{100 - gapSettings.gbPct}% Billing</th>
+                </tr>
+              </thead>
+              <tbody>
+                {gap.perDirector.map(d => (
+                  <tr key={d.code}>
+                    <td className="font-serif text-[15px] text-ink">{d.code}</td>
+                    <td className="num">{formatMoney(d.totalPay)}</td>
+                    <td className="num text-graphite">{formatMoney(d.fixed)}</td>
+                    <td className="num">
+                      {d.vrKpi < 0 ? (
+                        <span className="neg">({formatMoney(Math.abs(d.vrKpi))})</span>
+                      ) : (
+                        <span className="text-ledger">{formatMoney(d.vrKpi)}</span>
+                      )}
+                    </td>
+                    <td className="num text-graphite">{formatMoney(d.billing25)}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td className="font-serif italic text-accent">Total</td>
+                  <td className="num font-semibold">{formatMoney(gap.totalPay75)}</td>
+                  <td className="num font-semibold text-graphite">
+                    {formatMoney(gap.perDirector.reduce((s, d) => s + d.fixed, 0))}
+                  </td>
+                  <td className="num font-semibold">
+                    <span className="neg">({formatMoney(gap.advanceLedger)})</span>
+                  </td>
+                  <td className="num font-semibold text-graphite">
+                    {formatMoney(gap.billing25)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p className="font-sans text-xs text-muted mt-3">
+            Two advance views: <strong>{formatMoney(gap.advanceLedger)}</strong> is the ledger
+            figure — debt booked against only the directors who fell short.{' '}
+            <strong>{formatMoney(gap.advanceCash)}</strong> is the cash figure used in the table
+            above, which nets off directors whose share ran above their fixed salary, so the
+            buckets tally against the difference.
+          </p>
+          <p className="font-sans text-xs text-muted mt-2">
+            Computed on the fly from this period&rsquo;s figures at the rates in Director Pool
+            settings ({gapSettings.savingPct}% saving · {gapSettings.gbPct}/
+            {100 - gapSettings.gbPct} split). <strong>Nothing here is written to the database</strong> —
+            these buckets have no ledger of their own yet, so the difference simply sits in the HV
+            bank account.
+          </p>
+        </section>
       )}
 
       {/* Director Payroll (InfoTech) — per-director detail. Shown here for
