@@ -12,12 +12,16 @@ import { resolveLoansReceivableLeaf } from '@/lib/loans-coa'
 import type { Database } from '@/lib/supabase/database.types'
 
 // Mig 197: dept name → equity GL code mirror (must match dept_pool_gl_code SQL helper).
+// 2026-08-19: realigned to the post-unified-COA codes — the old 3030-3080 had
+// been renumbered to 1030-1070 (equity) by the bigbang reseed, while 30xx now
+// holds receivables. Never fired in between (no 'Dept Pool → Venture transfer'
+// JE exists), so no historical postings need correction.
 const DEPT_POOL_GL: Record<string, string> = {
-  Marketing: '3030',
-  Finance: '3040',
-  HR: '3050',
-  'Director Office': '3070',
-  Director: '3080',
+  Marketing: '1030',
+  Finance: '1040',
+  HR: '1050',
+  'Director Office': '1060',
+  Director: '1070',
 }
 
 // ─── Shared approval executor ─────────────────────────────────────────────────

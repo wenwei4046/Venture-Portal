@@ -66,8 +66,8 @@ async function interBillingNatureSplits(
 
 // Mig 200/P1-6a: invoice billing_mode → revenue GL code mapping.
 // 2026-06-11: fallback now lives in lib/billing.ts (fallbackRevenueGlCode) —
-// the four *_attribution modes are salary recharges and default to 5020
-// Salary Income; everything else stays on 5000 Service Revenue — Subs.
+// the four *_attribution modes are salary recharges and default to 5050
+// Salary Income; everything else stays on 5011 Service Revenue — Subs.
 function revenueGlCode(billingMode: string | null): string {
   return fallbackRevenueGlCode(billingMode)
 }

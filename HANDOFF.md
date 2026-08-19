@@ -84,6 +84,33 @@ partial receipts only ever hang off invoice_id.
    issued (bal 20,855.82). credit_dept_pool_on_invoice_paid keys off
    reference_type='invoice' so it never double-fired.
 
+## FIXED 2026-08-19 — user renamed income codes in Settings; app hardcodes realigned
+
+User renamed COA codes in Settings → Accounts (5020→5050 Salary Income,
+5000→5011 Service Revenue - Subs; plus new 5030/5031 groupings, 5999 Discount
+Allowed). rename_account_code re-pointed ALL history correctly (394 lines on
+5050 back to Jan; zero dangling refs anywhere) — but string literals in code
+don't follow renames. Realigned:
+ - lib/billing.ts fallbackRevenueGlCode: '5020'→'5050', '5000'→'5011'
+   (dead codes would have made consolidated-payroll/own-share invoice ISSUE
+   fail on the journal_lines FK)
+ - lib/inter-billing-nature.ts INCOME_TO_PAYER_EXPENSE: '5020'→'5050'
+   (else salary recharges settle into the 905x lump, not 9030 Salary Expense)
+ - GenerateConsolidatedInvoicesButton / GenerateOwnShareInvoiceButton default
+   categoryCode '5020'→'5050'
+ - approvals/actions.ts DEPT_POOL_GL: 3030/3040/3050/3070/3080 →
+   1030/1040/1050/1060/1070 — PRE-EXISTING stale mirror from before the
+   unified-COA bigbang (30xx are receivables now; 3070/3080 don't even
+   exist). Never fired (no 'Dept Pool → Venture transfer' JE), no data fix
+   needed.
+STANDING RULE: COA codes are hardcoded in lib/billing.ts,
+lib/inter-billing-nature.ts, lib/loans-coa.ts, lib/payroll-accrual.ts,
+approvals/actions.ts (DEPT_POOL_GL + AR/bank codes), billing/actions.ts,
+ba/actions.ts ('5028'/'6001'), claims/actions.ts ('9000'), fund-out,
+payments. After ANY code rename in Settings, grep src for the old code
+('XXXX' quoted) and realign. payment_categories table no longer exists;
+7725-7844 in hr-costing staff import are BANK codes, not COA.
+
 ## FIXED 2026-08-13 — July CTC invoices' income landed in August
 
 User: "我在july 的period, 我开的invoice 应该是31/07。他现在放到去8月".

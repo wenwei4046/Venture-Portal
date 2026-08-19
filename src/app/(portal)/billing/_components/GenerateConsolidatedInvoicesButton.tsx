@@ -55,7 +55,7 @@ export default function GenerateConsolidatedInvoicesButton({ currentPeriod, cate
   const [period, setPeriod] = useState(dayjs(currentPeriod).format('YYYY-MM'))
   const [preview, setPreview] = useState<ConsolidatedCompanyPreview[] | null>(null)
   const [loading, setLoading] = useState(false)
-  const [categoryCode, setCategoryCode] = useState('5020')
+  const [categoryCode, setCategoryCode] = useState('5050')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 

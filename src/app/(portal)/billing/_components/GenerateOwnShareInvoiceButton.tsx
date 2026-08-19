@@ -54,7 +54,7 @@ export default function GenerateOwnShareInvoiceButton({ currentPeriod, categorie
   const [period, setPeriod] = useState(dayjs(currentPeriod).format('YYYY-MM'))
   const [preview, setPreview] = useState<OwnShareInvoicePreview | null>(null)
   const [loading, setLoading] = useState(false)
-  const [categoryCode, setCategoryCode] = useState('5020')
+  const [categoryCode, setCategoryCode] = useState('5050')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 

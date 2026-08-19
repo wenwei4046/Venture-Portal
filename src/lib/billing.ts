@@ -125,8 +125,10 @@ export function invoiceJeDate(
 /**
  * Fallback revenue GL code when an invoice carries no explicit category:
  * the four *_attribution billing modes ARE salary recharges by definition →
- * 5020 Salary Income; everything else stays on 5000 Service Revenue — Subs.
+ * 5050 Salary Income; everything else stays on 5011 Service Revenue — Subs.
  * (user 2026-06-11: salary invoices were landing under Service Revenue.)
+ * These literals must track COA renames — 2026-08-19 the user renamed
+ * 5020→5050 and 5000→5011 in Settings, which re-points history but not code.
  */
 export function fallbackRevenueGlCode(billingMode: string | null): string {
   switch (billingMode) {
@@ -139,9 +141,9 @@ export function fallbackRevenueGlCode(billingMode: string | null): string {
     // routing is per-line via invoice_lines.segment (issue splits the JE by
     // segment); this only decides the revenue ACCOUNT, not the segment.
     case 'payroll_consolidated':
-      return '5020'
+      return '5050'
     default:
-      return '5000'
+      return '5011'
   }
 }
 

@@ -113,16 +113,16 @@ describe('invoiceJeDate', () => {
 })
 
 describe('fallbackRevenueGlCode', () => {
-  it('routes salary-attribution modes to 5020 Salary Income', () => {
-    expect(fallbackRevenueGlCode('hr_attribution')).toBe('5020')
-    expect(fallbackRevenueGlCode('finance_attribution')).toBe('5020')
-    expect(fallbackRevenueGlCode('director_office_attribution')).toBe('5020')
-    expect(fallbackRevenueGlCode('director_attribution')).toBe('5020')
+  it('routes salary-attribution modes to 5050 Salary Income', () => {
+    expect(fallbackRevenueGlCode('hr_attribution')).toBe('5050')
+    expect(fallbackRevenueGlCode('finance_attribution')).toBe('5050')
+    expect(fallbackRevenueGlCode('director_office_attribution')).toBe('5050')
+    expect(fallbackRevenueGlCode('director_attribution')).toBe('5050')
   })
-  it('keeps service billing on 5000', () => {
-    expect(fallbackRevenueGlCode('marketing_project')).toBe('5000')
-    expect(fallbackRevenueGlCode('venture_attribution')).toBe('5000')
-    expect(fallbackRevenueGlCode(null)).toBe('5000')
+  it('keeps service billing on 5011', () => {
+    expect(fallbackRevenueGlCode('marketing_project')).toBe('5011')
+    expect(fallbackRevenueGlCode('venture_attribution')).toBe('5011')
+    expect(fallbackRevenueGlCode(null)).toBe('5011')
   })
 })
 

@@ -7,7 +7,8 @@
 // Mapping rules, per invoice line:
 //   income-type category on the receiver → payer expense counterpart
 //       7012 Rental Income → 9094 Office Rental
-//       5020 Salary Income → 9030 Salary Expense
+//       5050 Salary Income → 9030 Salary Expense (code was 5020 until the
+//       2026-08-19 COA rename)
 //   expense-type category (expense recovery, e.g. 9091 utilities) → the SAME
 //       account: receiver carries the credit, payer the debit — the expense
 //       simply migrates to the dept that consumed it.
@@ -16,7 +17,7 @@
 
 export const INCOME_TO_PAYER_EXPENSE: Record<string, string> = {
   '7012': '9094', // Rental Income → Office Rental
-  '5020': '9030', // Salary Income → Salary Expense
+  '5050': '9030', // Salary Income → Salary Expense
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100

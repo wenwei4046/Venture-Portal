@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { payerExpenseSplits } from './inter-billing-nature'
 
 const typeOf = (code: string) =>
-  ({ '9091': 'expense', '9087': 'expense', '7012': 'other_income', '5020': 'revenue' })[code]
+  ({ '9091': 'expense', '9087': 'expense', '7012': 'other_income', '5050': 'revenue' })[code]
 
 describe('payerExpenseSplits', () => {
   it('maps income categories to their payer expense counterparts', () => {
@@ -10,7 +10,7 @@ describe('payerExpenseSplits', () => {
       payerExpenseSplits([{ category_code: '7012', amount: 100 }], 100, null, typeOf, '9051'),
     ).toEqual([{ accountCode: '9094', amount: 100 }])
     expect(
-      payerExpenseSplits([{ category_code: '5020', amount: 50 }], 50, null, typeOf, '9056'),
+      payerExpenseSplits([{ category_code: '5050', amount: 50 }], 50, null, typeOf, '9056'),
     ).toEqual([{ accountCode: '9030', amount: 50 }])
   })
 
