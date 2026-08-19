@@ -153,7 +153,20 @@ export default function CreateInvoiceButton({
   }, [open])
 
   const [period, setPeriod] = useState(dayjs(currentPeriod).format('YYYY-MM'))
-  const [invoiceDate, setInvoiceDate] = useState(dayjs().format('YYYY-MM-DD'))
+  // Invoice date defaults to the PERIOD's month-end and follows the period
+  // until the user touches it (2026-08-13: July CTC invoices created on 4 Aug
+  // kept the old today-default, so their issue JEs landed in August's P&L —
+  // "我开的invoice 应该是31/07").
+  const periodEnd = (p: string) => dayjs(`${p}-01`).endOf('month').format('YYYY-MM-DD')
+  const [invoiceDate, setInvoiceDate] = useState(periodEnd(dayjs(currentPeriod).format('YYYY-MM')))
+  const [dateTouched, setDateTouched] = useState(false)
+  useEffect(() => {
+    if (open) setDateTouched(false)
+  }, [open])
+  useEffect(() => {
+    if (!dateTouched) setInvoiceDate(periodEnd(period))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period, dateTouched, open])
   const [dueDate, setDueDate] = useState(dayjs().add(30, 'day').format('YYYY-MM-DD'))
   const [description, setDescription] = useState('')
   const [referenceNo, setReferenceNo] = useState('')
@@ -794,7 +807,10 @@ export default function CreateInvoiceButton({
                   <input
                     type="date"
                     value={invoiceDate}
-                    onChange={(e) => setInvoiceDate(e.target.value)}
+                    onChange={(e) => {
+                      setDateTouched(true)
+                      setInvoiceDate(e.target.value)
+                    }}
                     disabled={isPending}
                     className={inputCls + ' font-mono'}
                   />

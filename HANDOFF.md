@@ -84,6 +84,23 @@ partial receipts only ever hang off invoice_id.
    issued (bal 20,855.82). credit_dept_pool_on_invoice_paid keys off
    reference_type='invoice' so it never double-fired.
 
+## FIXED 2026-08-13 — July CTC invoices' income landed in August
+
+User: "我在july 的period, 我开的invoice 应该是31/07。他现在放到去8月".
+HV-INV-202607-0038..0041 (director CTC, period 2026-07) were created 4 Aug in
+the Create Invoice modal, whose invoice-date field DEFAULTED TO TODAY — so
+invoice_date = 2026-08-04, and bulk issue (correctly, per the 2026-06-11 rule
+"JE date = invoice date") posted their revenue JEs into August.
+ - Data fix (mig 20260813010000, applied live): the 4 invoices → invoice_date
+   2026-07-31; their issue JEs JE-202608-0378..0381 → transaction_date
+   2026-07-31 + period_month 2026-07-01. Settlement receipts stay on real
+   August dates. Entry numbers keep the JE-202608 prefix (cosmetic; all
+   reports bucket by transaction_date). period_locks was empty — no lock
+   bypassed.
+ - Code fix: the modal's invoice date now DEFAULTS TO THE PERIOD'S MONTH-END
+   and follows the period selector until the user touches the field
+   (dateTouched); issue-side logic unchanged (it was already right).
+
 ## Allocator: cross-month snapshots (2026-08-13)
 
 User: "为什么我快照明明有7月的了，但是选项没有" → the Calculate headcount
