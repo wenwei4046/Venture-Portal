@@ -733,14 +733,41 @@ export async function createCreditNote(formData: FormData) {
   const { data: invoice, error: invErr } = await supabase
     .from('invoices')
     .select(
-      'id, company_id, total_amount, billable_to_type, billable_to_department_id, billable_to_freetext_name, billing_mode'
+      'id, invoice_no, status, company_id, total_amount, billable_to_type, billable_to_department_id, billable_to_freetext_name, billing_mode'
     )
     .eq('id', invoiceId)
     .single()
 
   if (invErr || !invoice) throw new Error('Invoice not found')
-  if (amount > Number(invoice.total_amount)) {
-    throw new Error(`Credit note amount cannot exceed invoice total (RM ${Number(invoice.total_amount).toFixed(2)})`)
+  // CN v2 (2026-08-19): a CN nets against the invoice's OUTSTANDING balance,
+  // so it only makes sense on an issued (still-collectable) invoice. A paid
+  // invoice needs a refund (cash-out PV), not a CN; consolidated payroll
+  // invoices settle in full by design, so no CN there either.
+  if (invoice.status !== 'issued') {
+    throw new Error(`Credit notes only apply to issued invoices — this one is ${invoice.status}`)
+  }
+  if (invoice.billing_mode === 'payroll_consolidated') {
+    throw new Error('Consolidated payroll invoices settle in full — credit notes are not supported on them')
+  }
+  const [{ data: receiptRows }, { data: priorCnRows }] = await Promise.all([
+    supabase
+      .from('payment_vouchers')
+      .select('amount')
+      .eq('invoice_id', invoiceId)
+      .eq('direction', 'credit')
+      .neq('status', 'voided'),
+    supabase.from('credit_notes').select('amount, status').eq('invoice_id', invoiceId),
+  ])
+  const received = (receiptRows ?? []).reduce((s, r) => s + Number(r.amount), 0)
+  // Drafts reserve their amount too — two drafts must not over-allocate.
+  const priorCn = (priorCnRows ?? [])
+    .filter((c) => c.status !== 'voided')
+    .reduce((s, c) => s + Number(c.amount), 0)
+  const outstanding = Math.round((Number(invoice.total_amount) - received - priorCn) * 100) / 100
+  if (amount > outstanding + 0.005) {
+    throw new Error(
+      `Credit note amount exceeds the invoice's outstanding balance (RM ${outstanding.toFixed(2)} after receipts and earlier credit notes)`,
+    )
   }
 
   // Mint CN number under advisory lock (mig 227). Replaces the old
@@ -1117,6 +1144,18 @@ export async function settleInvoicesConsolidated(payload: {
     paidById.set(r.invoice_id, (paidById.get(r.invoice_id) ?? 0) + Number(r.amount))
   }
 
+  // Approved credit notes reduce the balance like receipts do (CN v2,
+  // 2026-08-19) — the receipt then collects total − receipts − CNs.
+  const { data: cnRows } = await supabase
+    .from('credit_notes')
+    .select('invoice_id, amount')
+    .in('invoice_id', invoices.map((i) => i.id))
+    .eq('status', 'approved')
+  const creditedById = new Map<string, number>()
+  for (const r of cnRows ?? []) {
+    creditedById.set(r.invoice_id, (creditedById.get(r.invoice_id) ?? 0) + Number(r.amount))
+  }
+
   // Same-company + issued + non-dept_pool + balance validation (pure helper)
   const check = validateConsolidation(
     invoices.map((i) => ({
@@ -1127,6 +1166,7 @@ export async function settleInvoicesConsolidated(payload: {
       billable_to_freetext_name: i.billable_to_freetext_name,
       total_amount: i.total_amount,
       paid_to_date: paidById.get(i.id) ?? 0,
+      credited_to_date: creditedById.get(i.id) ?? 0,
     })),
     { partialAmount: payload.partialAmount },
   )
@@ -2056,6 +2096,10 @@ export async function approveInvoicesForPeriod(formData: FormData) {
   return { issued: count ?? 0, period }
 }
 
+// CN v2 (2026-08-19): approval is the accounting event. It posts the credit
+// against AR — Dr <cn.category, e.g. 5999 Discount Allowed> / Cr 3030 — under
+// the CN's own pool segment, then flips the parent invoice to paid if the
+// receipts already on file cover total − approved CNs.
 export async function approveCreditNote(formData: FormData) {
   const user = await requireRole(['principal'])
   const supabase = await createClient()
@@ -2065,7 +2109,30 @@ export async function approveCreditNote(formData: FormData) {
 
   await assertPeriodOpen(supabase, new Date())
 
-  const { error } = await supabase
+  const { data: cn } = await supabase
+    .from('credit_notes')
+    .select('id, credit_note_no, invoice_id, amount, reason, status, billing_mode, category_code')
+    .eq('id', id)
+    .single()
+  if (!cn) throw new Error('Credit note not found')
+  if (cn.status !== 'draft') throw new Error(`Credit note is ${cn.status}, expected draft`)
+
+  const { data: inv } = await supabase
+    .from('invoices')
+    .select('id, invoice_no, status, total_amount, billing_mode')
+    .eq('id', cn.invoice_id)
+    .single()
+  if (!inv) throw new Error('Parent invoice not found')
+
+  const amount = Number(cn.amount)
+  const mode = (cn.billing_mode as string | null) ?? inv.billing_mode
+  const debitCode = await resolveRevenueGlCode(supabase, cn.category_code, mode)
+  const segment = segmentForBillingMode(mode)
+
+  // Claim the row first (blocks a concurrent double-approve), then post the
+  // JE; a failed posting reverts the claim so the CN never sits approved
+  // without its GL entry.
+  const { data: claimed, error: claimErr } = await supabase
     .from('credit_notes')
     .update({
       status: 'approved',
@@ -2074,8 +2141,75 @@ export async function approveCreditNote(formData: FormData) {
     })
     .eq('id', id)
     .eq('status', 'draft')
+    .select('id')
+  if (claimErr) throw new Error(`Failed to approve credit note: ${claimErr.message}`)
+  if (!claimed || claimed.length === 0) throw new Error('Credit note was already approved')
 
-  if (error) throw new Error(`Failed to approve credit note: ${error.message}`)
+  try {
+    await postJournalEntry(supabase, {
+      transactionDate: dayjs().format('YYYY-MM-DD'),
+      segment,
+      description: `Credit note ${cn.credit_note_no ?? cn.id.slice(0, 8)} against invoice ${inv.invoice_no ?? inv.id.slice(0, 8)} — ${cn.reason}`,
+      referenceType: 'credit_note',
+      referenceId: cn.id,
+      createdBy: user.id,
+      lines: [
+        { accountCode: debitCode, debit: amount, description: `Credit note — ${cn.reason}` },
+        { accountCode: '3030', credit: amount, description: `AR reduced — CN ${cn.credit_note_no ?? ''}`.trim() },
+      ],
+    })
+  } catch (jeErr) {
+    await supabase
+      .from('credit_notes')
+      .update({ status: 'draft', approved_by: null, approved_at: null })
+      .eq('id', id)
+    const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
+    throw new Error(`Credit note GL posting failed (nothing approved): ${msg}`)
+  }
+
+  // If receipts already on file now cover the net total, close the invoice —
+  // mirrors the CN-aware mark_invoice_paid triggers (mig 20260819010000),
+  // which only fire on voucher writes and so can't see a CN approval.
+  if (inv.status === 'issued') {
+    const [{ data: receiptRows }, { data: cnRows }] = await Promise.all([
+      supabase
+        .from('payment_vouchers')
+        .select('amount')
+        .eq('invoice_id', inv.id)
+        .eq('direction', 'credit')
+        .neq('status', 'voided'),
+      supabase.from('credit_notes').select('amount').eq('invoice_id', inv.id).eq('status', 'approved'),
+    ])
+    const received = (receiptRows ?? []).reduce((s, r) => s + Number(r.amount), 0)
+    const credited = (cnRows ?? []).reduce((s, r) => s + Number(r.amount), 0)
+    if (received >= Number(inv.total_amount) - credited - 0.005) {
+      await supabase.from('invoices').update({ status: 'paid' }).eq('id', inv.id).eq('status', 'issued')
+    }
+  }
+
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+}
+
+// Draft CNs can be binned by Finance (same UX as draft invoices) — nothing
+// has posted yet. Approved CNs are permanent: they carry a JE.
+export async function deleteCreditNote(formData: FormData) {
+  await requireRole(['finance', 'principal'])
+  const supabase = await createClient()
+
+  const id = formData.get('id') as string
+  if (!id) throw new Error('Credit note id is required')
+
+  const { data: cn } = await supabase
+    .from('credit_notes')
+    .select('id, status')
+    .eq('id', id)
+    .single()
+  if (!cn) throw new Error('Credit note not found')
+  if (cn.status !== 'draft') throw new Error('Only draft credit notes can be deleted')
+
+  const { error } = await supabase.from('credit_notes').delete().eq('id', id).eq('status', 'draft')
+  if (error) throw new Error(`Failed to delete credit note: ${error.message}`)
 
   revalidatePath('/billing')
 }

@@ -84,6 +84,35 @@ partial receipts only ever hang off invoice_id.
    issued (bal 20,855.82). credit_dept_pool_on_invoice_paid keys off
    reference_type='invoice' so it never double-fired.
 
+## Credit notes v2 (2026-08-19, mig 20260819010000) — full lifecycle + PDF
+
+User raised the system's FIRST CN (HV-CN-202608-0001, RM500 discount on
+HV-INV-202608-0016) and found create-only half-feature: no list, no approval
+UI, no GL, no balance effect. Now:
+ - /billing shows a "Credit notes" section (CreditNotesList.tsx) under the
+   invoice list — rows for CNs against the period's invoices, with
+   Approve (principal) / Delete (draft only) / PDF actions.
+ - createCreditNote guards: invoice must be ISSUED (paid needs a refund PV,
+   not a CN), payroll_consolidated blocked (settles in full by design), and
+   amount capped at outstanding = total − receipts − existing CNs (drafts
+   reserve too).
+ - approveCreditNote (principal): claims draft→approved, posts
+   Dr cn.category_code (resolveRevenueGlCode fallback) / Cr 3030, segment
+   from cn.billing_mode, referenceType 'credit_note'; JE failure reverts the
+   claim. Then flips the invoice to paid if receipts ≥ total − approved CNs
+   (the DB triggers only fire on voucher writes, so this covers CN-last).
+ - deleteCreditNote: draft only; RLS cn_no_delete replaced by
+   cn_delete_draft (finance/principal, status='draft').
+ - Balance math: validateConsolidation gains credited_to_date (approved CNs)
+   — settle collects total − receipts − CNs everywhere (billing list badge
+   "CN −X · bal Y", batch modal, /payments/new preset now prefills the
+   outstanding). mark_invoice_paid triggers are CN-aware (mig).
+ - PDF: /billing/credit-note-doc?id= (or ?ids=) → CREDIT NOTE document
+   (credit-note-doc-pdf.tsx, same letterhead as invoice-doc) with an
+   "effect on invoice" balance box; draft prints with a DRAFT note.
+ - NOT done (scope): CN lines on /statements monthly statements; voiding an
+   APPROVED CN (needs reversal JE — do on request); refunds on paid invoices.
+
 ## FIXED 2026-08-19 — user renamed income codes in Settings; app hardcodes realigned
 
 User renamed COA codes in Settings → Accounts (5020→5050 Salary Income,

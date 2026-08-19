@@ -11,6 +11,9 @@ export interface SettleableInvoice {
   /** Σ non-voided receipts already recorded against this invoice (partial
    *  payments, user 2026-08-11). Omitted/0 = untouched invoice. */
   paid_to_date?: number | string
+  /** Σ APPROVED credit notes against this invoice (2026-08-19) — reduces the
+   *  balance exactly like a receipt does. Draft CNs don't count. */
+  credited_to_date?: number | string
 }
 
 /** Stable key identifying the payer. Subsidiary invoices key off company_id;
@@ -71,7 +74,11 @@ export function validateConsolidation(
     if (Number.isNaN(paidCents)) {
       return { ok: false, error: `Invoice ${i.id} has an invalid paid_to_date` }
     }
-    const remainingCents = cents - paidCents
+    const creditedCents = Math.round(Number(i.credited_to_date ?? 0) * 100)
+    if (Number.isNaN(creditedCents)) {
+      return { ok: false, error: `Invoice ${i.id} has an invalid credited_to_date` }
+    }
+    const remainingCents = cents - paidCents - creditedCents
     if (remainingCents <= 0) {
       return { ok: false, error: `Invoice ${i.id} is already fully collected` }
     }

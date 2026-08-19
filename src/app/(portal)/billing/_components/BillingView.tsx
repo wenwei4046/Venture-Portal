@@ -13,6 +13,7 @@ import GenerateInvoicesButton from './GenerateInvoicesButton'
 import MarketingProjectList from './MarketingProjectList'
 import NonBillableList from './NonBillableList'
 import InvoicesList from './InvoicesList'
+import CreditNotesList from './CreditNotesList'
 import { fetchPaidByInvoice } from '@/lib/debtor-aging-data'
 import CreateInvoiceButton from './CreateInvoiceButton'
 import CreateMultiLineInvoiceButton from './CreateMultiLineInvoiceButton'
@@ -172,6 +173,25 @@ export default async function BillingView({ searchParams }: Props) {
     if (paid > 0) paidByInvoice[id] = paid
   }
 
+  // CN v2 (2026-08-19): credit notes against this period's invoices. Approved
+  // sums net off the settle balance (cnByInvoice); the full rows power the
+  // Credit Notes section below the invoice list. Bounded .in() — one period's
+  // invoice ids, same shape as fetchPaidByInvoice above.
+  const allInvoiceIds = invoiceList.map((i) => i.id as string)
+  const { data: cnRows } = allInvoiceIds.length
+    ? await supabase
+        .from('credit_notes')
+        .select('id, credit_note_no, invoice_id, amount, reason, status, category_code, billing_mode, created_at')
+        .in('invoice_id', allInvoiceIds)
+        .order('created_at', { ascending: false })
+    : { data: [] as never[] }
+  const cnByInvoice: Record<string, number> = {}
+  for (const cn of cnRows ?? []) {
+    if (cn.status !== 'approved') continue
+    cnByInvoice[cn.invoice_id as string] =
+      Math.round(((cnByInvoice[cn.invoice_id as string] ?? 0) + Number(cn.amount)) * 100) / 100
+  }
+
   // Per-mode invoice sums (shown in the cost cards).
   const marketingTotal = invoiceList
     .filter((i) => i.billing_mode === 'marketing_project')
@@ -310,6 +330,31 @@ export default async function BillingView({ searchParams }: Props) {
   const departmentMap = new Map<string, string>(
     (departments ?? []).map((d) => [d.id as string, d.name as string])
   )
+
+  // CN v2: display rows for the Credit Notes section — party + invoice no +
+  // category label resolved server-side so the client list stays dumb.
+  const invoiceById = new Map(invoiceList.map((i) => [i.id as string, i]))
+  const coaNameByCode = new Map((categories ?? []).map((c) => [c.code as string, c.name as string]))
+  const creditNoteRows = (cnRows ?? []).map((cn) => {
+    const inv = invoiceById.get(cn.invoice_id as string)
+    let party = inv?.billable_to_freetext_name ?? '—'
+    if (inv?.company_id) party = companyMap.get(inv.company_id)?.name ?? '—'
+    else if (inv?.billable_to_type === 'dept_pool' && inv.billable_to_department_id)
+      party = departmentMap.get(inv.billable_to_department_id) ?? '—'
+    return {
+      id: cn.id as string,
+      credit_note_no: (cn.credit_note_no as string | null) ?? null,
+      invoice_no: (inv?.invoice_no as string | null) ?? null,
+      party,
+      amount: Number(cn.amount),
+      reason: (cn.reason as string) ?? '',
+      status: (cn.status as string) ?? 'draft',
+      category_label: cn.category_code
+        ? `${cn.category_code} · ${coaNameByCode.get(cn.category_code as string) ?? ''}`.trim()
+        : null,
+      created_at: (cn.created_at as string) ?? null,
+    }
+  })
 
   return (
     <div>
@@ -628,7 +673,9 @@ export default async function BillingView({ searchParams }: Props) {
         </section>
       )}
 
-      <InvoicesList invoices={invoiceList} companyMap={companyMap} departmentMap={departmentMap} period={period} categories={categoryList} bankAccounts={bankList} invoiceLines={linesByInvoice} paidByInvoice={paidByInvoice} />
+      <InvoicesList invoices={invoiceList} companyMap={companyMap} departmentMap={departmentMap} period={period} categories={categoryList} bankAccounts={bankList} invoiceLines={linesByInvoice} paidByInvoice={paidByInvoice} cnByInvoice={cnByInvoice} />
+
+      {creditNoteRows.length > 0 ? <CreditNotesList rows={creditNoteRows} /> : null}
 
       <MarketingProjectList
         contracts={(marketingContracts ?? [])

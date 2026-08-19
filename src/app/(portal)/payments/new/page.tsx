@@ -144,12 +144,28 @@ export default async function NewPaymentPage({ searchParams }: Props) {
 
     if (inv && inv.status !== 'paid' && inv.status !== 'paid_via_netting') {
       const company = (inv.companies as { name: string } | null) ?? null
+      // Prefill the OUTSTANDING balance, not the printed total — partial
+      // receipts and approved credit notes (CN v2, 2026-08-19) both reduce
+      // what's left to collect.
+      const [{ data: receiptRows }, { data: cnRows }] = await Promise.all([
+        supabase
+          .from('payment_vouchers')
+          .select('amount')
+          .eq('invoice_id', inv.id)
+          .eq('direction', 'credit')
+          .neq('status', 'voided'),
+        supabase.from('credit_notes').select('amount').eq('invoice_id', inv.id).eq('status', 'approved'),
+      ])
+      const received = (receiptRows ?? []).reduce((s, r) => s + Number(r.amount), 0)
+      const credited = (cnRows ?? []).reduce((s, r) => s + Number(r.amount), 0)
+      const outstanding =
+        Math.round((Number(inv.total_amount) - received - credited) * 100) / 100
       invoicePreset = {
         id: inv.id,
         invoice_no: inv.invoice_no,
         company_id: inv.company_id, // may be null for non-subsidiary invoices (Item 5)
         company_name: company?.name ?? '—',
-        total_amount: Number(inv.total_amount),
+        total_amount: outstanding > 0 ? outstanding : Number(inv.total_amount),
         period_month: inv.period_month,
         billing_mode: inv.billing_mode,
         target_pool: poolForBillingMode(inv.billing_mode),

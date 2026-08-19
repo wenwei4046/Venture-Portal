@@ -116,11 +116,14 @@ interface Props {
   /** invoice_id → Σ receipts already recorded (partial payments). Issued
    *  invoices settle for their REMAINING balance; part-paid rows get a badge. */
   paidByInvoice?: Record<string, number>
+  /** invoice_id → Σ APPROVED credit notes (CN v2, 2026-08-19) — reduces the
+   *  settle balance exactly like receipts do. */
+  cnByInvoice?: Record<string, number>
 }
 
 // Invoices for the selected period. Populated by Step 5's generate_monthly_invoices
 // RPC. Until Step 5 ships, this section shows the empty state with an explanation.
-export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [], bankAccounts = [], invoiceLines = {}, paidByInvoice = {} }: Props) {
+export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [], bankAccounts = [], invoiceLines = {}, paidByInvoice = {}, cnByInvoice = {} }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -133,7 +136,9 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
 
   // Partial payments: what an issued invoice still owes.
   const remainingOf = (inv: Invoice) =>
-    Math.round((Number(inv.total_amount) - (paidByInvoice[inv.id] ?? 0)) * 100) / 100
+    Math.round(
+      (Number(inv.total_amount) - (paidByInvoice[inv.id] ?? 0) - (cnByInvoice[inv.id] ?? 0)) * 100,
+    ) / 100
 
   // Only 'issued' subsidiary/freetext invoices are batch-settleable.
   // (Drafts need approval first; paid is done; dept_pool/inter-billing
@@ -451,14 +456,17 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   align: 'right',
                   render: (inv) => {
                     const paid = paidByInvoice[inv.id] ?? 0
-                    if (inv.status !== 'issued' || paid <= 0) {
+                    const credited = cnByInvoice[inv.id] ?? 0
+                    if (inv.status !== 'issued' || (paid <= 0 && credited <= 0)) {
                       return formatMoney(Number(inv.total_amount))
                     }
                     return (
                       <div>
                         <div>{formatMoney(Number(inv.total_amount))}</div>
                         <div className="font-mono text-[11px] text-alert">
-                          part-paid {formatMoney(paid)} · bal {formatMoney(remainingOf(inv))}
+                          {paid > 0 ? `part-paid ${formatMoney(paid)} · ` : ''}
+                          {credited > 0 ? `CN −${formatMoney(credited)} · ` : ''}
+                          bal {formatMoney(remainingOf(inv))}
                         </div>
                       </div>
                     )

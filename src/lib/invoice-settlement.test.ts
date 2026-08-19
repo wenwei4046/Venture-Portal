@@ -70,6 +70,24 @@ describe('validateConsolidation', () => {
     }
   })
 
+  it('approved credit notes reduce the balance like receipts (CN v2)', () => {
+    const r = validateConsolidation([
+      inv({ id: 'a', total_amount: 2500, credited_to_date: 500 }),
+      inv({ id: 'b', total_amount: 100, paid_to_date: 40, credited_to_date: 10 }),
+    ])
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.remainingById).toEqual({ a: 2000, b: 50 })
+      expect(r.total).toBe(2050)
+    }
+  })
+
+  it('rejects an invoice fully covered by receipts + credit notes', () => {
+    const r = validateConsolidation([inv({ id: 'a', total_amount: 100, paid_to_date: 60, credited_to_date: 40 })])
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error).toContain('fully collected')
+  })
+
   it('rejects an invoice that is already fully collected', () => {
     const r = validateConsolidation([inv({ total_amount: 100, paid_to_date: 100 })])
     expect(r.ok).toBe(false)
