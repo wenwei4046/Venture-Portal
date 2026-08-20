@@ -445,6 +445,34 @@ export async function setLoanRepaymentStart(
   return undefined
 }
 
+// ─── Void a recorded repayment (2026-08-20) ──────────────────────────────────
+// One atomic SECURITY DEFINER RPC (mig 20260819050000) reverses everything a
+// mis-keyed recordRepayment did: mirror JE (both legs flagged is_reversed so
+// reports drop the pair), bank-cache bump-down, venture_pool VOID counter-row
+// for principal, repayments row deleted, fully_repaid un-flipped when needed.
+// Built after a Hookka repayment landed on the wrong loan — void here, then
+// re-record on the right one.
+export async function voidRepayment(formData: FormData): Promise<{ error: string } | undefined> {
+  await requireRole(['finance', 'principal'])
+  const supabase = await createClient()
+
+  const repaymentId = (formData.get('repayment_id') as string) ?? ''
+  const loanId = (formData.get('loan_id') as string) ?? ''
+  if (!repaymentId) return { error: 'Repayment id is required' }
+
+  const { error } = await supabase.rpc('void_loan_repayment' as never, {
+    p_repayment_id: repaymentId,
+  } as never)
+  if (error) return { error: `撤销失败: ${error.message}` }
+
+  if (loanId) revalidatePath(`/fund-out/${loanId}`)
+  revalidatePath('/fund-out')
+  revalidatePath('/repayment-schedule')
+  revalidatePath('/reports/loan-aging')
+  revalidatePath('/dashboard')
+  return undefined
+}
+
 // ─── Amend an active loan (Principal — self-service, direct apply) ────────────
 // Principal is the top approval authority, so edits apply immediately via the
 // amend_loan SECURITY DEFINER RPC (audited by loans.updated_at). Only the

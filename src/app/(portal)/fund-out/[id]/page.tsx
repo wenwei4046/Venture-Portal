@@ -9,6 +9,7 @@ import { cancelLoan } from '../actions'
 import RepaymentForm from '../_components/RepaymentForm'
 import FundingSourceEditor from './_components/FundingSourceEditor'
 import RepaymentStartEditor from './_components/RepaymentStartEditor'
+import VoidRepaymentButton from './_components/VoidRepaymentButton'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -343,6 +344,7 @@ export default async function LoanDetailPage({ params }: Props) {
                   <th>Type</th>
                   <th className="right">Amount</th>
                   <th>Notes</th>
+                  {isFinanceSide ? <th className="right">Action</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -360,6 +362,15 @@ export default async function LoanDetailPage({ params }: Props) {
                     <td className="text-sm text-muted italic font-serif">
                       {r.notes ?? '—'}
                     </td>
+                    {isFinanceSide ? (
+                      <td className="text-right">
+                        <VoidRepaymentButton
+                          repaymentId={r.id as string}
+                          loanId={loan.id as string}
+                          label={`${r.payment_type} RM ${formatMoney(Number(r.amount))} · ${dayjs(r.payment_date).format('D MMM YYYY')}`}
+                        />
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>

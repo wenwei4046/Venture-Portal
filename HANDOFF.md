@@ -84,6 +84,29 @@ partial receipts only ever hang off invoice_id.
    issued (bal 20,855.82). credit_dept_pool_on_invoice_paid keys off
    reference_type='invoice' so it never double-fired.
 
+## Void loan repayment (2026-08-20, mig 20260819050000)
+
+A Hookka repayment got keyed against the wrong loan (fixed in place by mig
+20260819040000 — same company so only linkage moved). For NEXT time there's
+now a self-service **Void** button per row in the loan detail's Repayment
+history (finance/principal). One atomic SECURITY DEFINER RPC
+void_loan_repayment(p_repayment_id):
+ - mirror JE (swapped lines, same segment) dated in the original month
+   unless locked (then today); BOTH legs flagged is_reversed so reports
+   drop the pair (mark_journal_entry_reversed convention)
+ - bank cache bumped back down (bank derived from the original JE's Dr line)
+ - venture_pool 'fund_out' VOID counter-row for principal (append-only, same
+   pattern as reverse_voucher_pool_rows)
+ - repayments row deleted (definer bypasses repayments_no_delete);
+   fully_repaid un-flipped to active when no longer covered
+Flow for a wrong-loan repayment: Void on the wrong loan → re-record on the
+right one. Cross-company mistakes MUST use this (receivable leaves differ);
+same-company can also just be re-pointed by hand.
+Related data fixes same day: Hookka compound loans 2%→4% retroactive (mig
+20260819030000, keying error); HC fund-return interest reclassed 5027→6000
+(mig 20260819020000 — paying a funder interest belongs in 6000/6001, never
+debit 5027).
+
 ## Credit notes v2 (2026-08-19, mig 20260819010000) — full lifecycle + PDF
 
 User raised the system's FIRST CN (HV-CN-202608-0001, RM500 discount on
