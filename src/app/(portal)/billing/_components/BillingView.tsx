@@ -164,9 +164,25 @@ export default async function BillingView({ searchParams }: Props) {
   const invoiceList = invoices ?? []
   const invoiceTotal = invoiceList.reduce((acc, i) => acc + Number(i.total_amount), 0)
 
+  // 跨月合并结算 (2026-08-20): a payer often clears several months' invoices
+  // with ONE transfer, but this page is period-scoped — fetch OTHER periods'
+  // still-issued invoices too, and InvoicesList reveals them behind a 跨月
+  // toggle so they can be ticked into the same receipt. Period totals stay
+  // period-only.
+  const { data: otherOpenRaw } = await supabase
+    .from('invoices')
+    .select('id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code, created_at')
+    .eq('status', 'issued')
+    .neq('period_month', period)
+    .order('period_month', { ascending: false })
+  const otherOpenInvoices = otherOpenRaw ?? []
+
   // Partial payments: Σ receipts per issued invoice so the list can show
   // part-paid badges and the settle modal collects the REMAINING balance.
-  const issuedIds = invoiceList.filter((i) => i.status === 'issued').map((i) => i.id as string)
+  const issuedIds = [
+    ...invoiceList.filter((i) => i.status === 'issued').map((i) => i.id as string),
+    ...otherOpenInvoices.map((i) => i.id as string),
+  ]
   const paidMap = await fetchPaidByInvoice(supabase as unknown as Parameters<typeof fetchPaidByInvoice>[0], issuedIds)
   const paidByInvoice: Record<string, number> = {}
   for (const [id, paid] of paidMap) {
@@ -177,7 +193,10 @@ export default async function BillingView({ searchParams }: Props) {
   // sums net off the settle balance (cnByInvoice); the full rows power the
   // Credit Notes section below the invoice list. Bounded .in() — one period's
   // invoice ids, same shape as fetchPaidByInvoice above.
-  const allInvoiceIds = invoiceList.map((i) => i.id as string)
+  const allInvoiceIds = [
+    ...invoiceList.map((i) => i.id as string),
+    ...otherOpenInvoices.map((i) => i.id as string),
+  ]
   const { data: cnRows } = allInvoiceIds.length
     ? await supabase
         .from('credit_notes')
@@ -335,7 +354,9 @@ export default async function BillingView({ searchParams }: Props) {
   // category label resolved server-side so the client list stays dumb.
   const invoiceById = new Map(invoiceList.map((i) => [i.id as string, i]))
   const coaNameByCode = new Map((categories ?? []).map((c) => [c.code as string, c.name as string]))
-  const creditNoteRows = (cnRows ?? []).map((cn) => {
+  // Section shows the PERIOD's CNs only — other-period invoices are fetched
+  // just for the 跨月 settle toggle, their CNs belong to their own month view.
+  const creditNoteRows = (cnRows ?? []).filter((cn) => invoiceById.has(cn.invoice_id as string)).map((cn) => {
     const inv = invoiceById.get(cn.invoice_id as string)
     let party = inv?.billable_to_freetext_name ?? '—'
     if (inv?.company_id) party = companyMap.get(inv.company_id)?.name ?? '—'
@@ -673,7 +694,7 @@ export default async function BillingView({ searchParams }: Props) {
         </section>
       )}
 
-      <InvoicesList invoices={invoiceList} companyMap={companyMap} departmentMap={departmentMap} period={period} categories={categoryList} bankAccounts={bankList} invoiceLines={linesByInvoice} paidByInvoice={paidByInvoice} cnByInvoice={cnByInvoice} />
+      <InvoicesList invoices={invoiceList} extraOpenInvoices={otherOpenInvoices} companyMap={companyMap} departmentMap={departmentMap} period={period} categories={categoryList} bankAccounts={bankList} invoiceLines={linesByInvoice} paidByInvoice={paidByInvoice} cnByInvoice={cnByInvoice} />
 
       {creditNoteRows.length > 0 ? <CreditNotesList rows={creditNoteRows} /> : null}
 

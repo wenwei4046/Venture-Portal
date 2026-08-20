@@ -84,6 +84,18 @@ partial receipts only ever hang off invoice_id.
    issued (bal 20,855.82). credit_dept_pool_on_invoice_paid keys off
    reference_type='invoice' so it never double-fired.
 
+## 跨月合并结算 toggle (2026-08-20, no migration)
+
+User: "同个公司收多笔invoice时无法跨月tick" — the billing page is
+period-scoped, so a payer's June + July invoices couldn't share one receipt.
+settleInvoicesConsolidated never cared about periods (settles by id); only
+the list was scoped. BillingView now also fetches OTHER periods'
+still-issued invoices (otherOpenInvoices → extraOpenInvoices prop, included
+in the paid/CN sum fetches); InvoicesList shows a 跨月 toggle button
+("跨月：其他月份未结 +N" ↔ "只看本月") that merges them into the table for
+ticking. Period totals/cards stay period-only; the CN section filters to the
+period's invoices; same-payer guard unchanged.
+
 ## Void loan repayment (2026-08-20, mig 20260819050000)
 
 A Hookka repayment got keyed against the wrong loan (fixed in place by mig

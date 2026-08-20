@@ -119,14 +119,21 @@ interface Props {
   /** invoice_id → Σ APPROVED credit notes (CN v2, 2026-08-19) — reduces the
    *  settle balance exactly like receipts do. */
   cnByInvoice?: Record<string, number>
+  /** 跨月合并结算 (2026-08-20): OTHER periods' still-issued invoices. Hidden
+   *  until the 跨月 toggle is on, then they join the list so one receipt can
+   *  cover a payer's invoices across months. Period totals ignore them. */
+  extraOpenInvoices?: Invoice[]
 }
 
 // Invoices for the selected period. Populated by Step 5's generate_monthly_invoices
 // RPC. Until Step 5 ships, this section shows the empty state with an explanation.
-export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [], bankAccounts = [], invoiceLines = {}, paidByInvoice = {}, cnByInvoice = {} }: Props) {
+export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [], bankAccounts = [], invoiceLines = {}, paidByInvoice = {}, cnByInvoice = {}, extraOpenInvoices = [] }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  // 跨月: reveal other periods' unsettled invoices in the same list.
+  const [showAllOpen, setShowAllOpen] = useState(false)
+  const displayRows = showAllOpen ? [...invoices, ...extraOpenInvoices] : invoices
   const [showSettleModal, setShowSettleModal] = useState(false)
   const [settleBank, setSettleBank] = useState<string>('')
   const [settleDate, setSettleDate] = useState<string>(dayjs().format('YYYY-MM-DD'))
@@ -147,7 +154,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
     return inv.status === 'issued' && inv.billable_to_type !== 'dept_pool'
   }
 
-  const selectedInvoices = invoices.filter((i) => selectedIds.has(i.id) && isBatchSettleable(i))
+  const selectedInvoices = displayRows.filter((i) => selectedIds.has(i.id) && isBatchSettleable(i))
   // Batch settle collects the REMAINING balance of each invoice, not the
   // printed total (they differ once partial receipts exist).
   const selectedTotal = selectedInvoices.reduce((s, i) => s + remainingOf(i), 0)
@@ -176,7 +183,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
     })
   }
   function selectAllIssued() {
-    setSelectedIds(new Set(invoices.filter(isBatchSettleable).map((i) => i.id)))
+    setSelectedIds(new Set(displayRows.filter(isBatchSettleable).map((i) => i.id)))
   }
   function clearSelection() {
     setSelectedIds(new Set())
@@ -272,7 +279,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
         </div>
       </div>
 
-      {invoices.length === 0 ? (
+      {invoices.length === 0 && extraOpenInvoices.length === 0 ? (
         <div className="border border-hairline rounded-md bg-surface p-6 text-center">
           <p className="font-serif italic text-muted text-sm">
             No invoices generated for this period yet. Finance generates them from
@@ -306,13 +313,13 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
 
           <div className="overflow-x-auto">
             <SortableTable<Invoice>
-              rows={invoices}
+              rows={displayRows}
               getRowKey={(inv) => inv.id}
               defaultSort={{ key: 'invoice_no', dir: 'desc' }}
               searchKeys={['invoice_no', 'company', 'billing_mode', 'description']}
               searchPlaceholder="Search invoice # / company / mode…"
               toolbarRight={
-                invoices.some(isBatchSettleable) ? (
+                displayRows.some(isBatchSettleable) || extraOpenInvoices.length > 0 ? (
                   <>
                     {/* Selection summary + batch actions — inline in the toolbar
                         (between search and 全选), not a floating bar (user 2026-06-11). */}
@@ -348,6 +355,20 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                           {crossCompany ? '不同公司不能合并' : `合并结算 ${selectedInvoices.length} 张 → 生成收据`}
                         </button>
                       </div>
+                    ) : null}
+                    {extraOpenInvoices.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllOpen((v) => !v)}
+                        title="同一家公司跨月的未结发票可以一起勾选、开一张收据"
+                        className={`border rounded-md px-3 py-1.5 text-xs font-sans transition-colors whitespace-nowrap ${
+                          showAllOpen
+                            ? 'bg-accent text-white border-accent hover:bg-accent-hover'
+                            : 'bg-surface hover:bg-surface-2 border-hairline text-ink'
+                        }`}
+                      >
+                        {showAllOpen ? '只看本月' : `跨月：其他月份未结 +${extraOpenInvoices.length}`}
+                      </button>
                     ) : null}
                     <button
                       type="button"
