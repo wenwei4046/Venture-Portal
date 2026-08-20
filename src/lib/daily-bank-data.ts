@@ -181,6 +181,11 @@ export async function fetchDailyBank(
       list.push(item)
       pendingByBank.set(v.bank_account_id, list)
     }
+    // Voucher-number order (= submit order) — the .in() fetch above returns
+    // rows in arbitrary DB order, which read as a jumble on the day sheet.
+    for (const list of pendingByBank.values()) {
+      list.sort((a, b) => a.voucherNo.localeCompare(b.voucherNo))
+    }
   }
 
   // ── Receipts (OR vouchers) dated D, itemised for the by-bank view ──
