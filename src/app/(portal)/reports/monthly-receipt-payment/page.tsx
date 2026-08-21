@@ -44,14 +44,20 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))
 
-  const [lines, accounts, { data: banks }, inSaved, outSaved, glRefs] = await Promise.all([
-    fetchAllJournalLines(supabase),
-    fetchCoaAccounts(supabase),
-    supabase.rpc('bank_gl_codes' as never),
-    readReportLayout(supabase, 'cash_flow_in'),
-    readReportLayout(supabase, 'cash_flow_out'),
-    fetchGlRefs(supabase),
-  ])
+  const [lines, accounts, { data: banks }, inSaved, outSaved, glRefs, receiptPartiesRes, { data: companyRows }] =
+    await Promise.all([
+      fetchAllJournalLines(supabase),
+      fetchCoaAccounts(supabase),
+      supabase.rpc('bank_gl_codes' as never),
+      readReportLayout(supabase, 'cash_flow_in'),
+      readReportLayout(supabase, 'cash_flow_out'),
+      fetchGlRefs(supabase),
+      // Receipt payee names via SECURITY DEFINER (mig 20260820040000) —
+      // dept_manager RLS blocks payment_vouchers, which dumped all their
+      // collections into 未标示 and made every debtor row only ever grow.
+      supabase.rpc('receipt_party_refs' as never),
+      supabase.from('companies').select('id, name, short_code'),
+    ])
   const bankCodes = new Set((banks ?? []) as unknown as string[])
   const ib = await fetchInterBillingCashFlow(supabase, bankCodes)
   const consolidated = !isDeptMgr && !segment
@@ -99,9 +105,31 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
   const outstandingByCol = [balanceAt(accPeriod.to), ...months.map((ym) => balanceAt(monthEnd(ym)))]
 
   // Per-debtor split of the running AR balance (user 2026-08-20: "我比较在意
-  // 的是还没收回的钱，因为那个也是我的部门的钱"). GlTxn party comes from
-  // applyGlRefs; movements the refs can't attribute fall into 未标示.
-  const partyOf = (l: GlLine) => (l as GlLine & { party?: string | null }).party ?? '未标示 · Unattributed'
+  // 的是还没收回的钱，因为那个也是我的部门的钱"). Party sources, unified onto
+  // ONE key per company: invoice legs carry the company SHORT CODE, receipt
+  // legs carry the payee FULL NAME (or nothing at all under dept_manager RLS
+  // — receipt_party_refs fills that) — normalise names → short codes so a
+  // debtor's billing and collections net in the same bucket.
+  const receiptPayeeById = new Map<string, string>(
+    (Array.isArray((receiptPartiesRes as { data?: unknown })?.data)
+      ? ((receiptPartiesRes as { data: unknown }).data as Array<{ id: string; payee: string }>)
+      : []
+    ).map((r) => [r.id, r.payee]),
+  )
+  const shortByName = new Map<string, string>(
+    ((companyRows ?? []) as Array<{ name: string; short_code: string | null }>).flatMap((c) =>
+      c.short_code ? [[c.name, c.short_code] as [string, string]] : [],
+    ),
+  )
+  const partyOf = (l: GlLine) => {
+    const raw =
+      (l as GlLine & { party?: string | null }).party ??
+      (l.ref_type === 'payment_voucher' || l.ref_type === 'payment_voucher_void'
+        ? (l.ref_id ? receiptPayeeById.get(l.ref_id) ?? null : null)
+        : null)
+    if (!raw) return '未标示 · Unattributed'
+    return shortByName.get(raw) ?? raw
+  }
   const parties = [...new Set(arLines.map(partyOf))]
   const partyBalanceAt = (p: string, toDate: string) =>
     r2(
@@ -114,7 +142,11 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
       p,
       values: [partyBalanceAt(p, accPeriod.to), ...months.map((ym) => partyBalanceAt(p, monthEnd(ym)))],
     }))
-    .filter((r) => r.values.some((v) => Math.abs(v) > 0.005))
+    // 只看还没收回的 (user 2026-08-20): only debtors whose balance is still
+    // POSITIVE — netted-off buckets, credit noise and the unattributed
+    // remainder are hidden. The 月末未收 parent row above stays the full GL
+    // figure, so the visible children may sum to slightly more than it.
+    .filter((r) => r.values[0] > 0.005)
     .sort((a, b) => b.values[0] - a.values[0])
     .map((r) => ({
       key: `AR_P_${r.p}`,
