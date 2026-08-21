@@ -197,7 +197,7 @@ export async function fetchInterBillingCashFlow(
     ? '3000'
     : (bankCodes.values().next().value ?? '3000')
   try {
-    const [payRes, recRes, custodyRes, fundRes, voidedRes] = await Promise.all([
+    const [payRes, recRes, custodyRes, fundRes, voidedRes, flagsRes] = await Promise.all([
       supabase
         .from('dept_pools')
         .select('amount, created_at, description, departments!inner(name)')
@@ -228,6 +228,11 @@ export async function fetchInterBillingCashFlow(
       // voucher's round, otherwise the bridge counts the original leg while the
       // reversal leg never matches (found live with voided HV-PV-202607-0115).
       supabase.from('payment_vouchers').select('voucher_no').eq('status', 'voided'),
+      // Pairing refs via SECURITY DEFINER (mig 20260820020000): a dept_manager's
+      // RLS hides the HR-pool custody rows and all payment_vouchers, which
+      // emptied custodyRefs + voided and silently killed their payroll bridge.
+      // Ref strings only — unioned with the direct reads below.
+      supabase.rpc('bridge_ref_flags' as never),
     ])
     // Mirror rows carry the PAYING side's real expense account per nature
     // (rent / utilities / salary…) since the 2026-07-24 by-nature change.
@@ -245,11 +250,16 @@ export async function fetchInterBillingCashFlow(
     const recRows = (recRes.data ?? []) as unknown as PoolRow[]
     const custodyRows = (custodyRes.data ?? []) as unknown as PoolRow[]
     const fundRows = (fundRes.data ?? []) as unknown as PoolRow[]
-    const voided = new Set(
-      ((voidedRes.data ?? []) as { voucher_no: string | null }[])
+    const flags = ((flagsRes as { data?: unknown })?.data ?? {}) as {
+      voided?: string[]
+      payroll_refs?: string[]
+    }
+    const voided = new Set([
+      ...(((voidedRes.data ?? []) as { voucher_no: string | null }[])
         .map((v) => v.voucher_no)
-        .filter(Boolean) as string[],
-    )
+        .filter(Boolean) as string[]),
+      ...(Array.isArray(flags.voided) ? flags.voided : []),
+    ])
 
     const pvref = (d: string | null): string | null => d?.match(PVREF)?.[0] ?? null
     const payerPvrefs = new Set(
@@ -315,11 +325,13 @@ export async function fetchInterBillingCashFlow(
     // otherwise pull in director-salary custody parks, whose GL already pays
     // under the director segment (double count).
     const pvrefPv = (d: string | null): string | null => d?.match(PVREF_PV)?.[0] ?? null
-    const custodyRefs = new Set(
-      custodyRows
+    const custodyRefs = new Set([
+      ...(custodyRows
         .map((r) => pvrefPv(r.description))
-        .filter((ref) => ref && !voided.has(ref)) as string[],
-    )
+        .filter((ref) => ref && !voided.has(ref)) as string[]),
+      // RLS-proof pairing set (already excludes voided server-side).
+      ...(Array.isArray(flags.payroll_refs) ? flags.payroll_refs : []),
+    ])
     const drainRefs = new Set(
       fundRows
         .map((r) => pvrefPv(r.description))

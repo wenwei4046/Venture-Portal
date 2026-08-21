@@ -105,6 +105,15 @@ User: "为什么7月没有salary" on Monthly R&P (marketing). Two truths:
      (np_in only, GL pays under director segment) stay excluded, no double
      count. STANDING: if the payroll marker wording changes again, check
      this bridge.
+ (3) Round 2, dept_manager view specifically ("还是没有薪水啊?" as Marketing
+     Manager): the bridge pairs drains against HR-pool custody rows and a
+     voided-voucher set, both RLS-invisible to dept managers — so THEIR
+     payroll bridge was empty even after (2) (finance viewing the same
+     segment was fine). Fix: bridge_ref_flags() SECURITY DEFINER RPC (mig
+     20260820020000) returns ref STRINGS only (voided voucher_nos +
+     custody-paired non-voided payroll refs); the bridge unions them with
+     its direct reads. Dept managers' inter-billing nature-split still
+     degrades to lumped lines (mirror rows RLS-blocked) — cosmetic only.
 
 ## Marketing / dept-manager self-service (2026-08-20, mig 20260820010000)
 
