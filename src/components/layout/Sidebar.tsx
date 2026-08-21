@@ -173,6 +173,7 @@ const navEntries: NavEntry[] = [
       { href: '/reports/cash-flow', label: 'Cash Flow', visible: canAccessDeptReports },
       { href: '/reports/monthly-cash-flow', label: 'Monthly Cash Flow', visible: canAccessDeptReports },
       { href: '/reports/receipt-payment', label: 'Receipt & Payment', visible: canAccessDeptReports },
+      { href: '/reports/monthly-receipt-payment', label: 'Monthly R&P', visible: canAccessDeptReports },
       { href: '/reports/balance-sheet', label: 'Balance Sheet', visible: canAccessReports },
       { href: '/reports/trial-balance', label: 'Trial Balance', visible: canAccessReports },
       { href: '/reports/fund-summary', label: 'Fund Summary', visible: canAccessReports },
