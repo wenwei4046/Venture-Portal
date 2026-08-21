@@ -52,10 +52,11 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
       readReportLayout(supabase, 'cash_flow_in'),
       readReportLayout(supabase, 'cash_flow_out'),
       fetchGlRefs(supabase),
-      // Receipt payee names via SECURITY DEFINER (mig 20260820040000) —
-      // dept_manager RLS blocks payment_vouchers, which dumped all their
-      // collections into 未标示 and made every debtor row only ever grow.
-      supabase.rpc('receipt_party_refs' as never),
+      // Voucher payee names (both directions) via SECURITY DEFINER (mig
+      // 20260820050000) — dept_manager RLS blocks payment_vouchers, which
+      // dumped their collections into 未标示; the payments breakdown below
+      // needs the debit-direction payees too.
+      supabase.rpc('voucher_party_refs' as never),
       supabase.from('companies').select('id, name, short_code'),
     ])
   const bankCodes = new Set((banks ?? []) as unknown as string[])
@@ -110,7 +111,7 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
   // legs carry the payee FULL NAME (or nothing at all under dept_manager RLS
   // — receipt_party_refs fills that) — normalise names → short codes so a
   // debtor's billing and collections net in the same bucket.
-  const receiptPayeeById = new Map<string, string>(
+  const payeeByVoucherId = new Map<string, string>(
     (Array.isArray((receiptPartiesRes as { data?: unknown })?.data)
       ? ((receiptPartiesRes as { data: unknown }).data as Array<{ id: string; payee: string }>)
       : []
@@ -125,7 +126,7 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
     const raw =
       (l as GlLine & { party?: string | null }).party ??
       (l.ref_type === 'payment_voucher' || l.ref_type === 'payment_voucher_void'
-        ? (l.ref_id ? receiptPayeeById.get(l.ref_id) ?? null : null)
+        ? (l.ref_id ? payeeByVoucherId.get(l.ref_id) ?? null : null)
         : null)
     if (!raw) return '未标示 · Unattributed'
     return shortByName.get(raw) ?? raw
@@ -156,6 +157,50 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
       values: r.values,
     }))
 
+  // ── 支出对象 Paid-to breakdown (user 2026-08-20: "payment 那边我也要看到
+  // 花出去的钱的breakdown") — money-out bank lines grouped by WHO was paid.
+  // Real payments attribute via voucher payees; the synthetic bridge legs
+  // label themselves as internal transfers so the block still reconciles
+  // with the outflow totals above.
+  const paidLines = applyGlRefs(
+    [...(lines as GlLine[]), ...ibLines].filter(
+      (l) => bankCodes.has(l.account_code) && Number(l.credit ?? 0) > 0 && inSeg(l),
+    ),
+    glRefs,
+  )
+  const paidPartyOf = (l: GlLine) => {
+    if (l.ref_type === 'inter_billing_transfer') {
+      return (l.entry_description ?? '').toLowerCase().includes('payroll')
+        ? 'HR Payroll custody (internal)'
+        : 'Inter-billing (internal)'
+    }
+    return partyOf(l)
+  }
+  const paidSumIn = (p: string, ym: string) =>
+    r2(
+      paidLines
+        .filter((l) => paidPartyOf(l) === p && l.date.startsWith(ym))
+        .reduce((s, l) => s + Number(l.credit ?? 0), 0),
+    )
+  const paidParties = [...new Set(paidLines.map(paidPartyOf))]
+  const paidPartyRows: MatrixRow[] = paidParties
+    .map((p) => {
+      const perMonth = months.map((ym) => paidSumIn(p, ym))
+      return { p, values: [r2(perMonth.reduce((s, v) => s + v, 0)), ...perMonth] }
+    })
+    .filter((r) => r.values[0] > 0.005)
+    .sort((a, b) => b.values[0] - a.values[0])
+    .map((r) => ({
+      key: `PAID_P_${r.p}`,
+      label: r.p,
+      depth: 1,
+      kind: 'account' as const,
+      values: r.values.map((v) => -v),
+    }))
+  const paidTotalByCol = [0, ...months.map(() => 0)].map((_, i) =>
+    r2(paidPartyRows.reduce((s, row) => s + row.values[i], 0)),
+  )
+
   const nCols = data.columns.length
   const rows: MatrixRow[] = [
     ...buildSideMatrixRows(data.inflow, inSaved as ReportLayout | null, nCols, 'in', '流入合计 · Total money in', data.inflowTotalByCol),
@@ -163,6 +208,10 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
     { key: 'NET_CHANGE', label: 'Net change in cash', depth: 0, kind: 'subtotal', tone: 'auto', emphasis: 'strong', values: data.netChangeByCol },
     { key: 'OPENING_CASH', label: 'Opening cash', depth: 0, kind: 'subtotal', tone: 'ledger', values: data.openingByCol },
     { key: 'CLOSING_CASH', label: 'Closing cash', depth: 0, kind: 'subtotal', tone: 'ledger', emphasis: 'strong', values: data.closingByCol },
+    // 支出对象 — who the money went to, one row per payee (internal transfers
+    // labelled as such). Negative = money out, matching the outflow section.
+    { key: 'PAID_TO', label: '支出对象 · Paid to (钱花给了谁)', depth: 0, kind: 'subtotal', tone: 'auto', emphasis: 'strong', values: paidTotalByCol },
+    ...paidPartyRows,
     { key: 'AR_BILLED', label: '开单 · Billed (应收 ↑)', depth: 0, kind: 'subtotal', tone: 'ledger', values: billedByCol },
     { key: 'AR_COLLECTED', label: '收回/CN · Collected (应收 ↓)', depth: 0, kind: 'subtotal', tone: 'auto', values: collectedByCol.map((v) => -v) },
     { key: 'AR_OUTSTANDING', label: '月末未收 · Outstanding (AR balance)', depth: 0, kind: 'subtotal', tone: 'danger', emphasis: 'strong', values: outstandingByCol },
