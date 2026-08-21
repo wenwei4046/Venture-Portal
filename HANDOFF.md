@@ -116,6 +116,14 @@ dept_manager could already SELECT own-segment invoices/journal/contracts/pool
  - NOT done: dept_manager edit/delete own drafts (ask Finance); 开单 for
    non-marketing dept managers works via their segment's *_attribution mode
    but was built for Marketing; statements/PDF export on the new report.
+ - Same day follow-ups: /reports/receipt-payment REBUILT in the Cash Flow
+   statement format (buildCashFlow + cashFlowBlocks + GlReportView + shared
+   layouts) with a 未收 section appended as ReportBlocks (consolidated view
+   asks for a segment first). NEW /reports/monthly-receipt-payment ("Monthly
+   R&P" in sidebar): Monthly Cash Flow matrix + three AR rows — billed/month
+   (Dr 3030), collected+CN/month (Cr 3030), and 月末未收 = running
+   segment-tagged 3030 balance at each month-end (all-time cumulative, ties
+   to GL); Accumulated column = YTD for flows, point-in-time for balance.
 
 ## 跨月合并结算 toggle (2026-08-20, no migration)
 
