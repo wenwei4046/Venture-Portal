@@ -193,7 +193,9 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
     .map((r) => ({
       key: `PAID_P_${r.p}`,
       label: r.p,
-      depth: 1,
+      // depth 2 → hidden until L3 (user 2026-08-20: "我主要看的是未收款的罢了,
+      // 现在太长了") — L1/L2 show just the one-line total at the bottom.
+      depth: 2,
       kind: 'account' as const,
       values: r.values.map((v) => -v),
     }))
@@ -208,10 +210,6 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
     { key: 'NET_CHANGE', label: 'Net change in cash', depth: 0, kind: 'subtotal', tone: 'auto', emphasis: 'strong', values: data.netChangeByCol },
     { key: 'OPENING_CASH', label: 'Opening cash', depth: 0, kind: 'subtotal', tone: 'ledger', values: data.openingByCol },
     { key: 'CLOSING_CASH', label: 'Closing cash', depth: 0, kind: 'subtotal', tone: 'ledger', emphasis: 'strong', values: data.closingByCol },
-    // 支出对象 — who the money went to, one row per payee (internal transfers
-    // labelled as such). Negative = money out, matching the outflow section.
-    { key: 'PAID_TO', label: '支出对象 · Paid to (钱花给了谁)', depth: 0, kind: 'subtotal', tone: 'auto', emphasis: 'strong', values: paidTotalByCol },
-    ...paidPartyRows,
     { key: 'AR_BILLED', label: '开单 · Billed (应收 ↑)', depth: 0, kind: 'subtotal', tone: 'ledger', values: billedByCol },
     { key: 'AR_COLLECTED', label: '收回/CN · Collected (应收 ↓)', depth: 0, kind: 'subtotal', tone: 'auto', values: collectedByCol.map((v) => -v) },
     { key: 'AR_OUTSTANDING', label: '月末未收 · Outstanding (AR balance)', depth: 0, kind: 'subtotal', tone: 'danger', emphasis: 'strong', values: outstandingByCol },
@@ -227,6 +225,10 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
       emphasis: 'strong',
       values: data.closingByCol.map((c, i) => r2(c + (outstandingByCol[i] ?? 0))),
     },
+    // 支出对象 lives LAST and its payee rows only surface at L3 — the user's
+    // main read is 未收, so the long payee list must never push it down.
+    { key: 'PAID_TO', label: '支出对象 · Paid to (钱花给了谁, L3 展开)', depth: 0, kind: 'subtotal', tone: 'auto', emphasis: 'strong', values: paidTotalByCol },
+    ...paidPartyRows,
   ]
 
   return (
