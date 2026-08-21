@@ -157,6 +157,19 @@ dept_manager could already SELECT own-segment invoices/journal/contracts/pool
    balance, party via applyGlRefs; GlRefs gained optional creditNoteParties
    (CN JE → parent invoice bill-to) so CN movements attribute cleanly; final
    row 部门总资金 = closing cash + outstanding.
+ - Round 3 (只看还没收回的 + attribution fixes): debtor rows show POSITIVE
+   accumulated balances only; invoice legs carry company SHORT CODES while
+   receipt legs carry payee FULL NAMES → normalised via companies map so
+   collections net against their debtor row; payee names via
+   voucher_party_refs() SECURITY DEFINER (mig 20260820050000, both
+   directions, names only — superseded receipt_party_refs from mig ...040000)
+   because dept_manager RLS blocks payment_vouchers (their view had dumped
+   ALL collections into 未标示). Payroll salary bridge now lands on 4070
+   Accrual - Salary (was 9030) so the salary series is ONE continuous row —
+   from July that row carries the full CTC packet.
+ - Round 4 (支出对象): Paid-to breakdown after Closing cash — money-out bank
+   lines per payee per month (negative values), synthetic bridge legs
+   labelled 'HR Payroll custody (internal)' / 'Inter-billing (internal)'.
  - Same day follow-ups: /reports/receipt-payment REBUILT in the Cash Flow
    statement format (buildCashFlow + cashFlowBlocks + GlReportView + shared
    layouts) with a 未收 section appended as ReportBlocks (consolidated view
