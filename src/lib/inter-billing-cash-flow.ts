@@ -207,13 +207,16 @@ export async function fetchInterBillingCashFlow(
         .select('amount, created_at, description, departments!inner(name)')
         .eq('transaction_type', 'np_in')
         .like('description', 'PV HV-OR-%'),
-      // Payroll custody receipts — the funding PV parks the FULL round in HR's
-      // pool; unique marker written by approve_single_voucher.
+      // Payroll custody receipts — the funding PV parks the FULL round in the
+      // custody pool; marker written by approve_single_voucher. The wording
+      // changed 2026-08 ('… → HR custody' → '… → custody pool'), which
+      // silently unbridged every August round — match the stable prefix and
+      // let the ref-pairing below do the filtering.
       supabase
         .from('dept_pools')
         .select('amount, created_at, description, departments!inner(name)')
         .eq('transaction_type', 'np_in')
-        .like('description', '%payroll fund → HR custody%'),
+        .like('description', '%payroll fund → %'),
       // Payroll funding drains — each department's typed contribution.
       supabase
         .from('dept_pools')
@@ -307,9 +310,18 @@ export async function fetchInterBillingCashFlow(
     // PV ref, so only true custody rounds bridge (any similarly-worded drain
     // without a custody twin is left alone). Voided rounds are skipped on both
     // sides — their pool effect is already nulled by the void_in/void_out rows.
+    // Pairing is SYMMETRIC (2026-08-20): a custody receipt only bridges when a
+    // drain shares its ref too — the broadened marker match above would
+    // otherwise pull in director-salary custody parks, whose GL already pays
+    // under the director segment (double count).
     const pvrefPv = (d: string | null): string | null => d?.match(PVREF_PV)?.[0] ?? null
     const custodyRefs = new Set(
       custodyRows
+        .map((r) => pvrefPv(r.description))
+        .filter((ref) => ref && !voided.has(ref)) as string[],
+    )
+    const drainRefs = new Set(
+      fundRows
         .map((r) => pvrefPv(r.description))
         .filter((ref) => ref && !voided.has(ref)) as string[],
     )
@@ -330,7 +342,7 @@ export async function fetchInterBillingCashFlow(
     }
     for (const r of custodyRows) {
       const ref = pvrefPv(r.description)
-      if (!ref || voided.has(ref)) continue
+      if (!ref || voided.has(ref) || !drainRefs.has(ref)) continue
       sides.push({
         deptName: (r.departments?.name as string) ?? '',
         amount: Number(r.amount ?? 0),

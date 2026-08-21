@@ -84,6 +84,28 @@ partial receipts only ever hang off invoice_id.
    issued (bal 20,855.82). credit_dept_pool_on_invoice_paid keys off
    reference_type='invoice' so it never double-fired.
 
+## FIXED 2026-08-20 — August payroll rounds vanished from every dept cash flow
+
+User: "为什么7月没有salary" on Monthly R&P (marketing). Two truths:
+ (1) NOT a bug for July: since the new payroll flow (2026-07), the per-dept
+     salary payout in a dept's cash flow is the BRIDGED pool transfer shown
+     on 9030 Salary Expense ("Transfer to HR payroll custody") — the old
+     "Accrual - Salary" (4070) clearing rows moved to the HR segment (19
+     per-employee JEs/month) and stay 0 for other depts forever. Side
+     effect to know: per-segment 4070 balances are lopsided by design now
+     (marketing +69,918.88 / hr −116,464.54 as at 2026-08-20; sums to 0
+     company-wide).
+ (2) REAL bug for August: the other session changed approve_single_voucher's
+     custody marker from 'payroll fund → HR custody' to 'payroll fund →
+     custody pool'; the inter-billing bridge's LIKE filter only knew the old
+     wording, so the whole 2026-08-06 round (PV-202608-0228, all 4 depts)
+     un-bridged. Fix in inter-billing-cash-flow.ts: match the stable prefix
+     '%payroll fund → %' AND make pairing SYMMETRIC (custody receipts only
+     bridge when a drain shares the ref) — director-salary custody parks
+     (np_in only, GL pays under director segment) stay excluded, no double
+     count. STANDING: if the payroll marker wording changes again, check
+     this bridge.
+
 ## Marketing / dept-manager self-service (2026-08-20, mig 20260820010000)
 
 User: "我现在要做marketing user 的功能" → picked 4: Receipt & Payment 报表
