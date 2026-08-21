@@ -45,8 +45,14 @@ export const interBillTransferAccount: CoaAccount = {
  *  Financing line so the report reads "transfer to HR payroll custody". */
 export const PAYROLL_XFER_CODE = 'PY-XFER'
 /** Real COA account the PAYING dept's payroll funding shows up as in its cash
- *  flow — cash out for payroll is salary in direct-method terms. */
-export const PAYROLL_EXPENSE_CODE = '9030'
+ *  flow. 4070 'Accrual - Salary' — the SAME row the pre-July per-segment
+ *  salary payments cleared — so the salary series reads as ONE continuous
+ *  line across the flow change (user 2026-08-20: "salary 分开了，不能做一起
+ *  吗?"; it previously landed on 9030 Salary Expense, splitting the report
+ *  into two salary blocks). Note the funding drain is the dept's FULL CTC
+ *  contribution (salary + statutory), so from July the 4070 row carries the
+ *  whole packet while the 4071-4074 component rows simply end. */
+export const PAYROLL_EXPENSE_CODE = '4070'
 
 export const payrollCustodyAccount: CoaAccount = {
   code: PAYROLL_XFER_CODE,
