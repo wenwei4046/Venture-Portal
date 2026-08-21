@@ -138,6 +138,11 @@ dept_manager could already SELECT own-segment invoices/journal/contracts/pool
  - NOT done: dept_manager edit/delete own drafts (ask Finance); 开单 for
    non-marketing dept managers works via their segment's *_attribution mode
    but was built for Marketing; statements/PDF export on the new report.
+ - Monthly R&P round 2 (user: 未收也是部门的钱): 月末未收 splits into one
+   row per DEBTOR (depth 1, L2/L3 detail levels) — running per-party 3030
+   balance, party via applyGlRefs; GlRefs gained optional creditNoteParties
+   (CN JE → parent invoice bill-to) so CN movements attribute cleanly; final
+   row 部门总资金 = closing cash + outstanding.
  - Same day follow-ups: /reports/receipt-payment REBUILT in the Cash Flow
    statement format (buildCashFlow + cashFlowBlocks + GlReportView + shared
    layouts) with a 未收 section appended as ReportBlocks (consolidated view
