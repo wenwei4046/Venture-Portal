@@ -13,7 +13,7 @@ import dayjs from 'dayjs'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { fetchAllJournalLines, fetchCoaAccounts, type GlLine } from '@/lib/gl-reports'
+import { applyGlRefs, fetchAllJournalLines, fetchCoaAccounts, fetchGlRefs, type GlLine } from '@/lib/gl-reports'
 import { buildMonthlyCashFlowSides, buildSideMatrixRows } from '@/lib/cash-flow-custom'
 import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
 import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
@@ -44,12 +44,13 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))
 
-  const [lines, accounts, { data: banks }, inSaved, outSaved] = await Promise.all([
+  const [lines, accounts, { data: banks }, inSaved, outSaved, glRefs] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
     supabase.rpc('bank_gl_codes' as never),
     readReportLayout(supabase, 'cash_flow_in'),
     readReportLayout(supabase, 'cash_flow_out'),
+    fetchGlRefs(supabase),
   ])
   const bankCodes = new Set((banks ?? []) as unknown as string[])
   const ib = await fetchInterBillingCashFlow(supabase, bankCodes)
@@ -67,7 +68,12 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
   const { months, accPeriod } = monthColumns(year, throughMonth)
   const segList = segmentFilterFor(segment)
   const inSeg = (l: GlLine) => !segList || segList.includes(l.segment)
-  const arLines = (lines as GlLine[]).filter((l) => l.account_code === AR_CODE && inSeg(l))
+  // applyGlRefs resolves WHO each 3030 movement belongs to (invoice bill-to /
+  // receipt payee / CN parent invoice) so 月末未收 can split per debtor.
+  const arLines = applyGlRefs(
+    (lines as GlLine[]).filter((l) => l.account_code === AR_CODE && inSeg(l)),
+    glRefs,
+  )
 
   const billedInMonth = (ym: string) =>
     r2(arLines.filter((l) => l.date.startsWith(ym)).reduce((s, l) => s + Number(l.debit ?? 0), 0))
@@ -92,6 +98,32 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
   ]
   const outstandingByCol = [balanceAt(accPeriod.to), ...months.map((ym) => balanceAt(monthEnd(ym)))]
 
+  // Per-debtor split of the running AR balance (user 2026-08-20: "我比较在意
+  // 的是还没收回的钱，因为那个也是我的部门的钱"). GlTxn party comes from
+  // applyGlRefs; movements the refs can't attribute fall into 未标示.
+  const partyOf = (l: GlLine) => (l as GlLine & { party?: string | null }).party ?? '未标示 · Unattributed'
+  const parties = [...new Set(arLines.map(partyOf))]
+  const partyBalanceAt = (p: string, toDate: string) =>
+    r2(
+      arLines
+        .filter((l) => partyOf(l) === p && l.date <= toDate)
+        .reduce((s, l) => s + Number(l.debit ?? 0) - Number(l.credit ?? 0), 0),
+    )
+  const partyRows: MatrixRow[] = parties
+    .map((p) => ({
+      p,
+      values: [partyBalanceAt(p, accPeriod.to), ...months.map((ym) => partyBalanceAt(p, monthEnd(ym)))],
+    }))
+    .filter((r) => r.values.some((v) => Math.abs(v) > 0.005))
+    .sort((a, b) => b.values[0] - a.values[0])
+    .map((r) => ({
+      key: `AR_P_${r.p}`,
+      label: r.p,
+      depth: 1,
+      kind: 'account' as const,
+      values: r.values,
+    }))
+
   const nCols = data.columns.length
   const rows: MatrixRow[] = [
     ...buildSideMatrixRows(data.inflow, inSaved as ReportLayout | null, nCols, 'in', '流入合计 · Total money in', data.inflowTotalByCol),
@@ -102,6 +134,18 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
     { key: 'AR_BILLED', label: '开单 · Billed (应收 ↑)', depth: 0, kind: 'subtotal', tone: 'ledger', values: billedByCol },
     { key: 'AR_COLLECTED', label: '收回/CN · Collected (应收 ↓)', depth: 0, kind: 'subtotal', tone: 'auto', values: collectedByCol.map((v) => -v) },
     { key: 'AR_OUTSTANDING', label: '月末未收 · Outstanding (AR balance)', depth: 0, kind: 'subtotal', tone: 'danger', emphasis: 'strong', values: outstandingByCol },
+    // Who owes it — one row per debtor, running balance at each month-end.
+    ...partyRows,
+    // 未收也是部门的钱: cash on hand + still-to-collect = the dept's position.
+    {
+      key: 'TOTAL_POSITION',
+      label: '部门总资金 · Cash + 未收 (Total position)',
+      depth: 0,
+      kind: 'subtotal',
+      tone: 'ledger',
+      emphasis: 'strong',
+      values: data.closingByCol.map((c, i) => r2(c + (outstandingByCol[i] ?? 0))),
+    },
   ]
 
   return (

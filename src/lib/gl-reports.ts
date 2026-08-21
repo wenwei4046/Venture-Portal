@@ -105,12 +105,15 @@ export interface GlRefs {
   invoices: Map<string, InvoiceRef>
   /** payment voucher id → payee (PV: paid to / OR: received from). */
   voucherPayees: Map<string, string>
+  /** credit note id → the parent invoice's bill-to (CN v2, 2026-08-20) —
+   *  optional so hand-built refs (tests) stay valid. */
+  creditNoteParties?: Map<string, string>
 }
 
 /** Reference lookups for enriching drill-down rows: invoice number /
  *  description / bill-to, and voucher payee names. */
 export async function fetchGlRefs(supabase: SupabaseClient): Promise<GlRefs> {
-  const [{ data: invoices, error: iErr }, { data: companies }, { data: departments }, { data: vouchers, error: vErr }] =
+  const [{ data: invoices, error: iErr }, { data: companies }, { data: departments }, { data: vouchers, error: vErr }, { data: creditNotes }] =
     await Promise.all([
       supabase
         .from('invoices')
@@ -120,6 +123,10 @@ export async function fetchGlRefs(supabase: SupabaseClient): Promise<GlRefs> {
       // party; keep it out of the id→name resolver too.
       supabase.from('departments').select('id, name').eq('is_internal', false),
       supabase.from('payment_vouchers').select('id, payee_name'),
+      // CN JEs (reference_type='credit_note') resolve their party through the
+      // parent invoice's bill-to. Errors tolerated (dept_manager RLS blocks
+      // credit_notes) — those lines just keep a null party.
+      supabase.from('credit_notes').select('id, invoice_id'),
     ])
   if (iErr) throw new Error(`fetchGlRefs invoices: ${iErr.message}`)
   if (vErr) throw new Error(`fetchGlRefs vouchers: ${vErr.message}`)
@@ -146,6 +153,16 @@ export async function fetchGlRefs(supabase: SupabaseClient): Promise<GlRefs> {
         .filter((v) => v.payee_name)
         .map((v) => [v.id as string, v.payee_name as string]),
     ),
+    creditNoteParties: new Map(
+      (creditNotes ?? []).flatMap((cn) => {
+        const inv = (invoices ?? []).find((i) => i.id === cn.invoice_id)
+        const billTo =
+          (inv?.company_id ? coById.get(inv.company_id as string) : null) ??
+          (inv?.billable_to_department_id ? deptById.get(inv.billable_to_department_id as string) : null) ??
+          ((inv?.billable_to_freetext_name as string | null) || null)
+        return billTo ? [[cn.id as string, billTo] as [string, string]] : []
+      }),
+    ),
   }
 }
 
@@ -165,6 +182,11 @@ export function applyGlRefs(lines: GlLine[], refs: GlRefs): GlLine[] {
       const payee = refs.voucherPayees.get(l.ref_id)
       if (!payee) return l
       return { ...l, party: payee }
+    }
+    if (l.ref_type === 'credit_note') {
+      const party = refs.creditNoteParties?.get(l.ref_id)
+      if (!party) return l
+      return { ...l, party }
     }
     return l
   })
