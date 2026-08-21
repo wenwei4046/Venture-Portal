@@ -236,10 +236,11 @@ export async function fetchInterBillingCashFlow(
     ])
     // Mirror rows carry the PAYING side's real expense account per nature
     // (rent / utilities / salary…) since the 2026-07-24 by-nature change.
-    const mirrorRes = await supabase
-      .from('payment_voucher_sources')
-      .select('amount, account_code, role, payment_vouchers!inner(voucher_no)')
-      .eq('role', 'mirror')
+    // Via bridge_mirror_slices RPC (mig 20260820030000): the direct
+    // payment_voucher_sources read is RLS-blocked for dept_manager, which
+    // lumped their inter-billing line; the RPC serves finance/principal all
+    // slices and a dept_manager only their own department's vouchers.
+    const mirrorRes = await supabase.rpc('bridge_mirror_slices' as never)
     if (payRes.error) throw payRes.error
     if (recRes.error) throw recRes.error
     if (custodyRes.error) throw custodyRes.error
@@ -268,14 +269,16 @@ export async function fetchInterBillingCashFlow(
 
     // voucher_no → its mirror slices, so a payer row can be split by nature.
     const naturesByPv = new Map<string, { code: string; amount: number }[]>()
-    for (const m of (mirrorRes.data ?? []) as unknown as Array<{
-      amount: number | null
-      account_code: string | null
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      payment_vouchers: any
-    }>) {
-      const no = m.payment_vouchers?.voucher_no as string | undefined
-      const code = m.account_code as string | null
+    const mirrorSlices = Array.isArray((mirrorRes as { data?: unknown })?.data)
+      ? ((mirrorRes as { data: unknown }).data as Array<{
+          voucher_no: string | null
+          account_code: string | null
+          amount: number | null
+        }>)
+      : []
+    for (const m of mirrorSlices) {
+      const no = m.voucher_no
+      const code = m.account_code
       if (!no || !code) continue
       const arr = naturesByPv.get(no) ?? []
       arr.push({ code, amount: round2(Number(m.amount ?? 0)) })

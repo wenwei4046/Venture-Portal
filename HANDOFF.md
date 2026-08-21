@@ -112,8 +112,13 @@ User: "为什么7月没有salary" on Monthly R&P (marketing). Two truths:
      segment was fine). Fix: bridge_ref_flags() SECURITY DEFINER RPC (mig
      20260820020000) returns ref STRINGS only (voided voucher_nos +
      custody-paired non-voided payroll refs); the bridge unions them with
-     its direct reads. Dept managers' inter-billing nature-split still
-     degrades to lumped lines (mirror rows RLS-blocked) — cosmetic only.
+     its direct reads.
+ (4) Nature split for dept managers too ("inter-billing 那行也帮我拆开"):
+     bridge_mirror_slices() RPC (mig 20260820030000) replaces the direct
+     mirror-rows read — finance/principal get all slices, a dept_manager
+     ONLY slices of vouchers their own dept paid (inter_billing_out row
+     references the voucher_no). Their inter-billing line now splits by
+     nature (rent/utilities/salary) same as finance's view.
 
 ## Marketing / dept-manager self-service (2026-08-20, mig 20260820010000)
 
