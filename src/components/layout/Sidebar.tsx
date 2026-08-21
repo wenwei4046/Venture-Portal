@@ -139,6 +139,9 @@ const navEntries: NavEntry[] = [
   // Allowance / ER statutory). Dept Manager sees own dept only; Principal
   // picks any dept via the in-page switcher.
   { href: '/opex', label: 'OPEX', section: 'Departments', visible: (r) => r === 'dept_manager' || r === 'principal' },
+  // Dept-manager billing workbench (2026-08-20): own-segment invoices with
+  // 回款 status, 开单 (draft-only), contract tracking with expiry.
+  { href: '/my-billing', label: 'My Billing', section: 'Departments', visible: (r) => r === 'dept_manager' },
   // Marketing dept_manager can create service contracts for their dept
   // (mig 207 RLS). The page self-gates on Marketing dept — other dept_managers
   // clicking this would hit notFound().
@@ -169,6 +172,7 @@ const navEntries: NavEntry[] = [
       { href: '/reports/monthly-pnl', label: 'Monthly P&L', visible: canAccessDeptReports },
       { href: '/reports/cash-flow', label: 'Cash Flow', visible: canAccessDeptReports },
       { href: '/reports/monthly-cash-flow', label: 'Monthly Cash Flow', visible: canAccessDeptReports },
+      { href: '/reports/receipt-payment', label: 'Receipt & Payment', visible: canAccessDeptReports },
       { href: '/reports/balance-sheet', label: 'Balance Sheet', visible: canAccessReports },
       { href: '/reports/trial-balance', label: 'Trial Balance', visible: canAccessReports },
       { href: '/reports/fund-summary', label: 'Fund Summary', visible: canAccessReports },

@@ -84,6 +84,39 @@ partial receipts only ever hang off invoice_id.
    issued (bal 20,855.82). credit_dept_pool_on_invoice_paid keys off
    reference_type='invoice' so it never double-fired.
 
+## Marketing / dept-manager self-service (2026-08-20, mig 20260820010000)
+
+User: "我现在要做marketing user 的功能" → picked 4: Receipt & Payment 报表
+(实收+未收+支出), 开单/看回款, own Dashboard cards, 合同管理加强.
+dept_manager could already SELECT own-segment invoices/journal/contracts/pool
+(RLS). New pieces:
+ - DB: mint_invoice_no now allows dept_manager (number only);
+   invoices_dept_manager_insert policy (DRAFT + own segment via
+   billing_mode_to_segment + created_by=self — issue stays finance/principal);
+   dept_invoice_settlements(p_segment DEFAULT NULL) SECURITY DEFINER RPC →
+   per-ISSUED-invoice receipts + approved-CN sums for the caller's segment
+   (dept_manager forced to own; finance/principal may pass one). Exposes ONLY
+   aggregates — payment_vouchers/credit_notes stay unreadable to managers.
+ - lib/dept-receipt-payment.ts: fetchDeptCashLines (bank COA lines, name
+   'Cash & Bank%', inside segment JEs — join-filtered + paginated),
+   fetchDeptOutstanding (issued × RPC sums → outstanding), monthRange.
+ - /my-billing (dept_manager only): KPI cards (本月开单/本月实收/未收/合同
+   expiring ≤30d), 开单 modal (CreateDeptInvoiceButton → createDeptInvoice:
+   draft, own segment's billing_mode via SEGMENT_TO_BILLING_MODE, invoice_date
+   defaults period month-end), invoice list with 回款 bal (收/CN detail),
+   contracts table with 到期 badge + per-contract 已开单/已收/未收
+   (invoices.contract_id).
+ - /reports/receipt-payment (canAccessDeptReports): month nav; dept_manager
+   locked to own segment, finance/principal get segment chips (default
+   marketing). Cards 实收/支出/净现金 (+YTD) + 未收 total; three tables:
+   Received / Paid out (GL bank lines) / To collect (all months).
+ - Sidebar: My Billing (dept_manager) + Reports → Receipt & Payment
+   (canAccessDeptReports). Dashboard dept_manager branch: +本月开单 and
+   +未收 cards (RPC + RLS invoices), links to /my-billing.
+ - NOT done: dept_manager edit/delete own drafts (ask Finance); 开单 for
+   non-marketing dept managers works via their segment's *_attribution mode
+   but was built for Marketing; statements/PDF export on the new report.
+
 ## 跨月合并结算 toggle (2026-08-20, no migration)
 
 User: "同个公司收多笔invoice时无法跨月tick" — the billing page is

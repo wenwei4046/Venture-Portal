@@ -455,6 +455,8 @@ export default async function DashboardPage() {
         { data: balanceRow },
         { data: pendingSubmissions },
         { data: recentExpenses },
+        { data: dmInvoices },
+        { data: dmSettlements },
       ] = await Promise.all([
         supabase.rpc('calculate_dept_np', { p_dept_id: dept.id, p_period: period }),
         supabase.from('dept_pool_balances').select('balance').eq('department_id', dept.id).maybeSingle(),
@@ -472,6 +474,10 @@ export default async function DashboardPage() {
           .eq('transaction_type', 'expense_out')
           .order('created_at', { ascending: false })
           .limit(5),
+        // My Billing cards (2026-08-20): own-segment invoices via RLS + the
+        // receipts/CN sums RPC → 本月开单 and 未收 figures.
+        supabase.from('invoices').select('id, total_amount, status, period_month').order('id'),
+        supabase.rpc('dept_invoice_settlements' as never, {} as never),
       ])
 
       type NpRow = {
@@ -501,6 +507,25 @@ export default async function DashboardPage() {
       const recentList = recentExpenses ?? []
       const deptDetailHref =
         dept.name.toLowerCase() === 'marketing' ? '/dept-pool/marketing' : '/dept-pool'
+
+      // My Billing figures: 本月开单 (issued+paid invoices in this period) and
+      // 未收 (issued balances net of receipts/approved CNs from the RPC).
+      type DmInv = { id: string; total_amount: number; status: string; period_month: string }
+      const dmInvList = (dmInvoices ?? []) as DmInv[]
+      const dmSumById = new Map<string, { receipts: number; credits: number }>()
+      for (const s of ((dmSettlements ?? []) as unknown as Array<{ invoice_id: string; receipts: number; credits: number }>)) {
+        dmSumById.set(s.invoice_id, { receipts: Number(s.receipts), credits: Number(s.credits) })
+      }
+      const dmIssuedFamily = new Set(['issued', 'paid', 'paid_via_netting'])
+      const billedThisMonth = dmInvList
+        .filter((i) => dmIssuedFamily.has(i.status) && i.period_month.startsWith(dayjs(period).format('YYYY-MM')))
+        .reduce((s, i) => s + Number(i.total_amount), 0)
+      const dmOutstanding = dmInvList
+        .filter((i) => i.status === 'issued')
+        .reduce((s, i) => {
+          const m = dmSumById.get(i.id)
+          return s + Math.max(0, Number(i.total_amount) - (m?.receipts ?? 0) - (m?.credits ?? 0))
+        }, 0)
 
       return (
         <div>
@@ -559,6 +584,28 @@ export default async function DashboardPage() {
                 {pendingCount > 0
                   ? `${formatMoney(pendingTotal)} total`
                   : 'Nothing waiting'}
+              </div>
+            </div>
+            <div className="border border-hairline rounded-md bg-surface p-5">
+              <div className="font-serif italic text-sm text-accent mb-1">
+                本月开单 Billed {dayjs(period).format('MMM')}
+              </div>
+              <div className="font-serif text-2xl text-num-ink tabular tracking-[-0.01em] leading-none">
+                {formatMoney(billedThisMonth)}
+              </div>
+              <div className="font-mono text-xs text-muted mt-2">
+                <Link href="/my-billing" className="text-accent hover:underline">My Billing →</Link>
+              </div>
+            </div>
+            <div className="border border-hairline rounded-md bg-surface p-5">
+              <div className="font-serif italic text-sm text-accent mb-1">
+                未收 To collect
+              </div>
+              <div className={`font-serif text-2xl tabular tracking-[-0.01em] leading-none ${dmOutstanding > 0 ? 'text-alert' : 'text-num-ink'}`}>
+                {formatMoney(dmOutstanding)}
+              </div>
+              <div className="font-mono text-xs text-muted mt-2">
+                issued invoices net of receipts/CN
               </div>
             </div>
           </div>
