@@ -88,6 +88,20 @@ user's "把rm 1, 测试数据清楚 然后这些功能补上":
    their cash-flow twins; dept_manager allowed — RLS/RPCs scope them; Monthly
    R&P export reuses lib/monthly-rnp so rows are identical to the page).
 
+8. **FIXED: Monthly R&P per-debtor rows ignored collections** (user: "月尾
+   rygis private 我记得都蛮准时给的" — Rygis showed 9,500 owing, truly owed 0:
+   10,000 billed − 9,500 received − 500 CN). Root cause: settle receipts store
+   payee_name '—', so fetchGlRefs.voucherPayees attributed the 3030 credits to
+   a phantom party '—' (negative → hidden by the positive-only filter) while
+   the debit side kept the debtor. Fix in BOTH paths: fetchGlRefs now resolves
+   invoice-LINKED vouchers through the linked invoice's bill-to (short_code →
+   dept → freetext) and drops '—' payees; voucher_party_refs RPC (dept_manager
+   fallback) mirrored in mig 20260824070000 (APPLIED). Verified by SQL
+   simulation: Rygis→0/0, CAR/DC/CONTS/HC unchanged (their receipts carried
+   real payee names that shortByName already normalized), Σ parties = 3030
+   balance 57,081.53. journal_lines FK is `entry_id`, date is
+   `transaction_date` (not journal_entry_id/entry_date).
+
 Still deferred (user said 不理他先 / needs go-ahead): IT-dept payroll 3 traps;
 payroll allocation + statements participation for NEW registry depts; Principal
 mobile push; Alliance recon PDF template (awaiting sample).

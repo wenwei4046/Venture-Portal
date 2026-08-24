@@ -122,7 +122,7 @@ export async function fetchGlRefs(supabase: SupabaseClient): Promise<GlRefs> {
       // is_internal=false — the 'Venture Office' pseudo-dept is never a billable
       // party; keep it out of the id→name resolver too.
       supabase.from('departments').select('id, name').eq('is_internal', false),
-      supabase.from('payment_vouchers').select('id, payee_name'),
+      supabase.from('payment_vouchers').select('id, payee_name, invoice_id'),
       // CN JEs (reference_type='credit_note') resolve their party through the
       // parent invoice's bill-to. Errors tolerated (dept_manager RLS blocks
       // credit_notes) — those lines just keep a null party.
@@ -134,6 +134,18 @@ export async function fetchGlRefs(supabase: SupabaseClient): Promise<GlRefs> {
   const coById = new Map((companies ?? []).map((c) => [c.id as string, (c.short_code as string | null) ?? (c.name as string)]))
   const deptById = new Map((departments ?? []).map((d) => [d.id as string, d.name as string]))
 
+  const billToOf = (i: {
+    company_id: string | null
+    billable_to_department_id: string | null
+    billable_to_freetext_name: string | null
+  }) =>
+    (i.company_id ? coById.get(i.company_id) : null) ??
+    (i.billable_to_department_id ? deptById.get(i.billable_to_department_id) : null) ??
+    (i.billable_to_freetext_name || null)
+  const invoiceBillTo = new Map(
+    (invoices ?? []).map((i) => [i.id as string, billToOf(i as Parameters<typeof billToOf>[0])]),
+  )
+
   return {
     invoices: new Map(
       (invoices ?? []).map((i) => [
@@ -141,25 +153,25 @@ export async function fetchGlRefs(supabase: SupabaseClient): Promise<GlRefs> {
         {
           invoice_no: (i.invoice_no as string | null) ?? null,
           description: (i.description as string | null) ?? null,
-          billTo:
-            (i.company_id ? coById.get(i.company_id as string) : null) ??
-            (i.billable_to_department_id ? deptById.get(i.billable_to_department_id as string) : null) ??
-            ((i.billable_to_freetext_name as string | null) || null),
+          billTo: invoiceBillTo.get(i.id as string) ?? null,
         },
       ]),
     ),
+    // Settle receipts often carry a placeholder payee ('—' from the batch
+    // settle modal) — the linked INVOICE's bill-to is the real counterparty,
+    // so it wins whenever the voucher has an invoice_id. Without this the
+    // Monthly R&P per-debtor rows never saw the collections (2026-08-24:
+    // Rygis showed 9,500 owing when it truly owed 0).
     voucherPayees: new Map(
-      (vouchers ?? [])
-        .filter((v) => v.payee_name)
-        .map((v) => [v.id as string, v.payee_name as string]),
+      (vouchers ?? []).flatMap((v) => {
+        const viaInvoice = v.invoice_id ? invoiceBillTo.get(v.invoice_id as string) ?? null : null
+        const payee = viaInvoice ?? (((v.payee_name as string | null) ?? '').trim() || null)
+        return payee && payee !== '—' ? [[v.id as string, payee] as [string, string]] : []
+      }),
     ),
     creditNoteParties: new Map(
       (creditNotes ?? []).flatMap((cn) => {
-        const inv = (invoices ?? []).find((i) => i.id === cn.invoice_id)
-        const billTo =
-          (inv?.company_id ? coById.get(inv.company_id as string) : null) ??
-          (inv?.billable_to_department_id ? deptById.get(inv.billable_to_department_id as string) : null) ??
-          ((inv?.billable_to_freetext_name as string | null) || null)
+        const billTo = invoiceBillTo.get(cn.invoice_id as string) ?? null
         return billTo ? [[cn.id as string, billTo] as [string, string]] : []
       }),
     ),
