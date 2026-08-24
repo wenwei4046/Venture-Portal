@@ -69,6 +69,39 @@ export async function generateStatements(formData: FormData) {
     .order('id', { ascending: true })
     .range(lo, hi))
 
+  // 2c. Approved credit notes against this period's invoices (CN v2,
+  // 2026-08-24): each becomes a contra line reducing what the company owes.
+  const periodInvoiceIds = (periodInvoices ?? []).map((i) => i.id as string)
+  const cnsByCompany = new Map<
+    string,
+    Array<{ id: string; credit_note_no: string | null; amount: number; reason: string }>
+  >()
+  if (periodInvoiceIds.length > 0) {
+    const { data: cnRows } = await supabase
+      .from('credit_notes')
+      .select('id, credit_note_no, amount, reason, company_id, invoice_id')
+      .eq('status', 'approved')
+      .in('invoice_id', periodInvoiceIds)
+    for (const cn of (cnRows ?? []) as Array<{
+      id: string
+      credit_note_no: string | null
+      amount: number
+      reason: string
+      company_id: string | null
+      invoice_id: string
+    }>) {
+      if (!cn.company_id) continue
+      const list = cnsByCompany.get(cn.company_id) ?? []
+      list.push({
+        id: cn.id,
+        credit_note_no: cn.credit_note_no,
+        amount: Number(cn.amount),
+        reason: cn.reason ?? '',
+      })
+      cnsByCompany.set(cn.company_id, list)
+    }
+  }
+
   const invoicesByCompany = new Map<
     string,
     Array<{ id: string; billing_mode: BillingMode; total_amount: number }>
@@ -184,6 +217,28 @@ export async function generateStatements(formData: FormData) {
         errors.push(`${company.short_code} invoice line: ${lineError.message}`)
       } else {
         totalInvoice += inv.total_amount
+      }
+    }
+
+    // Credit notes (CN v2, 2026-08-24): approved CNs against this company's
+    // period invoices show as contra lines — the statement's net drops by
+    // exactly what the CN credited.
+    for (const cn of cnsByCompany.get(company.id) ?? []) {
+      if (cn.amount <= 0) continue
+      const { error: lineError } = await supabase.from('monthly_statement_lines').insert({
+        statement_id: statementId,
+        line_type: 'contra',
+        direction: 'payable',
+        category_code: 'credit_note',
+        description: `Credit note ${cn.credit_note_no ?? cn.id.slice(0, 8)}${cn.reason ? ` — ${cn.reason}` : ''}`,
+        reference_id: cn.id,
+        reference_table: 'credit_notes',
+        amount: cn.amount,
+      })
+      if (lineError) {
+        errors.push(`${company.short_code} credit note line: ${lineError.message}`)
+      } else {
+        totalContra += cn.amount
       }
     }
 

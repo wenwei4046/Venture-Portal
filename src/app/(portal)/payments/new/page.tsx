@@ -174,6 +174,43 @@ export default async function NewPaymentPage({ searchParams }: Props) {
     }
   }
 
+  // Refund flow (2026-08-24): '?mode=refund&invoice_id=' on a PAID invoice
+  // prefills a debit PV paying the money back — payee/amount/description
+  // filled from the invoice's actual receipts; Finance picks pool + GL
+  // account; normal PV approval. The invoice itself stays paid (money-out
+  // only — no settle-math / mark_invoice_paid interaction).
+  let refundPreset: {
+    invoice_no: string | null
+    company_name: string
+    company_id: string | null
+    amount: number
+  } | null = null
+  if (mode === 'refund' && invoiceId && !invoicePreset) {
+    const { data: inv } = await supabase
+      .from('invoices')
+      .select('id, invoice_no, company_id, billable_to_freetext_name, status, companies(name)')
+      .eq('id', invoiceId)
+      .single()
+    if (inv && (inv.status === 'paid' || inv.status === 'paid_via_netting')) {
+      const { data: receiptRows } = await supabase
+        .from('payment_vouchers')
+        .select('amount')
+        .eq('invoice_id', inv.id)
+        .eq('direction', 'credit')
+        .neq('status', 'voided')
+      const received = (receiptRows ?? []).reduce((s, r) => s + Number(r.amount), 0)
+      if (received > 0) {
+        const company = (inv.companies as { name: string } | null) ?? null
+        refundPreset = {
+          invoice_no: inv.invoice_no,
+          company_name: company?.name ?? inv.billable_to_freetext_name ?? '—',
+          company_id: inv.company_id,
+          amount: Math.round(received * 100) / 100,
+        }
+      }
+    }
+  }
+
   // Split entry points (user 2026-06-12): the sidebar Receipt entry
   // (?mode=receipt) is receive-only — Credit form + a shortcut to the
   // dedicated 收到 Loan 还款 flow. The Payments page's Create payment is
@@ -182,29 +219,33 @@ export default async function NewPaymentPage({ searchParams }: Props) {
 
   const headingTitle = invoicePreset
     ? 'Settle invoice'
-    : nonBillablePreset
-      ? 'Non-billable expense'
-      : isReceiptMode
-        ? 'Create receipt'
-        : 'Create payment'
+    : refundPreset
+      ? 'Refund payment'
+      : nonBillablePreset
+        ? 'Non-billable expense'
+        : isReceiptMode
+          ? 'Create receipt'
+          : 'Create payment'
 
   // mig 252: settle-invoice is incoming money → Official Receipt (OR);
   // expense / payment paths stay as Payment Voucher (PV).
   const headingEyebrow = invoicePreset
     ? 'OFFICIAL RECEIPT · SETTLE INVOICE'
-    : nonBillablePreset
-      ? 'PAYMENT VOUCHER · NON-BILLABLE'
-      : isReceiptMode
-        ? 'OFFICIAL RECEIPT · NEW'
-        : 'PAYMENT VOUCHER · NEW'
+    : refundPreset
+      ? 'PAYMENT VOUCHER · REFUND'
+      : nonBillablePreset
+        ? 'PAYMENT VOUCHER · NON-BILLABLE'
+        : isReceiptMode
+          ? 'OFFICIAL RECEIPT · NEW'
+          : 'PAYMENT VOUCHER · NEW'
 
   return (
     <div>
       <Link
-        href={invoicePreset ? '/billing' : isReceiptMode ? '/receipts' : '/payments'}
+        href={invoicePreset || refundPreset ? '/billing' : isReceiptMode ? '/receipts' : '/payments'}
         className="text-sm text-muted hover:text-accent font-sans transition-colors"
       >
-        ← Back to {invoicePreset ? 'Billing' : isReceiptMode ? 'Receipts' : 'Payments'}
+        ← Back to {invoicePreset || refundPreset ? 'Billing' : isReceiptMode ? 'Receipts' : 'Payments'}
       </Link>
       <div className="page-head">
         <div>
@@ -235,6 +276,7 @@ export default async function NewPaymentPage({ searchParams }: Props) {
         }))}
         invoicePreset={invoicePreset}
         nonBillablePreset={nonBillablePreset}
+        refundPreset={refundPreset}
         payableFundSources={payableFundSources}
         lockedDirection={isReceiptMode ? 'credit' : invoicePreset ? undefined : 'debit'}
       />

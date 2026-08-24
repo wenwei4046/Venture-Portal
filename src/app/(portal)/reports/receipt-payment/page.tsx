@@ -28,6 +28,7 @@ import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
 import { fetchDeptOutstanding } from '@/lib/dept-receipt-payment'
 import { deptNameToSegment } from '@/lib/billing'
 import GlReportView from '../_components/GlReportView'
+import ExportLinks from '../_components/ExportLinks'
 import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 
@@ -159,6 +160,7 @@ export default async function ReceiptPaymentPage({ searchParams }: Props) {
           </div>
           <h1 className="page-title">Receipt &amp; Payment</h1>
         </div>
+        <ExportLinks basePath="/reports/receipt-payment/export" period={period} compare={compare} segment={segment} />
       </div>
 
       <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">

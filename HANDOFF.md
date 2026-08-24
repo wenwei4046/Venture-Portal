@@ -44,6 +44,51 @@ migrations applied live + archived; detailed sections follow this block):
    HR/Finance/Marketing/Director Office (+director from director_monthly_
    payroll); 还款 PVs are typed 'expense' with fund_source_id links.
 
+## SESSION 2026-08-24 (evening) — RM1 purge + five gap features + R&P paid-to removal
+
+All local gates passed before push (tsc / vitest 555 / next build). Batch was the
+user's "把rm 1, 测试数据清楚 然后这些功能补上":
+
+1. **RM1 Revenue-Department test data purged** (mig 20260824050000, applied via
+   execute_sql): the live acceptance-test invoice + its settle voucher, JE lines,
+   dept_pools np_in rows, bank −1.00 Hong Leong. Order matters:
+   voucher BEFORE its source rows (pvs_enforce_sum_matches_voucher blocks
+   source-row deletes while the voucher exists). Registry/department itself KEPT —
+   Revenue Department is now a real empty dept.
+2. **CN void after approve** (billing/actions.ts `voidCreditNote` + Void button in
+   CreditNotesList): claims the CN row → posts reversal JEs (swapped legs via
+   postJournalEntry) → mark_journal_entry_reversed flags originals → un-flips
+   invoice paid→issued IF settlement_voucher_id is null and receipts < total −
+   remaining approved CNs. On JE failure the claim reverts.
+3. **dept_manager edit/delete OWN DRAFT invoices** (mig 20260824060000 APPLIED:
+   invoices_dept_manager_update/_delete policies = draft + created_by=auth.uid() +
+   own segment; my-billing/actions.ts updateDeptInvoice/deleteDeptInvoice;
+   DraftInvoiceActions.tsx edit modal on /my-billing, renders only when
+   status=draft && created_by=self).
+4. **CN lines on monthly statements** (statements/actions.ts): approved CNs
+   against the period's invoices insert as line_type 'contra', direction
+   'payable', category_code 'credit_note', reference_table 'credit_notes',
+   accumulated into total_contra so net = invoice − contra still satisfies
+   totals_match_net. No CHECK constraint on category_code — free-form is safe.
+5. **Refund flow for PAID invoices**: /billing paid rows get "Refund →" →
+   `/payments/new?mode=refund&invoice_id=` (payments/new/page.tsx builds
+   refundPreset from non-voided credit PVs; NewPaymentForm prop prefills
+   payee/amount/description + banner). Deliberately does NOT set invoice_id on
+   the PV and does NOT touch invoice status — money-out only, Finance picks
+   pool + GL account, normal PV approval. Column note: invoices freetext party
+   is `billable_to_freetext_name` (NOT billable_to / billable_to_name).
+6. **Monthly R&P paid-to block REMOVED** (user twice: "我只是要还没收回的就好").
+   lib/monthly-rnp.ts now returns only AR_BILLED / AR_COLLECTED / AR_OUTSTANDING
+   / per-debtor rows (positive accumulated only) / TOTAL_POSITION. Page rewritten
+   onto the shared lib.
+7. **R&P + Monthly R&P Excel/PDF exports** (both new export/route.tsx mirror
+   their cash-flow twins; dept_manager allowed — RLS/RPCs scope them; Monthly
+   R&P export reuses lib/monthly-rnp so rows are identical to the page).
+
+Still deferred (user said 不理他先 / needs go-ahead): IT-dept payroll 3 traps;
+payroll allocation + statements participation for NEW registry depts; Principal
+mobile push; Alliance recon PDF template (awaiting sample).
+
 ## Partial invoice settlement (2026-08-11, no migration)
 
 User received a PART payment of an issued invoice and Settle refused ("我收到

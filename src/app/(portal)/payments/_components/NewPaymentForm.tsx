@@ -55,6 +55,15 @@ interface Props {
   accounts: Account[]
   invoicePreset?: InvoicePreset | null
   nonBillablePreset?: boolean
+  /** Refund flow (2026-08-24): pay money BACK against a paid invoice.
+   *  Prefills payee/amount/description; Finance still picks pool + GL
+   *  account and the PV walks the normal approval path. */
+  refundPreset?: {
+    invoice_no: string | null
+    company_name: string
+    company_id: string | null
+    amount: number
+  } | null
   payableFundSources?: PayableFundSource[]
   /** Entry-point split (2026-06-12): '/payments/new' = pay-only (debit),
    *  '?mode=receipt' = receive-only (credit). Locks the direction and hides
@@ -99,11 +108,12 @@ interface SourceRow {
   override_reason?: string
 }
 
-export default function NewPaymentForm({ companies, bankAccounts, accounts, invoicePreset, nonBillablePreset, payableFundSources = [], lockedDirection }: Props) {
+export default function NewPaymentForm({ companies, bankAccounts, accounts, invoicePreset, nonBillablePreset, refundPreset, payableFundSources = [], lockedDirection }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const isInvoicePay = !!invoicePreset
   const isNonBillable = !!nonBillablePreset && !isInvoicePay
+  const isRefund = !!refundPreset && !isInvoicePay
   const [direction, setDirection] = useState<'debit' | 'credit'>(
     isInvoicePay ? 'credit' : lockedDirection ?? 'debit',
   )
@@ -131,15 +141,21 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
       ? [{ pool: 'venture_pool', amount: '', account_code: '' }]
       : [{ pool: '', amount: '', account_code: '' }]
   )
-  const [amount, setAmount] = useState(isInvoicePay ? invoicePreset!.total_amount.toFixed(2) : '')
+  const [amount, setAmount] = useState(
+    isInvoicePay ? invoicePreset!.total_amount.toFixed(2) : isRefund ? refundPreset!.amount.toFixed(2) : '',
+  )
   // Payment date — defaults to today (browser-LOCAL date so a UTC+8 user
   // doesn't get "yesterday" in the early morning), user can backdate.
   const now = new Date()
   const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const [paymentDate, setPaymentDate] = useState(todayIso)
   // Controlled payee fields so loan-repayment mode can auto-fill them
-  const [payeeName, setPayeeName] = useState(isInvoicePay ? invoicePreset!.company_name : '')
-  const [payeeCompanyId, setPayeeCompanyId] = useState(isInvoicePay ? (invoicePreset!.company_id ?? '') : '')
+  const [payeeName, setPayeeName] = useState(
+    isInvoicePay ? invoicePreset!.company_name : isRefund ? refundPreset!.company_name : '',
+  )
+  const [payeeCompanyId, setPayeeCompanyId] = useState(
+    isInvoicePay ? (invoicePreset!.company_id ?? '') : isRefund ? (refundPreset!.company_id ?? '') : '',
+  )
   // Loan repayment mode — HV repaying a fund source (subsidiary savings / director loan)
   const [isLoanRepayment, setIsLoanRepayment] = useState(false)
   const [fundSourceId, setFundSourceId] = useState<string>('')
@@ -377,6 +393,18 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
           <div className="font-mono text-sm text-ink mb-1">{invoicePreset!.invoice_no}</div>
           <div className="font-serif text-sm text-graphite">
             {invoicePreset!.company_name} paid RM {invoicePreset!.total_amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
+          </div>
+        </div>
+      ) : null}
+
+      {isRefund ? (
+        <div className="mb-6 border border-accent-border rounded-md bg-accent-bg p-4">
+          <div className="font-serif italic text-accent text-sm mb-1">退款 · Refund against paid invoice</div>
+          <div className="font-mono text-sm text-ink mb-1">{refundPreset!.invoice_no ?? '—'}</div>
+          <div className="font-serif text-sm text-graphite">
+            {refundPreset!.company_name} · 已收 RM{' '}
+            {refundPreset!.amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} — 金额可改成部分退款。
+            来源 pool 选当初收款进的部门池,GL 科目选原本入账的收入/3030,审批走正常 PV 流程。
           </div>
         </div>
       ) : null}
@@ -946,7 +974,9 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
           defaultValue={
             isInvoicePay
               ? `Settle invoice ${invoicePreset!.invoice_no} — ${invoicePreset!.company_name}`
-              : ''
+              : isRefund
+                ? `Refund invoice ${refundPreset!.invoice_no ?? ''} — ${refundPreset!.company_name}`
+                : ''
           }
           className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
           placeholder="What is this payment for? Include reference numbers, invoice numbers, etc."

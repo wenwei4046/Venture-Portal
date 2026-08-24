@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
-import { approveCreditNote, deleteCreditNote } from '../actions'
+import { approveCreditNote, deleteCreditNote, voidCreditNote } from '../actions'
 
 // CN v2 (2026-08-19): the credit notes raised against the current period's
 // invoices. Rows arrive display-ready from BillingView (party / invoice no /
@@ -66,6 +66,16 @@ export default function CreditNotesList({ rows }: { rows: CreditNoteRow[] }) {
     )
       return
     run(deleteCreditNote, cn.id)
+  }
+
+  function handleVoid(cn: CreditNoteRow) {
+    if (
+      !window.confirm(
+        `撤销 ${cn.credit_note_no ?? 'credit note'} (RM ${formatMoney(cn.amount)})?\n\n会开一张反向分录对冲原来的 GL,${cn.party} 在 ${cn.invoice_no ?? 'invoice'} 上的欠款会加回 RM ${formatMoney(cn.amount)};如果那张单是被这张 CN 抵到 paid 的,会自动变回 issued。`,
+      )
+    )
+      return
+    run(voidCreditNote, cn.id)
   }
 
   return (
@@ -158,6 +168,15 @@ export default function CreditNotesList({ rows }: { rows: CreditNoteRow[] }) {
                             Delete
                           </button>
                         </>
+                      ) : cn.status === 'approved' ? (
+                        <button
+                          onClick={() => handleVoid(cn)}
+                          disabled={busy}
+                          className="text-xs text-graphite hover:text-danger font-serif italic disabled:opacity-50"
+                          title="撤销 — 反向分录对冲,欠款加回"
+                        >
+                          {busy ? 'Working…' : 'Void'}
+                        </button>
                       ) : null}
                     </div>
                   </td>

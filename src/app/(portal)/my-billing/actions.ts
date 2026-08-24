@@ -23,6 +23,68 @@ const SEGMENT_TO_BILLING_MODE: Record<string, string> = {
   director: 'director_attribution',
 }
 
+// Edit / delete OWN drafts (2026-08-24): RLS (mig 20260824060000) is the hard
+// gate — draft + own segment + created_by self. Zero-row updates surface as
+// a friendly error instead of silently succeeding.
+export async function updateDeptInvoice(
+  formData: FormData,
+): Promise<{ error?: string }> {
+  await requireRole(['dept_manager'])
+  const supabase = await createClient()
+
+  const id = String(formData.get('id') ?? '').trim()
+  const rawAmount = String(formData.get('amount') ?? '').trim()
+  const invoiceDate = String(formData.get('invoice_date') ?? '').trim() || null
+  const dueDate = String(formData.get('due_date') ?? '').trim() || null
+  const description = String(formData.get('description') ?? '').trim() || null
+
+  if (!id) return { error: 'Invoice id is required' }
+  const amount = Number(rawAmount)
+  if (!Number.isFinite(amount) || amount <= 0) return { error: '金额必须大于 0' }
+
+  const { data, error } = await supabase
+    .from('invoices')
+    .update({
+      base_amount: amount,
+      total_amount: amount,
+      invoice_date: invoiceDate,
+      due_date: dueDate,
+      description,
+    })
+    .eq('id', id)
+    .eq('status', 'draft')
+    .select('id')
+  if (error) return { error: `Update failed: ${error.message}` }
+  if (!data || data.length === 0) return { error: '改不到 — 只能改自己开的、还是 draft 的单' }
+
+  revalidatePath('/my-billing')
+  revalidatePath('/billing')
+  return {}
+}
+
+export async function deleteDeptInvoice(
+  formData: FormData,
+): Promise<{ error?: string }> {
+  await requireRole(['dept_manager'])
+  const supabase = await createClient()
+
+  const id = String(formData.get('id') ?? '').trim()
+  if (!id) return { error: 'Invoice id is required' }
+
+  const { data, error } = await supabase
+    .from('invoices')
+    .delete()
+    .eq('id', id)
+    .eq('status', 'draft')
+    .select('id')
+  if (error) return { error: `Delete failed: ${error.message}` }
+  if (!data || data.length === 0) return { error: '删不到 — 只能删自己开的、还是 draft 的单' }
+
+  revalidatePath('/my-billing')
+  revalidatePath('/billing')
+  return {}
+}
+
 export async function createDeptInvoice(
   formData: FormData,
 ): Promise<{ error?: string; invoiceNo?: string }> {

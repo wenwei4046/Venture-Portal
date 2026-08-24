@@ -560,6 +560,14 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                           >
                             Settle →
                           </Link>
+                        ) : inv.status === 'paid' ? (
+                          <Link
+                            href={`/payments/new?mode=refund&invoice_id=${inv.id}`}
+                            className="text-xs text-muted hover:text-danger font-serif italic"
+                            title="退款:开一张 debit PV 把已收的钱退回去(正常审批流程)"
+                          >
+                            Refund →
+                          </Link>
                         ) : null}
                         {inv.status !== 'draft' ? (
                           <CreateCreditNoteButton

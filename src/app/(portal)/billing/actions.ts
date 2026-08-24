@@ -2194,6 +2194,107 @@ export async function approveCreditNote(formData: FormData) {
   revalidatePath('/statements')
 }
 
+// Void an APPROVED credit note (2026-08-24, user: "CN approve 后想撤销"):
+// posts the mirror JE (Dr 3030 / Cr the CN's category), flags both legs
+// is_reversed so reports drop the pair, restores the invoice to issued when
+// the CN's credit was what had closed it, and marks the CN voided. Every
+// balance consumer (settle math, dept_invoice_settlements, the paid
+// triggers) filters status='approved', so the voided CN falls out of the
+// numbers automatically.
+export async function voidCreditNote(formData: FormData) {
+  const user = await requireRole(['finance', 'principal'])
+  const supabase = await createClient()
+
+  const id = formData.get('id') as string
+  if (!id) throw new Error('Credit note id is required')
+
+  await assertPeriodOpen(supabase, new Date())
+
+  const { data: cn } = await supabase
+    .from('credit_notes')
+    .select('id, credit_note_no, invoice_id, amount, reason, status')
+    .eq('id', id)
+    .single()
+  if (!cn) throw new Error('Credit note not found')
+  if (cn.status !== 'approved') throw new Error(`Only approved credit notes can be voided (status=${cn.status})`)
+
+  // Claim first (race-guard), revert on JE failure — mirrors approveCreditNote.
+  const { data: claimed, error: claimErr } = await supabase
+    .from('credit_notes')
+    .update({ status: 'voided' })
+    .eq('id', id)
+    .eq('status', 'approved')
+    .select('id')
+  if (claimErr) throw new Error(`Failed to void credit note: ${claimErr.message}`)
+  if (!claimed || claimed.length === 0) throw new Error('Credit note was already voided')
+
+  const { data: jes } = await supabase
+    .from('journal_entries')
+    .select('id, entry_no, segment, description')
+    .eq('reference_type', 'credit_note')
+    .eq('reference_id', cn.id)
+    .eq('is_reversed', false)
+  try {
+    for (const e of jes ?? []) {
+      const { data: lines } = await supabase
+        .from('journal_lines')
+        .select('account_code, debit, credit, description')
+        .eq('entry_id', e.id)
+      if (!lines || lines.length === 0) continue
+      const reversalId = await postJournalEntry(supabase, {
+        transactionDate: dayjs().format('YYYY-MM-DD'),
+        segment: (e.segment as string) ?? undefined,
+        description: `VOID ${cn.credit_note_no ?? cn.id.slice(0, 8)}: reversal of ${e.description ?? ''}`.trim(),
+        referenceType: 'credit_note_void',
+        referenceId: cn.id,
+        createdBy: user.id,
+        lines: lines.map((l) => ({
+          accountCode: l.account_code as string,
+          debit: l.credit ? Number(l.credit) : undefined,
+          credit: l.debit ? Number(l.debit) : undefined,
+          description: `Reversal — ${l.description ?? ''}`.trim(),
+        })),
+      })
+      const { error: flagErr } = await supabase.rpc('mark_journal_entry_reversed' as never, {
+        p_original_id: e.id,
+        p_reversal_id: reversalId,
+      } as never)
+      if (flagErr) throw new Error(`reversal posted but flagging failed: ${flagErr.message}`)
+    }
+  } catch (jeErr) {
+    await supabase.from('credit_notes').update({ status: 'approved' }).eq('id', id)
+    const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
+    throw new Error(`Credit note GL reversal failed (nothing voided): ${msg}`)
+  }
+
+  // If the CN's credit was what closed the invoice, reopen it. Full settles
+  // (settlement_voucher_id set) are cash-closed and stay paid.
+  const { data: inv } = await supabase
+    .from('invoices')
+    .select('id, status, total_amount, settlement_voucher_id')
+    .eq('id', cn.invoice_id)
+    .single()
+  if (inv && inv.status === 'paid' && !inv.settlement_voucher_id) {
+    const [{ data: receiptRows }, { data: cnRows }] = await Promise.all([
+      supabase
+        .from('payment_vouchers')
+        .select('amount')
+        .eq('invoice_id', inv.id)
+        .eq('direction', 'credit')
+        .neq('status', 'voided'),
+      supabase.from('credit_notes').select('amount').eq('invoice_id', inv.id).eq('status', 'approved'),
+    ])
+    const received = (receiptRows ?? []).reduce((s, r) => s + Number(r.amount), 0)
+    const credited = (cnRows ?? []).reduce((s, r) => s + Number(r.amount), 0)
+    if (received < Number(inv.total_amount) - credited - 0.005) {
+      await supabase.from('invoices').update({ status: 'issued' }).eq('id', inv.id).eq('status', 'paid')
+    }
+  }
+
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+}
+
 // Draft CNs can be binned by Finance (same UX as draft invoices) — nothing
 // has posted yet. Approved CNs are permanent: they carry a JE.
 export async function deleteCreditNote(formData: FormData) {

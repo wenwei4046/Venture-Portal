@@ -12,6 +12,7 @@ import { formatMoney } from '@/lib/utils'
 import { deptNameToSegment } from '@/lib/billing'
 import { fetchDeptCashLines, monthRange } from '@/lib/dept-receipt-payment'
 import CreateDeptInvoiceButton from './_components/CreateDeptInvoiceButton'
+import DraftInvoiceActions from './_components/DraftInvoiceActions'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -48,7 +49,7 @@ export default async function MyBillingPage() {
       supabase
         .from('invoices')
         .select(
-          'id, invoice_no, company_id, billable_to_freetext_name, period_month, invoice_date, total_amount, status, contract_id',
+          'id, invoice_no, company_id, billable_to_freetext_name, period_month, invoice_date, due_date, description, total_amount, status, contract_id, created_by',
         )
         .order('invoice_no', { ascending: false }),
       supabase.rpc('dept_invoice_settlements' as never, {} as never),
@@ -73,9 +74,12 @@ export default async function MyBillingPage() {
     billable_to_freetext_name: string | null
     period_month: string
     invoice_date: string | null
+    due_date: string | null
+    description: string | null
     total_amount: number
     status: string
     contract_id: string | null
+    created_by: string | null
   }
   const invoices = (invRows ?? []) as Inv[]
   const partyOf = (i: Inv) => (i.company_id ? companyMap.get(i.company_id) ?? '—' : i.billable_to_freetext_name ?? '—')
@@ -205,6 +209,7 @@ export default async function MyBillingPage() {
                   <th className="right">未收 Bal</th>
                   <th>Status</th>
                   <th>Date</th>
+                  <th className="right">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -247,6 +252,22 @@ export default async function MyBillingPage() {
                       </td>
                       <td className="font-mono text-xs text-muted">
                         {i.invoice_date ? dayjs(i.invoice_date).format('DD MMM YY') : '—'}
+                      </td>
+                      <td className="text-right">
+                        {i.status === 'draft' && i.created_by === user.id ? (
+                          <DraftInvoiceActions
+                            invoice={{
+                              id: i.id,
+                              invoice_no: i.invoice_no,
+                              total_amount: Number(i.total_amount),
+                              invoice_date: i.invoice_date,
+                              due_date: i.due_date,
+                              description: i.description,
+                            }}
+                          />
+                        ) : (
+                          <span className="text-muted text-xs">—</span>
+                        )}
                       </td>
                     </tr>
                   )
