@@ -195,6 +195,8 @@ const navEntries: NavEntry[] = [
     visible: canAccessCategories,
     children: [
       { href: '/settings?tab=accounts', label: 'Chart of Account', tab: 'accounts', visible: canAccessCategories },
+      // Departments management (2026-08-24): add + 转正 provision — Finance too.
+      { href: '/settings?tab=departments', label: 'Departments', tab: 'departments', visible: canAccessCategories },
       { href: '/reports/base-rate', label: 'Base Rate History', visible: canAccessReports },
       { href: '/settings?tab=treasury', label: 'Treasury', tab: 'treasury', visible: canAccessSettings },
       { href: '/settings?tab=overdue', label: 'Overdue Config', tab: 'overdue', visible: canAccessSettings },
