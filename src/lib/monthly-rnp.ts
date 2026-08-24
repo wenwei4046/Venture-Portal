@@ -1,69 +1,68 @@
-// Monthly Receipt & Payment — the rows the cash matrix doesn't have, shared
-// by the page and the export route so screen and file can never drift.
-// After three rounds of trimming (user 2026-08-24: "我要的就是在月尾还没收到
-// 的钱在下面就好"), the bottom block is ONLY:
-//   月末未收 (running 3030 balance as at each month end) + one row per
-//   debtor still owing (positive accumulated balance only).
-// Removed on request: 支出对象 paid-to, 每月开单, 每月收回/CN, 部门总资金.
+// Monthly Receipt & Payment — the 未收 rows under the cash matrix, shared by
+// the page and the export route so screen and file can never drift.
+// INVOICE-based since 2026-08-24 (user: "收到钱了就应该 knock off"): the old
+// GL-3030-per-segment version showed ghosts because early lump settle JEs
+// posted their whole 3030 credit under one segment (e.g. JE-202605-0051 put a
+// 7-invoice Dream Crafter batch under 'corporate' while the invoice debits
+// sat in marketing). Now every value comes from dated invoice events
+// (rnp_invoice_events RPC): billed +total at invoice date, collected −amount
+// at receipt date (batch settles clear their residual at the settlement
+// voucher's date), credited −amount at CN approval. Paid invoice ⇒ zero.
+// The bottom block is ONLY 月末未收 + one row per debtor still owing —
+// 开单/收回/部门总资金/支出对象 rows were all removed on request.
 
 import dayjs from 'dayjs'
-import { applyGlRefs, type GlLine, type GlRefs } from './gl-reports'
 import type { MatrixRow } from './monthly-matrix'
 
-const AR_CODE = '3030'
 const r2 = (n: number) => Math.round(n * 100) / 100
 
+/** One row of the rnp_invoice_events RPC. */
+export interface RnpInvoiceEvent {
+  invoice_id: string
+  invoice_no: string | null
+  company_id: string | null
+  party_fallback: string | null
+  event_kind: 'billed' | 'collected' | 'credited'
+  amount: number
+  event_date: string
+}
+
 export interface RnpExtrasInput {
-  /** RAW journal lines (fetchAllJournalLines) — NOT ref-applied. */
-  lines: GlLine[]
-  glRefs: GlRefs
-  /** voucher id → payee (voucher_party_refs RPC), both directions. */
-  payeeByVoucherId: Map<string, string>
-  /** company full name → short code, to unify invoice/receipt party keys. */
-  shortByName: Map<string, string>
+  events: RnpInvoiceEvent[]
+  /** company id → short code (fallback name) for the debtor row label. */
+  companyLabelById: Map<string, string>
   months: string[]
   accPeriod: { from: string; to: string }
-  segList: string[] | undefined
 }
 
 export function buildRnpMatrixRows(i: RnpExtrasInput): MatrixRow[] {
-  const inSeg = (l: GlLine) => !i.segList || i.segList.includes(l.segment)
   const monthEnd = (ym: string) => dayjs(`${ym}-01`).endOf('month').format('YYYY-MM-DD')
+  const signed = (e: RnpInvoiceEvent) =>
+    e.event_kind === 'billed' ? Number(e.amount) : -Number(e.amount)
+  const partyOf = (e: RnpInvoiceEvent) =>
+    (e.company_id ? i.companyLabelById.get(e.company_id) : null) ??
+    e.party_fallback ??
+    '未标示 · Unattributed'
 
-  // ── Receivables (3030, ref-applied for party attribution) ─────────────────
-  const arLines = applyGlRefs(
-    i.lines.filter((l) => l.account_code === AR_CODE && inSeg(l)),
-    i.glRefs,
-  )
-  const balanceAt = (toDate: string) =>
-    r2(
-      arLines
-        .filter((l) => l.date <= toDate)
-        .reduce((s, l) => s + Number(l.debit ?? 0) - Number(l.credit ?? 0), 0),
-    )
+  const balanceAt = (events: RnpInvoiceEvent[], toDate: string) =>
+    r2(events.filter((e) => e.event_date <= toDate).reduce((s, e) => s + signed(e), 0))
 
-  const outstandingByCol = [balanceAt(i.accPeriod.to), ...i.months.map((ym) => balanceAt(monthEnd(ym)))]
+  const outstandingByCol = [
+    balanceAt(i.events, i.accPeriod.to),
+    ...i.months.map((ym) => balanceAt(i.events, monthEnd(ym))),
+  ]
 
-  const partyOf = (l: GlLine) => {
-    const raw =
-      (l as GlLine & { party?: string | null }).party ??
-      (l.ref_type === 'payment_voucher' || l.ref_type === 'payment_voucher_void'
-        ? (l.ref_id ? i.payeeByVoucherId.get(l.ref_id) ?? null : null)
-        : null)
-    if (!raw) return '未标示 · Unattributed'
-    return i.shortByName.get(raw) ?? raw
+  const byParty = new Map<string, RnpInvoiceEvent[]>()
+  for (const e of i.events) {
+    const p = partyOf(e)
+    const list = byParty.get(p) ?? []
+    list.push(e)
+    byParty.set(p, list)
   }
-  const parties = [...new Set(arLines.map(partyOf))]
-  const partyBalanceAt = (p: string, toDate: string) =>
-    r2(
-      arLines
-        .filter((l) => partyOf(l) === p && l.date <= toDate)
-        .reduce((s, l) => s + Number(l.debit ?? 0) - Number(l.credit ?? 0), 0),
-    )
-  const partyRows: MatrixRow[] = parties
-    .map((p) => ({
+  const partyRows: MatrixRow[] = [...byParty.entries()]
+    .map(([p, evs]) => ({
       p,
-      values: [partyBalanceAt(p, i.accPeriod.to), ...i.months.map((ym) => partyBalanceAt(p, monthEnd(ym)))],
+      values: [balanceAt(evs, i.accPeriod.to), ...i.months.map((ym) => balanceAt(evs, monthEnd(ym)))],
     }))
     // 只看还没收回的: only debtors whose accumulated balance is still positive.
     .filter((r) => r.values[0] > 0.005)

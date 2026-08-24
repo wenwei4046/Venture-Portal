@@ -102,6 +102,30 @@ user's "把rm 1, 测试数据清楚 然后这些功能补上":
    balance 57,081.53. journal_lines FK is `entry_id`, date is
    `transaction_date` (not journal_entry_id/entry_date).
 
+9. **Monthly R&P 未收 rewritten INVOICE-based** (mig 20260824080000
+   rnp_invoice_events, APPLIED). Chain of discovery: user asked about Rygis
+   9,500 → attribution fix (item 8) → user pressed "不是还了吗?想清楚" →
+   found the REAL structural problem: early lump settle JEs post the whole
+   3030 credit under ONE segment (JE-202605-0051: 7-invoice DC batch
+   27,147.14 all under 'corporate') while invoice debits sit per-segment, so
+   marketing GL-3030 carries ghosts forever (DC 26,589.15 showed outstanding
+   though PAID 30 May). Newer settles slice per-segment; old ones don't.
+   Also the 91.26 Notion 1/3: NOT repaid — moved 3030→3059 Due-from-DC on
+   2026-06-12 (user ruling), 3059 still open; showed on marketing R&P only
+   because that reclass JV was segmented treasury. Decision (user approved
+   after impact check): report reads invoices, GL untouched. rnp_invoice_events
+   RPC (role-scoped like dept_invoice_settlements; finance NULL = consolidated)
+   returns dated events: billed +total @ invoice_date, collected −amount @
+   receipt payment_date (+ batch-settle residual @ settlement voucher date —
+   all 140 paid invoices verified to zero out, no double count), credited
+   −amount @ CN approved_at. lib/monthly-rnp.ts consumes events only (no GL
+   lines / glRefs / voucher_party_refs — that RPC is now unused by code but
+   kept in DB). True marketing 未收 Aug = CAR 21,004.53 only (was showing
+   57,081.53 of mostly ghosts). Old wrong-segment settle JEs left AS-IS in GL
+   (segment cash slices still off there — separate decision if user ever
+   wants GL repair). voucher_party_refs/gl-refs attribution fix (item 8)
+   retained — it still improves drill-down party labels elsewhere.
+
 Still deferred (user said 不理他先 / needs go-ahead): IT-dept payroll 3 traps;
 payroll allocation + statements participation for NEW registry depts; Principal
 mobile push; Alliance recon PDF template (awaiting sample).

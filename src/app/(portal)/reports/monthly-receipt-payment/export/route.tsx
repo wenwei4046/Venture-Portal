@@ -4,12 +4,12 @@
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
-import { fetchAllJournalLines, fetchCoaAccounts, fetchGlRefs, type GlLine } from '@/lib/gl-reports'
+import { fetchAllJournalLines, fetchCoaAccounts } from '@/lib/gl-reports'
 import { buildMonthlyCashFlowSides, buildSideMatrixRows } from '@/lib/cash-flow-custom'
 import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
 import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
 import { monthColumns, type MatrixRow } from '@/lib/monthly-matrix'
-import { buildRnpMatrixRows } from '@/lib/monthly-rnp'
+import { buildRnpMatrixRows, type RnpInvoiceEvent } from '@/lib/monthly-rnp'
 import { segmentFilterFor } from '../../_components/report-segments'
 import { exportPdfResponse, exportXlsxResponse } from '@/lib/export/response'
 import { buildMatrixXlsx } from '@/lib/export/monthly-matrix-export'
@@ -27,15 +27,18 @@ export async function GET(req: Request) {
   const throughMonth = Number(period.slice(5, 7))
 
   const supabase = await createClient()
-  const [lines, accounts, { data: banks }, inSaved, outSaved, glRefs, partiesRes, { data: companyRows }] =
+  const isDeptMgr = user.role === 'dept_manager'
+  const [lines, accounts, { data: banks }, inSaved, outSaved, eventsRes, { data: companyRows }] =
     await Promise.all([
       fetchAllJournalLines(supabase),
       fetchCoaAccounts(supabase),
       supabase.rpc('bank_gl_codes' as never),
       readReportLayout(supabase, 'cash_flow_in'),
       readReportLayout(supabase, 'cash_flow_out'),
-      fetchGlRefs(supabase),
-      supabase.rpc('voucher_party_refs' as never),
+      supabase.rpc(
+        'rnp_invoice_events' as never,
+        (isDeptMgr || !segment ? {} : { p_segment: segment }) as never,
+      ),
       supabase.from('companies').select('id, name, short_code'),
     ])
   const bankCodes = new Set((banks ?? []) as unknown as string[])
@@ -50,26 +53,17 @@ export async function GET(req: Request) {
   )
 
   const { months, accPeriod } = monthColumns(year, throughMonth)
-  const payeeByVoucherId = new Map<string, string>(
-    (Array.isArray((partiesRes as { data?: unknown })?.data)
-      ? ((partiesRes as { data: unknown }).data as Array<{ id: string; payee: string }>)
+  const events = (
+    Array.isArray((eventsRes as { data?: unknown })?.data)
+      ? ((eventsRes as { data: unknown }).data as RnpInvoiceEvent[])
       : []
-    ).map((r) => [r.id, r.payee]),
   )
-  const shortByName = new Map<string, string>(
-    ((companyRows ?? []) as Array<{ name: string; short_code: string | null }>).flatMap((c) =>
-      c.short_code ? [[c.name, c.short_code] as [string, string]] : [],
+  const companyLabelById = new Map<string, string>(
+    ((companyRows ?? []) as Array<{ id: string; name: string; short_code: string | null }>).map(
+      (c) => [c.id, c.short_code ?? c.name],
     ),
   )
-  const rnpRows = buildRnpMatrixRows({
-    lines: lines as GlLine[],
-    glRefs,
-    payeeByVoucherId,
-    shortByName,
-    months,
-    accPeriod,
-    segList: segmentFilterFor(segment),
-  })
+  const rnpRows = buildRnpMatrixRows({ events, companyLabelById, months, accPeriod })
 
   const nCols = data.columns.length
   const rows: MatrixRow[] = [
