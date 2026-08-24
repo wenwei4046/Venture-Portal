@@ -286,6 +286,31 @@ export async function reopenPeriod(formData: FormData) {
 
 // ─── Company Management (add / edit / toggle active) ─────────────────────────
 
+// ─── Departments (2026-08-24) ────────────────────────────────────────────────
+// ADD-only by design: dept_to_segment() and a dozen TS maps key off the five
+// core department NAMES, so rename/delete stays off the UI entirely — a
+// renamed "Marketing" would silently re-segment its whole book. New
+// departments are lightweight (staff / claims / inter-billing targets); their
+// GL folds into Venture until a full segment build is done for them.
+export async function addDepartment(formData: FormData) {
+  await requireRole(['principal', 'finance'])
+  const supabase = await createClient()
+
+  const name = (formData.get('name') as string)?.trim()
+  if (!name) throw new Error('Department name is required')
+  if (name.length > 40) throw new Error('Department name is too long (max 40 chars)')
+
+  const { data: existing } = await supabase.from('departments').select('id, name')
+  if ((existing ?? []).some((d) => (d.name as string).trim().toLowerCase() === name.toLowerCase())) {
+    throw new Error(`Department "${name}" already exists`)
+  }
+
+  const { error } = await supabase.from('departments').insert({ name, is_internal: false })
+  if (error) throw new Error(`Failed to add department: ${error.message}`)
+
+  revalidatePath('/settings')
+}
+
 export async function addCompany(formData: FormData) {
   await requireRole(['principal'])
   const supabase = await createClient()

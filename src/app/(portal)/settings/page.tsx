@@ -12,11 +12,12 @@ import DirectorSalarySection from './_components/DirectorSalarySection'
 import BaseRateSimulator from './_components/BaseRateSimulator'
 import BankAccountsSection from './_components/BankAccountsSection'
 import CompaniesSection from './_components/CompaniesSection'
+import DepartmentsSection from './_components/DepartmentsSection'
 import AccountsSection from './_components/AccountsSection'
 import PeriodsSection from './_components/PeriodsSection'
 import SettingsTabs, { type SettingsTab } from './_components/SettingsTabs'
 
-const VALID_TABS: SettingsTab[] = ['treasury', 'overdue', 'splits', 'directors', 'companies', 'banks', 'accounts', 'periods', 'simulator']
+const VALID_TABS: SettingsTab[] = ['treasury', 'overdue', 'splits', 'directors', 'companies', 'departments', 'banks', 'accounts', 'periods', 'simulator']
 function isValidTab(s: string | undefined): s is SettingsTab {
   return !!s && (VALID_TABS as string[]).includes(s)
 }
@@ -44,7 +45,8 @@ export default async function SettingsPage({ searchParams }: Props) {
   const activeTab: SettingsTab = isValidTab(rawTab) ? rawTab : defaultTab
 
   // Finance hitting a Principal-only tab via direct URL falls back to Accounts.
-  const activeTabResolved: SettingsTab = !isPrincipal && activeTab !== 'accounts'
+  // (Finance-allowed tabs: Accounts + Departments, mirroring FINANCE_TABS.)
+  const activeTabResolved: SettingsTab = !isPrincipal && !['accounts', 'departments'].includes(activeTab)
     ? 'accounts'
     : activeTab
 
@@ -62,6 +64,7 @@ export default async function SettingsPage({ searchParams }: Props) {
     { data: bankAccountRows },
     { data: periodLockRows },
     { data: accountRows },
+    { data: departmentRows },
   ] = await Promise.all([
     supabase.from('treasury_config').select('*'),
     supabase.from('overdue_config').select('*'),
@@ -79,6 +82,7 @@ export default async function SettingsPage({ searchParams }: Props) {
       .order('type')
       .order('sort_order')
       .order('code'),
+    supabase.from('departments').select('id, name, is_internal, created_at').order('created_at'),
   ])
 
   const treasury = (treasuryRows ?? []) as TreasuryConfig[]
@@ -168,6 +172,17 @@ export default async function SettingsPage({ searchParams }: Props) {
             name: c.name,
             short_code: c.short_code,
             is_active: c.is_active,
+          }))}
+        />
+      )}
+
+      {activeTabResolved === 'departments' && (
+        <DepartmentsSection
+          departments={(departmentRows ?? []).map((d) => ({
+            id: d.id as string,
+            name: d.name as string,
+            is_internal: Boolean(d.is_internal),
+            created_at: (d.created_at as string | null) ?? null,
           }))}
         />
       )}

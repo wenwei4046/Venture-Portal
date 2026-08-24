@@ -10,6 +10,7 @@ export type SettingsTab =
   | 'splits'
   | 'directors'
   | 'companies'
+  | 'departments'
   | 'banks'
   | 'accounts'
   | 'periods'
@@ -21,15 +22,17 @@ const ALL_TABS: TabItem[] = [
   { key: 'splits', label: 'Splits' },
   { key: 'directors', label: 'Directors' },
   { key: 'companies', label: 'Companies' },
+  { key: 'departments', label: 'Departments' },
   { key: 'banks', label: 'Bank Accounts' },
   { key: 'accounts', label: 'Accounts' },
   { key: 'periods', label: 'Periods' },
   { key: 'simulator', label: 'Simulator' },
 ]
 
-// Finance only sees Accounts (the unified COA) — every other Settings tab is
-// Principal-only (treasury config, period locks, base rate simulator, splits).
-const FINANCE_TABS: SettingsTab[] = ['accounts']
+// Finance sees Accounts (the unified COA) + Departments (add-only, 2026-08-24)
+// — every other Settings tab is Principal-only (treasury config, period locks,
+// base rate simulator, splits).
+const FINANCE_TABS: SettingsTab[] = ['accounts', 'departments']
 
 export function isSettingsTab(s: string | undefined): s is SettingsTab {
   return !!s && ALL_TABS.some((t) => t.key === s)
