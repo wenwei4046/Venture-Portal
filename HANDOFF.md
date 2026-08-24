@@ -84,6 +84,16 @@ partial receipts only ever hang off invoice_id.
    issued (bal 20,855.82). credit_dept_pool_on_invoice_paid keys off
    reference_type='invoice' so it never double-fired.
 
+## Departments tab (2026-08-24, mig 20260824010000)
+
+Settings → Departments: ADD-only management, Principal + Finance (RLS INSERT
+policy departments_pf_insert). No rename, no delete, no is_active — the five
+core department NAMES drive dept_to_segment() + a dozen TS maps, so renaming
+would silently re-segment a book. New departments are LIGHTWEIGHT: usable for
+staff/claims/inter-billing/dept_manager assignment, GL folds into Venture
+(corporate). Making one a full segment (own P&L/pool/billing mode/reports)
+stays a one-off engineering job — enum + mappings + pool GL account.
+
 ## FIXED 2026-08-20 — August payroll rounds vanished from every dept cash flow
 
 User: "为什么7月没有salary" on Monthly R&P (marketing). Two truths:
