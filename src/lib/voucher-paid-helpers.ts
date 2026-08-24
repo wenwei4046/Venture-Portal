@@ -55,9 +55,11 @@ export async function adjustPool(
         })
     if (error) throw new Error(`Pool adjustment failed (invoice_payout_pool ${direction} ${amount}): ${error.message}`)
   } else if (pool.startsWith('dept_pool_')) {
-    // All 5 Dept Pools (HR, Finance, Director Office, Marketing, Director)
-    // live in dept_pools keyed by department_id. Explicit map because
-    // 'dept_pool_director_office' → 'Director Office' needs underscore→space.
+    // Dept Pools live in dept_pools keyed by department_id. The five cores
+    // keep the explicit name map ('dept_pool_director_office' → 'Director
+    // Office' needs underscore→space); dynamically provisioned departments
+    // (2026-08-24) resolve by segment_key — their pool key is always
+    // 'dept_pool_<segment_key>'.
     const POOL_TO_DEPT: Record<string, string> = {
       dept_pool_hr: 'HR',
       dept_pool_finance: 'Finance',
@@ -66,15 +68,14 @@ export async function adjustPool(
       dept_pool_director: 'Director',
     }
     const deptName = POOL_TO_DEPT[pool]
-    if (!deptName) throw new Error(`Pool adjustment failed: unknown dept pool "${pool}"`)
 
-    const { data: dept, error: deptErr } = await supabase
-      .from('departments')
-      .select('id')
-      .eq('name', deptName)
-      .single()
+    const { data: dept, error: deptErr } = deptName
+      ? await supabase.from('departments').select('id').eq('name', deptName).single()
+      : await supabase.from('departments').select('id').eq('segment_key', pool.slice('dept_pool_'.length)).single()
     if (deptErr || !dept) {
-      throw new Error(`Pool adjustment failed (${pool}): department "${deptName}" lookup failed${deptErr ? `: ${deptErr.message}` : ''}`)
+      throw new Error(
+        `Pool adjustment failed: unknown dept pool "${pool}"${deptErr ? ` (${deptErr.message})` : ''}`,
+      )
     }
 
     const { error } = await supabase.from('dept_pools').insert({
