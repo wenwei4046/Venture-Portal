@@ -19,8 +19,10 @@ import {
   buildBankDay,
   columnForPool,
   columnForSegment,
+  dbColumnsWithLabels,
   emptyAmounts,
   addAmounts,
+  setExtraDbColumns,
   totalsAcrossBanks,
   type BankDay,
   type DbColumn,
@@ -35,6 +37,10 @@ export interface DailyBankData {
   date: string
   banks: BankDay[]
   totals: ReturnType<typeof totalsAcrossBanks>
+  /** Column set for the view/export — the six cores + one per provisioned
+   *  full department. Travels in the payload because the view is a client
+   *  component and can't read the server module's column state. */
+  columns: Array<{ key: string; label: string }>
 }
 
 export async function fetchDailyBank(
@@ -42,6 +48,17 @@ export async function fetchDailyBank(
   date: string, // YYYY-MM-DD
 ): Promise<DailyBankData> {
   const dayEndIso = `${date}T23:59:59.999+08:00`
+
+  // Dynamic departments (2026-08-24): every provisioned full dept gets its
+  // own column. Set BEFORE any emptyAmounts()/column resolution below.
+  const { data: fullDeptRows } = await supabase
+    .from('departments')
+    .select('name, segment_key')
+    .not('segment_key', 'is', null)
+  const extraCols = ((fullDeptRows ?? []) as Array<{ name: string; segment_key: string }>)
+    .filter(d => !['marketing', 'hr', 'finance', 'director_office', 'director', 'corporate'].includes(d.segment_key))
+    .map(d => ({ key: d.segment_key, label: d.name }))
+  setExtraDbColumns(extraCols)
 
   const { data: bankRows } = await supabase
     .from('bank_accounts')
@@ -55,7 +72,8 @@ export async function fetchDailyBank(
     is_primary: boolean
   }>).filter(b => b.gl_account_code)
   const codes = banks.map(b => b.gl_account_code as string)
-  if (codes.length === 0) return { date, banks: [], totals: totalsAcrossBanks([]) }
+  if (codes.length === 0)
+    return { date, banks: [], totals: totalsAcrossBanks([]), columns: dbColumnsWithLabels() }
 
   // ── GL lines on every bank code up to D, with the JE's segment ──
   const glRows = (await fetchAllRows((lo, hi) =>
@@ -254,6 +272,8 @@ export async function fetchDailyBank(
       Finance: 'finance',
       HR: 'hr',
       Marketing: 'marketing',
+      // Dynamic full departments: their column key IS the segment key.
+      ...Object.fromEntries(extraCols.map(e => [e.label, e.key])),
     }
     const targets: Partial<Record<DbColumn, number>> = {}
     let ventureOverlay = 0
@@ -268,5 +288,5 @@ export async function fetchDailyBank(
     days = applyPoolAdjust(days, targets, ventureOverlay, banks[0]?.id ?? '')
   }
 
-  return { date, banks: days, totals: totalsAcrossBanks(days) }
+  return { date, banks: days, totals: totalsAcrossBanks(days), columns: dbColumnsWithLabels() }
 }

@@ -7,7 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { fetchDailyBank } from '@/lib/daily-bank-data'
-import { DB_COLUMNS, DB_COLUMN_LABELS, sumAmounts } from '@/lib/daily-bank'
+import { sumAmounts } from '@/lib/daily-bank'
 import { PdfDocument, PdfTable, type PdfColumn, type PdfRowKind } from '@/lib/export/pdf'
 import { exportPdfResponse } from '@/lib/export/response'
 
@@ -21,11 +21,15 @@ export async function GET(request: Request) {
     /^\d{4}-\d{2}-\d{2}$/.test(raw) && dayjs(raw).isValid() ? raw : dayjs().format('YYYY-MM-DD')
 
   const data = await fetchDailyBank(supabase, date)
+  // Dynamic departments: the column set comes from the payload (cores + one
+  // per provisioned full dept), so the PDF matches the screen.
+  const colKeys = data.columns.map(c => c.key)
 
-  // Landscape A4 usable ≈ 760pt: label 200 + 7 dept cols 70 + total 70 = 760.
+  // Landscape A4 usable ≈ 760pt: label + dept cols + total share the width.
+  const deptColWidth = Math.max(48, Math.floor(490 / Math.max(colKeys.length, 1)))
   const columns: PdfColumn[] = [
     { label: 'Bank \\ Dept', width: 200 },
-    ...DB_COLUMNS.map(c => ({ label: DB_COLUMN_LABELS[c], width: 70, align: 'right' as const })),
+    ...data.columns.map(c => ({ label: c.label, width: deptColWidth, align: 'right' as const })),
     { label: 'Total', width: 70, align: 'right' as const },
   ]
 
@@ -39,14 +43,14 @@ export async function GET(request: Request) {
   for (const b of data.banks) {
     push(
       `${b.bankName} - Balance B/F`,
-      DB_COLUMNS.map(c => b.bf[c]),
+      colKeys.map(c => b.bf[c] ?? 0),
       sumAmounts(b.bf),
       'group',
     )
     if (sumAmounts(b.inToday) !== 0) {
       push(
         '  Received today',
-        DB_COLUMNS.map(c => b.inToday[c]),
+        colKeys.map(c => b.inToday[c] ?? 0),
         sumAmounts(b.inToday),
         'detail',
       )
@@ -55,21 +59,21 @@ export async function GET(request: Request) {
       const desc = p.description.length > 26 ? `${p.description.slice(0, 24)}..` : p.description
       push(
         `  PENDING ${p.payee} ${p.voucherNo}${desc ? ` ${desc}` : ''}`,
-        DB_COLUMNS.map(c => -p.amounts[c]),
+        colKeys.map(c => -(p.amounts[c] ?? 0)),
         -p.total,
         'detail',
       )
     }
     push(
       '  Available balance',
-      DB_COLUMNS.map(c => b.available[c]),
+      colKeys.map(c => b.available[c] ?? 0),
       sumAmounts(b.available),
       'total',
     )
   }
   rows.push([
     'TOTAL AVAILABLE',
-    ...DB_COLUMNS.map(c => data.totals.available[c]),
+    ...colKeys.map(c => data.totals.available[c] ?? 0),
     data.totals.grand,
   ])
   kinds.push('total')

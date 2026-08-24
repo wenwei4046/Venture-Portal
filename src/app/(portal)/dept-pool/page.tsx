@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import { fetchIncomeStatement } from '@/lib/cfo-reports'
 import { deptNameToPoolKey, splitPoolAccrual } from '@/lib/dept-pool-accrual'
+import { extraDeptNameToSegment, primedRegistryRows } from '@/lib/dept-registry'
 import { BalanceProvider, BalanceToggle, BalanceValue } from './_components/RevealAmount'
 
 // dept_manager only owns their own dept pool. Skip the multi-dept list and
@@ -410,9 +411,12 @@ export default async function DeptPoolPage({
         'Director Office': 'director_office',
         Director: 'director',
       }
+      // Dynamic full departments (2026-08-24): their segment_key is a first-
+      // class row too, resolved via the primed registry.
+      const extraSegByName = extraDeptNameToSegment(primedRegistryRows())
       const segToBalance = new Map<string, number>()
       for (const d of departments ?? []) {
-        const seg = nameToSeg[d.name as string]
+        const seg = nameToSeg[d.name as string] ?? extraSegByName[d.name as string]
         if (seg) segToBalance.set(seg, balanceMap.get(d.id as string) ?? 0)
       }
       const segLabels: Array<{ seg: string | string[]; label: string }> = [
@@ -421,6 +425,7 @@ export default async function DeptPoolPage({
         { seg: 'finance',                        label: 'Finance' },
         { seg: 'hr',                             label: 'HR' },
         { seg: 'marketing',                      label: 'Marketing' },
+        ...Object.entries(extraSegByName).map(([name, seg]) => ({ seg, label: name })),
         { seg: ['corporate', 'treasury'],        label: 'Venture (Office)' },
       ]
       const primaryCode = banks[0]?.code // is_primary desc → Hong Leong first

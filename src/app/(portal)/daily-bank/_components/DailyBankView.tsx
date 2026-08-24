@@ -13,6 +13,14 @@ import {
 } from '@/lib/daily-bank'
 import type { DailyBankData } from '@/lib/daily-bank-data'
 
+// Dynamic departments (2026-08-24): the column set travels in the payload
+// (six cores + one per provisioned full dept). Set by the top component each
+// render; the nested row components read it synchronously.
+let COLS: Array<{ key: string; label: string }> = DB_COLUMNS.map(k => ({
+  key: k as string,
+  label: DB_COLUMN_LABELS[k],
+}))
+
 const money = (n: number) => formatMoneyBare(Math.abs(n))
 
 // House rendering for the board: negatives in red parentheses (matches the
@@ -26,6 +34,9 @@ function Cell({ n, zeroDash = true, tone }: { n: number; zeroDash?: boolean; ton
 const v = (token: string) => `rgb(var(${token}))`
 
 export default function DailyBankView({ data, today }: { data: DailyBankData; today: string }) {
+  if (data.columns?.length) {
+    COLS = data.columns
+  }
   const router = useRouter()
   const [view, setView] = useState<'matrix' | 'banks'>('matrix')
   const [busy, setBusy] = useState(false)
@@ -193,12 +204,12 @@ function MatrixView({ data }: { data: DailyBankData }) {
             <th className="text-left font-sans text-[11px] tracking-wider text-muted px-4 py-2">
               BANK \ DEPT
             </th>
-            {DB_COLUMNS.map(c => (
+            {COLS.map(col => (
               <th
-                key={c}
+                key={col.key}
                 className="text-right font-sans text-[11px] tracking-wider text-muted px-3 py-2"
               >
-                {DB_COLUMN_LABELS[c].toUpperCase()}
+                {col.label.toUpperCase()}
               </th>
             ))}
             <th className="text-right font-sans text-[11px] tracking-wider text-ink px-4 py-2">
@@ -212,9 +223,9 @@ function MatrixView({ data }: { data: DailyBankData }) {
           ))}
           <tr style={{ backgroundColor: v('--ledger-bg') }}>
             <td className="px-4 py-2 font-sans font-semibold text-ledger">Total available</td>
-            {DB_COLUMNS.map(c => (
-              <td key={c} className="text-right px-3 py-2 font-semibold">
-                <Cell n={data.totals.available[c]} zeroDash={false} tone="text-ink" />
+            {COLS.map(col => (
+              <td key={col.key} className="text-right px-3 py-2 font-semibold">
+                <Cell n={data.totals.available[col.key] ?? 0} zeroDash={false} tone="text-ink" />
               </td>
             ))}
             <td className="text-right px-4 py-2 font-semibold text-ledger">
@@ -245,9 +256,9 @@ function AmountRow({
       <td className={`px-4 py-2 font-sans ${strong ? 'font-semibold text-ink' : 'text-graphite'}`}>
         {label}
       </td>
-      {DB_COLUMNS.map(c => (
-        <td key={c} className={`text-right px-3 py-2 ${strong ? 'font-semibold' : ''}`}>
-          <Cell n={amounts[c]} tone={tone} />
+      {COLS.map(col => (
+        <td key={col.key} className={`text-right px-3 py-2 ${strong ? 'font-semibold' : ''}`}>
+          <Cell n={amounts[col.key] ?? 0} tone={tone} />
         </td>
       ))}
       <td className={`text-right px-4 py-2 ${strong ? 'font-semibold' : ''}`}>
@@ -279,10 +290,10 @@ function BankMatrixRows({ b }: { b: BankDay }) {
               Pending
             </span>
           </td>
-          {DB_COLUMNS.map(c => (
-            <td key={c} className="text-right px-3 py-2">
-              {p.amounts[c] !== 0 ? (
-                <span className="text-alert">({money(p.amounts[c])})</span>
+          {COLS.map(col => (
+            <td key={col.key} className="text-right px-3 py-2">
+              {(p.amounts[col.key] ?? 0) !== 0 ? (
+                <span className="text-alert">({money(p.amounts[col.key])})</span>
               ) : (
                 <span className="text-muted">—</span>
               )}

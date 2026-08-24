@@ -121,10 +121,25 @@ registry modes. database.types.ts REGENERATED (has the new enum values).
 tsconfig now excludes '**/* - Copy*' so local `next build` matches Vercel
 (.gitignore already blocks those files from shipping).
 
-NOT yet dynamic (folds new depts into Venture where applicable): Daily Bank
-columns, payroll allocation participation, statements. Verification: tsc 0 /
-555 tests / next build 73 pages — all BEFORE push per user's "local test run
-成了再 push".
+NOT yet dynamic (folds new depts into Venture where applicable): payroll
+allocation participation, statements. Verification: tsc 0 / 555 tests / next
+build 73 pages — all BEFORE push per user's "local test run 成了再 push".
+
+Live-acceptance follow-ups (same day, each found by the user's RM1 Revenue
+Department walk-through, each gated locally before push):
+ - adjustPool (TS) + apply_pool_adjustment (SQL, mig 20260824030000): both
+   pool adjusters had the hardcoded five-pool map → "unknown dept pool".
+   The FIRST failed settle left HV-OR-202608-0301 half-done (voucher + bank
+   bump + paid-flip, no JE/pool) — completed by mig 20260824040000.
+ - deptNameToPoolKey (dept-pool overview) — seventh hardcoded map.
+ - Daily Bank + dept-pool Per-bank breakdown now DYNAMIC: daily-bank.ts keeps
+   the six core columns and grows via setExtraDbColumns (registry, set by
+   fetchDailyBank); the column set travels in DailyBankData.columns because
+   DailyBankView is a client component (module state doesn't cross); PDF
+   export shares it; dept-pool per-bank segLabels append registry extras
+   before the Venture combo row. SegAmounts loosened to Record<string,
+   number>; user-tuned applyPoolAdjust logic untouched, targets now include
+   dynamic dept names.
 
 ## Departments tab (2026-08-24, mig 20260824010000)
 

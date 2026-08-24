@@ -28,15 +28,37 @@ export const DB_COLUMNS = [
   'hr',
   'marketing',
 ] as const
-export type DbColumn = (typeof DB_COLUMNS)[number]
+// Dynamic departments (2026-08-24): columns can now grow at runtime, so the
+// column type is plain string. The six cores above stay first and fixed.
+export type DbColumn = string
 
-export const DB_COLUMN_LABELS: Record<DbColumn, string> = {
+export const DB_COLUMN_LABELS: Record<string, string> = {
   venture: 'Venture',
   director: 'Director',
   director_office: 'Director Office',
   finance: 'Finance',
   hr: 'HR',
   marketing: 'Marketing',
+}
+
+// Extra full departments (dept registry): key = segment_key, one column each.
+// Set by the data layer before building; empty = the classic six columns, so
+// every existing test and caller behaves bit-identically.
+let EXTRA_DB_COLUMNS: Array<{ key: string; label: string }> = []
+
+export function setExtraDbColumns(extras: Array<{ key: string; label: string }>): void {
+  EXTRA_DB_COLUMNS = extras.filter(e => !(DB_COLUMNS as readonly string[]).includes(e.key))
+}
+
+export function dbColumns(): string[] {
+  return [...DB_COLUMNS, ...EXTRA_DB_COLUMNS.map(e => e.key)]
+}
+
+export function dbColumnsWithLabels(): Array<{ key: string; label: string }> {
+  return [
+    ...DB_COLUMNS.map(k => ({ key: k as string, label: DB_COLUMN_LABELS[k] })),
+    ...EXTRA_DB_COLUMNS,
+  ]
 }
 
 export function columnForSegment(segment: string | null | undefined): DbColumn {
@@ -52,6 +74,8 @@ export function columnForSegment(segment: string | null | undefined): DbColumn {
     case 'marketing':
       return 'marketing'
     default:
+      // Dynamically provisioned dept segments get their own column.
+      if (segment && EXTRA_DB_COLUMNS.some(e => e.key === segment)) return segment
       return 'venture' // corporate, treasury, unallocated, NULL, anything new
   }
 }
@@ -68,32 +92,32 @@ export function columnForPool(pool: string | null | undefined): DbColumn {
       return 'hr'
     case 'dept_pool_marketing':
       return 'marketing'
-    default:
+    default: {
+      // 'dept_pool_<segment_key>' of a provisioned dept → its own column.
+      if (pool?.startsWith('dept_pool_')) {
+        const key = pool.slice('dept_pool_'.length)
+        if (EXTRA_DB_COLUMNS.some(e => e.key === key)) return key
+      }
       return 'venture' // venture_pool, dept_pool_venture_office, unknown
+    }
   }
 }
 
-export type SegAmounts = Record<DbColumn, number>
+export type SegAmounts = Record<string, number>
 
-export const emptyAmounts = (): SegAmounts => ({
-  venture: 0,
-  director: 0,
-  director_office: 0,
-  finance: 0,
-  hr: 0,
-  marketing: 0,
-})
+export const emptyAmounts = (): SegAmounts =>
+  Object.fromEntries(dbColumns().map(c => [c, 0])) as SegAmounts
 
 export function addAmounts(target: SegAmounts, col: DbColumn, amount: number): void {
-  target[col] = r2(target[col] + amount)
+  target[col] = r2((target[col] ?? 0) + amount)
 }
 
 export const sumAmounts = (a: SegAmounts): number =>
-  r2(DB_COLUMNS.reduce((s, c) => s + a[c], 0))
+  r2(dbColumns().reduce((s, c) => s + (a[c] ?? 0), 0))
 
 const combine = (a: SegAmounts, b: SegAmounts, sign: 1 | -1): SegAmounts => {
   const out = emptyAmounts()
-  for (const c of DB_COLUMNS) out[c] = r2(a[c] + sign * b[c])
+  for (const c of dbColumns()) out[c] = r2((a[c] ?? 0) + sign * (b[c] ?? 0))
   return out
 }
 
@@ -144,7 +168,7 @@ export function buildBankDay(input: {
   const current = combine(combine(input.bf, input.inToday, 1), input.outToday, -1)
   const pendingTotal = emptyAmounts()
   for (const p of input.pending) {
-    for (const c of DB_COLUMNS) addAmounts(pendingTotal, c, p.amounts[c])
+    for (const c of dbColumns()) addAmounts(pendingTotal, c, p.amounts[c] ?? 0)
   }
   const available = combine(current, pendingTotal, -1)
   const otherInToday = r2(
@@ -162,7 +186,7 @@ export function buildBankDay(input: {
 export function totalsAcrossBanks(banks: BankDay[]): { available: SegAmounts; grand: number } {
   const available = emptyAmounts()
   for (const b of banks) {
-    for (const c of DB_COLUMNS) addAmounts(available, c, b.available[c])
+    for (const c of dbColumns()) addAmounts(available, c, b.available[c] ?? 0)
   }
   return { available, grand: sumAmounts(available) }
 }
@@ -190,7 +214,7 @@ export function applyPoolAdjust(
     if (col === 'venture') return r2(ventureOverlay)
     const target = targets[col]
     if (target == null) return 0
-    const glTotal = r2(banks.reduce((s, b) => s + b.current[col], 0))
+    const glTotal = r2(banks.reduce((s, b) => s + (b.current[col] ?? 0), 0))
     return r2(target - glTotal)
   }
 
@@ -199,12 +223,12 @@ export function applyPoolAdjust(
     const bf = { ...b.bf }
     const current = { ...b.current }
     const available = { ...b.available }
-    for (const c of DB_COLUMNS) {
+    for (const c of dbColumns()) {
       const adj = adjustFor(c)
       if (adj === 0) continue
-      bf[c] = r2(bf[c] + adj)
-      current[c] = r2(current[c] + adj)
-      available[c] = r2(current[c] - b.pendingTotal[c])
+      bf[c] = r2((bf[c] ?? 0) + adj)
+      current[c] = r2((current[c] ?? 0) + adj)
+      available[c] = r2(current[c] - (b.pendingTotal[c] ?? 0))
     }
     return { ...b, bf, current, available }
   })

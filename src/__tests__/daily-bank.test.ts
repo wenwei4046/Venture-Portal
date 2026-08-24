@@ -11,7 +11,7 @@ import {
   type SegAmounts,
 } from '@/lib/daily-bank'
 
-const amounts = (patch: Partial<SegAmounts>): SegAmounts => ({ ...emptyAmounts(), ...patch })
+const amounts = (patch: Record<string, number>): SegAmounts => ({ ...emptyAmounts(), ...patch })
 
 describe('column mapping', () => {
   it('maps JE segments — corporate/treasury/untagged all land in Venture (dept-pool page parity)', () => {
