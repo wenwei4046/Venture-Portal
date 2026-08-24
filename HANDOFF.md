@@ -77,10 +77,13 @@ user's "把rm 1, 测试数据清楚 然后这些功能补上":
    the PV and does NOT touch invoice status — money-out only, Finance picks
    pool + GL account, normal PV approval. Column note: invoices freetext party
    is `billable_to_freetext_name` (NOT billable_to / billable_to_name).
-6. **Monthly R&P paid-to block REMOVED** (user twice: "我只是要还没收回的就好").
-   lib/monthly-rnp.ts now returns only AR_BILLED / AR_COLLECTED / AR_OUTSTANDING
-   / per-debtor rows (positive accumulated only) / TOTAL_POSITION. Page rewritten
-   onto the shared lib.
+6. **Monthly R&P bottom block trimmed THREE times** — final state per user
+   ("我要的就是在月尾还没收到的钱在下面就好", confirmed via option pick):
+   lib/monthly-rnp.ts returns ONLY 月末未收 AR_OUTSTANDING (running 3030
+   balance at each month end) + one depth-1 row per debtor still owing
+   (positive accumulated only). Removed across the rounds: 支出对象 paid-to,
+   每月开单 AR_BILLED, 每月收回 AR_COLLECTED, 部门总资金 TOTAL_POSITION.
+   Do NOT re-add any of these without being asked. Page + export share the lib.
 7. **R&P + Monthly R&P Excel/PDF exports** (both new export/route.tsx mirror
    their cash-flow twins; dept_manager allowed — RLS/RPCs scope them; Monthly
    R&P export reuses lib/monthly-rnp so rows are identical to the page).

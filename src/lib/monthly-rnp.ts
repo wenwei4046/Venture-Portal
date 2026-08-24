@@ -1,10 +1,10 @@
 // Monthly Receipt & Payment — the rows the cash matrix doesn't have, shared
-// by the page and the export route so screen and file can never drift:
-//   开单/收回/月末未收 (per-month 3030 movements + running balance), the
-//   per-debtor split (positive balances only) and 部门总资金 (closing cash +
-//   outstanding). The 支出对象 paid-to breakdown was REMOVED on request
-//   (user 2026-08-24: "我只是要还没收回的就好") — the user's read is
-//   receivables; the by-account outflow sections above already cover spend.
+// by the page and the export route so screen and file can never drift.
+// After three rounds of trimming (user 2026-08-24: "我要的就是在月尾还没收到
+// 的钱在下面就好"), the bottom block is ONLY:
+//   月末未收 (running 3030 balance as at each month end) + one row per
+//   debtor still owing (positive accumulated balance only).
+// Removed on request: 支出对象 paid-to, 每月开单, 每月收回/CN, 部门总资金.
 
 import dayjs from 'dayjs'
 import { applyGlRefs, type GlLine, type GlRefs } from './gl-reports'
@@ -24,7 +24,6 @@ export interface RnpExtrasInput {
   months: string[]
   accPeriod: { from: string; to: string }
   segList: string[] | undefined
-  closingByCol: number[]
 }
 
 export function buildRnpMatrixRows(i: RnpExtrasInput): MatrixRow[] {
@@ -36,10 +35,6 @@ export function buildRnpMatrixRows(i: RnpExtrasInput): MatrixRow[] {
     i.lines.filter((l) => l.account_code === AR_CODE && inSeg(l)),
     i.glRefs,
   )
-  const billedInMonth = (ym: string) =>
-    r2(arLines.filter((l) => l.date.startsWith(ym)).reduce((s, l) => s + Number(l.debit ?? 0), 0))
-  const collectedInMonth = (ym: string) =>
-    r2(arLines.filter((l) => l.date.startsWith(ym)).reduce((s, l) => s + Number(l.credit ?? 0), 0))
   const balanceAt = (toDate: string) =>
     r2(
       arLines
@@ -47,14 +42,6 @@ export function buildRnpMatrixRows(i: RnpExtrasInput): MatrixRow[] {
         .reduce((s, l) => s + Number(l.debit ?? 0) - Number(l.credit ?? 0), 0),
     )
 
-  const billedByCol = [
-    r2(i.months.reduce((s, ym) => s + billedInMonth(ym), 0)),
-    ...i.months.map(billedInMonth),
-  ]
-  const collectedByCol = [
-    r2(i.months.reduce((s, ym) => s + collectedInMonth(ym), 0)),
-    ...i.months.map(collectedInMonth),
-  ]
   const outstandingByCol = [balanceAt(i.accPeriod.to), ...i.months.map((ym) => balanceAt(monthEnd(ym)))]
 
   const partyOf = (l: GlLine) => {
@@ -90,18 +77,7 @@ export function buildRnpMatrixRows(i: RnpExtrasInput): MatrixRow[] {
     }))
 
   return [
-    { key: 'AR_BILLED', label: '开单 · Billed (应收 ↑)', depth: 0, kind: 'subtotal', tone: 'ledger', values: billedByCol },
-    { key: 'AR_COLLECTED', label: '收回/CN · Collected (应收 ↓)', depth: 0, kind: 'subtotal', tone: 'auto', values: collectedByCol.map((v) => -v) },
-    { key: 'AR_OUTSTANDING', label: '月末未收 · Outstanding (AR balance)', depth: 0, kind: 'subtotal', tone: 'danger', emphasis: 'strong', values: outstandingByCol },
+    { key: 'AR_OUTSTANDING', label: '月末未收 · Outstanding (还没收到的钱)', depth: 0, kind: 'subtotal', tone: 'danger', emphasis: 'strong', values: outstandingByCol },
     ...partyRows,
-    {
-      key: 'TOTAL_POSITION',
-      label: '部门总资金 · Cash + 未收 (Total position)',
-      depth: 0,
-      kind: 'subtotal',
-      tone: 'ledger',
-      emphasis: 'strong',
-      values: i.closingByCol.map((c, idx) => r2(c + (outstandingByCol[idx] ?? 0))),
-    },
   ]
 }

@@ -69,7 +69,6 @@ export async function GET(req: Request) {
     months,
     accPeriod,
     segList: segmentFilterFor(segment),
-    closingByCol: data.closingByCol,
   })
 
   const nCols = data.columns.length

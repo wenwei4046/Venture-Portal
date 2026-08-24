@@ -83,7 +83,6 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
     months,
     accPeriod,
     segList: segmentFilterFor(segment),
-    closingByCol: data.closingByCol,
   })
 
   const nCols = data.columns.length
@@ -137,9 +136,8 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
       </div>
 
       <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
-        跟 Monthly Cash Flow 同一个格子:Accumulated + 每个月一栏。多出最下面:每月<em>开单</em>、
-        每月<em>收回/CN</em>、<em>月末未收</em>(每家欠钱的公司一行,只列还没收清的)和
-        <em>部门总资金</em>(现金 + 未收)。
+        跟 Monthly Cash Flow 同一个格子:Accumulated + 每个月一栏。多出最下面一块:
+        <em>月末未收</em> — 每个月月底还没收到的钱,底下每家还欠钱的公司一行。
       </p>
 
       <ReportSearchProvider>
