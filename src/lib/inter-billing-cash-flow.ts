@@ -26,6 +26,7 @@
 import type { CoaAccount, GlLine } from './gl-reports'
 import type { CashFlowLayout } from './cash-flow-custom'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { primedNameToSegment } from './dept-registry'
 
 /** Pseudo account code for the synthetic Financing transfer legs. */
 export const INTERBILL_TRANSFER_CODE = 'IB-XFER'
@@ -149,7 +150,7 @@ export function buildInterBillingCashFlowLines(sides: TransferSide[], bankCode: 
   const lines: GlLine[] = []
   let i = 0
   for (const s of sides) {
-    const seg = DEPT_TO_SEGMENT[s.deptName]
+    const seg = DEPT_TO_SEGMENT[s.deptName] ?? primedNameToSegment()[s.deptName]
     const amt = round2(s.amount)
     const date = (s.date ?? '').slice(0, 10)
     if (!seg || !(amt > 0) || !date) continue

@@ -13,6 +13,7 @@ import { eliminateInterBilling, fetchInterBillingElimination } from '@/lib/conso
 import { pnlBlocks } from '@/lib/gl-report-blocks'
 import GlReportView from '../_components/GlReportView'
 import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
+import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import ExportLinks from '../_components/ExportLinks'
 
 export const dynamic = 'force-dynamic'
@@ -87,7 +88,7 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
         period={period}
         compare={compare}
         segment={segment}
-        segments={isDeptMgr ? [] : REPORT_SEGMENTS}
+        segments={isDeptMgr ? [] : [...REPORT_SEGMENTS, ...extraReportSegments(primedRegistryRows())]}
         blocks={blocks}
         pctBase={{ current: pnl.revenue.current, previous: pnl.revenue.previous }}
         currentLabel={dayjs(`${period}-01`).format('MMM YYYY')}

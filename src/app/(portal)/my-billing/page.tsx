@@ -32,11 +32,13 @@ export default async function MyBillingPage() {
   }
   const { data: dept } = await supabase
     .from('departments')
-    .select('id, name')
+    .select('id, name, segment_key')
     .eq('id', user.department_id)
     .single()
   const deptName = dept?.name ?? '—'
-  const segment = deptNameToSegment(deptName) ?? null
+  const segment =
+    ((dept as { segment_key?: string | null } | null)?.segment_key ?? null) ||
+    (deptNameToSegment(deptName) ?? null)
 
   const thisMonth = dayjs().format('YYYY-MM')
   const { from, to } = monthRange(thisMonth)

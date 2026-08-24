@@ -19,6 +19,7 @@ import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
 import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
 import { monthColumns, r2, type MatrixRow } from '@/lib/monthly-matrix'
 import { segmentFilterFor } from '../_components/report-segments'
+import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import MonthlyMatrix from '../_components/MonthlyMatrix'
 import MonthlyReportControls from '../_components/MonthlyReportControls'
 import { ReportSearchProvider } from '../_components/ReportSearchProvider'
@@ -267,7 +268,7 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
 
       <ReportSearchProvider>
         <div className="flex gap-8 items-start">
-          <MonthlyReportControls period={period} segment={segment} hideSegment={isDeptMgr} />
+          <MonthlyReportControls period={period} segment={segment} hideSegment={isDeptMgr} extraSegments={extraReportSegments(primedRegistryRows())} />
           <div className="min-w-0 flex-1">
             <MonthlyMatrix columns={data.columns} rows={rows} />
           </div>

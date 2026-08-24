@@ -84,6 +84,48 @@ partial receipts only ever hang off invoice_id.
    issued (bal 20,855.82). credit_dept_pool_on_invoice_paid keys off
    reference_type='invoice' so it never double-fired.
 
+## DYNAMIC FULL DEPARTMENTS (2026-08-24, mig 20260824020000) — 转正 self-service
+
+User: "我要做成有自己的p&L pool 等等 … 以后可以手动加，然后功能自动链接";
+first provisioned: **Revenue Department** (segment 'revenue_department', pool
+GL 1090, mode 'revenue_department_attribution').
+
+DB: departments = the REGISTRY (segment_key UNIQUE / pool_gl_code FK /
+billing_mode_key UNIQUE; five cores backfilled 1030-1070). Every SQL mapping
+helper (dept_to_segment, billing_mode_to_segment, pool_key_to_segment,
+dept_pool_gl_code) keeps its LEGACY CASE FIRST — cores bit-identical incl.
+the Director-name→director_office quirk — registry fallback only for new
+names/modes/pools. credit_dept_pool_on_invoice_paid + calculate_dept_np
+gained registry branches guarded OFF the cores. provision_full_department
+(finance/principal): validates key, ALTER TYPE gl_segment + billing_mode ADD
+VALUE (PG15 in-txn ok since values unused in-txn), opens pool account at the
+next free multiple-of-10 in 1030-1490 (NOT next_account_code — that returns
+1901 after 1900 Opening Balance Clearing), files the registry row.
+IRREVERSIBLE: enum values can't be dropped.
+
+TS: lib/dept-registry.ts — fetch/extras builders + a PRIMED module store.
+Priming happens in lib/supabase/server createClient() (30s throttle,
+best-effort) so EVERY server path is covered without threading params; the
+provision action re-primes immediately. Deep pure helpers consult primed as
+LAST fallback (cores hardcoded-first): segmentForBillingMode /
+segmentToPoolKey / lineAttributions (invoice-settlement), deptNameToSegment
+(billing), invoicePoolForBillingMode + manualJvPoolForSegment (cfo-reports;
+MANUAL_JV_SEGMENT_TO_POOL loosened to Record<string,string> since gl_segment
+grows at runtime), bridge DEPT_TO_SEGMENT. approvals DEPT_POOL_GL now reads
+departments.pool_gl_code (registry-first). my-billing reads the dept row's
+segment_key/billing_mode_key. Report rails (P&L/CF/BS/R&P + 3 monthly via
+MonthlyReportControls extraSegments) append extraReportSegments(primed).
+Invoice/CN/Edit modals take extraModes (BillingView → InvoicesList → CN;
+EditInvoiceButton self-appends an unknown mode). createManualInvoice accepts
+registry modes. database.types.ts REGENERATED (has the new enum values).
+tsconfig now excludes '**/* - Copy*' so local `next build` matches Vercel
+(.gitignore already blocks those files from shipping).
+
+NOT yet dynamic (folds new depts into Venture where applicable): Daily Bank
+columns, payroll allocation participation, statements. Verification: tsc 0 /
+555 tests / next build 73 pages — all BEFORE push per user's "local test run
+成了再 push".
+
 ## Departments tab (2026-08-24, mig 20260824010000)
 
 Settings → Departments: ADD-only management, Principal + Finance (RLS INSERT

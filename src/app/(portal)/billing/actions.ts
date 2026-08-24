@@ -12,6 +12,7 @@ import { validateConsolidation, poolAttributions, segmentForBillingMode, lineAtt
 import { deptNameToSegment, fallbackRevenueGlCode, invoiceJeDate } from '@/lib/billing'
 import { payerExpenseSplits, type NatureSplit } from '@/lib/inter-billing-nature'
 import { INVOICE_BILLING_MODE_TO_POOL } from '@/lib/cfo-reports'
+import { primedModeToPool, primedModeToSegment } from '@/lib/dept-registry'
 import {
   buildConsolidatedInvoiceLines,
   periodShortLabel,
@@ -166,7 +167,9 @@ export async function createManualInvoice(formData: FormData): Promise<void> {
     throw new Error('Billable party name is required')
   }
   if (!rawPeriod) throw new Error('Period is required')
-  if (!CREATE_INVOICE_MODES.includes(rawMode as CreateInvoiceMode)) {
+  // Dynamic full departments (2026-08-24): a provisioned dept's own
+  // '<segment>_attribution' mode is as valid as the built-ins.
+  if (!CREATE_INVOICE_MODES.includes(rawMode as CreateInvoiceMode) && !(rawMode in primedModeToSegment())) {
     throw new Error(`Unsupported billing mode: ${rawMode}`)
   }
   const billingMode = rawMode as CreateInvoiceMode
@@ -1289,7 +1292,7 @@ export async function settleInvoicesConsolidated(payload: {
     // remaining balance), never the printed invoice total.
     return poolAttributions(
       [{ id: i.id, invoice_no: i.invoice_no, billing_mode: i.billing_mode, total_amount: collectFor(i.id) }],
-      INVOICE_BILLING_MODE_TO_POOL,
+      { ...INVOICE_BILLING_MODE_TO_POOL, ...primedModeToPool() },
     )
   })
   for (const a of attributions) {

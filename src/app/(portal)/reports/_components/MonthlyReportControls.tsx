@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { REPORT_SEGMENTS } from './report-segments'
+import { REPORT_SEGMENTS, type ReportSegmentOption } from './report-segments'
 import { useReportSearch } from './ReportSearchProvider'
 
 // Left-rail controls for the monthly matrix reports: "up to month" picker +
@@ -11,12 +11,17 @@ export default function MonthlyReportControls({
   period,
   segment,
   hideSegment = false,
+  extraSegments = [],
 }: {
   period: string
   segment: string
   // Dept managers are locked to their own segment (RLS) — hide the picker.
   hideSegment?: boolean
+  /** Dynamically provisioned full departments (dept-registry), appended to
+   *  the built-in rail. Server pages pass extraReportSegments(...). */
+  extraSegments?: ReportSegmentOption[]
 }) {
+  const allSegments = [...REPORT_SEGMENTS, ...extraSegments]
   const router = useRouter()
   const pathname = usePathname()
   const sp = useSearchParams()
@@ -108,7 +113,7 @@ export default function MonthlyReportControls({
       <div>
         <div className="text-xs uppercase tracking-wide text-muted font-sans mb-2">Segment</div>
         <div className="space-y-0.5">
-          {REPORT_SEGMENTS.map((s) => {
+          {allSegments.map((s) => {
             const active = segment === s.value
             return (
               <button

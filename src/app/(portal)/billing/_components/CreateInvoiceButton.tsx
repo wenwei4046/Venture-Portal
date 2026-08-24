@@ -48,6 +48,8 @@ interface Props {
   /** Phase 11 / post-unified-COA: chart_of_accounts rows projected to
    *  { code, label } for GL routing. Required for new flow. */
   categories?: Category[]
+  /** Dynamically provisioned dept modes (dept-registry) appended to the list. */
+  extraModes?: Array<{ value: string; label: string }>
 }
 
 const BILLABLE_OPTIONS: Array<{ value: BillableToKind; label: string; hint: string }> = [
@@ -106,8 +108,10 @@ export default function CreateInvoiceButton({
   label,
   departments = [],
   categories = [],
+  extraModes = [],
 }: Props) {
   const router = useRouter()
+  const poolOptions = [...POOL_OPTIONS, ...(extraModes as unknown as typeof POOL_OPTIONS)]
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -438,7 +442,7 @@ export default function CreateInvoiceButton({
               amount: Number(r.amount),
             })
           } catch (err) {
-            const lbl = POOL_OPTIONS.find((o) => o.value === r.mode)?.label ?? String(r.mode)
+            const lbl = poolOptions.find((o) => o.value === r.mode)?.label ?? String(r.mode)
             failures.push({ label: lbl, error: err instanceof Error ? err.message : 'Create failed' })
           }
         }
@@ -482,7 +486,7 @@ export default function CreateInvoiceButton({
           // Distribute by ratio: this pool's slice of subAmount.
           const slice = Math.round((subAmount * Number(pool.amount) / ratioSum) * 100) / 100
           if (slice <= 0) continue
-          const poolLabel = POOL_OPTIONS.find((o) => o.value === pool.mode)?.label ?? String(pool.mode)
+          const poolLabel = poolOptions.find((o) => o.value === pool.mode)?.label ?? String(pool.mode)
           try {
             await submitInvoice({
               billableType: 'subsidiary',
@@ -639,7 +643,7 @@ export default function CreateInvoiceButton({
                       disabled={isPending}
                       className={inputCls}
                     >
-                      {POOL_OPTIONS.map((opt) => (
+                      {poolOptions.map((opt) => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
                       ))}
                     </select>
@@ -792,6 +796,7 @@ export default function CreateInvoiceButton({
               {usesMultiPool ? (
                 <PoolTable
                   poolRows={poolRows}
+                  poolOptions={poolOptions}
                   categoryOptions={categoryOptions}
                   isPending={isPending}
                   isRatioTemplate={billableType === 'subsidiary'}
@@ -893,6 +898,7 @@ function PoolTable({
   onUpdate,
   onAdd,
   onRemove,
+  poolOptions,
 }: {
   poolRows: PoolRow[]
   categoryOptions: AccountOption[]
@@ -901,6 +907,7 @@ function PoolTable({
   onUpdate: (uid: string, patch: Partial<PoolRow>) => void
   onAdd: () => void
   onRemove: (uid: string) => void
+  poolOptions: Array<{ value: CreateInvoiceMode; label: string }>
 }) {
   return (
     <div>
@@ -939,7 +946,7 @@ function PoolTable({
                   className={inputCls}
                 >
                   <option value="">Select pool…</option>
-                  {POOL_OPTIONS.map((opt) => (
+                  {poolOptions.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>

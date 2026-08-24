@@ -19,6 +19,7 @@ import {
 import { balanceSheetBlocks } from '@/lib/gl-report-blocks'
 import GlReportView from '../_components/GlReportView'
 import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
+import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import ExportLinks from '../_components/ExportLinks'
 
 export const dynamic = 'force-dynamic'
@@ -81,7 +82,7 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
         period={period}
         compare={compare}
         segment={segment}
-        segments={REPORT_SEGMENTS}
+        segments={[...REPORT_SEGMENTS, ...extraReportSegments(primedRegistryRows())]}
         blocks={blocks}
         currentLabel={asAt(period)}
         compareLabel={compare ? asAt(compare) : ''}

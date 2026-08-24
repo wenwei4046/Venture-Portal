@@ -212,10 +212,15 @@ async function performApproval(
       // Mig 197/P0-3: post dept pool → HV Operating Fund equity reclassification.
       const { data: srcDept } = await supabase
         .from('departments')
-        .select('name')
+        .select('name, pool_gl_code')
         .eq('id', fundSource.from_department_id)
         .single()
-      const srcGl = srcDept?.name ? DEPT_POOL_GL[srcDept.name] : undefined
+      // Registry-first (2026-08-24): the dept row carries its own pool GL
+      // code now — identical to DEPT_POOL_GL for the cores, and the only
+      // source of truth for dynamically provisioned departments.
+      const srcGl =
+        ((srcDept as { pool_gl_code?: string | null } | null)?.pool_gl_code ?? undefined) ??
+        (srcDept?.name ? DEPT_POOL_GL[srcDept.name] : undefined)
       if (srcGl) {
         await postJournalEntry(supabase, {
           transactionDate: fundSource.effective_date ?? new Date().toISOString().slice(0, 10),

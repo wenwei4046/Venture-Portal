@@ -82,7 +82,7 @@ export default async function SettingsPage({ searchParams }: Props) {
       .order('type')
       .order('sort_order')
       .order('code'),
-    supabase.from('departments').select('id, name, is_internal, created_at').order('created_at'),
+    supabase.from('departments').select('id, name, is_internal, created_at, segment_key, pool_gl_code, billing_mode_key').order('created_at'),
   ])
 
   const treasury = (treasuryRows ?? []) as TreasuryConfig[]
@@ -183,6 +183,9 @@ export default async function SettingsPage({ searchParams }: Props) {
             name: d.name as string,
             is_internal: Boolean(d.is_internal),
             created_at: (d.created_at as string | null) ?? null,
+            segment_key: ((d as { segment_key?: string | null }).segment_key as string | null) ?? null,
+            pool_gl_code: ((d as { pool_gl_code?: string | null }).pool_gl_code as string | null) ?? null,
+            billing_mode_key: ((d as { billing_mode_key?: string | null }).billing_mode_key as string | null) ?? null,
           }))}
         />
       )}

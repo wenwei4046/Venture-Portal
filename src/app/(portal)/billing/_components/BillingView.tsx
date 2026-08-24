@@ -14,6 +14,7 @@ import MarketingProjectList from './MarketingProjectList'
 import NonBillableList from './NonBillableList'
 import InvoicesList from './InvoicesList'
 import CreditNotesList from './CreditNotesList'
+import { extraBillingModeOptions, primedRegistryRows } from '@/lib/dept-registry'
 import { fetchPaidByInvoice } from '@/lib/debtor-aging-data'
 import CreateInvoiceButton from './CreateInvoiceButton'
 import CreateMultiLineInvoiceButton from './CreateMultiLineInvoiceButton'
@@ -343,6 +344,9 @@ export default async function BillingView({ searchParams }: Props) {
   const companyMap = new Map(
     companyList.map((c) => [c.id, { name: c.name as string, code: c.short_code as string }])
   )
+  // Dynamic full departments (2026-08-24): their billing modes join every
+  // invoice/CN modal's pool dropdown.
+  const extraModes = extraBillingModeOptions(primedRegistryRows())
   // Inter-billing: invoices may target a dept_pool (billable_to_type='dept_pool')
   // instead of a subsidiary, so InvoicesList needs to resolve dept name from
   // billable_to_department_id rather than falling through to '—'.
@@ -403,12 +407,14 @@ export default async function BillingView({ searchParams }: Props) {
                 currentPeriod={period}
                 departments={departments ?? []}
                 categories={categoryList}
+                extraModes={extraModes}
               />
               <CreateInvoiceButton
                 companies={companyList}
                 currentPeriod={period}
                 departments={departments ?? []}
                 categories={categoryList}
+                extraModes={extraModes}
               />
             </>
           )}
@@ -694,7 +700,7 @@ export default async function BillingView({ searchParams }: Props) {
         </section>
       )}
 
-      <InvoicesList invoices={invoiceList} extraOpenInvoices={otherOpenInvoices} companyMap={companyMap} departmentMap={departmentMap} period={period} categories={categoryList} bankAccounts={bankList} invoiceLines={linesByInvoice} paidByInvoice={paidByInvoice} cnByInvoice={cnByInvoice} />
+      <InvoicesList invoices={invoiceList} extraOpenInvoices={otherOpenInvoices} companyMap={companyMap} departmentMap={departmentMap} period={period} categories={categoryList} bankAccounts={bankList} invoiceLines={linesByInvoice} paidByInvoice={paidByInvoice} cnByInvoice={cnByInvoice} extraModes={extraModes} />
 
       {creditNoteRows.length > 0 ? <CreditNotesList rows={creditNoteRows} /> : null}
 

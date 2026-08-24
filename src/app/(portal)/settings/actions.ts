@@ -311,6 +311,38 @@ export async function addDepartment(formData: FormData) {
   revalidatePath('/settings')
 }
 
+// 转正 (2026-08-24): promote a lightweight department to a FULL one — the
+// provision_full_department RPC appends its gl_segment + billing_mode enum
+// values, opens its pool equity account (1030/1040/… block) and files the
+// registry row. From then on every consumer (invoice modes, settle pools,
+// report rails, bridge) picks it up via the primed dept registry.
+export async function provisionDepartment(formData: FormData) {
+  await requireRole(['principal', 'finance'])
+  const supabase = await createClient()
+
+  const id = (formData.get('id') as string) ?? ''
+  const segmentKey = ((formData.get('segment_key') as string) ?? '').trim().toLowerCase()
+  if (!id) throw new Error('Department id is required')
+  if (!/^[a-z][a-z0-9_]{2,30}$/.test(segmentKey)) {
+    throw new Error('Segment key must be 3-31 chars: a-z, 0-9, _ (e.g. revenue_department)')
+  }
+
+  const { data, error } = await supabase.rpc('provision_full_department' as never, {
+    p_department_id: id,
+    p_segment_key: segmentKey,
+  } as never)
+  if (error) throw new Error(`Provision failed: ${error.message}`)
+
+  // Re-prime immediately so the new dept shows up without the 30s throttle.
+  const { primeDeptRegistryFromDb } = await import('@/lib/dept-registry')
+  await primeDeptRegistryFromDb(supabase as never)
+
+  revalidatePath('/settings')
+  revalidatePath('/billing')
+  revalidatePath('/reports')
+  return data
+}
+
 export async function addCompany(formData: FormData) {
   await requireRole(['principal'])
   const supabase = await createClient()

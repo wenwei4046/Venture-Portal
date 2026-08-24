@@ -58,6 +58,374 @@ export type Database = {
           },
         ]
       }
+      alloc_categories: {
+        Row: {
+          coa_code: string | null
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          coa_code?: string | null
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          coa_code?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      alloc_company_settings: {
+        Row: {
+          company_id: string
+          enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alloc_company_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alloc_staff: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          department: string
+          id: string
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          department?: string
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          department?: string
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alloc_staff_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alloc_staff_history: {
+        Row: {
+          company_id: string | null
+          department: string
+          department_id: string | null
+          id: string
+          pct: number
+          period_month: string
+          snapshotted_at: string
+          staff_id: string
+          staff_name: string
+          status: string
+        }
+        Insert: {
+          company_id?: string | null
+          department?: string
+          department_id?: string | null
+          id?: string
+          pct?: number
+          period_month: string
+          snapshotted_at?: string
+          staff_id: string
+          staff_name: string
+          status: string
+        }
+        Update: {
+          company_id?: string | null
+          department?: string
+          department_id?: string | null
+          id?: string
+          pct?: number
+          period_month?: string
+          snapshotted_at?: string
+          staff_id?: string
+          staff_name?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alloc_staff_history_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alloc_staff_history_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alloc_staff_splits: {
+        Row: {
+          company_id: string | null
+          department_id: string | null
+          id: string
+          pct: number
+          staff_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          department_id?: string | null
+          id?: string
+          pct: number
+          staff_id: string
+        }
+        Update: {
+          company_id?: string | null
+          department_id?: string | null
+          id?: string
+          pct?: number
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alloc_staff_splits_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alloc_staff_splits_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alloc_staff_splits_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "alloc_staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alloc_template_splits: {
+        Row: {
+          company_id: string
+          pct: number
+          template_id: string
+        }
+        Insert: {
+          company_id: string
+          pct: number
+          template_id: string
+        }
+        Update: {
+          company_id?: string
+          pct?: number
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alloc_template_splits_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alloc_template_splits_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "alloc_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alloc_templates: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          default_amount: number
+          default_method: string
+          id: string
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          default_amount?: number
+          default_method?: string
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          default_amount?: number
+          default_method?: string
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alloc_templates_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "alloc_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alloc_txn_details: {
+        Row: {
+          amount: number
+          company_id: string | null
+          department_id: string | null
+          id: string
+          is_own_share: boolean
+          method_detail: string
+          txn_id: string
+        }
+        Insert: {
+          amount: number
+          company_id?: string | null
+          department_id?: string | null
+          id?: string
+          is_own_share?: boolean
+          method_detail?: string
+          txn_id: string
+        }
+        Update: {
+          amount?: number
+          company_id?: string | null
+          department_id?: string | null
+          id?: string
+          is_own_share?: boolean
+          method_detail?: string
+          txn_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alloc_txn_details_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alloc_txn_details_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alloc_txn_details_txn_id_fkey"
+            columns: ["txn_id"]
+            isOneToOne: false
+            referencedRelation: "alloc_txns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alloc_txns: {
+        Row: {
+          amount: number
+          billed_ref: string | null
+          category_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string
+          hc_period: string | null
+          id: string
+          method: string
+          period_month: string
+          txn_no: string
+        }
+        Insert: {
+          amount: number
+          billed_ref?: string | null
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description: string
+          hc_period?: string | null
+          id?: string
+          method: string
+          period_month: string
+          txn_no: string
+        }
+        Update: {
+          amount?: number
+          billed_ref?: string | null
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          hc_period?: string | null
+          id?: string
+          method?: string
+          period_month?: string
+          txn_no?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alloc_txns_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "alloc_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alloc_txns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       approval_requests: {
         Row: {
           amount: number | null
@@ -146,6 +514,202 @@ export type Database = {
           },
         ]
       }
+      ba_attachments: {
+        Row: {
+          ba_id: string
+          content_type: string | null
+          created_at: string
+          file_name: string
+          id: string
+          storage_path: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          ba_id: string
+          content_type?: string | null
+          created_at?: string
+          file_name: string
+          id?: string
+          storage_path: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          ba_id?: string
+          content_type?: string | null
+          created_at?: string
+          file_name?: string
+          id?: string
+          storage_path?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ba_attachments_ba_id_fkey"
+            columns: ["ba_id"]
+            isOneToOne: false
+            referencedRelation: "ba_facilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ba_attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ba_facilities: {
+        Row: {
+          ba_no: string | null
+          bank_annual_rate: number
+          bank_name: string | null
+          borrower_company_id: string | null
+          borrower_name: string | null
+          charge_rate_monthly: number
+          created_at: string
+          created_by: string | null
+          face_amount: number
+          fund_source_id: string | null
+          hc_rate_monthly: number
+          id: string
+          loan_id: string | null
+          maturity_date: string | null
+          notes: string | null
+          start_date: string
+          status: string
+          tenor_days: number
+          updated_at: string
+        }
+        Insert: {
+          ba_no?: string | null
+          bank_annual_rate?: number
+          bank_name?: string | null
+          borrower_company_id?: string | null
+          borrower_name?: string | null
+          charge_rate_monthly?: number
+          created_at?: string
+          created_by?: string | null
+          face_amount: number
+          fund_source_id?: string | null
+          hc_rate_monthly?: number
+          id?: string
+          loan_id?: string | null
+          maturity_date?: string | null
+          notes?: string | null
+          start_date: string
+          status?: string
+          tenor_days: number
+          updated_at?: string
+        }
+        Update: {
+          ba_no?: string | null
+          bank_annual_rate?: number
+          bank_name?: string | null
+          borrower_company_id?: string | null
+          borrower_name?: string | null
+          charge_rate_monthly?: number
+          created_at?: string
+          created_by?: string | null
+          face_amount?: number
+          fund_source_id?: string | null
+          hc_rate_monthly?: number
+          id?: string
+          loan_id?: string | null
+          maturity_date?: string | null
+          notes?: string | null
+          start_date?: string
+          status?: string
+          tenor_days?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ba_facilities_borrower_company_id_fkey"
+            columns: ["borrower_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ba_facilities_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ba_facilities_fund_source_id_fkey"
+            columns: ["fund_source_id"]
+            isOneToOne: false
+            referencedRelation: "fund_source_outstanding"
+            referencedColumns: ["fund_source_id"]
+          },
+          {
+            foreignKeyName: "ba_facilities_fund_source_id_fkey"
+            columns: ["fund_source_id"]
+            isOneToOne: false
+            referencedRelation: "fund_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ba_facilities_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "loan_outstanding"
+            referencedColumns: ["loan_id"]
+          },
+          {
+            foreignKeyName: "ba_facilities_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "loans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ba_limits: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          limit_amount: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          limit_amount?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          limit_amount?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ba_limits_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ba_limits_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bank_accounts: {
         Row: {
           account_holder: string
@@ -212,6 +776,154 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "chart_of_accounts"
             referencedColumns: ["code"]
+          },
+        ]
+      }
+      bank_recon_lines: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          id: string
+          match_kind: string | null
+          matched_journal_line_id: string | null
+          session_id: string
+          txn_date: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          match_kind?: string | null
+          matched_journal_line_id?: string | null
+          session_id: string
+          txn_date: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          match_kind?: string | null
+          matched_journal_line_id?: string | null
+          session_id?: string
+          txn_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_recon_lines_matched_journal_line_id_fkey"
+            columns: ["matched_journal_line_id"]
+            isOneToOne: false
+            referencedRelation: "journal_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_recon_lines_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "bank_recon_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bank_recon_matches: {
+        Row: {
+          created_at: string
+          id: string
+          journal_line_id: string | null
+          match_group: string
+          session_id: string | null
+          statement_line_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          journal_line_id?: string | null
+          match_group: string
+          session_id?: string | null
+          statement_line_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          journal_line_id?: string | null
+          match_group?: string
+          session_id?: string | null
+          statement_line_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_recon_matches_journal_line_id_fkey"
+            columns: ["journal_line_id"]
+            isOneToOne: true
+            referencedRelation: "journal_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_recon_matches_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "bank_recon_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_recon_matches_statement_line_id_fkey"
+            columns: ["statement_line_id"]
+            isOneToOne: false
+            referencedRelation: "bank_recon_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bank_recon_sessions: {
+        Row: {
+          bank_account_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          period_month: string
+          source_filename: string | null
+          statement_closing: number | null
+          statement_opening: number | null
+          status: string
+        }
+        Insert: {
+          bank_account_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          period_month: string
+          source_filename?: string | null
+          statement_closing?: number | null
+          statement_opening?: number | null
+          status?: string
+        }
+        Update: {
+          bank_account_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          period_month?: string
+          source_filename?: string | null
+          statement_closing?: number | null
+          statement_opening?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_recon_sessions_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_recon_sessions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -715,24 +1427,41 @@ export type Database = {
       }
       departments: {
         Row: {
+          billing_mode_key: string | null
           created_at: string
           id: string
           is_internal: boolean
           name: string
+          pool_gl_code: string | null
+          segment_key: string | null
         }
         Insert: {
+          billing_mode_key?: string | null
           created_at?: string
           id?: string
           is_internal?: boolean
           name: string
+          pool_gl_code?: string | null
+          segment_key?: string | null
         }
         Update: {
+          billing_mode_key?: string | null
           created_at?: string
           id?: string
           is_internal?: boolean
           name?: string
+          pool_gl_code?: string | null
+          segment_key?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "departments_pool_gl_code_fkey"
+            columns: ["pool_gl_code"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["code"]
+          },
+        ]
       }
       dept_payment_requests: {
         Row: {
@@ -1854,6 +2583,7 @@ export type Database = {
           repaid_at: string | null
           repaid_by: string | null
           repayment_date: string | null
+          repayment_start_month: string | null
           source_type: Database["public"]["Enums"]["fund_source_type"]
           status: Database["public"]["Enums"]["fund_source_status"]
           updated_at: string
@@ -1882,6 +2612,7 @@ export type Database = {
           repaid_at?: string | null
           repaid_by?: string | null
           repayment_date?: string | null
+          repayment_start_month?: string | null
           source_type: Database["public"]["Enums"]["fund_source_type"]
           status?: Database["public"]["Enums"]["fund_source_status"]
           updated_at?: string
@@ -1910,6 +2641,7 @@ export type Database = {
           repaid_at?: string | null
           repaid_by?: string | null
           repayment_date?: string | null
+          repayment_start_month?: string | null
           source_type?: Database["public"]["Enums"]["fund_source_type"]
           status?: Database["public"]["Enums"]["fund_source_status"]
           updated_at?: string
@@ -2886,6 +3618,7 @@ export type Database = {
           effective_rate: number
           id: string
           principal: number
+          repayment_start_month: string | null
           repayment_terms: string | null
           risk_premium: number
           status: Database["public"]["Enums"]["loan_status"]
@@ -2905,6 +3638,7 @@ export type Database = {
           effective_rate: number
           id?: string
           principal: number
+          repayment_start_month?: string | null
           repayment_terms?: string | null
           risk_premium: number
           status?: Database["public"]["Enums"]["loan_status"]
@@ -2924,6 +3658,7 @@ export type Database = {
           effective_rate?: number
           id?: string
           principal?: number
+          repayment_start_month?: string | null
           repayment_terms?: string | null
           risk_premium?: number
           status?: Database["public"]["Enums"]["loan_status"]
@@ -4503,6 +5238,8 @@ export type Database = {
         Args: { p_mode: string }
         Returns: Database["public"]["Enums"]["gl_segment"]
       }
+      bridge_mirror_slices: { Args: never; Returns: Json }
+      bridge_ref_flags: { Args: never; Returns: Json }
       build_hr_cost_submission_payload: {
         Args: { p_period: string }
         Returns: {
@@ -4596,6 +5333,15 @@ export type Database = {
         Args: { p_payment_date: string; p_period: string; p_scope: string }
         Returns: Json
       }
+      create_payroll_statutory_director_topup: {
+        Args: {
+          p_bank_account_id?: string
+          p_payment_date?: string
+          p_period: string
+          p_scheme: string
+        }
+        Returns: Json
+      }
       create_payroll_statutory_vouchers: {
         Args: {
           p_bank_account_id?: string
@@ -4618,6 +5364,14 @@ export type Database = {
       delete_manual_journal_voucher: {
         Args: { p_entry_id: string }
         Returns: undefined
+      }
+      dept_invoice_settlements: {
+        Args: { p_segment?: Database["public"]["Enums"]["gl_segment"] }
+        Returns: {
+          credits: number
+          invoice_id: string
+          receipts: number
+        }[]
       }
       dept_pool_gl_code: { Args: { p_dept_name: string }; Returns: string }
       dept_request_pv_rejected: {
@@ -4863,6 +5617,10 @@ export type Database = {
           employer: number
         }[]
       }
+      mark_journal_entry_reversed: {
+        Args: { p_original_id: string; p_reversal_id: string }
+        Returns: undefined
+      }
       mark_matured_fund_sources: { Args: never; Returns: number }
       mint_credit_note_no: { Args: { p_period?: string }; Returns: string }
       mint_invoice_no: { Args: { p_period: string }; Returns: string }
@@ -4885,6 +5643,10 @@ export type Database = {
           p_transaction_date: string
         }
         Returns: string
+      }
+      provision_full_department: {
+        Args: { p_department_id: string; p_segment_key: string }
+        Returns: Json
       }
       refresh_base_rate: { Args: { p_op_margin: number }; Returns: string }
       reject_dept_payment_request: {
@@ -4924,8 +5686,20 @@ export type Database = {
         Returns: number
       }
       save_director_salary_results: { Args: { p_data: Json }; Returns: Json }
+      set_fund_source_notes: {
+        Args: { p_fund_source_id: string; p_notes: string }
+        Returns: undefined
+      }
+      set_fund_source_repayment_start: {
+        Args: { p_fund_source_id: string; p_month: string }
+        Returns: undefined
+      }
       set_loan_funding_source: {
         Args: { p_loan_id: string; p_source: string }
+        Returns: undefined
+      }
+      set_loan_repayment_start: {
+        Args: { p_loan_id: string; p_month: string }
         Returns: undefined
       }
       set_payroll_pv_payment_date: {
@@ -4975,6 +5749,8 @@ export type Database = {
         }
         Returns: undefined
       }
+      void_loan_repayment: { Args: { p_repayment_id: string }; Returns: Json }
+      voucher_party_refs: { Args: never; Returns: Json }
       withdraw_pending_fund_source: {
         Args: { p_fund_source_id: string }
         Returns: undefined
@@ -5026,6 +5802,7 @@ export type Database = {
         | "finance_attribution"
         | "venture_attribution"
         | "payroll_consolidated"
+        | "revenue_department_attribution"
       cash_flow_category: "operating" | "investing" | "financing"
       claim_status: "pending" | "approved" | "rejected" | "paid"
       claim_type: "project" | "benefit"
@@ -5075,6 +5852,7 @@ export type Database = {
         | "corporate"
         | "unallocated"
         | "director"
+        | "revenue_department"
       hr_employment_type: "salaried" | "commission_eligible"
       hr_monthly_payroll_source: "imported" | "manual" | "carried_forward"
       hr_monthly_payroll_status: "draft" | "submitted" | "paid"
@@ -5306,6 +6084,7 @@ export const Constants = {
         "finance_attribution",
         "venture_attribution",
         "payroll_consolidated",
+        "revenue_department_attribution",
       ],
       cash_flow_category: ["operating", "investing", "financing"],
       claim_status: ["pending", "approved", "rejected", "paid"],
@@ -5361,6 +6140,7 @@ export const Constants = {
         "corporate",
         "unallocated",
         "director",
+        "revenue_department",
       ],
       hr_employment_type: ["salaried", "commission_eligible"],
       hr_monthly_payroll_source: ["imported", "manual", "carried_forward"],

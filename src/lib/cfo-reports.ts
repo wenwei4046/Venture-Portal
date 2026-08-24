@@ -24,6 +24,7 @@ import dayjs from 'dayjs'
 import { poolLabel, comparePools } from './pools'
 import { fetchAllRows } from './paginate'
 import { lineAttributions, segmentToPoolKey } from './invoice-settlement'
+import { primedModeToPool, primedSegmentToPool } from './dept-registry'
 import type { AccountType, CashFlowCategory } from './coa'
 import { CASH_FLOW_CATEGORIES } from './coa'
 import type { Database } from './supabase/database.types'
@@ -233,6 +234,12 @@ export function invoicePoolForBillingMode(billingMode: string | null | undefined
   if (billingMode && billingMode in INVOICE_BILLING_MODE_TO_POOL) {
     return INVOICE_BILLING_MODE_TO_POOL[billingMode]
   }
+  // Dynamic full departments (2026-08-24): a provisioned dept's own billing
+  // mode routes to its pool; anything else stays Venture as before.
+  if (billingMode) {
+    const primed = primedModeToPool()[billingMode]
+    if (primed) return primed
+  }
   return VENTURE_POOL
 }
 
@@ -242,7 +249,10 @@ export function invoicePoolForBillingMode(billingMode: string | null | undefined
 // pool, so they fall into the Venture Pool — the same place treasury interest
 // and unmapped invoices already land.
 // ────────────────────────────────────────────────────────────────────────────
-export const MANUAL_JV_SEGMENT_TO_POOL: Record<GlSegment, string> = {
+// Record<string,…> (not Record<GlSegment,…>): gl_segment now GROWS at runtime
+// when departments are provisioned — dynamic segments resolve through the
+// primed registry fallback below, so this map stays cores-only.
+export const MANUAL_JV_SEGMENT_TO_POOL: Record<string, string> = {
   marketing: 'dept_pool_marketing',
   hr: 'dept_pool_hr',
   finance: 'dept_pool_finance',
@@ -253,8 +263,12 @@ export const MANUAL_JV_SEGMENT_TO_POOL: Record<GlSegment, string> = {
   unallocated: VENTURE_POOL,
 }
 
-export function manualJvPoolForSegment(segment: GlSegment): string {
-  return MANUAL_JV_SEGMENT_TO_POOL[segment] ?? VENTURE_POOL
+export function manualJvPoolForSegment(segment: GlSegment | string): string {
+  return (
+    (MANUAL_JV_SEGMENT_TO_POOL as Record<string, string>)[segment] ??
+    primedSegmentToPool()[segment] ??
+    VENTURE_POOL
+  )
 }
 
 // ────────────────────────────────────────────────────────────────────────────

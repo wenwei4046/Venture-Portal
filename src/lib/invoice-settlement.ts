@@ -1,5 +1,8 @@
 // Pure helpers for consolidated invoice settlement. No Supabase/server
 // imports so both the server action and the client list can use them.
+// (dept-registry's primed store is plain module state — still client-safe.)
+
+import { primedModeToSegment, primedSegmentToPool } from './dept-registry'
 
 export interface SettleableInvoice {
   id: string
@@ -153,8 +156,12 @@ const BILLING_MODE_TO_SEGMENT: Record<string, string> = {
   director_attribution: 'director',
 }
 
-export function segmentForBillingMode(mode: string): string {
-  return BILLING_MODE_TO_SEGMENT[mode] ?? 'corporate'
+export function segmentForBillingMode(
+  mode: string,
+  /** Dynamic full departments (dept-registry extraBillingModeToSegment). */
+  extra?: Record<string, string>,
+): string {
+  return BILLING_MODE_TO_SEGMENT[mode] ?? extra?.[mode] ?? primedModeToSegment()[mode] ?? 'corporate'
 }
 
 // Inverse of the billing_mode→pool routing, keyed by gl_segment. Which dept
@@ -169,8 +176,12 @@ const SEGMENT_TO_POOL: Record<string, string> = {
   marketing: 'dept_pool_marketing',
 }
 
-export function segmentToPoolKey(segment: string): string {
-  return SEGMENT_TO_POOL[segment] ?? 'venture_pool'
+export function segmentToPoolKey(
+  segment: string,
+  /** Dynamic full departments (dept-registry extraSegmentToPool). */
+  extra?: Record<string, string>,
+): string {
+  return SEGMENT_TO_POOL[segment] ?? extra?.[segment] ?? primedSegmentToPool()[segment] ?? 'venture_pool'
 }
 
 export interface SegmentedLine {
@@ -192,8 +203,10 @@ export interface SegmentAttribution {
 export function lineAttributions(
   lines: SegmentedLine[],
   invoiceBillingMode: string,
+  /** Dynamic full departments — mode→segment and segment→pool extras. */
+  extras?: { modeToSegment?: Record<string, string>; segmentToPool?: Record<string, string> },
 ): SegmentAttribution[] {
-  const fallbackSeg = segmentForBillingMode(invoiceBillingMode)
+  const fallbackSeg = segmentForBillingMode(invoiceBillingMode, extras?.modeToSegment)
   const order: string[] = []
   const cents = new Map<string, number>()
   for (const ln of lines) {
@@ -206,7 +219,7 @@ export function lineAttributions(
   }
   return order.map((seg) => ({
     segment: seg,
-    pool: segmentToPoolKey(seg),
+    pool: segmentToPoolKey(seg, extras?.segmentToPool),
     amount: cents.get(seg)! / 100,
   }))
 }

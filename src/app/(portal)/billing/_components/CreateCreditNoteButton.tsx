@@ -21,6 +21,8 @@ interface Props {
     type: AccountType
     parent_code: string | null
   }>
+  /** Dynamically provisioned dept modes (dept-registry) appended to the list. */
+  extraModes?: Array<{ value: string; label: string }>
 }
 
 const POOL_OPTIONS: Array<{ value: CreateInvoiceMode; label: string }> = [
@@ -55,8 +57,10 @@ export default function CreateCreditNoteButton({
   invoiceTotal,
   payeeLabel,
   categories = [],
+  extraModes = [],
 }: Props) {
   const router = useRouter()
+  const poolOptions = [...POOL_OPTIONS, ...(extraModes as unknown as typeof POOL_OPTIONS)]
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -133,7 +137,7 @@ export default function CreateCreditNoteButton({
           await createCreditNote(fd)
           created += 1
         } catch (err) {
-          const lbl = POOL_OPTIONS.find((o) => o.value === r.mode)?.label ?? String(r.mode)
+          const lbl = poolOptions.find((o) => o.value === r.mode)?.label ?? String(r.mode)
           failures.push({ label: lbl, error: err instanceof Error ? err.message : 'Create failed' })
         }
       }
@@ -263,7 +267,7 @@ export default function CreateCreditNoteButton({
                               className={inputCls}
                             >
                               <option value="">Select pool…</option>
-                              {POOL_OPTIONS.map((opt) => (
+                              {poolOptions.map((opt) => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
                               ))}
                             </select>

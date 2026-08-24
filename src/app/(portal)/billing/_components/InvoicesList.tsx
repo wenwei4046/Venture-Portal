@@ -123,11 +123,13 @@ interface Props {
    *  until the 跨月 toggle is on, then they join the list so one receipt can
    *  cover a payer's invoices across months. Period totals ignore them. */
   extraOpenInvoices?: Invoice[]
+  /** Dynamically provisioned dept modes — forwarded to the CN modal. */
+  extraModes?: Array<{ value: string; label: string }>
 }
 
 // Invoices for the selected period. Populated by Step 5's generate_monthly_invoices
 // RPC. Until Step 5 ships, this section shows the empty state with an explanation.
-export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [], bankAccounts = [], invoiceLines = {}, paidByInvoice = {}, cnByInvoice = {}, extraOpenInvoices = [] }: Props) {
+export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [], bankAccounts = [], invoiceLines = {}, paidByInvoice = {}, cnByInvoice = {}, extraOpenInvoices = [], extraModes = [] }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -566,6 +568,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                             invoiceTotal={Number(inv.total_amount)}
                             payeeLabel={labels.primary}
                             categories={categories}
+                            extraModes={extraModes}
                           />
                         ) : null}
                       </div>

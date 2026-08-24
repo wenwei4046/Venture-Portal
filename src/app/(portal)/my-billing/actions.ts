@@ -32,12 +32,17 @@ export async function createDeptInvoice(
   if (!user.department_id) return { error: 'No department assigned to your account' }
   const { data: dept } = await supabase
     .from('departments')
-    .select('name')
+    .select('name, billing_mode_key')
     .eq('id', user.department_id)
     .single()
-  const segment = deptNameToSegment(dept?.name)
-  const billingMode = segment ? SEGMENT_TO_BILLING_MODE[segment] : undefined
-  if (!billingMode) return { error: `Department ${dept?.name ?? '?'} has no billing mode mapping` }
+  // Registry-first (2026-08-24): the dept row carries its billing mode —
+  // identical to the hardcoded map for cores, and the only source for
+  // dynamically provisioned full departments.
+  const deptRow = dept as { name?: string; billing_mode_key?: string | null } | null
+  const segment = deptNameToSegment(deptRow?.name)
+  const billingMode =
+    deptRow?.billing_mode_key ?? (segment ? SEGMENT_TO_BILLING_MODE[segment] : undefined)
+  if (!billingMode) return { error: `Department ${deptRow?.name ?? '?'} has no billing mode mapping — provision it as a full department first` }
 
   const companyId = String(formData.get('company_id') ?? '').trim()
   const freetext = String(formData.get('billable_to_freetext_name') ?? '').trim()

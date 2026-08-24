@@ -22,6 +22,7 @@ import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
 import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
 import GlReportView from '../_components/GlReportView'
 import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
+import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import ExportLinks from '../_components/ExportLinks'
 
 export const dynamic = 'force-dynamic'
@@ -128,7 +129,7 @@ export default async function CashFlowPage({ searchParams }: Props) {
         period={period}
         compare={compare}
         segment={segment}
-        segments={isDeptMgr ? [] : REPORT_SEGMENTS}
+        segments={isDeptMgr ? [] : [...REPORT_SEGMENTS, ...extraReportSegments(primedRegistryRows())]}
         blocks={blocks}
         currentLabel={dayjs(`${period}-01`).format('MMM YYYY')}
         compareLabel={compare ? dayjs(`${compare}-01`).format('MMM YYYY') : ''}

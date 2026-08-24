@@ -7,6 +7,7 @@ import { eliminateInterBilling, fetchInterBillingElimination } from '@/lib/conso
 import { buildPnlAccounts, buildCustomPnlRows, defaultPnlLayout } from '@/lib/pnl-custom'
 import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
 import { segmentFilterFor } from '../_components/report-segments'
+import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import MonthlyMatrix from '../_components/MonthlyMatrix'
 import MonthlyReportControls from '../_components/MonthlyReportControls'
 import { ReportSearchProvider } from '../_components/ReportSearchProvider'
@@ -23,14 +24,14 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
 
   const params = await searchParams
   const period = /^\d{4}-\d{2}$/.test(params.period ?? '') ? params.period! : dayjs().format('YYYY-MM')
-  // Dept managers see ONLY their own segment (RLS) — force empty + hide picker.
+  // Dept managers see ONLY their own segment (RLS) â€” force empty + hide picker.
   const isDeptMgr = user.role === 'dept_manager'
   const segment = isDeptMgr ? '' : (params.segment ?? '')
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))
 
   // Consolidated = all-segments view for finance/principal; dept managers'
-  // empty segment is their OWN view via RLS — never eliminate for them.
+  // empty segment is their OWN view via RLS â€” never eliminate for them.
   const consolidated = !isDeptMgr && !segment
   const [rawLines, accounts, savedRaw, elim] = await Promise.all([
     fetchAllJournalLines(supabase),
@@ -50,22 +51,22 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
   return (
     <div>
       <Link href="/reports" className="text-sm text-muted hover:text-accent font-sans transition-colors">
-        ← Back to Reports
+        â† Back to Reports
       </Link>
 
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>III.</em> REPORTS · MONTHLY P&amp;L · FY {year}
+            <em>III.</em> REPORTS Â· MONTHLY P&amp;L Â· FY {year}
           </div>
           <h1 className="page-title">Monthly P&amp;L</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
-            FY {year} · read-only · all amounts RM · % of sales
-            {consolidated ? <> · <em className="text-accent">内部互收已抵销</em></> : null}
+            FY {year} Â· read-only Â· all amounts RM Â· % of sales
+            {consolidated ? <> Â· <em className="text-accent">å†…éƒ¨äº’æ”¶å·²æŠµé”€</em></> : null}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {/* Edit layout edits the SHARED company P&L layout — hide from dept managers. */}
+          {/* Edit layout edits the SHARED company P&L layout â€” hide from dept managers. */}
           {!isDeptMgr && (
             <Link
               href="/reports/monthly-pnl/layout"
@@ -92,14 +93,14 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
       <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
         Each month of the fiscal year as its own column, with an Accumulated
         (year-to-date) column. Grouped under your own categories (edit the layout
-        to drag accounts around — subtotals recompute automatically). Cost /
+        to drag accounts around â€” subtotals recompute automatically). Cost /
         expense show negative; % is each line against that column&rsquo;s sales.
       </p>
 
       {/* Provider bridges the rail's search box to the matrix that owns the rows. */}
       <ReportSearchProvider>
         <div className="flex gap-8 items-start">
-          <MonthlyReportControls period={period} segment={segment} hideSegment={isDeptMgr} />
+          <MonthlyReportControls period={period} segment={segment} hideSegment={isDeptMgr} extraSegments={extraReportSegments(primedRegistryRows())} />
           <div className="min-w-0 flex-1">
             <MonthlyMatrix columns={data.columns} rows={rows} pctBaseByColumn={data.salesByColumn} />
           </div>

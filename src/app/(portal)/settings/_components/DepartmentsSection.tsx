@@ -1,26 +1,39 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { addDepartment } from '../actions'
+import { addDepartment, provisionDepartment } from '../actions'
 
-// Departments management (2026-08-24). ADD-only on purpose: the five core
-// departments' NAMES drive segment mapping across the whole system, so there
-// is no rename and no delete here. New departments are lightweight — usable
-// for staff, claims and inter-billing targets — and their GL books under the
-// Venture segment until a full segment build is done for them.
+// Departments management (2026-08-24, dynamic departments). ADD + 转正
+// (provision): a lightweight department books under Venture; provisioning
+// gives it its own segment, pool account and billing mode — after that every
+// consumer (invoice modes, settle pools, report rails, bridge) picks it up
+// automatically via the dept registry. No rename, no delete: names drive the
+// core mappings, and enum values can't be removed once issued.
 
 interface DeptRow {
   id: string
   name: string
   is_internal: boolean
   created_at: string | null
+  segment_key: string | null
+  pool_gl_code: string | null
+  billing_mode_key: string | null
 }
 
-const CORE_NAMES = new Set(['marketing', 'hr', 'finance', 'director office', 'director'])
+function slugOf(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 31)
+}
 
 export default function DepartmentsSection({ departments }: { departments: DeptRow[] }) {
   const [isPending, startTransition] = useTransition()
   const [showAdd, setShowAdd] = useState(false)
+  const [provisionId, setProvisionId] = useState<string | null>(null)
+  const [segKey, setSegKey] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   function handleAdd(formData: FormData) {
@@ -29,6 +42,28 @@ export default function DepartmentsSection({ departments }: { departments: DeptR
       try {
         await addDepartment(formData)
         setShowAdd(false)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error')
+      }
+    })
+  }
+
+  function handleProvision(d: DeptRow) {
+    if (
+      !window.confirm(
+        `把 "${d.name}" 转正为完整部门?\n\nSegment: ${segKey}\nBilling mode: ${segKey}_attribution\nPool 科目: 自动开 (10xx)\n\n转正后不能撤销 (segment 发出去收不回)。`,
+      )
+    )
+      return
+    setError(null)
+    startTransition(async () => {
+      try {
+        const fd = new FormData()
+        fd.set('id', d.id)
+        fd.set('segment_key', segKey)
+        await provisionDepartment(fd)
+        setProvisionId(null)
+        setSegKey('')
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       }
@@ -48,9 +83,8 @@ export default function DepartmentsSection({ departments }: { departments: DeptR
         </button>
       </div>
       <p className="font-serif italic text-muted text-sm mb-4 max-w-2xl">
-        新部门马上可以:挂员工、挂 claims、被 inter-billing 开单、给账号设 dept manager。
-        它的账目会记在 Venture segment 底下 — 要有自己的 P&amp;L / pool / 报表,是另一次工程,跟 Claude 讲。
-        名字不能改、部门不能删 (五个核心部门的名字连着整个账本的分段规则)。
+        普通部门:挂员工、挂 claims、被 inter-billing 开单,账记 Venture。按 <em>转正 Provision</em> 给它
+        自己的 segment / P&amp;L / pool / 开单模式 — 全系统自动接上。名字不能改、部门不能删、转正不能撤销。
       </p>
 
       {error ? (
@@ -94,23 +128,70 @@ export default function DepartmentsSection({ departments }: { departments: DeptR
           <thead>
             <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans bg-surface-2/30">
               <th className="text-left py-3 px-4 font-medium">Name</th>
-              <th className="text-left py-3 px-4 font-medium">Type</th>
               <th className="text-left py-3 px-4 font-medium">Segment</th>
+              <th className="text-left py-3 px-4 font-medium">Pool GL</th>
+              <th className="text-left py-3 px-4 font-medium">Billing mode</th>
+              <th className="text-right py-3 px-4 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
             {departments.map((d) => {
-              const core = CORE_NAMES.has(d.name.trim().toLowerCase())
+              const full = d.segment_key !== null
               return (
                 <tr key={d.id} className="border-b border-hairline last:border-0">
-                  <td className="py-3 px-4 font-serif text-ink">{d.name}</td>
-                  <td className="py-3 px-4">
-                    <span className="font-serif italic text-sm text-graphite">
-                      {d.is_internal ? 'internal (system)' : core ? 'core department' : 'department'}
-                    </span>
+                  <td className="py-3 px-4 font-serif text-ink">
+                    {d.name}
+                    {d.is_internal ? (
+                      <span className="font-mono text-[10px] text-muted ml-2">internal</span>
+                    ) : null}
                   </td>
-                  <td className="py-3 px-4 font-mono text-xs text-muted">
-                    {d.is_internal ? '—' : core ? '自己的 segment' : 'Venture (corporate)'}
+                  <td className="py-3 px-4 font-mono text-xs">
+                    {full ? (
+                      <span className="text-ledger">{d.segment_key}</span>
+                    ) : (
+                      <span className="text-muted">Venture (轻量)</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-4 font-mono text-xs text-graphite">{d.pool_gl_code ?? '—'}</td>
+                  <td className="py-3 px-4 font-mono text-xs text-graphite">{d.billing_mode_key ?? '—'}</td>
+                  <td className="py-3 px-4 text-right">
+                    {!full && !d.is_internal ? (
+                      provisionId === d.id ? (
+                        <span className="inline-flex items-center gap-2">
+                          <input
+                            value={segKey}
+                            onChange={(e) => setSegKey(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_'))}
+                            placeholder="segment key"
+                            className="px-2 py-1 bg-paper border border-hairline rounded-md text-xs font-mono text-ink w-44 focus:outline-none focus:border-accent-border"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleProvision(d)}
+                            disabled={isPending || !/^[a-z][a-z0-9_]{2,30}$/.test(segKey)}
+                            className="text-xs text-accent hover:text-accent-hover font-serif italic disabled:opacity-40"
+                          >
+                            {isPending ? 'Provisioning…' : 'Confirm'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setProvisionId(null); setSegKey('') }}
+                            className="text-xs text-muted hover:text-ink font-sans"
+                          >
+                            Cancel
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => { setProvisionId(d.id); setSegKey(slugOf(d.name)) }}
+                          className="text-xs text-accent hover:text-accent-hover font-serif italic"
+                        >
+                          转正 Provision
+                        </button>
+                      )
+                    ) : (
+                      <span className="font-serif italic text-xs text-muted">{full && !d.is_internal ? 'full department' : '—'}</span>
+                    )}
                   </td>
                 </tr>
               )

@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import { primedNameToSegment } from './dept-registry'
 
 /**
  * Normalizes any date-like input to the first day of its month in ISO format
@@ -153,13 +154,19 @@ export function fallbackRevenueGlCode(billingMode: string | null): string {
  * landing in Venture's P&L because the JE inherited the invoice's
  * billing_mode segment instead of the payer's).
  */
-export function deptNameToSegment(name: string | null | undefined): string | undefined {
+export function deptNameToSegment(
+  name: string | null | undefined,
+  /** Dynamic full departments (dept-registry extraDeptNameToSegment) — the
+   *  five cores stay hardcoded so their behaviour can never drift. */
+  extra?: Record<string, string>,
+): string | undefined {
   switch (name) {
     case 'Marketing': return 'marketing'
     case 'HR': return 'hr'
     case 'Finance': return 'finance'
     case 'Director Office': return 'director_office'
     case 'Director': return 'director'
-    default: return undefined
+    default:
+      return name ? extra?.[name] ?? primedNameToSegment()[name] : undefined
   }
 }

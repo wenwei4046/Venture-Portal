@@ -161,6 +161,13 @@ export function EditInvoiceButton({
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
+  // Dynamic departments (2026-08-24): an invoice on a provisioned dept's own
+  // billing mode keeps that mode visible in the edit select.
+  const poolOptions =
+    initial.billing_mode && !POOL_OPTIONS.some((o) => o.value === initial.billing_mode)
+      ? [...POOL_OPTIONS, { value: initial.billing_mode as CreateInvoiceMode, label: initial.billing_mode }]
+      : POOL_OPTIONS
+
   const isMultiSource = initialLines.length > 0
 
   const [billableType, setBillableType] = useState<BillableToKind>(
@@ -420,7 +427,7 @@ export function EditInvoiceButton({
                 disabled={isPending}
                 className={inputCls}
               >
-                {POOL_OPTIONS.map((opt) => (
+                {poolOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>

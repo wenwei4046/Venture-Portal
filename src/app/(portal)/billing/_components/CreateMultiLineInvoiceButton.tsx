@@ -41,6 +41,8 @@ interface Props {
   currentPeriod: string
   departments?: Department[]
   categories?: Category[]
+  /** Dynamically provisioned dept modes (dept-registry) appended to the list. */
+  extraModes?: Array<{ value: string; label: string }>
 }
 
 const BILLABLE_OPTIONS: Array<{ value: BillableToKind; label: string }> = [
@@ -79,8 +81,10 @@ export default function CreateMultiLineInvoiceButton({
   currentPeriod,
   departments = [],
   categories = [],
+  extraModes = [],
 }: Props) {
   const router = useRouter()
+  const poolOptions = [...POOL_OPTIONS, ...(extraModes as unknown as typeof POOL_OPTIONS)]
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -423,7 +427,7 @@ export default function CreateMultiLineInvoiceButton({
                     disabled={isPending}
                     className={inputCls}
                   >
-                    {POOL_OPTIONS.map((opt) => (
+                    {poolOptions.map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
