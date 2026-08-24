@@ -1,7 +1,11 @@
 import type { PoolPnl } from './cfo-reports'
+import { primedNameToSegment } from './dept-registry'
 
 // Department.name (from the `departments` table) → cfo-reports pool slug
-// (see src/lib/pools.ts POOL_LABEL). Names not present here have no P&L pool.
+// (see src/lib/pools.ts POOL_LABEL). Cores hardcoded first; dynamically
+// provisioned full departments (2026-08-24) resolve via the primed registry —
+// their pool key is always 'dept_pool_<segment_key>'. Names in neither have
+// no P&L pool.
 const DEPT_NAME_TO_POOL: Record<string, string> = {
   Marketing: 'dept_pool_marketing',
   HR: 'dept_pool_hr',
@@ -11,7 +15,10 @@ const DEPT_NAME_TO_POOL: Record<string, string> = {
 }
 
 export function deptNameToPoolKey(name: string): string | null {
-  return DEPT_NAME_TO_POOL[name] ?? null
+  const core = DEPT_NAME_TO_POOL[name]
+  if (core) return core
+  const seg = primedNameToSegment()[name]
+  return seg ? `dept_pool_${seg}` : null
 }
 
 export interface DeptPoolAccrual {
