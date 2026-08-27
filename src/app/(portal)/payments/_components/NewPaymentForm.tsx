@@ -204,6 +204,17 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
     } else if (selectedFundSource.from_director_id) {
       setPayeeName('Director')
       setPayeeCompanyId('')
+    } else {
+      // Outsource / unlinked lenders (e.g. Kingsley, source_type='outsource'
+      // with neither company nor director row): the payee field is HIDDEN in
+      // loan-repayment mode, so an empty fallback made Create un-passable
+      // ("Payee name is required", 2026-08-24). Take the lender's name off
+      // the option label ("Kingsley · RM 100,000.00 @ …").
+      const name = selectedFundSource.label.split(' · ')[0]?.trim()
+      if (name) {
+        setPayeeName(name)
+        setPayeeCompanyId('')
+      }
     }
     setRepayPrincipal((prev) => (prev === '0.00' || prev === '' ? selectedFundSource.monthly_principal.toFixed(2) : prev))
     setRepayInterest((prev) => (prev === '0.00' || prev === '' ? selectedFundSource.monthly_interest.toFixed(2) : prev))
