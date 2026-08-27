@@ -114,6 +114,19 @@ export interface TransferSide {
    *  mirror rows, which carry the nature since the 2026-07-24 by-nature
    *  change. Absent → falls back to the IB-XFER / PY-XFER pseudo account. */
   natureCode?: string
+  /** The source dept_pools row's own description (e.g. "PV HV-OR-…: Notion
+   *  Claim … [dept_pool_marketing]") — appended to the drill-down label so
+   *  the user can see WHAT each transfer actually was (user 2026-08-24:
+   *  "展开时可以show description?"). */
+  sourceDesc?: string | null
+}
+
+/** Collapse newlines, trim the trailing " [pool tag]" and leading "PV ", cap
+ *  length — the pool description is written for the ledger, not a report row. */
+function cleanSourceDesc(d: string | null | undefined): string {
+  if (!d) return ''
+  const oneLine = d.replace(/\s+/g, ' ').trim().replace(/\s*\[[^\]]*\]\s*$/, '').replace(/^PV\s+/, '')
+  return oneLine.length > 140 ? `${oneLine.slice(0, 137)}…` : oneLine
 }
 
 function mkLine(
@@ -157,6 +170,8 @@ export function buildInterBillingCashFlowLines(sides: TransferSide[], bankCode: 
     const payroll = s.kind === 'payroll'
     const xferCode = payroll ? PAYROLL_XFER_CODE : INTERBILL_TRANSFER_CODE
     const id = `${payroll ? 'pyx' : 'ibx'}-${s.direction}-${i++}`
+    const src = cleanSourceDesc(s.sourceDesc)
+    const suffix = src ? ` · ${src}` : ''
     if (s.direction === 'out') {
       // Paying side lands on the REAL expense account when we know the nature,
       // so a dept's cash flow reads "Office Rental / Salary" instead of a
@@ -167,14 +182,14 @@ export function buildInterBillingCashFlowLines(sides: TransferSide[], bankCode: 
         mkLine(id, bankCode, 0, amt, date, seg,
           payroll ? 'Transfer to HR payroll custody' : 'Inter-billing transfer out'),
         mkLine(id, outCode, amt, 0, date, seg,
-          payroll ? `Payroll share — ${s.deptName}` : `Inter-billing paid — ${s.deptName}`),
+          (payroll ? `Payroll share — ${s.deptName}` : `Inter-billing paid — ${s.deptName}`) + suffix),
       )
     } else {
       lines.push(
         mkLine(id, bankCode, amt, 0, date, seg,
           payroll ? 'Payroll custody received' : 'Inter-billing transfer in'),
         mkLine(id, xferCode, 0, amt, date, seg,
-          payroll ? `Payroll custody received — ${s.deptName}` : `Inter-billing received — ${s.deptName}`),
+          (payroll ? `Payroll custody received — ${s.deptName}` : `Inter-billing received — ${s.deptName}`) + suffix),
       )
     }
   }
@@ -307,10 +322,10 @@ export async function fetchInterBillingCashFlow(
       if (natures && natureSum === amount) {
         for (const n of natures) {
           if (!(n.amount > 0)) continue
-          sides.push({ deptName, amount: n.amount, date, direction: 'out', natureCode: n.code })
+          sides.push({ deptName, amount: n.amount, date, direction: 'out', natureCode: n.code, sourceDesc: r.description })
         }
       } else {
-        sides.push({ deptName, amount, date, direction: 'out' })
+        sides.push({ deptName, amount, date, direction: 'out', sourceDesc: r.description })
       }
     }
     // Receivers: only np_in whose PV ref matches a (non-voided) payer.
@@ -322,6 +337,7 @@ export async function fetchInterBillingCashFlow(
           amount: Number(r.amount ?? 0),
           date: String(r.created_at ?? '').slice(0, 10),
           direction: 'in',
+          sourceDesc: r.description,
         })
       }
     }
@@ -359,6 +375,7 @@ export async function fetchInterBillingCashFlow(
           // Cash actually left this dept to fund payroll — direct-method cash
           // flow calls that salary, so show it on 9030 rather than PY-XFER.
           natureCode: PAYROLL_EXPENSE_CODE,
+          sourceDesc: r.description,
         })
       }
     }
@@ -371,6 +388,7 @@ export async function fetchInterBillingCashFlow(
         date: String(r.created_at ?? '').slice(0, 10),
         direction: 'in',
         kind: 'payroll',
+        sourceDesc: r.description,
       })
     }
 
