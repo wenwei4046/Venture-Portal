@@ -525,7 +525,9 @@ function SectionRows({
             <td>
               <div className="flex items-baseline gap-3 font-mono text-[11px] text-graphite" style={{ paddingLeft: `${depth * 18 + 22}px` }}>
                 <span>{dayjs(t.date).format('D MMM')}</span>
-                <span className="text-muted truncate max-w-[24rem]" title={t.description}>
+                {/* Wrap, don't clip — user 2026-08-24: "没显示完" on the
+                    inter-billing source descriptions. */}
+                <span className="text-muted min-w-0 whitespace-normal break-words" title={t.description}>
                   {t.description}
                 </span>
                 {t.party ? <span className="text-accent shrink-0">{t.party}</span> : null}
