@@ -126,6 +126,24 @@ user's "把rm 1, 测试数据清楚 然后这些功能补上":
    wants GL repair). voucher_party_refs/gl-refs attribution fix (item 8)
    retained — it still improves drill-down party labels elsewhere.
 
+10. **Reassign GL account on approved/paid vouchers** (mig 20260824090000
+    reassign_voucher_gl_account, APPLIED; user: "gl account 放错,我希望
+    approve 了我还能改"). "改 GL account" button in the voucher detail's
+    sources section (finance/principal, status approved/paid): edits the
+    posted journal_lines IN PLACE (same JE/amount/date, only non-bank leg's
+    account) so P&L + cash-flow drill-downs + TB move together — no
+    correcting-JV noise. RPC guards: bank legs + 3030 blocked (3030 = void
+    the receipt instead), period-lock check, audit note appended to each JE
+    description, payment_voucher_sources account_code/override synced (keeps
+    bridge mirror natures right). From-side offered = the voucher's actual
+    posted non-bank GL accounts. Also this evening: loan-repayment payee
+    falls back to the fund-source label name (outsource lenders like
+    Kingsley have no company/director row; payee field is hidden in that
+    mode so Create was un-passable); inter-billing drill-down rows append
+    the source dept_pools description; GlReportView txn descriptions wrap
+    instead of clipping at 24rem. Note: paid DEBIT payments DO have full
+    reversal — reversePaidPayment (I mis-said otherwise once).
+
 Still deferred (user said 不理他先 / needs go-ahead): IT-dept payroll 3 traps;
 payroll allocation + statements participation for NEW registry depts; Principal
 mobile push; Alliance recon PDF template (awaiting sample).

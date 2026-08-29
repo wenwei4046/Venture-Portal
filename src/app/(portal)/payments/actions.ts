@@ -1157,6 +1157,46 @@ export async function updatePaymentVoucher(formData: FormData) {
   redirect(`/payments/${id}`)
 }
 
+// ─── Reassign GL account on an approved/paid voucher (Finance) ──────────────
+// User 2026-08-24: "gl account 放错，我希望approve 了我还能改". Edits the
+// posted journal lines IN PLACE via the reassign_voucher_gl_account RPC —
+// same entries/amounts/dates, only the non-bank leg's account moves, so P&L,
+// cash-flow drill-downs and trial balance all follow. The RPC guards roles,
+// bank/3030 legs, period locks, and appends an audit note to each JE.
+
+export async function reassignVoucherGlAccount(
+  formData: FormData,
+): Promise<{ error?: string; changed?: number }> {
+  try {
+    await requireRole(['finance', 'principal'])
+    const supabase = await createClient()
+
+    const id = ((formData.get('id') as string) ?? '').trim()
+    const oldAccount = ((formData.get('old_account') as string) ?? '').trim()
+    const newAccount = ((formData.get('new_account') as string) ?? '').trim()
+    const reason = ((formData.get('reason') as string) ?? '').trim()
+    if (!id || !oldAccount || !newAccount) {
+      return { error: 'Voucher, current account and new account are all required' }
+    }
+    if (!reason) return { error: 'Reason is required (goes into the audit note)' }
+
+    const { data, error } = await supabase.rpc('reassign_voucher_gl_account' as never, {
+      p_voucher_id: id,
+      p_old_account: oldAccount,
+      p_new_account: newAccount,
+      p_reason: reason,
+    } as never)
+    if (error) return { error: error.message }
+
+    revalidatePath(`/payments/${id}`)
+    revalidatePath('/payments')
+    revalidatePath('/reports')
+    return { changed: Number(data ?? 0) }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
 // ─── Void voucher (Finance, only draft/pending) ─────────────────────────────
 
 export async function voidVoucher(formData: FormData) {

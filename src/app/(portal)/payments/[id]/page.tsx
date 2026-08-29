@@ -7,6 +7,7 @@ import { formatMoney } from '@/lib/utils'
 import { submitForApproval, approveVoucher, voidVoucher, voidPaidReceipt, reversePaidPayment, returnVoucherToDraft } from '../actions'
 import VoucherActions from './_components/VoucherActions'
 import CopyVoucherButton from './_components/CopyVoucherButton'
+import ReassignGlAccountButton from './_components/ReassignGlAccountButton'
 import AttachmentUploader from './_components/AttachmentUploader'
 import AttachmentList from '@/components/voucher/AttachmentList'
 
@@ -110,6 +111,42 @@ export default async function PaymentDetailPage({ params }: Props) {
     )
   )
   const categoryLabel = categoryLabels.length > 0 ? categoryLabels.join(' + ') : null
+
+  // Reassign-GL data (user 2026-08-24: "gl account 放错,我希望approve 了我还
+  // 能改"): offer the voucher's actually-POSTED non-bank GL accounts as the
+  // from-side, and every active non-bank account as the to-side. 3030 is
+  // excluded — that leg belongs to invoice settlement.
+  let reassignFrom: Array<{ code: string; name: string; total: number }> = []
+  let accountOptions: Array<{ code: string; name: string }> = []
+  if (isFinance && (voucher.status === 'approved' || voucher.status === 'paid')) {
+    const [{ data: jlRows }, { data: coaRows }, { data: bankCodesData }] = await Promise.all([
+      supabase
+        .from('journal_lines')
+        .select('account_code, debit, credit, journal_entries!inner(reference_type, reference_id, is_reversed)')
+        .eq('journal_entries.reference_type', 'payment_voucher')
+        .eq('journal_entries.reference_id', id)
+        .eq('journal_entries.is_reversed', false),
+      supabase.from('chart_of_accounts').select('code, name').eq('is_active', true).order('code'),
+      supabase.rpc('bank_gl_codes' as never),
+    ])
+    const bankSet = new Set(((bankCodesData ?? []) as unknown as string[]))
+    const nameByCode = new Map(
+      ((coaRows ?? []) as Array<{ code: string; name: string }>).map((c) => [c.code, c.name]),
+    )
+    const totals = new Map<string, number>()
+    for (const l of (jlRows ?? []) as Array<{ account_code: string; debit: number | null; credit: number | null }>) {
+      if (bankSet.has(l.account_code) || l.account_code === '3000' || l.account_code === '3030') continue
+      totals.set(l.account_code, (totals.get(l.account_code) ?? 0) + Number(l.debit ?? 0) + Number(l.credit ?? 0))
+    }
+    reassignFrom = [...totals.entries()].map(([code, total]) => ({
+      code,
+      name: nameByCode.get(code) ?? code,
+      total: Math.round(total * 100) / 100,
+    }))
+    accountOptions = ((coaRows ?? []) as Array<{ code: string; name: string }>).filter(
+      (c) => !bankSet.has(c.code) && c.code !== '3000',
+    )
+  }
 
   let poolLabel: string | null = null
   if (voucher.direction === 'credit') {
@@ -219,6 +256,13 @@ export default async function PaymentDetailPage({ params }: Props) {
             <h2>{voucher.direction === 'debit' ? 'Deducted from' : 'Credited to'}</h2>
             <span className="rule" aria-hidden />
             <span className="count">{sourceRows.length} SOURCE{sourceRows.length === 1 ? '' : 'S'} · PER DEPARTMENT</span>
+            {reassignFrom.length > 0 ? (
+              <ReassignGlAccountButton
+                voucherId={voucher.id}
+                fromOptions={reassignFrom}
+                accountOptions={accountOptions}
+              />
+            ) : null}
           </div>
           <div className="overflow-x-auto">
             <table className="ledger-table">
