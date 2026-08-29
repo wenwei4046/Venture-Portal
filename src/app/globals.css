@@ -68,38 +68,47 @@
   --info-bg: 26 30 40;
 }
 
-/* ─── Sidebar contrast skin (2026-08-29, user: "background 颜色我想要和其他
-   的旁边主题的完全不一样") ───
-   The sidebar re-declares the palette tokens inside its own subtree, so every
-   text/border/bg utility used by the nav recolors at once with no markup
-   changes: light app → deep espresso panel with cream text. In dark mode the
-   panel drops one step darker than the page so it still reads apart. */
+/* ─── Sidebar panel skin (final form 2026-08-29, user picked "同色系加深一
+   档" after trying espresso/slate) ───
+   Same warm family as the page, one step deeper, with a clear edge + soft
+   shadow so the panel reads as a panel. Text/accent tokens inherit the theme
+   unchanged. Light: deeper tan on the cream page. Dark: one step LIGHTER
+   than the charcoal page (elevated-panel convention) with a brighter edge. */
 .sidebar-contrast {
-  --paper: 33 27 21;
-  --surface: 33 27 21;
-  --surface-2: 48 40 31;
-  --hairline: 70 59 46;
-  --ink: 240 233 221;
-  --graphite: 199 187 168;
-  --muted: 152 139 119;
-  --num-ink: 245 240 232;
-  --accent: 228 114 64;
-  --accent-bg: 66 41 26;
-  --accent-border: 139 90 58;
-  --accent-hover: 242 132 82;
+  --paper: 233 223 200;
+  --surface: 233 223 200;
+  --surface-2: 221 208 179;
+  --hairline: 183 168 138;
+  box-shadow: 2px 0 10px rgb(28 22 15 / 0.07);
 }
-/* Dark mode: a merely-darker warm panel read the same as the page (user
-   2026-08-29 "dark mode 时有分不清") — switch HUE instead: deep slate blue
-   against the warm charcoal page, cool vs warm is unmistakable and the
-   orange accent pops harder on it. */
 [data-theme="dark"] .sidebar-contrast {
-  --paper: 20 25 35;
-  --surface: 20 25 35;
-  --surface-2: 31 38 52;
-  --hairline: 56 66 86;
-  --ink: 235 238 245;
-  --graphite: 178 186 202;
-  --muted: 128 137 155;
+  --paper: 44 39 31;
+  --surface: 44 39 31;
+  --surface-2: 56 50 41;
+  --hairline: 82 72 58;
+  box-shadow: 2px 0 12px rgb(0 0 0 / 0.45);
+}
+
+/* Sidebar scrollbar (user 2026-08-29 "这个也优化,不好看"): the nav's default
+   white-tracked scrollbar glared against the panel — thin, trackless, thumb
+   in the panel's own hairline tone. */
+.sidebar-contrast * {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--hairline)) transparent;
+}
+.sidebar-contrast ::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.sidebar-contrast ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-contrast ::-webkit-scrollbar-thumb {
+  background: rgb(var(--hairline));
+  border-radius: 9999px;
+}
+.sidebar-contrast ::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--muted));
 }
 
 /* System preference fallback (when no explicit toggle) */
@@ -131,13 +140,11 @@
   }
 
   :root:not([data-theme="light"]) .sidebar-contrast {
-    --paper: 20 25 35;
-    --surface: 20 25 35;
-    --surface-2: 31 38 52;
-    --hairline: 56 66 86;
-    --ink: 235 238 245;
-    --graphite: 178 186 202;
-    --muted: 128 137 155;
+    --paper: 44 39 31;
+    --surface: 44 39 31;
+    --surface-2: 56 50 41;
+    --hairline: 82 72 58;
+    box-shadow: 2px 0 12px rgb(0 0 0 / 0.45);
   }
 }
 
