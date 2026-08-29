@@ -74,19 +74,31 @@
    shadow so the panel reads as a panel. Text/accent tokens inherit the theme
    unchanged. Light: deeper tan on the cream page. Dark: one step LIGHTER
    than the charcoal page (elevated-panel convention) with a brighter edge. */
+/* Final direction (user: "要不一样颜色,要match 的上的"): banker's deep
+   green — a different world from the cream page but its natural partner
+   (green ↔ burnt-orange accent are complements; classic ledger pairing).
+   Cream text, hairlines and scrollbar all green-tinted via the tokens. */
 .sidebar-contrast {
-  --paper: 233 223 200;
-  --surface: 233 223 200;
-  --surface-2: 221 208 179;
-  --hairline: 183 168 138;
-  box-shadow: 2px 0 10px rgb(28 22 15 / 0.07);
+  --paper: 34 54 42;
+  --surface: 34 54 42;
+  --surface-2: 47 71 56;
+  --hairline: 76 100 84;
+  --ink: 240 236 224;
+  --graphite: 199 206 191;
+  --muted: 150 160 142;
+  --num-ink: 245 242 232;
+  --accent: 228 124 72;
+  --accent-bg: 28 45 35;
+  --accent-border: 110 118 82;
+  --accent-hover: 242 140 90;
+  box-shadow: 2px 0 10px rgb(28 22 15 / 0.18);
 }
 [data-theme="dark"] .sidebar-contrast {
-  --paper: 44 39 31;
-  --surface: 44 39 31;
-  --surface-2: 56 50 41;
-  --hairline: 82 72 58;
-  box-shadow: 2px 0 12px rgb(0 0 0 / 0.45);
+  --paper: 24 37 30;
+  --surface: 24 37 30;
+  --surface-2: 36 53 43;
+  --hairline: 60 81 68;
+  box-shadow: 2px 0 12px rgb(0 0 0 / 0.5);
 }
 
 /* Sidebar scrollbar (user 2026-08-29 "这个也优化,不好看"): the nav's default
@@ -140,11 +152,11 @@
   }
 
   :root:not([data-theme="light"]) .sidebar-contrast {
-    --paper: 44 39 31;
-    --surface: 44 39 31;
-    --surface-2: 56 50 41;
-    --hairline: 82 72 58;
-    box-shadow: 2px 0 12px rgb(0 0 0 / 0.45);
+    --paper: 24 37 30;
+    --surface: 24 37 30;
+    --surface-2: 36 53 43;
+    --hairline: 60 81 68;
+    box-shadow: 2px 0 12px rgb(0 0 0 / 0.5);
   }
 }
 
