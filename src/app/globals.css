@@ -93,11 +93,11 @@
   --accent-hover: 242 140 90;
   box-shadow: 2px 0 10px rgb(28 22 15 / 0.18);
 }
+/* Dark mode keeps the SAME green (user 2026-08-29: light-mode green ✓, the
+   darkened variant read muddy) — the panel palette is self-contained, so one
+   identity across both themes; it sits naturally brighter than the charcoal
+   page. Only the edge shadow deepens. */
 [data-theme="dark"] .sidebar-contrast {
-  --paper: 24 37 30;
-  --surface: 24 37 30;
-  --surface-2: 36 53 43;
-  --hairline: 60 81 68;
   box-shadow: 2px 0 12px rgb(0 0 0 / 0.5);
 }
 
@@ -152,10 +152,6 @@
   }
 
   :root:not([data-theme="light"]) .sidebar-contrast {
-    --paper: 24 37 30;
-    --surface: 24 37 30;
-    --surface-2: 36 53 43;
-    --hairline: 60 81 68;
     box-shadow: 2px 0 12px rgb(0 0 0 / 0.5);
   }
 }
