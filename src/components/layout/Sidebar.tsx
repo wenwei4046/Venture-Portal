@@ -288,20 +288,30 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII']
   let romanIdx = 0
 
+  // Desktop (2026-08-29, user: "background colour 可以换一下…然后做成隐藏的,
+  // 鼠标划过去才显示"): the sidebar rests as a slim 16px rail and expands on
+  // hover (or keyboard focus) — width animates in-flow so the content glides
+  // rather than being overlapped. Solid bg-surface (was a paper-fading
+  // gradient) so the panel reads apart from the page. Mobile drawer unchanged.
   return (
     <aside
       className={
-        `w-[240px] shrink-0 border-r border-hairline flex flex-col h-full ` +
+        `group/side w-[240px] shrink-0 border-r border-hairline h-full bg-surface ` +
         `fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-out ` +
         (mobileOpen ? 'translate-x-0' : '-translate-x-full') +
-        ` md:relative md:translate-x-0 md:transition-none md:w-[220px] md:z-auto`
+        ` md:relative md:translate-x-0 md:z-auto md:w-4 md:hover:w-[220px] ` +
+        `md:overflow-hidden md:transition-[width] md:duration-200`
       }
-      style={{
-        background:
-          'linear-gradient(180deg, rgb(var(--surface-2) / 0.55) 0%, rgb(var(--paper)) 180px)',
-      }}
       aria-label="Main navigation"
     >
+      {/* Collapsed-rail hint (desktop only) — fades out once expanded. */}
+      <div
+        className="hidden md:flex absolute inset-y-0 left-0 w-4 items-center justify-center opacity-100 group-hover/side:opacity-0 transition-opacity duration-150 pointer-events-none"
+        aria-hidden
+      >
+        <span className="font-mono text-[10px] text-muted">❯</span>
+      </div>
+      <div className="flex flex-col h-full w-[240px] md:w-[220px] md:opacity-0 md:group-hover/side:opacity-100 md:transition-opacity md:duration-150">
       {/* Brand mark */}
       <div className="px-6 pt-7 pb-5 flex items-start justify-between relative">
         <div>
@@ -462,6 +472,7 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
           <br />
           Phase 3 Shipped
         </p>
+      </div>
       </div>
     </aside>
   )
