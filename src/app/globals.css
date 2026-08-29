@@ -40,15 +40,19 @@
   --info-bg: 235 238 243;
 }
 
-/* ─── Dark mode — warm charcoal, not cold ─── */
+/* ─── Dark mode — warm charcoal, not cold ───
+   Elevation rework 2026-08-29 (user: dark mode 不太行): everything sat within
+   a few points of black and melted together. Three clear levels now —
+   sidebar darkest (see .sidebar-contrast), page lifted a step, cards a step
+   above that, hairlines bright enough to actually draw edges. */
 [data-theme="dark"] {
-  --paper: 26 23 20;
-  --surface: 36 32 25;
-  --surface-2: 46 41 34;
-  --hairline: 61 54 44;
-  --ink: 232 224 212;
-  --graphite: 168 155 140;
-  --muted: 115 103 88;
+  --paper: 33 29 24;
+  --surface: 44 39 32;
+  --surface-2: 57 51 42;
+  --hairline: 80 71 57;
+  --ink: 234 226 214;
+  --graphite: 176 163 148;
+  --muted: 124 112 96;
 
   /* Numbers — brightest paper tone for max contrast on dark bg */
   --num-ink: 245 240 232;
@@ -93,24 +97,24 @@
   --accent-hover: 242 140 90;
   box-shadow: 2px 0 10px rgb(28 22 15 / 0.18);
 }
-/* Dark mode (user pick after green-on-dark failed): the LIGHT theme's cream
-   paper palette, scoped to the sidebar — a warm paper panel with dark ink
-   text floating on the charcoal page. Maximum recognition, and it's the
-   theme's own colour. Every token the green base sets is re-set here. */
+/* Dark mode: the DEEPEST level of the elevation ladder — near-black warm
+   panel under the lifted charcoal page (cream and green both clashed there;
+   depth hierarchy separates without fighting the theme). Every token the
+   green base sets is re-set here. */
 [data-theme="dark"] .sidebar-contrast {
-  --paper: 243 236 221;
-  --surface: 243 236 221;
-  --surface-2: 232 221 196;
-  --hairline: 198 185 158;
-  --ink: 28 22 15;
-  --graphite: 90 78 64;
-  --muted: 133 119 95;
-  --num-ink: 20 16 10;
-  --accent: 204 90 46;
-  --accent-bg: 251 232 222;
-  --accent-border: 232 176 152;
-  --accent-hover: 181 74 34;
-  box-shadow: 2px 0 12px rgb(0 0 0 / 0.55);
+  --paper: 18 16 13;
+  --surface: 18 16 13;
+  --surface-2: 32 28 23;
+  --hairline: 58 51 41;
+  --ink: 232 224 212;
+  --graphite: 168 155 140;
+  --muted: 120 108 92;
+  --num-ink: 245 240 232;
+  --accent: 224 107 58;
+  --accent-bg: 61 37 23;
+  --accent-border: 139 90 58;
+  --accent-hover: 240 122 72;
+  box-shadow: 2px 0 14px rgb(0 0 0 / 0.6);
 }
 
 /* Sidebar scrollbar (user 2026-08-29 "这个也优化,不好看"): the nav's default
@@ -138,13 +142,13 @@
 /* System preference fallback (when no explicit toggle) */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: 26 23 20;
-    --surface: 36 32 25;
-    --surface-2: 46 41 34;
-    --hairline: 61 54 44;
-    --ink: 232 224 212;
-    --graphite: 168 155 140;
-    --muted: 115 103 88;
+    --paper: 33 29 24;
+    --surface: 44 39 32;
+    --surface-2: 57 51 42;
+    --hairline: 80 71 57;
+    --ink: 234 226 214;
+    --graphite: 176 163 148;
+    --muted: 124 112 96;
 
     --num-ink: 245 240 232;
 
@@ -164,19 +168,19 @@
   }
 
   :root:not([data-theme="light"]) .sidebar-contrast {
-    --paper: 243 236 221;
-    --surface: 243 236 221;
-    --surface-2: 232 221 196;
-    --hairline: 198 185 158;
-    --ink: 28 22 15;
-    --graphite: 90 78 64;
-    --muted: 133 119 95;
-    --num-ink: 20 16 10;
-    --accent: 204 90 46;
-    --accent-bg: 251 232 222;
-    --accent-border: 232 176 152;
-    --accent-hover: 181 74 34;
-    box-shadow: 2px 0 12px rgb(0 0 0 / 0.55);
+    --paper: 18 16 13;
+    --surface: 18 16 13;
+    --surface-2: 32 28 23;
+    --hairline: 58 51 41;
+    --ink: 232 224 212;
+    --graphite: 168 155 140;
+    --muted: 120 108 92;
+    --num-ink: 245 240 232;
+    --accent: 224 107 58;
+    --accent-bg: 61 37 23;
+    --accent-border: 139 90 58;
+    --accent-hover: 240 122 72;
+    box-shadow: 2px 0 14px rgb(0 0 0 / 0.6);
   }
 }
 
