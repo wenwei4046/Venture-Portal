@@ -69,10 +69,14 @@ features. Additional 08-29 work:)
    ignored line categories and fell back to revenue — 0022/0029 (issued
    17 Aug) post per-line correctly. If more pre-fix dept_pool invoices
    surface on 5011, same one-click fix.
-4. **0022/0029 status**: legitimate Marketing internal recharges
-   (Job Street 1,013.73 + utilities 746.30), just unsettled — settle each via
-   Settle → (netting, no bank). The 91.26 Notion 1/3 still OPEN on 3059
-   Due-from-DC (was reclassed there 06-12, never repaid).
+4. **0022/0029 SETTLED by user same day** (HV-OR-202608-0317/0318, netting):
+   Marketing pool inter_billing_out −1,760.03, Venture Office np_in +,
+   venture_pool pass-through, bank untouched, invoices paid. VERIFIED — and
+   note the invariant confirmed twice (0007 too): dept_pool netting settles
+   post NO JE (both GL sides were already posted at issue; settle = pools +
+   status only), and status shows 'paid' not 'paid_via_netting' (the
+   mark_invoice_paid trigger flips first — cosmetic). The 91.26 Notion 1/3
+   still OPEN on 3059 Due-from-DC (reclassed there 06-12, never repaid).
 5. **Sidebar redesign** (several rounds): desktop rests as a 16px rail,
    expands on hover; 📌 pin persists in localStorage (hv_sidebar_pinned).
    Final palette after espresso/slate/tan/green-dark/cream-dark experiments:
