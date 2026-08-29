@@ -60,18 +60,22 @@ export default function GlReportView({
   const [openTxns, setOpenTxns] = useState<Set<string>>(new Set())
 
   // L1 = top accounts only · L2 = every account level · L3 = + transactions.
+  // Row identity is `${section.key}:${code}` — the SAME account can appear in
+  // two sections (e.g. 3052 in both 实收 and 支出 of the cash-flow grammar);
+  // bare codes made those rows share React keys + open state, so clicking the
+  // first copy only ever expanded the last one (user 2026-08-29: "点不开").
   const { allGroupCodes, allTxnCodes } = useMemo(() => {
     const groups: string[] = []
     const txns: string[] = []
-    const walk = (n: AccountNode) => {
+    const walk = (sk: string, n: AccountNode) => {
       if (n.children.length > 0) {
-        groups.push(n.code)
-        n.children.forEach(walk)
+        groups.push(`${sk}:${n.code}`)
+        n.children.forEach((c) => walk(sk, c))
       } else if (n.txns.length > 0) {
-        txns.push(n.code)
+        txns.push(`${sk}:${n.code}`)
       }
     }
-    for (const b of blocks) if (b.kind === 'section') b.section.nodes.forEach(walk)
+    for (const b of blocks) if (b.kind === 'section') b.section.nodes.forEach((n) => walk(b.section.key, n))
     return { allGroupCodes: groups, allTxnCodes: txns }
   }, [blocks])
 
@@ -96,17 +100,17 @@ export default function GlReportView({
     const hits: string[] = []
     const open = new Set<string>()
     if (!search.trim()) return { hitCodes: hits, forceOpen: open }
-    const walk = (n: AccountNode, ancestors: string[]) => {
+    const walk = (sk: string, n: AccountNode, ancestors: string[]) => {
       if (matchesAccount(search, n.code, n.name)) {
-        hits.push(n.code)
+        hits.push(`${sk}:${n.code}`)
         for (const a of ancestors) open.add(a)
       }
       if (n.children.length > 0) {
-        const next = [...ancestors, n.code]
-        for (const c of n.children) walk(c, next)
+        const next = [...ancestors, `${sk}:${n.code}`]
+        for (const c of n.children) walk(sk, c, next)
       }
     }
-    for (const b of blocks) if (b.kind === 'section') b.section.nodes.forEach((n) => walk(n, []))
+    for (const b of blocks) if (b.kind === 'section') b.section.nodes.forEach((n) => walk(b.section.key, n, []))
     return { hitCodes: hits, forceOpen: open }
   }, [blocks, search])
 
@@ -443,22 +447,26 @@ function SectionRows({
 
   const renderNode = (n: AccountNode, depth: number) => {
     const isGroup = n.children.length > 0
+    // Section-scoped row identity — the same account may appear in another
+    // section (cash-flow in/out both carry e.g. 3052), and sharing bare-code
+    // keys/state made the first copy un-expandable.
+    const rk = `${section.key}:${n.code}`
     // A match below forces its ancestors open, so a hit is never buried.
-    const isCollapsed = collapsed.has(n.code) && !forceOpen.has(n.code)
-    const isHit = hitSet.has(n.code)
-    const isActive = activeCode === n.code
-    const txnsOpen = openTxns.has(n.code)
+    const isCollapsed = collapsed.has(rk) && !forceOpen.has(rk)
+    const isHit = hitSet.has(rk)
+    const isActive = activeCode === rk
+    const txnsOpen = openTxns.has(rk)
     const hasTxns = !isGroup && n.txns.length > 0
     // The whole code+name area toggles — not just the arrow (user 2026-06-11).
     const toggleAction = isGroup
-      ? () => onToggleGroup(n.code)
+      ? () => onToggleGroup(rk)
       : hasTxns
-        ? () => onToggleTxns(n.code)
+        ? () => onToggleTxns(rk)
         : undefined
     rows.push(
       <tr
-        key={n.code}
-        id={`gl-row-${n.code}`}
+        key={rk}
+        id={`gl-row-${rk}`}
         className={`${isGroup ? 'row-group' : 'row-leaf'}${
           isActive ? ' search-row-active' : isHit ? ' search-row-hit' : ''
         }`}
@@ -521,7 +529,7 @@ function SectionRows({
       for (let i = 0; i < n.txns.length; i++) {
         const t = n.txns[i]
         rows.push(
-          <tr key={`${n.code}-txn-${i}`} className="row-txn">
+          <tr key={`${rk}-txn-${i}`} className="row-txn">
             <td>
               <div className="flex items-baseline gap-3 font-mono text-[11px] text-graphite" style={{ paddingLeft: `${depth * 18 + 22}px` }}>
                 <span>{dayjs(t.date).format('D MMM')}</span>
