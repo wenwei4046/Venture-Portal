@@ -68,6 +68,33 @@
   --info-bg: 26 30 40;
 }
 
+/* ─── Sidebar contrast skin (2026-08-29, user: "background 颜色我想要和其他
+   的旁边主题的完全不一样") ───
+   The sidebar re-declares the palette tokens inside its own subtree, so every
+   text/border/bg utility used by the nav recolors at once with no markup
+   changes: light app → deep espresso panel with cream text. In dark mode the
+   panel drops one step darker than the page so it still reads apart. */
+.sidebar-contrast {
+  --paper: 33 27 21;
+  --surface: 33 27 21;
+  --surface-2: 48 40 31;
+  --hairline: 70 59 46;
+  --ink: 240 233 221;
+  --graphite: 199 187 168;
+  --muted: 152 139 119;
+  --num-ink: 245 240 232;
+  --accent: 228 114 64;
+  --accent-bg: 66 41 26;
+  --accent-border: 139 90 58;
+  --accent-hover: 242 132 82;
+}
+[data-theme="dark"] .sidebar-contrast {
+  --paper: 14 12 10;
+  --surface: 14 12 10;
+  --surface-2: 27 23 19;
+  --hairline: 48 42 34;
+}
+
 /* System preference fallback (when no explicit toggle) */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -94,6 +121,13 @@
     --danger-bg: 46 24 18;
     --info: 123 144 181;
     --info-bg: 26 30 40;
+  }
+
+  :root:not([data-theme="light"]) .sidebar-contrast {
+    --paper: 14 12 10;
+    --surface: 14 12 10;
+    --surface-2: 27 23 19;
+    --hairline: 48 42 34;
   }
 }
 

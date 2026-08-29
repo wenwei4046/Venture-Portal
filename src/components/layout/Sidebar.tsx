@@ -284,34 +284,62 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname])
 
+  // Desktop pin (2026-08-29 "固定钉住需要"): keeps the panel permanently open.
+  // Read from localStorage AFTER mount so the server-rendered markup matches.
+  const [pinned, setPinned] = useState(false)
+  useEffect(() => {
+    try {
+      setPinned(localStorage.getItem('hv_sidebar_pinned') === '1')
+    } catch {}
+  }, [])
+  const togglePinned = () => {
+    setPinned((p) => {
+      const next = !p
+      try {
+        localStorage.setItem('hv_sidebar_pinned', next ? '1' : '0')
+      } catch {}
+      return next
+    })
+  }
+
   // Roman numeral counter for labeled sections only (skip the unlabeled overview).
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII']
   let romanIdx = 0
 
   // Desktop (2026-08-29, user: "background colour 可以换一下…然后做成隐藏的,
-  // 鼠标划过去才显示"): the sidebar rests as a slim 16px rail and expands on
-  // hover (or keyboard focus) — width animates in-flow so the content glides
-  // rather than being overlapped. Solid bg-surface (was a paper-fading
-  // gradient) so the panel reads apart from the page. Mobile drawer unchanged.
+  // 鼠标划过去才显示" + "固定钉住需要"): the sidebar rests as a slim 16px rail
+  // and expands on hover — width animates in-flow so the content glides rather
+  // than being overlapped. The 📌 pin keeps it permanently open (persisted in
+  // localStorage, read after mount so SSR markup stays stable). The
+  // `sidebar-contrast` class re-declares the palette tokens for this subtree —
+  // deep espresso panel, completely apart from the cream page. Mobile drawer
+  // unchanged.
   return (
     <aside
       className={
-        `group/side w-[240px] shrink-0 border-r border-hairline h-full bg-surface ` +
+        `group/side sidebar-contrast w-[240px] shrink-0 border-r border-hairline h-full bg-surface ` +
         `fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-out ` +
         (mobileOpen ? 'translate-x-0' : '-translate-x-full') +
-        ` md:relative md:translate-x-0 md:z-auto md:w-4 md:hover:w-[220px] ` +
-        `md:overflow-hidden md:transition-[width] md:duration-200`
+        ` md:relative md:translate-x-0 md:z-auto md:overflow-hidden md:transition-[width] md:duration-200 ` +
+        (pinned ? 'md:w-[220px]' : 'md:w-4 md:hover:w-[220px]')
       }
       aria-label="Main navigation"
     >
       {/* Collapsed-rail hint (desktop only) — fades out once expanded. */}
+      {!pinned ? (
+        <div
+          className="hidden md:flex absolute inset-y-0 left-0 w-4 items-center justify-center opacity-100 group-hover/side:opacity-0 transition-opacity duration-150 pointer-events-none"
+          aria-hidden
+        >
+          <span className="font-mono text-[10px] text-muted">❯</span>
+        </div>
+      ) : null}
       <div
-        className="hidden md:flex absolute inset-y-0 left-0 w-4 items-center justify-center opacity-100 group-hover/side:opacity-0 transition-opacity duration-150 pointer-events-none"
-        aria-hidden
+        className={
+          `flex flex-col h-full w-[240px] md:w-[220px] md:transition-opacity md:duration-150 ` +
+          (pinned ? 'md:opacity-100' : 'md:opacity-0 md:group-hover/side:opacity-100')
+        }
       >
-        <span className="font-mono text-[10px] text-muted">❯</span>
-      </div>
-      <div className="flex flex-col h-full w-[240px] md:w-[220px] md:opacity-0 md:group-hover/side:opacity-100 md:transition-opacity md:duration-150">
       {/* Brand mark */}
       <div className="px-6 pt-7 pb-5 flex items-start justify-between relative">
         <div>
@@ -325,6 +353,19 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
             INTERNAL LEDGER · <span className="text-accent not-italic font-sans tracking-wider text-[10.5px]">内部账册</span>
           </p>
         </div>
+        {/* Pin — desktop only: keep the panel open instead of hover-reveal. */}
+        <button
+          type="button"
+          onClick={togglePinned}
+          className={`hidden md:block text-base leading-none pt-1 px-1 transition-all ${
+            pinned ? '' : 'opacity-35 grayscale hover:opacity-70'
+          }`}
+          title={pinned ? '取消固定 — 恢复滑过才显示' : '固定 sidebar — 常驻展开'}
+          aria-label={pinned ? 'Unpin sidebar' : 'Pin sidebar'}
+          aria-pressed={pinned}
+        >
+          📌
+        </button>
         {/* Close button — mobile only */}
         {onClose ? (
           <button
