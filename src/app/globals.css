@@ -88,11 +88,18 @@
   --accent-border: 139 90 58;
   --accent-hover: 242 132 82;
 }
+/* Dark mode: a merely-darker warm panel read the same as the page (user
+   2026-08-29 "dark mode 时有分不清") — switch HUE instead: deep slate blue
+   against the warm charcoal page, cool vs warm is unmistakable and the
+   orange accent pops harder on it. */
 [data-theme="dark"] .sidebar-contrast {
-  --paper: 14 12 10;
-  --surface: 14 12 10;
-  --surface-2: 27 23 19;
-  --hairline: 48 42 34;
+  --paper: 20 25 35;
+  --surface: 20 25 35;
+  --surface-2: 31 38 52;
+  --hairline: 56 66 86;
+  --ink: 235 238 245;
+  --graphite: 178 186 202;
+  --muted: 128 137 155;
 }
 
 /* System preference fallback (when no explicit toggle) */
@@ -124,10 +131,13 @@
   }
 
   :root:not([data-theme="light"]) .sidebar-contrast {
-    --paper: 14 12 10;
-    --surface: 14 12 10;
-    --surface-2: 27 23 19;
-    --hairline: 48 42 34;
+    --paper: 20 25 35;
+    --surface: 20 25 35;
+    --surface-2: 31 38 52;
+    --hairline: 56 66 86;
+    --ink: 235 238 245;
+    --graphite: 178 186 202;
+    --muted: 128 137 155;
   }
 }
 
