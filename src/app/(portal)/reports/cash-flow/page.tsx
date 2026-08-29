@@ -84,8 +84,8 @@ export default async function CashFlowPage({ searchParams }: Props) {
     readReportLayout(supabase, 'cash_flow_out'),
   ])
   const blocks = cashFlowBlocks(cf, {
-    inflow: buildCashFlowSideSections(cf.inflowLeaves, coaWithSynthetic, inLayoutRaw as ReportLayout | null, '现金流入 · Money in'),
-    outflow: buildCashFlowSideSections(cf.outflowLeaves, coaWithSynthetic, outLayoutRaw as ReportLayout | null, '现金流出 · Money out'),
+    inflow: buildCashFlowSideSections(cf.inflowLeaves, coaWithSynthetic, inLayoutRaw as ReportLayout | null, '现金流入 · Money in', 'in'),
+    outflow: buildCashFlowSideSections(cf.outflowLeaves, coaWithSynthetic, outLayoutRaw as ReportLayout | null, '现金流出 · Money out', 'out'),
   })
   const periodLabel = dayjs(`${period}-01`).format('MMMM YYYY')
 

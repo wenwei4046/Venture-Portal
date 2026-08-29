@@ -68,8 +68,8 @@ export async function GET(req: Request) {
     readReportLayout(supabase, 'cash_flow_out'),
   ])
   const blocks = cashFlowBlocks(cf, {
-    inflow: buildCashFlowSideSections(cf.inflowLeaves, coaWithSynthetic, inLayoutRaw as ReportLayout | null, '实收 · Money in'),
-    outflow: buildCashFlowSideSections(cf.outflowLeaves, coaWithSynthetic, outLayoutRaw as ReportLayout | null, '支出 · Money out'),
+    inflow: buildCashFlowSideSections(cf.inflowLeaves, coaWithSynthetic, inLayoutRaw as ReportLayout | null, '实收 · Money in', 'in'),
+    outflow: buildCashFlowSideSections(cf.outflowLeaves, coaWithSynthetic, outLayoutRaw as ReportLayout | null, '支出 · Money out', 'out'),
   })
 
   // 未收 block — dept_manager scoped by the RPC; finance/principal need a

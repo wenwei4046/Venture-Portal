@@ -23,17 +23,24 @@ export const OTHER_SECTION_LABEL = '其他 · Other'
 
 /** Group one side's leaves into the layout's ordered sections, COA tree inside
  *  each. `layout` null/empty → a single section holding everything, which is
- *  exactly today's behaviour. */
+ *  exactly today's behaviour.
+ *  `sideKey` namespaces the section keys ('in:other' vs 'out:other') — the
+ *  in/out halves render in ONE GlReportView list, and identical keys across
+ *  sides ('other', 'all', or a layout id reused in both saved layouts) made
+ *  React keep stale rows from the previous period on navigation (2026-08-29:
+ *  August repayments ghosting into July's inflow). */
 export function buildCashFlowSideSections(
   leaves: CashFlowLeaf[],
   accounts: CoaAccount[],
   layout: ReportLayout | null,
   fallbackLabel: string,
+  sideKey: string = 'side',
 ): ReportSection[] {
   const byCode = new Map(leaves.map((l) => [l.code, l]))
   const cats = layout?.categories?.filter((c) => c && typeof c.id === 'string') ?? []
 
-  const sectionFor = (id: string, label: string, codes: string[]): ReportSection | null => {
+  const sectionFor = (rawId: string, label: string, codes: string[]): ReportSection | null => {
+    const id = `${sideKey}:${rawId}`
     const buckets = new Map<string, { current: number; previous: number; txns: CashFlowLeaf['txns'] }>()
     for (const code of codes) {
       const leaf = byCode.get(code)

@@ -63,8 +63,8 @@ export async function GET(req: Request) {
     currentLabel: dayjs(`${period}-01`).format('MMM YYYY'),
     compareLabel: compare ? dayjs(`${compare}-01`).format('MMM YYYY') : '',
     blocks: cashFlowBlocks(cf, {
-      inflow: buildCashFlowSideSections(cf.inflowLeaves, coaWithSynthetic, inLayoutRaw as ReportLayout | null, '现金流入 · Money in'),
-      outflow: buildCashFlowSideSections(cf.outflowLeaves, coaWithSynthetic, outLayoutRaw as ReportLayout | null, '现金流出 · Money out'),
+      inflow: buildCashFlowSideSections(cf.inflowLeaves, coaWithSynthetic, inLayoutRaw as ReportLayout | null, '现金流入 · Money in', 'in'),
+      outflow: buildCashFlowSideSections(cf.outflowLeaves, coaWithSynthetic, outLayoutRaw as ReportLayout | null, '现金流出 · Money out', 'out'),
     }),
   })
 }
