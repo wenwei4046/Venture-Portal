@@ -44,6 +44,50 @@ migrations applied live + archived; detailed sections follow this block):
    HR/Finance/Marketing/Director Office (+director from director_monthly_
    payroll); 还款 PVs are typed 'expense' with fund_source_id links.
 
+## SESSION 2026-08-29 — reassign-GL day + report ghost fixes + sidebar
+
+(Items 8–10 of the 2026-08-24 section below actually happened TODAY 08-29 —
+the Rygis 9,500 investigation, invoice-based Monthly R&P, and both reassign
+features. Additional 08-29 work:)
+
+1. **Report ghost rows fixed, two layers** (user's July Cash Flow showed
+   August loan repayments): GlReportView rows were keyed by bare account code
+   while the cash-flow grammar renders the SAME account in both 实收 and 支出
+   — duplicate React keys froze stale rows across period navigation and made
+   the first copy un-expandable. Fix 1: rows keyed `${section.key}:${code}`.
+   Fix 2: the section keys ALSO collided ('other'/'all'/layout ids exist on
+   both sides) — buildCashFlowSideSections now takes sideKey ('in'/'out') and
+   prefixes every section key. MonthlyMatrix/Monthly P&L already namespaced;
+   P&L/BS single-section-per-account — audited clean.
+2. **Invoice detail modal shows everything** ("点了单号显示的资料太少了"):
+   line items w/ category labels, every receipt (direct + batch settlement
+   voucher resolved via settlement_voucher_id, tagged 合并收据), CNs with
+   status/reason, freetext contact, paid/outstanding summary. BillingView
+   passes receiptsByInvoice/cnDetailByInvoice.
+3. **HV-INV-202608-0007 GL corrected 5011→9095** via the new invoice
+   reassign (audit note stamped). Cause: dept_pool bulk-issue before ~17 Aug
+   ignored line categories and fell back to revenue — 0022/0029 (issued
+   17 Aug) post per-line correctly. If more pre-fix dept_pool invoices
+   surface on 5011, same one-click fix.
+4. **0022/0029 status**: legitimate Marketing internal recharges
+   (Job Street 1,013.73 + utilities 746.30), just unsettled — settle each via
+   Settle → (netting, no bank). The 91.26 Notion 1/3 still OPEN on 3059
+   Due-from-DC (was reclassed there 06-12, never repaid).
+5. **Sidebar redesign** (several rounds): desktop rests as a 16px rail,
+   expands on hover; 📌 pin persists in localStorage (hv_sidebar_pinned).
+   Final palette after espresso/slate/tan/green-dark/cream-dark experiments:
+   LIGHT = banker deep green panel (.sidebar-contrast scoped tokens, cream
+   text, orange accent); DARK = near-black warm panel as the bottom of a new
+   3-level elevation ladder — the whole dark THEME was lifted (paper 33 29 24,
+   surface 44 39 32, surface-2 57 51 42, hairline 80 71 57, text brighter)
+   because everything previously melted near black. Thin themed scrollbar
+   inside the panel. User: "就先这样吧,到时我再调看看" — expect tweaks.
+6. Loan-repayment payee fallback (outsource lenders e.g. Kingsley have no
+   company/director row; payee hidden in that mode → Create was un-passable);
+   Kingsley 100k repayment voucher created OK after fix. Inter-billing
+   drill-down rows now append the source dept_pools description;
+   GlReportView txn descriptions wrap instead of clipping.
+
 ## SESSION 2026-08-24 (evening) — RM1 purge + five gap features + R&P paid-to removal
 
 All local gates passed before push (tsc / vitest 555 / next build). Batch was the
