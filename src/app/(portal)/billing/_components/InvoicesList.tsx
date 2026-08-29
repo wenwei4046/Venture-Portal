@@ -124,16 +124,24 @@ interface Props {
    *  until the 跨月 toggle is on, then they join the list so one receipt can
    *  cover a payer's invoices across months. Period totals ignore them. */
   extraOpenInvoices?: Invoice[]
+  /** invoice_id → receipts recorded against it (detail-modal 收款记录). */
+  receiptsByInvoice?: Record<string, Array<{ voucherNo: string | null; date: string | null; amount: number; batch?: boolean }>>
+  /** invoice_id → credit notes raised against it (detail modal, any status). */
+  cnDetailByInvoice?: Record<string, Array<{ cnNo: string | null; amount: number; status: string; reason: string | null }>>
   /** Dynamically provisioned dept modes — forwarded to the CN modal. */
   extraModes?: Array<{ value: string; label: string }>
 }
 
 // Invoices for the selected period. Populated by Step 5's generate_monthly_invoices
 // RPC. Until Step 5 ships, this section shows the empty state with an explanation.
-export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [], bankAccounts = [], invoiceLines = {}, paidByInvoice = {}, cnByInvoice = {}, extraOpenInvoices = [], extraModes = [] }: Props) {
+export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [], bankAccounts = [], invoiceLines = {}, paidByInvoice = {}, cnByInvoice = {}, extraOpenInvoices = [], extraModes = [], receiptsByInvoice = {}, cnDetailByInvoice = {} }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  // code → account name, labels the detail modal's line categories.
+  const catLabelByCode: Record<string, string> = Object.fromEntries(
+    categories.map((c) => [c.code, c.label]),
+  )
   // 跨月: reveal other periods' unsettled invoices in the same list.
   const [showAllOpen, setShowAllOpen] = useState(false)
   const displayRows = showAllOpen ? [...invoices, ...extraOpenInvoices] : invoices
@@ -425,11 +433,18 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                           reference_no: inv.reference_no ?? null,
                           category_code: inv.category_code ?? null,
                           created_at: inv.created_at ?? null,
+                          freetext_address: inv.billable_to_freetext_address ?? null,
+                          freetext_phone: inv.billable_to_freetext_phone ?? null,
+                          freetext_email: inv.billable_to_freetext_email ?? null,
                         }}
                         partyPrimary={labels.primary}
                         partySub={labels.sub}
                         categoryLabel={categoryLabel}
                         billingModeLabel={formatBillingMode(inv.billing_mode)}
+                        lines={invoiceLines[inv.id] ?? []}
+                        categoryLabels={catLabelByCode}
+                        receipts={receiptsByInvoice[inv.id] ?? []}
+                        creditNotes={cnDetailByInvoice[inv.id] ?? []}
                       />
                     )
                   },

@@ -67,7 +67,7 @@ export default async function BillingView({ searchParams }: Props) {
       .order('created_at', { ascending: false }),
     supabase
       .from('invoices')
-      .select('id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code, created_at')
+      .select('id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code, created_at, settlement_voucher_id')
       .eq('period_month', period)
       .order('billing_mode', { ascending: true }),
     supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('short_code'),
@@ -210,6 +210,82 @@ export default async function BillingView({ searchParams }: Props) {
     if (cn.status !== 'approved') continue
     cnByInvoice[cn.invoice_id as string] =
       Math.round(((cnByInvoice[cn.invoice_id as string] ?? 0) + Number(cn.amount)) * 100) / 100
+  }
+
+  // Detail-modal enrichments (2026-08-29, user: "点了单号显示的资料太少了"):
+  // every receipt against every listed invoice — direct-linked credit
+  // vouchers plus the batch settlement voucher each paid invoice points at
+  // via settlement_voucher_id (batch receipts carry no invoice_id) — and the
+  // full credit-note rows per invoice.
+  const receiptsByInvoice: Record<
+    string,
+    Array<{ voucherNo: string | null; date: string | null; amount: number; batch?: boolean }>
+  > = {}
+  const { data: rcptRows } = allInvoiceIds.length
+    ? await supabase
+        .from('payment_vouchers')
+        .select('invoice_id, voucher_no, payment_date, amount')
+        .in('invoice_id', allInvoiceIds)
+        .eq('direction', 'credit')
+        .neq('status', 'voided')
+        .order('payment_date')
+    : { data: [] as never[] }
+  const directVoucherNos = new Set<string>()
+  for (const r of rcptRows ?? []) {
+    const arr = receiptsByInvoice[r.invoice_id as string] ?? []
+    arr.push({
+      voucherNo: (r.voucher_no as string | null) ?? null,
+      date: (r.payment_date as string | null) ?? null,
+      amount: Number(r.amount),
+    })
+    receiptsByInvoice[r.invoice_id as string] = arr
+    if (r.voucher_no) directVoucherNos.add(`${r.invoice_id}|${r.voucher_no}`)
+  }
+  const allInvoiceRows = [...(invoices ?? []), ...otherOpenInvoices] as Array<{
+    id: string
+    settlement_voucher_id?: string | null
+  }>
+  const settleVoucherIds = [
+    ...new Set(allInvoiceRows.map((i) => i.settlement_voucher_id).filter(Boolean) as string[]),
+  ]
+  if (settleVoucherIds.length > 0) {
+    const { data: svRows } = await supabase
+      .from('payment_vouchers')
+      .select('id, voucher_no, payment_date, amount')
+      .in('id', settleVoucherIds)
+    const svById = new Map(
+      ((svRows ?? []) as Array<{ id: string; voucher_no: string | null; payment_date: string | null; amount: number }>).map(
+        (v) => [v.id, v],
+      ),
+    )
+    for (const inv of allInvoiceRows) {
+      if (!inv.settlement_voucher_id) continue
+      const v = svById.get(inv.settlement_voucher_id)
+      if (!v) continue
+      if (v.voucher_no && directVoucherNos.has(`${inv.id}|${v.voucher_no}`)) continue
+      const arr = receiptsByInvoice[inv.id] ?? []
+      arr.push({
+        voucherNo: v.voucher_no,
+        date: v.payment_date,
+        amount: Number(v.amount),
+        batch: true,
+      })
+      receiptsByInvoice[inv.id] = arr
+    }
+  }
+  const cnDetailByInvoice: Record<
+    string,
+    Array<{ cnNo: string | null; amount: number; status: string; reason: string | null }>
+  > = {}
+  for (const cn of cnRows ?? []) {
+    const arr = cnDetailByInvoice[cn.invoice_id as string] ?? []
+    arr.push({
+      cnNo: (cn.credit_note_no as string | null) ?? null,
+      amount: Number(cn.amount),
+      status: cn.status as string,
+      reason: (cn.reason as string | null) ?? null,
+    })
+    cnDetailByInvoice[cn.invoice_id as string] = arr
   }
 
   // Per-mode invoice sums (shown in the cost cards).
@@ -700,7 +776,7 @@ export default async function BillingView({ searchParams }: Props) {
         </section>
       )}
 
-      <InvoicesList invoices={invoiceList} extraOpenInvoices={otherOpenInvoices} companyMap={companyMap} departmentMap={departmentMap} period={period} categories={categoryList} bankAccounts={bankList} invoiceLines={linesByInvoice} paidByInvoice={paidByInvoice} cnByInvoice={cnByInvoice} extraModes={extraModes} />
+      <InvoicesList invoices={invoiceList} extraOpenInvoices={otherOpenInvoices} companyMap={companyMap} departmentMap={departmentMap} period={period} categories={categoryList} bankAccounts={bankList} invoiceLines={linesByInvoice} paidByInvoice={paidByInvoice} cnByInvoice={cnByInvoice} extraModes={extraModes} receiptsByInvoice={receiptsByInvoice} cnDetailByInvoice={cnDetailByInvoice} />
 
       {creditNoteRows.length > 0 ? <CreditNotesList rows={creditNoteRows} /> : null}
 
