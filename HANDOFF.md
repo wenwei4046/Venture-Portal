@@ -143,6 +143,12 @@ user's "把rm 1, 测试数据清楚 然后这些功能补上":
     the source dept_pools description; GlReportView txn descriptions wrap
     instead of clipping at 24rem. Note: paid DEBIT payments DO have full
     reversal — reversePaidPayment (I mis-said otherwise once).
+    **Invoice twin** (mig 20260824100000 reassign_invoice_gl_account,
+    APPLIED): "改 account" link on non-draft rows in /billing — edits the
+    invoice JEs' income leg in place, old account auto-detects (errors with
+    the candidate list on multi-account invoices; then pick in the modal),
+    syncs invoices.category_code + invoice_lines (category_code IS a COA
+    code), same guards (3030/bank blocked, period lock, audit note).
 
 Still deferred (user said 不理他先 / needs go-ahead): IT-dept payroll 3 traps;
 payroll allocation + statements participation for NEW registry depts; Principal

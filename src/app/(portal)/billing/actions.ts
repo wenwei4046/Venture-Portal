@@ -2194,6 +2194,44 @@ export async function approveCreditNote(formData: FormData) {
   revalidatePath('/statements')
 }
 
+// ─── Reassign GL account on an issued/paid invoice (Finance) ────────────────
+// User 2026-08-24: "invoice 那边选的account 也是同理，我要能更改" — the twin
+// of payments' reassignVoucherGlAccount. The reassign_invoice_gl_account RPC
+// edits the invoice JEs' income leg in place (3030/bank legs blocked), stamps
+// an audit note, and syncs invoices.category_code + invoice_lines so the
+// displayed category matches the GL. old_account omitted = auto-detect.
+
+export async function reassignInvoiceGlAccount(
+  formData: FormData,
+): Promise<{ error?: string; changed?: number; oldAccount?: string }> {
+  try {
+    await requireRole(['finance', 'principal'])
+    const supabase = await createClient()
+
+    const id = ((formData.get('id') as string) ?? '').trim()
+    const newAccount = ((formData.get('new_account') as string) ?? '').trim()
+    const oldAccount = ((formData.get('old_account') as string) ?? '').trim()
+    const reason = ((formData.get('reason') as string) ?? '').trim()
+    if (!id || !newAccount) return { error: 'Invoice and new account are required' }
+    if (!reason) return { error: 'Reason is required (goes into the audit note)' }
+
+    const { data, error } = await supabase.rpc('reassign_invoice_gl_account' as never, {
+      p_invoice_id: id,
+      p_new_account: newAccount,
+      p_reason: reason,
+      p_old_account: oldAccount || null,
+    } as never)
+    if (error) return { error: error.message }
+
+    const res = (data ?? {}) as { changed?: number; old_account?: string }
+    revalidatePath('/billing')
+    revalidatePath('/reports')
+    return { changed: Number(res.changed ?? 0), oldAccount: res.old_account }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
 // Void an APPROVED credit note (2026-08-24, user: "CN approve 后想撤销"):
 // posts the mirror JE (Dr 3030 / Cr the CN's category), flags both legs
 // is_reversed so reports drop the pair, restores the invoice to issued when

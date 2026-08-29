@@ -7,6 +7,7 @@ import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
 import { ApproveInvoiceButton, BulkIssueInvoicesButton, DeleteInvoiceButton, EditInvoiceButton } from './InvoiceActions'
 import CreateCreditNoteButton from './CreateCreditNoteButton'
+import ReassignInvoiceGlButton from './ReassignInvoiceGlButton'
 import CopyInvoiceButton from './CopyInvoiceButton'
 import InvoiceDetailButton from './InvoiceDetailButton'
 import SortableTable from '@/components/SortableTable'
@@ -570,14 +571,22 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                           </Link>
                         ) : null}
                         {inv.status !== 'draft' ? (
-                          <CreateCreditNoteButton
-                            invoiceId={inv.id}
-                            invoiceNo={inv.invoice_no}
-                            invoiceTotal={Number(inv.total_amount)}
-                            payeeLabel={labels.primary}
-                            categories={categories}
-                            extraModes={extraModes}
-                          />
+                          <>
+                            <CreateCreditNoteButton
+                              invoiceId={inv.id}
+                              invoiceNo={inv.invoice_no}
+                              invoiceTotal={Number(inv.total_amount)}
+                              payeeLabel={labels.primary}
+                              categories={categories}
+                              extraModes={extraModes}
+                            />
+                            <ReassignInvoiceGlButton
+                              invoiceId={inv.id}
+                              invoiceNo={inv.invoice_no}
+                              currentCategory={inv.category_code ?? null}
+                              categories={categories.map((c) => ({ code: c.code, label: c.label }))}
+                            />
+                          </>
                         ) : null}
                       </div>
                     )
