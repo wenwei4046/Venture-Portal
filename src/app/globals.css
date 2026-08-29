@@ -93,12 +93,24 @@
   --accent-hover: 242 140 90;
   box-shadow: 2px 0 10px rgb(28 22 15 / 0.18);
 }
-/* Dark mode keeps the SAME green (user 2026-08-29: light-mode green ✓, the
-   darkened variant read muddy) — the panel palette is self-contained, so one
-   identity across both themes; it sits naturally brighter than the charcoal
-   page. Only the edge shadow deepens. */
+/* Dark mode (user pick after green-on-dark failed): the LIGHT theme's cream
+   paper palette, scoped to the sidebar — a warm paper panel with dark ink
+   text floating on the charcoal page. Maximum recognition, and it's the
+   theme's own colour. Every token the green base sets is re-set here. */
 [data-theme="dark"] .sidebar-contrast {
-  box-shadow: 2px 0 12px rgb(0 0 0 / 0.5);
+  --paper: 243 236 221;
+  --surface: 243 236 221;
+  --surface-2: 232 221 196;
+  --hairline: 198 185 158;
+  --ink: 28 22 15;
+  --graphite: 90 78 64;
+  --muted: 133 119 95;
+  --num-ink: 20 16 10;
+  --accent: 204 90 46;
+  --accent-bg: 251 232 222;
+  --accent-border: 232 176 152;
+  --accent-hover: 181 74 34;
+  box-shadow: 2px 0 12px rgb(0 0 0 / 0.55);
 }
 
 /* Sidebar scrollbar (user 2026-08-29 "这个也优化,不好看"): the nav's default
@@ -152,7 +164,19 @@
   }
 
   :root:not([data-theme="light"]) .sidebar-contrast {
-    box-shadow: 2px 0 12px rgb(0 0 0 / 0.5);
+    --paper: 243 236 221;
+    --surface: 243 236 221;
+    --surface-2: 232 221 196;
+    --hairline: 198 185 158;
+    --ink: 28 22 15;
+    --graphite: 90 78 64;
+    --muted: 133 119 95;
+    --num-ink: 20 16 10;
+    --accent: 204 90 46;
+    --accent-bg: 251 232 222;
+    --accent-border: 232 176 152;
+    --accent-hover: 181 74 34;
+    box-shadow: 2px 0 12px rgb(0 0 0 / 0.55);
   }
 }
 
