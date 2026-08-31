@@ -790,8 +790,17 @@ annotations, so the existing desktop markup is untouched:
    first, which is the hidden copy still carrying the original `defaultValue` —
    the user's edit in the panel is silently discarded and the stale value is
    saved. The commission settings grids (`ProductsSection`,
-   `CommissionSection`) wrap one `ActionForm` around every row and are exactly
+   `CommissionSection`) span one form across every cell of a row and are exactly
    this shape.
+
+   Those grids now use `RowForm` (`_components/config/ui.tsx`), which keeps the
+   `<form>` element out of the table entirely — it is portalled to `<body>` and
+   the fields join it through the `form` attribute, because `<form>` is not a
+   legal child of `<tbody>` either. **That does not make them foldable.** The
+   duplicated cell still produces two inputs with the same `name` pointing at
+   the same form, and `FormData` still returns the stale first one. The test is
+   "does one form own fields in more than one cell", not "is there a `<form>`
+   tag in the row".
 
    A `<form>` **inside a single cell** is fine — the duplicate is a complete,
    independent form and either copy submits correctly (see `/overdue` and the
