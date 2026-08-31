@@ -633,7 +633,14 @@ PCB 0, WHT 200, net 9,800, then back to 0).
 
 ---
 
-## 9. The consolidated Settings tab
+## 9. The consolidated rules page
+
+> **Moved 2026-08-31.** This was a tab inside Settings. It is now
+> `/hr-costing/commission/rules`, a tab of the Commission module itself, with
+> the Product List beside it at `/hr-costing/commission/products`. Settings is
+> a principal + finance page with no sidebar entry for HR, so the one screen
+> that configures HR's own payroll was reachable by URL alone. The layout below
+> is unchanged.
 
 One **Commission** tab holds every rule, threshold and per-person tick, laid out
 as dense tables following `DESIGN.md` v3.0 (`.ledger-table`, `.num`,
@@ -760,7 +767,8 @@ move; a person who qualifies for a higher rank than they hold shows a
 | `…/[period]/import` | ERP import wizard: parse → period + cancelled report → **agent matching** → commit |
 | `…/[period]/open-bill` | day-by-day board, pre-filled from `sequence_in_day`, reviewed by a human. Defaults to the salesperson-days still on a suggestion |
 | `/hr-costing/commission/org-chart` | the org chart (below) |
-| Settings → **Commission** | §9 |
+| `…/rules` | every rule the engine reads (§9) — Principal + HR |
+| `…/products` | item code → unit cost + brand — Principal only |
 
 The deferred-orders list is a section on the run dashboard rather than a page
 of its own: it is read once, alongside the total it is holding back.
@@ -799,7 +807,7 @@ statutory on a Revenue row would have quietly handed back their tax.
 | 3 | Pure TS engine + tests | ✅ 91 tests |
 | 4 | ERP parser + tests | ✅ 25 tests, verified against the real file |
 | 5 | **Create the ~39 salespeople** in the Revenue Department | ⛔ blocked — needs the staff list (Q2) |
-| 6 | Settings → Commission tab (§9) | ✅ built |
+| 6 | The rules page (§9) + Product list | ✅ built; moved out of Settings 2026-08-31 |
 | 7 | Org chart (`@xyflow/react`, drag-to-reparent) | ✅ built |
 | 8 | Import wizard + agent matching | ✅ built |
 | 9 | Open Bill board | ✅ built |

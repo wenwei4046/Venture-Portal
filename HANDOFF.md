@@ -132,7 +132,7 @@ Leader 9% · Senior Team Leader 10%. **There is no 7% Revenue Specialist.**
 
 ### Where cost comes from (the ERP export has none)
 
-1. **Settings → Product List** (Principal only) — `comm_products`, item code →
+1. **The Product list** (Principal only) — `comm_products`, item code →
    unit cost + brand, with a spreadsheet bulk paste. The importer stamps
    `qty × unit_cost` onto `sales_order_lines.cost_amount` ONCE, so changing a
    price later cannot rewrite a run already computed against the old one.
@@ -176,11 +176,14 @@ PCB 0 → WHT 160 → net 7,840.
 
 ### UI built
 
-- **Settings → Commission** (Principal + HR): nine sections — sub-department
+- **`/hr-costing/commission/rules`** (Principal + HR): nine sections — sub-department
   picker with Generate New, scheme switches, tier ladder, item groups, KPI
   items, KPI thresholds, Open Bill rates, brands + margin bands, promotion
   criteria (read-only), salespeople table.
-- **Settings → Product List** (Principal), with a red "missing a cost" counter.
+- **`/hr-costing/commission/products`** (Principal), with a red "missing a cost"
+  counter. Both of these were Settings tabs until 2026-08-31; they are tabs of
+  the Commission module now, because Settings has no sidebar entry for HR and
+  the page configuring HR's own payroll was reachable by URL alone.
 - **/hr-costing/commission** landing + `[period]` page (surfaces unmatched
   agents, lines without cost/brand, orders under the deposit gate).
 - **/hr-costing/commission/org-chart** — `@xyflow/react`. Drop a card onto a

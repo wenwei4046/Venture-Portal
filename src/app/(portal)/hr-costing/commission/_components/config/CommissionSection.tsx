@@ -16,8 +16,8 @@ import {
   upsertKpiThreshold,
   upsertMarginBand,
   upsertRank,
-} from '../../commission-actions'
-import { setPositionFromForm, updateStaffTax } from '../../../hr-costing/commission/hierarchy-actions'
+} from '../../config-actions'
+import { setPositionFromForm, updateStaffTax } from '../../hierarchy-actions'
 import {
   ActionButton,
   ActionForm,
