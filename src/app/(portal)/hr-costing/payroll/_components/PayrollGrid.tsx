@@ -30,8 +30,18 @@ export interface PayrollRowData {
   eis_er: number
   eis_ee: number
   pcb: number
+  withholding_tax: number
   gross: number
   net: number
+  /**
+   * True for a salesperson in a `payroll_source = 'commission'` department.
+   * Their Commission is DERIVED by the commission run, so the cell is read
+   * only — a hand edit would be silently overwritten by the next Apply after
+   * diverging from the statement that explains it.
+   */
+  commission_is_derived: boolean
+  /** Link to this month's statement, when a run has computed one. */
+  commission_statement_href: string | null
 }
 
 interface Props {

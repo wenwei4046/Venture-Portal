@@ -16,8 +16,11 @@ import DepartmentsSection from './_components/DepartmentsSection'
 import AccountsSection from './_components/AccountsSection'
 import PeriodsSection from './_components/PeriodsSection'
 import SettingsTabs, { type SettingsTab } from './_components/SettingsTabs'
+import CommissionSection from './_components/commission/CommissionSection'
+import ProductsSection from './_components/commission/ProductsSection'
+import { loadCommissionSettings, loadProducts } from './_components/commission/load'
 
-const VALID_TABS: SettingsTab[] = ['treasury', 'overdue', 'splits', 'directors', 'companies', 'departments', 'banks', 'accounts', 'periods', 'simulator']
+const VALID_TABS: SettingsTab[] = ['treasury', 'overdue', 'splits', 'directors', 'companies', 'departments', 'banks', 'accounts', 'periods', 'simulator', 'commission', 'products']
 function isValidTab(s: string | undefined): s is SettingsTab {
   return !!s && (VALID_TABS as string[]).includes(s)
 }
@@ -34,21 +37,33 @@ interface Props {
 }
 
 export default async function SettingsPage({ searchParams }: Props) {
-  // Finance is allowed in for the Categories tab only — every other tab
-  // re-checks role inside the conditional below and renders nothing for
-  // non-Principal. SettingsTabs hides the disallowed tabs from the rail.
-  const user = await requireRole(['principal', 'finance'])
+  // Finance is allowed in for the Categories tab only, and HR for Commission —
+  // every other tab re-checks role inside the conditional below and renders
+  // nothing otherwise. SettingsTabs hides the disallowed tabs from the rail.
+  const user = await requireRole(['principal', 'finance', 'hr'])
   const isPrincipal = user.role === 'principal'
+  const isHr = user.role === 'hr'
 
   const { tab: rawTab } = await searchParams
-  const defaultTab: SettingsTab = isPrincipal ? 'treasury' : 'accounts'
+  const defaultTab: SettingsTab = isPrincipal ? 'treasury' : isHr ? 'commission' : 'accounts'
   const activeTab: SettingsTab = isValidTab(rawTab) ? rawTab : defaultTab
 
-  // Finance hitting a Principal-only tab via direct URL falls back to Accounts.
-  // (Finance-allowed tabs: Accounts + Departments, mirroring FINANCE_TABS.)
-  const activeTabResolved: SettingsTab = !isPrincipal && !['accounts', 'departments'].includes(activeTab)
-    ? 'accounts'
-    : activeTab
+  // Someone hitting a tab they are not allowed on via a direct URL falls back
+  // to their own default. Mirrors FINANCE_TABS / HR_TABS in SettingsTabs.
+  const allowedTabs: SettingsTab[] | null = isPrincipal
+    ? null
+    : isHr
+      ? ['commission']
+      : ['accounts', 'departments']
+  const activeTabResolved: SettingsTab =
+    allowedTabs && !allowedTabs.includes(activeTab) ? defaultTab : activeTab
+
+  // Only the commission tabs need these, and HR must not trigger the
+  // Principal-only queries below.
+  const commissionData =
+    activeTabResolved === 'commission' ? await loadCommissionSettings() : null
+  const productRows =
+    activeTabResolved === 'products' && isPrincipal ? await loadProducts() : null
 
   const supabase = await createClient()
 
@@ -240,6 +255,14 @@ export default async function SettingsPage({ searchParams }: Props) {
           opMargin={Number(latestBaseRate?.op_margin ?? opMargin)}
           currentBaseRate={Number(latestBaseRate?.base_rate ?? 0)}
         />
+      )}
+
+      {activeTabResolved === 'commission' && commissionData && (
+        <CommissionSection data={commissionData} />
+      )}
+
+      {activeTabResolved === 'products' && isPrincipal && productRows && (
+        <ProductsSection products={productRows} />
       )}
     </div>
   )
