@@ -6,6 +6,13 @@
  * is responsible for loading these shapes out of Postgres and posting the
  * result back through `apply_commission_run`.
  *
+ * Scope note (user brief 2026-08-31): the Revenue Department is divided into
+ * SUB-DEPARTMENTS, and each one calculates differently. The four components
+ * modelled here are the **Fair** sub-department's ruleset (the roadshow /
+ * event team). A scheme therefore belongs to a sub-department and can switch
+ * each component off, so a future sub-department can reuse what applies and
+ * drop what doesn't.
+ *
  * See docs/module-spec-revenue-commission.md §3 for the money rules.
  */
 
@@ -13,11 +20,15 @@
 
 export interface SalesLine {
   id: string
-  /** ERP product code — matched against KPI items at compute time. */
+  /** ERP `Item Group`, e.g. MATTRESS / SOFA / ACC / TRANS. Drives whether the
+   *  line's revenue is commissionable at all. */
+  itemGroup: string
+  /** ERP `Item Code` — matched against KPI items at compute time. */
   productCode: string
   productName?: string
   qty: number
-  /** Line revenue, already net of whatever discount the ERP applied. */
+  /** ERP `Total (Ex)`. Note the ERP prices packages: the whole order value
+   *  usually sits on the main item's line and the bundled items are 0. */
   lineAmount: number
 }
 
@@ -28,17 +39,27 @@ export interface SalesOrder {
   staffId: string
   /** YYYY-MM-DD */
   orderDate: string
-  /** YYYY-MM-DD — the event day used for 1st/2nd/3rd Bill grouping. */
+  /** YYYY-MM-DD — the event day used for Open Bill (1st/2nd/3rd) grouping. */
   eventDate: string
   lines: SalesLine[]
 }
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
+/**
+ * Whether an ERP item group's revenue counts toward commission.
+ * User decision 2026-08-31: TRANS (transport charges) and OTHER (disposal,
+ * miscellaneous) are NOT commissionable; ACC (accessories) IS.
+ */
+export interface ItemGroupRule {
+  group: string
+  commissionable: boolean
+}
+
 /** A product that pays a flat KPI allowance instead of counting as revenue. */
 export interface KpiItem {
   productCode: string
-  /** RM per unit, e.g. pillow → 30. */
+  /** RM per unit, e.g. 50 or 60. */
   kpiAmount: number
 }
 
@@ -49,18 +70,18 @@ export interface KpiThreshold {
   bonusPct: number
 }
 
-export type BillRank = 1 | 2 | 3
+export type OpenBillRank = 1 | 2 | 3
 
-export interface BillBonusRule {
-  billRank: BillRank
-  /** 0.50 for the 1st Bill, 0.40 for the 2nd, 0.30 for the 3rd. */
+export interface OpenBillRule {
+  rank: OpenBillRank
+  /** 0.50 for the 1st bill of the day, 0.40 for the 2nd, 0.30 for the 3rd. */
   pct: number
 }
 
 /** Manual pick: this order is that salesperson's Nth bill of the event day. */
-export interface BillTag {
+export interface OpenBillTag {
   orderId: string
-  billRank: BillRank
+  rank: OpenBillRank
 }
 
 /** One person's payroll-purpose position for the period being computed. */
@@ -68,31 +89,52 @@ export interface HierarchyNode {
   staffId: string
   /** null = top of a tree. */
   uplineStaffId: string | null
+  /** e.g. 'revenue_specialist' | 'team_assistant' | 'team_leader' | 'senior_team_leader' */
+  tierKey: string
+  /** The (tier, rate) pair, e.g. 'rs_6' — rates overlap across tiers. */
   rankKey: string
-  /** 0.07 = 7% of product revenue. */
+  /** 0.07 = 7% of commissionable product revenue. */
   productRate: number
+  /**
+   * Whether this rank may hold downlines at all. A Revenue Specialist on 5%
+   * may not recruit; reaching 6% unlocks it (user brief 2026-08-31).
+   */
+  canRecruit: boolean
 }
 
 export interface CommissionScheme {
   /**
-   * How the 1st/2nd/3rd Bill bonus is based (spec Q1):
-   *  - 'uplift_on_commission' → orderRevenue × personalRate × billPct
-   *  - 'pct_of_revenue'       → orderRevenue × billPct
+   * How the Open Bill bonus is based (confirmed 2026-08-31):
+   *  - 'uplift_on_commission' → orderRevenue × personalRate × billPct.
+   *    "10,000 at 7% → compute the 7% first, then add 50%" → 700 + 350.
+   *  - 'pct_of_revenue' → orderRevenue × billPct. Kept as a documented
+   *    alternative; no sub-department uses it today.
    */
-  billBonusBasis: 'uplift_on_commission' | 'pct_of_revenue'
+  openBillBasis: 'uplift_on_commission' | 'pct_of_revenue'
   /** Whether KPI-item revenue counts toward a downline's override base. */
   overrideIncludesKpi: boolean
+  /** Per-component switches, so another sub-department can reuse a subset. */
+  enableProductRevenue: boolean
+  enableKpi: boolean
+  enableOpenBill: boolean
+  enableOverride: boolean
+  /**
+   * Item-group allowlist. A group absent from this list is NOT commissionable
+   * and raises a warning — a new ERP group must be classified by a human
+   * before it can silently start (or stop) paying commission.
+   */
+  itemGroups: ItemGroupRule[]
 }
 
 export interface EngineInput {
-  /** YYYY-MM-01 */
+  /** YYYY-MM-01. Commission settles per calendar month (user, 2026-08-31). */
   periodMonth: string
   scheme: CommissionScheme
   orders: SalesOrder[]
   kpiItems: KpiItem[]
   kpiThresholds: KpiThreshold[]
-  billBonusRules: BillBonusRule[]
-  billTags: BillTag[]
+  openBillRules: OpenBillRule[]
+  openBillTags: OpenBillTag[]
   hierarchy: HierarchyNode[]
 }
 
@@ -102,7 +144,7 @@ export type CommissionComponent =
   | 'product_revenue'
   | 'kpi_item'
   | 'kpi_threshold'
-  | 'bill_bonus'
+  | 'open_bill'
   | 'override'
 
 /**
@@ -124,11 +166,15 @@ export interface StatementLine {
 
 export interface Statement {
   staffId: string
+  tierKey: string | null
   rankKey: string | null
   productRate: number
   uplineStaffId: string | null
 
+  /** Commissionable product revenue: excludes KPI items and excluded groups. */
   productRevenue: number
+  /** Revenue that was dropped because its item group isn't commissionable. */
+  excludedRevenue: number
   productCommission: number
 
   kpiQty: number
@@ -136,7 +182,7 @@ export interface Statement {
   kpiThresholdPct: number
   kpiCommission: number
 
-  billBonus: number
+  openBillBonus: number
   overrideCommission: number
   totalCommission: number
 
@@ -149,8 +195,9 @@ export interface EngineResult {
   totalCommission: number
   /**
    * Non-fatal problems a human must look at before applying the run — e.g. a
-   * salesperson with sales but no rank, or a hierarchy cycle. Surfaced on the
-   * run dashboard; the Apply button is disabled while any warning stands.
+   * salesperson with sales but no rank, an unclassified ERP item group, or a
+   * non-recruiting rank that somehow holds downlines. Surfaced on the run
+   * dashboard; the Apply button is disabled while any warning stands.
    */
   warnings: string[]
 }

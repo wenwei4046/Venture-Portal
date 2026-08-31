@@ -5,17 +5,29 @@
 --
 -- Spec: docs/module-spec-revenue-commission.md
 --
--- ⚠️  NOT YET APPLIED TO THE LIVE PROJECT. Two things are still open before
---     this runs (spec §8): the Tier/rank ladder brief (Q3) and the
---     1st/2nd/3rd Bill bonus basis (Q1). Neither changes the SHAPE below —
---     Q3 fills comm_ranks with rows, Q1 flips a comm_schemes column — so the
---     schema can be reviewed now.
+-- ⚠️  NOT YET APPLIED TO THE LIVE PROJECT. Verified by dry-run inside
+--     BEGIN/ROLLBACK against the live schema. Two things are still open
+--     (spec §8): what the Revenue Specialist's 300k promotion measures, and
+--     the Team Assistant 7%→8% sales target. Neither changes the shape below.
 --
--- What this adds:
---   sales_*  — raw ERP order facts, one immutable batch per import
---   comm_*   — commission configuration, runs, statements, audit lines
---   plus two columns on existing tables (departments.payroll_source,
---   hr_staff_costs.erp_sales_code)
+-- Structure, per the user's brief 2026-08-31:
+--
+--   The Revenue Department is divided into SUB-DEPARTMENTS, and each one
+--   calculates commission differently. "Fair" (the roadshow / event team) is
+--   the first, and its ruleset is the four components the engine implements.
+--   A new sub-department may CLONE an existing one's rules or define its own,
+--   which is why every rule table hangs off a SCHEME, and a scheme hangs off a
+--   sub-department.
+--
+--   departments (Revenue Department)
+--     └── comm_sub_departments (Fair, …)
+--           └── comm_schemes            ← the knobs + component switches
+--                 ├── comm_ranks              4 tiers, rates 5–10%
+--                 ├── comm_item_groups        which ERP groups are commissionable
+--                 ├── comm_kpi_items          product → flat KPI allowance
+--                 ├── comm_kpi_thresholds     qty ladder → uplift
+--                 ├── comm_open_bill_rules    1st/2nd/3rd bill of the day
+--                 └── comm_hierarchy          who is under who, effective-dated
 --
 -- What this deliberately does NOT touch: hr_monthly_payroll, payroll_runs,
 -- the statutory trigger, GL. The engine feeds ONE existing field
@@ -34,17 +46,20 @@ CREATE TYPE comm_component AS ENUM (
     'product_revenue',
     'kpi_item',
     'kpi_threshold',
-    'bill_bonus',
+    'open_bill',
     'override'
 );
 
-CREATE TYPE comm_bill_bonus_basis AS ENUM (
-    'uplift_on_commission',   -- orderRevenue × personalRate × billPct
-    'pct_of_revenue'          -- orderRevenue × billPct
+CREATE TYPE comm_open_bill_basis AS ENUM (
+    'uplift_on_commission',   -- orderRevenue x personalRate x billPct  (Fair)
+    'pct_of_revenue'          -- orderRevenue x billPct
 );
 
 COMMENT ON TYPE comm_run_status IS
     'draft: created, not computed. computed: engine ran, statements exist. applied: written into hr_monthly_payroll.commission_amount. locked: payroll run submitted, immutable.';
+
+COMMENT ON TYPE comm_open_bill_basis IS
+    'uplift_on_commission (user decision 2026-08-31): "10,000 at 7% — compute the 7% first, then add 50%" gives 700 commission + 350 bonus. Follows the salesperson''s CURRENT rate, so a promotion changes the bonus.';
 
 -- ----------------------------------------------------------------------------
 -- Existing-table columns
@@ -60,33 +75,344 @@ COMMENT ON COLUMN departments.payroll_source IS
 UPDATE departments SET payroll_source = 'commission' WHERE name = 'Revenue Department';
 
 -- Revenue staff pay model (user decision 2026-08-31): NO basic salary and NO
--- statutory allowance -- they are paid 100% on commission. Nothing needs to
+-- statutory allowance — they are paid 100% on commission. Nothing needs to
 -- change for that to work:
 --   * hr_staff_costs.basic_salary already allows 0 (migration 141 relaxed the
 --     CHECK for commission-only staff; HV020 is the existing precedent), and
 --     hr_employment_type already has 'commission_eligible' (migration 120).
 --   * compute_hr_monthly_payroll bases EPF/SOCSO/EIS on
 --     (prorated basic + statutory allowance), so with both at 0 every
---     statutory lookup returns 0 on its own -- no trigger change, and no risk
+--     statutory lookup returns 0 on its own — no trigger change, and no risk
 --     to the departments that DO carry a basic.
 -- PCB is the one deduction that still bites: the trigger computes it on gross,
--- which for these staff is the whole commission. Left as-is deliberately --
+-- which for these staff is the whole commission. Left as-is deliberately —
 -- commission is taxable income. Flagged in the spec for the user to confirm.
-
-ALTER TABLE hr_staff_costs
-    ADD COLUMN IF NOT EXISTS erp_sales_code TEXT;
-
-COMMENT ON COLUMN hr_staff_costs.erp_sales_code IS
-    'Salesperson code as it appears in the ERP order export. Primary match key for the sales import; fuzzy name is the fallback, same convention as the InfoTech payroll import.';
-
-CREATE UNIQUE INDEX IF NOT EXISTS uq_hr_staff_erp_sales_code
-    ON hr_staff_costs (erp_sales_code) WHERE erp_sales_code IS NOT NULL;
 
 -- Retire the never-wired v1 engine (migration 123). Kept for history.
 COMMENT ON TABLE commission_rules IS
     'DEPRECATED 2026-08-31 — superseded by comm_schemes / comm_ranks / comm_kpi_items. Never wired to any UI. Kept for history; do not extend.';
 COMMENT ON TABLE commission_inputs IS
     'DEPRECATED 2026-08-31 — superseded by sales_orders / sales_order_lines. Never wired to any UI. Kept for history; do not extend.';
+
+-- ============================================================================
+-- ORG: SUB-DEPARTMENTS
+-- ============================================================================
+
+CREATE TABLE comm_sub_departments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    department_id UUID NOT NULL REFERENCES departments(id),
+    name TEXT NOT NULL,
+    code TEXT,
+    description TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_sub_department_name UNIQUE (department_id, name)
+);
+
+COMMENT ON TABLE comm_sub_departments IS
+    'Sub-units of a commission department, each with its own calculation rules. First one: "Fair" — the roadshow / event team whose 3-day events are what the Open Bill bonus rewards.';
+
+-- ============================================================================
+-- CONFIGURATION
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- TABLE: comm_schemes
+-- The knob-holder + component switches. A run snapshots which scheme it used
+-- so changing a knob never silently rewrites a past month.
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE comm_schemes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sub_department_id UUID NOT NULL REFERENCES comm_sub_departments(id) ON DELETE RESTRICT,
+    scheme_name TEXT NOT NULL,
+
+    -- "Generate New Sub-Department -> follow an existing one's rules" copies
+    -- every child row and records where it came from.
+    cloned_from_scheme_id UUID REFERENCES comm_schemes(id),
+
+    open_bill_basis comm_open_bill_basis NOT NULL DEFAULT 'uplift_on_commission',
+    override_includes_kpi BOOLEAN NOT NULL DEFAULT FALSE,
+
+    -- Per-component switches: another sub-department reuses the subset that
+    -- applies to it instead of getting a bespoke engine.
+    enable_product_revenue BOOLEAN NOT NULL DEFAULT TRUE,
+    enable_kpi             BOOLEAN NOT NULL DEFAULT TRUE,
+    enable_open_bill       BOOLEAN NOT NULL DEFAULT TRUE,
+    enable_override        BOOLEAN NOT NULL DEFAULT TRUE,
+
+    effective_from DATE NOT NULL,
+    effective_to DATE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT effective_window CHECK (effective_to IS NULL OR effective_to >= effective_from)
+);
+
+COMMENT ON TABLE comm_schemes IS
+    'One commission ruleset, owned by a sub-department. cloned_from_scheme_id records a "follow an existing sub-department''s rules" creation.';
+
+CREATE UNIQUE INDEX uq_comm_scheme_active_per_sub_dept
+    ON comm_schemes (sub_department_id) WHERE is_active AND effective_to IS NULL;
+
+-- ----------------------------------------------------------------------------
+-- TABLE: comm_ranks — the Tier ladder
+--
+-- Four tiers, rates 5-10%. Rates OVERLAP across tiers (7% is both a senior
+-- Revenue Specialist and a junior Team Assistant), so the rank key, not the
+-- rate, is the identity. The override differential is always derived from the
+-- rates — never stored per pair.
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE comm_ranks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scheme_id UUID NOT NULL REFERENCES comm_schemes(id) ON DELETE CASCADE,
+    tier_key TEXT NOT NULL,
+    tier_label TEXT NOT NULL,
+    rank_key TEXT NOT NULL,
+    label TEXT NOT NULL,
+    product_rate DECIMAL(9, 6) NOT NULL,
+
+    -- A Revenue Specialist on 5% may not hold downlines; reaching 6% unlocks
+    -- recruiting. The engine warns if a placement violates this.
+    can_recruit BOOLEAN NOT NULL DEFAULT TRUE,
+
+    -- Promotion is MANUAL for now: the portal shows progress toward the
+    -- threshold, a human promotes. Auto-promotion needs promotion_basis
+    -- answered first (personal sales? group sales? recruits?), spec Q3b.
+    promote_to_rank_key TEXT,
+    promotion_threshold_amount DECIMAL(15, 2),
+    promotion_basis TEXT
+        CONSTRAINT valid_promotion_basis
+        CHECK (promotion_basis IS NULL
+               OR promotion_basis IN ('personal_sales', 'group_sales', 'recruitment')),
+
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT product_rate_sane CHECK (product_rate >= 0 AND product_rate <= 1),
+    CONSTRAINT uq_comm_rank_key UNIQUE (scheme_id, rank_key)
+);
+
+COMMENT ON TABLE comm_ranks IS
+    'Tier ladder: Revenue Specialist 5/6/7%, Team Assistant 7/8%, Team Leader 9%, Senior Team Leader 10%. can_recruit is false below 6%.';
+COMMENT ON COLUMN comm_ranks.promotion_threshold_amount IS
+    'Display-only until promotion_basis is decided. The brief says a Revenue Specialist promotes to 7% at 300k, but not 300k of what.';
+
+-- ----------------------------------------------------------------------------
+-- TABLE: comm_item_groups
+-- Which ERP `Item Group` values earn commission. User decision 2026-08-31:
+-- TRANS (transport charges) and OTHER (disposal, misc) do NOT; accessories do.
+-- An unlisted group is treated as NOT commissionable AND raises a run warning,
+-- so a new ERP group can never silently start or stop paying.
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE comm_item_groups (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scheme_id UUID NOT NULL REFERENCES comm_schemes(id) ON DELETE CASCADE,
+    item_group TEXT NOT NULL,
+    commissionable BOOLEAN NOT NULL,
+    note TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_comm_item_group UNIQUE (scheme_id, item_group)
+);
+
+COMMENT ON TABLE comm_item_groups IS
+    'ERP Item Group -> commissionable? Seeded from the groups seen in the July SO export: MATTRESS / SOFA / BEDFRAME / DINING / ACC pay, TRANS / OTHER do not.';
+
+-- ----------------------------------------------------------------------------
+-- TABLE: comm_kpi_items / comm_kpi_thresholds
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE comm_kpi_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scheme_id UUID NOT NULL REFERENCES comm_schemes(id) ON DELETE CASCADE,
+    product_code TEXT NOT NULL,
+    product_name TEXT,
+    kpi_amount DECIMAL(15, 2) NOT NULL,
+    effective_from DATE NOT NULL,
+    effective_to DATE,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT kpi_amount_non_negative CHECK (kpi_amount >= 0),
+    CONSTRAINT effective_window CHECK (effective_to IS NULL OR effective_to >= effective_from),
+    CONSTRAINT no_overlapping_kpi_item EXCLUDE USING gist (
+        scheme_id WITH =,
+        (UPPER(BTRIM(product_code))) WITH =,
+        daterange(effective_from, effective_to, '[]') WITH &&
+    )
+);
+
+COMMENT ON TABLE comm_kpi_items IS
+    'Products that pay a flat KPI allowance (e.g. RM50 or RM60 per pillow). Their sales revenue is EXCLUDED from the product-revenue base — the allowance already pays for them. Most are bundled free in the ERP (qty > 0 at RM0), which is exactly the case the flat allowance exists to reward.';
+
+CREATE INDEX idx_comm_kpi_items_code ON comm_kpi_items (scheme_id, (UPPER(BTRIM(product_code))));
+
+CREATE TABLE comm_kpi_thresholds (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scheme_id UUID NOT NULL REFERENCES comm_schemes(id) ON DELETE CASCADE,
+    tier_label TEXT,
+    min_qty INTEGER NOT NULL,
+    bonus_pct DECIMAL(9, 6) NOT NULL,
+    effective_from DATE NOT NULL,
+    effective_to DATE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT min_qty_positive CHECK (min_qty > 0),
+    CONSTRAINT bonus_pct_sane CHECK (bonus_pct >= 0 AND bonus_pct <= 5),
+    CONSTRAINT effective_window CHECK (effective_to IS NULL OR effective_to >= effective_from),
+    CONSTRAINT no_overlapping_threshold EXCLUDE USING gist (
+        scheme_id WITH =,
+        min_qty WITH =,
+        daterange(effective_from, effective_to, '[]') WITH &&
+    )
+);
+
+COMMENT ON TABLE comm_kpi_thresholds IS
+    'KPI quantity ladder. Tier 1 = 10 units -> +20% on the whole KPI base (10 x RM50 = 500 -> 600). The engine applies the HIGHEST rung met, never the sum of rungs.';
+
+-- ----------------------------------------------------------------------------
+-- TABLE: comm_open_bill_rules
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE comm_open_bill_rules (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scheme_id UUID NOT NULL REFERENCES comm_schemes(id) ON DELETE CASCADE,
+    bill_rank SMALLINT NOT NULL,
+    pct DECIMAL(9, 6) NOT NULL,
+    effective_from DATE NOT NULL,
+    effective_to DATE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT valid_bill_rank CHECK (bill_rank BETWEEN 1 AND 3),
+    CONSTRAINT pct_sane CHECK (pct >= 0 AND pct <= 1),
+    CONSTRAINT effective_window CHECK (effective_to IS NULL OR effective_to >= effective_from),
+    CONSTRAINT no_overlapping_open_bill_rule EXCLUDE USING gist (
+        scheme_id WITH =,
+        bill_rank WITH =,
+        daterange(effective_from, effective_to, '[]') WITH &&
+    )
+);
+
+COMMENT ON TABLE comm_open_bill_rules IS
+    'Open Bill: the 1st / 2nd / 3rd bill a salesperson writes on an event day earns +50 / 40 / 30% ON TOP of that order''s commission, at the person''s current rate.';
+
+-- ----------------------------------------------------------------------------
+-- TABLE: comm_hierarchy
+-- The payroll-purpose org chart. Deliberately separate from
+-- hr_staff_costs.department_id and from any app-role hierarchy: this exists
+-- only to answer "who overrides whom, at what rate, in which month".
+--
+-- The exclusion constraint spans SCHEMES on purpose: a salesperson may hold
+-- only one position at a time, so they cannot sit in two sub-departments and
+-- be paid twice for the same sale.
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE comm_hierarchy (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scheme_id UUID NOT NULL REFERENCES comm_schemes(id) ON DELETE CASCADE,
+    staff_id UUID NOT NULL REFERENCES hr_staff_costs(id) ON DELETE CASCADE,
+    upline_staff_id UUID REFERENCES hr_staff_costs(id) ON DELETE RESTRICT,
+    rank_id UUID NOT NULL REFERENCES comm_ranks(id) ON DELETE RESTRICT,
+    effective_from DATE NOT NULL,
+    effective_to DATE,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT not_own_upline CHECK (upline_staff_id IS DISTINCT FROM staff_id),
+    CONSTRAINT effective_window CHECK (effective_to IS NULL OR effective_to >= effective_from),
+    CONSTRAINT one_position_at_a_time EXCLUDE USING gist (
+        staff_id WITH =,
+        daterange(effective_from, effective_to, '[]') WITH &&
+    )
+);
+
+COMMENT ON TABLE comm_hierarchy IS
+    'Effective-dated upline map + rank, read as-at the period being computed and then SNAPSHOTTED into comm_statements so history never moves. Drives the drag-to-reparent org chart.';
+
+CREATE INDEX idx_comm_hierarchy_staff ON comm_hierarchy (scheme_id, staff_id, effective_from DESC);
+CREATE INDEX idx_comm_hierarchy_upline ON comm_hierarchy (scheme_id, upline_staff_id);
+
+-- ----------------------------------------------------------------------------
+-- TRIGGER: reject a cycle in the upline chain.
+-- The engine also guards (depth cap + visited set) — belt and braces, because
+-- a cycle here would be a silent money bug, not a crash. Dragging a manager
+-- under their own downline in the org chart is exactly how one gets created.
+-- ----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION comm_hierarchy_reject_cycle()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $body$
+DECLARE
+    v_cursor UUID := NEW.upline_staff_id;
+    v_depth  INTEGER := 0;
+BEGIN
+    WHILE v_cursor IS NOT NULL AND v_depth < 20 LOOP
+        IF v_cursor = NEW.staff_id THEN
+            RAISE EXCEPTION
+                'comm_hierarchy: upline chain for staff % is cyclic', NEW.staff_id;
+        END IF;
+
+        SELECT h.upline_staff_id INTO v_cursor
+        FROM comm_hierarchy h
+        WHERE h.staff_id = v_cursor
+          AND h.id IS DISTINCT FROM NEW.id
+          AND daterange(h.effective_from, h.effective_to, '[]')
+              && daterange(NEW.effective_from, NEW.effective_to, '[]')
+        LIMIT 1;
+
+        v_depth := v_depth + 1;
+    END LOOP;
+
+    IF v_depth >= 20 THEN
+        RAISE EXCEPTION
+            'comm_hierarchy: upline chain for staff % exceeds 20 levels', NEW.staff_id;
+    END IF;
+
+    RETURN NEW;
+END;
+$body$;
+
+CREATE TRIGGER trg_comm_hierarchy_reject_cycle
+    BEFORE INSERT OR UPDATE OF upline_staff_id, staff_id, effective_from, effective_to
+    ON comm_hierarchy
+    FOR EACH ROW
+    EXECUTE FUNCTION comm_hierarchy_reject_cycle();
+
+-- ----------------------------------------------------------------------------
+-- TABLE: comm_agent_aliases
+-- The ERP export carries the salesperson as a FREE-TEXT `Agent` name with no
+-- code, and the names are dirty: trailing spaces ("MELVIN CHONG "), mixed case
+-- ("Peifen", "Lim Yau Wei"), plus non-people ("OTHERS", "Test Sales Director",
+-- "HOUZS CENTURY"). One human can therefore appear under several spellings, so
+-- the mapping is a table, not a column on hr_staff_costs.
+--
+-- agent_key = UPPER(collapse-whitespace(name)), computed by the importer.
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE comm_agent_aliases (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agent_key TEXT NOT NULL UNIQUE,
+    agent_name_sample TEXT NOT NULL,
+    staff_id UUID NOT NULL REFERENCES hr_staff_costs(id) ON DELETE CASCADE,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+COMMENT ON TABLE comm_agent_aliases IS
+    'ERP Agent name -> hr_staff_costs. Confirmed once by a human in the import wizard, then remembered. Of the 40 agents in the July export only one (SIA JONAS) already existed in the staff master, so the Revenue Department''s people must be created before the first run.';
+
+CREATE INDEX idx_comm_agent_aliases_staff ON comm_agent_aliases (staff_id);
 
 -- ============================================================================
 -- IMPORTED FACTS
@@ -107,7 +433,11 @@ CREATE TABLE sales_import_batches (
     sheet_name TEXT,
     row_count INTEGER NOT NULL DEFAULT 0,
     order_count INTEGER NOT NULL DEFAULT 0,
-    unmatched_count INTEGER NOT NULL DEFAULT 0,
+    -- The export is a date RANGE, not a month: the user's "July SO" file
+    -- actually ran 2026-07-01 to 2026-08-15. These record what was dropped.
+    out_of_period_count INTEGER NOT NULL DEFAULT 0,
+    cancelled_count INTEGER NOT NULL DEFAULT 0,
+    unmatched_agent_count INTEGER NOT NULL DEFAULT 0,
     status sales_import_status NOT NULL DEFAULT 'draft',
     notes TEXT,
     imported_by UUID REFERENCES users(id),
@@ -118,7 +448,7 @@ CREATE TABLE sales_import_batches (
 );
 
 COMMENT ON TABLE sales_import_batches IS
-    'Revenue commission: one ERP sales-order file import. At most one committed batch per period (partial unique index below).';
+    'One ERP sales-order file import. At most one committed batch per period (partial unique index below).';
 
 CREATE UNIQUE INDEX uq_sales_batch_committed_per_period
     ON sales_import_batches (period_month) WHERE status = 'committed';
@@ -136,16 +466,28 @@ CREATE TABLE sales_orders (
     order_no TEXT NOT NULL,
     order_date DATE NOT NULL,
 
-    -- The 1st/2nd/3rd Bill race is per EVENT DAY, which is normally the order
-    -- date but is editable: a 3-day roadshow can straddle a cut-off, and the
-    -- ERP timestamps late-entry orders on the following day.
+    -- The Open Bill race is per EVENT DAY, normally the order date but
+    -- editable: a 3-day roadshow can straddle a cut-off and the ERP dates
+    -- late-entry orders on the following day.
     event_date DATE NOT NULL,
 
+    debtor_code TEXT,
     customer_name TEXT,
-    erp_sales_code TEXT,
+    -- Agent as written in the file, plus the normalised matching key.
+    agent_name TEXT NOT NULL,
+    agent_key TEXT NOT NULL,
     staff_id UUID REFERENCES hr_staff_costs(id) ON DELETE RESTRICT,
-    company_id UUID REFERENCES companies(id),
+    -- Branch: KL / PG / SRW / SBH. Salespeople work across branches, so this
+    -- is descriptive only — it never drives the hierarchy.
+    location TEXT,
     order_total DECIMAL(15, 2) NOT NULL DEFAULT 0,
+    -- ERP BALANCE — outstanding amount. Recorded so a future "pay commission
+    -- on collection" rule has the data; nothing reads it today.
+    balance DECIMAL(15, 2),
+    cancelled BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Position among that agent's orders that day, derived from the running
+    -- Doc. No. — the Date cells carry no time. Seeds the Open Bill picks.
+    sequence_in_day INTEGER,
     raw JSONB,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
@@ -154,13 +496,14 @@ CREATE TABLE sales_orders (
 );
 
 COMMENT ON TABLE sales_orders IS
-    'Revenue commission: one ERP sales order. staff_id NULL = unmatched salesperson, blocks the run until a human resolves it.';
+    'One ERP sales order. staff_id NULL = unmatched agent, which blocks the run until a human resolves it in the import wizard.';
 COMMENT ON COLUMN sales_orders.raw IS
-    'The source row(s) as parsed, verbatim. Lets us re-derive without asking for the file again when a mapping bug surfaces.';
+    'The source row as parsed, verbatim. Lets us re-derive without asking for the file again when a mapping bug surfaces.';
 
 CREATE INDEX idx_sales_orders_batch ON sales_orders (batch_id);
 CREATE INDEX idx_sales_orders_staff_period ON sales_orders (staff_id, period_month);
 CREATE INDEX idx_sales_orders_event_date ON sales_orders (staff_id, event_date);
+CREATE INDEX idx_sales_orders_agent_key ON sales_orders (agent_key);
 
 -- ----------------------------------------------------------------------------
 -- TABLE: sales_order_lines
@@ -168,14 +511,23 @@ CREATE INDEX idx_sales_orders_event_date ON sales_orders (staff_id, event_date);
 -- No is_kpi column ON PURPOSE. Whether a line is a KPI item is derived at
 -- compute time from comm_kpi_items, so re-configuring the KPI list and
 -- re-running the engine gives the right answer without re-importing.
+--
+-- Beware when reading these: the ERP prices PACKAGES. 607 of the 691 orders in
+-- the July export put the entire order value on ONE line (usually the
+-- mattress) with the bundled items at qty > 0 and amount 0. A per-line amount
+-- is not a per-product revenue split — only sums across an order are meaningful.
 -- ----------------------------------------------------------------------------
 
 CREATE TABLE sales_order_lines (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     order_id UUID NOT NULL REFERENCES sales_orders(id) ON DELETE CASCADE,
     line_no INTEGER NOT NULL,
+    item_group TEXT NOT NULL,
     product_code TEXT NOT NULL,
     product_name TEXT,
+    description2 TEXT,
+    uom TEXT,
+    location TEXT,
     qty DECIMAL(15, 3) NOT NULL DEFAULT 0,
     unit_price DECIMAL(15, 2) NOT NULL DEFAULT 0,
     line_amount DECIMAL(15, 2) NOT NULL DEFAULT 0,
@@ -185,23 +537,27 @@ CREATE TABLE sales_order_lines (
 );
 
 COMMENT ON TABLE sales_order_lines IS
-    'Revenue commission: order line items. KPI classification happens at compute time against comm_kpi_items — never stored here.';
+    'Order line items. item_group decides whether the revenue is commissionable (comm_item_groups); product_code decides whether it is a KPI item. Both are resolved at compute time, never stored here.';
 
 CREATE INDEX idx_sales_order_lines_order ON sales_order_lines (order_id);
 CREATE INDEX idx_sales_order_lines_product ON sales_order_lines (product_code);
+CREATE INDEX idx_sales_order_lines_group ON sales_order_lines (item_group);
 
 -- ----------------------------------------------------------------------------
--- TABLE: sales_order_bill_tags
--- Manual pick: which order is this salesperson's 1st / 2nd / 3rd bill of the
--- event day. One tag per order; one holder per (staff, day, rank).
+-- TABLE: sales_order_open_bill_tags
+-- Which order is this salesperson's 1st / 2nd / 3rd bill of the event day.
+-- Seeded from sales_orders.sequence_in_day, then adjustable by hand.
 -- ----------------------------------------------------------------------------
 
-CREATE TABLE sales_order_bill_tags (
+CREATE TABLE sales_order_open_bill_tags (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     order_id UUID NOT NULL UNIQUE REFERENCES sales_orders(id) ON DELETE CASCADE,
     staff_id UUID NOT NULL REFERENCES hr_staff_costs(id) ON DELETE CASCADE,
     event_date DATE NOT NULL,
     bill_rank SMALLINT NOT NULL,
+    -- TRUE while the rank is still the importer's suggestion; a human edit
+    -- clears it, so the board can show what has actually been reviewed.
+    auto_suggested BOOLEAN NOT NULL DEFAULT FALSE,
     tagged_by UUID REFERENCES users(id),
     tagged_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
@@ -209,246 +565,18 @@ CREATE TABLE sales_order_bill_tags (
     CONSTRAINT uq_bill_rank_per_staff_day UNIQUE (staff_id, event_date, bill_rank)
 );
 
-COMMENT ON TABLE sales_order_bill_tags IS
-    'Revenue commission: the Additional Order (1st/2nd/3rd Bill) picks. Manual, per salesperson per event day.';
+COMMENT ON TABLE sales_order_open_bill_tags IS
+    'The Open Bill picks. One tag per order; one holder per (staff, event day, rank). In July, 300 of the 473 orders were a 2nd bill or later for their agent that day, so these are suggested first and reviewed rather than picked from scratch.';
 
-CREATE INDEX idx_bill_tags_staff_day ON sales_order_bill_tags (staff_id, event_date);
-
--- ============================================================================
--- CONFIGURATION
--- ============================================================================
-
--- ----------------------------------------------------------------------------
--- TABLE: comm_schemes
--- The knob-holder. One active scheme at a time; a run snapshots which one it
--- used so changing a knob never silently rewrites a past month.
--- ----------------------------------------------------------------------------
-
-CREATE TABLE comm_schemes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    scheme_name TEXT NOT NULL,
-    department_id UUID NOT NULL REFERENCES departments(id),
-
-    bill_bonus_basis comm_bill_bonus_basis NOT NULL DEFAULT 'uplift_on_commission',
-    override_includes_kpi BOOLEAN NOT NULL DEFAULT FALSE,
-
-    effective_from DATE NOT NULL,
-    effective_to DATE,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-
-    created_by UUID REFERENCES users(id),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT effective_window CHECK (effective_to IS NULL OR effective_to >= effective_from)
-);
-
-COMMENT ON TABLE comm_schemes IS
-    'Revenue commission: scheme-level knobs. bill_bonus_basis = uplift_on_commission (user decision 2026-08-31): the 1st/2nd/3rd Bill bonus is a 50/40/30% uplift ON THAT ORDER''S COMMISSION, and is ADDITIVE to it.';
-
-CREATE UNIQUE INDEX uq_comm_scheme_active_per_dept
-    ON comm_schemes (department_id) WHERE is_active AND effective_to IS NULL;
-
--- ----------------------------------------------------------------------------
--- TABLE: comm_ranks
--- The Tier ladder. Rows arrive once the user briefs Q3 — the shape is a
--- straightforward (rank, personal rate) ladder and holds for any tier count.
--- ----------------------------------------------------------------------------
-
-CREATE TABLE comm_ranks (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    scheme_id UUID NOT NULL REFERENCES comm_schemes(id) ON DELETE CASCADE,
-    rank_key TEXT NOT NULL,
-    label TEXT NOT NULL,
-    product_rate DECIMAL(9, 6) NOT NULL,
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT product_rate_sane CHECK (product_rate >= 0 AND product_rate <= 1),
-    CONSTRAINT uq_comm_rank_key UNIQUE (scheme_id, rank_key)
-);
-
-COMMENT ON TABLE comm_ranks IS
-    'Revenue commission: Tier 1/2/3… and the personal % of product revenue each earns. The override differential is derived from these rates, never stored per pair.';
-
--- ----------------------------------------------------------------------------
--- TABLE: comm_kpi_items
--- Products that pay a flat allowance instead of counting as product revenue.
--- ----------------------------------------------------------------------------
-
-CREATE TABLE comm_kpi_items (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    scheme_id UUID NOT NULL REFERENCES comm_schemes(id) ON DELETE CASCADE,
-    product_code TEXT NOT NULL,
-    product_name TEXT,
-    kpi_amount DECIMAL(15, 2) NOT NULL,
-    effective_from DATE NOT NULL,
-    effective_to DATE,
-    created_by UUID REFERENCES users(id),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT kpi_amount_non_negative CHECK (kpi_amount >= 0),
-    CONSTRAINT effective_window CHECK (effective_to IS NULL OR effective_to >= effective_from),
-    -- btree_gist is installed; this stops two overlapping definitions of the
-    -- same product silently double-paying.
-    CONSTRAINT no_overlapping_kpi_item EXCLUDE USING gist (
-        scheme_id WITH =,
-        (UPPER(BTRIM(product_code))) WITH =,
-        daterange(effective_from, effective_to, '[]') WITH &&
-    )
-);
-
-COMMENT ON TABLE comm_kpi_items IS
-    'Revenue commission: KPI products (e.g. pillow → RM30/unit). Their sales revenue is EXCLUDED from the product-revenue base — the allowance already pays for them.';
-
-CREATE INDEX idx_comm_kpi_items_code ON comm_kpi_items (scheme_id, (UPPER(BTRIM(product_code))));
-
--- ----------------------------------------------------------------------------
--- TABLE: comm_kpi_thresholds
--- Ladder: sell N KPI units in the month → uplift the whole KPI base by X%.
--- ----------------------------------------------------------------------------
-
-CREATE TABLE comm_kpi_thresholds (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    scheme_id UUID NOT NULL REFERENCES comm_schemes(id) ON DELETE CASCADE,
-    min_qty INTEGER NOT NULL,
-    bonus_pct DECIMAL(9, 6) NOT NULL,
-    effective_from DATE NOT NULL,
-    effective_to DATE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT min_qty_positive CHECK (min_qty > 0),
-    CONSTRAINT bonus_pct_sane CHECK (bonus_pct >= 0 AND bonus_pct <= 5),
-    CONSTRAINT effective_window CHECK (effective_to IS NULL OR effective_to >= effective_from),
-    CONSTRAINT no_overlapping_threshold EXCLUDE USING gist (
-        scheme_id WITH =,
-        min_qty WITH =,
-        daterange(effective_from, effective_to, '[]') WITH &&
-    )
-);
-
-COMMENT ON TABLE comm_kpi_thresholds IS
-    'Revenue commission: KPI quantity ladder. The engine applies the HIGHEST rung met, not the sum of rungs.';
-
--- ----------------------------------------------------------------------------
--- TABLE: comm_bill_bonus_rules
--- ----------------------------------------------------------------------------
-
-CREATE TABLE comm_bill_bonus_rules (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    scheme_id UUID NOT NULL REFERENCES comm_schemes(id) ON DELETE CASCADE,
-    bill_rank SMALLINT NOT NULL,
-    pct DECIMAL(9, 6) NOT NULL,
-    effective_from DATE NOT NULL,
-    effective_to DATE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT valid_bill_rank CHECK (bill_rank BETWEEN 1 AND 3),
-    CONSTRAINT pct_sane CHECK (pct >= 0 AND pct <= 1),
-    CONSTRAINT effective_window CHECK (effective_to IS NULL OR effective_to >= effective_from),
-    CONSTRAINT no_overlapping_bill_rule EXCLUDE USING gist (
-        scheme_id WITH =,
-        bill_rank WITH =,
-        daterange(effective_from, effective_to, '[]') WITH &&
-    )
-);
-
-COMMENT ON TABLE comm_bill_bonus_rules IS
-    'Revenue commission: 1st/2nd/3rd Bill bonus rates (50 / 40 / 30%). How the rate is applied is comm_schemes.bill_bonus_basis.';
-
--- ----------------------------------------------------------------------------
--- TABLE: comm_hierarchy
--- The payroll-purpose org chart. Deliberately separate from
--- hr_staff_costs.department_id and from any app-role hierarchy: this exists
--- only to answer "who overrides whom, at what rate, in which month".
--- ----------------------------------------------------------------------------
-
-CREATE TABLE comm_hierarchy (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    scheme_id UUID NOT NULL REFERENCES comm_schemes(id) ON DELETE CASCADE,
-    staff_id UUID NOT NULL REFERENCES hr_staff_costs(id) ON DELETE CASCADE,
-    upline_staff_id UUID REFERENCES hr_staff_costs(id) ON DELETE RESTRICT,
-    rank_id UUID NOT NULL REFERENCES comm_ranks(id) ON DELETE RESTRICT,
-    effective_from DATE NOT NULL,
-    effective_to DATE,
-    created_by UUID REFERENCES users(id),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT not_own_upline CHECK (upline_staff_id IS DISTINCT FROM staff_id),
-    CONSTRAINT effective_window CHECK (effective_to IS NULL OR effective_to >= effective_from),
-    -- One position per person at any point in time.
-    CONSTRAINT no_overlapping_position EXCLUDE USING gist (
-        scheme_id WITH =,
-        staff_id WITH =,
-        daterange(effective_from, effective_to, '[]') WITH &&
-    )
-);
-
-COMMENT ON TABLE comm_hierarchy IS
-    'Revenue commission: effective-dated upline map + rank. Read as-at the period being computed, then SNAPSHOTTED into comm_statements so history never moves.';
-
-CREATE INDEX idx_comm_hierarchy_staff ON comm_hierarchy (scheme_id, staff_id, effective_from DESC);
-CREATE INDEX idx_comm_hierarchy_upline ON comm_hierarchy (scheme_id, upline_staff_id);
-
--- ----------------------------------------------------------------------------
--- TRIGGER: reject a cycle in the upline chain.
--- The engine also guards (depth cap + visited set) — belt and braces, because
--- a cycle here would be a silent money bug, not a crash.
--- ----------------------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION comm_hierarchy_reject_cycle()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-    v_cursor UUID := NEW.upline_staff_id;
-    v_depth  INTEGER := 0;
-BEGIN
-    WHILE v_cursor IS NOT NULL AND v_depth < 20 LOOP
-        IF v_cursor = NEW.staff_id THEN
-            RAISE EXCEPTION
-                'comm_hierarchy: upline chain for staff % is cyclic', NEW.staff_id;
-        END IF;
-
-        SELECT h.upline_staff_id INTO v_cursor
-        FROM comm_hierarchy h
-        WHERE h.scheme_id = NEW.scheme_id
-          AND h.staff_id = v_cursor
-          AND h.id IS DISTINCT FROM NEW.id
-          AND daterange(h.effective_from, h.effective_to, '[]')
-              && daterange(NEW.effective_from, NEW.effective_to, '[]')
-        LIMIT 1;
-
-        v_depth := v_depth + 1;
-    END LOOP;
-
-    IF v_depth >= 20 THEN
-        RAISE EXCEPTION
-            'comm_hierarchy: upline chain for staff % exceeds 20 levels', NEW.staff_id;
-    END IF;
-
-    RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER trg_comm_hierarchy_reject_cycle
-    BEFORE INSERT OR UPDATE OF upline_staff_id, staff_id, effective_from, effective_to
-    ON comm_hierarchy
-    FOR EACH ROW
-    EXECUTE FUNCTION comm_hierarchy_reject_cycle();
+CREATE INDEX idx_open_bill_tags_staff_day ON sales_order_open_bill_tags (staff_id, event_date);
 
 -- ============================================================================
 -- RUNS + RESULTS
 -- ============================================================================
 
--- ----------------------------------------------------------------------------
--- TABLE: comm_runs
--- ----------------------------------------------------------------------------
-
 CREATE TABLE comm_runs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sub_department_id UUID NOT NULL REFERENCES comm_sub_departments(id) ON DELETE RESTRICT,
     period_month DATE NOT NULL,
     scheme_id UUID NOT NULL REFERENCES comm_schemes(id) ON DELETE RESTRICT,
     batch_id UUID REFERENCES sales_import_batches(id) ON DELETE RESTRICT,
@@ -465,16 +593,11 @@ CREATE TABLE comm_runs (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT period_is_first_of_month CHECK (EXTRACT(DAY FROM period_month) = 1),
-    CONSTRAINT uq_comm_run_per_period UNIQUE (period_month)
+    CONSTRAINT uq_comm_run_per_sub_dept_period UNIQUE (sub_department_id, period_month)
 );
 
 COMMENT ON TABLE comm_runs IS
-    'Revenue commission: one run per month. warnings holds the engine''s non-fatal findings; Apply stays disabled while any stands.';
-
--- ----------------------------------------------------------------------------
--- TABLE: comm_statements
--- One per (run × salesperson). Rank + rate + upline are SNAPSHOTS.
--- ----------------------------------------------------------------------------
+    'One run per sub-department per calendar month (user 2026-08-31: commission settles month to month, 1st to last day). warnings holds the engine''s non-fatal findings; Apply stays disabled while any stands.';
 
 CREATE TABLE comm_statements (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -482,11 +605,15 @@ CREATE TABLE comm_statements (
     staff_id UUID NOT NULL REFERENCES hr_staff_costs(id) ON DELETE RESTRICT,
 
     -- Snapshot of the position used, so later config edits never rewrite history
+    tier_key TEXT,
     rank_key TEXT,
     product_rate DECIMAL(9, 6) NOT NULL DEFAULT 0,
     upline_staff_id UUID REFERENCES hr_staff_costs(id),
 
     product_revenue DECIMAL(15, 2) NOT NULL DEFAULT 0,
+    -- Revenue dropped because its item group is not commissionable — shown so
+    -- the salesperson can see WHY their base is below their sales figure.
+    excluded_revenue DECIMAL(15, 2) NOT NULL DEFAULT 0,
     product_commission DECIMAL(15, 2) NOT NULL DEFAULT 0,
 
     kpi_qty DECIMAL(15, 3) NOT NULL DEFAULT 0,
@@ -494,7 +621,7 @@ CREATE TABLE comm_statements (
     kpi_threshold_pct DECIMAL(9, 6) NOT NULL DEFAULT 0,
     kpi_commission DECIMAL(15, 2) NOT NULL DEFAULT 0,
 
-    bill_bonus DECIMAL(15, 2) NOT NULL DEFAULT 0,
+    open_bill_bonus DECIMAL(15, 2) NOT NULL DEFAULT 0,
     override_commission DECIMAL(15, 2) NOT NULL DEFAULT 0,
     total_commission DECIMAL(15, 2) NOT NULL DEFAULT 0,
 
@@ -503,22 +630,15 @@ CREATE TABLE comm_statements (
     CONSTRAINT uq_comm_statement_per_run UNIQUE (run_id, staff_id),
     CONSTRAINT components_tally CHECK (
         total_commission
-        = product_commission + kpi_commission + bill_bonus + override_commission
+        = product_commission + kpi_commission + open_bill_bonus + override_commission
     )
 );
 
 COMMENT ON TABLE comm_statements IS
-    'Revenue commission: one salesperson''s month. total_commission is what lands in hr_monthly_payroll.commission_amount. The CHECK makes a component/total drift impossible to store.';
+    'One salesperson''s month. total_commission is what lands in hr_monthly_payroll.commission_amount. The CHECK makes a component/total drift impossible to store.';
 
 CREATE INDEX idx_comm_statements_run ON comm_statements (run_id);
 CREATE INDEX idx_comm_statements_staff ON comm_statements (staff_id);
-
--- ----------------------------------------------------------------------------
--- TABLE: comm_statement_lines
--- The audit trail — the reason this module can be trusted with money.
--- Invariant Σ lines.amount = statement.total_commission is verified by
--- apply_commission_run before it commits (arrives with the RPC migration).
--- ----------------------------------------------------------------------------
 
 CREATE TABLE comm_statement_lines (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -527,7 +647,7 @@ CREATE TABLE comm_statement_lines (
 
     source_order_id UUID REFERENCES sales_orders(id) ON DELETE SET NULL,
     source_line_id UUID REFERENCES sales_order_lines(id) ON DELETE SET NULL,
-    /* the downline whose volume produced an override line */
+    -- the downline whose volume produced an override line
     source_staff_id UUID REFERENCES hr_staff_costs(id) ON DELETE SET NULL,
 
     basis_amount DECIMAL(15, 2) NOT NULL DEFAULT 0,
@@ -540,10 +660,74 @@ CREATE TABLE comm_statement_lines (
 );
 
 COMMENT ON TABLE comm_statement_lines IS
-    'Revenue commission: every ringgit traced to the order line, tagged bill or downline that produced it. Drives the statement drill-down page.';
+    'Every ringgit traced to the order, order line, tagged bill or downline that produced it. Sum of lines.amount = statement.total_commission is verified by apply_commission_run before it commits.';
 
 CREATE INDEX idx_comm_statement_lines_stmt ON comm_statement_lines (statement_id, component);
 CREATE INDEX idx_comm_statement_lines_order ON comm_statement_lines (source_order_id);
+
+-- ============================================================================
+-- SEED — Revenue Department > Fair
+-- ============================================================================
+
+DO $seed$
+DECLARE
+    v_dept   UUID;
+    v_sub    UUID;
+    v_scheme UUID;
+BEGIN
+    SELECT id INTO v_dept FROM departments WHERE name = 'Revenue Department';
+    IF v_dept IS NULL THEN
+        RAISE NOTICE 'Revenue Department not found - skipping the Fair seed.';
+        RETURN;
+    END IF;
+
+    INSERT INTO comm_sub_departments (department_id, name, code, description)
+    VALUES (v_dept, 'Fair', 'FAIR',
+            'Roadshow / event team. Open Bill rewards writing consecutive bills during a 3-day event.')
+    RETURNING id INTO v_sub;
+
+    INSERT INTO comm_schemes (sub_department_id, scheme_name, effective_from)
+    VALUES (v_sub, 'Fair 2026', DATE '2026-01-01')
+    RETURNING id INTO v_scheme;
+
+    -- Tier ladder. Rates overlap across tiers; can_recruit unlocks at 6%.
+    INSERT INTO comm_ranks
+        (scheme_id, tier_key, tier_label, rank_key, label, product_rate, can_recruit,
+         promote_to_rank_key, promotion_threshold_amount, sort_order)
+    VALUES
+        (v_scheme, 'revenue_specialist', 'Revenue Specialist', 'rs_5',   'Revenue Specialist - 5%',  0.05, FALSE, 'rs_6', NULL,      10),
+        (v_scheme, 'revenue_specialist', 'Revenue Specialist', 'rs_6',   'Revenue Specialist - 6%',  0.06, TRUE,  'rs_7', 300000.00, 20),
+        (v_scheme, 'revenue_specialist', 'Revenue Specialist', 'rs_7',   'Revenue Specialist - 7%',  0.07, TRUE,  NULL,   NULL,      30),
+        (v_scheme, 'team_assistant',     'Team Assistant',     'ta_7',   'Team Assistant - 7%',      0.07, TRUE,  'ta_8', NULL,      40),
+        (v_scheme, 'team_assistant',     'Team Assistant',     'ta_8',   'Team Assistant - 8%',      0.08, TRUE,  NULL,   NULL,      50),
+        (v_scheme, 'team_leader',        'Team Leader',        'tl_9',   'Team Leader - 9%',         0.09, TRUE,  NULL,   NULL,      60),
+        (v_scheme, 'senior_team_leader', 'Senior Team Leader', 'stl_10', 'Senior Team Leader - 10%', 0.10, TRUE,  NULL,   NULL,      70);
+
+    -- Item groups seen in the July SO export.
+    INSERT INTO comm_item_groups (scheme_id, item_group, commissionable, note) VALUES
+        (v_scheme, 'MATTRESS', TRUE,  NULL),
+        (v_scheme, 'SOFA',     TRUE,  NULL),
+        (v_scheme, 'BEDFRAME', TRUE,  NULL),
+        (v_scheme, 'DINING',   TRUE,  NULL),
+        (v_scheme, 'ACC',      TRUE,  'Accessories pay, except the codes configured as KPI items.'),
+        (v_scheme, 'TRANS',    FALSE, 'Transportation charges - a service fee, not product revenue.'),
+        (v_scheme, 'OTHER',    FALSE, 'Disposal / miscellaneous - a service fee, not product revenue.');
+
+    -- Open Bill: 1st / 2nd / 3rd bill of the event day.
+    INSERT INTO comm_open_bill_rules (scheme_id, bill_rank, pct, effective_from) VALUES
+        (v_scheme, 1, 0.50, DATE '2026-01-01'),
+        (v_scheme, 2, 0.40, DATE '2026-01-01'),
+        (v_scheme, 3, 0.30, DATE '2026-01-01');
+
+    -- KPI Tier 1: 10 units -> +20% on the whole KPI base.
+    INSERT INTO comm_kpi_thresholds (scheme_id, tier_label, min_qty, bonus_pct, effective_from)
+    VALUES (v_scheme, 'Tier 1', 10, 0.20, DATE '2026-01-01');
+
+    -- comm_kpi_items is left EMPTY on purpose: which product codes are KPI
+    -- items, and at what amount, is the user's call in Settings. The July
+    -- export has 26 distinct ACC codes to choose from.
+END;
+$seed$;
 
 -- ============================================================================
 -- RLS
@@ -554,31 +738,20 @@ CREATE INDEX idx_comm_statement_lines_order ON comm_statement_lines (source_orde
 -- DENY (a read-only own-department carve-out is spec Q6, not assumed here).
 -- ============================================================================
 
-ALTER TABLE sales_import_batches   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sales_orders           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sales_order_lines      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sales_order_bill_tags  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE comm_schemes           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE comm_ranks             ENABLE ROW LEVEL SECURITY;
-ALTER TABLE comm_kpi_items         ENABLE ROW LEVEL SECURITY;
-ALTER TABLE comm_kpi_thresholds    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE comm_bill_bonus_rules  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE comm_hierarchy         ENABLE ROW LEVEL SECURITY;
-ALTER TABLE comm_runs              ENABLE ROW LEVEL SECURITY;
-ALTER TABLE comm_statements        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE comm_statement_lines   ENABLE ROW LEVEL SECURITY;
-
-DO $do$
+DO $rls$
 DECLARE
     t TEXT;
 BEGIN
     FOREACH t IN ARRAY ARRAY[
+        'comm_sub_departments', 'comm_schemes', 'comm_ranks', 'comm_item_groups',
+        'comm_kpi_items', 'comm_kpi_thresholds', 'comm_open_bill_rules',
+        'comm_hierarchy', 'comm_agent_aliases',
         'sales_import_batches', 'sales_orders', 'sales_order_lines',
-        'sales_order_bill_tags', 'comm_schemes', 'comm_ranks',
-        'comm_kpi_items', 'comm_kpi_thresholds', 'comm_bill_bonus_rules',
-        'comm_hierarchy', 'comm_runs', 'comm_statements', 'comm_statement_lines'
+        'sales_order_open_bill_tags',
+        'comm_runs', 'comm_statements', 'comm_statement_lines'
     ]
     LOOP
+        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', t);
         -- One statement per EXECUTE: plpgsql's EXECUTE cannot take two
         -- commands in a single string.
         EXECUTE format($f$
@@ -593,6 +766,6 @@ BEGIN
         $f$, t);
     END LOOP;
 END;
-$do$;
+$rls$;
 
--- finance / dept_manager: no policy → DENY ALL. Deliberate — see the header.
+-- finance / dept_manager: no policy -> DENY ALL. Deliberate — see the header.

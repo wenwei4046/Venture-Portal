@@ -1,13 +1,16 @@
 /**
  * Revenue Department commission engine — pure math, no I/O.
  *
- * Four components, computed per salesperson per month
+ * Implements the **Fair** sub-department's ruleset (user brief 2026-08-31).
+ * Four components, computed per salesperson per calendar month
  * (docs/module-spec-revenue-commission.md §3):
  *
- *   C1 product revenue  — PR × personal rate, KPI-item revenue EXCLUDED
- *   C2 KPI items        — Σ(qty × kpiAmount) × (1 + threshold bonus)
- *   C3 1st/2nd/3rd Bill — bonus on manually tagged orders
- *   C4 hierarchy override — differential roll-up over the upline chain
+ *   C1 product revenue  — PR × personal rate. Excludes KPI items and any item
+ *                         group that isn't commissionable (TRANS, OTHER).
+ *   C2 KPI items        — Σ(qty × kpiAmount) × (1 + threshold uplift)
+ *   C3 Open Bill        — 1st/2nd/3rd bill of the event day: the order's
+ *                         commission, then +50/40/30% on top
+ *   C4 override         — differential roll-up over the upline chain
  *
  * Rounding rule: every statement LINE is rounded to 2dp, and every subtotal is
  * the sum of its rounded lines. That makes `Σ lines === total` exact, which is
@@ -15,13 +18,15 @@
  */
 
 import type {
-  BillRank,
   CommissionComponent,
   EngineInput,
   EngineResult,
   HierarchyNode,
+  ItemGroupRule,
   KpiItem,
   KpiThreshold,
+  OpenBillRank,
+  SalesLine,
   SalesOrder,
   Statement,
   StatementLine,
@@ -40,6 +45,10 @@ function sum(ns: number[]): number {
   return round2(ns.reduce((a, b) => a + b, 0))
 }
 
+export function normaliseCode(code: string): string {
+  return code.trim().toUpperCase()
+}
+
 // ─── Line classification ────────────────────────────────────────────────────
 
 /**
@@ -47,15 +56,11 @@ function sum(ns: number[]): number {
  * trimmed — ERP exports pad and vary case between reports.
  */
 export function indexKpiItems(items: KpiItem[]): Map<string, number> {
-  const map = new Map<string, number>()
-  for (const item of items) {
-    map.set(normaliseCode(item.productCode), item.kpiAmount)
-  }
-  return map
+  return new Map(items.map(i => [normaliseCode(i.productCode), i.kpiAmount]))
 }
 
-export function normaliseCode(code: string): string {
-  return code.trim().toUpperCase()
+export function indexItemGroups(rules: ItemGroupRule[]): Map<string, boolean> {
+  return new Map(rules.map(r => [normaliseCode(r.group), r.commissionable]))
 }
 
 /**
@@ -67,14 +72,28 @@ export function isKpiLine(productCode: string, kpiIndex: Map<string, number>): b
   return kpiIndex.has(normaliseCode(productCode))
 }
 
-/** Product revenue of one order: revenue lines only. */
+export type LineClass = 'kpi' | 'commissionable' | 'excluded_group' | 'unknown_group'
+
+export function classifyLine(
+  line: SalesLine,
+  kpiIndex: Map<string, number>,
+  groupIndex: Map<string, boolean>,
+): LineClass {
+  if (isKpiLine(line.productCode, kpiIndex)) return 'kpi'
+  const known = groupIndex.get(normaliseCode(line.itemGroup))
+  if (known === undefined) return 'unknown_group'
+  return known ? 'commissionable' : 'excluded_group'
+}
+
+/** Product revenue of one order: commissionable, non-KPI lines only. */
 export function orderProductRevenue(
   order: SalesOrder,
   kpiIndex: Map<string, number>,
+  groupIndex: Map<string, boolean>,
 ): number {
   return sum(
     order.lines
-      .filter(l => !isKpiLine(l.productCode, kpiIndex))
+      .filter(l => classifyLine(l, kpiIndex, groupIndex) === 'commissionable')
       .map(l => l.lineAmount),
   )
 }
@@ -101,7 +120,7 @@ export interface OverrideCredit {
   /** Whose volume produced it. */
   downlineStaffId: string
   basisAmount: number
-  /** The differential, e.g. 0.02 for 7% − 5%. */
+  /** The differential, e.g. 0.01 for a 6% Specialist over a 5% one. */
   rate: number
   amount: number
 }
@@ -110,10 +129,11 @@ export interface OverrideCredit {
  * Walk up from every producer, crediting each ancestor the difference between
  * their rate and the highest rate already paid below them. Total paid on any
  * ringgit therefore never exceeds the top ancestor's rate, and equal rates
- * compress to zero automatically.
+ * compress to zero automatically — which is exactly the brief's "reaching 6%
+ * lets you override the 5%s".
  *
- *   Me 7% → Alvin 5% → Ben 3%, Ben sells 10,000
- *   Ben 3% (own) · Alvin (5−3)=2% · Me (7−5)=2%  →  7% total
+ *   STL 10% → TL 9% → TA 7% → RS 5%, and the RS sells 10,000
+ *   RS 5% (own) · TA 2% · TL 2% · STL 1%  →  10% total
  */
 export function computeOverrides(
   nodes: Map<string, HierarchyNode>,
@@ -178,7 +198,9 @@ export function computeOverrides(
 
 export function computeCommissionRun(input: EngineInput): EngineResult {
   const warnings: string[] = []
-  const kpiIndex = indexKpiItems(input.kpiItems)
+  const { scheme } = input
+  const kpiIndex = scheme.enableKpi ? indexKpiItems(input.kpiItems) : new Map<string, number>()
+  const groupIndex = indexItemGroups(scheme.itemGroups)
 
   const nodes = new Map<string, HierarchyNode>()
   for (const n of input.hierarchy) {
@@ -189,11 +211,24 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     nodes.set(n.staffId, n)
   }
 
-  const billPctByRank = new Map<BillRank, number>(
-    input.billBonusRules.map(r => [r.billRank, r.pct]),
+  // A rank below the recruiting threshold must not hold downlines. Flag rather
+  // than silently paying (or silently dropping) their override.
+  for (const n of nodes.values()) {
+    if (n.uplineStaffId) {
+      const up = nodes.get(n.uplineStaffId)
+      if (up && !up.canRecruit) {
+        warnings.push(
+          `Staff ${n.staffId} is placed under ${up.staffId}, whose rank (${up.rankKey}) is not allowed to recruit.`,
+        )
+      }
+    }
+  }
+
+  const openBillPct = new Map<OpenBillRank, number>(
+    input.openBillRules.map(r => [r.rank, r.pct]),
   )
-  const tagByOrder = new Map<string, BillRank>(
-    input.billTags.map(t => [t.orderId, t.billRank]),
+  const tagByOrder = new Map<string, OpenBillRank>(
+    input.openBillTags.map(t => [t.orderId, t.rank]),
   )
 
   // Group orders by salesperson.
@@ -202,6 +237,21 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     const list = ordersByStaff.get(order.staffId)
     if (list) list.push(order)
     else ordersByStaff.set(order.staffId, [order])
+  }
+
+  // Warn once per unclassified ERP item group rather than per line.
+  const unknownGroups = new Set<string>()
+  for (const order of input.orders) {
+    for (const line of order.lines) {
+      if (classifyLine(line, kpiIndex, groupIndex) === 'unknown_group') {
+        unknownGroups.add(line.itemGroup)
+      }
+    }
+  }
+  for (const g of unknownGroups) {
+    warnings.push(
+      `Item group "${g}" is not classified in the scheme — its revenue was treated as NOT commissionable. Classify it in Settings.`,
+    )
   }
 
   // Everyone who either sold something or sits in the hierarchy gets a
@@ -214,6 +264,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     node: HierarchyNode | undefined
     lines: StatementLine[]
     productRevenue: number
+    excludedRevenue: number
     kpiRevenue: number
     kpiQty: number
     kpiBase: number
@@ -234,16 +285,17 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
 
     const lines: StatementLine[] = []
     let productRevenue = 0
+    let excludedRevenue = 0
     let kpiRevenue = 0
     let kpiQty = 0
     let kpiBase = 0
 
-    // C1 — one line per order, so the drill-down reads like a ledger.
     for (const order of orders) {
-      const opr = orderProductRevenue(order, kpiIndex)
+      const opr = orderProductRevenue(order, kpiIndex, groupIndex)
       productRevenue = round2(productRevenue + opr)
 
-      if (opr !== 0 && rate > 0) {
+      // C1 — one line per order, so the drill-down reads like a ledger.
+      if (scheme.enableProductRevenue && opr !== 0 && rate > 0) {
         lines.push({
           component: 'product_revenue',
           sourceOrderId: order.id,
@@ -255,10 +307,17 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
         })
       }
 
-      // C2 inputs — one line per KPI line item.
       for (const line of order.lines) {
-        const unit = kpiIndex.get(normaliseCode(line.productCode))
-        if (unit === undefined) continue
+        const cls = classifyLine(line, kpiIndex, groupIndex)
+
+        if (cls === 'excluded_group' || cls === 'unknown_group') {
+          excludedRevenue = round2(excludedRevenue + line.lineAmount)
+          continue
+        }
+        if (cls !== 'kpi') continue
+
+        // C2 inputs — one line per KPI line item.
+        const unit = kpiIndex.get(normaliseCode(line.productCode)) ?? 0
         kpiRevenue = round2(kpiRevenue + line.lineAmount)
         kpiQty += line.qty
         const amount = round2(line.qty * unit)
@@ -289,36 +348,38 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       })
     }
 
-    // C3 — 1st / 2nd / 3rd Bill bonus on tagged orders.
-    for (const order of orders) {
-      const rank = tagByOrder.get(order.id)
-      if (rank === undefined) continue
-      const pct = billPctByRank.get(rank)
-      if (pct === undefined) {
-        warnings.push(
-          `Order ${order.orderNo} is tagged Bill ${rank}, but no bonus rate is configured for that rank.`,
-        )
-        continue
+    // C3 — Open Bill: the 1st / 2nd / 3rd bill written on an event day.
+    if (scheme.enableOpenBill) {
+      for (const order of orders) {
+        const rank = tagByOrder.get(order.id)
+        if (rank === undefined) continue
+        const pct = openBillPct.get(rank)
+        if (pct === undefined) {
+          warnings.push(
+            `Order ${order.orderNo} is tagged Open Bill ${rank}, but no bonus rate is configured for that rank.`,
+          )
+          continue
+        }
+        const opr = orderProductRevenue(order, kpiIndex, groupIndex)
+        const amount =
+          scheme.openBillBasis === 'pct_of_revenue'
+            ? round2(opr * pct)
+            : round2(opr * rate * pct)
+        if (amount === 0) continue
+        lines.push({
+          component: 'open_bill',
+          sourceOrderId: order.id,
+          basisAmount: opr,
+          rate: pct,
+          qty: null,
+          amount,
+          note:
+            `${ordinal(rank)} bill · ${order.eventDate} · ${order.orderNo}` +
+            (scheme.openBillBasis === 'pct_of_revenue'
+              ? ` · ${round2(pct * 100)}% of revenue`
+              : ` · +${round2(pct * 100)}% on ${round2(rate * 100)}% commission`),
+        })
       }
-      const opr = orderProductRevenue(order, kpiIndex)
-      const amount =
-        input.scheme.billBonusBasis === 'pct_of_revenue'
-          ? round2(opr * pct)
-          : round2(opr * rate * pct)
-      if (amount === 0) continue
-      lines.push({
-        component: 'bill_bonus',
-        sourceOrderId: order.id,
-        basisAmount: opr,
-        rate: pct,
-        qty: null,
-        amount,
-        note:
-          `${ordinal(rank)} Bill · ${order.eventDate} · ${order.orderNo}` +
-          (input.scheme.billBonusBasis === 'pct_of_revenue'
-            ? ` · ${round2(pct * 100)}% of revenue`
-            : ` · +${round2(pct * 100)}% on ${round2(rate * 100)}% commission`),
-      })
     }
 
     drafts.set(staffId, {
@@ -326,6 +387,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       node,
       lines,
       productRevenue,
+      excludedRevenue,
       kpiRevenue,
       kpiQty,
       kpiBase,
@@ -334,27 +396,28 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
   }
 
   // ── Pass 2: overrides, off the settled per-person bases ────────────────
-  const baseByStaff = new Map<string, number>()
-  for (const d of drafts.values()) {
-    const base = input.scheme.overrideIncludesKpi
-      ? round2(d.productRevenue + d.kpiRevenue)
-      : d.productRevenue
-    baseByStaff.set(d.staffId, base)
-  }
+  if (scheme.enableOverride) {
+    const baseByStaff = new Map<string, number>()
+    for (const d of drafts.values()) {
+      const base = scheme.overrideIncludesKpi
+        ? round2(d.productRevenue + d.kpiRevenue)
+        : d.productRevenue
+      baseByStaff.set(d.staffId, base)
+    }
 
-  for (const credit of computeOverrides(nodes, baseByStaff, warnings)) {
-    const draft = drafts.get(credit.uplineStaffId)
-    if (!draft) continue
-    if (credit.amount === 0) continue
-    draft.lines.push({
-      component: 'override',
-      sourceStaffId: credit.downlineStaffId,
-      basisAmount: credit.basisAmount,
-      rate: credit.rate,
-      qty: null,
-      amount: credit.amount,
-      note: `Override on downline ${credit.downlineStaffId} · ${round2(credit.rate * 100)}% differential`,
-    })
+    for (const credit of computeOverrides(nodes, baseByStaff, warnings)) {
+      const draft = drafts.get(credit.uplineStaffId)
+      if (!draft || credit.amount === 0) continue
+      draft.lines.push({
+        component: 'override',
+        sourceStaffId: credit.downlineStaffId,
+        basisAmount: credit.basisAmount,
+        rate: credit.rate,
+        qty: null,
+        amount: credit.amount,
+        note: `Override on downline ${credit.downlineStaffId} · ${round2(credit.rate * 100)}% differential`,
+      })
+    }
   }
 
   // ── Assemble ───────────────────────────────────────────────────────────
@@ -365,10 +428,10 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
 
     const productCommission = by('product_revenue')
     const kpiCommission = round2(by('kpi_item') + by('kpi_threshold'))
-    const billBonus = by('bill_bonus')
+    const openBillBonus = by('open_bill')
     const overrideCommission = by('override')
     const totalCommission = round2(
-      productCommission + kpiCommission + billBonus + overrideCommission,
+      productCommission + kpiCommission + openBillBonus + overrideCommission,
     )
 
     // A person with no orders, no downline volume and no rank contributes
@@ -377,16 +440,18 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
 
     statements.push({
       staffId: d.staffId,
+      tierKey: d.node?.tierKey ?? null,
       rankKey: d.node?.rankKey ?? null,
       productRate: d.node?.productRate ?? 0,
       uplineStaffId: d.node?.uplineStaffId ?? null,
       productRevenue: d.productRevenue,
+      excludedRevenue: d.excludedRevenue,
       productCommission,
       kpiQty: d.kpiQty,
       kpiBase: d.kpiBase,
       kpiThresholdPct: d.kpiThresholdPct,
       kpiCommission,
-      billBonus,
+      openBillBonus,
       overrideCommission,
       totalCommission,
       lines: d.lines,
@@ -403,6 +468,6 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
   }
 }
 
-function ordinal(n: BillRank): string {
+function ordinal(n: OpenBillRank): string {
   return n === 1 ? '1st' : n === 2 ? '2nd' : '3rd'
 }

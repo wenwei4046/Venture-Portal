@@ -1,7 +1,9 @@
 # Module Spec — Revenue Department Commission Payroll
 
-Status: **DRAFT — Q1/Q2/Q5 answered 2026-08-31. Still awaiting the Tier/rank ladder brief (Q3) + a sample ERP export (Q7).**
-Owner: Principal + HR. Author: 2026-08-31 session.
+Status: **DRAFT.** Rules briefed 2026-08-31 and implemented in the engine.
+Blocking gaps: the ~39 salespeople do not exist in the staff master, and the
+KPI product list has not been chosen (§9).
+Owner: Principal + HR.
 Related: `module-spec-phase3.md` (HR Costing), `db-schema.md`, `DESIGN.md`.
 
 ---
@@ -13,9 +15,8 @@ Today every payroll row is *imported already-computed* from InfoTech
 
 The **Revenue Department** (dept `186bd9e0…`, segment `revenue_department`,
 pool GL `1090`, provisioned 2026-08-24) does not work that way. Its staff are
-salespeople. Their pay is *derived* from an ERP **sales order** export:
-per-order, per-product, per-quantity. The portal must compute their commission
-from that raw data, not receive a finished number.
+salespeople with **no basic salary and no statutory allowance** — 100% of their
+pay is commission, *derived* from an ERP sales-order export.
 
 So payroll gains a second **source type**:
 
@@ -24,6 +25,9 @@ So payroll gains a second **source type**:
 | `imported` | InfoTech payroll export (verbatim) | HR, Finance, Marketing, IT, Director Office |
 | `commission` | ERP sales export → commission engine | Revenue Department |
 
+Commission settles **month to month on the calendar month** — August = 1 Aug
+through 31 Aug (user, 2026-08-31).
+
 ---
 
 ## 2. Core architectural decision — do NOT fork payroll
@@ -31,14 +35,14 @@ So payroll gains a second **source type**:
 The commission engine is an **upstream feeder**, not a parallel payroll.
 
 ```
-ERP order export (xlsx/csv)
-        │  import (preview → commit)
+ERP sales-order export (xlsx)
+        │  import (parse → preview → match agents → commit)
         ▼
   sales_orders + sales_order_lines          ← raw facts, immutable per batch
         │
-        │  + comm_ranks / comm_kpi_items / comm_kpi_thresholds
-        │  + comm_bill_bonus_rules / comm_hierarchy   ← config (Settings)
-        │  + sales_order_bill_tags                    ← manual 1st/2nd/3rd Bill picks
+        │  + comm_ranks / comm_item_groups / comm_kpi_items
+        │  + comm_kpi_thresholds / comm_open_bill_rules / comm_hierarchy
+        │  + sales_order_open_bill_tags     ← 1st/2nd/3rd bill picks
         ▼
   COMMISSION ENGINE  (pure TS, src/lib/commission/engine.ts)
         │
@@ -57,91 +61,145 @@ ERP order export (xlsx/csv)
 ```
 
 **Why:** statutory lookups, payroll runs, funding, accrual JVs, disbursement
-vouchers, GL segments and the whole approval chain already work and are audited.
-Forking them for one department would double the surface area of every future
-fix. The only thing genuinely new is *how `commission_amount` is arrived at*.
-
-**Consequence:** the commission engine owes the payroll exactly one number per
-salesperson per month, plus a drill-down page that justifies it.
+vouchers, GL segments and the whole approval chain already work and are
+audited. Forking them for one department would double the surface area of every
+future fix. The only genuinely new thing is *how `commission_amount` is arrived
+at*.
 
 ---
 
-## 3. The four commission components
+## 3. Org structure — department › sub-department › scheme
 
-All four are computed for one salesperson `S` in one period `P` (a month).
+The Revenue Department is divided into **sub-departments**, and *each one
+calculates differently* (user, 2026-08-31). **Fair** — the roadshow / event
+team — is the first, and the four components below are **Fair's** ruleset, not
+the department's.
 
-### 3.0 Line classification
+```
+departments (Revenue Department)
+  └── comm_sub_departments (Fair, …)
+        └── comm_schemes                  ← knobs + per-component switches
+              ├── comm_ranks              4 tiers, rates 5–10%
+              ├── comm_item_groups        which ERP groups are commissionable
+              ├── comm_kpi_items          product → flat KPI allowance
+              ├── comm_kpi_thresholds     qty ladder → uplift
+              ├── comm_open_bill_rules    1st/2nd/3rd bill of the day
+              └── comm_hierarchy          who is under who, effective-dated
+```
+
+Settings gets a **Generate New Sub-Department** action. Creating one either
+**clones** an existing sub-department's scheme (every rule row copied, with
+`cloned_from_scheme_id` recorded) or starts empty for a bespoke ruleset. Because
+each component can be switched off at scheme level
+(`enable_product_revenue` / `enable_kpi` / `enable_open_bill` /
+`enable_override`), a sub-department that only pays a flat percentage reuses the
+same engine instead of getting a bespoke one.
+
+`comm_hierarchy` enforces **one position per person at a time** across all
+schemes, so nobody can sit in two sub-departments and be paid twice.
+
+### 3.1 The tier ladder
+
+| Tier | Rates | Notes |
+|---|---|---|
+| Revenue Specialist | **5%** → **6%** → **7%** | 5% **may not recruit**. Reaching 6% unlocks recruiting and overriding the 5%s. 6% → 7% at **300k**. |
+| Team Assistant | **7%**, **8%** | each with a sales target |
+| Team Leader | **9%** | |
+| Senior Team Leader | **10%** | |
+
+Rates **overlap across tiers** (7% is both a senior Revenue Specialist and a
+junior Team Assistant), so `comm_ranks.rank_key` — not the rate — is the
+identity. `can_recruit` is `false` only on `rs_5`; the engine warns if anyone is
+placed under a rank that may not recruit.
+
+Promotion is **manual for now**: the portal shows progress toward the threshold
+and a human promotes. Auto-promotion needs Q1 (§9) answered — the brief says
+300k but not 300k *of what*.
+
+---
+
+## 4. The four commission components (Fair)
+
+Computed for one salesperson `S` in one calendar month `P`.
+
+### 4.0 Line classification
 
 Every `sales_order_lines` row is classified at **compute time** (not import
-time, so re-configuring KPI items re-computes cleanly):
+time, so re-configuring KPI items or item groups re-computes cleanly):
 
-- **KPI line** — its `product_code` matches an active `comm_kpi_items` row for `P`.
-- **Revenue line** — everything else.
+1. **KPI line** — `product_code` matches an active `comm_kpi_items` row.
+2. **Commissionable** — `item_group` is marked commissionable.
+3. **Excluded** — `item_group` is marked non-commissionable.
+4. **Unknown group** — not in `comm_item_groups` at all → treated as **not**
+   commissionable **and raises a run warning**. A new ERP group can never
+   silently start or stop paying.
 
-> `PR(S)` = **product revenue** = Σ `line_amount` over S's *revenue* lines.
-> KPI-item revenue is deliberately **excluded** — the item already earns a KPI
-> allowance, so counting it twice would double-pay (user rule: *"这个 pillow 卖
-> 250 块的 revenue 是不算进 product revenue 里面的"*).
+Item-group policy (user, 2026-08-31):
 
-### 3.1 Component 1 — Product Revenue Commission
+| Group | Commissionable | July 2026 revenue |
+|---|---|---:|
+| MATTRESS | ✅ | 2,326,517.00 |
+| SOFA | ✅ | 436,455.00 |
+| BEDFRAME | ✅ | 63,602.00 |
+| ACC (accessories) | ✅ | 3,133.30 |
+| DINING | ✅ | 2,000.00 |
+| **TRANS** (transport charges) | ❌ | 27,444.00 |
+| **OTHER** (disposal, misc) | ❌ | 2,210.00 |
+
+> `PR(S)` = **product revenue** = Σ `line_amount` over S's *commissionable,
+> non-KPI* lines. July's commissionable base is **RM2,831,707.30** of
+> RM2,861,361.30 booked — RM29,654.00 dropped.
+
+### 4.1 C1 — Product revenue commission
 
 ```
 C1 = PR(S) × rate(S)
 ```
 
-`rate(S)` = the personal commission percentage of S's **rank** in period `P`
-(Tier 1 = x%, Tier 2 = y%, …). Ranks live in `comm_ranks`; a person's rank for
-a period comes from `comm_hierarchy` (effective-dated), and is **snapshotted**
-into `comm_statements` when the run is computed.
+`rate(S)` comes from S's rank in `comm_hierarchy` as at `P`, and is
+**snapshotted** onto the statement when the run computes.
 
-### 3.2 Component 2 — KPI Item Commission
+### 4.2 C2 — KPI items
 
 ```
 KPIqty  = Σ qty                       over KPI lines
-KPIbase = Σ (qty × kpi_unit_amount)   over KPI lines     e.g. pillow → RM30/unit
-bonus%  = highest comm_kpi_thresholds row whose min_qty ≤ KPIqty  (else 0)
+KPIbase = Σ (qty × kpi_unit_amount)   over KPI lines     e.g. pillow → RM50
+bonus%  = highest comm_kpi_thresholds rung whose min_qty ≤ KPIqty  (else 0)
 C2      = KPIbase × (1 + bonus%)
 ```
 
-Ladder example: `[{min_qty: 10, bonus_pct: 0.20}]` → 10+ KPI items sold uplifts
-the whole KPI amount by 20%. Modelled as a ladder (not a single threshold) so
-`[{10, 20%}, {25, 35%}]` works without a schema change.
+The brief's worked example: 10 × RM50 = RM500, +20% on top = **RM600**. ✅
 
-### 3.3 Component 3 — Additional Order Bonus (1st / 2nd / 3rd Bill)
+KPI-item revenue is **excluded from `PR`** — the item already earns its
+allowance, so counting it twice would double-pay. In practice most KPI items are
+**bundled free** (see §5), which is precisely the case a flat allowance exists
+to reward. Modelled as a ladder, not a single threshold, so `Tier 2` can be
+added later without a schema change.
 
-Rewards fast consecutive closing during a 3-day event. HR/Principal **manually
-tags** which of a salesperson's orders is that **day's** 1st, 2nd or 3rd bill.
+### 4.3 C3 — Open Bill (1st / 2nd / 3rd bill of the event day)
+
+Rewards writing consecutive bills during a 3-day event. HR/Principal picks which
+of a salesperson's orders is that **day's** 1st, 2nd or 3rd bill.
 
 ```
-for each tagged order O of S with bill_rank r:
-    OPR(O) = Σ line_amount over O's revenue lines
-    C3 += OPR(O) × bill_pct(r)          [basis = 'pct_of_revenue']
-       or OPR(O) × rate(S) × bill_pct(r) [basis = 'uplift_on_commission']
+for each tagged order O of S with rank r:
+    OPR(O) = commissionable, non-KPI revenue of O
+    C3 += OPR(O) × rate(S) × billPct(r)      billPct = 50% / 40% / 30%
 ```
 
-`bill_pct`: rank 1 = 50%, rank 2 = 40%, rank 3 = 30% (`comm_bill_bonus_rules`,
-effective-dated).
+Confirmed by the brief: *"10,000 at 7% — compute the 7% first, then add 50%"*
+→ 700 commission + **350 bonus** = 1,050 on that order. It follows the person's
+**current** rate, so a promotion changes the bonus, and it is **additive** — the
+tagged order still earns its normal C1.
 
-> ✅ **RESOLVED 2026-08-31 (Q1).** The basis is **`uplift_on_commission`**: the
-> bonus is 50/40/30% *of that order's commission*, not of its raw revenue.
-> RM10,000 order at 7% → RM700 commission → 1st Bill bonus RM350.
-> (`pct_of_revenue` stays in the enum as a documented alternative; flipping the
-> scheme column switches every future run.)
->
-> ✅ **RESOLVED 2026-08-31 (Q2).** The bonus is **additive** — a tagged order
-> still earns its normal C1, so the RM10,000 first bill pays 700 + 350 = 1,050.
+`comm_schemes.open_bill_basis` also supports `pct_of_revenue` as a documented
+alternative for a future sub-department. Nothing uses it today.
 
-Tagging constraints:
-- one tag per order (an order can't be both 1st and 2nd bill);
-- unique `(staff_id, event_date, bill_rank)` — one 1st Bill per person per day.
+### 4.4 C4 — Hierarchy override
 
-### 3.4 Component 4 — Hierarchy Override (upline / downline)
-
-Classic **differential roll-up**. Each person earns their own rate on their own
-volume; each upline earns the *difference* between their rate and the highest
-rate already paid below them, on the downline's volume.
-
-Algorithm (per downline `D`, walking up the chain):
+Classic **differential roll-up**: each person earns their own rate on their own
+volume; each upline earns the difference between their rate and the highest rate
+already paid below them.
 
 ```
 paid = rate(D)
@@ -151,242 +209,218 @@ for A in ancestors(D), nearest first:
     paid = max(paid, rate(A))
 ```
 
-Worked example — the user's case, extended to 3 levels:
+Worked example — a full chain, downline sells RM10,000:
 
-| Person | Rate | Own PR | Earns |
-|---|---|---|---|
-| Me | 7% | 0 | override on Alvin: (7%−5%) × PR(Alvin) = **2% × PR(Alvin)** |
-| Alvin | 5% | 20,000 | own 5% × 20,000 = 1,000; override on Ben: (5%−3%) × PR(Ben) |
-| Ben | 3% | 10,000 | own 3% × 10,000 = 300 |
+| Person | Rate | Earns | Why |
+|---|---|---:|---|
+| Revenue Specialist | 5% | 500 | own |
+| Team Assistant | 7% | 200 | 7 − 5 |
+| Team Leader | 9% | 200 | 9 − 7 |
+| Senior Team Leader | 10% | 100 | 10 − 9 |
+| | | **1,000** | never more than the top rate (10%) |
 
-Ben's 10,000 pays out: Ben 3% + Alvin 2% + Me 2% = 7% total — never more than
-the top rate. Equal rates compress to zero automatically. No infinite loop:
-`comm_hierarchy` enforces acyclicity (§4.7).
+Two rates that are equal compress to zero automatically, which is exactly the
+brief's *"reaching 6% lets you override the 5%s"*. Override base is `PR(D)`
+(KPI excluded; `override_includes_kpi` defaults false).
 
-Override base = `PR(D)` (KPI lines excluded, same as C1). Scheme flag
-`override_includes_kpi` defaults `false`.
+### 4.5 Total
 
-### 3.45 Revenue staff have no basic and no statutory
+```
+commission_amount(S, P) = C1 + C2 + C3 + C4
+```
 
-**User decision 2026-08-31:** Revenue Department staff carry **no basic salary
-and no statutory allowance** — they are paid 100% on commission.
+Rounding: every statement **line** is rounded to 2dp and every subtotal is the
+sum of its rounded lines, so `Σ lines === total` holds exactly. `comm_statements`
+carries a CHECK that makes a component/total drift impossible to store.
 
-The happy surprise is that this needs *no* code change:
+---
 
-- `hr_staff_costs.basic_salary` already accepts 0 (migration 141 relaxed the
-  CHECK for commission-only staff; HV020 is the existing precedent), and
-  `hr_employment_type` already has a `commission_eligible` value (migration 120).
-- `compute_hr_monthly_payroll` bases EPF / SOCSO / EIS on
-  `prorated basic + statutory allowance`. With both at 0, every statutory
-  lookup returns 0 by itself — no trigger edit, and therefore no risk to the
-  departments that *do* carry a basic.
-- Pro-rata likewise becomes a no-op (it never applied to commission anyway).
+## 5. What the ERP export actually looks like
+
+Confirmed against `July SO.xlsx` (2026-08-31). The parser
+(`src/lib/import/erp-sales-order.ts`) reproduces every figure below.
+
+| | |
+|---|---|
+| Rows / orders / agents | 3,261 lines → **691 orders** → **40 agents** |
+| Date range | **2026-07-01 → 2026-08-15** (473 July orders + 218 August) |
+| July / August value | RM2,861,361.30 / RM1,243,027.00 |
+| Cancelled | 1 (`ZZTEST-0001`, `Cancelled = 'T'`) |
+| Branches | KL 2,470 · PG 677 · SRW 102 · SBH 12 lines |
+
+**One row per order line; the order header repeats on every line.** Grouping is
+by `Doc. No.`.
+
+Five things that shaped the design:
+
+1. **`Total` and `Tax` appear TWICE** — once in the order-header block and once
+   in the line block. A naive header-name map resolves `Total` to the *line*
+   total and every package order looks discounted. Columns are therefore
+   resolved *relative to `Item Group`*, which separates the two blocks. With
+   that fixed, header `Total` = `SubTotal (Ex)` = Σ line `Total (Ex)` for **all
+   691 orders**, tax is always 0 and `Discount` is never used.
+2. **Package pricing.** 607 of 691 orders put the whole order value on ONE line
+   (usually the mattress); the bundled bedframe/pillows/protectors are qty > 0
+   at RM0. Per-line amounts are *not* a per-product revenue split — only sums
+   across an order are meaningful. ACC has 1,523 lines / 3,042 units but only
+   **13 lines carry money** (RM4,683 in the whole file).
+3. **The agent is a free-text name with no code, and the names are dirty** —
+   trailing spaces (`"MELVIN CHONG "`, `"ETHAN SOO "`), mixed case (`Peifen`,
+   `Zack`, `Lim Yau Wei`, `Hwasheng`), plus non-people (`OTHERS`,
+   `Test Sales Director`, `HOUZS CENTURY`, `GRACE`). Hence `comm_agent_aliases`
+   (many spellings → one person), not a code column. **Of the 40 agents, exactly
+   one (`SIA JONAS`) already exists in the staff master — and in Marketing, not
+   Revenue.**
+4. **No time of day** — every `Date` cell is midnight, so the order in which
+   bills were written can only come from the running `Doc. No.` (SO-012578 …
+   SO-013266; sorting 688 orders by number gives just 2 date inversions). The
+   importer uses it to *suggest* Open Bill ranks. In July, 300 of 473 orders
+   were their agent's 2nd bill or later that day — picking all of them by hand
+   would be unreasonable.
+5. **The export is a date RANGE, not a month.** A "July" file carrying six
+   weeks of orders would pay August work inside the July run, so
+   `selectPeriod()` filters to the calendar month and reports what it dropped.
+
+`BALANCE` / `PAYEMENT` are also captured: 324 orders fully paid, 360 part-paid,
+6 unpaid. Nothing reads them today — see Q3.
+
+---
+
+## 6. Data model
+
+New tables. `sales_*` = imported facts, `comm_*` = config + results. The dormant
+`commission_rules` / `commission_inputs` from migration 123 are marked
+**DEPRECATED** — never wired to any UI, and too weak for this.
+
+| Table | Holds |
+|---|---|
+| `comm_sub_departments` | Fair, and whatever comes next |
+| `comm_schemes` | knobs + the four component switches + `cloned_from_scheme_id` |
+| `comm_ranks` | tier, rank, rate, `can_recruit`, promotion threshold |
+| `comm_item_groups` | ERP group → commissionable? |
+| `comm_kpi_items` / `comm_kpi_thresholds` | KPI products and the qty ladder |
+| `comm_open_bill_rules` | 50 / 40 / 30% |
+| `comm_hierarchy` | effective-dated upline + rank; one position per person |
+| `comm_agent_aliases` | ERP agent name → `hr_staff_costs` |
+| `sales_import_batches` | one per file; one `committed` batch per period |
+| `sales_orders` / `sales_order_lines` | the raw facts, plus `raw` JSONB |
+| `sales_order_open_bill_tags` | the picks, with `auto_suggested` |
+| `comm_runs` | one per sub-department per month |
+| `comm_statements` / `comm_statement_lines` | results + the audit trail |
+
+Changes to existing tables: `departments.payroll_source`
+(`imported` \| `commission`). Nothing else.
+
+**Revenue staff need no schema change to be paid pure commission**:
+`hr_staff_costs.basic_salary` already allows 0 (migration 141; HV020 is the
+precedent), `hr_employment_type` already has `commission_eligible`
+(migration 120), and `compute_hr_monthly_payroll` bases EPF/SOCSO/EIS on
+`prorated basic + statutory allowance` — with both at 0 every statutory lookup
+returns 0 on its own, with zero risk to departments that *do* carry a basic.
 
 > ⚠️ **PCB still applies.** The trigger computes PCB on gross, which for these
-> staff is the entire commission, so `net = commission − PCB`. Left as is on
-> purpose — commission is taxable income — but it is the one deduction a
-> pure-commission salesperson will still see on the payslip. Confirm this is
-> intended (**Q5b**).
+> staff is the entire commission, so `net = commission − PCB`. Left as-is on
+> purpose — commission is taxable income — but confirm (Q2).
 
-### 3.5 Total
+**Cycle safety, twice.** `comm_hierarchy` has a `BEFORE` trigger that walks the
+chain and rejects a cycle (depth cap 20); the engine independently carries a
+visited set and depth cap. Dragging a manager under their own downline in the
+org chart is exactly how one gets created, and a cycle here would be a silent
+money bug rather than a crash.
 
-```
-commission_amount(S, P) = C1 + C2 + C3 + C4          (rounded to 2dp once, at the end)
-```
-
----
-
-## 4. Data model
-
-New tables. Prefix `sales_*` = imported facts, `comm_*` = config + results.
-(The dormant `commission_rules` / `commission_inputs` from migration 123 are
-**deprecated** — never wired to any UI, and too weak for this. They get a
-`COMMENT ... DEPRECATED` and stay for history.)
-
-### 4.1 `sales_import_batches`
-One row per ERP file import. `period_month`, `file_name`, `file_hash`,
-`row_count`, `order_count`, `imported_by`, `status` (`draft|committed|superseded`),
-`notes`. Re-importing the same month supersedes the previous batch rather than
-duplicating — the engine only reads the `committed` batch for that period.
-
-### 4.2 `sales_orders`
-`batch_id`, `period_month`, `order_no`, `order_date`, `event_date`
-(defaults to `order_date`; the 3-day event may straddle a boundary),
-`customer_name`, `erp_sales_code`, `staff_id` (matched, nullable → review
-queue), `company_id` (nullable — which subsidiary the sale belongs to),
-`order_total`, `raw` JSONB.
-Unique `(batch_id, order_no)`.
-
-### 4.3 `sales_order_lines`
-`order_id`, `line_no`, `product_code`, `product_name`, `qty`, `unit_price`,
-`line_amount`, `raw` JSONB. **No `is_kpi` column** — classification is derived
-at compute time from `comm_kpi_items`.
-
-### 4.4 `comm_schemes`
-Named, versioned, effective-dated knob-holder: `bill_bonus_basis`
-(`uplift_on_commission` — the answered default — or `pct_of_revenue`) and
-`override_includes_kpi`.
-One active scheme at a time; the run snapshots `scheme_id`.
-
-### 4.5 `comm_ranks`
-`scheme_id`, `rank_key` (`tier_1`…), `label`, `product_rate` DECIMAL(9,6),
-`sort_order`. **Awaiting the user's Tier brief** — the ladder shape here is the
-one piece of §3 that is not yet specified.
-
-### 4.6 `comm_kpi_items` / `comm_kpi_thresholds`
-- `comm_kpi_items`: `product_code`, `product_name`, `kpi_amount` per unit,
-  `effective_from/to`, `is_active`. (Pillow → RM30.)
-- `comm_kpi_thresholds`: `min_qty`, `bonus_pct`, `effective_from/to`. Ladder.
-
-### 4.7 `comm_hierarchy`
-The **payroll-purpose** org chart — deliberately separate from
-`hr_staff_costs.department_id` and from any app-role hierarchy.
-
-`staff_id`, `upline_staff_id` (nullable = top), `rank_id`, `effective_from`,
-`effective_to`. One active row per staff at any date (exclusion constraint).
-Cycle prevention: a `BEFORE INSERT/UPDATE` trigger walks the chain (depth cap
-20) and rejects if `staff_id` reappears.
-
-### 4.8 `sales_order_bill_tags`
-`order_id` (unique), `staff_id`, `event_date`, `bill_rank` (1|2|3),
-`tagged_by`, `tagged_at`. Unique `(staff_id, event_date, bill_rank)`.
-
-### 4.9 `comm_bill_bonus_rules`
-`scheme_id`, `bill_rank`, `pct`, `effective_from/to`.
-
-### 4.10 `comm_runs`
-`period_month` (unique among non-superseded), `scheme_id`, `batch_id`,
-`status` (`draft|computed|applied|locked`), `computed_at/by`, `applied_at/by`,
-`total_commission`, `staff_count`.
-Lifecycle: `draft → computed` (engine ran) `→ applied` (written into
-`hr_monthly_payroll`) `→ locked` (payroll run submitted; period-lock aware).
-Recompute is allowed while every touched payroll row is still `draft`.
-
-### 4.11 `comm_statements`
-One per (run × staff). Snapshots: `rank_key`, `product_rate`, `upline_staff_id`.
-Figures: `product_revenue`, `product_commission`, `kpi_qty`, `kpi_base`,
-`kpi_threshold_pct`, `kpi_commission`, `bill_bonus`, `override_commission`,
-`total_commission`.
-
-### 4.12 `comm_statement_lines`
-The audit trail — **the reason this module is trustable**. One row per
-contributing fact:
-`statement_id`, `component` (`product_revenue|kpi_item|kpi_threshold|bill_bonus|override`),
-`source_order_id` / `source_line_id` / `source_staff_id` (the downline, for
-overrides), `basis_amount`, `rate`, `qty`, `amount`, `note`.
-
-Invariant enforced by the RPC: `Σ lines.amount = statement.total_commission`
-per statement, and `Σ statements.total = run.total_commission`.
-
-### 4.13 Schema changes to existing tables
-- `departments.payroll_source` TEXT NOT NULL DEFAULT `'imported'`
-  CHECK IN (`'imported'`,`'commission'`). Revenue Department → `'commission'`.
-- `hr_staff_costs.erp_sales_code` TEXT — the ERP's salesperson code. Matching
-  falls back to fuzzy name (same convention as the InfoTech import), and the
-  import wizard writes the code back once a human confirms a match.
-
-### 4.14 RLS
-Mirrors `hr_monthly_payroll` exactly: `principal` ALL; `hr` full R/W while the
-run is `draft|computed`; `finance` **DENY** on `comm_statements` /
-`comm_statement_lines` / `sales_*` (they are per-individual salary detail —
-CLAUDE.md: *Finance CANNOT see individual employee salaries*); `dept_manager`
-DENY, with a later possible read-only own-department carve-out for the Revenue
-Department manager (**Q6**).
+**RLS:** `principal` ALL, `hr` ALL, `finance` **DENY**, `dept_manager` DENY.
+These tables *are* individual salary detail, and CLAUDE.md's standing rule is
+that Finance never sees per-employee pay.
 
 ---
 
-## 5. Engine placement — hybrid, per the Director Salary precedent
+## 7. Engine placement — hybrid, per the Director Salary precedent
 
-Math in **TypeScript** (`src/lib/commission/engine.ts`, pure functions, no I/O),
-atomic write via **one RPC** (`apply_commission_run`). Same choice the user made
-for the salary engine (memory: *hybrid salary engine — TS math + SQL atomic
-write*).
-
-Rationale: this math is the gnarliest in the portal (four interacting
-components, a tree walk, a threshold ladder, an exclusion rule). It must be
-unit-testable against hand-worked examples without a database.
+Math in **TypeScript** (`src/lib/commission/`), atomic write via one RPC
+(`apply_commission_run`). Same choice the user made for the salary engine.
 
 ```
 src/lib/commission/
   types.ts        — inputs/outputs, no Supabase types
-  engine.ts       — classification, C1–C4, assembly. Every helper exported
-                    so it can be tested on its own.
-  engine.test.ts  — 30 worked examples incl. the user's Me/Alvin/Ben chain
+  engine.ts       — classification, C1–C4, assembly; every helper exported
+  engine.test.ts  — 34 worked examples incl. both of the brief's Open Bill cases
+src/lib/import/
+  erp-sales-order.ts       — the parser (column resolution, dates, agents, sequencing)
+  erp-sales-order.test.ts  — 25 tests on a golden grid mirroring the real export
 ```
 
-Status: **built and green** (`npx vitest run src/lib/commission` → 30 passed).
-
-The Server Action loads inputs → calls the pure engine → posts the whole result
-as one JSONB payload to `apply_commission_run(p_period, p_payload)`, which
-deletes and re-inserts statements + lines in one transaction and verifies the
-sum invariant before committing.
+Status: **built and green** — 614 tests pass across the suite (was 555).
 
 ---
 
-## 6. UI
+## 8. UI
 
 Following `DESIGN.md` v3.0 (`.page-head`, `.ledger-table`, `.num`, `.sect-head`).
 
 | Route | Purpose |
 |---|---|
-| `/hr-costing/commission` | period landing — months with sales data, run status |
-| `/hr-costing/commission/[period]` | run dashboard: hero total, per-salesperson `.ledger-table` (PR / C1 / KPI / Bill / Override / Total), Compute + Apply buttons |
-| `/hr-costing/commission/[period]/[staffId]` | one salesperson's statement — the four components, each expandable to its `comm_statement_lines` |
-| `/hr-costing/commission/[period]/import` | ERP import wizard (mirrors `ImportWizard.tsx`: parse client-side → preview → commit) |
-| `/hr-costing/commission/[period]/bills` | day-by-day 1st/2nd/3rd Bill tagging board |
-| `/hr-costing/commission/hierarchy` | the payroll org chart — drag/select upline, set rank |
-| Settings → **Commission** tab | scheme knobs, rank ladder, KPI items, KPI thresholds, bill bonus rates |
+| `/hr-costing/commission` | period landing — months with sales data, run status per sub-department |
+| `…/[period]` | run dashboard: hero total, per-salesperson `.ledger-table` (PR / C1 / KPI / Open Bill / Override / Total), Compute + Apply |
+| `…/[period]/[staffId]` | one salesperson's statement — four components, each expandable to its `comm_statement_lines` |
+| `…/[period]/import` | ERP import wizard: parse → period + cancelled report → **agent matching** → commit |
+| `…/[period]/open-bills` | day-by-day board, pre-filled from `sequence_in_day`, reviewed by a human |
+| `/hr-costing/commission/org-chart` | the org chart (below) |
+| Settings → **Commission** tab | sub-departments (+ Generate New), scheme switches, rank ladder, item groups, KPI items, thresholds, Open Bill rates |
 
-Payroll grid change (`PayrollRow.tsx`): for staff in a `payroll_source =
-'commission'` department, the Commission cell is **read-only** with a
-`from commission run` badge linking to the statement. Prevents a hand-edit
-silently diverging from the audit trail.
+**Org chart.** A tree diagram with n8n-style connector lines where a salesperson
+can be **dragged onto another team member** to re-parent them. Recommended
+library: **`@xyflow/react`** — n8n's own canvas is Vue Flow, the sibling port of
+the same project, so this is the closest match to the reference. Every drop
+writes a new effective-dated `comm_hierarchy` row rather than mutating the old
+one, so past runs never move; the cycle trigger rejects an illegal drop, and a
+drop under a `can_recruit = false` rank is refused in the UI.
 
-Sidebar: `HR Costing → Commission`, gated `principal + hr`.
+**Payroll grid change** (`PayrollRow.tsx`): for staff in a
+`payroll_source = 'commission'` department the Commission cell becomes
+**read-only** with a `from commission run` badge linking to the statement, so a
+hand-edit can't silently diverge from the audit trail.
 
 ---
 
-## 7. Build order
+## 9. Build order
 
-Each step ends with build + E2E + commit, per the project's per-task rule.
-
-| # | Step | Blocked by |
+| # | Step | State |
 |---|---|---|
-| 0 | This spec + user answers | Q1–Q7 |
-| 1 | ✅ Migration written + dry-run verified (BEGIN/ROLLBACK on live schema) — **not yet applied** | Q3 fills rows, not shape |
-| 2 | ✅ Pure TS engine + unit tests (worked examples) | Q1/Q2/Q4 are config toggles, not blockers |
-| 3 | Settings → Commission tab (scheme, ranks, KPI items, thresholds, bill rates) | 1 |
-| 4 | Hierarchy page + cycle guard | 1 |
-| 5 | ERP import: parser + wizard + staff matching | **sample export file** |
-| 6 | Bill tagging board | 5 |
-| 7 | `compute_commission_run` + `apply_commission_run` RPCs + run dashboard + statement page | 2–6 |
-| 8 | Payroll writeback + read-only cell + `payroll_source` wiring | 7 |
-| 9 | Revenue Dept P&L / pool 1090 wiring (commission as dept cost) | 8, separate scope |
+| 1 | Migration: 16 tables + RLS + `payroll_source` + the Fair seed | ✅ written, dry-run verified, **not applied** |
+| 2 | Pure TS engine + tests | ✅ 34 tests |
+| 3 | ERP parser + tests | ✅ 25 tests, verified against the real file |
+| 4 | **Create the ~39 salespeople** in the Revenue Department | ⛔ blocked — needs the staff list (§10 Q4) |
+| 5 | Settings → Commission tab (sub-dept, ranks, item groups, KPI items, thresholds, Open Bill) | ready to build |
+| 6 | Org chart (`@xyflow/react`, drag-to-reparent) | ready to build |
+| 7 | Import wizard + agent matching | ready to build |
+| 8 | Open Bill board | after 7 |
+| 9 | `compute_commission_run` + `apply_commission_run` RPCs + run dashboard + statement page | after 5–8 |
+| 10 | Payroll writeback + read-only cell | after 9 |
+| 11 | Revenue Dept P&L / pool 1090 wiring | separate scope |
 
-Steps 1–4 need no ERP file and can ship first.
-
----
-
-## 8. Open questions
-
-| # | Question | Why it matters | Default assumed |
-|---|---|---|---|
-| **Q1** | ✅ **ANSWERED** — the Bill bonus is a **50/40/30% uplift on that order's commission**, not on raw revenue. | 7–10× difference in payout | `uplift_on_commission`, implemented |
-| **Q2** | ✅ **ANSWERED** — the bonus is **additive**; the tagged order still earns normal C1. | additive vs replacement | implemented |
-| **Q5** | ✅ **ANSWERED** — Revenue staff have **no basic and no statutory**, full commission base. Needs no code change (§3.45); the now-dead `commission_is_statutory_wage` knob was removed from the migration. | compliance | implemented |
-| **Q3** | ⏳ The Tier/rank ladder — how many tiers, what rates, and what promotes someone? | fills `comm_ranks` with rows; the schema shape already holds | *user to brief* |
-| **Q4** | ⏳ Override: unlimited levels with differential roll-up as in §3.4, or **one level only** (direct downline)? | changes C4 materially | unlimited roll-up |
-| **Q5b** | ⏳ PCB on a pure-commission salesperson — deduct as the trigger does today, or not? | the only deduction left on their payslip | deduct (current behaviour) |
-| **Q6** | ⏳ Should the Revenue Dept manager (`dept_manager` role) see their team's commission? | RLS scope | DENY for now |
-| **Q7** | ⏳ ERP name + a **sample export file** — one row per order line, or per order? Which columns? | step 5 cannot start without it | — |
+Steps 5–8 need no further answers and can proceed now.
 
 ---
 
-## 9. Non-goals (v1)
+## 10. Open questions
 
-- No clawback / cancelled-order reversal across periods (a cancelled order in a
+| # | Question | Why it matters |
+|---|---|---|
+| **Q1** | The Revenue Specialist's **300k** promotion — 300k of *personal* sales, *group* sales, or recruitment? And over what window (cumulative? rolling 12 months?) Same for the Team Assistant 7%→8% target. | `promotion_basis` is deliberately NULL and promotion is manual until answered |
+| **Q2** | **PCB** on a pure-commission salesperson — deduct as the trigger does today, or not? | the only deduction left on their payslip |
+| **Q3** | Commission on the **order** or on **collection**? 360 of 691 July/August orders were only part-paid. The brief says the period is the calendar month but not which date drives it; the engine currently uses the SO date. | pays commission on money not yet received |
+| **Q4** | The **staff list** for the ~39 salespeople — names, NRIC, bank accounts, hire dates, and which sub-department each belongs to. | nothing can run until they exist in `hr_staff_costs` |
+| **Q5** | The **KPI product list**: which of the 26 ACC item codes, at what amount? Sizing check — RM50 on the five commonest pillow codes would have paid **≈ RM63,000** of KPI in July against ≈ RM141,000 of product commission at a flat 5%. Worth confirming that scale is intended. | drives `comm_kpi_items` |
+| **Q6** | Should the Revenue Dept manager (`dept_manager` role) see their team's commission? | RLS scope; DENY for now |
+
+---
+
+## 11. Non-goals (v1)
+
+- No clawback / cancelled-order reversal across periods (an order cancelled in a
   later month does not retro-adjust a locked run) — needs its own rule.
-- No target/quota tracking or leaderboards.
+- No auto-promotion between ranks (see Q1).
+- No target / quota tracking or leaderboards.
 - No commission accrual JV separate from the existing payroll accrual.
 - The Revenue Department's own P&L, billing mode and pool 1090 flows are out of
-  scope here (step 9, separate spec).
+  scope (step 11).
