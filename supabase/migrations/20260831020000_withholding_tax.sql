@@ -3,7 +3,10 @@
 -- Withholding Tax as an alternative to PCB
 -- HOUZS Venture Portal
 --
--- ⚠️  NOT YET APPLIED TO THE LIVE PROJECT.
+-- Applied 2026-08-31. Before applying, the recompute fingerprint over all 38
+-- existing payroll rows was compared under the OLD and the NEW function and
+-- came back identical (a3a28e0c77114c261b2280e0dd34f40a), with total
+-- withholding of 0 — so this changed nothing for anybody already on PCB.
 --
 -- User decision 2026-08-31: Revenue Department salespeople do not have PCB.
 -- They pay **Withholding Tax at 2% of total salary** instead, and it is a

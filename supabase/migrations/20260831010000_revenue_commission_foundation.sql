@@ -5,10 +5,10 @@
 --
 -- Spec: docs/module-spec-revenue-commission.md
 --
--- ⚠️  NOT YET APPLIED TO THE LIVE PROJECT. Verified by dry-run inside
---     BEGIN/ROLLBACK against the live schema. Two things are still open
---     (spec §8): what the Revenue Specialist's 300k promotion measures, and
---     the Team Assistant 7%→8% sales target. Neither changes the shape below.
+-- Applied 2026-08-31, after being verified by dry-run inside BEGIN/ROLLBACK
+-- against the live schema. Two things are still open (spec §12): the
+-- group-sales targets above 300k, and where product cost comes from — neither
+-- changes the shape below, and both are configuration rather than schema.
 --
 -- Structure, per the user's brief 2026-08-31:
 --
@@ -346,7 +346,7 @@ COMMENT ON TABLE comm_open_bill_rules IS
 -- differs - Akemi's incentive Tier 1 is 36% where Zanotti's is 33%.
 --
 -- The ERP export has no brand column, so item_code_prefixes lets the importer
--- tag each line from its Item Code (AK-... -> Acami, and so on).
+-- tag each line from its Item Code (AK-... -> Akemi, and so on).
 -- ----------------------------------------------------------------------------
 
 CREATE TABLE comm_brands (
@@ -1034,7 +1034,7 @@ BEGIN
         (v_scheme, 'ERGOTEX', 'Ergotex', ARRAY[]::TEXT[],
          'Ladder and prefixes to be set later in Settings (user 2026-08-31).');
 
-    -- Acami's full ladder, exactly as briefed.
+    -- Akemi's full ladder, exactly as briefed.
     INSERT INTO comm_margin_bands
         (scheme_id, brand_id, band_key, label, kind, margin_pct, commission_multiplier, monthly_incentive, sort_order)
     SELECT v_scheme, b.id, x.band_key, x.label, x.kind::comm_margin_band_kind,
