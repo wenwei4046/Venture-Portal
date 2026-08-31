@@ -50,6 +50,11 @@ CREATE TYPE comm_component AS ENUM (
     'override'
 );
 
+CREATE TYPE comm_rate_mode AS ENUM (
+    'fixed',      -- once promoted, the rate stays even in a month below target
+    'variable'    -- recomputed monthly from that month's group sales
+);
+
 CREATE TYPE comm_open_bill_basis AS ENUM (
     'uplift_on_commission',   -- orderRevenue x personalRate x billPct  (Fair)
     'pct_of_revenue'          -- orderRevenue x billPct
@@ -136,6 +141,17 @@ CREATE TABLE comm_schemes (
     open_bill_basis comm_open_bill_basis NOT NULL DEFAULT 'uplift_on_commission',
     override_includes_kpi BOOLEAN NOT NULL DEFAULT FALSE,
 
+    -- Share of the ORDER TOTAL the customer must have deposited before any of
+    -- that order's commission is released. 0.50 = half; NULL disables the gate.
+    -- Nothing is lost below it: the order pays in the month its deposit clears.
+    deposit_threshold_pct DECIMAL(9, 6)
+        CONSTRAINT deposit_threshold_sane
+        CHECK (deposit_threshold_pct IS NULL
+               OR (deposit_threshold_pct >= 0 AND deposit_threshold_pct <= 1)),
+
+    -- Applied to a salesperson with no rate_mode of their own.
+    default_rate_mode comm_rate_mode NOT NULL DEFAULT 'variable',
+
     -- Per-component switches: another sub-department reuses the subset that
     -- applies to it instead of getting a bespoke engine.
     enable_product_revenue BOOLEAN NOT NULL DEFAULT TRUE,
@@ -182,15 +198,18 @@ CREATE TABLE comm_ranks (
     -- recruiting. The engine warns if a placement violates this.
     can_recruit BOOLEAN NOT NULL DEFAULT TRUE,
 
-    -- Promotion is MANUAL for now: the portal shows progress toward the
-    -- threshold, a human promotes. Auto-promotion needs promotion_basis
-    -- answered first (personal sales? group sales? recruits?), spec Q3b.
-    promote_to_rank_key TEXT,
-    promotion_threshold_amount DECIMAL(15, 2),
-    promotion_basis TEXT
-        CONSTRAINT valid_promotion_basis
-        CHECK (promotion_basis IS NULL
-               OR promotion_basis IN ('personal_sales', 'group_sales', 'recruitment')),
+    -- GROUP sales needed to hold this rank: the person's own commissionable
+    -- revenue plus their whole downline's (user 2026-08-31 - a Specialist on
+    -- 200k with two downlines on 100k each has group sales of 400k and clears
+    -- the 300k gate for Team Assistant). NULL = an entry rank that cannot be
+    -- climbed to by volume.
+    --
+    -- A `variable` salesperson is paid the highest rank they clear each month
+    -- and drops back when they miss it; a `fixed` one keeps what they attained
+    -- and this only drives the "due a promotion" prompt.
+    group_sales_threshold DECIMAL(15, 2)
+        CONSTRAINT group_sales_threshold_positive
+        CHECK (group_sales_threshold IS NULL OR group_sales_threshold > 0),
 
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -200,9 +219,9 @@ CREATE TABLE comm_ranks (
 );
 
 COMMENT ON TABLE comm_ranks IS
-    'Tier ladder: Revenue Specialist 5/6/7%, Team Assistant 7/8%, Team Leader 9%, Senior Team Leader 10%. can_recruit is false below 6%.';
-COMMENT ON COLUMN comm_ranks.promotion_threshold_amount IS
-    'Display-only until promotion_basis is decided. The brief says a Revenue Specialist promotes to 7% at 300k, but not 300k of what.';
+    'Tier ladder: Revenue Specialist 5/6%, Team Assistant 7/8%, Team Leader 9%, Senior Team Leader 10%. There is NO 7% Revenue Specialist - 7% is where Team Assistant starts. can_recruit is false on the 5% rung.';
+COMMENT ON COLUMN comm_ranks.group_sales_threshold IS
+    'Group sales (own + whole downline) needed to hold this rank. Only ta_7 (300k) is known; the other rungs await their targets.';
 
 -- ----------------------------------------------------------------------------
 -- TABLE: comm_item_groups
@@ -320,7 +339,11 @@ CREATE TABLE comm_hierarchy (
     scheme_id UUID NOT NULL REFERENCES comm_schemes(id) ON DELETE CASCADE,
     staff_id UUID NOT NULL REFERENCES hr_staff_costs(id) ON DELETE CASCADE,
     upline_staff_id UUID REFERENCES hr_staff_costs(id) ON DELETE RESTRICT,
+    -- The rank ATTAINED. In fixed mode this is the whole story; in variable
+    -- mode it is the floor the monthly recalculation can never drop below.
     rank_id UUID NOT NULL REFERENCES comm_ranks(id) ON DELETE RESTRICT,
+    -- NULL = follow comm_schemes.default_rate_mode.
+    rate_mode comm_rate_mode,
     effective_from DATE NOT NULL,
     effective_to DATE,
     created_by UUID REFERENCES users(id),
@@ -484,6 +507,10 @@ CREATE TABLE sales_orders (
     -- ERP BALANCE — outstanding amount. Recorded so a future "pay commission
     -- on collection" rule has the data; nothing reads it today.
     balance DECIMAL(15, 2),
+    -- What the customer has actually put in. The deposit gate measures this
+    -- against order_total, so it is derived once here rather than in every query.
+    paid_amount DECIMAL(15, 2)
+        GENERATED ALWAYS AS (order_total - COALESCE(balance, 0)) STORED,
     cancelled BOOLEAN NOT NULL DEFAULT FALSE,
     -- Position among that agent's orders that day, derived from the running
     -- Doc. No. — the Date cells carry no time. Seeds the Open Bill picks.
@@ -574,6 +601,8 @@ CREATE INDEX idx_open_bill_tags_staff_day ON sales_order_open_bill_tags (staff_i
 -- RUNS + RESULTS
 -- ============================================================================
 
+-- comm_order_releases follows comm_runs below (it references it).
+
 CREATE TABLE comm_runs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     sub_department_id UUID NOT NULL REFERENCES comm_sub_departments(id) ON DELETE RESTRICT,
@@ -606,11 +635,22 @@ CREATE TABLE comm_statements (
 
     -- Snapshot of the position used, so later config edits never rewrite history
     tier_key TEXT,
+    -- The rank ATTAINED, and the one actually paid this month. They differ for
+    -- a variable-rate person whose group sales moved them up or back down.
+    base_rank_key TEXT,
     rank_key TEXT,
+    rate_mode comm_rate_mode,
+    -- Set when group sales clear a rank above the base: already applied for a
+    -- variable person, a promotion prompt for a fixed one.
+    qualifies_for_rank_key TEXT,
     product_rate DECIMAL(9, 6) NOT NULL DEFAULT 0,
     upline_staff_id UUID REFERENCES hr_staff_costs(id),
 
     product_revenue DECIMAL(15, 2) NOT NULL DEFAULT 0,
+    -- Own + the entire downline subtree - what the promotion threshold measures.
+    group_revenue DECIMAL(15, 2) NOT NULL DEFAULT 0,
+    -- Commissionable revenue held back by the deposit gate this month.
+    deferred_revenue DECIMAL(15, 2) NOT NULL DEFAULT 0,
     -- Revenue dropped because its item group is not commissionable — shown so
     -- the salesperson can see WHY their base is below their sales figure.
     excluded_revenue DECIMAL(15, 2) NOT NULL DEFAULT 0,
@@ -662,6 +702,35 @@ CREATE TABLE comm_statement_lines (
 COMMENT ON TABLE comm_statement_lines IS
     'Every ringgit traced to the order, order line, tagged bill or downline that produced it. Sum of lines.amount = statement.total_commission is verified by apply_commission_run before it commits.';
 
+-- ----------------------------------------------------------------------------
+-- TABLE: comm_order_releases
+-- Which orders have already had their commission paid, keyed by order_no
+-- because batch rows are replaced when a month is re-imported.
+--
+-- This is what makes the deposit gate safe: an order under the threshold in
+-- July is simply absent here, so August's run picks it up once the customer
+-- tops up - and the UNIQUE constraint means it can only ever be paid once.
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE comm_order_releases (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_no TEXT NOT NULL UNIQUE,
+    run_id UUID NOT NULL REFERENCES comm_runs(id) ON DELETE CASCADE,
+    staff_id UUID NOT NULL REFERENCES hr_staff_costs(id) ON DELETE RESTRICT,
+    period_month DATE NOT NULL,
+    order_period_month DATE NOT NULL,
+    product_revenue DECIMAL(15, 2) NOT NULL DEFAULT 0,
+    released_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT period_is_first_of_month CHECK (EXTRACT(DAY FROM period_month) = 1)
+);
+
+COMMENT ON TABLE comm_order_releases IS
+    'One row per sales order whose commission has been paid. order_period_month vs period_month shows an order carried forward because its deposit only cleared later.';
+
+CREATE INDEX idx_comm_order_releases_run ON comm_order_releases (run_id);
+CREATE INDEX idx_comm_order_releases_staff ON comm_order_releases (staff_id, period_month);
+
 CREATE INDEX idx_comm_statement_lines_stmt ON comm_statement_lines (statement_id, component);
 CREATE INDEX idx_comm_statement_lines_order ON comm_statement_lines (source_order_id);
 
@@ -686,22 +755,25 @@ BEGIN
             'Roadshow / event team. Open Bill rewards writing consecutive bills during a 3-day event.')
     RETURNING id INTO v_sub;
 
-    INSERT INTO comm_schemes (sub_department_id, scheme_name, effective_from)
-    VALUES (v_sub, 'Fair 2026', DATE '2026-01-01')
+    INSERT INTO comm_schemes (sub_department_id, scheme_name, effective_from,
+                              deposit_threshold_pct, default_rate_mode)
+    VALUES (v_sub, 'Fair 2026', DATE '2026-01-01', 0.50, 'variable')
     RETURNING id INTO v_scheme;
 
     -- Tier ladder. Rates overlap across tiers; can_recruit unlocks at 6%.
+    -- Six rungs. There is NO 7% Revenue Specialist: 7% is where Team
+    -- Assistant starts, and 300k of GROUP sales is what gets you there.
+    -- The other thresholds are unknown and left NULL (spec Q1).
     INSERT INTO comm_ranks
         (scheme_id, tier_key, tier_label, rank_key, label, product_rate, can_recruit,
-         promote_to_rank_key, promotion_threshold_amount, sort_order)
+         group_sales_threshold, sort_order)
     VALUES
-        (v_scheme, 'revenue_specialist', 'Revenue Specialist', 'rs_5',   'Revenue Specialist - 5%',  0.05, FALSE, 'rs_6', NULL,      10),
-        (v_scheme, 'revenue_specialist', 'Revenue Specialist', 'rs_6',   'Revenue Specialist - 6%',  0.06, TRUE,  'rs_7', 300000.00, 20),
-        (v_scheme, 'revenue_specialist', 'Revenue Specialist', 'rs_7',   'Revenue Specialist - 7%',  0.07, TRUE,  NULL,   NULL,      30),
-        (v_scheme, 'team_assistant',     'Team Assistant',     'ta_7',   'Team Assistant - 7%',      0.07, TRUE,  'ta_8', NULL,      40),
-        (v_scheme, 'team_assistant',     'Team Assistant',     'ta_8',   'Team Assistant - 8%',      0.08, TRUE,  NULL,   NULL,      50),
-        (v_scheme, 'team_leader',        'Team Leader',        'tl_9',   'Team Leader - 9%',         0.09, TRUE,  NULL,   NULL,      60),
-        (v_scheme, 'senior_team_leader', 'Senior Team Leader', 'stl_10', 'Senior Team Leader - 10%', 0.10, TRUE,  NULL,   NULL,      70);
+        (v_scheme, 'revenue_specialist', 'Revenue Specialist', 'rs_5',   'Revenue Specialist - 5%',  0.05, FALSE, NULL,      10),
+        (v_scheme, 'revenue_specialist', 'Revenue Specialist', 'rs_6',   'Revenue Specialist - 6%',  0.06, TRUE,  NULL,      20),
+        (v_scheme, 'team_assistant',     'Team Assistant',     'ta_7',   'Team Assistant - 7%',      0.07, TRUE,  300000.00, 30),
+        (v_scheme, 'team_assistant',     'Team Assistant',     'ta_8',   'Team Assistant - 8%',      0.08, TRUE,  NULL,      40),
+        (v_scheme, 'team_leader',        'Team Leader',        'tl_9',   'Team Leader - 9%',         0.09, TRUE,  NULL,      50),
+        (v_scheme, 'senior_team_leader', 'Senior Team Leader', 'stl_10', 'Senior Team Leader - 10%', 0.10, TRUE,  NULL,      60);
 
     -- Item groups seen in the July SO export.
     INSERT INTO comm_item_groups (scheme_id, item_group, commissionable, note) VALUES
@@ -748,7 +820,8 @@ BEGIN
         'comm_hierarchy', 'comm_agent_aliases',
         'sales_import_batches', 'sales_orders', 'sales_order_lines',
         'sales_order_open_bill_tags',
-        'comm_runs', 'comm_statements', 'comm_statement_lines'
+        'comm_runs', 'comm_statements', 'comm_statement_lines',
+        'comm_order_releases'
     ]
     LOOP
         EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', t);

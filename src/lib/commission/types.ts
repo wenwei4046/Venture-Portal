@@ -3,17 +3,16 @@
  *
  * Deliberately free of Supabase types: the engine is pure so it can be
  * unit-tested against hand-worked examples with no database. The Server Action
- * is responsible for loading these shapes out of Postgres and posting the
- * result back through `apply_commission_run`.
+ * loads these shapes out of Postgres and posts the result back through
+ * `apply_commission_run`.
  *
  * Scope note (user brief 2026-08-31): the Revenue Department is divided into
- * SUB-DEPARTMENTS, and each one calculates differently. The four components
- * modelled here are the **Fair** sub-department's ruleset (the roadshow /
- * event team). A scheme therefore belongs to a sub-department and can switch
- * each component off, so a future sub-department can reuse what applies and
- * drop what doesn't.
+ * SUB-DEPARTMENTS and each one calculates differently. The components modelled
+ * here are the **Fair** sub-department's ruleset (the roadshow / event team).
+ * A scheme belongs to a sub-department and can switch each component off, so a
+ * future sub-department reuses what applies and drops what doesn't.
  *
- * See docs/module-spec-revenue-commission.md §3 for the money rules.
+ * See docs/module-spec-revenue-commission.md §4 for the money rules.
  */
 
 // ─── Imported facts ─────────────────────────────────────────────────────────
@@ -39,8 +38,19 @@ export interface SalesOrder {
   staffId: string
   /** YYYY-MM-DD */
   orderDate: string
+  /** YYYY-MM-01 of orderDate. Differs from the run's period for an order
+   *  carried forward because its deposit only cleared later. */
+  periodMonth: string
   /** YYYY-MM-DD — the event day used for Open Bill (1st/2nd/3rd) grouping. */
   eventDate: string
+  /** ERP header `Total` — the deposit gate measures against this, not against
+   *  the commissionable subset. */
+  orderTotal: number
+  /** Collected so far = orderTotal − ERP `BALANCE`. */
+  paidAmount: number
+  /** True when an earlier applied run already paid this order's commission.
+   *  Guards the carry-forward path against double-paying. */
+  alreadyReleased?: boolean
   lines: SalesLine[]
 }
 
@@ -84,22 +94,51 @@ export interface OpenBillTag {
   rank: OpenBillRank
 }
 
+/**
+ * One rung of the tier ladder (user brief 2026-08-31):
+ *   Revenue Specialist 5% → 6% · Team Assistant 7% → 8%
+ *   Team Leader 9% · Senior Team Leader 10%
+ * Rates do not repeat, but the rank key is still the identity so a future
+ * scheme can reuse a rate at two tiers.
+ */
+export interface Rank {
+  rankKey: string
+  tierKey: string
+  tierLabel: string
+  label: string
+  /** 0.07 = 7% of commissionable product revenue. */
+  productRate: number
+  /** A Revenue Specialist on 5% may not hold downlines; 6% unlocks it. */
+  canRecruit: boolean
+  /**
+   * GROUP sales needed to hold this rank — the person's own commissionable
+   * revenue plus their whole downline's. 300,000 promotes a 6% Revenue
+   * Specialist to Team Assistant 7%. `null` = an entry rank that cannot be
+   * climbed to by volume.
+   */
+  groupSalesThreshold: number | null
+  sortOrder: number
+}
+
+export type RateMode = 'fixed' | 'variable'
+
 /** One person's payroll-purpose position for the period being computed. */
 export interface HierarchyNode {
   staffId: string
   /** null = top of a tree. */
   uplineStaffId: string | null
-  /** e.g. 'revenue_specialist' | 'team_assistant' | 'team_leader' | 'senior_team_leader' */
-  tierKey: string
-  /** The (tier, rate) pair, e.g. 'rs_6' — rates overlap across tiers. */
-  rankKey: string
-  /** 0.07 = 7% of commissionable product revenue. */
-  productRate: number
   /**
-   * Whether this rank may hold downlines at all. A Revenue Specialist on 5%
-   * may not recruit; reaching 6% unlocks it (user brief 2026-08-31).
+   * The rank they have ATTAINED. In `fixed` mode this is the whole story; in
+   * `variable` mode it is the floor they can never drop below.
    */
-  canRecruit: boolean
+  baseRankKey: string
+  /**
+   * fixed    — once promoted, the rate stays even in a month that misses the
+   *            target ("升到 7% 之后即使没达到 300k 依然 fixed 在 7%").
+   * variable — recomputed every month from that month's group sales; misses
+   *            the target and the rate drops back to the base rank.
+   */
+  rateMode: RateMode
 }
 
 export interface CommissionScheme {
@@ -107,8 +146,8 @@ export interface CommissionScheme {
    * How the Open Bill bonus is based (confirmed 2026-08-31):
    *  - 'uplift_on_commission' → orderRevenue × personalRate × billPct.
    *    "10,000 at 7% → compute the 7% first, then add 50%" → 700 + 350.
-   *  - 'pct_of_revenue' → orderRevenue × billPct. Kept as a documented
-   *    alternative; no sub-department uses it today.
+   *  - 'pct_of_revenue' → orderRevenue × billPct. A documented alternative;
+   *    no sub-department uses it today.
    */
   openBillBasis: 'uplift_on_commission' | 'pct_of_revenue'
   /** Whether KPI-item revenue counts toward a downline's override base. */
@@ -124,12 +163,22 @@ export interface CommissionScheme {
    * before it can silently start (or stop) paying commission.
    */
   itemGroups: ItemGroupRule[]
+  /**
+   * Fraction of the order total the customer must have paid before ANY of
+   * that order's commission is released. 0.5 = half. `null` disables the gate.
+   * An order below it is deferred, not lost: it pays in the month its deposit
+   * finally clears.
+   */
+  depositThresholdPct: number | null
+  /** Applied to a salesperson who has no explicit rateMode of their own. */
+  defaultRateMode: RateMode
 }
 
 export interface EngineInput {
-  /** YYYY-MM-01. Commission settles per calendar month (user, 2026-08-31). */
+  /** YYYY-MM-01 — commission settles per calendar month. */
   periodMonth: string
   scheme: CommissionScheme
+  ranks: Rank[]
   orders: SalesOrder[]
   kpiItems: KpiItem[]
   kpiThresholds: KpiThreshold[]
@@ -164,17 +213,44 @@ export interface StatementLine {
   note: string
 }
 
+/** An order held back because its deposit has not reached the threshold. */
+export interface DeferredOrder {
+  staffId: string
+  orderId: string
+  orderNo: string
+  orderDate: string
+  orderTotal: number
+  paidAmount: number
+  requiredAmount: number
+  /** Commissionable revenue that is waiting on the top-up. */
+  productRevenue: number
+}
+
 export interface Statement {
   staffId: string
+
+  /** What they have attained; the floor in variable mode. */
+  baseRankKey: string | null
+  rateMode: RateMode
+  /** The rank actually used this month, after the variable-rate resolution. */
+  effectiveRankKey: string | null
   tierKey: string | null
-  rankKey: string | null
   productRate: number
+  /** Set when group sales qualify them for a rank above their base — the
+   *  promotion prompt for a fixed-rate person, already applied for a variable. */
+  qualifiesForRankKey: string | null
+
   uplineStaffId: string | null
 
-  /** Commissionable product revenue: excludes KPI items and excluded groups. */
+  /** Own commissionable revenue: excludes KPI items, excluded groups, and
+   *  orders held by the deposit gate. */
   productRevenue: number
-  /** Revenue that was dropped because its item group isn't commissionable. */
+  /** Own + entire downline subtree — what the promotion threshold measures. */
+  groupRevenue: number
+  /** Revenue dropped because its item group isn't commissionable. */
   excludedRevenue: number
+  /** Revenue waiting on a deposit top-up. */
+  deferredRevenue: number
   productCommission: number
 
   kpiQty: number
@@ -193,6 +269,9 @@ export interface EngineResult {
   periodMonth: string
   statements: Statement[]
   totalCommission: number
+  /** Orders held back by the deposit gate, so the run dashboard can show how
+   *  much commission is waiting on collections. */
+  deferred: DeferredOrder[]
   /**
    * Non-fatal problems a human must look at before applying the run — e.g. a
    * salesperson with sales but no rank, an unclassified ERP item group, or a

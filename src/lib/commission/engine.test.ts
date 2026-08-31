@@ -2,22 +2,27 @@ import { describe, it, expect } from 'vitest'
 import {
   classifyLine,
   computeCommissionRun,
+  computeGroupRevenue,
   computeOverrides,
+  depositRequired,
   indexItemGroups,
   indexKpiItems,
+  isDepositMet,
   kpiThresholdPct,
   orderProductRevenue,
+  resolveRank,
 } from './engine'
 import type {
   CommissionScheme,
   EngineInput,
   HierarchyNode,
   ItemGroupRule,
+  Rank,
   SalesOrder,
   Statement,
 } from './types'
 
-// ─── Fixtures — the Fair sub-department ruleset ─────────────────────────────
+// ─── Fixtures — the Fair sub-department ─────────────────────────────────────
 
 /**
  * ERP item groups seen in the July SO export. User decision 2026-08-31:
@@ -34,6 +39,20 @@ const ITEM_GROUPS: ItemGroupRule[] = [
   { group: 'OTHER', commissionable: false },
 ]
 
+/**
+ * The corrected ladder (user, 2026-08-31): Revenue Specialist is 5% → 6% ONLY;
+ * 7% is where Team Assistant starts. 300k of GROUP sales is what promotes a 6%
+ * Specialist to Team Assistant.
+ */
+const RANKS: Rank[] = [
+  { rankKey: 'rs_5', tierKey: 'revenue_specialist', tierLabel: 'Revenue Specialist', label: 'Revenue Specialist · 5%', productRate: 0.05, canRecruit: false, groupSalesThreshold: null, sortOrder: 10 },
+  { rankKey: 'rs_6', tierKey: 'revenue_specialist', tierLabel: 'Revenue Specialist', label: 'Revenue Specialist · 6%', productRate: 0.06, canRecruit: true, groupSalesThreshold: null, sortOrder: 20 },
+  { rankKey: 'ta_7', tierKey: 'team_assistant', tierLabel: 'Team Assistant', label: 'Team Assistant · 7%', productRate: 0.07, canRecruit: true, groupSalesThreshold: 300_000, sortOrder: 30 },
+  { rankKey: 'ta_8', tierKey: 'team_assistant', tierLabel: 'Team Assistant', label: 'Team Assistant · 8%', productRate: 0.08, canRecruit: true, groupSalesThreshold: null, sortOrder: 40 },
+  { rankKey: 'tl_9', tierKey: 'team_leader', tierLabel: 'Team Leader', label: 'Team Leader · 9%', productRate: 0.09, canRecruit: true, groupSalesThreshold: null, sortOrder: 50 },
+  { rankKey: 'stl_10', tierKey: 'senior_team_leader', tierLabel: 'Senior Team Leader', label: 'Senior Team Leader · 10%', productRate: 0.10, canRecruit: true, groupSalesThreshold: null, sortOrder: 60 },
+]
+
 const SCHEME: CommissionScheme = {
   openBillBasis: 'uplift_on_commission',
   overrideIncludesKpi: false,
@@ -42,6 +61,8 @@ const SCHEME: CommissionScheme = {
   enableOpenBill: true,
   enableOverride: true,
   itemGroups: ITEM_GROUPS,
+  depositThresholdPct: 0.5,
+  defaultRateMode: 'variable',
 }
 
 const KPI_ITEMS = [{ productCode: 'AK-CS AIRLOFT COMFY PIL', kpiAmount: 50 }]
@@ -52,42 +73,50 @@ const OPEN_BILL_RULES = [
   { rank: 3 as const, pct: 0.3 },
 ]
 
-/**
- * The four tiers from the brief. Rates overlap across tiers (7% is both a
- * senior Revenue Specialist and a junior Team Assistant), which is why the
- * rank key carries the tier.
- */
-const RS5: Omit<HierarchyNode, 'staffId' | 'uplineStaffId'> =
-  { tierKey: 'revenue_specialist', rankKey: 'rs_5', productRate: 0.05, canRecruit: false }
-const RS6: Omit<HierarchyNode, 'staffId' | 'uplineStaffId'> =
-  { tierKey: 'revenue_specialist', rankKey: 'rs_6', productRate: 0.06, canRecruit: true }
-const TA7: Omit<HierarchyNode, 'staffId' | 'uplineStaffId'> =
-  { tierKey: 'team_assistant', rankKey: 'ta_7', productRate: 0.07, canRecruit: true }
-const TL9: Omit<HierarchyNode, 'staffId' | 'uplineStaffId'> =
-  { tierKey: 'team_leader', rankKey: 'tl_9', productRate: 0.09, canRecruit: true }
-const STL10: Omit<HierarchyNode, 'staffId' | 'uplineStaffId'> =
-  { tierKey: 'senior_team_leader', rankKey: 'stl_10', productRate: 0.10, canRecruit: true }
+function node(
+  staffId: string,
+  uplineStaffId: string | null,
+  baseRankKey: string,
+  rateMode: 'fixed' | 'variable' = 'fixed',
+): HierarchyNode {
+  return { staffId, uplineStaffId, baseRankKey, rateMode }
+}
 
-/** STL 10% → TL 9% → TA 7% → RS 5% */
+/** STL 10% → TL 9% → TA 7% → RS 5%, all on fixed rates. */
 const CHAIN: HierarchyNode[] = [
-  { staffId: 'stl', uplineStaffId: null, ...STL10 },
-  { staffId: 'tl', uplineStaffId: 'stl', ...TL9 },
-  { staffId: 'ta', uplineStaffId: 'tl', ...TA7 },
-  { staffId: 'rs', uplineStaffId: 'ta', ...RS5 },
+  node('stl', null, 'stl_10'),
+  node('tl', 'stl', 'tl_9'),
+  node('ta', 'tl', 'ta_7'),
+  node('rs', 'ta', 'rs_5'),
 ]
+
+interface OrderOpts {
+  date?: string
+  paidAmount?: number
+  orderTotal?: number
+  alreadyReleased?: boolean
+  periodMonth?: string
+}
 
 function order(
   id: string,
   staffId: string,
   lines: Array<[group: string, code: string, qty: number, amount: number]>,
-  date = '2026-07-06',
+  opts: OrderOpts = {},
 ): SalesOrder {
+  const date = opts.date ?? '2026-07-06'
+  const total = opts.orderTotal ?? lines.reduce((a, l) => a + l[3], 0)
   return {
     id,
     orderNo: `SO-${id}`,
     staffId,
     orderDate: date,
+    periodMonth: opts.periodMonth ?? `${date.slice(0, 7)}-01`,
     eventDate: date,
+    orderTotal: total,
+    // Default to fully paid so a test only opts into the deposit gate.
+    paidAmount: opts.paidAmount ?? total,
+    alreadyReleased: opts.alreadyReleased,
     lines: lines.map(([itemGroup, productCode, qty, lineAmount], i) => ({
       id: `${id}-L${i + 1}`,
       itemGroup,
@@ -102,6 +131,7 @@ function run(partial: Partial<EngineInput>) {
   return computeCommissionRun({
     periodMonth: '2026-07-01',
     scheme: SCHEME,
+    ranks: RANKS,
     orders: [],
     kpiItems: KPI_ITEMS,
     kpiThresholds: KPI_THRESHOLDS,
@@ -161,7 +191,224 @@ describe('item group policy', () => {
     const rs = find(r.statements, 'rs')
     expect(rs.productRevenue).toBe(7083)
     expect(rs.excludedRevenue).toBe(1205)
-    expect(rs.productCommission).toBe(354.15) // 7,083 × 5%
+    expect(rs.productCommission).toBe(354.15) // 7,083 x 5%
+  })
+})
+
+// ─── Deposit gate ───────────────────────────────────────────────────────────
+
+describe('deposit gate', () => {
+  it('computes the required deposit off the ORDER total, not the commissionable part', () => {
+    // 10,000 of goods + 500 transport: the customer owes 10,500, so half is
+    // 5,250 even though only 10,000 earns commission.
+    const o = order('1', 'rs', [
+      ['MATTRESS', 'M1', 1, 10_000],
+      ['TRANS', 'T', 1, 500],
+    ], { paidAmount: 5_000 })
+    expect(depositRequired(o.orderTotal, 0.5)).toBe(5_250)
+    expect(isDepositMet(o, 0.5)).toBe(false)
+  })
+
+  it("matches the brief's example: 10,000 order needs 5,000 in", () => {
+    const under = order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000]], { paidAmount: 4_999 })
+    const exact = order('2', 'rs', [['MATTRESS', 'M1', 1, 10_000]], { paidAmount: 5_000 })
+    expect(isDepositMet(under, 0.5)).toBe(false)
+    expect(isDepositMet(exact, 0.5)).toBe(true)
+  })
+
+  it('pays nothing at all on an under-deposited order', () => {
+    const r = run({
+      orders: [order('1', 'rs', [
+        ['MATTRESS', 'M1', 1, 10_000],
+        ['ACC', 'AK-CS AIRLOFT COMFY PIL', 4, 0],
+      ], { paidAmount: 2_000 })],
+      openBillTags: [{ orderId: '1', rank: 1 }],
+    })
+    const rs = find(r.statements, 'rs')
+    expect(rs.productRevenue).toBe(0)
+    expect(rs.deferredRevenue).toBe(10_000)
+    expect(rs.kpiCommission).toBe(0) // the free pillows wait too
+    expect(rs.openBillBonus).toBe(0)
+    expect(rs.totalCommission).toBe(0)
+  })
+
+  it('reports the shortfall so collections can chase it', () => {
+    const r = run({
+      orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000]], { paidAmount: 2_000 })],
+    })
+    expect(r.deferred).toEqual([{
+      staffId: 'rs',
+      orderId: '1',
+      orderNo: 'SO-1',
+      orderDate: '2026-07-06',
+      orderTotal: 10_000,
+      paidAmount: 2_000,
+      requiredAmount: 5_000,
+      productRevenue: 10_000,
+    }])
+  })
+
+  it('pays a July order inside the August run once the deposit clears', () => {
+    const r = run({
+      periodMonth: '2026-08-01',
+      orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000]], {
+        date: '2026-07-20', paidAmount: 6_000,
+      })],
+    })
+    const rs = find(r.statements, 'rs')
+    expect(rs.productCommission).toBe(500)
+    expect(rs.lines[0].note).toMatch(/carried from 2026-07/)
+  })
+
+  it('never pays an order a previous run already released', () => {
+    const r = run({
+      orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000]], { alreadyReleased: true })],
+    })
+    expect(r.statements.find(s => s.staffId === 'rs' && s.totalCommission > 0)).toBeUndefined()
+  })
+
+  it('disables the gate when no threshold is configured', () => {
+    const r = run({
+      scheme: { ...SCHEME, depositThresholdPct: null },
+      orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000]], { paidAmount: 0 })],
+    })
+    expect(find(r.statements, 'rs').productCommission).toBe(500)
+    expect(r.deferred).toEqual([])
+  })
+})
+
+// ─── Group revenue + rate resolution ────────────────────────────────────────
+
+describe('group revenue', () => {
+  it("matches the brief: 200k own + 100k + 100k downline = 400k group", () => {
+    const nodes = new Map([
+      ['boss', node('boss', null, 'rs_6')],
+      ['a', node('a', 'boss', 'rs_5')],
+      ['b', node('b', 'boss', 'rs_5')],
+    ])
+    const own = new Map([['boss', 200_000], ['a', 100_000], ['b', 100_000]])
+    const group = computeGroupRevenue(nodes, own, [])
+    expect(group.get('boss')).toBe(400_000)
+    expect(group.get('a')).toBe(100_000)
+  })
+
+  it('rolls a grandchild all the way to the top', () => {
+    const nodes = new Map([
+      ['top', node('top', null, 'tl_9')],
+      ['mid', node('mid', 'top', 'ta_7')],
+      ['low', node('low', 'mid', 'rs_5')],
+    ])
+    const group = computeGroupRevenue(nodes, new Map([['low', 50_000]]), [])
+    expect(group.get('low')).toBe(50_000)
+    expect(group.get('mid')).toBe(50_000)
+    expect(group.get('top')).toBe(50_000)
+  })
+
+  it('stops at a cycle rather than looping forever', () => {
+    const nodes = new Map([
+      ['a', node('a', 'b', 'rs_6')],
+      ['b', node('b', 'a', 'rs_5')],
+    ])
+    const warnings: string[] = []
+    const group = computeGroupRevenue(nodes, new Map([['a', 10_000]]), warnings)
+    expect(group.get('b')).toBe(10_000)
+    expect(warnings.join(' ')).toMatch(/cycle/i)
+  })
+})
+
+describe('resolveRank — fixed vs variable', () => {
+  it('variable climbs to Team Assistant when group sales clear 300k', () => {
+    const r = resolveRank(node('x', null, 'rs_6', 'variable'), RANKS, 400_000)
+    expect(r.effective?.rankKey).toBe('ta_7')
+    expect(r.qualifiesFor?.rankKey).toBe('ta_7')
+  })
+
+  it('variable drops back to the base rank in a month that misses the target', () => {
+    const r = resolveRank(node('x', null, 'rs_6', 'variable'), RANKS, 250_000)
+    expect(r.effective?.rankKey).toBe('rs_6')
+    expect(r.qualifiesFor).toBeUndefined()
+  })
+
+  it('fixed keeps the attained rank but still reports the qualification', () => {
+    const r = resolveRank(node('x', null, 'rs_6', 'fixed'), RANKS, 400_000)
+    expect(r.effective?.rankKey).toBe('rs_6')
+    expect(r.qualifiesFor?.rankKey).toBe('ta_7')
+  })
+
+  it('fixed keeps 7% in a month below target — the point of fixed', () => {
+    const r = resolveRank(node('x', null, 'ta_7', 'fixed'), RANKS, 10_000)
+    expect(r.effective?.rankKey).toBe('ta_7')
+    expect(r.effective?.productRate).toBe(0.07)
+  })
+
+  it('never drops a variable person below their attained rank', () => {
+    const r = resolveRank(node('x', null, 'ta_7', 'variable'), RANKS, 0)
+    expect(r.effective?.rankKey).toBe('ta_7')
+  })
+
+  it('the ladder has no 7% Revenue Specialist', () => {
+    expect(RANKS.filter(r => r.tierKey === 'revenue_specialist').map(r => r.productRate))
+      .toEqual([0.05, 0.06])
+  })
+})
+
+describe('rate mode end to end', () => {
+  const team: HierarchyNode[] = [
+    node('boss', null, 'rs_6', 'variable'),
+    node('a', 'boss', 'rs_5'),
+    node('b', 'boss', 'rs_5'),
+  ]
+  const orders = [
+    order('1', 'boss', [['MATTRESS', 'M', 1, 200_000]]),
+    order('2', 'a', [['MATTRESS', 'M', 1, 100_000]]),
+    order('3', 'b', [['MATTRESS', 'M', 1, 100_000]]),
+  ]
+
+  it('a variable leader on 400k group sales is paid at 7%', () => {
+    const r = run({ hierarchy: team, orders })
+    const boss = find(r.statements, 'boss')
+    expect(boss.groupRevenue).toBe(400_000)
+    expect(boss.effectiveRankKey).toBe('ta_7')
+    expect(boss.productRate).toBe(0.07)
+    expect(boss.productCommission).toBe(14_000) // 200k x 7%
+    expect(boss.overrideCommission).toBe(4_000) // (7-5)% x 200k of downline
+    expect(r.totalCommission).toBe(28_000) // every ringgit capped at 7%
+  })
+
+  it('the same team on a fixed leader pays 6%', () => {
+    const fixed = team.map(n => (n.staffId === 'boss' ? node('boss', null, 'rs_6', 'fixed') : n))
+    const r = run({ hierarchy: fixed, orders })
+    const boss = find(r.statements, 'boss')
+    expect(boss.effectiveRankKey).toBe('rs_6')
+    expect(boss.productCommission).toBe(12_000) // 200k x 6%
+    expect(boss.overrideCommission).toBe(2_000) // (6-5)% x 200k
+    expect(boss.qualifiesForRankKey).toBe('ta_7') // prompt to promote them
+    expect(r.totalCommission).toBe(24_000)
+  })
+
+  it('a variable leader below target reverts to 6% the next month', () => {
+    const lean = [
+      order('1', 'boss', [['MATTRESS', 'M', 1, 100_000]]),
+      order('2', 'a', [['MATTRESS', 'M', 1, 50_000]]),
+    ]
+    const r = run({ hierarchy: team, orders: lean })
+    const boss = find(r.statements, 'boss')
+    expect(boss.groupRevenue).toBe(150_000)
+    expect(boss.effectiveRankKey).toBe('rs_6')
+    expect(boss.productRate).toBe(0.06)
+  })
+
+  it('group sales count only revenue that passed the deposit gate', () => {
+    const gated = [
+      order('1', 'boss', [['MATTRESS', 'M', 1, 200_000]]),
+      order('2', 'a', [['MATTRESS', 'M', 1, 100_000]]),
+      order('3', 'b', [['MATTRESS', 'M', 1, 100_000]], { paidAmount: 1_000 }),
+    ]
+    const r = run({ hierarchy: team, orders: gated })
+    const boss = find(r.statements, 'boss')
+    expect(boss.groupRevenue).toBe(300_000)
+    expect(boss.effectiveRankKey).toBe('ta_7') // exactly on the threshold
+    expect(find(r.statements, 'b').deferredRevenue).toBe(100_000)
   })
 })
 
@@ -172,8 +419,6 @@ describe('KPI items', () => {
   const groupIndex = indexItemGroups(ITEM_GROUPS)
 
   it('excludes a KPI item from product revenue even though ACC is commissionable', () => {
-    // A pillow sold for 250 must not count as revenue — it already earns its
-    // flat KPI allowance.
     const o = order('1', 'rs', [
       ['MATTRESS', 'AK-GUARDIAN MATT (Q)', 1, 2800],
       ['ACC', 'AK-CS AIRLOFT COMFY PIL', 1, 250],
@@ -183,8 +428,6 @@ describe('KPI items', () => {
   })
 
   it('pays free bundled KPI items — the usual case in the ERP export', () => {
-    // The ERP prices packages: the mattress line carries the money, the pillows
-    // are qty 4 at 0. Those 4 pillows still earn 4 × 50.
     const r = run({
       orders: [order('1', 'rs', [
         ['MATTRESS', 'AK-GUARDIAN MATT (K)', 1, 6400],
@@ -197,9 +440,12 @@ describe('KPI items', () => {
     expect(rs.kpiCommission).toBe(200)
   })
 
-  it("matches the brief's worked example: 10 × 50 then +20%", () => {
+  it("matches the brief's worked example: 10 x 50 then +20%", () => {
     const r = run({
-      orders: [order('1', 'rs', [['ACC', 'AK-CS AIRLOFT COMFY PIL', 10, 0]])],
+      orders: [order('1', 'rs', [
+        ['MATTRESS', 'M', 1, 5_000],
+        ['ACC', 'AK-CS AIRLOFT COMFY PIL', 10, 0],
+      ])],
     })
     const rs = find(r.statements, 'rs')
     expect(rs.kpiBase).toBe(500)
@@ -209,7 +455,10 @@ describe('KPI items', () => {
 
   it('does not uplift below the rung', () => {
     const r = run({
-      orders: [order('1', 'rs', [['ACC', 'AK-CS AIRLOFT COMFY PIL', 9, 0]])],
+      orders: [order('1', 'rs', [
+        ['MATTRESS', 'M', 1, 5_000],
+        ['ACC', 'AK-CS AIRLOFT COMFY PIL', 9, 0],
+      ])],
     })
     expect(find(r.statements, 'rs').kpiCommission).toBe(450)
   })
@@ -232,7 +481,7 @@ describe('KPI items', () => {
 describe('Open Bill bonus', () => {
   const orders = [order('1', 'ta', [['MATTRESS', 'M1', 1, 10_000]])]
 
-  it("matches the brief: Team Assistant on 7%, 10,000 → 700 then +50%", () => {
+  it('matches the brief: Team Assistant on 7%, 10,000 → 700 then +50%', () => {
     const r = run({ orders, openBillTags: [{ orderId: '1', rank: 1 }] })
     const ta = find(r.statements, 'ta')
     expect(ta.productCommission).toBe(700)
@@ -240,7 +489,7 @@ describe('Open Bill bonus', () => {
     expect(ta.productCommission + ta.openBillBonus).toBe(1_050)
   })
 
-  it("matches the brief: Revenue Specialist on 5%, 10,000 → 500 then +50%", () => {
+  it('matches the brief: Revenue Specialist on 5%, 10,000 → 500 then +50%', () => {
     const r = run({
       orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000]])],
       openBillTags: [{ orderId: '1', rank: 1 }],
@@ -250,17 +499,20 @@ describe('Open Bill bonus', () => {
     expect(rs.openBillBonus).toBe(250)
   })
 
-  it('follows the person\'s CURRENT rate, so a promotion changes the bonus', () => {
-    const promoted = CHAIN.map(n => (n.staffId === 'ta' ? { ...n, ...TL9 } : n))
-    const r = run({ orders, openBillTags: [{ orderId: '1', rank: 1 }], hierarchy: promoted })
-    expect(find(r.statements, 'ta').openBillBonus).toBe(450) // 10,000 × 9% × 50%
+  it('follows the EFFECTIVE rate, so a variable promotion lifts the bonus too', () => {
+    const solo = [node('x', null, 'rs_6', 'variable')]
+    const big = [order('1', 'x', [['MATTRESS', 'M', 1, 400_000]])]
+    const r = run({ hierarchy: solo, orders: big, openBillTags: [{ orderId: '1', rank: 1 }] })
+    const x = find(r.statements, 'x')
+    expect(x.productRate).toBe(0.07) // climbed on 400k group sales
+    expect(x.openBillBonus).toBe(14_000) // 400,000 x 7% x 50%
   })
 
   it('grades the 2nd and 3rd bill of the day down to 40% and 30%', () => {
     const two = run({ orders, openBillTags: [{ orderId: '1', rank: 2 }] })
     const three = run({ orders, openBillTags: [{ orderId: '1', rank: 3 }] })
-    expect(find(two.statements, 'ta').openBillBonus).toBe(280) // 700 × 40%
-    expect(find(three.statements, 'ta').openBillBonus).toBe(210) // 700 × 30%
+    expect(find(two.statements, 'ta').openBillBonus).toBe(280) // 700 x 40%
+    expect(find(three.statements, 'ta').openBillBonus).toBe(210) // 700 x 30%
   })
 
   it('excludes transport and KPI revenue from the bonus base', () => {
@@ -312,10 +564,7 @@ describe('hierarchy override — differential roll-up', () => {
   })
 
   it("implements the brief's '6% can override the 5%s'", () => {
-    const pair: HierarchyNode[] = [
-      { staffId: 'six', uplineStaffId: null, ...RS6 },
-      { staffId: 'five', uplineStaffId: 'six', ...RS5 },
-    ]
+    const pair: HierarchyNode[] = [node('six', null, 'rs_6'), node('five', 'six', 'rs_5')]
     const r = run({
       hierarchy: pair,
       orders: [order('1', 'five', [['MATTRESS', 'M1', 1, 20_000]])],
@@ -325,41 +574,37 @@ describe('hierarchy override — differential roll-up', () => {
   })
 
   it('compresses to zero between two people on the same rate', () => {
-    // Revenue Specialist 7% under Team Assistant 7%: nothing to override.
-    const flat: HierarchyNode[] = [
-      { staffId: 'ta', uplineStaffId: null, ...TA7 },
-      { staffId: 'rs7', uplineStaffId: 'ta', tierKey: 'revenue_specialist', rankKey: 'rs_7', productRate: 0.07, canRecruit: true },
-    ]
-    const r = run({ hierarchy: flat, orders: [order('1', 'rs7', [['MATTRESS', 'M1', 1, 20_000]])] })
-    expect(r.statements.find(s => s.staffId === 'ta')).toBeUndefined()
-    expect(find(r.statements, 'rs7').totalCommission).toBe(1_400)
+    const flat: HierarchyNode[] = [node('up', null, 'ta_7'), node('down', 'up', 'ta_7')]
+    const r = run({ hierarchy: flat, orders: [order('1', 'down', [['MATTRESS', 'M1', 1, 20_000]])] })
+    expect(find(r.statements, 'up').overrideCommission).toBe(0)
+    expect(find(r.statements, 'down').totalCommission).toBe(1_400)
   })
 
   it('flags a downline placed under a rank that may not recruit', () => {
-    const bad: HierarchyNode[] = [
-      { staffId: 'five', uplineStaffId: null, ...RS5 },
-      { staffId: 'other', uplineStaffId: 'five', ...RS5 },
-    ]
+    const bad: HierarchyNode[] = [node('five', null, 'rs_5'), node('other', 'five', 'rs_5')]
     const r = run({ hierarchy: bad, orders: [] })
     expect(r.warnings.join(' ')).toMatch(/is not allowed to recruit/)
   })
 
   it('breaks a hierarchy cycle instead of looping forever', () => {
-    const cyclic = new Map<string, HierarchyNode>([
-      ['a', { staffId: 'a', uplineStaffId: 'b', ...TA7 }],
-      ['b', { staffId: 'b', uplineStaffId: 'a', ...RS5 }],
-    ])
+    const cyclic = new Map([['a', node('a', 'b', 'ta_7')], ['b', node('b', 'a', 'rs_5')]])
+    const rates = new Map([['a', 0.07], ['b', 0.05]])
     const warnings: string[] = []
-    const credits = computeOverrides(cyclic, new Map([['b', 10_000]]), warnings)
+    const credits = computeOverrides(cyclic, rates, new Map([['b', 10_000]]), warnings)
     expect(credits).toHaveLength(1)
     expect(credits[0]).toMatchObject({ uplineStaffId: 'a', amount: 200 })
     expect(warnings.join(' ')).toMatch(/cycle/i)
   })
 
   it('warns when an upline has no active hierarchy row', () => {
-    const orphan: HierarchyNode[] = [{ staffId: 'rs', uplineStaffId: 'ghost', ...RS5 }]
+    const orphan: HierarchyNode[] = [node('rs', 'ghost', 'rs_5')]
     const r = run({ hierarchy: orphan, orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000]])] })
     expect(r.warnings.join(' ')).toMatch(/no active hierarchy row/)
+  })
+
+  it('warns when someone holds a rank the scheme does not define', () => {
+    const r = run({ hierarchy: [node('rs', null, 'rs_7')], orders: [] })
+    expect(r.warnings.join(' ')).toMatch(/rank "rs_7", which is not in this scheme/)
   })
 })
 
@@ -383,7 +628,7 @@ describe('scheme component switches', () => {
     expect(ta.kpiCommission).toBe(0)
     expect(ta.openBillBonus).toBe(0)
     expect(ta.totalCommission).toBe(700)
-    expect(r.statements.find(s => s.staffId === 'tl')).toBeUndefined()
+    expect(find(r.statements, 'tl').overrideCommission).toBe(0)
   })
 
   it('turning KPI off puts the pillow back into product revenue', () => {
@@ -430,10 +675,12 @@ describe('run invariants', () => {
     expect([...totals].sort((a, b) => b - a)).toEqual(totals)
   })
 
-  it('snapshots tier, rank, rate and upline onto each statement', () => {
+  it('snapshots rank, rate, mode and upline onto each statement', () => {
     const ta = find(result.statements, 'ta')
+    expect(ta.baseRankKey).toBe('ta_7')
+    expect(ta.effectiveRankKey).toBe('ta_7')
     expect(ta.tierKey).toBe('team_assistant')
-    expect(ta.rankKey).toBe('ta_7')
+    expect(ta.rateMode).toBe('fixed')
     expect(ta.productRate).toBe(0.07)
     expect(ta.uplineStaffId).toBe('tl')
   })
@@ -456,7 +703,10 @@ describe('unranked salesperson', () => {
 
   it('still pays flat KPI allowances, which do not depend on rate', () => {
     const r = run({
-      orders: [order('1', 'stranger', [['ACC', 'AK-CS AIRLOFT COMFY PIL', 10, 0]])],
+      orders: [order('1', 'stranger', [
+        ['MATTRESS', 'M', 1, 5_000],
+        ['ACC', 'AK-CS AIRLOFT COMFY PIL', 10, 0],
+      ])],
     })
     expect(find(r.statements, 'stranger').kpiCommission).toBe(600)
   })

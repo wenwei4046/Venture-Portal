@@ -2,23 +2,25 @@
  * Revenue Department commission engine — pure math, no I/O.
  *
  * Implements the **Fair** sub-department's ruleset (user brief 2026-08-31).
- * Four components, computed per salesperson per calendar month
- * (docs/module-spec-revenue-commission.md §3):
+ * Computed per salesperson per calendar month, in five passes because the
+ * later ones depend on the earlier ones:
  *
- *   C1 product revenue  — PR × personal rate. Excludes KPI items and any item
- *                         group that isn't commissionable (TRANS, OTHER).
- *   C2 KPI items        — Σ(qty × kpiAmount) × (1 + threshold uplift)
- *   C3 Open Bill        — 1st/2nd/3rd bill of the event day: the order's
- *                         commission, then +50/40/30% on top
- *   C4 override         — differential roll-up over the upline chain
+ *   A  classify lines, apply the DEPOSIT GATE, get each person's own revenue
+ *   B  GROUP revenue — own + the whole downline subtree
+ *   C  resolve the EFFECTIVE RATE (fixed vs variable, off group revenue)
+ *   D  C1 product revenue · C2 KPI items · C3 Open Bill
+ *   E  C4 override, using the effective rates from C
  *
  * Rounding rule: every statement LINE is rounded to 2dp, and every subtotal is
  * the sum of its rounded lines. That makes `Σ lines === total` exact, which is
  * the invariant the drill-down page and the apply RPC both rely on.
+ *
+ * See docs/module-spec-revenue-commission.md §4.
  */
 
 import type {
   CommissionComponent,
+  DeferredOrder,
   EngineInput,
   EngineResult,
   HierarchyNode,
@@ -26,6 +28,7 @@ import type {
   KpiItem,
   KpiThreshold,
   OpenBillRank,
+  Rank,
   SalesLine,
   SalesOrder,
   Statement,
@@ -98,7 +101,30 @@ export function orderProductRevenue(
   )
 }
 
-// ─── C2 helper — threshold ladder ───────────────────────────────────────────
+// ─── Deposit gate ───────────────────────────────────────────────────────────
+
+/**
+ * An order pays no commission at all until the customer has deposited the
+ * configured share of the ORDER TOTAL — 50% of a 10,000 order means 5,000 must
+ * be in before any of it counts (user brief 2026-08-31). The gate measures
+ * against the ERP header total, not the commissionable subset, because that is
+ * what the customer was invoiced.
+ *
+ * Nothing is lost: a deferred order simply pays in the month its deposit
+ * clears, which is why `SalesOrder.alreadyReleased` exists.
+ */
+export function depositRequired(orderTotal: number, thresholdPct: number | null): number {
+  if (thresholdPct === null) return 0
+  return round2(orderTotal * thresholdPct)
+}
+
+export function isDepositMet(order: SalesOrder, thresholdPct: number | null): boolean {
+  if (thresholdPct === null) return true
+  if (order.orderTotal <= 0) return true
+  return order.paidAmount + 0.005 >= depositRequired(order.orderTotal, thresholdPct)
+}
+
+// ─── KPI threshold ladder ───────────────────────────────────────────────────
 
 /**
  * Highest rung whose minQty is met. Rungs need not be sorted by the caller.
@@ -112,7 +138,100 @@ export function kpiThresholdPct(qty: number, thresholds: KpiThreshold[]): number
   return best
 }
 
-// ─── C4 helper — differential roll-up ───────────────────────────────────────
+// ─── Group revenue ──────────────────────────────────────────────────────────
+
+/**
+ * Own commissionable revenue plus the entire downline subtree's — what the
+ * promotion threshold measures. The brief's example: a Revenue Specialist with
+ * 200k of their own and two downlines on 100k each has group sales of 400k,
+ * which clears the 300k gate for Team Assistant.
+ *
+ * Implemented by pushing each producer's revenue up their own chain, so a
+ * broken or cyclic chain degrades locally instead of corrupting every total.
+ */
+export function computeGroupRevenue(
+  nodes: Map<string, HierarchyNode>,
+  ownRevenue: Map<string, number>,
+  warnings: string[],
+): Map<string, number> {
+  const group = new Map<string, number>()
+  for (const staffId of nodes.keys()) group.set(staffId, 0)
+  for (const [staffId, rev] of ownRevenue) {
+    group.set(staffId, round2((group.get(staffId) ?? 0) + rev))
+  }
+
+  for (const [staffId, rev] of ownRevenue) {
+    if (rev === 0) continue
+    let cursor = nodes.get(staffId)?.uplineStaffId ?? null
+    const seen = new Set<string>([staffId])
+    let depth = 0
+
+    while (cursor) {
+      if (seen.has(cursor)) {
+        warnings.push(
+          `Hierarchy cycle detected at staff ${cursor} — group revenue roll-up stopped for ${staffId}.`,
+        )
+        break
+      }
+      if (++depth > MAX_UPLINE_DEPTH) {
+        warnings.push(
+          `Upline chain deeper than ${MAX_UPLINE_DEPTH} for staff ${staffId} — group revenue truncated.`,
+        )
+        break
+      }
+      seen.add(cursor)
+      group.set(cursor, round2((group.get(cursor) ?? 0) + rev))
+      cursor = nodes.get(cursor)?.uplineStaffId ?? null
+    }
+  }
+
+  return group
+}
+
+// ─── Rate resolution ────────────────────────────────────────────────────────
+
+export interface ResolvedRank {
+  /** The rank actually used to pay this month. */
+  effective: Rank | undefined
+  /** What they have attained — the floor. */
+  base: Rank | undefined
+  /** Highest threshold rank their group sales clear, when above the base. */
+  qualifiesFor: Rank | undefined
+}
+
+/**
+ * `fixed`    — the attained rank, full stop. Once promoted to Team Assistant 7%
+ *              the rate stays even in a month that misses 300k.
+ * `variable` — the highest rank whose group-sales threshold this month's
+ *              figures clear, never below the attained rank. Miss the target
+ *              and it drops back.
+ *
+ * Either way `qualifiesFor` is reported, so a fixed-rate person who has just
+ * cleared 300k shows up as due a promotion instead of silently staying put.
+ */
+export function resolveRank(
+  node: HierarchyNode,
+  ranks: Rank[],
+  groupRevenue: number,
+): ResolvedRank {
+  const byKey = new Map(ranks.map(r => [r.rankKey, r]))
+  const base = byKey.get(node.baseRankKey)
+
+  let qualifies: Rank | undefined
+  for (const r of ranks) {
+    if (r.groupSalesThreshold === null) continue
+    if (groupRevenue + 0.005 < r.groupSalesThreshold) continue
+    if (base && r.sortOrder <= base.sortOrder) continue
+    if (!qualifies || r.sortOrder > qualifies.sortOrder) qualifies = r
+  }
+
+  const effective =
+    node.rateMode === 'variable' && qualifies ? qualifies : base
+
+  return { effective, base, qualifiesFor: qualifies }
+}
+
+// ─── Override roll-up ───────────────────────────────────────────────────────
 
 export interface OverrideCredit {
   /** Who earns the override. */
@@ -134,9 +253,13 @@ export interface OverrideCredit {
  *
  *   STL 10% → TL 9% → TA 7% → RS 5%, and the RS sells 10,000
  *   RS 5% (own) · TA 2% · TL 2% · STL 1%  →  10% total
+ *
+ * `rateOf` supplies the EFFECTIVE rate, so a variable-rate upline who cleared
+ * their target this month overrides at the higher rate.
  */
 export function computeOverrides(
   nodes: Map<string, HierarchyNode>,
+  rateOf: Map<string, number>,
   baseByStaff: Map<string, number>,
   warnings: string[],
 ): OverrideCredit[] {
@@ -147,7 +270,7 @@ export function computeOverrides(
     const self = nodes.get(downlineStaffId)
     if (!self) continue
 
-    let paid = self.productRate
+    let paid = rateOf.get(downlineStaffId) ?? 0
     let cursor = self.uplineStaffId
     const seen = new Set<string>([downlineStaffId])
     let depth = 0
@@ -175,7 +298,8 @@ export function computeOverrides(
         break
       }
 
-      const diff = ancestor.productRate - paid
+      const ancestorRate = rateOf.get(ancestor.staffId) ?? 0
+      const diff = ancestorRate - paid
       if (diff > 0) {
         credits.push({
           uplineStaffId: ancestor.staffId,
@@ -184,7 +308,7 @@ export function computeOverrides(
           rate: diff,
           amount: round2(base * diff),
         })
-        paid = ancestor.productRate
+        paid = ancestorRate
       }
 
       cursor = ancestor.uplineStaffId
@@ -196,11 +320,27 @@ export function computeOverrides(
 
 // ─── Engine ─────────────────────────────────────────────────────────────────
 
+interface Draft {
+  staffId: string
+  node: HierarchyNode | undefined
+  lines: StatementLine[]
+  eligibleOrders: SalesOrder[]
+  productRevenue: number
+  excludedRevenue: number
+  deferredRevenue: number
+  kpiRevenue: number
+  kpiQty: number
+  kpiBase: number
+  kpiThresholdPct: number
+}
+
 export function computeCommissionRun(input: EngineInput): EngineResult {
   const warnings: string[] = []
   const { scheme } = input
   const kpiIndex = scheme.enableKpi ? indexKpiItems(input.kpiItems) : new Map<string, number>()
   const groupIndex = indexItemGroups(scheme.itemGroups)
+  const ranks = [...input.ranks].sort((a, b) => a.sortOrder - b.sortOrder)
+  const rankByKey = new Map(ranks.map(r => [r.rankKey, r]))
 
   const nodes = new Map<string, HierarchyNode>()
   for (const n of input.hierarchy) {
@@ -208,30 +348,28 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       warnings.push(`Staff ${n.staffId} has more than one active hierarchy row — using the first.`)
       continue
     }
+    if (!rankByKey.has(n.baseRankKey)) {
+      warnings.push(`Staff ${n.staffId} holds rank "${n.baseRankKey}", which is not in this scheme's ladder.`)
+    }
     nodes.set(n.staffId, n)
   }
 
   // A rank below the recruiting threshold must not hold downlines. Flag rather
   // than silently paying (or silently dropping) their override.
   for (const n of nodes.values()) {
-    if (n.uplineStaffId) {
-      const up = nodes.get(n.uplineStaffId)
-      if (up && !up.canRecruit) {
-        warnings.push(
-          `Staff ${n.staffId} is placed under ${up.staffId}, whose rank (${up.rankKey}) is not allowed to recruit.`,
-        )
-      }
+    if (!n.uplineStaffId) continue
+    const up = nodes.get(n.uplineStaffId)
+    const upRank = up && rankByKey.get(up.baseRankKey)
+    if (upRank && !upRank.canRecruit) {
+      warnings.push(
+        `Staff ${n.staffId} is placed under ${up!.staffId}, whose rank (${upRank.label}) is not allowed to recruit.`,
+      )
     }
   }
 
-  const openBillPct = new Map<OpenBillRank, number>(
-    input.openBillRules.map(r => [r.rank, r.pct]),
-  )
-  const tagByOrder = new Map<string, OpenBillRank>(
-    input.openBillTags.map(t => [t.orderId, t.rank]),
-  )
+  const openBillPct = new Map<OpenBillRank, number>(input.openBillRules.map(r => [r.rank, r.pct]))
+  const tagByOrder = new Map<string, OpenBillRank>(input.openBillTags.map(t => [t.orderId, t.rank]))
 
-  // Group orders by salesperson.
   const ordersByStaff = new Map<string, SalesOrder[]>()
   for (const order of input.orders) {
     const list = ordersByStaff.get(order.staffId)
@@ -257,25 +395,13 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
   // Everyone who either sold something or sits in the hierarchy gets a
   // statement — an upline with no personal sales still earns overrides.
   const staffIds = new Set<string>([...ordersByStaff.keys(), ...nodes.keys()])
-
-  // ── Pass 1: per-person own components + the override base ──────────────
-  interface Draft {
-    staffId: string
-    node: HierarchyNode | undefined
-    lines: StatementLine[]
-    productRevenue: number
-    excludedRevenue: number
-    kpiRevenue: number
-    kpiQty: number
-    kpiBase: number
-    kpiThresholdPct: number
-  }
   const drafts = new Map<string, Draft>()
+  const deferred: DeferredOrder[] = []
 
+  // ── Pass A: deposit gate + own revenue ─────────────────────────────────
   for (const staffId of staffIds) {
     const node = nodes.get(staffId)
     const orders = ordersByStaff.get(staffId) ?? []
-    const rate = node?.productRate ?? 0
 
     if (!node && orders.length > 0) {
       warnings.push(
@@ -283,46 +409,108 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       )
     }
 
-    const lines: StatementLine[] = []
+    const eligibleOrders: SalesOrder[] = []
     let productRevenue = 0
     let excludedRevenue = 0
-    let kpiRevenue = 0
-    let kpiQty = 0
-    let kpiBase = 0
+    let deferredRevenue = 0
 
     for (const order of orders) {
       const opr = orderProductRevenue(order, kpiIndex, groupIndex)
+
+      if (order.alreadyReleased) {
+        // An earlier applied run already paid this one; never pay it twice.
+        continue
+      }
+
+      if (!isDepositMet(order, scheme.depositThresholdPct)) {
+        deferredRevenue = round2(deferredRevenue + opr)
+        deferred.push({
+          staffId,
+          orderId: order.id,
+          orderNo: order.orderNo,
+          orderDate: order.orderDate,
+          orderTotal: order.orderTotal,
+          paidAmount: order.paidAmount,
+          requiredAmount: depositRequired(order.orderTotal, scheme.depositThresholdPct),
+          productRevenue: opr,
+        })
+        continue
+      }
+
+      eligibleOrders.push(order)
       productRevenue = round2(productRevenue + opr)
+      for (const line of order.lines) {
+        const cls = classifyLine(line, kpiIndex, groupIndex)
+        if (cls === 'excluded_group' || cls === 'unknown_group') {
+          excludedRevenue = round2(excludedRevenue + line.lineAmount)
+        }
+      }
+    }
+
+    drafts.set(staffId, {
+      staffId,
+      node,
+      lines: [],
+      eligibleOrders,
+      productRevenue,
+      excludedRevenue,
+      deferredRevenue,
+      kpiRevenue: 0,
+      kpiQty: 0,
+      kpiBase: 0,
+      kpiThresholdPct: 0,
+    })
+  }
+
+  // ── Pass B: group revenue ──────────────────────────────────────────────
+  const ownRevenue = new Map([...drafts.values()].map(d => [d.staffId, d.productRevenue]))
+  const groupRevenue = computeGroupRevenue(nodes, ownRevenue, warnings)
+
+  // ── Pass C: effective rate ─────────────────────────────────────────────
+  const resolved = new Map<string, ResolvedRank>()
+  const rateOf = new Map<string, number>()
+  for (const staffId of staffIds) {
+    const node = nodes.get(staffId)
+    if (!node) {
+      rateOf.set(staffId, 0)
+      continue
+    }
+    const r = resolveRank(node, ranks, groupRevenue.get(staffId) ?? 0)
+    resolved.set(staffId, r)
+    rateOf.set(staffId, r.effective?.productRate ?? 0)
+  }
+
+  // ── Pass D: C1 / C2 / C3 ───────────────────────────────────────────────
+  for (const draft of drafts.values()) {
+    const rate = rateOf.get(draft.staffId) ?? 0
+
+    for (const order of draft.eligibleOrders) {
+      const opr = orderProductRevenue(order, kpiIndex, groupIndex)
+      const carried = order.periodMonth !== input.periodMonth
+      const carriedNote = carried ? ` · carried from ${order.periodMonth.slice(0, 7)}` : ''
 
       // C1 — one line per order, so the drill-down reads like a ledger.
       if (scheme.enableProductRevenue && opr !== 0 && rate > 0) {
-        lines.push({
+        draft.lines.push({
           component: 'product_revenue',
           sourceOrderId: order.id,
           basisAmount: opr,
           rate,
           qty: null,
           amount: round2(opr * rate),
-          note: `${order.orderNo} · ${order.orderDate}`,
+          note: `${order.orderNo} · ${order.orderDate}${carriedNote}`,
         })
       }
 
+      // C2 inputs — one line per KPI line item.
       for (const line of order.lines) {
-        const cls = classifyLine(line, kpiIndex, groupIndex)
-
-        if (cls === 'excluded_group' || cls === 'unknown_group') {
-          excludedRevenue = round2(excludedRevenue + line.lineAmount)
-          continue
-        }
-        if (cls !== 'kpi') continue
-
-        // C2 inputs — one line per KPI line item.
+        if (classifyLine(line, kpiIndex, groupIndex) !== 'kpi') continue
         const unit = kpiIndex.get(normaliseCode(line.productCode)) ?? 0
-        kpiRevenue = round2(kpiRevenue + line.lineAmount)
-        kpiQty += line.qty
+        draft.kpiRevenue = round2(draft.kpiRevenue + line.lineAmount)
+        draft.kpiQty += line.qty
         const amount = round2(line.qty * unit)
-        kpiBase = round2(kpiBase + amount)
-        lines.push({
+        draft.kpiBase = round2(draft.kpiBase + amount)
+        draft.lines.push({
           component: 'kpi_item',
           sourceOrderId: order.id,
           sourceLineId: line.id,
@@ -336,76 +524,63 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     }
 
     // C2 threshold uplift — a single line on the whole KPI base.
-    const thresholdPct = kpiThresholdPct(kpiQty, input.kpiThresholds)
-    if (thresholdPct > 0 && kpiBase > 0) {
-      lines.push({
+    draft.kpiThresholdPct = kpiThresholdPct(draft.kpiQty, input.kpiThresholds)
+    if (draft.kpiThresholdPct > 0 && draft.kpiBase > 0) {
+      draft.lines.push({
         component: 'kpi_threshold',
-        basisAmount: kpiBase,
-        rate: thresholdPct,
-        qty: kpiQty,
-        amount: round2(kpiBase * thresholdPct),
-        note: `${kpiQty} KPI items → +${round2(thresholdPct * 100)}% on ${kpiBase.toFixed(2)}`,
+        basisAmount: draft.kpiBase,
+        rate: draft.kpiThresholdPct,
+        qty: draft.kpiQty,
+        amount: round2(draft.kpiBase * draft.kpiThresholdPct),
+        note: `${draft.kpiQty} KPI items → +${round2(draft.kpiThresholdPct * 100)}% on ${draft.kpiBase.toFixed(2)}`,
       })
     }
 
     // C3 — Open Bill: the 1st / 2nd / 3rd bill written on an event day.
-    if (scheme.enableOpenBill) {
-      for (const order of orders) {
-        const rank = tagByOrder.get(order.id)
-        if (rank === undefined) continue
-        const pct = openBillPct.get(rank)
-        if (pct === undefined) {
-          warnings.push(
-            `Order ${order.orderNo} is tagged Open Bill ${rank}, but no bonus rate is configured for that rank.`,
-          )
-          continue
-        }
-        const opr = orderProductRevenue(order, kpiIndex, groupIndex)
-        const amount =
-          scheme.openBillBasis === 'pct_of_revenue'
-            ? round2(opr * pct)
-            : round2(opr * rate * pct)
-        if (amount === 0) continue
-        lines.push({
-          component: 'open_bill',
-          sourceOrderId: order.id,
-          basisAmount: opr,
-          rate: pct,
-          qty: null,
-          amount,
-          note:
-            `${ordinal(rank)} bill · ${order.eventDate} · ${order.orderNo}` +
-            (scheme.openBillBasis === 'pct_of_revenue'
-              ? ` · ${round2(pct * 100)}% of revenue`
-              : ` · +${round2(pct * 100)}% on ${round2(rate * 100)}% commission`),
-        })
+    if (!scheme.enableOpenBill) continue
+    for (const order of draft.eligibleOrders) {
+      const rank = tagByOrder.get(order.id)
+      if (rank === undefined) continue
+      const pct = openBillPct.get(rank)
+      if (pct === undefined) {
+        warnings.push(
+          `Order ${order.orderNo} is tagged Open Bill ${rank}, but no bonus rate is configured for that rank.`,
+        )
+        continue
       }
+      const opr = orderProductRevenue(order, kpiIndex, groupIndex)
+      const amount =
+        scheme.openBillBasis === 'pct_of_revenue'
+          ? round2(opr * pct)
+          : round2(opr * rate * pct)
+      if (amount === 0) continue
+      draft.lines.push({
+        component: 'open_bill',
+        sourceOrderId: order.id,
+        basisAmount: opr,
+        rate: pct,
+        qty: null,
+        amount,
+        note:
+          `${ordinal(rank)} bill · ${order.eventDate} · ${order.orderNo}` +
+          (scheme.openBillBasis === 'pct_of_revenue'
+            ? ` · ${round2(pct * 100)}% of revenue`
+            : ` · +${round2(pct * 100)}% on ${round2(rate * 100)}% commission`),
+      })
     }
-
-    drafts.set(staffId, {
-      staffId,
-      node,
-      lines,
-      productRevenue,
-      excludedRevenue,
-      kpiRevenue,
-      kpiQty,
-      kpiBase,
-      kpiThresholdPct: thresholdPct,
-    })
   }
 
-  // ── Pass 2: overrides, off the settled per-person bases ────────────────
+  // ── Pass E: overrides, off the settled per-person bases ────────────────
   if (scheme.enableOverride) {
     const baseByStaff = new Map<string, number>()
     for (const d of drafts.values()) {
-      const base = scheme.overrideIncludesKpi
-        ? round2(d.productRevenue + d.kpiRevenue)
-        : d.productRevenue
-      baseByStaff.set(d.staffId, base)
+      baseByStaff.set(
+        d.staffId,
+        scheme.overrideIncludesKpi ? round2(d.productRevenue + d.kpiRevenue) : d.productRevenue,
+      )
     }
 
-    for (const credit of computeOverrides(nodes, baseByStaff, warnings)) {
+    for (const credit of computeOverrides(nodes, rateOf, baseByStaff, warnings)) {
       const draft = drafts.get(credit.uplineStaffId)
       if (!draft || credit.amount === 0) continue
       draft.lines.push({
@@ -434,18 +609,33 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       productCommission + kpiCommission + openBillBonus + overrideCommission,
     )
 
-    // A person with no orders, no downline volume and no rank contributes
-    // nothing — don't clutter the run with empty statements.
-    if (totalCommission === 0 && d.lines.length === 0 && d.productRevenue === 0) continue
+    const rank = resolved.get(d.staffId)
+
+    // Someone with no orders, no downline volume, nothing deferred and no
+    // rank contributes nothing — don't clutter the run with empty statements.
+    if (
+      totalCommission === 0 &&
+      d.lines.length === 0 &&
+      d.productRevenue === 0 &&
+      d.deferredRevenue === 0 &&
+      (groupRevenue.get(d.staffId) ?? 0) === 0
+    ) {
+      continue
+    }
 
     statements.push({
       staffId: d.staffId,
-      tierKey: d.node?.tierKey ?? null,
-      rankKey: d.node?.rankKey ?? null,
-      productRate: d.node?.productRate ?? 0,
+      baseRankKey: d.node?.baseRankKey ?? null,
+      rateMode: d.node?.rateMode ?? scheme.defaultRateMode,
+      effectiveRankKey: rank?.effective?.rankKey ?? null,
+      tierKey: rank?.effective?.tierKey ?? null,
+      productRate: rateOf.get(d.staffId) ?? 0,
+      qualifiesForRankKey: rank?.qualifiesFor?.rankKey ?? null,
       uplineStaffId: d.node?.uplineStaffId ?? null,
       productRevenue: d.productRevenue,
+      groupRevenue: groupRevenue.get(d.staffId) ?? d.productRevenue,
       excludedRevenue: d.excludedRevenue,
+      deferredRevenue: d.deferredRevenue,
       productCommission,
       kpiQty: d.kpiQty,
       kpiBase: d.kpiBase,
@@ -464,6 +654,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     periodMonth: input.periodMonth,
     statements,
     totalCommission: sum(statements.map(s => s.totalCommission)),
+    deferred,
     warnings,
   }
 }
