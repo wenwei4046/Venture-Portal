@@ -321,6 +321,11 @@ export default function Sidebar({ role, mobileOpen = false, onClose }: SidebarPr
         `fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-out ` +
         (mobileOpen ? 'translate-x-0' : '-translate-x-full') +
         ` md:relative md:translate-x-0 md:z-auto md:overflow-hidden md:transition-[width] md:duration-200 ` +
+        // Desktop: float the rail as a rounded panel inset from the shell edges
+        // rather than a full-bleed slab bolted to the left border. The gap lets
+        // the page colour run behind it, which is what stops a panel this tall
+        // from reading as a wall. Mobile keeps the full-bleed drawer.
+        ` md:border-r-0 md:rounded-panel md:my-2.5 md:ml-2.5 md:h-[calc(100%-20px)] md:ring-1 md:ring-hairline ` +
         (pinned ? 'md:w-[220px]' : 'md:w-4 md:hover:w-[220px]')
       }
       aria-label="Main navigation"

@@ -41,8 +41,11 @@ export default function TopBar({ user, onMenuClick }: TopBarProps) {
   const quarter = `Q${Math.floor(now.month() / 3) + 1} ${now.year()}`
   const displayName = user.name || getRoleLabel(user.role)
 
+  // No bottom border on the header: the rule used to stop dead where the
+  // sidebar edge began, which is what made the top-left corner read as two
+  // unrelated pieces. The header now simply sits on the page.
   return (
-    <div className="h-[60px] bg-paper border-b border-hairline px-4 md:px-8 flex items-center justify-between shrink-0 gap-3">
+    <div className="h-[60px] bg-paper px-4 md:px-8 flex items-center justify-between shrink-0 gap-3">
       <div className="flex items-center gap-3 min-w-0">
         {/* Hamburger — mobile only */}
         {onMenuClick ? (

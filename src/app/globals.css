@@ -4,117 +4,174 @@
 
 /* ═══════════════════════════════════════════════════════════════════════
    HOUZS Venture Portal — global styles
-   2026-06-24: near-white surfaces + Inter (single UI typeface) + rust accent
-   (was warm paper + Instrument Serif). Numbers stay Chivo Mono.
+
+   2026-08-31 · WALNUT. Replaces the cream / deep-green / rust set.
+   Three values, each with exactly one job:
+
+     Plaster  242 239 234   the page (warm neutral greige, no yellow cast)
+     Walnut    90  62  43   the ONE dark thing — hero cards, primary buttons,
+                            money ink, modal scrim. Never a rail, never a wall.
+     Harbour   46  92 138   the ONLY signal — active nav, links, focus rings.
+
+   Why the accent is cool while the palette is warm: rust used to sit 4° from
+   --danger on the colour wheel (16.7° vs 12.7°) with --alert a further 21°
+   away, so three of five meaningful colours shared one 25° wedge and the
+   accent could never read as "you are here" rather than "something's wrong".
+   Red / amber / green are load-bearing and can't move, which leaves blue.
+   A *surface* is free to be any hue; a *signal* is not.
+
+   Typography unchanged — Inter throughout, Chivo Mono for numbers.
    ═══════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* Color — original warm "paper" cream restored (2026-06-24 trial: keep the
-     new Inter typography but revert the background to the cream tones to
-     compare modern-font-on-warm-paper vs the near-white version). */
-  --paper: 243 236 221;
-  --surface: 250 245 234;
-  --surface-2: 232 221 196;
-  --hairline: 198 185 158;
-  --ink: 28 22 15;
-  --graphite: 90 78 64;
-  --muted: 133 119 95;
+  --paper: 242 239 234;
+  --surface: 252 250 247;
+  --surface-2: 235 230 223;
+  --hairline: 211 203 192;
+  --ink: 43 31 23;
+  --graphite: 90 78 68;
+  --muted: 148 139 128;
 
   /* Numbers — deepest tone, reserved for monetary values + tabular data */
-  --num-ink: 26 19 11;
+  --num-ink: 51 36 27;
 
-  /* Accent — single rust seal */
-  --accent: 204 90 46;
-  --accent-bg: 251 232 222;
-  --accent-border: 232 176 152;
-  --accent-hover: 181 74 34;
+  /* Accent — Harbour slate blue, 208°. The only signal colour. */
+  --accent: 46 92 138;
+  --accent-bg: 222 231 240;
+  --accent-border: 166 189 210;
+  --accent-hover: 34 72 112;
 
-  /* Semantic — muted */
-  --ledger: 61 107 69;
-  --ledger-bg: 231 239 230;
-  --alert: 160 112 32;
-  --alert-bg: 245 235 211;
-  --danger: 163 55 26;
-  --danger-bg: 248 225 216;
-  --info: 90 107 138;
-  --info-bg: 235 238 243;
+  /* Semantic — load-bearing, spread across the wheel (min gap now 40°, was 4°) */
+  --ledger: 21 110 78;
+  --ledger-bg: 222 240 232;
+  --alert: 150 100 12;
+  --alert-bg: 249 238 214;
+  --danger: 176 40 34;
+  --danger-bg: 250 228 224;
+  --info: 108 104 98;
+  --info-bg: 238 235 231;
+
+  /* Walnut — the dark object. Hero figures, primary buttons, overlay scrim.
+     Tinted rather than black so the page beneath a modal keeps its own colour
+     instead of being grey-washed. */
+  --walnut: 90 62 43;
+  --scrim: 90 62 43;
 }
 
 /* ─── Dark mode — warm charcoal, not cold ───
-   Elevation rework 2026-08-29 (user: dark mode 不太行): everything sat within
-   a few points of black and melted together. Three clear levels now —
-   sidebar darkest (see .sidebar-contrast), page lifted a step, cards a step
-   above that, hairlines bright enough to actually draw edges. */
+   Elevation ladder kept from 2026-08-29, re-tinted walnut: page darkest,
+   sidebar one step ABOVE it (elevated-panel convention), cards above that. */
 [data-theme="dark"] {
-  --paper: 33 29 24;
-  --surface: 44 39 32;
-  --surface-2: 57 51 42;
-  --hairline: 80 71 57;
-  --ink: 234 226 214;
-  --graphite: 176 163 148;
-  --muted: 124 112 96;
+  --paper: 26 22 19;
+  --surface: 37 32 27;
+  --surface-2: 49 42 36;
+  --hairline: 68 59 50;
+  --ink: 234 226 217;
+  --graphite: 166 152 138;
+  --muted: 120 109 98;
 
   /* Numbers — brightest paper tone for max contrast on dark bg */
-  --num-ink: 245 240 232;
+  --num-ink: 245 238 230;
 
-  --accent: 224 107 58;
-  --accent-bg: 61 37 23;
-  --accent-border: 139 90 58;
-  --accent-hover: 240 122 72;
+  --accent: 122 164 210;
+  --accent-bg: 24 38 54;
+  --accent-border: 58 88 118;
+  --accent-hover: 152 190 230;
 
-  --ledger: 90 155 98;
-  --ledger-bg: 30 46 31;
-  --alert: 200 144 48;
+  --ledger: 90 170 120;
+  --ledger-bg: 22 46 34;
+  --alert: 208 156 56;
   --alert-bg: 46 37 16;
-  --danger: 212 80 48;
-  --danger-bg: 46 24 18;
-  --info: 123 144 181;
-  --info-bg: 26 30 40;
+  --danger: 224 96 90;
+  --danger-bg: 52 24 22;
+  --info: 146 138 128;
+  --info-bg: 34 30 26;
+
+  --walnut: 122 88 62;
+  --scrim: 14 10 8;
 }
 
-/* ─── Sidebar panel skin (final form 2026-08-29, user picked "同色系加深一
-   档" after trying espresso/slate) ───
-   Same warm family as the page, one step deeper, with a clear edge + soft
-   shadow so the panel reads as a panel. Text/accent tokens inherit the theme
-   unchanged. Light: deeper tan on the cream page. Dark: one step LIGHTER
-   than the charcoal page (elevated-panel convention) with a brighter edge. */
-/* Final direction (user: "要不一样颜色,要match 的上的"): banker's deep
-   green — a different world from the cream page but its natural partner
-   (green ↔ burnt-orange accent are complements; classic ledger pairing).
-   Cream text, hairlines and scrollbar all green-tinted via the tokens. */
+/* ─── Sidebar panel skin (2026-08-31, Walnut) ───
+   The rail carries NO colour. Three attempts at a coloured rail — deep green,
+   Prussian, basalt — were all rejected, and the variable that mattered turned
+   out to be area, not hue: a full-height panel is the largest surface in the
+   app and the one surface carrying no numbers. So the rail is now Plaster one
+   step down, separated by a hairline and rounded corners rather than by weight,
+   and the dark moved to a card-sized object instead (see --walnut).
+   No shadow — a light panel that casts one reads as dirty. */
 .sidebar-contrast {
-  --paper: 34 54 42;
-  --surface: 34 54 42;
-  --surface-2: 47 71 56;
-  --hairline: 76 100 84;
-  --ink: 240 236 224;
-  --graphite: 199 206 191;
-  --muted: 150 160 142;
-  --num-ink: 245 242 232;
-  --accent: 228 124 72;
-  --accent-bg: 28 45 35;
-  --accent-border: 110 118 82;
-  --accent-hover: 242 140 90;
-  box-shadow: 2px 0 10px rgb(28 22 15 / 0.18);
+  --paper: 232 227 219;
+  --surface: 232 227 219;
+  --surface-2: 222 215 205;
+  --hairline: 218 211 200;
+  --ink: 51 36 27;
+  --graphite: 74 64 58;
+  --muted: 152 142 130;
+  --num-ink: 51 36 27;
+  --accent: 46 92 138;
+  --accent-bg: 222 231 240;
+  --accent-border: 172 194 214;
+  --accent-hover: 34 72 112;
+  box-shadow: none;
 }
-/* Dark mode: the DEEPEST level of the elevation ladder — near-black warm
-   panel under the lifted charcoal page (cream and green both clashed there;
-   depth hierarchy separates without fighting the theme). Every token the
-   green base sets is re-set here. */
+/* Dark mode: one step ABOVE the page (elevated-panel convention), same as the
+   light side is one step below it — in both themes the rail is the adjacent
+   tone, never the extreme one. */
 [data-theme="dark"] .sidebar-contrast {
-  --paper: 18 16 13;
-  --surface: 18 16 13;
-  --surface-2: 32 28 23;
-  --hairline: 58 51 41;
-  --ink: 232 224 212;
-  --graphite: 168 155 140;
-  --muted: 120 108 92;
-  --num-ink: 245 240 232;
-  --accent: 224 107 58;
-  --accent-bg: 61 37 23;
-  --accent-border: 139 90 58;
-  --accent-hover: 240 122 72;
-  box-shadow: 2px 0 14px rgb(0 0 0 / 0.6);
+  --paper: 37 32 27;
+  --surface: 37 32 27;
+  --surface-2: 50 43 36;
+  --hairline: 74 64 55;
+  --ink: 234 226 217;
+  --graphite: 166 152 138;
+  --muted: 120 109 98;
+  --num-ink: 245 238 230;
+  --accent: 122 164 210;
+  --accent-bg: 24 38 54;
+  --accent-border: 58 88 118;
+  --accent-hover: 152 190 230;
+  box-shadow: none;
+}
+
+/* ─── Walnut hero card ───
+   The one dark object in the design. Everything else — page, rail, header — is
+   light; this is where the weight goes, because it holds the figure you opened
+   the page to read. Roughly a tenth of the area a dark sidebar occupied, and it
+   pulls attention toward the number instead of away from it.
+
+   Same technique as .sidebar-contrast: re-declare the palette tokens for the
+   subtree, so markup inside keeps using text-num-ink / text-muted / text-accent
+   and inverts for free — including SVG strokes bound to rgb(var(--ink)). */
+.hero-walnut {
+  --paper: 90 62 43;
+  --surface: 104 74 52;
+  --surface-2: 118 86 62;
+  --hairline: 132 100 76;
+  --ink: 246 238 230;
+  --graphite: 214 194 173;
+  --muted: 176 150 121;
+  --num-ink: 250 246 242;
+  --accent: 206 170 132;
+  --accent-bg: 104 74 52;
+  --accent-border: 132 100 76;
+  --accent-hover: 222 190 156;
+  background: rgb(var(--walnut));
+  border-radius: 16px;
+}
+[data-theme="dark"] .hero-walnut,
+:root:not([data-theme="light"]) .hero-walnut {
+  --paper: 122 88 62;
+  --surface: 136 100 72;
+  --surface-2: 150 112 82;
+  --hairline: 164 128 96;
+  --ink: 248 242 235;
+  --graphite: 224 206 186;
+  --muted: 194 170 142;
+  --num-ink: 252 249 245;
+  --accent: 224 192 158;
+  --accent-bg: 136 100 72;
+  --accent-border: 164 128 96;
+  --accent-hover: 238 212 184;
 }
 
 /* Sidebar scrollbar (user 2026-08-29 "这个也优化,不好看"): the nav's default
@@ -142,45 +199,48 @@
 /* System preference fallback (when no explicit toggle) */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: 33 29 24;
-    --surface: 44 39 32;
-    --surface-2: 57 51 42;
-    --hairline: 80 71 57;
-    --ink: 234 226 214;
-    --graphite: 176 163 148;
-    --muted: 124 112 96;
+    --paper: 26 22 19;
+    --surface: 37 32 27;
+    --surface-2: 49 42 36;
+    --hairline: 68 59 50;
+    --ink: 234 226 217;
+    --graphite: 166 152 138;
+    --muted: 120 109 98;
 
-    --num-ink: 245 240 232;
+    --num-ink: 245 238 230;
 
-    --accent: 224 107 58;
-    --accent-bg: 61 37 23;
-    --accent-border: 139 90 58;
-    --accent-hover: 240 122 72;
+    --accent: 122 164 210;
+    --accent-bg: 24 38 54;
+    --accent-border: 58 88 118;
+    --accent-hover: 152 190 230;
 
-    --ledger: 90 155 98;
-    --ledger-bg: 30 46 31;
-    --alert: 200 144 48;
+    --ledger: 90 170 120;
+    --ledger-bg: 22 46 34;
+    --alert: 208 156 56;
     --alert-bg: 46 37 16;
-    --danger: 212 80 48;
-    --danger-bg: 46 24 18;
-    --info: 123 144 181;
-    --info-bg: 26 30 40;
+    --danger: 224 96 90;
+    --danger-bg: 52 24 22;
+    --info: 146 138 128;
+    --info-bg: 34 30 26;
+
+    --walnut: 122 88 62;
+    --scrim: 14 10 8;
   }
 
   :root:not([data-theme="light"]) .sidebar-contrast {
-    --paper: 18 16 13;
-    --surface: 18 16 13;
-    --surface-2: 32 28 23;
-    --hairline: 58 51 41;
-    --ink: 232 224 212;
-    --graphite: 168 155 140;
-    --muted: 120 108 92;
-    --num-ink: 245 240 232;
-    --accent: 224 107 58;
-    --accent-bg: 61 37 23;
-    --accent-border: 139 90 58;
-    --accent-hover: 240 122 72;
-    box-shadow: 2px 0 14px rgb(0 0 0 / 0.6);
+    --paper: 37 32 27;
+    --surface: 37 32 27;
+    --surface-2: 50 43 36;
+    --hairline: 74 64 55;
+    --ink: 234 226 217;
+    --graphite: 166 152 138;
+    --muted: 120 109 98;
+    --num-ink: 245 238 230;
+    --accent: 122 164 210;
+    --accent-bg: 24 38 54;
+    --accent-border: 58 88 118;
+    --accent-hover: 152 190 230;
+    box-shadow: none;
   }
 }
 
