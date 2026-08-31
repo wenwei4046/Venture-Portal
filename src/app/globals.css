@@ -914,6 +914,52 @@ table.ledger-table tr.lt-detail {
   .text-3xl.mono { letter-spacing: 0; }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   Form controls on a phone (2026-08-31)
+
+   iOS Safari zooms the viewport whenever a focused input's font-size is under
+   16px, and then leaves it zoomed — the user pinches back out after every
+   field. Every control in the portal reads at 13-14px, so every tap on every
+   form did it. Raising the floor to 16px below 768px is the only fix Safari
+   accepts (`user-scalable=no` would also stop it, but it breaks pinch-zoom for
+   everyone and fails WCAG 1.4.4).
+
+   The min-height brings controls to the 44px touch target DESIGN.md asks for
+   at the same time. Both are inside the media query — desktop keeps its
+   13-14px density exactly.
+
+   `!important` on the font-size is deliberate and is the one place in this
+   file that earns it: 16px is a floor Safari enforces, not a style choice, and
+   every control in the portal carries a `text-sm` / `text-[13px]` utility that
+   would otherwise win on specificity. (Contrast `.num`, which lives in
+   @layer components precisely so utilities CAN override it — there the page is
+   allowed the last word; here it must not be.)
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea {
+    font-size: 16px !important;
+    min-height: 44px;
+  }
+  /* Checkboxes stay small but get a bigger hit area via padding on the label
+     in the markup; bump the box itself to the platform minimum. */
+  input[type='checkbox'],
+  input[type='radio'] {
+    width: 18px;
+    height: 18px;
+  }
+  textarea {
+    min-height: 88px;
+  }
+  /* Money inputs inside a folded table panel are laid out by width utility
+     (w-24 / w-28) that assumed 12.5px text — let them fill the panel row. */
+  .lt-detail-list dd input {
+    width: 100%;
+    max-width: 180px;
+  }
+}
+
 /* Horizontal-scroll fallback for tables that genuinely cannot shed columns —
    the month-matrix reports (12 month columns + an account column). Wrap the
    table in <div class="table-scroll"> to get momentum scrolling plus a right
