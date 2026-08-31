@@ -29,6 +29,18 @@ export interface SalesLine {
   /** ERP `Total (Ex)`. Note the ERP prices packages: the whole order value
    *  usually sits on the main item's line and the bundled items are 0. */
   lineAmount: number
+  /**
+   * Which brand's margin ladder this line answers to (Acami / Zanotti /
+   * Ergotax). Margin thresholds and incentives are per brand.
+   */
+  brandCode?: string
+  /**
+   * Cost of goods for this line, used for margin. **The ERP sales-order export
+   * carries no cost column**, so this is undefined until a cost source exists —
+   * the engine then skips the margin penalty and says so in the warnings
+   * rather than quietly paying full commission on a bad-margin bill.
+   */
+  costAmount?: number
 }
 
 export interface SalesOrder {
@@ -94,12 +106,50 @@ export interface OpenBillTag {
   rank: OpenBillRank
 }
 
+export type MarginBandKind =
+  /** margin at or ABOVE `marginPct` → pays `monthlyIncentive`, cumulative. */
+  | 'incentive'
+  /** a named reference level ("standard", "low") with no money attached. */
+  | 'reference'
+  /** margin at or BELOW `marginPct` → that bill's commission × `commissionMultiplier`. */
+  | 'penalty'
+
 /**
- * One rung of the tier ladder (user brief 2026-08-31):
+ * One rung of a brand's margin ladder (user brief 2026-08-31). Thresholds are
+ * per BRAND because what counts as a good margin differs — Acami's incentive
+ * Tier 1 is 36% where Zanotti's is 33%.
+ *
+ * The worked example the user gave, for one brand:
+ *
+ *   incentive tier 2   43%   → a further RM1,500  (RM2,500 in total)
+ *   incentive tier 1   36%   → RM1,000
+ *   standard           33%   → reference only
+ *   low                30%   → reference only
+ *   below tier 1       27%   → that bill's commission x 50%
+ *   below tier 2       25%   → x 25%
+ *   below tier 3       24%   → x 0
+ *
+ * Incentives are evaluated on the salesperson's MONTHLY margin and stack up the
+ * ladder; penalties are evaluated PER BILL and the most severe match wins.
+ */
+export interface MarginBand {
+  brandCode: string
+  bandKey: string
+  label: string
+  kind: MarginBandKind
+  /** 0.36 = 36%. Read as ">=" for incentive/reference, "<=" for penalty. */
+  marginPct: number
+  /** Penalty only. 0.5 keeps half the commission, 0 kills it. */
+  commissionMultiplier: number
+  /** Incentive only, INCREMENTAL: 1,000 at Tier 1 then a further 1,500 at Tier 2. */
+  monthlyIncentive: number
+}
+
+/**
+ * One rung of the tier ladder (user brief 2026-08-31, corrected):
  *   Revenue Specialist 5% → 6% · Team Assistant 7% → 8%
  *   Team Leader 9% · Senior Team Leader 10%
- * Rates do not repeat, but the rank key is still the identity so a future
- * scheme can reuse a rate at two tiers.
+ * There is no 7% Revenue Specialist.
  */
 export interface Rank {
   rankKey: string
@@ -112,14 +162,21 @@ export interface Rank {
   canRecruit: boolean
   /**
    * GROUP sales needed to hold this rank — the person's own commissionable
-   * revenue plus their whole downline's. 300,000 promotes a 6% Revenue
-   * Specialist to Team Assistant 7%. `null` = an entry rank that cannot be
-   * climbed to by volume.
+   * revenue plus their whole downline's. Only the 300k gate to Team Assistant
+   * is live; the richer promotion criteria (consecutive months, KPI per head,
+   * margin tier) are RECORDED in comm_promotion_rules but not yet enforced,
+   * at the user's request. `null` = a rank that cannot be climbed to by volume.
    */
   groupSalesThreshold: number | null
   sortOrder: number
 }
 
+/**
+ * fixed    — "flexible": whatever title a human drags them to is their title,
+ *            and the rate stays there even in a month below target.
+ * variable — "entitled to the scheme target": recomputed every month from that
+ *            month's group sales, dropping back when the target is missed.
+ */
 export type RateMode = 'fixed' | 'variable'
 
 /** One person's payroll-purpose position for the period being computed. */
@@ -132,12 +189,6 @@ export interface HierarchyNode {
    * `variable` mode it is the floor they can never drop below.
    */
   baseRankKey: string
-  /**
-   * fixed    — once promoted, the rate stays even in a month that misses the
-   *            target ("升到 7% 之后即使没达到 300k 依然 fixed 在 7%").
-   * variable — recomputed every month from that month's group sales; misses
-   *            the target and the rate drops back to the base rank.
-   */
   rateMode: RateMode
 }
 
@@ -157,6 +208,10 @@ export interface CommissionScheme {
   enableKpi: boolean
   enableOpenBill: boolean
   enableOverride: boolean
+  /** Below-margin penalty on a bill's own commission. */
+  enableMarginPenalty: boolean
+  /** Monthly margin incentive (RM1,000 / a further RM1,500). */
+  enableMarginIncentive: boolean
   /**
    * Item-group allowlist. A group absent from this list is NOT commissionable
    * and raises a warning — a new ERP group must be classified by a human
@@ -184,6 +239,7 @@ export interface EngineInput {
   kpiThresholds: KpiThreshold[]
   openBillRules: OpenBillRule[]
   openBillTags: OpenBillTag[]
+  marginBands: MarginBand[]
   hierarchy: HierarchyNode[]
 }
 
@@ -195,10 +251,12 @@ export type CommissionComponent =
   | 'kpi_threshold'
   | 'open_bill'
   | 'override'
+  | 'margin_incentive'
 
 /**
  * One traceable contribution to a statement. The invariant the RPC enforces:
  * Σ lines.amount === statement.totalCommission, for every statement.
+ * A line's `amount` is already NET of any below-margin penalty.
  */
 export interface StatementLine {
   component: CommissionComponent
@@ -224,6 +282,20 @@ export interface DeferredOrder {
   requiredAmount: number
   /** Commissionable revenue that is waiting on the top-up. */
   productRevenue: number
+}
+
+/** A bill whose margin fell into a penalty band. */
+export interface PenalisedOrder {
+  staffId: string
+  orderId: string
+  orderNo: string
+  brandCode: string | null
+  marginPct: number
+  bandKey: string
+  bandLabel: string
+  multiplier: number
+  /** Commission the penalty removed from this bill. */
+  withheld: number
 }
 
 export interface Statement {
@@ -260,6 +332,21 @@ export interface Statement {
 
   openBillBonus: number
   overrideCommission: number
+
+  /** Monthly margin across their eligible orders (goods only). */
+  marginRevenue: number
+  marginCost: number
+  /** null when no cost data was supplied — no penalty, no incentive, a warning. */
+  marginPct: number | null
+  /** Brand with the largest commissionable revenue this month. */
+  marginBrandCode: string | null
+  marginBandKey: string | null
+  /** RM1,000 / RM2,500 etc. Paid as its own statement line. */
+  marginIncentive: number
+  /** Memo: commission the below-margin penalty removed. Already reflected in
+   *  the line amounts, so it is NOT part of totalCommission. */
+  marginPenaltyWithheld: number
+
   totalCommission: number
 
   lines: StatementLine[]
@@ -272,11 +359,13 @@ export interface EngineResult {
   /** Orders held back by the deposit gate, so the run dashboard can show how
    *  much commission is waiting on collections. */
   deferred: DeferredOrder[]
+  /** Bills that lost commission to a below-margin penalty. */
+  penalised: PenalisedOrder[]
   /**
    * Non-fatal problems a human must look at before applying the run — e.g. a
-   * salesperson with sales but no rank, an unclassified ERP item group, or a
-   * non-recruiting rank that somehow holds downlines. Surfaced on the run
-   * dashboard; the Apply button is disabled while any warning stands.
+   * salesperson with sales but no rank, an unclassified ERP item group, a
+   * non-recruiting rank that holds downlines, or missing cost data. Surfaced on
+   * the run dashboard; the Apply button is disabled while any warning stands.
    */
   warnings: string[]
 }

@@ -1,8 +1,9 @@
 # Module Spec — Revenue Department Commission Payroll
 
 Status: **DRAFT.** Rules briefed 2026-08-31 and implemented in the engine.
-Blocking gaps: the ~39 salespeople do not exist in the staff master, and the
-KPI product list has not been chosen (§11).
+Blocking gaps: the ~39 salespeople do not exist in the staff master, the KPI
+product list has not been chosen, and **the ERP export carries no cost, so the
+whole margin layer cannot run yet** (§12).
 Owner: Principal + HR.
 Related: `module-spec-phase3.md` (HR Costing), `db-schema.md`, `DESIGN.md`.
 
@@ -131,10 +132,10 @@ threshold measures money the company can really recognise.
 Once someone reaches Team Assistant, their rate can be set two ways, and each
 salesperson is ticked one or the other:
 
-| Mode | Behaviour |
-|---|---|
-| **Fixed** | Once promoted from 6% to 7%, the rate **stays at 7%** even in a month whose group sales miss 300k. |
-| **Variable** | Recomputed every month: clear 300k this month → 7%; miss it next month → back to 6%. |
+| Mode | The user's words | Behaviour |
+|---|---|---|
+| **Fixed** | *"flexible — 我自己移去哪一个 title 就是哪一个 title"* | Whatever title a human moves them to is their title. Once promoted from 6% to 7%, the rate **stays at 7%** even in a month whose group sales miss 300k. |
+| **Variable** | *"entitled 整个 target scheme"* | Recomputed every month from the scheme's targets: clear 300k this month → 7%; miss it next month → back to 6%. |
 
 Implementation: `comm_hierarchy.rank_id` is the **attained** rank — the whole
 story in fixed mode, and the floor a variable person can never drop below.
@@ -149,6 +150,31 @@ effective-dated hierarchy row.
 
 The effective rate is what everything else uses: product commission, the Open
 Bill uplift, and the override differential.
+
+### 3.4 Promotion criteria — recorded, not enforced
+
+> **Status: written down, nothing reads them.** The user's instruction
+> (2026-08-31): *"这个本身先不需要 set goal，等之后 fixed 的时候我再重新写进去，
+> 担心根据 restrictions 会有不同的算法。不过可以先写下来。"* They live in
+> `comm_promotion_rules` with `is_enforced = FALSE`. The only gate the engine
+> actually applies is `comm_ranks.group_sales_threshold`, which today carries
+> the single 300k rung to Team Assistant.
+
+Criteria sharing an `alternative_group` are **ANDed**; different groups are
+**ORed**. That models the 7% → 8% rule exactly.
+
+| From → To | Criteria |
+|---|---|
+| **5% → 6%** | Personal sales ≥ **100k for two consecutive months**. (At 5% you cannot hold a team, so it can only be personal.) |
+| **6% → 7%** | **Group sales ≥ 300k.** ← the one live gate |
+| **7% → 8%** | **Any one of:** (a) group sales ≥ 500k **and** 10 KPI items per head — a team of 5 needs 50 in total; (b) group sales ≥ 500k **and** margin at Tier 1; (c) group sales ≥ **700k** on its own, whatever the KPI and margin |
+| **8% → 9%** | **All three, compulsory:** group sales ≥ 700k **and** margin Tier 1 **and** 10 KPI items per head |
+| **9% → 10%** | Not yet specified — the user's "Tier 3" rules are still to come |
+
+Two of these need machinery the engine does not have yet, which is another
+reason not to enforce them today: `personal_sales … for 2 consecutive months`
+needs history across runs, and `kpi_items_per_pax` needs a head-count of the
+person's team.
 
 ---
 
@@ -271,10 +297,73 @@ Worked example — a full chain, downline sells RM10,000:
 Two equal rates compress to zero automatically, which is exactly the brief's
 *"reaching 6% lets you override the 5%s"*.
 
-### 4.6 Total
+### 4.6 Margin — the per-bill penalty and the monthly incentive
+
+Margin thresholds follow the **brand** (user, 2026-08-31): Acami, Zanotti,
+Ergotax. What counts as a good margin differs — Acami's incentive Tier 1 is
+36% where Zanotti's is 33% — so each brand carries its own ladder in
+`comm_margin_bands`.
+
+The user's worked ladder, for one brand:
+
+| Band | Margin | Effect |
+|---|---:|---|
+| Incentive Tier 2 | 43% | a **further RM1,500** — RM2,500 in total |
+| Incentive Tier 1 | 36% | **RM1,000** |
+| Standard | 33% | reference label only |
+| Low | 30% | reference label only |
+| Below Tier 1 | 27% | that **bill's** commission **× 0.50** |
+| Below Tier 2 | 25% | **× 0.25** |
+| Below Tier 3 | 24% | **× 0** |
+
+Read the incentive rungs as **"margin ≥ this"**, stacking up the ladder, and
+the penalty rungs as **"margin ≤ this"**, most severe match winning. That
+reproduces the brief's numbers exactly:
 
 ```
-commission_amount(S, P) = C1 + C2 + C3 + C4
+28% → no band matches                         → no penalty
+27% → below tier 1                            → × 0.50
+26% → below tier 1                            → × 0.50
+25% → tier 1 and tier 2 match, tier 2 is worse → × 0.25
+24% → all three match, tier 3 is worst         → × 0
+38% → incentive tier 1                         → RM1,000
+44% → tier 1 and tier 2                        → RM1,000 + RM1,500
+```
+
+**How margin is computed.** Goods only:
+
+```
+marginRevenue = Σ lineAmount   over lines in commissionable item groups
+marginCost    = Σ costAmount   over the same lines
+marginPct     = (marginRevenue − marginCost) / marginRevenue
+```
+
+Transport and disposal are excluded — they are pass-through service charges and
+are not commissionable either. **Free bundled KPI items ARE included**: a
+giveaway pillow has real cost and no revenue, which is exactly how giving them
+away is supposed to hurt the margin.
+
+**What the penalty scales.** The bill's own product commission and its Open Bill
+bonus — both are percentages of that bill's revenue. It does **not** scale the
+flat KPI allowance (that is paid for moving the item, not for the margin), and
+it does not currently scale an upline's override (§12 Q5).
+
+**Incentive timing.** *Per-bill* for the penalty, *monthly* for the incentive:
+the salesperson's whole month's margin is computed once and pays RM1,000 /
+RM2,500 as its own statement line. Two bills at 44% and 30% average to 37% and
+pay Tier 1 once — not twice.
+
+> ⛔ **This cannot run yet.** The ERP sales-order export has **no cost column**,
+> so margin is unknowable from the data we have. The engine takes cost per line
+> as an input, skips the penalty when it is missing, and raises a run warning
+> naming how many orders were affected — deliberately loud, because silently
+> paying full commission on a bad-margin bill is the failure mode to avoid. See
+> §12 Q1.
+
+### 4.7 Total
+
+```
+commission_amount(S, P) = C1 + C2 + C3 + C4 + margin incentive
 ```
 
 Rounding: every statement **line** is rounded to 2dp and every subtotal is the
@@ -386,10 +475,13 @@ New tables. `sales_*` = imported facts, `comm_*` = config + results. The dormant
 | `comm_item_groups` | ERP group → commissionable? |
 | `comm_kpi_items` / `comm_kpi_thresholds` | KPI products and the qty ladder |
 | `comm_open_bill_rules` | 50 / 40 / 30% |
+| `comm_brands` | Acami / Zanotti / Ergotax + the Item-Code prefixes that identify them |
+| `comm_margin_bands` | each brand's margin ladder (incentive / reference / penalty) |
+| `comm_promotion_rules` | the promotion criteria, recorded with `is_enforced = FALSE` |
 | `comm_hierarchy` | effective-dated upline + attained rank + `rate_mode`; one position per person |
 | `comm_agent_aliases` | ERP agent name → `hr_staff_costs` |
 | `sales_import_batches` | one per file; one `committed` batch per period |
-| `sales_orders` / `sales_order_lines` | the raw facts, plus `raw` JSONB |
+| `sales_orders` / `sales_order_lines` | the raw facts, plus `brand_code`, `cost_amount` and `raw` JSONB |
 | `sales_order_open_bill_tags` | the picks, with `auto_suggested` |
 | `comm_runs` | one per sub-department per month |
 | `comm_statements` / `comm_statement_lines` | results + the audit trail |
@@ -420,15 +512,17 @@ Math in **TypeScript** (`src/lib/commission/`), atomic write via one RPC
 ```
 src/lib/commission/
   types.ts        — inputs/outputs, no Supabase types
-  engine.ts       — five passes: deposit gate → group revenue → rate
-                    resolution → C1/C2/C3 → C4. Every helper exported.
-  engine.test.ts  — 55 worked examples incl. every figure the brief quotes
+  engine.ts       — six passes: deposit gate → group revenue → rate
+                    resolution → C1/C2/C3 (each bill scaled by its margin
+                    penalty) → C4 → monthly margin incentive. Every helper
+                    exported.
+  engine.test.ts  — 79 worked examples incl. every figure the briefs quote
 src/lib/import/
   erp-sales-order.ts       — the parser (column resolution, dates, agents, sequencing)
   erp-sales-order.test.ts  — 25 tests on a golden grid mirroring the real export
 ```
 
-Status: **built and green** — 635 tests pass across the suite (was 555).
+Status: **built and green** — 659 tests pass across the suite (was 555).
 
 ---
 
@@ -493,14 +587,52 @@ AK- ESSENTIAL BOLSTER         Soft Bolster              30.00       [ ]        4
 
 **VI. Open Bill rates** — `1st 50% · 2nd 40% · 3rd 30%`.
 
-**VII. Salespeople** — the per-person tick table the whole tab exists for.
+**VII. Brands and margin bands** — a brand picker, then that brand's ladder.
+Incentive rows carry an RM amount, penalty rows a multiplier; the two never mix
+in one column, so the table reads as one continuous ladder.
 
 ```
-NAME            SUB-DEPT   UPLINE        ATTAINED RANK   RATE MODE        WITHHOLDING   WHT %
-YUNY            Fair       —             Team Leader 9%  (•)Fix ( )Var       [✓]        2.00
-TAN KAR JIUN    Fair       YUNY          Team Asst 7%    ( )Fix (•)Var       [✓]        2.00
-LUCAS           Fair       YUNY          Rev Spec 6%     ( )Fix (•)Var       [ ]          —
-SALLY           Fair       TAN KAR JIUN  Rev Spec 5%     ( )Fix (•)Var       [✓]        2.00
+BRAND: ( ) Acami  (•) Zanotti  ( ) Ergotax        item code prefixes [ ZNT-, ZN- ]
+
+BAND                   KIND        MARGIN    COMMISSION    MONTHLY INCENTIVE
+Incentive Tier 2       incentive   >= 43%       full            +1,500.00
+Incentive Tier 1       incentive   >= 36%       full            +1,000.00
+Standard margin        reference   >= 33%       full                   —
+Low margin             reference   >= 30%       full                   —
+Below margin Tier 1    penalty     <= 27%       x 50%                  —
+Below margin Tier 2    penalty     <= 25%       x 25%                  —
+Below margin Tier 3    penalty     <= 24%       x 0                    —
+                                                        [ + add band ]
+```
+
+**VIII. Promotion criteria** — read-only for now, with an `enforced` column that
+is off everywhere. Rows in the same `ALT` group are ANDed; different groups are
+alternatives.
+
+```
+FROM → TO      ALT   CRITERION              THRESHOLD        ENFORCED
+5% → 6%         1    Personal sales         100,000 x 2 mth     [ ]
+6% → 7%         1    Group sales            300,000             [✓]
+7% → 8%         1    Group sales            500,000             [ ]
+7% → 8%         1    KPI items per head     10                  [ ]
+7% → 8%         2    Group sales            500,000             [ ]
+7% → 8%         2    Margin band            Incentive Tier 1    [ ]
+7% → 8%         3    Group sales            700,000             [ ]
+8% → 9%         1    Group sales            700,000             [ ]
+8% → 9%         1    Margin band            Incentive Tier 1    [ ]
+8% → 9%         1    KPI items per head     10                  [ ]
+```
+
+**IX. Salespeople** — the per-person tick table the whole tab exists for.
+"Manual" is the user's *flexible* (a human sets the title); "Scheme" is
+*entitled to the target scheme* (the monthly targets set it).
+
+```
+NAME            SUB-DEPT   UPLINE        ATTAINED RANK   RATE MODE            WITHHOLDING   WHT %
+YUNY            Fair       —             Team Leader 9%  (•)Manual ( )Scheme     [✓]        2.00
+TAN KAR JIUN    Fair       YUNY          Team Asst 7%    ( )Manual (•)Scheme     [✓]        2.00
+LUCAS           Fair       YUNY          Rev Spec 6%     ( )Manual (•)Scheme     [ ]          —
+SALLY           Fair       TAN KAR JIUN  Rev Spec 5%     ( )Manual (•)Scheme     [✓]        2.00
 ```
 
 Rules the table enforces inline: an upline whose rank has `can_recruit = false`
@@ -542,9 +674,9 @@ hand-edit can't silently diverge from the audit trail.
 
 | # | Step | State |
 |---|---|---|
-| 1 | Migration: 17 tables + RLS + `payroll_source` + the Fair seed | ✅ written, dry-run verified, **not applied** |
+| 1 | Migration: 20 tables + RLS + `payroll_source` + the Fair seed (ladder, item groups, Open Bill rates, brands, Acami's margin ladder, promotion criteria) | ✅ written, dry-run verified, **not applied** |
 | 2 | Withholding Tax migration (tax_mode, WHT column, trigger branch) | ✅ written, regression-verified, **not applied** |
-| 3 | Pure TS engine + tests | ✅ 55 tests |
+| 3 | Pure TS engine + tests | ✅ 79 tests |
 | 4 | ERP parser + tests | ✅ 25 tests, verified against the real file |
 | 5 | **Create the ~39 salespeople** in the Revenue Department | ⛔ blocked — needs the staff list (Q2) |
 | 6 | Settings → Commission tab (§9) | ready to build |
@@ -553,8 +685,9 @@ hand-edit can't silently diverge from the audit trail.
 | 9 | Open Bill board + deferred-orders page | after 8 |
 | 10 | `compute_commission_run` + `apply_commission_run` RPCs + run dashboard + statement page | after 6–9 |
 | 11 | Payroll writeback + read-only cell | after 10 |
-| 12 | WHT remittance in the statutory export | before the first real payout |
-| 13 | Revenue Dept P&L / pool 1090 wiring | separate scope |
+| 12 | Cost feed → margin penalty and incentive go live | ⛔ blocked — the SO export has no cost column (Q1) |
+| 13 | WHT remittance in the statutory export | before the first real payout |
+| 14 | Revenue Dept P&L / pool 1090 wiring | separate scope |
 
 Steps 6–9 need no further answers and can proceed now.
 
@@ -564,12 +697,16 @@ Steps 6–9 need no further answers and can proceed now.
 
 | # | Question | Why it matters |
 |---|---|---|
-| **Q1** | The remaining **group-sales targets**: what promotes 5% → 6%, and what are the Team Assistant 7% → 8%, Team Leader and Senior Team Leader thresholds? Only `ta_7 = 300k` is known. | a `variable` salesperson can currently only climb to 7%; the higher rungs never trigger |
-| **Q2** | The **staff list** for the ~39 salespeople — names, NRIC, bank accounts, hire dates, sub-department, upline, attained rank, fixed/variable, and who is withheld. | nothing can run until they exist in `hr_staff_costs` |
-| **Q3** | The **KPI product list**: which of the 26 ACC item codes, at what amount? Sizing check — RM50 on the five commonest pillow codes would have paid **≈ RM63,000** of KPI in July against ≈ RM141,000 of product commission at a flat 5%. Worth confirming that scale is intended. | drives `comm_kpi_items` |
-| **Q4** | **WHT remittance** — which LHDN form / schedule, so the statutory export can produce it. | legally required before the first payout |
-| **Q5** | Is the deposit threshold really **50%**, and is it the same for every sub-department? | it is a per-scheme setting; 50% is seeded |
-| **Q6** | Should the Revenue Dept manager (`dept_manager` role) see their team's commission? | RLS scope; DENY for now |
+| **Q1** | **Where does cost come from?** The sales-order export has no cost column, so margin — and therefore the whole penalty/incentive layer — cannot be computed. Either a cost price per Item Code, or a second ERP export carrying cost or margin per line. | blocks the entire margin layer |
+| **Q2** | The **staff list** for the ~39 salespeople — names, NRIC, bank accounts, hire dates, sub-department, upline, attained rank, manual/scheme rate mode, and who is withheld. | nothing can run until they exist in `hr_staff_costs` |
+| **Q3** | **Brand mapping**: is "Acami" the ERP's `AK-` prefix (AKEMI)? Which prefixes are Zanotti and Ergotax? The July export's codes start `AK- NTYR- JM- AERO- HOK- DSL- AMN- CH-`. | `comm_brands.item_code_prefixes` decides which ladder a line answers to |
+| **Q4** | The **KPI product list**: which of the 26 ACC item codes, at what amount? Sizing check — RM50 on the five commonest pillow codes would have paid **≈ RM63,000** of KPI in July against ≈ RM141,000 of product commission at a flat 5%. | drives `comm_kpi_items` |
+| **Q5** | Should the below-margin penalty also cut the **upline's override** on that bill? Today it does not, so a halved bill still pays the upline in full — which can push the total above the top rate. | override math |
+| **Q6** | A bill mixing brands (common — AK- mattress + HOK- bedframe): the engine uses the bill's overall margin and the **dominant brand's** ladder. Correct, or should each brand's slice be judged separately? | which ladder a mixed bill answers to |
+| **Q7** | The **Zanotti and Ergotax ladders** — only Zanotti's Tier 1 (33%) is known. | seeded partially |
+| **Q8** | **WHT remittance** — which LHDN form / schedule, so the statutory export can produce it. | legally required before the first payout |
+| **Q9** | Is the deposit threshold really **50%**, and is it the same for every sub-department? | it is a per-scheme setting; 50% is seeded |
+| **Q10** | Should the Revenue Dept manager (`dept_manager` role) see their team's commission? | RLS scope; DENY for now |
 
 ---
 

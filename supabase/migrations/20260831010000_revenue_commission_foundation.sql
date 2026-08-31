@@ -47,7 +47,21 @@ CREATE TYPE comm_component AS ENUM (
     'kpi_item',
     'kpi_threshold',
     'open_bill',
-    'override'
+    'override',
+    'margin_incentive'
+);
+
+CREATE TYPE comm_margin_band_kind AS ENUM (
+    'incentive',   -- margin at or ABOVE the threshold pays monthly_incentive, cumulative
+    'reference',   -- a named level ("standard", "low") with no money attached
+    'penalty'      -- margin at or BELOW the threshold scales that BILL's commission
+);
+
+CREATE TYPE comm_promotion_criterion AS ENUM (
+    'personal_sales',
+    'group_sales',
+    'kpi_items_per_pax',
+    'margin_band'
 );
 
 CREATE TYPE comm_rate_mode AS ENUM (
@@ -154,10 +168,12 @@ CREATE TABLE comm_schemes (
 
     -- Per-component switches: another sub-department reuses the subset that
     -- applies to it instead of getting a bespoke engine.
-    enable_product_revenue BOOLEAN NOT NULL DEFAULT TRUE,
-    enable_kpi             BOOLEAN NOT NULL DEFAULT TRUE,
-    enable_open_bill       BOOLEAN NOT NULL DEFAULT TRUE,
-    enable_override        BOOLEAN NOT NULL DEFAULT TRUE,
+    enable_product_revenue  BOOLEAN NOT NULL DEFAULT TRUE,
+    enable_kpi              BOOLEAN NOT NULL DEFAULT TRUE,
+    enable_open_bill        BOOLEAN NOT NULL DEFAULT TRUE,
+    enable_override         BOOLEAN NOT NULL DEFAULT TRUE,
+    enable_margin_penalty   BOOLEAN NOT NULL DEFAULT TRUE,
+    enable_margin_incentive BOOLEAN NOT NULL DEFAULT TRUE,
 
     effective_from DATE NOT NULL,
     effective_to DATE,
@@ -322,6 +338,107 @@ CREATE TABLE comm_open_bill_rules (
 
 COMMENT ON TABLE comm_open_bill_rules IS
     'Open Bill: the 1st / 2nd / 3rd bill a salesperson writes on an event day earns +50 / 40 / 30% ON TOP of that order''s commission, at the person''s current rate.';
+
+-- ----------------------------------------------------------------------------
+-- TABLE: comm_brands
+-- Margin thresholds, incentives and KPI expectations follow the BRAND
+-- (user 2026-08-31): Acami, Zanotti, Ergotax. What counts as a good margin
+-- differs - Acami's incentive Tier 1 is 36% where Zanotti's is 33%.
+--
+-- The ERP export has no brand column, so item_code_prefixes lets the importer
+-- tag each line from its Item Code (AK-... -> Acami, and so on).
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE comm_brands (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scheme_id UUID NOT NULL REFERENCES comm_schemes(id) ON DELETE CASCADE,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    item_code_prefixes TEXT[] NOT NULL DEFAULT '{}',
+    note TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_comm_brand_code UNIQUE (scheme_id, code)
+);
+
+COMMENT ON TABLE comm_brands IS
+    'Brands whose margin ladders differ. item_code_prefixes maps ERP Item Codes onto a brand because the sales-order export carries no brand column.';
+
+-- ----------------------------------------------------------------------------
+-- TABLE: comm_margin_bands
+-- One brand's margin ladder. From the user's worked example:
+--
+--   incentive tier 2   43%   -> a further RM1,500 (RM2,500 in total)
+--   incentive tier 1   36%   -> RM1,000
+--   standard           33%   -> reference only
+--   low                30%   -> reference only
+--   below tier 1       27%   -> that BILL's commission x 0.50
+--   below tier 2       25%   -> x 0.25
+--   below tier 3       24%   -> x 0
+--
+-- Incentives read as ">= margin_pct" and STACK up the ladder; they are settled
+-- on the salesperson's MONTHLY margin. Penalties read as "<= margin_pct" and
+-- the MOST SEVERE match wins; they are settled PER BILL.
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE comm_margin_bands (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scheme_id UUID NOT NULL REFERENCES comm_schemes(id) ON DELETE CASCADE,
+    brand_id UUID NOT NULL REFERENCES comm_brands(id) ON DELETE CASCADE,
+    band_key TEXT NOT NULL,
+    label TEXT NOT NULL,
+    kind comm_margin_band_kind NOT NULL,
+    margin_pct DECIMAL(9, 6) NOT NULL,
+    commission_multiplier DECIMAL(9, 6) NOT NULL DEFAULT 1,
+    monthly_incentive DECIMAL(15, 2) NOT NULL DEFAULT 0,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT margin_pct_sane CHECK (margin_pct >= -1 AND margin_pct <= 1),
+    CONSTRAINT multiplier_sane CHECK (commission_multiplier >= 0 AND commission_multiplier <= 1),
+    CONSTRAINT incentive_non_negative CHECK (monthly_incentive >= 0),
+    CONSTRAINT uq_comm_margin_band UNIQUE (brand_id, band_key)
+);
+
+COMMENT ON TABLE comm_margin_bands IS
+    'Per-brand margin ladder. kind=incentive pays monthly and stacks; kind=penalty scales a single bill''s commission and the most severe match wins; kind=reference is a label only.';
+
+-- ----------------------------------------------------------------------------
+-- TABLE: comm_promotion_rules
+-- The promotion criteria, RECORDED BUT NOT ENFORCED (user 2026-08-31: "先不需
+-- 要 set goal... 不过可以先写下来" - the algorithm may change once the
+-- restrictions are settled). is_enforced stays FALSE; the live gate remains
+-- comm_ranks.group_sales_threshold until the user says otherwise.
+--
+-- Criteria sharing an alternative_group are ANDed; different groups are ORed.
+-- That models 7% -> 8% exactly: (500k AND 10 KPI per pax) OR (500k AND margin
+-- Tier 1) OR (700k on its own).
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE comm_promotion_rules (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scheme_id UUID NOT NULL REFERENCES comm_schemes(id) ON DELETE CASCADE,
+    from_rank_key TEXT NOT NULL,
+    to_rank_key TEXT NOT NULL,
+    alternative_group SMALLINT NOT NULL DEFAULT 1,
+    criterion comm_promotion_criterion NOT NULL,
+    threshold_amount DECIMAL(15, 2),
+    threshold_qty INTEGER,
+    margin_band_key TEXT,
+    consecutive_months SMALLINT,
+    is_enforced BOOLEAN NOT NULL DEFAULT FALSE,
+    note TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT consecutive_months_sane CHECK (consecutive_months IS NULL OR consecutive_months > 0)
+);
+
+COMMENT ON TABLE comm_promotion_rules IS
+    'Promotion criteria, recorded for reference. Same alternative_group = AND, different groups = OR. is_enforced is FALSE everywhere: nothing reads these yet, by the user''s request.';
+
+CREATE INDEX idx_comm_promotion_rules_scheme
+    ON comm_promotion_rules (scheme_id, from_rank_key, alternative_group);
 
 -- ----------------------------------------------------------------------------
 -- TABLE: comm_hierarchy
@@ -558,6 +675,13 @@ CREATE TABLE sales_order_lines (
     qty DECIMAL(15, 3) NOT NULL DEFAULT 0,
     unit_price DECIMAL(15, 2) NOT NULL DEFAULT 0,
     line_amount DECIMAL(15, 2) NOT NULL DEFAULT 0,
+    -- Brand, resolved from the Item Code via comm_brands.item_code_prefixes.
+    brand_code TEXT,
+    -- Cost of goods, for margin. THE ERP SALES-ORDER EXPORT HAS NO COST COLUMN,
+    -- so this stays NULL until a cost source exists; the engine then skips the
+    -- below-margin penalty and says so in the run warnings rather than quietly
+    -- paying full commission on a bad-margin bill.
+    cost_amount DECIMAL(15, 2),
     raw JSONB,
 
     CONSTRAINT uq_sales_order_line UNIQUE (order_id, line_no)
@@ -663,6 +787,20 @@ CREATE TABLE comm_statements (
 
     open_bill_bonus DECIMAL(15, 2) NOT NULL DEFAULT 0,
     override_commission DECIMAL(15, 2) NOT NULL DEFAULT 0,
+
+    -- Margin, on the goods only (transport and disposal excluded, free KPI
+    -- giveaways included - their cost is real and is meant to hurt).
+    margin_revenue DECIMAL(15, 2) NOT NULL DEFAULT 0,
+    margin_cost DECIMAL(15, 2) NOT NULL DEFAULT 0,
+    -- NULL when no cost data was available: no penalty, no incentive, a warning.
+    margin_pct DECIMAL(9, 6),
+    margin_brand_code TEXT,
+    margin_band_key TEXT,
+    margin_incentive DECIMAL(15, 2) NOT NULL DEFAULT 0,
+    -- Memo: commission the below-margin penalty removed. Already reflected in
+    -- the statement lines, so it is NOT part of total_commission.
+    margin_penalty_withheld DECIMAL(15, 2) NOT NULL DEFAULT 0,
+
     total_commission DECIMAL(15, 2) NOT NULL DEFAULT 0,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -670,7 +808,8 @@ CREATE TABLE comm_statements (
     CONSTRAINT uq_comm_statement_per_run UNIQUE (run_id, staff_id),
     CONSTRAINT components_tally CHECK (
         total_commission
-        = product_commission + kpi_commission + open_bill_bonus + override_commission
+        = product_commission + kpi_commission + open_bill_bonus
+          + override_commission + margin_incentive
     )
 );
 
@@ -798,6 +937,74 @@ BEGIN
     -- comm_kpi_items is left EMPTY on purpose: which product codes are KPI
     -- items, and at what amount, is the user's call in Settings. The July
     -- export has 26 distinct ACC codes to choose from.
+
+    -- ── Brands. item_code_prefixes are EMPTY on purpose: the mapping from ERP
+    -- Item Codes to these names has not been confirmed (is "Acami" the AK-
+    -- prefix, i.e. AKEMI?). Filled in Settings.
+    INSERT INTO comm_brands (scheme_id, code, name, note) VALUES
+        (v_scheme, 'ACAMI',   'Acami',   'Margin ladder below is the user''s worked example.'),
+        (v_scheme, 'ZANOTTI', 'Zanotti', 'Incentive Tier 1 is 33% - the rest of the ladder is pending.'),
+        (v_scheme, 'ERGOTAX', 'Ergotax', 'Ladder pending.');
+
+    -- Acami's full ladder, exactly as briefed.
+    INSERT INTO comm_margin_bands
+        (scheme_id, brand_id, band_key, label, kind, margin_pct, commission_multiplier, monthly_incentive, sort_order)
+    SELECT v_scheme, b.id, x.band_key, x.label, x.kind::comm_margin_band_kind,
+           x.margin_pct, x.multiplier, x.incentive, x.sort_order
+    FROM comm_brands b
+    CROSS JOIN (VALUES
+        ('incentive_tier_2', 'Incentive Tier 2',    'incentive', 0.43, 1.00, 1500.00, 10),
+        ('incentive_tier_1', 'Incentive Tier 1',    'incentive', 0.36, 1.00, 1000.00, 20),
+        ('standard',         'Standard margin',     'reference', 0.33, 1.00,    0.00, 30),
+        ('low',              'Low margin',          'reference', 0.30, 1.00,    0.00, 40),
+        ('below_tier_1',     'Below margin Tier 1', 'penalty',   0.27, 0.50,    0.00, 50),
+        ('below_tier_2',     'Below margin Tier 2', 'penalty',   0.25, 0.25,    0.00, 60),
+        ('below_tier_3',     'Below margin Tier 3', 'penalty',   0.24, 0.00,    0.00, 70)
+    ) AS x(band_key, label, kind, margin_pct, multiplier, incentive, sort_order)
+    WHERE b.scheme_id = v_scheme AND b.code = 'ACAMI';
+
+    -- Zanotti: only the one threshold the user gave.
+    INSERT INTO comm_margin_bands
+        (scheme_id, brand_id, band_key, label, kind, margin_pct, monthly_incentive, sort_order)
+    SELECT v_scheme, b.id, 'incentive_tier_1', 'Incentive Tier 1', 'incentive', 0.33, 1000.00, 20
+    FROM comm_brands b WHERE b.scheme_id = v_scheme AND b.code = 'ZANOTTI';
+
+    -- ── Promotion criteria. RECORDED ONLY (is_enforced = FALSE).
+    INSERT INTO comm_promotion_rules
+        (scheme_id, from_rank_key, to_rank_key, alternative_group, criterion,
+         threshold_amount, threshold_qty, margin_band_key, consecutive_months, note)
+    VALUES
+        -- 5% -> 6%: two consecutive months at 100k. At 5% you cannot hold a
+        -- team, so this can only be personal sales.
+        (v_scheme, 'rs_5', 'rs_6', 1, 'personal_sales',    100000.00, NULL, NULL, 2,
+         'Two consecutive months at 100k.'),
+
+        -- 6% -> 7%: group sales 300k. This one IS live, via
+        -- comm_ranks.group_sales_threshold on ta_7.
+        (v_scheme, 'rs_6', 'ta_7', 1, 'group_sales',       300000.00, NULL, NULL, NULL,
+         'Group sales 300k. Currently the only enforced gate.'),
+
+        -- 7% -> 8%: any ONE of three alternatives.
+        (v_scheme, 'ta_7', 'ta_8', 1, 'group_sales',       500000.00, NULL, NULL, NULL,
+         'Alternative A: 500k group sales AND 10 KPI items per head.'),
+        (v_scheme, 'ta_7', 'ta_8', 1, 'kpi_items_per_pax',      NULL,   10, NULL, NULL,
+         'Alternative A: a team of 5 needs 50 KPI items in total.'),
+        (v_scheme, 'ta_7', 'ta_8', 2, 'group_sales',       500000.00, NULL, NULL, NULL,
+         'Alternative B: 500k group sales AND margin Tier 1.'),
+        (v_scheme, 'ta_7', 'ta_8', 2, 'margin_band',            NULL, NULL, 'incentive_tier_1', NULL,
+         'Alternative B: margin Tier 1.'),
+        (v_scheme, 'ta_7', 'ta_8', 3, 'group_sales',       700000.00, NULL, NULL, NULL,
+         'Alternative C: 700k group sales on its own, whatever the KPI and margin.'),
+
+        -- 8% -> 9%: all three, compulsory.
+        (v_scheme, 'ta_8', 'tl_9', 1, 'group_sales',       700000.00, NULL, NULL, NULL,
+         'All three are compulsory.'),
+        (v_scheme, 'ta_8', 'tl_9', 1, 'margin_band',            NULL, NULL, 'incentive_tier_1', NULL,
+         'All three are compulsory.'),
+        (v_scheme, 'ta_8', 'tl_9', 1, 'kpi_items_per_pax',      NULL,   10, NULL, NULL,
+         'All three are compulsory.');
+
+    -- 9% -> 10% has no rules yet (the user's "Tier 3" is still to come).
 END;
 $seed$;
 
@@ -817,6 +1024,7 @@ BEGIN
     FOREACH t IN ARRAY ARRAY[
         'comm_sub_departments', 'comm_schemes', 'comm_ranks', 'comm_item_groups',
         'comm_kpi_items', 'comm_kpi_thresholds', 'comm_open_bill_rules',
+        'comm_brands', 'comm_margin_bands', 'comm_promotion_rules',
         'comm_hierarchy', 'comm_agent_aliases',
         'sales_import_batches', 'sales_orders', 'sales_order_lines',
         'sales_order_open_bill_tags',

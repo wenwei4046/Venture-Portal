@@ -9,7 +9,11 @@ import {
   indexKpiItems,
   isDepositMet,
   kpiThresholdPct,
+  marginBase,
+  marginIncentiveFor,
+  marginPctOf,
   orderProductRevenue,
+  penaltyBandFor,
   resolveRank,
 } from './engine'
 import type {
@@ -17,6 +21,7 @@ import type {
   EngineInput,
   HierarchyNode,
   ItemGroupRule,
+  MarginBand,
   Rank,
   SalesOrder,
   Statement,
@@ -53,6 +58,28 @@ const RANKS: Rank[] = [
   { rankKey: 'stl_10', tierKey: 'senior_team_leader', tierLabel: 'Senior Team Leader', label: 'Senior Team Leader · 10%', productRate: 0.10, canRecruit: true, groupSalesThreshold: null, sortOrder: 60 },
 ]
 
+/**
+ * The brand ladder from the user's worked example (2026-08-31). Thresholds are
+ * per brand: Acami's incentive Tier 1 is 36% where Zanotti's is 33%.
+ */
+const ACAMI_BANDS: MarginBand[] = [
+  { brandCode: 'ACAMI', bandKey: 'incentive_tier_2', label: 'Incentive Tier 2', kind: 'incentive', marginPct: 0.43, commissionMultiplier: 1, monthlyIncentive: 1_500 },
+  { brandCode: 'ACAMI', bandKey: 'incentive_tier_1', label: 'Incentive Tier 1', kind: 'incentive', marginPct: 0.36, commissionMultiplier: 1, monthlyIncentive: 1_000 },
+  { brandCode: 'ACAMI', bandKey: 'standard', label: 'Standard margin', kind: 'reference', marginPct: 0.33, commissionMultiplier: 1, monthlyIncentive: 0 },
+  { brandCode: 'ACAMI', bandKey: 'low', label: 'Low margin', kind: 'reference', marginPct: 0.30, commissionMultiplier: 1, monthlyIncentive: 0 },
+  { brandCode: 'ACAMI', bandKey: 'below_tier_1', label: 'Below margin Tier 1', kind: 'penalty', marginPct: 0.27, commissionMultiplier: 0.5, monthlyIncentive: 0 },
+  { brandCode: 'ACAMI', bandKey: 'below_tier_2', label: 'Below margin Tier 2', kind: 'penalty', marginPct: 0.25, commissionMultiplier: 0.25, monthlyIncentive: 0 },
+  { brandCode: 'ACAMI', bandKey: 'below_tier_3', label: 'Below margin Tier 3', kind: 'penalty', marginPct: 0.24, commissionMultiplier: 0, monthlyIncentive: 0 },
+]
+
+/** Zanotti clears at a lower bar — the reason bands are per brand. */
+const ZANOTTI_BANDS: MarginBand[] = [
+  { brandCode: 'ZANOTTI', bandKey: 'incentive_tier_1', label: 'Incentive Tier 1', kind: 'incentive', marginPct: 0.33, commissionMultiplier: 1, monthlyIncentive: 1_000 },
+  { brandCode: 'ZANOTTI', bandKey: 'below_tier_1', label: 'Below margin Tier 1', kind: 'penalty', marginPct: 0.20, commissionMultiplier: 0.5, monthlyIncentive: 0 },
+]
+
+const MARGIN_BANDS = [...ACAMI_BANDS, ...ZANOTTI_BANDS]
+
 const SCHEME: CommissionScheme = {
   openBillBasis: 'uplift_on_commission',
   overrideIncludesKpi: false,
@@ -60,6 +87,8 @@ const SCHEME: CommissionScheme = {
   enableKpi: true,
   enableOpenBill: true,
   enableOverride: true,
+  enableMarginPenalty: true,
+  enableMarginIncentive: true,
   itemGroups: ITEM_GROUPS,
   depositThresholdPct: 0.5,
   defaultRateMode: 'variable',
@@ -101,7 +130,7 @@ interface OrderOpts {
 function order(
   id: string,
   staffId: string,
-  lines: Array<[group: string, code: string, qty: number, amount: number]>,
+  lines: Array<[group: string, code: string, qty: number, amount: number, cost?: number, brand?: string]>,
   opts: OrderOpts = {},
 ): SalesOrder {
   const date = opts.date ?? '2026-07-06'
@@ -117,12 +146,14 @@ function order(
     // Default to fully paid so a test only opts into the deposit gate.
     paidAmount: opts.paidAmount ?? total,
     alreadyReleased: opts.alreadyReleased,
-    lines: lines.map(([itemGroup, productCode, qty, lineAmount], i) => ({
+    lines: lines.map(([itemGroup, productCode, qty, lineAmount, costAmount, brandCode], i) => ({
       id: `${id}-L${i + 1}`,
       itemGroup,
       productCode,
       qty,
       lineAmount,
+      costAmount,
+      brandCode: brandCode ?? (costAmount === undefined ? undefined : 'ACAMI'),
     })),
   }
 }
@@ -137,6 +168,7 @@ function run(partial: Partial<EngineInput>) {
     kpiThresholds: KPI_THRESHOLDS,
     openBillRules: OPEN_BILL_RULES,
     openBillTags: [],
+    marginBands: MARGIN_BANDS,
     hierarchy: CHAIN,
     ...partial,
   })
@@ -643,15 +675,18 @@ describe('scheme component switches', () => {
 // ─── Cross-cutting invariants ───────────────────────────────────────────────
 
 describe('run invariants', () => {
+  // Costs give every bill a 33% margin: above the penalty ladder, below the
+  // 36% incentive bar, so this run exercises the components with no margin
+  // adjustment in play.
   const result = run({
     orders: [
       order('1', 'ta', [
-        ['MATTRESS', 'M1', 1, 20_000],
-        ['ACC', 'AK-CS AIRLOFT COMFY PIL', 11, 0],
-        ['TRANS', 'TRANSPORTATION CHARGES', 1, 800],
+        ['MATTRESS', 'M1', 1, 20_000, 13_400],
+        ['ACC', 'AK-CS AIRLOFT COMFY PIL', 11, 0, 0],
+        ['TRANS', 'TRANSPORTATION CHARGES', 1, 800, 780],
       ]),
-      order('2', 'rs', [['SOFA', 'S1', 1, 10_000]]),
-      order('3', 'rs', [['BEDFRAME', 'B1', 2, 3_333.33]]),
+      order('2', 'rs', [['SOFA', 'S1', 1, 10_000, 6_700]]),
+      order('3', 'rs', [['BEDFRAME', 'B1', 2, 3_333.33, 2_233.33]]),
     ],
     openBillTags: [{ orderId: '1', rank: 1 }],
   })
@@ -687,6 +722,220 @@ describe('run invariants', () => {
 
   it('produces no warnings on a clean run', () => {
     expect(result.warnings).toEqual([])
+  })
+
+  it('carries the monthly margin without applying an adjustment at 33%', () => {
+    const ta = find(result.statements, 'ta')
+    expect(ta.marginPct).toBeCloseTo(0.33, 10)
+    expect(ta.marginIncentive).toBe(0)
+    expect(ta.marginPenaltyWithheld).toBe(0)
+    expect(result.penalised).toEqual([])
+  })
+})
+
+// ─── Margin: penalty and incentive ──────────────────────────────────────────
+
+describe('margin base', () => {
+  const kpiIndex = indexKpiItems(KPI_ITEMS)
+  const groupIndex = indexItemGroups(ITEM_GROUPS)
+
+  it('counts goods only — transport and disposal are pass-through', () => {
+    const o = order('1', 'rs', [
+      ['MATTRESS', 'M1', 1, 10_000, 7_000],
+      ['TRANS', 'TRANSPORTATION CHARGES', 1, 500, 480],
+      ['OTHER', 'DISPOSE', 1, 200, 150],
+    ])
+    const base = marginBase(o.lines, kpiIndex, groupIndex)
+    expect(base.revenue).toBe(10_000)
+    expect(base.cost).toBe(7_000)
+    expect(marginPctOf(base)).toBeCloseTo(0.30, 10)
+  })
+
+  it('includes a free bundled KPI item — giving pillows away hurts margin', () => {
+    const o = order('1', 'rs', [
+      ['MATTRESS', 'M1', 1, 10_000, 7_300],
+      ['ACC', 'AK-CS AIRLOFT COMFY PIL', 4, 0, 100],
+    ])
+    const base = marginBase(o.lines, kpiIndex, groupIndex)
+    expect(base.revenue).toBe(10_000)
+    expect(base.cost).toBe(7_400)
+    expect(marginPctOf(base)).toBeCloseTo(0.26, 10)
+  })
+
+  it('returns null when any line in scope has no cost', () => {
+    const o = order('1', 'rs', [
+      ['MATTRESS', 'M1', 1, 10_000, 7_000],
+      ['SOFA', 'S1', 1, 5_000],
+    ])
+    const base = marginBase(o.lines, kpiIndex, groupIndex)
+    expect(base.complete).toBe(false)
+    expect(marginPctOf(base)).toBeNull()
+  })
+
+  it('picks the brand with the most revenue on the bill', () => {
+    const o = order('1', 'rs', [
+      ['MATTRESS', 'M1', 1, 3_000, 2_000, 'ZANOTTI'],
+      ['SOFA', 'S1', 1, 9_000, 6_000, 'ACAMI'],
+    ])
+    expect(marginBase(o.lines, kpiIndex, groupIndex).brandCode).toBe('ACAMI')
+  })
+})
+
+describe('penaltyBandFor — the most severe match wins', () => {
+  it("matches the user's ladder exactly", () => {
+    const at = (m: number) => penaltyBandFor(m, 'ACAMI', MARGIN_BANDS)?.bandKey ?? null
+    expect(at(0.28)).toBeNull() // above every penalty band
+    expect(at(0.27)).toBe('below_tier_1') // "27 and below"
+    expect(at(0.26)).toBe('below_tier_1')
+    expect(at(0.25)).toBe('below_tier_2')
+    expect(at(0.245)).toBe('below_tier_2')
+    expect(at(0.24)).toBe('below_tier_3') // "24 and below"
+    expect(at(0.10)).toBe('below_tier_3')
+  })
+
+  it('reads the ladder of the bill\'s own brand', () => {
+    // 22% is a Tier-1 penalty for Zanotti (bar at 20%? no — 22 > 20, so clear)
+    expect(penaltyBandFor(0.22, 'ZANOTTI', MARGIN_BANDS)).toBeNull()
+    expect(penaltyBandFor(0.22, 'ACAMI', MARGIN_BANDS)?.bandKey).toBe('below_tier_3')
+    expect(penaltyBandFor(0.19, 'ZANOTTI', MARGIN_BANDS)?.bandKey).toBe('below_tier_1')
+  })
+})
+
+describe('marginIncentiveFor — incentives stack up the ladder', () => {
+  const at = (m: number) => marginIncentiveFor(m, 'ACAMI', MARGIN_BANDS)
+
+  it('pays nothing below Tier 1', () => {
+    expect(at(0.35).amount).toBe(0)
+  })
+
+  it('pays RM1,000 at Tier 1', () => {
+    expect(at(0.36).amount).toBe(1_000)
+    expect(at(0.36).bandKey).toBe('incentive_tier_1')
+  })
+
+  it('pays RM1,000 + RM1,500 at Tier 2', () => {
+    expect(at(0.43).amount).toBe(2_500)
+    expect(at(0.50).amount).toBe(2_500)
+    expect(at(0.43).bandKey).toBe('incentive_tier_2')
+  })
+
+  it("uses the brand's own bar — Zanotti clears Tier 1 at 33%", () => {
+    expect(marginIncentiveFor(0.33, 'ZANOTTI', MARGIN_BANDS).amount).toBe(1_000)
+    expect(marginIncentiveFor(0.33, 'ACAMI', MARGIN_BANDS).amount).toBe(0)
+  })
+})
+
+describe('below-margin penalty, end to end', () => {
+  // 10,000 of goods at 7,400 cost = 26% margin → Below Tier 1 → x 0.5
+  const badBill = order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 7_400]])
+
+  it('halves the bill\'s product commission', () => {
+    const r = run({ orders: [badBill] })
+    const rs = find(r.statements, 'rs')
+    expect(rs.marginPct).toBeCloseTo(0.26, 10)
+    expect(rs.productCommission).toBe(250) // 10,000 x 5% = 500, halved
+    expect(rs.marginPenaltyWithheld).toBe(250)
+  })
+
+  it('halves the Open Bill bonus on the same bill', () => {
+    const r = run({ orders: [badBill], openBillTags: [{ orderId: '1', rank: 1 }] })
+    const rs = find(r.statements, 'rs')
+    expect(rs.openBillBonus).toBe(125) // 250 full, halved
+    expect(rs.marginPenaltyWithheld).toBe(375) // 250 + 125
+    expect(rs.totalCommission).toBe(375)
+  })
+
+  it('does NOT scale the flat KPI allowance', () => {
+    const r = run({
+      orders: [order('1', 'rs', [
+        ['MATTRESS', 'M1', 1, 10_000, 7_300],
+        ['ACC', 'AK-CS AIRLOFT COMFY PIL', 4, 0, 100],
+      ])],
+    })
+    const rs = find(r.statements, 'rs')
+    expect(rs.marginPct).toBeCloseTo(0.26, 10)
+    expect(rs.productCommission).toBe(250) // halved
+    expect(rs.kpiCommission).toBe(200) // 4 x 50, untouched
+    expect(rs.totalCommission).toBe(450)
+  })
+
+  it('kills the commission outright below Tier 3', () => {
+    const r = run({ orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 7_700]])] })
+    expect(find(r.statements, 'rs').productCommission).toBe(0) // 23% margin
+  })
+
+  it('reports each penalised bill for the run dashboard', () => {
+    const r = run({ orders: [badBill] })
+    expect(r.penalised).toHaveLength(1)
+    expect(r.penalised[0]).toMatchObject({
+      orderNo: 'SO-1', bandKey: 'below_tier_1', multiplier: 0.5, withheld: 250,
+    })
+  })
+
+  it('leaves a good-margin bill alone', () => {
+    const r = run({ orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 6_000]])] })
+    const rs = find(r.statements, 'rs')
+    expect(rs.productCommission).toBe(500)
+    expect(rs.marginPenaltyWithheld).toBe(0)
+    expect(r.penalised).toEqual([])
+  })
+
+  it('skips the penalty and warns loudly when there is no cost data', () => {
+    const r = run({ orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000]])] })
+    const rs = find(r.statements, 'rs')
+    expect(rs.productCommission).toBe(500) // full, not penalised
+    expect(rs.marginPct).toBeNull()
+    expect(r.warnings.join(' ')).toMatch(/no cost data/)
+  })
+
+  it('can be switched off per sub-department', () => {
+    const r = run({ orders: [badBill], scheme: { ...SCHEME, enableMarginPenalty: false } })
+    expect(find(r.statements, 'rs').productCommission).toBe(500)
+  })
+})
+
+describe('monthly margin incentive, end to end', () => {
+  it('pays RM1,000 as its own statement line at Tier 1', () => {
+    // 10,000 at 6,200 cost = 38% margin
+    const r = run({ orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 6_200]])] })
+    const rs = find(r.statements, 'rs')
+    expect(rs.marginPct).toBeCloseTo(0.38, 10)
+    expect(rs.marginIncentive).toBe(1_000)
+    expect(rs.totalCommission).toBe(1_500) // 500 commission + 1,000 incentive
+    expect(rs.lines.filter(l => l.component === 'margin_incentive')).toHaveLength(1)
+  })
+
+  it('pays RM2,500 at Tier 2', () => {
+    const r = run({ orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 5_600]])] })
+    expect(find(r.statements, 'rs').marginIncentive).toBe(2_500) // 44% margin
+  })
+
+  it('is monthly — two bills average into one margin, not two incentives', () => {
+    const r = run({
+      orders: [
+        order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 5_600]]), // 44%
+        order('2', 'rs', [['MATTRESS', 'M2', 1, 10_000, 7_000]]), // 30%
+      ],
+    })
+    const rs = find(r.statements, 'rs')
+    expect(rs.marginPct).toBeCloseTo(0.37, 10) // 20,000 rev, 12,600 cost
+    expect(rs.marginIncentive).toBe(1_000) // Tier 1 only, paid once
+  })
+
+  it('can be switched off per sub-department', () => {
+    const r = run({
+      orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 5_600]])],
+      scheme: { ...SCHEME, enableMarginIncentive: false },
+    })
+    expect(find(r.statements, 'rs').marginIncentive).toBe(0)
+  })
+
+  it('keeps the line-sum invariant with an incentive present', () => {
+    const r = run({ orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 5_600]])] })
+    for (const st of r.statements) {
+      const lineSum = Math.round(st.lines.reduce((a, l) => a + l.amount, 0) * 100) / 100
+      expect(lineSum).toBe(st.totalCommission)
+    }
   })
 })
 
