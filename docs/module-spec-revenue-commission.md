@@ -560,7 +560,76 @@ src/lib/import/
   erp-sales-order.test.ts  — 25 tests on a golden grid mirroring the real export
 ```
 
-Status: **built and green** — 668 tests pass across the suite (was 555).
+```
+src/lib/commission/
+  run-payload.ts       — the seam: Postgres rows -> EngineInput, EngineResult
+                         -> the save_commission_run payload
+  run-payload.test.ts  — 16 tests on the mapping itself
+src/app/(portal)/hr-costing/commission/
+  run-actions.ts       — computeRun / applyRun / reopenRun, plus the two
+                         review-board edits (Open Bill rank, manual margin)
+```
+
+### 8.1 The write half — three RPCs
+
+`save_commission_run` / `apply_commission_run` / `reopen_commission_run`
+(migration `20260831040000`). All three are **SECURITY INVOKER** on purpose:
+RLS is the outer wall — principal and hr only, and hr may only touch a *draft*
+payroll row — and the explicit guards inside are the inner one. A SECURITY
+DEFINER here would quietly hand HR the ability to rewrite a submitted month.
+
+They do no arithmetic beyond checking that the numbers handed to them add up.
+The invariants, none of which the client is trusted with:
+
+1. Sum of a statement's lines = its `total_commission`. (The five components
+   already tally to the total by CHECK; this covers the drill-down.)
+2. Sum of the statements = the run's total.
+3. An **applied or locked run is never overwritten in place** — recomputing it
+   would leave money in payroll describing statements that no longer exist.
+4. Payroll is written only for a month whose payroll run has not **settled**
+   (submitted / approved / paid) and whose rows are all still draft. A
+   *rejected* payroll run is dead and does not block — a period legitimately
+   holds several `payroll_runs` rows.
+5. An order is released exactly once, ever (`comm_order_releases.order_no` is
+   UNIQUE), so an order carried forward by the deposit gate cannot pay twice.
+6. **Reopening reverses everything the apply wrote**: `commission_amount` back
+   to 0 and the releases deleted, so the orders return to the pool.
+
+`apply_commission_run` also refuses while **any warning stands**. That is not a
+nag: every warning the engine raises is a case where it knows the figure is
+wrong — an unclassified item group whose revenue it silently dropped, a
+salesperson with sales and no rank paid at 0%, a placement that should not
+exist.
+
+### 8.2 What the run remembers
+
+`comm_runs` carries three JSONB snapshots — `released_orders`,
+`deferred_orders`, `penalised_orders` (migration `20260831030000`). These could
+all be recomputed from `sales_orders`, and the period page did exactly that
+before the run existed. A run must not work that way: **re-importing a month
+replaces every `sales_orders` row**, so a run that recomputed its own history
+would silently disagree with the money already in payroll.
+
+`hr_monthly_payroll.source` gains a fourth value, `commission`. The other three
+all describe a human putting the number there; a Revenue row is *derived*, and
+rewritten on every Apply, so a hand edit to one will not survive the next run.
+
+### 8.3 Carry-forward
+
+A run's input is not just its own month. It is every committed order up to and
+including that month which no applied run has paid for yet — so an order the
+deposit gate held in June arrives in July's run, at its **original**
+`period_month`, and the statement line says "carried from 2026-06". Orders an
+earlier run already paid are still passed to the engine, flagged: dropping them
+at the query would work for commission but their revenue would vanish from
+group sales, and group sales drive promotions.
+
+Status: **built and green** — 710 tests pass across the suite (was 555), and the
+three RPCs were proved on the live schema in a rolled-back transaction: both
+tally guards refuse, warnings block the apply, an applied run refuses to be
+recomputed, a rejected payroll run does not block while a submitted one does,
+and apply then reopen leaves payroll exactly where it started (gross 10,000,
+PCB 0, WHT 200, net 9,800, then back to 0).
 
 ---
 
@@ -686,13 +755,15 @@ move; a person who qualifies for a higher rank than they hold shows a
 | Route | Purpose |
 |---|---|
 | `/hr-costing/commission` | period landing — months with sales data, run status per sub-department |
-| `…/[period]` | run dashboard: hero total, per-salesperson `.ledger-table` (PR / group / C1 / KPI / Open Bill / Override / Total), deferred-revenue tile, Compute + Apply |
-| `…/[period]/[staffId]` | one salesperson's statement — components expandable to their `comm_statement_lines` |
+| `…/[period]` | run dashboard: hero total, per-salesperson `.ledger-table` (PR / group / C1 / KPI / Open Bill / Override / Incentive / Total), warnings, penalised bills, orders waiting on a deposit, Compute + Apply + Reopen |
+| `…/[period]/statement/[staffId]` | one salesperson's month ringgit by ringgit — the figures, margin brand by brand, and a section per component drilling into `comm_statement_lines` |
 | `…/[period]/import` | ERP import wizard: parse → period + cancelled report → **agent matching** → commit |
-| `…/[period]/open-bills` | day-by-day board, pre-filled from `sequence_in_day`, reviewed by a human |
-| `…/[period]/deferred` | orders waiting on a deposit top-up, with the shortfall |
+| `…/[period]/open-bill` | day-by-day board, pre-filled from `sequence_in_day`, reviewed by a human. Defaults to the salesperson-days still on a suggestion |
 | `/hr-costing/commission/org-chart` | the org chart (below) |
 | Settings → **Commission** | §9 |
+
+The deferred-orders list is a section on the run dashboard rather than a page
+of its own: it is read once, alongside the total it is holding back.
 
 **Org chart.** A tree diagram with n8n-style connector lines where a salesperson
 can be **dragged onto another team member** to re-parent them. Recommended
@@ -712,22 +783,24 @@ hand-edit can't silently diverge from the audit trail.
 
 | # | Step | State |
 |---|---|---|
-| 1 | Migration: 20 tables + RLS + `payroll_source` + the Fair seed (ladder, item groups, Open Bill rates, brands, Akemi's margin ladder, promotion criteria) | ✅ written, dry-run verified, **not applied** |
-| 2 | Withholding Tax migration (tax_mode, WHT column, trigger branch) | ✅ written, regression-verified, **not applied** |
-| 3 | Pure TS engine + tests | ✅ 88 tests |
+| 1 | Migration: 22 tables + RLS + `payroll_source` + the Fair seed (ladder, item groups, Open Bill rates, brands, Akemi's margin ladder, promotion criteria) | ✅ **applied live** 2026-08-31 |
+| 2 | Withholding Tax migration (tax_mode, WHT column, trigger branch) | ✅ **applied live**, regression-verified |
+| 3 | Pure TS engine + tests | ✅ 91 tests |
 | 4 | ERP parser + tests | ✅ 25 tests, verified against the real file |
 | 5 | **Create the ~39 salespeople** in the Revenue Department | ⛔ blocked — needs the staff list (Q2) |
-| 6 | Settings → Commission tab (§9) | ready to build |
-| 7 | Org chart (`@xyflow/react`, drag-to-reparent) | ready to build |
-| 8 | Import wizard + agent matching | ready to build |
-| 9 | Open Bill board + deferred-orders page | after 8 |
-| 10 | `compute_commission_run` + `apply_commission_run` RPCs + run dashboard + statement page | after 6–9 |
-| 11 | Payroll writeback + read-only cell | after 10 |
+| 6 | Settings → Commission tab (§9) | ✅ built |
+| 7 | Org chart (`@xyflow/react`, drag-to-reparent) | ✅ built |
+| 8 | Import wizard + agent matching | ✅ built |
+| 9 | Open Bill board | ✅ built |
+| 10 | `save_` / `apply_` / `reopen_commission_run` RPCs + run dashboard + statement drill-down | ✅ built, **applied live** 2026-08-31 |
+| 11 | Payroll read-only Commission cell for `payroll_source = 'commission'` staff | not started |
 | 12 | Cost feed → margin penalty and incentive go live | ⛔ blocked — the SO export has no cost column (Q1) |
 | 13 | WHT remittance in the statutory export | before the first real payout |
 | 14 | Revenue Dept P&L / pool 1090 wiring | separate scope |
 
-Steps 6–9 need no further answers and can proceed now.
+Steps 6–10 are done. What is left needs answers, not code: step 5 (the staff
+list) is the practical blocker on running a real month, and steps 12–14 wait on
+Q1, Q8 and a separate scope.
 
 ---
 

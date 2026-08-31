@@ -1,4 +1,4 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-08-31 · Revenue commission module)
+# HOUZS Venture Portal — Session Handoff (checkpoint 2026-08-31 · Revenue commission module, incl. the run)
 
 ## ═══ CHECKPOINT 2026-08-08 — read this first ═══
 
@@ -47,14 +47,19 @@ migrations applied live + archived; detailed sections follow this block):
 ## SESSION 2026-08-31 — Revenue Department commission payroll (NEW MODULE)
 
 **⚠️ READ FIRST: the work lives on branch `worktree-revenue-commission-payroll`,
-NOT on main — but its two migrations are ALREADY APPLIED to the live database.**
-So the schema is ahead of main. Merging the branch is the obvious next
-housekeeping step; until then, main has no record of 22 live tables.
+NOT on main — but its FOUR migrations are ALREADY APPLIED to the live
+database.** So the schema is ahead of main. Merging the branch is the obvious
+next housekeeping step; until then, main has no record of 22 live tables, three
+live RPCs and a fourth value on `hr_monthly_payroll_source`.
 Worktree: `.claude/worktrees/revenue-commission-payroll`.
-Commits `1bd3aa1` → `fde5781` (7). Suite 694 passing, `next build` clean,
-`tsc --noEmit` clean for the first time in this worktree (installing
+Suite 710 passing, `next build` clean, `tsc --noEmit` clean (installing
 @xyflow/react also pulled in @anthropic-ai/sdk, html-to-image and pdf2json,
 which package.json declared but nobody had installed).
+
+**The module is now feature-complete except for the data it needs.** The run
+itself — compute, review, apply, reopen — was built in the second sitting; see
+"The run" below. What still blocks a real July is that 39 of the 40 ERP agents
+do not exist as staff, and that nothing has a cost.
 
 Full spec: `docs/module-spec-revenue-commission.md`. Read that before touching
 any of this — everything below is a summary of it.
@@ -190,16 +195,96 @@ PCB 0 → WHT 160 → net 7,840.
 closes the old `comm_hierarchy` row the day before the current period and
 inserts a new one (edits in place only when the row started this month).
 
+### The run (second sitting, 2026-08-31)
+
+Compute → review → apply → reopen. The engine already existed and is unchanged;
+what was missing was everything around it.
+
+**Shape.** `run-actions.ts` loads the rows, `src/lib/commission/run-payload.ts`
+maps them onto `EngineInput` and maps the result back onto an RPC payload, the
+engine does the maths, and ONE SQL function writes. The seam is a pure module
+with 16 tests of its own because a mapping slip there does not throw — it
+quietly pays the wrong person the wrong amount.
+
+**Three RPCs, all SECURITY INVOKER** (migration `20260831040000`). RLS is the
+outer wall (principal + hr only; hr may only touch a *draft* payroll row) and
+the guards inside are the inner one. A SECURITY DEFINER would have handed HR
+the ability to rewrite a submitted month.
+
+- `save_commission_run` — replaces the month's statements in one transaction.
+  Refuses a payload whose lines do not sum to the statement total, or whose
+  statements do not sum to the run total, or a run that is already applied.
+- `apply_commission_run` — the ONLY place `hr_monthly_payroll.commission_amount`
+  is written. Refuses while any warning stands, refuses a payroll month that has
+  settled, refuses an order another run already paid.
+- `reopen_commission_run` — undoes an apply exactly: commission back to 0, the
+  releases deleted so the orders return to the pool.
+
+**`comm_runs` now snapshots what the run saw** (migration `20260831030000`):
+`released_orders`, `deferred_orders`, `penalised_orders` as JSONB, plus
+`reopened_at` / `reopened_by`. These are NOT recomputed on the page. Re-importing
+a month replaces every `sales_orders` row, so a page that re-derived its own
+history would disagree with the money already in payroll.
+
+**`hr_monthly_payroll_source` gained `commission`.** The other three values all
+describe a human putting the number there; a Revenue row is derived and is
+rewritten on every Apply, so a hand edit will not survive the next run. (Its own
+migration, because `ALTER TYPE ... ADD VALUE` cannot be USED in the transaction
+that adds it.)
+
+**Carry-forward works.** A run's input is every committed order up to and
+including its month that no applied run has paid for — so a June order the
+deposit gate held pays in July, at its original `period_month`, labelled
+"carried from 2026-06". Orders an earlier run already paid are still passed to
+the engine, flagged, because dropping them at the query would erase their
+revenue from GROUP sales, and group sales drive promotions.
+
+**UI.** The run dashboard on `…/[period]` (hero total, warnings, per-person
+table, penalised bills, orders waiting on a deposit, Compute / Apply / Reopen);
+the statement drill-down at `…/[period]/statement/[staffId]` (figures, margin
+brand by brand, a section per component down to the individual lines); and the
+Open Bill board at `…/[period]/open-bill` — which defaults to hiding everything
+already reviewed, because in a real month most days have one obvious answer and
+what deserves a person's attention is the day where the suggestion might be
+wrong. Both review-board edits (Open Bill rank, hand-keyed margin) refuse once
+the run has paid.
+
+**Proved on the live schema**, in a rolled-back transaction: both tally guards
+refuse, warnings block the apply, an applied run refuses to be recomputed, a
+*rejected* payroll run does not block while a *submitted* one does, and
+apply → reopen leaves payroll exactly where it started. Full chain for a
+commission-only salesperson on withholding: gross 10,000 → PCB 0 → WHT 200 →
+net 9,800, then back to 0 on reopen. Nothing pre-existing moved (all 38 rows
+still at `updated_at` 2026-08-03).
+
+**Two things found while doing it, both real:**
+
+1. **The July 2026 payroll run is `approved`.** The first attempt to prove the
+   apply used July and was refused by the guard — correctly. A real July
+   commission run cannot be applied until that payroll run is reopened.
+2. **A period holds several `payroll_runs` rows** — 2026-06-01 has both a
+   `rejected` and an `approved` one. The first cut of the guard asked "is there
+   a row that is not draft?", which a dead rejected run answers yes to. It now
+   asks whether any run has SETTLED (submitted / approved / paid). Corrected on
+   the live database by migration `commission_run_payroll_guard_ignores_rejected`
+   and folded back into `20260831040000` in the repo, so replaying the file
+   gives the same end state — the remote therefore records one migration name
+   that has no local file, on top of the pre-existing 394-vs-391 drift.
+
+**Not built:** the payroll grid's Commission cell is still editable for Revenue
+staff. It should be read-only with a "from commission run" badge linking to the
+statement, or a hand edit will silently diverge from the audit trail until the
+next Apply overwrites it.
+
 ### ⛔ Blocked / next
 
 1. **39 of the 40 ERP agents do not exist in `hr_staff_costs`** (only
    `SIA JONAS`, and he is in Marketing). Nothing can run until they are created
    under HR → Staff in the Revenue Department with basic 0, then placed on the
    org chart. This is the practical first move.
-2. **The commission run itself is not built**: `compute_commission_run` /
-   `apply_commission_run` RPCs, the statement drill-down, the Open Bill review
-   board. The engine math and the whole data layer are done and tested — what
-   is missing is wiring them into compute → review → write to payroll.
+2. ~~The commission run itself~~ — **done** (see "The run" above). What remains
+   on that side is the read-only Commission cell in the payroll grid, and
+   reopening the approved July payroll run before a real July can be applied.
 3. **KPI product list unchosen.** Sizing: RM50 on the five commonest pillow
    codes would have paid ≈ RM63,000 of KPI in July against ≈ RM141,000 of
    product commission at a flat 5%.

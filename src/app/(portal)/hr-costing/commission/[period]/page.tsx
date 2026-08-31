@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
+import RunControls from './_components/RunControls'
 
 interface PageProps {
   params: Promise<{ period: string }>
@@ -17,13 +18,65 @@ function label(period: string): string {
   })
 }
 
+function pct(v: number | null): string {
+  return v === null ? '—' : `${(v * 100).toFixed(1)}%`
+}
+
+interface RunRow {
+  id: string
+  status: 'draft' | 'computed' | 'applied' | 'locked'
+  staff_count: number
+  total_commission: number | string
+  warnings: string[] | null
+  computed_at: string | null
+  applied_at: string | null
+  deferred_orders: Array<{
+    orderNo: string
+    staffId: string
+    orderTotal: number
+    paidAmount: number
+    requiredAmount: number
+    productRevenue: number
+  }> | null
+  penalised_orders: Array<{
+    orderNo: string
+    staffId: string
+    brandCode: string | null
+    marginPct: number
+    bandLabel: string
+    multiplier: number
+    withheld: number
+  }> | null
+}
+
+interface StatementRow {
+  id: string
+  staff_id: string
+  rank_key: string | null
+  qualifies_for_rank_key: string | null
+  product_rate: number | string
+  product_revenue: number | string
+  group_revenue: number | string
+  deferred_revenue: number | string
+  product_commission: number | string
+  kpi_commission: number | string
+  open_bill_bonus: number | string
+  override_commission: number | string
+  margin_incentive: number | string
+  margin_pct: number | string | null
+  margin_penalty_withheld: number | string
+  total_commission: number | string
+}
+
 /**
- * One month's imported sales, and how ready it is to be turned into commission.
+ * One month's commission: what was imported, what the run made of it, and the
+ * gaps that would make it wrong.
  *
- * The run itself (compute → statements → apply into payroll) is the next piece
- * of work; until then this page's job is to make the gaps that would make a run
- * wrong impossible to miss — unmatched agents, lines with no cost, orders below
- * the deposit gate.
+ * The order of the page is the order of the work — import, fix what is flagged,
+ * compute, read the statements, apply. Everything the run says about itself is
+ * read from the RUN, not recomputed from sales_orders: re-importing a month
+ * replaces every order row, and a page that recomputed its own history would
+ * quietly disagree with the money already in payroll.
  */
 export default async function CommissionPeriodPage({ params }: PageProps) {
   await requireRole(['principal', 'hr'])
@@ -89,9 +142,44 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   const depositPct = scheme ? (scheme as { deposit_threshold_pct: number | string | null }).deposit_threshold_pct : null
   const threshold = depositPct === null || depositPct === undefined ? null : Number(depositPct)
 
-  const belowDeposit = threshold === null
-    ? []
-    : orders.filter(o => Number(o.paid_amount ?? 0) + 0.005 < Number(o.order_total) * threshold)
+  // ── The run ────────────────────────────────────────────────────────────
+  const { data: runData } = await supabase
+    .from('comm_runs')
+    .select('id, status, staff_count, total_commission, warnings, computed_at, applied_at, deferred_orders, penalised_orders')
+    .eq('period_month', period)
+    .limit(1)
+    .maybeSingle()
+  const run = runData as RunRow | null
+
+  const { data: statementData } = run
+    ? await supabase
+        .from('comm_statements')
+        .select('id, staff_id, rank_key, qualifies_for_rank_key, product_rate, product_revenue, group_revenue, deferred_revenue, product_commission, kpi_commission, open_bill_bonus, override_commission, margin_incentive, margin_pct, margin_penalty_withheld, total_commission')
+        .eq('run_id', run.id)
+    : { data: null }
+  const statements = ((statementData ?? []) as unknown as StatementRow[]).sort(
+    (a, b) => Number(b.total_commission) - Number(a.total_commission),
+  )
+
+  const warnings = run?.warnings ?? []
+  const runTotal = run ? Number(run.total_commission) : 0
+
+  // Names for anyone the run mentions but this month's batch does not — an
+  // upline who sold nothing themselves still earns an override.
+  const staffIds = [...new Set(statements.map(s => s.staff_id))]
+  const { data: staffRows } = staffIds.length
+    ? await supabase.from('hr_staff_costs').select('id, employee_name').in('id', staffIds)
+    : { data: null }
+  const nameOf = new Map(
+    ((staffRows ?? []) as Array<{ id: string; employee_name: string }>).map(s => [s.id, s.employee_name]),
+  )
+
+  // Before a run exists the deposit gate is shown from live orders; once it
+  // does, from the run's own snapshot of what it held back.
+  const belowDeposit =
+    threshold === null
+      ? []
+      : orders.filter(o => Number(o.paid_amount ?? 0) + 0.005 < Number(o.order_total) * threshold)
 
   const unmatched = orders.filter(o => !o.staff_id)
   const total = orders.reduce((a, o) => a + Number(o.order_total), 0)
@@ -124,7 +212,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
           </Link>
           <Link
             href={`/hr-costing/commission/${period}/import`}
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
           >
             {batchRow ? 'Re-import' : 'Import sales orders'}
           </Link>
@@ -197,12 +285,178 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
             </section>
           )}
 
-          {threshold !== null && belowDeposit.length > 0 ? (
+          {/* ── The run ─────────────────────────────────────────────────── */}
+          <section className="mb-10">
+            <div className="sect-head">
+              <h2>The run</h2>
+              <span className="rule" aria-hidden />
+              <span className="count">
+                {run ? run.status.toUpperCase() : 'NOT COMPUTED'}
+              </span>
+            </div>
+
+            <div className="border border-hairline rounded-md bg-surface p-5 mb-6">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="font-serif italic text-accent text-base mb-1">
+                    Commission this month
+                  </div>
+                  <div className="font-serif text-[40px] text-num-ink leading-none tabular tracking-[-0.01em]">
+                    {formatMoney(runTotal)}
+                  </div>
+                  <div className="font-mono text-[11px] text-graphite mt-3 tracking-[0.02em] font-medium uppercase">
+                    {run
+                      ? `${run.staff_count} STATEMENTS · ${(run.deferred_orders ?? []).length} ORDERS WAITING ON A DEPOSIT`
+                      : 'RUN IT TO SEE WHAT THE MONTH PAYS'}
+                  </div>
+                  {run?.applied_at ? (
+                    <div className="font-serif italic text-ledger text-xs mt-2">
+                      Written into the {period.slice(0, 7)} payroll.
+                    </div>
+                  ) : null}
+                </div>
+
+                <RunControls
+                  period={period}
+                  runId={run?.id ?? null}
+                  status={run?.status ?? 'none'}
+                  warningCount={warnings.length}
+                  hasImport={Boolean(batchRow)}
+                />
+              </div>
+
+              {warnings.length > 0 ? (
+                <div className="mt-5 border-t border-hairline pt-4">
+                  <div className="font-mono text-[10.5px] uppercase tracking-wide text-danger mb-2">
+                    {warnings.length} thing(s) to settle before this can pay
+                  </div>
+                  <ul className="space-y-1.5 font-serif text-sm text-graphite list-disc pl-5">
+                    {warnings.map((w, i) => (
+                      <li key={i}>{w}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+
+            {statements.length > 0 ? (
+              <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+                <table className="ledger-table">
+                  <thead>
+                    <tr>
+                      <th>Salesperson</th>
+                      <th>Rank</th>
+                      <th className="right">Own revenue</th>
+                      <th className="right">Group</th>
+                      <th className="right">Product</th>
+                      <th className="right">KPI</th>
+                      <th className="right">Open Bill</th>
+                      <th className="right">Override</th>
+                      <th className="right">Incentive</th>
+                      <th className="right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {statements.map(s => (
+                      <tr key={s.id}>
+                        <td>
+                          <Link
+                            href={`/hr-costing/commission/${period}/statement/${s.staff_id}`}
+                            className="font-serif text-[15px] text-ink hover:text-accent"
+                          >
+                            {nameOf.get(s.staff_id) ?? s.staff_id}
+                          </Link>
+                          {s.qualifies_for_rank_key && s.qualifies_for_rank_key !== s.rank_key ? (
+                            <div className="font-mono text-[10.5px] text-accent mt-0.5">
+                              QUALIFIES FOR {s.qualifies_for_rank_key.toUpperCase()}
+                            </div>
+                          ) : null}
+                        </td>
+                        <td>
+                          <span className="font-mono text-[11px] text-graphite">
+                            {s.rank_key ?? '—'} · {(Number(s.product_rate) * 100).toFixed(0)}%
+                          </span>
+                        </td>
+                        <td className="num">{formatMoney(Number(s.product_revenue))}</td>
+                        <td className="num">{formatMoney(Number(s.group_revenue))}</td>
+                        <td className="num">{formatMoney(Number(s.product_commission))}</td>
+                        <td className="num">{formatMoney(Number(s.kpi_commission))}</td>
+                        <td className="num">{formatMoney(Number(s.open_bill_bonus))}</td>
+                        <td className="num">{formatMoney(Number(s.override_commission))}</td>
+                        <td className="num">{formatMoney(Number(s.margin_incentive))}</td>
+                        <td className="num font-semibold">{formatMoney(Number(s.total_commission))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : run ? (
+              <p className="font-serif italic text-muted text-sm">
+                The run produced no statements — every order was either unmatched or held by the
+                deposit gate.
+              </p>
+            ) : null}
+
+            <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
+              Group revenue is a SALES figure: it is own plus the whole downline, and the
+              below-margin penalty does not reduce it. Commission is what the penalty cuts.
+            </p>
+          </section>
+
+          {/* ── Penalised bills ─────────────────────────────────────────── */}
+          {run && (run.penalised_orders ?? []).length > 0 ? (
+            <section className="mb-10">
+              <div className="sect-head">
+                <h2>Cut for margin</h2>
+                <span className="rule" aria-hidden />
+                <span className="count">{(run.penalised_orders ?? []).length} BILLS</span>
+              </div>
+              <p className="font-serif italic text-muted text-sm mb-4 max-w-3xl">
+                Judged per bill, most severe band wins. What the penalty removes is taken off the
+                upline&apos;s override in the same proportion.
+              </p>
+              <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+                <table className="ledger-table">
+                  <thead>
+                    <tr>
+                      <th>Order</th>
+                      <th>Salesperson</th>
+                      <th>Brand</th>
+                      <th className="right">Margin</th>
+                      <th>Band</th>
+                      <th className="right">Withheld</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(run.penalised_orders ?? []).slice(0, 60).map(p => (
+                      <tr key={p.orderNo}>
+                        <td className="font-mono text-xs">{p.orderNo}</td>
+                        <td>{nameOf.get(p.staffId) ?? p.staffId}</td>
+                        <td className="font-mono text-[11px] text-graphite">{p.brandCode ?? '—'}</td>
+                        <td className="num">{pct(p.marginPct)}</td>
+                        <td>
+                          <em className="font-serif text-graphite text-sm">
+                            {p.bandLabel} × {p.multiplier}
+                          </em>
+                        </td>
+                        <td className="num neg">{formatMoney(p.withheld)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
+
+          {/* ── Deposit gate ────────────────────────────────────────────── */}
+          {threshold !== null && (run ? (run.deferred_orders ?? []).length > 0 : belowDeposit.length > 0) ? (
             <section className="mb-10">
               <div className="sect-head">
                 <h2>Waiting on a deposit</h2>
                 <span className="rule" aria-hidden />
-                <span className="count">{belowDeposit.length} ORDERS</span>
+                <span className="count">
+                  {(run ? (run.deferred_orders ?? []).length : belowDeposit.length)} ORDERS
+                </span>
               </div>
               <p className="font-serif italic text-muted text-sm mb-4 max-w-3xl">
                 Below {Math.round(threshold * 100)}% of the order total, so none of their commission
@@ -217,20 +471,30 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                       <th className="right">Order total</th>
                       <th className="right">Paid</th>
                       <th className="right">Needed</th>
+                      {run ? <th className="right">Commission held</th> : null}
                     </tr>
                   </thead>
                   <tbody>
-                    {belowDeposit.slice(0, 40).map(o => (
-                      <tr key={o.id}>
-                        <td className="font-mono text-xs">{o.order_no}</td>
-                        <td>{o.hr_staff_costs?.employee_name ?? o.agent_name}</td>
-                        <td className="num">{formatMoney(Number(o.order_total))}</td>
-                        <td className="num">{formatMoney(Number(o.paid_amount ?? 0))}</td>
-                        <td className="num">
-                          {formatMoney(Number(o.order_total) * threshold)}
-                        </td>
-                      </tr>
-                    ))}
+                    {run
+                      ? (run.deferred_orders ?? []).slice(0, 60).map(d => (
+                          <tr key={d.orderNo}>
+                            <td className="font-mono text-xs">{d.orderNo}</td>
+                            <td>{nameOf.get(d.staffId) ?? d.staffId}</td>
+                            <td className="num">{formatMoney(d.orderTotal)}</td>
+                            <td className="num">{formatMoney(d.paidAmount)}</td>
+                            <td className="num">{formatMoney(d.requiredAmount)}</td>
+                            <td className="num">{formatMoney(d.productRevenue)}</td>
+                          </tr>
+                        ))
+                      : belowDeposit.slice(0, 40).map(o => (
+                          <tr key={o.id}>
+                            <td className="font-mono text-xs">{o.order_no}</td>
+                            <td>{o.hr_staff_costs?.employee_name ?? o.agent_name}</td>
+                            <td className="num">{formatMoney(Number(o.order_total))}</td>
+                            <td className="num">{formatMoney(Number(o.paid_amount ?? 0))}</td>
+                            <td className="num">{formatMoney(Number(o.order_total) * threshold)}</td>
+                          </tr>
+                        ))}
                   </tbody>
                 </table>
               </div>
@@ -266,7 +530,11 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
             <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
               This is raw sales value, not the commission base — transport and disposal come out,
               KPI items move to their own allowance, and the deposit gate holds anything under the
-              threshold. The run that works all of that out is the next piece of the module.
+              threshold.{' '}
+              <Link href={`/hr-costing/commission/${period}/open-bill`} className="text-accent hover:underline">
+                Review the Open Bill picks
+              </Link>{' '}
+              before computing: they are seeded from the document number, not from a real timestamp.
             </p>
           </section>
         </>
