@@ -19,10 +19,9 @@ function getGreeting(): string {
 
 interface TopBarProps {
   user: User
-  onMenuClick?: () => void
 }
 
-export default function TopBar({ user, onMenuClick }: TopBarProps) {
+export default function TopBar({ user }: TopBarProps) {
   const router = useRouter()
   const viewAsFormRef = useRef<HTMLFormElement>(null)
   const principalAccount = isPrincipalAccount(user)
@@ -58,32 +57,18 @@ export default function TopBar({ user, onMenuClick }: TopBarProps) {
   return (
     <div className="h-[60px] bg-chrome px-4 md:px-[22px] md:mt-2.5 md:mx-2.5 md:rounded-panel md:border md:border-hairline flex items-center justify-between shrink-0 gap-3">
       <div className="flex items-center gap-3 min-w-0">
-        {/* Hamburger — mobile only */}
-        {onMenuClick ? (
-          <button
-            type="button"
-            onClick={onMenuClick}
-            className="md:hidden text-graphite hover:text-ink p-1 -ml-1 self-center"
-            aria-label="Open navigation"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            >
-              <line x1="4" y1="7" x2="20" y2="7" />
-              <line x1="4" y1="12" x2="20" y2="12" />
-              <line x1="4" y1="17" x2="20" y2="17" />
-            </svg>
-          </button>
-        ) : null}
-        <div className="font-serif text-[18px] md:text-[20px] text-ink truncate leading-none">
-          {greeting}, <span className="italic text-accent">{displayName}</span>.
+        {/* The hamburger used to live here. Removed 2026-08-31 when mobile nav
+            became a bottom tab bar — the greeting now gets the full width it
+            was being squeezed out of ("Good ..." at 390px). */}
+        {/* Below sm the greeting clause is dropped rather than truncated: an
+            ellipsis eats the name ("Good even…") and the name is the half that
+            carries meaning. */}
+        {/* pr-1: `truncate` clips overflow, and the name renders in italic —
+            without the gutter the final letter's tail is shaved off. */}
+        <div className="font-serif text-[18px] md:text-[20px] text-ink truncate leading-none pr-1">
+          <span className="hidden sm:inline">{greeting}, </span>
+          <span className="italic text-accent">{displayName}</span>
+          <span className="hidden sm:inline">.</span>
         </div>
       </div>
 
@@ -129,9 +114,11 @@ export default function TopBar({ user, onMenuClick }: TopBarProps) {
           <span>{quarter}</span>
         </div>
         <ThemeToggle />
+        {/* Sign out is in the More sheet on mobile — repeating it here cost
+            ~90px of header width and truncated the greeting to "Good even…". */}
         <button
           onClick={handleSignOut}
-          className="font-sans text-[11px] text-muted hover:text-accent transition-colors uppercase tracking-[0.1em]"
+          className="hidden md:inline font-sans text-[11px] text-muted hover:text-accent transition-colors uppercase tracking-[0.1em]"
           aria-label="Sign out"
         >
           Sign out

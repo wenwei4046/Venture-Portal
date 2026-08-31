@@ -502,7 +502,7 @@ export default async function BillingView({ searchParams }: Props) {
           <div className="font-serif italic text-accent text-base mb-1">
             {dayjs(period).format('MMMM YYYY')}
           </div>
-          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
+          <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-ink leading-none">
             {invoiceList.length > 0
               ? formatMoney(invoiceTotal)
               : payrollSubmitted || directorSubmitted

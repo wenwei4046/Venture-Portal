@@ -78,7 +78,7 @@ export default async function OverduePage() {
           <div className="font-serif italic text-accent text-base mb-1">
             Penalty outstanding
           </div>
-          <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
+          <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
             {totalPenalty > 0 ? (
               formatMoney(totalPenalty)
             ) : (

@@ -376,7 +376,7 @@ export default async function HRPaymentPage({
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide mb-2">
             Total amount this month
           </div>
-          <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
+          <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
             {formatMoney(totalAmount)}
           </div>
           <div className="font-mono text-xs text-muted mt-2">
@@ -390,7 +390,7 @@ export default async function HRPaymentPage({
             HR Pool · payroll custody
           </div>
           <div
-            className={`font-serif text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${
+            className={`font-serif text-[30px] sm:text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${
               poolBal >= 0 ? 'text-num-ink' : 'text-danger'
             }`}
           >

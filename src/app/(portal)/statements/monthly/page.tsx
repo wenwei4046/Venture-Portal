@@ -71,7 +71,7 @@ export default async function MonthlyStatementsPage() {
           <div className="font-serif italic text-accent text-base mb-1">
             {latestPeriod ? `Latest period` : 'No statements yet'}
           </div>
-          <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tracking-[-0.01em]">
+          <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-num-ink leading-none tracking-[-0.01em]">
             {latestPeriod ? (
               dayjs(latestPeriod).format('MMMM YYYY')
             ) : (

@@ -139,7 +139,7 @@ export default async function VenturePoolPage() {
         <div className="lg:col-span-7 hero-walnut px-6 py-6 md:px-8 md:py-7">
           <div className="font-serif italic text-graphite text-sm mb-1">Running balance</div>
           <div
-            className={`font-serif text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${
+            className={`font-serif text-[30px] sm:text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${
               balance < 0 ? 'text-danger' : 'text-num-ink'
             }`}
           >

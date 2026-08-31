@@ -120,7 +120,7 @@ export default async function DeptPoolPage({
             <div className="font-serif italic text-accent text-base mb-1">
               Total net margin · P&amp;L (cumulative to-date)
             </div>
-            <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
+            <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-ink leading-none">
               {formatMoney(totalNetMargin)}
             </div>
             <div className="font-mono text-xs text-muted mt-2">
@@ -514,7 +514,7 @@ export default async function DeptPoolPage({
           <div className="font-serif italic text-accent text-base mb-1">
             Total cash available · all departments
           </div>
-          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
+          <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-ink leading-none">
             {formatMoney(totalDeployed)}
           </div>
           <div className="font-mono text-xs text-muted mt-2">

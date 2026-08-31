@@ -758,3 +758,174 @@ input.search-plain::-webkit-search-decoration {
   -webkit-appearance: none;
   appearance: none;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Mobile ledger tables (2026-08-31)
+
+   A nine-column voucher list is ~1030px wide. On a 390px phone that is three
+   sideways screens to read one row, which is not reading — so below 768px the
+   table keeps only its identifying columns and folds the rest into a per-row
+   detail panel opened by a chevron.
+
+   Two things drive it, both opt-in so an un-annotated table simply keeps its
+   old horizontal-scroll behaviour and nothing regresses:
+     .m-hide      on a <th>/<td> — this column leaves the mobile grid
+     .lt-toggle   the chevron cell; .lt-detail the panel row it opens
+
+   SortableTable applies both automatically from its column config. Hand-rolled
+   tables use <LedgerRow> (components/LedgerRow.tsx) plus .m-hide on the <th>s.
+
+   Desktop is untouched: every selector below is either inert at ≥768px or
+   inside the media query.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+table.ledger-table th.lt-toggle,
+table.ledger-table td.lt-toggle,
+table.ledger-table tr.lt-detail {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  /* Columns demoted to the detail panel leave the grid entirely. */
+  table.ledger-table th.m-hide,
+  table.ledger-table td.m-hide {
+    display: none;
+  }
+
+  /* Chevron column. Narrow — it is stealing width from a 358px content area. */
+  table.ledger-table th.lt-toggle,
+  table.ledger-table td.lt-toggle {
+    display: table-cell;
+    width: 34px;
+    padding-left: 0;
+    padding-right: 8px;
+    text-align: right;
+    vertical-align: middle;
+  }
+
+  /* Phone density: the desktop 14/16px cell padding wastes a third of the
+     screen on gutters once only two columns are left. */
+  table.ledger-table {
+    font-size: 13px;
+  }
+  table.ledger-table thead th {
+    padding: 10px 12px;
+    font-size: 10px;
+  }
+  table.ledger-table td {
+    padding: 12px;
+  }
+
+  /* The detail panel. Reads as an inset drawer under its row rather than as
+     another table row — hence the wash, the accent edge and no zebra. */
+  table.ledger-table tr.lt-detail {
+    display: table-row;
+  }
+  table.ledger-table tr.lt-detail > td {
+    padding: 0;
+    background: rgb(var(--surface-2) / 0.5);
+    box-shadow: inset 2px 0 0 rgb(var(--accent-border));
+  }
+  table.ledger-table tbody tr.lt-detail:hover > td {
+    background: rgb(var(--surface-2) / 0.5);
+  }
+
+  .lt-detail-list {
+    display: grid;
+    grid-template-columns: minmax(72px, auto) 1fr;
+    gap: 0;
+    padding: 4px 12px 10px;
+  }
+  .lt-detail-list > div {
+    display: contents;
+  }
+  .lt-detail-list dt {
+    grid-column: 1;
+    padding: 5px 12px 5px 0;
+    font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgb(var(--graphite));
+    white-space: nowrap;
+    align-self: baseline;
+  }
+  .lt-detail-list dd {
+    grid-column: 2;
+    padding: 5px 0;
+    margin: 0;
+    font-size: 13px;
+    color: rgb(var(--ink));
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* Unlabelled entries (action links) run the full width — a dash standing in
+     for a term the column never had is just noise. */
+  .lt-detail-list > div.lt-wide dd {
+    grid-column: 1 / -1;
+    padding-top: 8px;
+  }
+
+  /* An empty cell in the panel should still read as "nothing here" rather
+     than as a collapsed row. */
+  .lt-detail-list dd:empty::after {
+    content: '—';
+    color: rgb(var(--muted));
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Mobile type scale (2026-08-31)
+
+   DESIGN.md's scale is desktop-first: the hero step is 40px, which renders
+   "RM 4,798,561.66" at ~360px — wider than the 343px content column, so every
+   seven-figure hero on the portal was wrapping onto two lines with "RM"
+   stranded alone. Stepping the top of the scale down on phones fixes all of
+   them at once, including pages not yet visited, instead of adding an
+   `sm:text-3xl` override to a hundred call sites.
+
+   Only the steps that actually overflow are touched. Body, table and label
+   sizes are unchanged — they are already tuned for reading, and shrinking
+   them would just make the ledger harder to read on the smaller screen.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  .text-3xl { font-size: 30px; line-height: 34px; }
+  .text-2xl { font-size: 24px; line-height: 28px; }
+  .text-hero { font-size: 40px; line-height: 1; }
+  .text-hero-lg { font-size: 44px; line-height: 1; }
+  .num-hero { font-size: 36px; }
+  .num-hero .cents { font-size: 20px; }
+  .num-hero .unit { font-size: 16px; }
+
+  /* Seven-figure sums still need every pixel — kill the negative tracking
+     that the hero pattern applies for optical tightening at desktop sizes. */
+  .text-3xl.tabular,
+  .text-3xl.mono { letter-spacing: 0; }
+}
+
+/* Horizontal-scroll fallback for tables that genuinely cannot shed columns —
+   the month-matrix reports (12 month columns + an account column). Wrap the
+   table in <div class="table-scroll"> to get momentum scrolling plus a right
+   edge fade that tells the reader there is more.
+   Above md it is a plain block, so desktop layout is unaffected. */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 767px) {
+  .table-scroll {
+    position: relative;
+    /* Fades the right edge to signal "scrollable"; disappears once scrolled
+       to the end because the gradient is painted on the scroll container's
+       own background attachment. */
+    background:
+      linear-gradient(to right, rgb(var(--paper)) 30%, transparent),
+      linear-gradient(to right, transparent, rgb(var(--paper)) 70%) 100% 0,
+      radial-gradient(farthest-side at 0 50%, rgb(var(--ink) / 0.12), transparent),
+      radial-gradient(farthest-side at 100% 50%, rgb(var(--ink) / 0.12), transparent) 100% 0;
+    background-repeat: no-repeat;
+    background-size: 32px 100%, 32px 100%, 12px 100%, 12px 100%;
+    background-attachment: local, local, scroll, scroll;
+  }
+}

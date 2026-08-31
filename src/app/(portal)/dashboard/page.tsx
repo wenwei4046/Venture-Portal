@@ -818,7 +818,7 @@ export default async function DashboardPage() {
           <div className="font-serif italic text-accent text-base mb-1">
             Venture Pool
           </div>
-          <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none mb-3 tabular tracking-[-0.01em]">
+          <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-num-ink leading-none mb-3 tabular tracking-[-0.01em]">
             {hasAnyData ? (
               <span className={(summary.hv_fund_balance ?? 0) < 0 ? 'text-danger' : ''}>
                 {formatMoney(summary.hv_fund_balance ?? 0)}

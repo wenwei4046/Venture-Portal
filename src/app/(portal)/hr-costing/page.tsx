@@ -117,7 +117,7 @@ export default async function HRCostingPage() {
           <div className="font-serif italic text-accent text-base mb-1">
             {currentSubmission ? 'Submitted period' : 'Live preview'}
           </div>
-          <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tracking-[-0.01em]">
+          <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-num-ink leading-none tracking-[-0.01em]">
             {dayjs(currentPeriod).format('MMMM YYYY')}
           </div>
           <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
