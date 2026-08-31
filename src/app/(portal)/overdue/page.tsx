@@ -6,6 +6,7 @@ import { markOverduePaid } from './actions'
 import DetectOverdueButton from './_components/DetectOverdueButton'
 import EscalateButton from './_components/EscalateButton'
 import { OverdueBadge } from '@/components/motion/OverdueBadge'
+import LedgerRow from '@/components/LedgerRow'
 
 type OverdueRow = {
   id: string
@@ -130,9 +131,10 @@ export default async function OverduePage() {
                     <th>Company</th>
                     <th className="right">Outstanding</th>
                     <th className="right">Days past</th>
-                    <th>Status</th>
-                    <th className="right">Penalty</th>
-                    <th className="right"></th>
+                    <th className="m-hide">Status</th>
+                    <th className="right m-hide">Penalty</th>
+                    <th className="right m-hide"></th>
+                    <th className="lt-toggle" aria-hidden />
                   </tr>
                 </thead>
                 <tbody className="row-stagger">
@@ -142,7 +144,7 @@ export default async function OverduePage() {
                     const outstanding = outstandingMap.get(row.loan_id) ?? Number(loan?.principal ?? 0)
                     const hasLegacyStage = !!row.overdue_stage
                     return (
-                      <tr
+                      <LedgerRow
                         key={row.id}
                         style={{ '--i': i } as React.CSSProperties}
                       >
@@ -160,7 +162,7 @@ export default async function OverduePage() {
                         <td className="num">
                           {row.overdue_days}d
                         </td>
-                        <td>
+                        <td className="m-hide" data-label="Status">
                           <OverdueBadge
                             id={row.id}
                             label={hasLegacyStage ? stageLabel(row.overdue_stage!) : 'overdue'}
@@ -169,10 +171,10 @@ export default async function OverduePage() {
                               : 'text-danger text-sm'}
                           />
                         </td>
-                        <td className="num neg">
+                        <td className="num neg m-hide" data-label="Penalty">
                           {formatMoney(Number(row.penalty_amount ?? 0))}
                         </td>
-                        <td className="right">
+                        <td className="right m-hide">
                           {canFinanceAct ? (
                             <div className="flex items-center justify-end gap-3">
                               {row.overdue_stage === 'escalation' ? (
@@ -192,7 +194,7 @@ export default async function OverduePage() {
                             <span className="text-xs font-mono text-muted">—</span>
                           )}
                         </td>
-                      </tr>
+                      </LedgerRow>
                     )
                   })}
                 </tbody>

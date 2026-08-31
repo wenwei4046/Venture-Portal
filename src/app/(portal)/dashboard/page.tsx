@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import { resolveLiveApprovalAmounts } from '@/lib/approval-amounts'
+import LedgerRow from '@/components/LedgerRow'
 
 // Always re-fetch on request — dept pool balances change after every approve
 // & pay, so cached renders go stale within seconds.
@@ -297,31 +298,33 @@ export default async function DashboardPage() {
                 <thead>
                   <tr>
                     <th>Department</th>
-                    <th className="num">Staff</th>
-                    <th className="num">Basic</th>
-                    <th className="num">Statutory</th>
-                    <th className="num">Gross</th>
+                    <th className="num m-hide">Staff</th>
+                    <th className="num m-hide">Basic</th>
+                    <th className="num m-hide">Statutory</th>
+                    <th className="num m-hide">Gross</th>
                     <th className="num">Net</th>
+                    <th className="lt-toggle" aria-hidden />
                   </tr>
                 </thead>
                 <tbody>
                   {payrollDepts.map((d) => (
-                    <tr key={d.department_name}>
+                    <LedgerRow key={d.department_name}>
                       <td>{d.department_name}</td>
-                      <td className="num">{d.staff_count}</td>
-                      <td className="num">{formatMoneyBare(Number(d.basic))}</td>
-                      <td className="num">{formatMoneyBare(Number(d.statutory_er) + Number(d.statutory_ee))}</td>
-                      <td className="num">{formatMoneyBare(Number(d.gross))}</td>
+                      <td className="num m-hide" data-label="Staff">{d.staff_count}</td>
+                      <td className="num m-hide" data-label="Basic">{formatMoneyBare(Number(d.basic))}</td>
+                      <td className="num m-hide" data-label="Statutory">{formatMoneyBare(Number(d.statutory_er) + Number(d.statutory_ee))}</td>
+                      <td className="num m-hide" data-label="Gross">{formatMoneyBare(Number(d.gross))}</td>
                       <td className="num">{formatMoneyBare(Number(d.net))}</td>
-                    </tr>
+                    </LedgerRow>
                   ))}
                   <tr className="font-semibold">
                     <td>Total</td>
-                    <td className="num">{payrollTotals.staff}</td>
-                    <td className="num">{formatMoneyBare(payrollTotals.basic)}</td>
-                    <td className="num">{formatMoneyBare(payrollTotals.statutory)}</td>
-                    <td className="num">{formatMoneyBare(payrollTotals.gross)}</td>
+                    <td className="num m-hide">{payrollTotals.staff}</td>
+                    <td className="num m-hide">{formatMoneyBare(payrollTotals.basic)}</td>
+                    <td className="num m-hide">{formatMoneyBare(payrollTotals.statutory)}</td>
+                    <td className="num m-hide">{formatMoneyBare(payrollTotals.gross)}</td>
                     <td className="num">{formatMoneyBare(payrollTotals.net)}</td>
+                    <td className="lt-toggle" />
                   </tr>
                 </tbody>
               </table>
@@ -1211,15 +1214,16 @@ export default async function DashboardPage() {
               <thead>
                 <tr>
                   <th>Company</th>
-                  <th className="right">Savings</th>
-                  <th className="right">Loans</th>
+                  <th className="right m-hide">Savings</th>
+                  <th className="right m-hide">Loans</th>
                   <th className="right">Net</th>
-                  <th>Position</th>
+                  <th className="m-hide">Position</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
                 {subsidiaries.map((sub) => (
-                  <tr key={sub.id}>
+                  <LedgerRow key={sub.id}>
                     <td>
                       <div className="font-serif text-[15px] text-ink">{sub.name}</div>
                       <div className="font-mono text-[11px] text-graphite mt-0.5">
@@ -1229,12 +1233,12 @@ export default async function DashboardPage() {
                         ) : null}
                       </div>
                     </td>
-                    <td className="num">
+                    <td className="num m-hide" data-label="Savings">
                       {sub.savings_deposited > 0
                         ? formatMoney(sub.savings_deposited)
                         : <span className="text-muted">—</span>}
                     </td>
-                    <td className="num">
+                    <td className="num m-hide" data-label="Loans">
                       {sub.loans_outstanding > 0
                         ? formatMoney(sub.loans_outstanding)
                         : <span className="text-muted">—</span>}
@@ -1252,10 +1256,10 @@ export default async function DashboardPage() {
                         </span>
                       )}
                     </td>
-                    <td>
+                    <td className="m-hide" data-label="Position">
                       <PositionLabel position={sub.position} />
                     </td>
-                  </tr>
+                  </LedgerRow>
                 ))}
               </tbody>
             </table>

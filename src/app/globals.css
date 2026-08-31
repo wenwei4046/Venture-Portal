@@ -812,6 +812,11 @@ table.ledger-table tr.lt-detail {
     padding: 10px 12px;
     font-size: 10px;
   }
+  /* A table whose <thead> is one cell short of the chevron column leaves a
+     notch in the header band — CSS cannot close it (the missing-cell region is
+     painted with the TABLE's background, not the row's or the row group's), so
+     every folding table carries `<th className="lt-toggle" aria-hidden />` as
+     its last header cell. */
   table.ledger-table td {
     padding: 12px;
   }

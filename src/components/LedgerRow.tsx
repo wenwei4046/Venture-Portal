@@ -36,6 +36,9 @@ interface Props {
   className?: string
   /** Forwarded to the visible <tr> (e.g. onClick for row navigation). */
   onClick?: React.MouseEventHandler<HTMLTableRowElement>
+  /** Forwarded to the visible <tr> — several tables drive their stagger
+   *  animation with an inline `--i` custom property. */
+  style?: React.CSSProperties
   /** Set when the row's cells are already phone-narrow and no panel is wanted. */
   noCollapse?: boolean
 }
@@ -47,7 +50,7 @@ type CellProps = {
   title?: string
 }
 
-export default function LedgerRow({ children, className, onClick, noCollapse }: Props) {
+export default function LedgerRow({ children, className, onClick, style, noCollapse }: Props) {
   const [open, setOpen] = useState(false)
 
   const cells = Children.toArray(children).filter(isValidElement) as ReactElement<CellProps>[]
@@ -59,7 +62,7 @@ export default function LedgerRow({ children, className, onClick, noCollapse }: 
 
   return (
     <Fragment>
-      <tr className={className} onClick={onClick}>
+      <tr className={className} onClick={onClick} style={style}>
         {children}
         {hidden.length > 0 ? (
           <td className="lt-toggle">
