@@ -89,7 +89,7 @@ export default function ProductsSection({ products }: { products: ProductRow[] }
       </section>
 
       <section>
-        <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+        <div className="border border-hairline rounded-md bg-surface overflow-x-auto table-scroll">
           <table className="ledger-table">
             <thead>
               <tr>
