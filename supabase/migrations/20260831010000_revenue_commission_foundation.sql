@@ -59,6 +59,20 @@ COMMENT ON COLUMN departments.payroll_source IS
 
 UPDATE departments SET payroll_source = 'commission' WHERE name = 'Revenue Department';
 
+-- Revenue staff pay model (user decision 2026-08-31): NO basic salary and NO
+-- statutory allowance -- they are paid 100% on commission. Nothing needs to
+-- change for that to work:
+--   * hr_staff_costs.basic_salary already allows 0 (migration 141 relaxed the
+--     CHECK for commission-only staff; HV020 is the existing precedent), and
+--     hr_employment_type already has 'commission_eligible' (migration 120).
+--   * compute_hr_monthly_payroll bases EPF/SOCSO/EIS on
+--     (prorated basic + statutory allowance), so with both at 0 every
+--     statutory lookup returns 0 on its own -- no trigger change, and no risk
+--     to the departments that DO carry a basic.
+-- PCB is the one deduction that still bites: the trigger computes it on gross,
+-- which for these staff is the whole commission. Left as-is deliberately --
+-- commission is taxable income. Flagged in the spec for the user to confirm.
+
 ALTER TABLE hr_staff_costs
     ADD COLUMN IF NOT EXISTS erp_sales_code TEXT;
 
@@ -218,12 +232,6 @@ CREATE TABLE comm_schemes (
     bill_bonus_basis comm_bill_bonus_basis NOT NULL DEFAULT 'uplift_on_commission',
     override_includes_kpi BOOLEAN NOT NULL DEFAULT FALSE,
 
-    -- Malaysian statutory: commission IS EPF/SOCSO-liable wages, but
-    -- compute_hr_monthly_payroll excludes it from the statutory base today.
-    -- For Revenue staff commission is most of the pay, so this is material.
-    -- Flag only — nothing reads it until the user decides (spec Q5).
-    commission_is_statutory_wage BOOLEAN NOT NULL DEFAULT FALSE,
-
     effective_from DATE NOT NULL,
     effective_to DATE,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -236,7 +244,7 @@ CREATE TABLE comm_schemes (
 );
 
 COMMENT ON TABLE comm_schemes IS
-    'Revenue commission: scheme-level knobs. bill_bonus_basis resolves spec Q1; commission_is_statutory_wage is a parked compliance flag (spec Q5).';
+    'Revenue commission: scheme-level knobs. bill_bonus_basis = uplift_on_commission (user decision 2026-08-31): the 1st/2nd/3rd Bill bonus is a 50/40/30% uplift ON THAT ORDER''S COMMISSION, and is ADDITIVE to it.';
 
 CREATE UNIQUE INDEX uq_comm_scheme_active_per_dept
     ON comm_schemes (department_id) WHERE is_active AND effective_to IS NULL;

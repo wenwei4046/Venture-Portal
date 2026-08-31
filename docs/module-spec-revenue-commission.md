@@ -1,6 +1,6 @@
 # Module Spec — Revenue Department Commission Payroll
 
-Status: **DRAFT — awaiting user brief on the Tier/rank ladder + a sample ERP export.**
+Status: **DRAFT — Q1/Q2/Q5 answered 2026-08-31. Still awaiting the Tier/rank ladder brief (Q3) + a sample ERP export (Q7).**
 Owner: Principal + HR. Author: 2026-08-31 session.
 Related: `module-spec-phase3.md` (HR Costing), `db-schema.md`, `DESIGN.md`.
 
@@ -122,19 +122,18 @@ for each tagged order O of S with bill_rank r:
 `bill_pct`: rank 1 = 50%, rank 2 = 40%, rank 3 = 30% (`comm_bill_bonus_rules`,
 effective-dated).
 
-> ⚠️ **OPEN QUESTION Q1 — the basis.** The brief says the bonus is *"based on
-> product revenue, not the existing commission rate"*, which literally means
-> **50% of the order's revenue** — i.e. an RM10,000 first bill pays RM5,000
-> bonus. That is 7–10× the normal commission and is almost certainly not the
-> intent. The likely intent is a **50% uplift on that order's commission**
-> (RM10,000 × 7% × 50% = RM350). The schema therefore carries a scheme-level
-> `bill_bonus_basis` toggle and **defaults to `uplift_on_commission`** until
-> confirmed. See §8.
+> ✅ **RESOLVED 2026-08-31 (Q1).** The basis is **`uplift_on_commission`**: the
+> bonus is 50/40/30% *of that order's commission*, not of its raw revenue.
+> RM10,000 order at 7% → RM700 commission → 1st Bill bonus RM350.
+> (`pct_of_revenue` stays in the enum as a documented alternative; flipping the
+> scheme column switches every future run.)
+>
+> ✅ **RESOLVED 2026-08-31 (Q2).** The bonus is **additive** — a tagged order
+> still earns its normal C1, so the RM10,000 first bill pays 700 + 350 = 1,050.
 
 Tagging constraints:
 - one tag per order (an order can't be both 1st and 2nd bill);
-- unique `(staff_id, event_date, bill_rank)` — one 1st Bill per person per day;
-- tagged orders **still earn** their normal C1 (the bonus is additive) — **Q2**.
+- unique `(staff_id, event_date, bill_rank)` — one 1st Bill per person per day.
 
 ### 3.4 Component 4 — Hierarchy Override (upline / downline)
 
@@ -166,6 +165,28 @@ the top rate. Equal rates compress to zero automatically. No infinite loop:
 
 Override base = `PR(D)` (KPI lines excluded, same as C1). Scheme flag
 `override_includes_kpi` defaults `false`.
+
+### 3.45 Revenue staff have no basic and no statutory
+
+**User decision 2026-08-31:** Revenue Department staff carry **no basic salary
+and no statutory allowance** — they are paid 100% on commission.
+
+The happy surprise is that this needs *no* code change:
+
+- `hr_staff_costs.basic_salary` already accepts 0 (migration 141 relaxed the
+  CHECK for commission-only staff; HV020 is the existing precedent), and
+  `hr_employment_type` already has a `commission_eligible` value (migration 120).
+- `compute_hr_monthly_payroll` bases EPF / SOCSO / EIS on
+  `prorated basic + statutory allowance`. With both at 0, every statutory
+  lookup returns 0 by itself — no trigger edit, and therefore no risk to the
+  departments that *do* carry a basic.
+- Pro-rata likewise becomes a no-op (it never applied to commission anyway).
+
+> ⚠️ **PCB still applies.** The trigger computes PCB on gross, which for these
+> staff is the entire commission, so `net = commission − PCB`. Left as is on
+> purpose — commission is taxable income — but it is the one deduction a
+> pure-commission salesperson will still see on the payslip. Confirm this is
+> intended (**Q5b**).
 
 ### 3.5 Total
 
@@ -203,8 +224,8 @@ at compute time from `comm_kpi_items`.
 
 ### 4.4 `comm_schemes`
 Named, versioned, effective-dated knob-holder: `bill_bonus_basis`
-(`pct_of_revenue` | `uplift_on_commission`), `override_includes_kpi`,
-`commission_is_statutory_wage` (see Q5), `rounding` (`per_component` | `total`).
+(`uplift_on_commission` — the answered default — or `pct_of_revenue`) and
+`override_includes_kpi`.
 One active scheme at a time; the run snapshots `scheme_id`.
 
 ### 4.5 `comm_ranks`
@@ -350,13 +371,14 @@ Steps 1–4 need no ERP file and can ship first.
 
 | # | Question | Why it matters | Default assumed |
 |---|---|---|---|
-| **Q1** | Additional Order bonus: 50% **of the order's product revenue**, or a 50% **uplift on that order's commission**? | 7–10× difference in payout | `uplift_on_commission` |
-| **Q2** | Does a tagged 1st/2nd/3rd Bill order **also** earn normal product commission? | additive vs replacement | additive |
-| **Q3** | The Tier/rank ladder — how many tiers, what rates, and what promotes someone? | drives `comm_ranks` + `comm_hierarchy` | *user to brief* |
-| **Q4** | Override: unlimited levels with differential roll-up as in §3.4, or **one level only** (direct downline)? | changes C4 materially | unlimited roll-up |
-| **Q5** | Malaysian statutory: commission **is** EPF/SOCSO-liable wages, but `compute_hr_monthly_payroll` excludes it from the statutory base. For Revenue staff commission is most of the pay → material under-contribution. Turn it on for this department? | compliance | flagged, **not changed** (would alter existing depts) |
-| **Q6** | Should the Revenue Dept manager (`dept_manager` role) see their team's commission? | RLS scope | DENY for now |
-| **Q7** | ERP name + a **sample export file** — one row per order line, or per order? Which columns? | step 5 cannot start without it | — |
+| **Q1** | ✅ **ANSWERED** — the Bill bonus is a **50/40/30% uplift on that order's commission**, not on raw revenue. | 7–10× difference in payout | `uplift_on_commission`, implemented |
+| **Q2** | ✅ **ANSWERED** — the bonus is **additive**; the tagged order still earns normal C1. | additive vs replacement | implemented |
+| **Q5** | ✅ **ANSWERED** — Revenue staff have **no basic and no statutory**, full commission base. Needs no code change (§3.45); the now-dead `commission_is_statutory_wage` knob was removed from the migration. | compliance | implemented |
+| **Q3** | ⏳ The Tier/rank ladder — how many tiers, what rates, and what promotes someone? | fills `comm_ranks` with rows; the schema shape already holds | *user to brief* |
+| **Q4** | ⏳ Override: unlimited levels with differential roll-up as in §3.4, or **one level only** (direct downline)? | changes C4 materially | unlimited roll-up |
+| **Q5b** | ⏳ PCB on a pure-commission salesperson — deduct as the trigger does today, or not? | the only deduction left on their payslip | deduct (current behaviour) |
+| **Q6** | ⏳ Should the Revenue Dept manager (`dept_manager` role) see their team's commission? | RLS scope | DENY for now |
+| **Q7** | ⏳ ERP name + a **sample export file** — one row per order line, or per order? Which columns? | step 5 cannot start without it | — |
 
 ---
 
