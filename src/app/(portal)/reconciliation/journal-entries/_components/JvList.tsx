@@ -5,6 +5,7 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
 import JvRowActions from './JvRowActions'
+import LedgerRow from '@/components/LedgerRow'
 
 export interface JvRow {
   id: string
@@ -83,16 +84,17 @@ export default function JvList({ rows }: { rows: JvRow[] }) {
           <thead>
             <tr>
               <th>Voucher</th>
-              <th>Date</th>
-              <th>Description</th>
-              <th>Segment</th>
+              <th className="m-hide">Date</th>
+              <th className="m-hide">Description</th>
+              <th className="m-hide">Segment</th>
               <th className="right">Amount</th>
-              <th className="right">Actions</th>
+              <th className="right m-hide">Actions</th>
+              <th className="lt-toggle" aria-hidden />
             </tr>
           </thead>
           <tbody>
             {filtered.map((entry) => (
-              <tr key={entry.id}>
+              <LedgerRow key={entry.id}>
                 <td>
                   <Link
                     href={`/reconciliation/journal-entries/${entry.id}/edit`}
@@ -112,18 +114,18 @@ export default function JvList({ rows }: { rows: JvRow[] }) {
                     {entry.lineCount} {entry.lineCount === 1 ? 'line' : 'lines'}
                   </div>
                 </td>
-                <td className="font-mono text-[12px] text-graphite">
+                <td className="font-mono text-[12px] text-graphite m-hide" data-label="Date">
                   {dayjs(entry.transaction_date).format('D MMM YYYY')}
                 </td>
-                <td className="font-serif text-[15px] text-ink">{entry.description}</td>
-                <td className="font-mono text-[11px] uppercase tracking-wide text-graphite">
+                <td className="font-serif text-[15px] text-ink m-hide" data-label="Description">{entry.description}</td>
+                <td className="font-mono text-[11px] uppercase tracking-wide text-graphite m-hide" data-label="Segment">
                   {segLabel(entry.segment)}
                 </td>
                 <td className="num">{formatMoney(Number(entry.total_amount))}</td>
-                <td>
+                <td className="m-hide">
                   <JvRowActions id={entry.id} entryNo={entry.entry_no} />
                 </td>
-              </tr>
+              </LedgerRow>
             ))}
           </tbody>
         </table>

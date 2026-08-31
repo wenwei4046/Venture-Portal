@@ -5,6 +5,7 @@ import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import OpexTrendChart from './_components/OpexTrendChart'
+import LedgerRow from '@/components/LedgerRow'
 
 interface PayrollRow {
   basic_salary: number | string
@@ -175,33 +176,38 @@ export default async function OpexPage({ searchParams }: Props) {
               <thead>
                 <tr>
                   <th>Employee</th>
-                  <th className="right">Basic</th>
-                  <th className="right">KPI</th>
-                  <th className="right">Allowance</th>
-                  <th className="right">ER Statutory</th>
+                  <th className="right m-hide">Basic</th>
+                  <th className="right m-hide">KPI</th>
+                  <th className="right m-hide">Allowance</th>
+                  <th className="right m-hide">ER Statutory</th>
                   <th className="right">Total</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
                 {currentRows.map((r) => (
-                  <tr key={r.name}>
+                  <LedgerRow key={r.name}>
                     <td>
                       <div className="font-serif text-ink">{r.name}</div>
                     </td>
-                    <td className="num text-graphite">{formatMoney(r.basic)}</td>
-                    <td className="num text-graphite">{formatMoney(r.kpi)}</td>
-                    <td className="num text-graphite">{formatMoney(r.allowance)}</td>
-                    <td className="num text-graphite">{formatMoney(r.erStat)}</td>
+                    <td className="num text-graphite m-hide" data-label="Basic">{formatMoney(r.basic)}</td>
+                    <td className="num text-graphite m-hide" data-label="KPI">{formatMoney(r.kpi)}</td>
+                    <td className="num text-graphite m-hide" data-label="Allowance">{formatMoney(r.allowance)}</td>
+                    <td className="num text-graphite m-hide" data-label="ER Statutory">{formatMoney(r.erStat)}</td>
                     <td className="num">{formatMoney(r.total)}</td>
-                  </tr>
+                  </LedgerRow>
                 ))}
+                {/* Summary row: no panel to open, but it still needs the
+                    chevron column's placeholder so its Total stays under the
+                    Total above it. */}
                 <tr className="border-t-2 border-hairline bg-surface-2/40">
                   <td className="font-serif italic text-accent">Total</td>
-                  <td className="num text-num-ink font-semibold">{formatMoney(currentRows.reduce((s, r) => s + r.basic, 0))}</td>
-                  <td className="num text-num-ink font-semibold">{formatMoney(currentRows.reduce((s, r) => s + r.kpi, 0))}</td>
-                  <td className="num text-num-ink font-semibold">{formatMoney(currentRows.reduce((s, r) => s + r.allowance, 0))}</td>
-                  <td className="num text-num-ink font-semibold">{formatMoney(currentRows.reduce((s, r) => s + r.erStat, 0))}</td>
+                  <td className="num text-num-ink font-semibold m-hide">{formatMoney(currentRows.reduce((s, r) => s + r.basic, 0))}</td>
+                  <td className="num text-num-ink font-semibold m-hide">{formatMoney(currentRows.reduce((s, r) => s + r.kpi, 0))}</td>
+                  <td className="num text-num-ink font-semibold m-hide">{formatMoney(currentRows.reduce((s, r) => s + r.allowance, 0))}</td>
+                  <td className="num text-num-ink font-semibold m-hide">{formatMoney(currentRows.reduce((s, r) => s + r.erStat, 0))}</td>
                   <td className="num text-accent font-semibold">{formatMoney(monthOpex)}</td>
+                  <td className="lt-toggle" />
                 </tr>
               </tbody>
             </table>

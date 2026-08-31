@@ -329,9 +329,9 @@ export default function GlReportView({
           <tr>
             <th>Account</th>
             <th className="num">{currentLabel}</th>
-            {withCompare ? <th className="num">{compareLabel}</th> : null}
-            {withCompare ? <th className="num">Δ%</th> : null}
-            {pctBase ? <th className="num">% Rev</th> : null}
+            {withCompare ? <th className="num m-hide">{compareLabel}</th> : null}
+            {withCompare ? <th className="num m-hide">Δ%</th> : null}
+            {pctBase ? <th className="num m-hide">% Rev</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -383,15 +383,15 @@ export default function GlReportView({
                   {b.row.current < 0 ? <span className="neg">{money(b.row.current)}</span> : money(b.row.current)}
                 </td>
                 {withCompare ? (
-                  <td className="num text-graphite">
+                  <td className="num text-graphite m-hide">
                     {b.row.previous < 0 ? <span className="neg">{money(b.row.previous)}</span> : money(b.row.previous)}
                   </td>
                 ) : null}
                 {withCompare ? (
-                  <td className="num text-graphite">{deltaPct(b.row.current, b.row.previous)}</td>
+                  <td className="num text-graphite m-hide">{deltaPct(b.row.current, b.row.previous)}</td>
                 ) : null}
                 {pctBase ? (
-                  <td className="num text-graphite">{pctOf(b.row.current, pctBase.current)}</td>
+                  <td className="num text-graphite m-hide">{pctOf(b.row.current, pctBase.current)}</td>
                 ) : null}
               </tr>
             ),
@@ -517,12 +517,12 @@ function SectionRows({
           {n.current < 0 ? <span className="neg">{money(n.current)}</span> : money(n.current)}
         </td>
         {withCompare ? (
-          <td className="num text-graphite">
+          <td className="num text-graphite m-hide">
             {n.previous < 0 ? <span className="neg">{money(n.previous)}</span> : money(n.previous)}
           </td>
         ) : null}
-        {withCompare ? <td className="num text-graphite">{deltaPct(n.current, n.previous)}</td> : null}
-        {pctBase ? <td className="num text-graphite">{pctOf(n.current, pctBase.current)}</td> : null}
+        {withCompare ? <td className="num text-graphite m-hide">{deltaPct(n.current, n.previous)}</td> : null}
+        {pctBase ? <td className="num text-graphite m-hide">{pctOf(n.current, pctBase.current)}</td> : null}
       </tr>,
     )
     if (hasTxns && txnsOpen) {

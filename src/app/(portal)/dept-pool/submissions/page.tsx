@@ -4,6 +4,7 @@ import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { executeHrCosting } from '../../hr-costing/actions'
+import LedgerRow from '@/components/LedgerRow'
 
 interface DeptSummaryRow {
   department_id?: string
@@ -125,31 +126,33 @@ export default async function PastMonthSubmissionsPage() {
                       <thead>
                         <tr>
                           <th>Department</th>
-                          <th className="right">Staff</th>
-                          <th className="right">Basic</th>
-                          <th className="right">Stat ER</th>
-                          <th className="right">Allowance</th>
+                          <th className="right m-hide">Staff</th>
+                          <th className="right m-hide">Basic</th>
+                          <th className="right m-hide">Stat ER</th>
+                          <th className="right m-hide">Allowance</th>
                           <th className="right">Total CTC</th>
+                          <th className="lt-toggle" aria-hidden />
                         </tr>
                       </thead>
                       <tbody>
                         {depts.map(([deptName, d]) => (
-                          <tr key={deptName}>
+                          <LedgerRow key={deptName}>
                             <td>
                               <div className="font-serif text-ink">{deptName}</div>
                             </td>
-                            <td className="num text-graphite">{d.staff_count ?? 0}</td>
-                            <td className="num text-graphite">{formatMoney(Number(d.total_basic ?? 0))}</td>
-                            <td className="num text-graphite">{formatMoney(Number(d.total_statutory ?? 0))}</td>
-                            <td className="num text-graphite">{formatMoney(Number(d.total_allowance ?? 0))}</td>
+                            <td className="num text-graphite m-hide" data-label="Staff">{d.staff_count ?? 0}</td>
+                            <td className="num text-graphite m-hide" data-label="Basic">{formatMoney(Number(d.total_basic ?? 0))}</td>
+                            <td className="num text-graphite m-hide" data-label="Stat ER">{formatMoney(Number(d.total_statutory ?? 0))}</td>
+                            <td className="num text-graphite m-hide" data-label="Allowance">{formatMoney(Number(d.total_allowance ?? 0))}</td>
                             <td className="num">{formatMoney(Number(d.total_ctc ?? 0))}</td>
-                          </tr>
+                          </LedgerRow>
                         ))}
                         <tr className="border-t-2 border-hairline bg-surface-2/40">
                           <td className="font-serif italic text-accent" colSpan={5}>
                             Total
                           </td>
                           <td className="num text-num-ink font-semibold">{formatMoney(total)}</td>
+                          <td className="lt-toggle" />
                         </tr>
                       </tbody>
                     </table>

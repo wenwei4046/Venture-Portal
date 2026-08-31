@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireAuth } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import ApproveRejectButtons from './_components/ApproveRejectButtons'
+import LedgerRow from '@/components/LedgerRow'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -176,21 +177,22 @@ export default async function PayrollRunApprovalPage({ params }: PageProps) {
                 <thead>
                   <tr>
                     <th>Name</th>
-                    <th>Dept</th>
-                    <th className="right">Gross</th>
-                    <th className="right">Stat ER</th>
+                    <th className="m-hide">Dept</th>
+                    <th className="right m-hide">Gross</th>
+                    <th className="right m-hide">Stat ER</th>
                     <th className="right">Net</th>
+                    <th className="lt-toggle" aria-hidden />
                   </tr>
                 </thead>
                 <tbody>
                   {detailRows.map(r => (
-                    <tr key={r.id}>
+                    <LedgerRow key={r.id}>
                       <td className="font-serif text-ink">{r.employeeName}</td>
-                      <td className="font-serif italic text-graphite">{r.deptName}</td>
-                      <td className="num">{formatMoney(r.gross)}</td>
-                      <td className="num text-graphite">{formatMoney(r.totalStatEr)}</td>
+                      <td className="font-serif italic text-graphite m-hide" data-label="Dept">{r.deptName}</td>
+                      <td className="num m-hide" data-label="Gross">{formatMoney(r.gross)}</td>
+                      <td className="num text-graphite m-hide" data-label="Stat ER">{formatMoney(r.totalStatEr)}</td>
                       <td className="num">{formatMoney(r.net)}</td>
-                    </tr>
+                    </LedgerRow>
                   ))}
                 </tbody>
               </table>

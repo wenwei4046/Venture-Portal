@@ -14,6 +14,7 @@ import { fetchDeptCashLines, monthRange } from '@/lib/dept-receipt-payment'
 import CreateDeptInvoiceButton from './_components/CreateDeptInvoiceButton'
 import DraftInvoiceActions from './_components/DraftInvoiceActions'
 import Link from 'next/link'
+import LedgerRow from '@/components/LedgerRow'
 
 export const dynamic = 'force-dynamic'
 
@@ -203,13 +204,14 @@ export default async function MyBillingPage() {
               <thead>
                 <tr>
                   <th>Invoice #</th>
-                  <th>Bill to</th>
-                  <th>Period</th>
+                  <th className="m-hide">Bill to</th>
+                  <th className="m-hide">Period</th>
                   <th className="right">Amount</th>
-                  <th className="right">未收 Bal</th>
-                  <th>Status</th>
-                  <th>Date</th>
-                  <th className="right">Action</th>
+                  <th className="right m-hide">未收 Bal</th>
+                  <th className="m-hide">Status</th>
+                  <th className="m-hide">Date</th>
+                  <th className="right m-hide">Action</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
@@ -217,12 +219,12 @@ export default async function MyBillingPage() {
                   const bal = outstandingOf(i)
                   const s = sumById.get(i.id)
                   return (
-                    <tr key={i.id}>
+                    <LedgerRow key={i.id}>
                       <td className="font-mono text-xs text-ink">{i.invoice_no ?? i.id.slice(0, 8)}</td>
-                      <td className="font-serif text-ink">{partyOf(i)}</td>
-                      <td className="font-mono text-xs text-muted">{dayjs(i.period_month).format('MMM YYYY')}</td>
+                      <td className="font-serif text-ink m-hide" data-label="Bill to">{partyOf(i)}</td>
+                      <td className="font-mono text-xs text-muted m-hide" data-label="Period">{dayjs(i.period_month).format('MMM YYYY')}</td>
                       <td className="num">{formatMoney(Number(i.total_amount))}</td>
-                      <td className="num">
+                      <td className="num m-hide" data-label="未收 Bal">
                         {i.status === 'issued' ? (
                           <span className={bal > 0 ? 'text-alert' : ''}>
                             {formatMoney(bal)}
@@ -237,7 +239,7 @@ export default async function MyBillingPage() {
                           <span className="text-muted">—</span>
                         )}
                       </td>
-                      <td>
+                      <td className="m-hide" data-label="Status">
                         <span
                           className={`font-serif italic text-xs ${
                             i.status === 'draft'
@@ -250,10 +252,10 @@ export default async function MyBillingPage() {
                           {i.status}
                         </span>
                       </td>
-                      <td className="font-mono text-xs text-muted">
+                      <td className="font-mono text-xs text-muted m-hide" data-label="Date">
                         {i.invoice_date ? dayjs(i.invoice_date).format('DD MMM YY') : '—'}
                       </td>
-                      <td className="text-right">
+                      <td className="text-right m-hide">
                         {i.status === 'draft' && i.created_by === user.id ? (
                           <DraftInvoiceActions
                             invoice={{
@@ -269,7 +271,7 @@ export default async function MyBillingPage() {
                           <span className="text-muted text-xs">—</span>
                         )}
                       </td>
-                    </tr>
+                    </LedgerRow>
                   )
                 })}
               </tbody>
@@ -297,13 +299,14 @@ export default async function MyBillingPage() {
               <thead>
                 <tr>
                   <th>Contract</th>
-                  <th>Company</th>
+                  <th className="m-hide">Company</th>
                   <th className="right">Contract Amt</th>
-                  <th>Term</th>
-                  <th>Status</th>
-                  <th className="right">已开单</th>
-                  <th className="right">已收</th>
-                  <th className="right">未收</th>
+                  <th className="m-hide">Term</th>
+                  <th className="m-hide">Status</th>
+                  <th className="right m-hide">已开单</th>
+                  <th className="right m-hide">已收</th>
+                  <th className="right m-hide">未收</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
@@ -312,17 +315,17 @@ export default async function MyBillingPage() {
                   const daysLeft = c.end_date ? dayjs(c.end_date).diff(today, 'day') : null
                   const expiringSoon = c.status === 'active' && daysLeft !== null && daysLeft <= 30
                   return (
-                    <tr key={c.id}>
+                    <LedgerRow key={c.id}>
                       <td className="font-serif italic text-graphite text-sm max-w-[240px]">
                         <span title={c.description ?? ''}>
                           {(c.description ?? c.id.slice(0, 8)).slice(0, 48)}
                         </span>
                       </td>
-                      <td className="font-serif text-ink">
+                      <td className="font-serif text-ink m-hide" data-label="Company">
                         {c.company_id ? companyMap.get(c.company_id) ?? '—' : '—'}
                       </td>
                       <td className="num">{formatMoney(Number(c.amount))}</td>
-                      <td className="font-mono text-xs text-muted whitespace-nowrap">
+                      <td className="font-mono text-xs text-muted whitespace-nowrap m-hide" data-label="Term">
                         {c.start_date ? dayjs(c.start_date).format('DD MMM YY') : '—'} →{' '}
                         {c.end_date ? dayjs(c.end_date).format('DD MMM YY') : '—'}
                         {expiringSoon ? (
@@ -331,21 +334,21 @@ export default async function MyBillingPage() {
                           </span>
                         ) : null}
                       </td>
-                      <td>
+                      <td className="m-hide" data-label="Status">
                         <span className={`font-serif italic text-xs ${c.status === 'active' ? 'text-graphite' : 'text-muted'}`}>
                           {c.status}
                         </span>
                       </td>
-                      <td className="num">{formatMoney(st.invoiced)}</td>
-                      <td className="num">{formatMoney(st.collected)}</td>
-                      <td className="num">
+                      <td className="num m-hide" data-label="已开单">{formatMoney(st.invoiced)}</td>
+                      <td className="num m-hide" data-label="已收">{formatMoney(st.collected)}</td>
+                      <td className="num m-hide" data-label="未收">
                         {st.outstanding > 0 ? (
                           <span className="text-alert">{formatMoney(st.outstanding)}</span>
                         ) : (
                           <span className="text-muted">—</span>
                         )}
                       </td>
-                    </tr>
+                    </LedgerRow>
                   )
                 })}
               </tbody>

@@ -43,7 +43,7 @@ export default async function InvoicePoolPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
         <div className="lg:col-span-7">
           <div className="font-serif italic text-accent text-base mb-1">Pool Balance</div>
-          <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
+          <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
             {formatMoney(balance)}
           </div>
           <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">

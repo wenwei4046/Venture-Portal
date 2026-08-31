@@ -103,16 +103,16 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
         <thead>
           <tr className="text-[11px] uppercase tracking-wide text-muted font-sans border-b border-hairline">
             <th className="text-left py-1.5 px-3 font-medium">Position</th>
-            <th className="text-right py-1.5 px-3 font-medium">Original</th>
-            <th className="text-right py-1.5 px-3 font-medium">Total Interest</th>
-            <th className="text-right py-1.5 px-3 font-medium border-l border-hairline">
+            <th className="text-right py-1.5 px-3 font-medium hidden md:table-cell">Original</th>
+            <th className="text-right py-1.5 px-3 font-medium hidden md:table-cell">Total Interest</th>
+            <th className="text-right py-1.5 px-3 font-medium border-l border-hairline hidden md:table-cell">
               Principal Due
             </th>
-            <th className="text-right py-1.5 px-3 font-medium">Interest Due</th>
+            <th className="text-right py-1.5 px-3 font-medium hidden md:table-cell">Interest Due</th>
             <th className="text-right py-1.5 px-3 font-medium border-l border-hairline">
               Total Due
             </th>
-            <th className="text-right py-1.5 px-3 font-medium">Payoff</th>
+            <th className="text-right py-1.5 px-3 font-medium hidden md:table-cell">Payoff</th>
             <th className="py-1.5 px-3" />
           </tr>
         </thead>
@@ -128,20 +128,20 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
                   </span>
                   <SourceBadge source={item.source} side={item.side} />
                 </td>
-                <td className="py-1.5 px-3 text-right font-mono tabular text-graphite">
+                <td className="py-1.5 px-3 text-right font-mono tabular text-graphite hidden md:table-cell">
                   {formatMoneyBare(item.principal)}
                 </td>
-                <td className="py-1.5 px-3 text-right font-mono tabular text-graphite">
+                <td className="py-1.5 px-3 text-right font-mono tabular text-graphite hidden md:table-cell">
                   {totalInterest == null ? (
                     <span className="text-muted">—</span>
                   ) : (
                     formatMoneyBare(totalInterest)
                   )}
                 </td>
-                <td className="py-1.5 px-3 text-right font-mono tabular text-ink border-l border-hairline">
+                <td className="py-1.5 px-3 text-right font-mono tabular text-ink border-l border-hairline hidden md:table-cell">
                   {formatMoneyBare(item.principalOutstanding)}
                 </td>
-                <td className="py-1.5 px-3 text-right font-mono tabular text-graphite">
+                <td className="py-1.5 px-3 text-right font-mono tabular text-graphite hidden md:table-cell">
                   {item.kind === 'no_term' ? (
                     <span className="text-muted">—</span>
                   ) : (
@@ -151,7 +151,7 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
                 <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink border-l border-hairline">
                   {formatMoneyBare(oweTotalOf(item))}
                 </td>
-                <td className="py-1.5 px-3 text-right">{finishCell(item)}</td>
+                <td className="py-1.5 px-3 text-right hidden md:table-cell">{finishCell(item)}</td>
                 <td className="py-1.5 px-3 text-right">
                   <Link
                     href={item.side === 'collect' ? `/fund-out/${item.id}` : `/fund-in/${item.id}`}
@@ -165,16 +165,16 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
           })}
           <tr className="bg-surface/40">
             <td className="py-1.5 px-3 font-serif italic text-graphite">Subtotal</td>
-            <td className="py-1.5 px-3 text-right font-mono tabular text-graphite">
+            <td className="py-1.5 px-3 text-right font-mono tabular text-graphite hidden md:table-cell">
               {formatMoneyBare(sub.principal)}
             </td>
-            <td className="py-1.5 px-3 text-right font-mono tabular text-graphite">
+            <td className="py-1.5 px-3 text-right font-mono tabular text-graphite hidden md:table-cell">
               {formatMoneyBare(sub.totalInterest)}
             </td>
-            <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink border-l border-hairline">
+            <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink border-l border-hairline hidden md:table-cell">
               {formatMoneyBare(sub.outstanding)}
             </td>
-            <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink">
+            <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink hidden md:table-cell">
               {formatMoneyBare(sub.interest)}
             </td>
             <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink border-l border-hairline">
@@ -333,14 +333,14 @@ export default function StatementView({
               Counterparty
             </th>
             <th
-              className="py-1 px-3 font-medium border-b border-hairline"
+              className="py-1 px-3 font-medium border-b border-hairline m-hide"
               style={{ textAlign: 'center' }}
               colSpan={2}
             >
               To Collect
             </th>
             <th
-              className="py-1 px-3 font-medium border-b border-hairline"
+              className="py-1 px-3 font-medium border-b border-hairline m-hide"
               style={{ textAlign: 'center' }}
               colSpan={2}
             >
@@ -350,7 +350,11 @@ export default function StatementView({
               Net
             </th>
           </tr>
-          <tr className="text-[11px] uppercase tracking-wide text-muted font-sans border-b border-hairline">
+          {/* Sub-headers for the four principal/interest columns — all four
+              fold away on a phone, so the whole row goes with them. This table
+              already expands rows on tap for detail; it does not get a second
+              chevron. */}
+          <tr className="text-[11px] uppercase tracking-wide text-muted font-sans border-b border-hairline m-hide">
             <th className="right py-1 px-3 font-medium">Principal</th>
             <th className="right py-1 px-3 font-medium">Interest</th>
             <th className="right py-1 px-3 font-medium">Principal</th>
@@ -398,10 +402,10 @@ export default function StatementView({
                       {g.items.length} positions
                     </span>
                   </td>
-                  <td className="py-2 px-3 text-right font-mono tabular">{num(g.collectPrincipal)}</td>
-                  <td className="py-2 px-3 text-right font-mono tabular">{num(g.collectInterest)}</td>
-                  <td className="py-2 px-3 text-right font-mono tabular">{num(g.repayPrincipal)}</td>
-                  <td className="py-2 px-3 text-right font-mono tabular">{num(g.repayInterest)}</td>
+                  <td className="py-2 px-3 text-right font-mono tabular m-hide">{num(g.collectPrincipal)}</td>
+                  <td className="py-2 px-3 text-right font-mono tabular m-hide">{num(g.collectInterest)}</td>
+                  <td className="py-2 px-3 text-right font-mono tabular m-hide">{num(g.repayPrincipal)}</td>
+                  <td className="py-2 px-3 text-right font-mono tabular m-hide">{num(g.repayInterest)}</td>
                   <td className="py-2 px-3 text-right font-mono tabular font-semibold">
                     <span className={g.net >= 0 ? 'text-ledger' : 'text-danger'}>
                       {g.net >= 0 ? 'Collect ' : 'Repay '}
@@ -423,16 +427,16 @@ export default function StatementView({
             <td className="py-2.5 px-3 font-serif italic text-accent">
               Total{needle ? ' (filtered)' : ''}
             </td>
-            <td className="py-2.5 px-3 text-right font-mono tabular font-semibold text-ink">
+            <td className="py-2.5 px-3 text-right font-mono tabular font-semibold text-ink m-hide">
               {formatMoneyBare(shownTotals.collectPrincipal)}
             </td>
-            <td className="py-2.5 px-3 text-right font-mono tabular font-semibold text-ink">
+            <td className="py-2.5 px-3 text-right font-mono tabular font-semibold text-ink m-hide">
               {formatMoneyBare(shownTotals.collectInterest)}
             </td>
-            <td className="py-2.5 px-3 text-right font-mono tabular font-semibold text-ink">
+            <td className="py-2.5 px-3 text-right font-mono tabular font-semibold text-ink m-hide">
               {formatMoneyBare(shownTotals.repayPrincipal)}
             </td>
-            <td className="py-2.5 px-3 text-right font-mono tabular font-semibold text-ink">
+            <td className="py-2.5 px-3 text-right font-mono tabular font-semibold text-ink m-hide">
               {formatMoneyBare(shownTotals.repayInterest)}
             </td>
             <td className="py-2.5 px-3 text-right font-mono tabular font-semibold">

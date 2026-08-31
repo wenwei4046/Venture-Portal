@@ -299,8 +299,8 @@ export default function AccountsSection({ accounts }: Props) {
                       <tr>
                         <th>Name</th>
                         <th className="w-24">Code</th>
-                        <th className="w-28">Cash Flow</th>
-                        <th className="w-24">Status</th>
+                        <th className="w-28 m-hide">Cash Flow</th>
+                        <th className="w-24 m-hide">Status</th>
                         <th className="w-16"></th>
                       </tr>
                     </thead>
@@ -443,12 +443,12 @@ export default function AccountsSection({ accounts }: Props) {
                                 <td className="font-mono text-xs text-graphite">
                                   {acc.code}
                                 </td>
-                                <td>
+                                <td className="m-hide">
                                   <span className="font-mono text-[10px] uppercase tracking-wider text-info">
                                     {CFC_LABELS[acc.cash_flow_category]}
                                   </span>
                                 </td>
-                                <td>
+                                <td className="m-hide">
                                   <span
                                     className={`font-serif italic text-xs ${
                                       acc.is_active ? 'text-ledger' : 'text-muted'

@@ -24,6 +24,7 @@ import DirectorPayrollActualGrid, {
   type DirectorPayrollRowData,
 } from './_components/DirectorPayrollActualGrid'
 import DirectorPeriodPicker from './_components/DirectorPeriodPicker'
+import LedgerRow from '@/components/LedgerRow'
 
 interface Props {
   searchParams: Promise<{ period?: string; tab?: string }>
@@ -614,39 +615,41 @@ function SubmissionTab({
                 <tr>
                   <th>Director</th>
                   <th className="right">Pool share ({gapSettings.gbPct}%)</th>
-                  <th className="right">Fixed salary</th>
-                  <th className="right">Vr KPI</th>
-                  <th className="right">{100 - gapSettings.gbPct}% Billing</th>
+                  <th className="right m-hide">Fixed salary</th>
+                  <th className="right m-hide">Vr KPI</th>
+                  <th className="right m-hide">{100 - gapSettings.gbPct}% Billing</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
                 {gap.perDirector.map(d => (
-                  <tr key={d.code}>
+                  <LedgerRow key={d.code}>
                     <td className="font-serif text-[15px] text-ink">{d.code}</td>
                     <td className="num">{formatMoney(d.totalPay)}</td>
-                    <td className="num text-graphite">{formatMoney(d.fixed)}</td>
-                    <td className="num">
+                    <td className="num text-graphite m-hide" data-label="Fixed salary">{formatMoney(d.fixed)}</td>
+                    <td className="num m-hide" data-label="Vr KPI">
                       {d.vrKpi < 0 ? (
                         <span className="neg">({formatMoney(Math.abs(d.vrKpi))})</span>
                       ) : (
                         <span className="text-ledger">{formatMoney(d.vrKpi)}</span>
                       )}
                     </td>
-                    <td className="num text-graphite">{formatMoney(d.billing25)}</td>
-                  </tr>
+                    <td className="num text-graphite m-hide" data-label={`${100 - gapSettings.gbPct}% Billing`}>{formatMoney(d.billing25)}</td>
+                  </LedgerRow>
                 ))}
                 <tr>
                   <td className="font-serif italic text-accent">Total</td>
                   <td className="num font-semibold">{formatMoney(gap.totalPay75)}</td>
-                  <td className="num font-semibold text-graphite">
+                  <td className="num font-semibold text-graphite m-hide">
                     {formatMoney(gap.perDirector.reduce((s, d) => s + d.fixed, 0))}
                   </td>
-                  <td className="num font-semibold">
+                  <td className="num font-semibold m-hide">
                     <span className="neg">({formatMoney(gap.advanceLedger)})</span>
                   </td>
-                  <td className="num font-semibold text-graphite">
+                  <td className="num font-semibold text-graphite m-hide">
                     {formatMoney(gap.billing25)}
                   </td>
+                  <td className="lt-toggle" />
                 </tr>
               </tbody>
             </table>
@@ -700,38 +703,40 @@ function SubmissionTab({
                 <thead>
                   <tr>
                     <th>Director</th>
-                    <th className="right">Gross</th>
-                    <th className="right">EPF ER</th>
-                    <th className="right">SOCSO+EIS ER</th>
-                    <th className="right">PCB</th>
+                    <th className="right m-hide">Gross</th>
+                    <th className="right m-hide">EPF ER</th>
+                    <th className="right m-hide">SOCSO+EIS ER</th>
+                    <th className="right m-hide">PCB</th>
                     <th className="right">Net</th>
+                    <th className="lt-toggle" aria-hidden />
                   </tr>
                 </thead>
                 <tbody>
                   {payrollRows.map(r => (
-                    <tr key={r.id}>
+                    <LedgerRow key={r.id}>
                       <td>
                         <div className="font-serif text-[15px] text-ink">{r.director_code ?? r.employee_name}</div>
                         <div className="font-mono text-[11px] text-graphite mt-0.5">{r.employee_name}</div>
                       </td>
-                      <td className="num">{formatMoney(r.gross)}</td>
-                      <td className="num">{formatMoney(r.epf_er)}</td>
-                      <td className="num">{formatMoney(r.socso_er + r.eis_er)}</td>
-                      <td className="num">{formatMoney(r.pcb)}</td>
+                      <td className="num m-hide" data-label="Gross">{formatMoney(r.gross)}</td>
+                      <td className="num m-hide" data-label="EPF ER">{formatMoney(r.epf_er)}</td>
+                      <td className="num m-hide" data-label="SOCSO+EIS ER">{formatMoney(r.socso_er + r.eis_er)}</td>
+                      <td className="num m-hide" data-label="PCB">{formatMoney(r.pcb)}</td>
                       <td className="num font-semibold">{formatMoney(r.net)}</td>
-                    </tr>
+                    </LedgerRow>
                   ))}
                   <tr>
                     <td className="font-serif italic text-accent">Total</td>
-                    <td className="num font-semibold">{formatMoney(livePayrollTotals.gross)}</td>
-                    <td className="num font-semibold">
+                    <td className="num font-semibold m-hide">{formatMoney(livePayrollTotals.gross)}</td>
+                    <td className="num font-semibold m-hide">
                       {formatMoney(payrollRows.reduce((s, r) => s + r.epf_er, 0))}
                     </td>
-                    <td className="num font-semibold">
+                    <td className="num font-semibold m-hide">
                       {formatMoney(payrollRows.reduce((s, r) => s + r.socso_er + r.eis_er, 0))}
                     </td>
-                    <td className="num font-semibold">{formatMoney(livePayrollTotals.pcb)}</td>
+                    <td className="num font-semibold m-hide">{formatMoney(livePayrollTotals.pcb)}</td>
                     <td className="num font-semibold">{formatMoney(livePayrollTotals.net)}</td>
+                    <td className="lt-toggle" />
                   </tr>
                 </tbody>
               </table>
@@ -763,40 +768,42 @@ function SubmissionTab({
               <thead>
                 <tr>
                   <th>Subsidiary</th>
-                  <th className="right">Basic</th>
-                  <th className="right">KPI</th>
-                  <th className="right">Allowance</th>
-                  <th className="right">EPF ER</th>
-                  <th className="right">SOCSO ER</th>
-                  <th className="right">EIS ER</th>
+                  <th className="right m-hide">Basic</th>
+                  <th className="right m-hide">KPI</th>
+                  <th className="right m-hide">Allowance</th>
+                  <th className="right m-hide">EPF ER</th>
+                  <th className="right m-hide">SOCSO ER</th>
+                  <th className="right m-hide">EIS ER</th>
                   <th className="right">Total</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
                 {byCompany.map(r => (
-                  <tr key={r.company_id}>
+                  <LedgerRow key={r.company_id}>
                     <td>
                       <div className="font-serif text-[15px] text-ink">{r.company_short_code}</div>
                       <div className="font-mono text-[11px] text-graphite mt-0.5">{r.company_name}</div>
                     </td>
-                    <td className="num">{r.basic == null ? '—' : formatMoney(r.basic)}</td>
-                    <td className="num">{r.kpi == null ? '—' : formatMoney(r.kpi)}</td>
-                    <td className="num">{r.allowance == null ? '—' : formatMoney(r.allowance)}</td>
-                    <td className="num">{r.epf_er == null ? '—' : formatMoney(r.epf_er)}</td>
-                    <td className="num">{r.socso_er == null ? '—' : formatMoney(r.socso_er)}</td>
-                    <td className="num">{r.eis_er == null ? '—' : formatMoney(r.eis_er)}</td>
+                    <td className="num m-hide" data-label="Basic">{r.basic == null ? '—' : formatMoney(r.basic)}</td>
+                    <td className="num m-hide" data-label="KPI">{r.kpi == null ? '—' : formatMoney(r.kpi)}</td>
+                    <td className="num m-hide" data-label="Allowance">{r.allowance == null ? '—' : formatMoney(r.allowance)}</td>
+                    <td className="num m-hide" data-label="EPF ER">{r.epf_er == null ? '—' : formatMoney(r.epf_er)}</td>
+                    <td className="num m-hide" data-label="SOCSO ER">{r.socso_er == null ? '—' : formatMoney(r.socso_er)}</td>
+                    <td className="num m-hide" data-label="EIS ER">{r.eis_er == null ? '—' : formatMoney(r.eis_er)}</td>
                     <td className="num font-semibold">{formatMoney(r.total_ctc)}</td>
-                  </tr>
+                  </LedgerRow>
                 ))}
                 <tr>
                   <td className="font-serif italic text-accent">Total</td>
-                  <td className="num font-semibold">{sumOrDash(byCompany, r => r.basic)}</td>
-                  <td className="num font-semibold">{sumOrDash(byCompany, r => r.kpi)}</td>
-                  <td className="num font-semibold">{sumOrDash(byCompany, r => r.allowance)}</td>
-                  <td className="num font-semibold">{sumOrDash(byCompany, r => r.epf_er)}</td>
-                  <td className="num font-semibold">{sumOrDash(byCompany, r => r.socso_er)}</td>
-                  <td className="num font-semibold">{sumOrDash(byCompany, r => r.eis_er)}</td>
+                  <td className="num font-semibold m-hide">{sumOrDash(byCompany, r => r.basic)}</td>
+                  <td className="num font-semibold m-hide">{sumOrDash(byCompany, r => r.kpi)}</td>
+                  <td className="num font-semibold m-hide">{sumOrDash(byCompany, r => r.allowance)}</td>
+                  <td className="num font-semibold m-hide">{sumOrDash(byCompany, r => r.epf_er)}</td>
+                  <td className="num font-semibold m-hide">{sumOrDash(byCompany, r => r.socso_er)}</td>
+                  <td className="num font-semibold m-hide">{sumOrDash(byCompany, r => r.eis_er)}</td>
                   <td className="num font-semibold">{formatMoney(byCompanyTotal)}</td>
+                  <td className="lt-toggle" />
                 </tr>
               </tbody>
             </table>

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import SubmitHRCostButton from './_components/SubmitHRCostButton'
 import { executeHrCosting } from './actions'
+import LedgerRow from '@/components/LedgerRow'
 
 interface DeptSummary {
   department_id: string
@@ -117,7 +118,7 @@ export default async function HRCostingPage() {
           <div className="font-serif italic text-accent text-base mb-1">
             {currentSubmission ? 'Submitted period' : 'Live preview'}
           </div>
-          <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tracking-[-0.01em]">
+          <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-num-ink leading-none tracking-[-0.01em]">
             {dayjs(currentPeriod).format('MMMM YYYY')}
           </div>
           <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
@@ -169,25 +170,26 @@ export default async function HRCostingPage() {
               <thead>
                 <tr>
                   <th>Department</th>
-                  <th className="right">Staff</th>
-                  <th className="right">Basic</th>
-                  <th className="right">Statutory</th>
-                  <th className="right">Allowance</th>
+                  <th className="right m-hide">Staff</th>
+                  <th className="right m-hide">Basic</th>
+                  <th className="right m-hide">Statutory</th>
+                  <th className="right m-hide">Allowance</th>
                   <th className="right">Total CTC</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
                 {liveRowList.map((row) => (
-                  <tr key={row.department_id ?? row.department_name ?? 'unknown'}>
+                  <LedgerRow key={row.department_id ?? row.department_name ?? 'unknown'}>
                     <td className="font-serif text-[15px] text-ink">
                       {row.department_name ?? '—'}
                     </td>
-                    <td className="num">{row.staff_count ?? 0}</td>
-                    <td className="num">{formatMoney(Number(row.total_basic ?? 0))}</td>
-                    <td className="num">{formatMoney(Number(row.total_statutory ?? 0))}</td>
-                    <td className="num">{formatMoney(Number(row.total_allowance ?? 0))}</td>
+                    <td className="num m-hide" data-label="Staff">{row.staff_count ?? 0}</td>
+                    <td className="num m-hide" data-label="Basic">{formatMoney(Number(row.total_basic ?? 0))}</td>
+                    <td className="num m-hide" data-label="Statutory">{formatMoney(Number(row.total_statutory ?? 0))}</td>
+                    <td className="num m-hide" data-label="Allowance">{formatMoney(Number(row.total_allowance ?? 0))}</td>
                     <td className="num font-semibold">{formatMoney(Number(row.total_ctc ?? 0))}</td>
-                  </tr>
+                  </LedgerRow>
                 ))}
               </tbody>
             </table>
@@ -215,11 +217,12 @@ export default async function HRCostingPage() {
               <thead>
                 <tr>
                   <th>Period</th>
-                  <th>Submitted by</th>
-                  <th>State</th>
-                  <th className="right">Basic</th>
+                  <th className="m-hide">Submitted by</th>
+                  <th className="m-hide">State</th>
+                  <th className="right m-hide">Basic</th>
                   <th className="right">Total CTC</th>
-                  <th className="right"></th>
+                  <th className="right m-hide"></th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
@@ -238,19 +241,19 @@ export default async function HRCostingPage() {
                   )
                   const state = s.execution_state ?? 'approved_for_execution'
                   return (
-                    <tr key={s.id}>
+                    <LedgerRow key={s.id}>
                       <td className="font-serif text-[15px] text-ink">
                         {dayjs(s.period_month).format('MMMM YYYY')}
                       </td>
-                      <td className="font-serif italic text-graphite">
+                      <td className="font-serif italic text-graphite m-hide" data-label="Submitted by">
                         {submitterName.get(s.submitted_by) ?? '—'}
                       </td>
-                      <td>
+                      <td className="m-hide" data-label="State">
                         <StateBadge state={state} />
                       </td>
-                      <td className="num">{formatMoney(totalBasic)}</td>
+                      <td className="num m-hide" data-label="Basic">{formatMoney(totalBasic)}</td>
                       <td className="num font-semibold">{formatMoney(totalCtc)}</td>
-                      <td className="right">
+                      <td className="right m-hide">
                         {canExecute && state === 'approved_for_execution' ? (
                           <form action={executeHrCosting}>
                             <input type="hidden" name="id" value={s.id} />
@@ -265,7 +268,7 @@ export default async function HRCostingPage() {
                           <span className="text-xs font-mono text-muted">—</span>
                         )}
                       </td>
-                    </tr>
+                    </LedgerRow>
                   )
                 })}
               </tbody>

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { deleteAllocTxn, generateAllocatorInvoices, type GenerateResult } from '../actions'
 import type { AllocatorData, TxnRow } from './types'
 import { unwrap } from './unwrap'
+import LedgerRow from '@/components/LedgerRow'
 
 const fmt = (n: number) => n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -128,18 +129,19 @@ export default function RecordsTab({
         <table className="ledger-table w-full">
           <thead>
             <tr>
-              <th>Txn</th>
+              <th className="m-hide">Txn</th>
               <th>Description</th>
-              <th>Method</th>
+              <th className="m-hide">Method</th>
               <th className="num">Amount</th>
-              <th>分摊结果</th>
-              <th></th>
+              <th className="m-hide">分摊结果</th>
+              <th className="m-hide"></th>
+              <th className="lt-toggle" aria-hidden />
             </tr>
           </thead>
           <tbody>
             {data.txns.map((t) => (
-              <tr key={t.id}>
-                <td className="font-mono text-xs text-accent whitespace-nowrap">{t.txnNo}</td>
+              <LedgerRow key={t.id}>
+                <td className="font-mono text-xs text-accent whitespace-nowrap m-hide" data-label="Txn">{t.txnNo}</td>
                 <td>
                   <div className="font-serif text-md text-ink">{t.description}</div>
                   <div className="font-mono text-[10px] text-muted">
@@ -151,11 +153,11 @@ export default function RecordsTab({
                     )}
                   </div>
                 </td>
-                <td>
+                <td className="m-hide" data-label="Method">
                   <span className="px-2 py-0.5 bg-surface-2 rounded-md font-mono text-[10px] uppercase">{t.method}</span>
                 </td>
                 <td className="num font-mono tabular">{fmt(t.amount)}</td>
-                <td>
+                <td className="m-hide" data-label="分摊结果">
                   <div className="flex flex-wrap gap-1.5 py-1">
                     {t.details.map((d, i) => (
                       <span
@@ -172,7 +174,7 @@ export default function RecordsTab({
                     ))}
                   </div>
                 </td>
-                <td className="text-right whitespace-nowrap">
+                <td className="text-right whitespace-nowrap m-hide">
                   <button
                     type="button"
                     onClick={() => onEdit(t)}
@@ -192,7 +194,7 @@ export default function RecordsTab({
                     ×
                   </button>
                 </td>
-              </tr>
+              </LedgerRow>
             ))}
           </tbody>
         </table>

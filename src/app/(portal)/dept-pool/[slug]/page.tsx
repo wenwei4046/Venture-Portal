@@ -107,7 +107,7 @@ export default async function DeptPoolDetailPage({ params, searchParams }: Props
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
           <div className="lg:col-span-7">
             <div className="font-serif italic text-graphite text-sm mb-1">Pool balance</div>
-            <div className={`font-serif text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${balance < 0 ? 'text-danger' : 'text-num-ink'}`}>
+            <div className={`font-serif text-[30px] sm:text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${balance < 0 ? 'text-danger' : 'text-num-ink'}`}>
               {formatMoney(balance)}
             </div>
             <div className="font-mono text-xs text-muted mt-2">

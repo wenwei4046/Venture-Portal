@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
+import LedgerRow from '@/components/LedgerRow'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -128,34 +129,36 @@ export default async function DirectorReportPage({ params }: PageProps) {
               <thead>
                 <tr>
                   <th>Company</th>
-                  <th className="right">Basic</th>
-                  <th className="right">KPI</th>
-                  <th className="right">Allowance</th>
-                  <th className="right">ER Stat</th>
+                  <th className="right m-hide">Basic</th>
+                  <th className="right m-hide">KPI</th>
+                  <th className="right m-hide">Allowance</th>
+                  <th className="right m-hide">ER Stat</th>
                   <th className="right">Total CTC</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
                 {companies.map(c => (
-                  <tr key={c.short_code}>
+                  <LedgerRow key={c.short_code}>
                     <td>
                       <div className="font-serif text-md text-ink">{c.name}</div>
                       <div className="font-mono text-xs text-muted">{c.short_code}</div>
                     </td>
-                    <td className="num">{formatMoney(c.basic)}</td>
-                    <td className="num">{formatMoney(c.kpi)}</td>
-                    <td className="num">{formatMoney(c.allowance)}</td>
-                    <td className="num text-graphite">{formatMoney(c.er)}</td>
+                    <td className="num m-hide" data-label="Basic">{formatMoney(c.basic)}</td>
+                    <td className="num m-hide" data-label="KPI">{formatMoney(c.kpi)}</td>
+                    <td className="num m-hide" data-label="Allowance">{formatMoney(c.allowance)}</td>
+                    <td className="num text-graphite m-hide" data-label="ER Stat">{formatMoney(c.er)}</td>
                     <td className="num">{formatMoney(c.total)}</td>
-                  </tr>
+                  </LedgerRow>
                 ))}
                 <tr className="border-t-2 border-hairline bg-surface-2/40">
                   <td className="font-serif italic text-accent">Director Pool Total</td>
-                  <td className="num">{formatMoney(totals.basic)}</td>
-                  <td className="num">{formatMoney(totals.kpi)}</td>
-                  <td className="num">{formatMoney(totals.allowance)}</td>
-                  <td className="num text-graphite">{formatMoney(totals.er)}</td>
+                  <td className="num m-hide">{formatMoney(totals.basic)}</td>
+                  <td className="num m-hide">{formatMoney(totals.kpi)}</td>
+                  <td className="num m-hide">{formatMoney(totals.allowance)}</td>
+                  <td className="num text-graphite m-hide">{formatMoney(totals.er)}</td>
                   <td className="num text-accent">{formatMoney(totals.total)}</td>
+                  <td className="lt-toggle" />
                 </tr>
               </tbody>
             </table>
@@ -178,11 +181,12 @@ export default async function DirectorReportPage({ params }: PageProps) {
               <thead>
                 <tr>
                   <th>Director</th>
-                  <th className="right">Gross</th>
-                  <th className="right">Co-saving (5%)</th>
-                  <th className="right">Advance</th>
+                  <th className="right m-hide">Gross</th>
+                  <th className="right m-hide">Co-saving (5%)</th>
+                  <th className="right m-hide">Advance</th>
                   <th className="right">Payroll Net</th>
-                  <th className="right">Invoice Portion</th>
+                  <th className="right m-hide">Invoice Portion</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
@@ -190,26 +194,27 @@ export default async function DirectorReportPage({ params }: PageProps) {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   const director = (p as any).directors
                   return (
-                    <tr key={p.id}>
+                    <LedgerRow key={p.id}>
                       <td>
                         <div className="font-serif text-md text-ink">{director?.name ?? '—'}</div>
                         <div className="font-mono text-xs text-muted">{director?.code}</div>
                       </td>
-                      <td className="num">{formatMoney(Number(p.gross_amount ?? 0))}</td>
-                      <td className="num text-graphite">{formatMoney(Number(p.saving_amount ?? 0))}</td>
-                      <td className="num text-graphite">{formatMoney(Number(p.advance_amount ?? 0))}</td>
+                      <td className="num m-hide" data-label="Gross">{formatMoney(Number(p.gross_amount ?? 0))}</td>
+                      <td className="num text-graphite m-hide" data-label="Co-saving (5%)">{formatMoney(Number(p.saving_amount ?? 0))}</td>
+                      <td className="num text-graphite m-hide" data-label="Advance">{formatMoney(Number(p.advance_amount ?? 0))}</td>
                       <td className="num">{formatMoney(Number(p.payroll_net ?? 0))}</td>
-                      <td className="num text-graphite">{formatMoney(Number(p.invoice_total ?? 0))}</td>
-                    </tr>
+                      <td className="num text-graphite m-hide" data-label="Invoice Portion">{formatMoney(Number(p.invoice_total ?? 0))}</td>
+                    </LedgerRow>
                   )
                 })}
                 <tr className="border-t-2 border-hairline bg-surface-2/40">
                   <td className="font-serif italic text-accent">Total</td>
-                  <td className="num">{formatMoney(directorTotals.gross)}</td>
-                  <td className="num text-graphite">{formatMoney(directorTotals.saving)}</td>
-                  <td className="num text-graphite">{formatMoney(directorTotals.advance)}</td>
+                  <td className="num m-hide">{formatMoney(directorTotals.gross)}</td>
+                  <td className="num text-graphite m-hide">{formatMoney(directorTotals.saving)}</td>
+                  <td className="num text-graphite m-hide">{formatMoney(directorTotals.advance)}</td>
                   <td className="num">{formatMoney(directorTotals.payrollNet)}</td>
-                  <td className="num text-graphite">{formatMoney(directorTotals.invoiceTotal)}</td>
+                  <td className="num text-graphite m-hide">{formatMoney(directorTotals.invoiceTotal)}</td>
+                  <td className="lt-toggle" />
                 </tr>
               </tbody>
             </table>

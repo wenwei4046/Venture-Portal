@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter, Noto_Sans_SC, Chivo_Mono } from 'next/font/google'
 import NextTopLoader from 'nextjs-toploader'
 import './globals.css'
@@ -42,6 +42,24 @@ const notoSansSc = Noto_Sans_SC({
 export const metadata: Metadata = {
   title: 'HOUZS Venture Portal',
   description: 'Internal ledger for HOUZS Venture Sdn Bhd',
+  // Added to home screen, the portal should open chromeless so the bottom tab
+  // bar is the only bar on screen.
+  appleWebApp: { capable: true, title: 'Venture', statusBarStyle: 'default' },
+}
+
+// `viewportFit: 'cover'` is what makes env(safe-area-inset-bottom) resolve to
+// a real number on notched iPhones — without it the bottom tab bar sits under
+// the home indicator. `maximumScale` is deliberately left alone: pinch-zoom is
+// the only way to read a wide ledger matrix on a phone, and disabling it fails
+// WCAG 1.4.4.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: 'rgb(222 215 202)' },
+    { media: '(prefers-color-scheme: dark)', color: 'rgb(48 42 35)' },
+  ],
 }
 
 export default function RootLayout({

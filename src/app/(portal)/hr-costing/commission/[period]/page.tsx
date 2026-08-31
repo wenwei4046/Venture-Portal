@@ -5,6 +5,7 @@ import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import RunControls from './_components/RunControls'
+import LedgerRow from '@/components/LedgerRow'
 
 interface PageProps {
   params: Promise<{ period: string }>
@@ -303,7 +304,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                 <div className="font-serif italic text-accent text-base mb-1">
                   Commission this month
                 </div>
-                <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
+                <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
                   {formatMoney(runTotal)}
                 </div>
                 <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium uppercase">
@@ -348,20 +349,21 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                   <thead>
                     <tr>
                       <th>Salesperson</th>
-                      <th>Rank</th>
-                      <th className="right">Own revenue</th>
-                      <th className="right">Group</th>
-                      <th className="right">Product</th>
-                      <th className="right">KPI</th>
-                      <th className="right">Open Bill</th>
-                      <th className="right">Override</th>
-                      <th className="right">Incentive</th>
+                      <th className="m-hide">Rank</th>
+                      <th className="right m-hide">Own revenue</th>
+                      <th className="right m-hide">Group</th>
+                      <th className="right m-hide">Product</th>
+                      <th className="right m-hide">KPI</th>
+                      <th className="right m-hide">Open Bill</th>
+                      <th className="right m-hide">Override</th>
+                      <th className="right m-hide">Incentive</th>
                       <th className="right">Total</th>
+                      <th className="lt-toggle" aria-hidden />
                     </tr>
                   </thead>
                   <tbody>
                     {statements.map(s => (
-                      <tr key={s.id}>
+                      <LedgerRow key={s.id}>
                         <td>
                           <Link
                             href={`/hr-costing/commission/${period}/statement/${s.staff_id}`}
@@ -375,20 +377,20 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                             </div>
                           ) : null}
                         </td>
-                        <td>
+                        <td className="m-hide" data-label="Rank">
                           <span className="font-mono text-[11px] text-graphite">
                             {s.rank_key ?? '—'} · {(Number(s.product_rate) * 100).toFixed(0)}%
                           </span>
                         </td>
-                        <td className="num">{formatMoney(Number(s.product_revenue))}</td>
-                        <td className="num">{formatMoney(Number(s.group_revenue))}</td>
-                        <td className="num">{formatMoney(Number(s.product_commission))}</td>
-                        <td className="num">{formatMoney(Number(s.kpi_commission))}</td>
-                        <td className="num">{formatMoney(Number(s.open_bill_bonus))}</td>
-                        <td className="num">{formatMoney(Number(s.override_commission))}</td>
-                        <td className="num">{formatMoney(Number(s.margin_incentive))}</td>
+                        <td className="num m-hide" data-label="Own revenue">{formatMoney(Number(s.product_revenue))}</td>
+                        <td className="num m-hide" data-label="Group">{formatMoney(Number(s.group_revenue))}</td>
+                        <td className="num m-hide" data-label="Product">{formatMoney(Number(s.product_commission))}</td>
+                        <td className="num m-hide" data-label="KPI">{formatMoney(Number(s.kpi_commission))}</td>
+                        <td className="num m-hide" data-label="Open Bill">{formatMoney(Number(s.open_bill_bonus))}</td>
+                        <td className="num m-hide" data-label="Override">{formatMoney(Number(s.override_commission))}</td>
+                        <td className="num m-hide" data-label="Incentive">{formatMoney(Number(s.margin_incentive))}</td>
                         <td className="num font-semibold">{formatMoney(Number(s.total_commission))}</td>
-                      </tr>
+                      </LedgerRow>
                     ))}
                   </tbody>
                 </table>
@@ -423,27 +425,28 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                   <thead>
                     <tr>
                       <th>Order</th>
-                      <th>Salesperson</th>
-                      <th>Brand</th>
-                      <th className="right">Margin</th>
-                      <th>Band</th>
+                      <th className="m-hide">Salesperson</th>
+                      <th className="m-hide">Brand</th>
+                      <th className="right m-hide">Margin</th>
+                      <th className="m-hide">Band</th>
                       <th className="right">Withheld</th>
+                      <th className="lt-toggle" aria-hidden />
                     </tr>
                   </thead>
                   <tbody>
                     {(run.penalised_orders ?? []).slice(0, 60).map(p => (
-                      <tr key={p.orderNo}>
+                      <LedgerRow key={p.orderNo}>
                         <td className="font-mono text-xs">{p.orderNo}</td>
-                        <td>{nameOf.get(p.staffId) ?? p.staffId}</td>
-                        <td className="font-mono text-[11px] text-graphite">{p.brandCode ?? '—'}</td>
-                        <td className="num">{pct(p.marginPct)}</td>
-                        <td>
+                        <td className="m-hide" data-label="Salesperson">{nameOf.get(p.staffId) ?? p.staffId}</td>
+                        <td className="font-mono text-[11px] text-graphite m-hide" data-label="Brand">{p.brandCode ?? '—'}</td>
+                        <td className="num m-hide" data-label="Margin">{pct(p.marginPct)}</td>
+                        <td className="m-hide" data-label="Band">
                           <em className="font-serif text-graphite text-sm">
                             {p.bandLabel} × {p.multiplier}
                           </em>
                         </td>
                         <td className="num neg">{formatMoney(p.withheld)}</td>
-                      </tr>
+                      </LedgerRow>
                     ))}
                   </tbody>
                 </table>
@@ -470,33 +473,34 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                   <thead>
                     <tr>
                       <th>Order</th>
-                      <th>Salesperson</th>
-                      <th className="right">Order total</th>
-                      <th className="right">Paid</th>
+                      <th className="m-hide">Salesperson</th>
+                      <th className="right m-hide">Order total</th>
+                      <th className="right m-hide">Paid</th>
                       <th className="right">Needed</th>
-                      {run ? <th className="right">Commission held</th> : null}
+                      {run ? <th className="right m-hide">Commission held</th> : null}
+                      <th className="lt-toggle" aria-hidden />
                     </tr>
                   </thead>
                   <tbody>
                     {run
                       ? (run.deferred_orders ?? []).slice(0, 60).map(d => (
-                          <tr key={d.orderNo}>
+                          <LedgerRow key={d.orderNo}>
                             <td className="font-mono text-xs">{d.orderNo}</td>
-                            <td>{nameOf.get(d.staffId) ?? d.staffId}</td>
-                            <td className="num">{formatMoney(d.orderTotal)}</td>
-                            <td className="num">{formatMoney(d.paidAmount)}</td>
+                            <td className="m-hide" data-label="Salesperson">{nameOf.get(d.staffId) ?? d.staffId}</td>
+                            <td className="num m-hide" data-label="Order total">{formatMoney(d.orderTotal)}</td>
+                            <td className="num m-hide" data-label="Paid">{formatMoney(d.paidAmount)}</td>
                             <td className="num">{formatMoney(d.requiredAmount)}</td>
-                            <td className="num">{formatMoney(d.productRevenue)}</td>
-                          </tr>
+                            <td className="num m-hide" data-label="Commission held">{formatMoney(d.productRevenue)}</td>
+                          </LedgerRow>
                         ))
                       : belowDeposit.slice(0, 40).map(o => (
-                          <tr key={o.id}>
+                          <LedgerRow key={o.id}>
                             <td className="font-mono text-xs">{o.order_no}</td>
-                            <td>{o.hr_staff_costs?.employee_name ?? o.agent_name}</td>
-                            <td className="num">{formatMoney(Number(o.order_total))}</td>
-                            <td className="num">{formatMoney(Number(o.paid_amount ?? 0))}</td>
+                            <td className="m-hide" data-label="Salesperson">{o.hr_staff_costs?.employee_name ?? o.agent_name}</td>
+                            <td className="num m-hide" data-label="Order total">{formatMoney(Number(o.order_total))}</td>
+                            <td className="num m-hide" data-label="Paid">{formatMoney(Number(o.paid_amount ?? 0))}</td>
                             <td className="num">{formatMoney(Number(o.order_total) * threshold)}</td>
-                          </tr>
+                          </LedgerRow>
                         ))}
                   </tbody>
                 </table>

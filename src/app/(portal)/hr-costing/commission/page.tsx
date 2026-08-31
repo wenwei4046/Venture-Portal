@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
+import LedgerRow from '@/components/LedgerRow'
 import CommissionTabs from './_components/CommissionTabs'
 
 function label(period: string): string {
@@ -93,18 +94,19 @@ export default async function CommissionLandingPage() {
               <thead>
                 <tr>
                   <th>Month</th>
-                  <th className="right">Orders</th>
-                  <th className="right">Unmatched agents</th>
-                  <th>Run</th>
+                  <th className="right m-hide">Orders</th>
+                  <th className="right m-hide">Unmatched agents</th>
+                  <th className="m-hide">Run</th>
                   <th className="right">Commission</th>
-                  <th>Source file</th>
+                  <th className="m-hide">Source file</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
                 {rows.map(b => {
                   const run = runByPeriod.get(b.period_month)
                   return (
-                    <tr key={b.id}>
+                    <LedgerRow key={b.id}>
                       <td>
                         <Link
                           href={`/hr-costing/commission/${b.period_month}`}
@@ -113,22 +115,22 @@ export default async function CommissionLandingPage() {
                           {label(b.period_month)}
                         </Link>
                       </td>
-                      <td className="num">{b.order_count}</td>
-                      <td className="num">
+                      <td className="num m-hide" data-label="Orders">{b.order_count}</td>
+                      <td className="num m-hide" data-label="Unmatched agents">
                         {b.unmatched_agent_count > 0 ? (
                           <span className="neg">{b.unmatched_agent_count}</span>
                         ) : (
                           0
                         )}
                       </td>
-                      <td className="font-serif italic text-sm text-graphite">
+                      <td className="font-serif italic text-sm text-graphite m-hide" data-label="Run">
                         {run ? run.status : 'not computed'}
                       </td>
                       <td className="num">
                         {run ? formatMoney(Number(run.total_commission)) : '—'}
                       </td>
-                      <td className="font-mono text-xs text-muted">{b.file_name}</td>
-                    </tr>
+                      <td className="font-mono text-xs text-muted m-hide" data-label="Source file">{b.file_name}</td>
+                    </LedgerRow>
                   )
                 })}
               </tbody>

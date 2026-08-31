@@ -6,7 +6,7 @@ import {
 } from './loan-disbursement'
 
 const rows: RawAccountRow[] = [
-  { code: '3030', name: 'Accounts Receivable â€” Subs', account_type: 'asset', is_active: true, parent_code: null },
+  { code: '3030', name: 'Accounts Receivable — Subs', account_type: 'asset', is_active: true, parent_code: null },
   { code: '2000', name: 'Equipment / Computer', account_type: 'fixed_asset', is_active: true, parent_code: null },
   { code: '4000', name: 'Fund Sources Payable', account_type: 'liability', is_active: true, parent_code: null },
   { code: '1010', name: 'HV Operating Fund', account_type: 'equity', is_active: true, parent_code: null },

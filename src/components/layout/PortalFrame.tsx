@@ -5,13 +5,20 @@ import { usePathname } from 'next/navigation'
 import type { User } from '@/types'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
+import BottomTabBar from './BottomTabBar'
+import MoreSheet from './MoreSheet'
 import BackToTop from '@/components/BackToTop'
 
-// Portal shell — hosts the mobile nav state that both Sidebar and TopBar
-// need to coordinate on. On mobile (<md), Sidebar hides off-canvas and
-// TopBar shows a hamburger button. On desktop (md+), Sidebar is always
-// visible and the hamburger stays hidden — same layout as before the
-// mobile work.
+// Portal shell.
+//
+// Desktop (md+): the hover-expanding Sidebar rail on the left, TopBar above
+// the scrolling content — unchanged.
+//
+// Mobile (<md): the rail is not rendered. Navigation is a fixed BottomTabBar
+// (four role-specific destinations + More) with the rest of the portal in a
+// MoreSheet. Replaced the hamburger + off-canvas drawer on 2026-08-31 at the
+// user's request — thumb-reachable, and it stops stealing the greeting's width
+// in the header.
 export default function PortalFrame({
   user,
   children,
@@ -19,7 +26,7 @@ export default function PortalFrame({
   user: User
   children: React.ReactNode
 }) {
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
   // Wide data reports (month-matrix P&L / Cash Flow) opt out of the 1280px
   // reading-width cap so the many month columns can use the full content area.
   const pathname = usePathname()
@@ -28,34 +35,31 @@ export default function PortalFrame({
   return (
     <div className="flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible">
       <div className="print:hidden contents">
-        <Sidebar
-          role={user.role}
-          mobileOpen={mobileNavOpen}
-          onClose={() => setMobileNavOpen(false)}
-        />
+        <Sidebar role={user.role} />
       </div>
-
-      {/* Backdrop — mobile only, click-to-dismiss. backdrop-blur-sm focuses
-          attention on the drawer and softens the cream content behind so the
-          drawer edge reads clearly against the blurred paper. */}
-      {mobileNavOpen ? (
-        <div
-          onClick={() => setMobileNavOpen(false)}
-          className="fixed inset-0 bg-scrim/45 backdrop-blur-sm z-40 md:hidden print:hidden"
-          aria-label="Close navigation"
-        />
-      ) : null}
 
       <div className="flex flex-col flex-1 overflow-hidden print:overflow-visible">
         <div className="print:hidden contents">
-          <TopBar user={user} onMenuClick={() => setMobileNavOpen(true)} />
+          <TopBar user={user} />
         </div>
         <main className="flex-1 overflow-y-auto print:overflow-visible">
-          <div className={`${wide ? 'max-w-none' : 'max-w-[1280px]'} mx-auto px-4 md:px-8 py-6 md:py-10 page-enter print:max-w-none print:p-0`}>
+          {/* pb on mobile clears the 54px tab bar + the home-indicator inset,
+              so the last row of a ledger is never parked under the chrome. */}
+          <div
+            className={`${wide ? 'max-w-none' : 'max-w-[1280px]'} mx-auto px-4 md:px-8 py-6 md:py-10 pb-[calc(54px+24px+env(safe-area-inset-bottom))] md:pb-10 page-enter print:max-w-none print:p-0 print:pb-0`}
+          >
             {children}
           </div>
         </main>
       </div>
+
+      <BottomTabBar
+        role={user.role}
+        moreOpen={moreOpen}
+        onMoreClick={() => setMoreOpen((o) => !o)}
+      />
+      <MoreSheet user={user} open={moreOpen} onClose={() => setMoreOpen(false)} />
+
       <BackToTop />
     </div>
   )

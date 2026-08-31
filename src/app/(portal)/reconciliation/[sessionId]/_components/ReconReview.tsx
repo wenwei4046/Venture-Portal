@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import { formatMoneyBare } from '@/lib/utils'
 import { contraBookLines, dissolveGroup, manualMatch, setLineIgnored, unmatchLine } from '../../actions'
+import LedgerRow from '@/components/LedgerRow'
 
 export interface ReviewStatementLine {
   id: string
@@ -248,8 +249,8 @@ export default function ReconReview({
                 className="bg-paper border border-hairline rounded px-2 py-1 text-xs text-ink w-48 focus:outline-none focus:border-accent-border"
               />
             </div>
-            <div className="max-h-[440px] overflow-y-auto">
-              <table className="w-full text-sm">
+            <div className="max-h-[440px] overflow-y-auto table-scroll">
+              <table className="w-full text-sm min-w-[420px]">
                 <thead className="sticky top-0 bg-surface-2">
                   <tr className="text-[11px] uppercase tracking-wide text-muted font-sans border-b border-hairline">
                     <th className="text-left py-1.5 px-3 font-medium w-20">Date</th>
@@ -334,8 +335,8 @@ export default function ReconReview({
                 />
               </span>
             </div>
-            <div className="max-h-[440px] overflow-y-auto">
-              <table className="w-full text-sm">
+            <div className="max-h-[440px] overflow-y-auto table-scroll">
+              <table className="w-full text-sm min-w-[420px]">
                 <thead className="sticky top-0 bg-surface-2">
                   <tr className="text-[11px] uppercase tracking-wide text-muted font-sans border-b border-hairline">
                     <th className="text-left py-1.5 px-3 font-medium w-20">Date</th>
@@ -402,9 +403,10 @@ export default function ReconReview({
                 <tr>
                   <th>Statement</th>
                   <th className="num">Amount</th>
-                  <th>Book entries</th>
-                  <th>How</th>
-                  <th className="right"></th>
+                  <th className="m-hide">Book entries</th>
+                  <th className="m-hide">How</th>
+                  <th className="right m-hide"></th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
@@ -417,7 +419,7 @@ export default function ReconReview({
                     Math.round(sLines.reduce((s, l) => s + l.amount, 0) * 100) / 100
                   const kind = sLines[0]?.matchKind ?? 'manual'
                   return (
-                    <tr key={g.id}>
+                    <LedgerRow key={g.id}>
                       <td>
                         <div className="space-y-0.5">
                           {sLines.map(l => (
@@ -438,7 +440,7 @@ export default function ReconReview({
                         </div>
                       </td>
                       <td className="num">{money(gSum)}</td>
-                      <td>
+                      <td className="m-hide" data-label="Book entries">
                         {books.length === 0 ? (
                           '—'
                         ) : (
@@ -457,7 +459,7 @@ export default function ReconReview({
                           </div>
                         )}
                       </td>
-                      <td>
+                      <td className="m-hide" data-label="How">
                         <em className={`font-serif text-xs ${kind === 'auto' ? 'text-info' : 'text-graphite'}`}>
                           {kind}
                           {sLines.length > 1 || books.length > 1
@@ -465,7 +467,7 @@ export default function ReconReview({
                             : ''}
                         </em>
                       </td>
-                      <td className="text-right">
+                      <td className="text-right m-hide">
                         <button
                           type="button"
                           disabled={isPending}
@@ -475,7 +477,7 @@ export default function ReconReview({
                           Unmatch
                         </button>
                       </td>
-                    </tr>
+                    </LedgerRow>
                   )
                 })}
               </tbody>

@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
+import LedgerRow from '@/components/LedgerRow'
 
 interface PageProps {
   params: Promise<{ period: string; staffId: string }>
@@ -204,7 +205,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
         <div className="lg:col-span-7 hero-walnut px-6 py-6 md:px-8 md:py-7">
           <div className="font-serif italic text-accent text-base mb-1">Commission earned</div>
-          <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
+          <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
             {formatMoney(total)}
           </div>
           <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium uppercase">
@@ -337,15 +338,16 @@ export default async function CommissionStatementPage({ params }: PageProps) {
               <thead>
                 <tr>
                   <th>What it is</th>
-                  <th className="right">Basis</th>
-                  <th className="right">Rate</th>
-                  <th className="right">Qty</th>
+                  <th className="right m-hide">Basis</th>
+                  <th className="right m-hide">Rate</th>
+                  <th className="right m-hide">Qty</th>
                   <th className="right">Amount</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
                 {group.rows.map(l => (
-                  <tr key={l.id}>
+                  <LedgerRow key={l.id}>
                     <td>
                       <div className="font-serif text-[14px] text-ink">
                         {l.source_staff_id
@@ -356,11 +358,11 @@ export default async function CommissionStatementPage({ params }: PageProps) {
                         <div className="font-mono text-[10.5px] text-graphite mt-0.5">{l.note}</div>
                       ) : null}
                     </td>
-                    <td className="num">{formatMoney(Number(l.basis_amount))}</td>
-                    <td className="num">{l.rate === null ? '—' : pct(l.rate, 2)}</td>
-                    <td className="num">{l.qty === null ? '—' : Number(l.qty).toLocaleString()}</td>
+                    <td className="num m-hide" data-label="Basis">{formatMoney(Number(l.basis_amount))}</td>
+                    <td className="num m-hide" data-label="Rate">{l.rate === null ? '—' : pct(l.rate, 2)}</td>
+                    <td className="num m-hide" data-label="Qty">{l.qty === null ? '—' : Number(l.qty).toLocaleString()}</td>
                     <td className="num">{formatMoney(Number(l.amount))}</td>
-                  </tr>
+                  </LedgerRow>
                 ))}
               </tbody>
             </table>

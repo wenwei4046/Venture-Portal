@@ -9,6 +9,7 @@ import {
   setPayrollPvDate,
   type StatutoryScheme,
 } from '../actions'
+import LedgerRow from '@/components/LedgerRow'
 
 interface StatutoryPv {
   id: string
@@ -129,11 +130,12 @@ export default function StatutoryTable({ period, rows }: Props) {
           <thead>
             <tr>
               <th>Institution</th>
-              <th className="right">Staff</th>
-              <th className="right">Directors</th>
+              <th className="right m-hide">Staff</th>
+              <th className="right m-hide">Directors</th>
               <th className="right">Total</th>
-              <th>Payment date</th>
-              <th></th>
+              <th className="m-hide">Payment date</th>
+              <th className="m-hide"></th>
+              <th className="lt-toggle" aria-hidden />
             </tr>
           </thead>
           <tbody>
@@ -150,7 +152,7 @@ export default function StatutoryTable({ period, rows }: Props) {
               // director actuals arrived) and there is a share to pay.
               const offerTopup = r.pv != null && !r.directorsCovered && r.directors > 0
               return (
-                <tr key={r.scheme}>
+                <LedgerRow key={r.scheme}>
                   <td>
                     <div className="font-serif text-md text-ink">{r.payee}</div>
                     {r.pv ? (
@@ -177,10 +179,10 @@ export default function StatutoryTable({ period, rows }: Props) {
                       </div>
                     ) : null}
                   </td>
-                  <td className="num text-graphite">{fmt(r.staff)}</td>
-                  <td className="num text-graphite">{fmt(r.directors)}</td>
+                  <td className="num text-graphite m-hide" data-label="Staff">{fmt(r.staff)}</td>
+                  <td className="num text-graphite m-hide" data-label="Directors">{fmt(r.directors)}</td>
                   <td className="num">{fmt(total)}</td>
-                  <td>
+                  <td className="m-hide" data-label="Payment date">
                     {pvPaid ? (
                       <span className="font-mono text-xs text-graphite">
                         {r.pv?.payment_date ?? '—'}
@@ -216,7 +218,7 @@ export default function StatutoryTable({ period, rows }: Props) {
                       </div>
                     ) : null}
                   </td>
-                  <td className="text-right">
+                  <td className="text-right m-hide">
                     {r.pv == null ? (
                       total > 0 ? (
                         <button
@@ -274,7 +276,7 @@ export default function StatutoryTable({ period, rows }: Props) {
                       </div>
                     ) : null}
                   </td>
-                </tr>
+                </LedgerRow>
               )
             })}
           </tbody>
