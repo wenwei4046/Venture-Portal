@@ -20,6 +20,7 @@ import CreateInvoiceButton from './CreateInvoiceButton'
 import CreateMultiLineInvoiceButton from './CreateMultiLineInvoiceButton'
 import GenerateConsolidatedInvoicesButton from './GenerateConsolidatedInvoicesButton'
 import GenerateOwnShareInvoiceButton from './GenerateOwnShareInvoiceButton'
+import LedgerRow from '@/components/LedgerRow'
 
 interface Props {
   searchParams: Promise<{ period?: string }>
@@ -502,7 +503,7 @@ export default async function BillingView({ searchParams }: Props) {
           <div className="font-serif italic text-accent text-base mb-1">
             {dayjs(period).format('MMMM YYYY')}
           </div>
-          <div className="font-serif text-[44px] md:text-hero text-ink leading-none">
+          <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-ink leading-none">
             {invoiceList.length > 0
               ? formatMoney(invoiceTotal)
               : payrollSubmitted || directorSubmitted
@@ -641,42 +642,44 @@ export default async function BillingView({ searchParams }: Props) {
               <thead>
                 <tr>
                   <th>Subsidiary</th>
-                  <th className="right">Basic</th>
-                  <th className="right">KPI</th>
-                  <th className="right">Allowance</th>
-                  <th className="right">EPF ER</th>
-                  <th className="right">SOCSO ER</th>
-                  <th className="right">EIS ER</th>
+                  <th className="right m-hide">Basic</th>
+                  <th className="right m-hide">KPI</th>
+                  <th className="right m-hide">Allowance</th>
+                  <th className="right m-hide">EPF ER</th>
+                  <th className="right m-hide">SOCSO ER</th>
+                  <th className="right m-hide">EIS ER</th>
                   <th className="right">Total</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
                 {directorByCompany.map(r => (
-                  <tr key={r.company_id}>
+                  <LedgerRow key={r.company_id}>
                     <td>
                       <div className="font-serif text-[15px] text-ink">{r.company_short_code}</div>
                       <div className="font-mono text-[11px] text-graphite mt-0.5">{r.company_name}</div>
                     </td>
-                    <td className="num">{r.basic == null ? '—' : formatMoney(r.basic)}</td>
-                    <td className="num">{r.kpi == null ? '—' : formatMoney(r.kpi)}</td>
-                    <td className="num">{r.allowance == null ? '—' : formatMoney(r.allowance)}</td>
-                    <td className="num">{r.epf_er == null ? '—' : formatMoney(r.epf_er)}</td>
-                    <td className="num">{r.socso_er == null ? '—' : formatMoney(r.socso_er)}</td>
-                    <td className="num">{r.eis_er == null ? '—' : formatMoney(r.eis_er)}</td>
+                    <td className="num m-hide" data-label="Basic">{r.basic == null ? '—' : formatMoney(r.basic)}</td>
+                    <td className="num m-hide" data-label="KPI">{r.kpi == null ? '—' : formatMoney(r.kpi)}</td>
+                    <td className="num m-hide" data-label="Allowance">{r.allowance == null ? '—' : formatMoney(r.allowance)}</td>
+                    <td className="num m-hide" data-label="EPF ER">{r.epf_er == null ? '—' : formatMoney(r.epf_er)}</td>
+                    <td className="num m-hide" data-label="SOCSO ER">{r.socso_er == null ? '—' : formatMoney(r.socso_er)}</td>
+                    <td className="num m-hide" data-label="EIS ER">{r.eis_er == null ? '—' : formatMoney(r.eis_er)}</td>
                     <td className="num font-semibold">{formatMoney(r.total_ctc)}</td>
-                  </tr>
+                  </LedgerRow>
                 ))}
                 <tr>
                   <td className="font-serif italic text-accent">Total</td>
-                  <td className="num font-semibold">{directorSumOrDash(r => r.basic)}</td>
-                  <td className="num font-semibold">{directorSumOrDash(r => r.kpi)}</td>
-                  <td className="num font-semibold">{directorSumOrDash(r => r.allowance)}</td>
-                  <td className="num font-semibold">{directorSumOrDash(r => r.epf_er)}</td>
-                  <td className="num font-semibold">{directorSumOrDash(r => r.socso_er)}</td>
-                  <td className="num font-semibold">{directorSumOrDash(r => r.eis_er)}</td>
+                  <td className="num font-semibold m-hide">{directorSumOrDash(r => r.basic)}</td>
+                  <td className="num font-semibold m-hide">{directorSumOrDash(r => r.kpi)}</td>
+                  <td className="num font-semibold m-hide">{directorSumOrDash(r => r.allowance)}</td>
+                  <td className="num font-semibold m-hide">{directorSumOrDash(r => r.epf_er)}</td>
+                  <td className="num font-semibold m-hide">{directorSumOrDash(r => r.socso_er)}</td>
+                  <td className="num font-semibold m-hide">{directorSumOrDash(r => r.eis_er)}</td>
                   <td className="num font-semibold">
                     {formatMoney(directorByCompany.reduce((s, r) => s + r.total_ctc, 0))}
                   </td>
+                  <td className="lt-toggle" />
                 </tr>
               </tbody>
             </table>
@@ -713,17 +716,18 @@ export default async function BillingView({ searchParams }: Props) {
                     <thead>
                       <tr>
                         <th>{deptName}</th>
-                        <th className="right">Salary</th>
-                        <th className="right">Allowance</th>
-                        <th className="right">EPF</th>
-                        <th className="right">SOCSO</th>
-                        <th className="right">EIS</th>
+                        <th className="right m-hide">Salary</th>
+                        <th className="right m-hide">Allowance</th>
+                        <th className="right m-hide">EPF</th>
+                        <th className="right m-hide">SOCSO</th>
+                        <th className="right m-hide">EIS</th>
                         <th className="right">Total</th>
+                        <th className="lt-toggle" aria-hidden />
                       </tr>
                     </thead>
                     <tbody>
                       {companyRows.map((r) => (
-                        <tr key={r.company_id}>
+                        <LedgerRow key={r.company_id}>
                           <td>
                             <div className="font-serif text-[15px] text-ink">
                               {r.company_short_code}
@@ -732,25 +736,26 @@ export default async function BillingView({ searchParams }: Props) {
                               {r.company_name}
                             </div>
                           </td>
-                          <td className="num">{formatMoney(r.salary)}</td>
-                          <td className="num">{formatMoney(r.allowance)}</td>
-                          <td className="num">{formatMoney(r.epf)}</td>
-                          <td className="num">{formatMoney(r.socso)}</td>
-                          <td className="num">{formatMoney(r.eis)}</td>
+                          <td className="num m-hide" data-label="Salary">{formatMoney(r.salary)}</td>
+                          <td className="num m-hide" data-label="Allowance">{formatMoney(r.allowance)}</td>
+                          <td className="num m-hide" data-label="EPF">{formatMoney(r.epf)}</td>
+                          <td className="num m-hide" data-label="SOCSO">{formatMoney(r.socso)}</td>
+                          <td className="num m-hide" data-label="EIS">{formatMoney(r.eis)}</td>
                           <td className="num font-semibold">{formatMoney(r.amount)}</td>
-                        </tr>
+                        </LedgerRow>
                       ))}
                       <tr>
                         <td className="font-serif italic text-accent">Billable total</td>
-                        <td className="num">{formatMoney(sum((r) => r.salary))}</td>
-                        <td className="num">{formatMoney(sum((r) => r.allowance))}</td>
-                        <td className="num">{formatMoney(sum((r) => r.epf))}</td>
-                        <td className="num">{formatMoney(sum((r) => r.socso))}</td>
-                        <td className="num">{formatMoney(sum((r) => r.eis))}</td>
+                        <td className="num m-hide">{formatMoney(sum((r) => r.salary))}</td>
+                        <td className="num m-hide">{formatMoney(sum((r) => r.allowance))}</td>
+                        <td className="num m-hide">{formatMoney(sum((r) => r.epf))}</td>
+                        <td className="num m-hide">{formatMoney(sum((r) => r.socso))}</td>
+                        <td className="num m-hide">{formatMoney(sum((r) => r.eis))}</td>
                         <td className="num font-semibold">{formatMoney(sum((r) => r.amount))}</td>
+                        <td className="lt-toggle" />
                       </tr>
                       {hvRow && (
-                        <tr>
+                        <LedgerRow>
                           <td>
                             <div className="font-serif italic text-graphite">
                               HV — HOUZS Venture
@@ -759,13 +764,13 @@ export default async function BillingView({ searchParams }: Props) {
                               own share · not billed
                             </div>
                           </td>
-                          <td className="num text-graphite">{formatMoney(hvRow.salary)}</td>
-                          <td className="num text-graphite">{formatMoney(hvRow.allowance)}</td>
-                          <td className="num text-graphite">{formatMoney(hvRow.epf)}</td>
-                          <td className="num text-graphite">{formatMoney(hvRow.socso)}</td>
-                          <td className="num text-graphite">{formatMoney(hvRow.eis)}</td>
+                          <td className="num text-graphite m-hide" data-label="Salary">{formatMoney(hvRow.salary)}</td>
+                          <td className="num text-graphite m-hide" data-label="Allowance">{formatMoney(hvRow.allowance)}</td>
+                          <td className="num text-graphite m-hide" data-label="EPF">{formatMoney(hvRow.epf)}</td>
+                          <td className="num text-graphite m-hide" data-label="SOCSO">{formatMoney(hvRow.socso)}</td>
+                          <td className="num text-graphite m-hide" data-label="EIS">{formatMoney(hvRow.eis)}</td>
                           <td className="num text-graphite">{formatMoney(hvRow.amount)}</td>
-                        </tr>
+                        </LedgerRow>
                       )}
                     </tbody>
                   </table>

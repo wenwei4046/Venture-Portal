@@ -11,7 +11,7 @@
 
 ## Implementation rules — read this first
 
-These five rules are non-negotiable for any new or amended page. The CSS / Tailwind tokens that back them live in `src/app/globals.css` and `tailwind.config.ts` — already wired up.
+These six rules are non-negotiable for any new or amended page. The CSS / Tailwind tokens that back them live in `src/app/globals.css` and `tailwind.config.ts` — already wired up.
 
 1. **Page header.** Every top-level route page starts with this block (no exceptions, even small pages):
    ```tsx
@@ -36,6 +36,15 @@ These five rules are non-negotiable for any new or amended page. The CSS / Tailw
 
 5. **Colors come from CSS variables, never hex.** Use Tailwind classes (`text-ink`, `text-num-ink`, `bg-paper`, `border-hairline`, `text-accent`, `text-danger`) or `rgb(var(--xxx))` inside SVG. Hardcoded `#xxxxxx` is forbidden outside `globals.css` itself.
 
+6. **A table with five or more columns must fold for mobile.** Below `md` a
+   phone has ~343px of content width — enough for two columns and a chevron.
+   Mark the demoted columns `m-hide` + `data-label`, wrap the row in
+   `<LedgerRow>`, and end the `<thead>` with `<th className="lt-toggle" aria-hidden />`.
+   `SortableTable` does it from its column config instead. Full rules, including
+   the three cases that legitimately keep every column, are in
+   **Responsive** below. A hero figure uses `text-[30px] sm:text-[44px] md:text-hero`,
+   never a bare `text-[44px]`.
+
 ### Canonical reference pages
 
 When you're not sure how a pattern looks in code, copy from one of these — they're the v3.0 reference implementation:
@@ -50,6 +59,9 @@ When you're not sure how a pattern looks in code, copy from one of these — the
 | Pure read-only ledger | `src/app/(portal)/audit-log/page.tsx` |
 | Sidebar (roman numerals + dot markers) | `src/components/layout/Sidebar.tsx` |
 | TopBar (greet + role badge) | `src/components/layout/TopBar.tsx` |
+| Mobile nav (bottom tabs + sheet) | `src/components/layout/BottomTabBar.tsx`, `MoreSheet.tsx` |
+| Folding a hand-rolled table for mobile | `src/app/(portal)/venture-pool/page.tsx` |
+| Folding a config-driven table | `src/components/SortableTable.tsx` |
 
 ### Pages still on the legacy v2.0 chrome (clean up when you touch them)
 
@@ -695,17 +707,102 @@ Every data surface must handle 5 states:
 
 ---
 
-## Responsive Breakpoints (Phase 1)
+## Responsive (mobile shipped 2026-08-31)
 
-Desktop-first. VP is an office tool.
+Desktop remains the primary target — VP is an office tool — but the whole
+portal is usable on a phone. `md` (768px) is the one line that matters: above
+it nothing has changed from the desktop design; below it the shell and the
+tables reshape.
 
 | Breakpoint | Width | Scope |
 |---|---|---|
-| Mobile (<768) | not optimized | Works but not polished. Only Dashboard + Approvals usable. |
-| Tablet (768-1024) | partial | Collapsible sidebar, stacked sections |
+| Mobile (<768) | supported | Bottom tab bar, folded tables, 16px form controls |
+| Tablet (768–1024) | desktop shell | Sidebar rail returns; tables show every column |
 | Desktop (≥1024) | primary | Full layout |
 
-Phase 1.5 will add proper mobile polish.
+### Navigation
+
+Below `md` the sidebar rail is not rendered at all. Navigation is
+`BottomTabBar` — four destinations promoted per role plus **更多**, which opens
+`MoreSheet` with the full nav grouped exactly as the sidebar groups it.
+
+The four are defined in `components/layout/nav-config.ts` (`TABS_BY_ROLE`),
+which is also where `navEntries` now lives so the sidebar, the tab bar and the
+sheet cannot drift apart. Principal gets 总览 · 审批 · 付款 · 收款; Finance
+swaps 审批 for 发票; HR gets 薪资 · 员工 · 董事; a dept manager gets
+账单 · OPEX · 报表. The Approvals tab carries a pending-count badge.
+
+The bar is 54px plus `env(safe-area-inset-bottom)`; the root layout sets
+`viewportFit: 'cover'` so that inset resolves on notched phones, and
+`PortalFrame` pads the main scroll area by the same amount.
+
+### Tables — the fold
+
+A nine-column voucher list is ~1030px wide; on a 390px phone that is three
+sideways screens to read one row. Below `md` a table keeps only the columns
+that identify a row and folds the rest into a per-row panel behind a chevron.
+
+**`SortableTable`** derives the split from its column config — `mobile: 'keep'`
+pins a column, `mobile: 'drop'` removes it from mobile entirely, and with
+neither declared it keeps the first column plus the first right-aligned
+(amount) column.
+
+**Hand-rolled tables** use `<LedgerRow>` (`components/LedgerRow.tsx`) plus two
+annotations, so the existing desktop markup is untouched:
+
+```tsx
+<table className="ledger-table">
+  <thead>
+    <tr>
+      <th>Voucher</th>
+      <th className="m-hide">Date</th>
+      <th className="num">Amount</th>
+      <th className="lt-toggle" aria-hidden />   {/* required */}
+    </tr>
+  </thead>
+  <tbody>
+    <LedgerRow>
+      <td>{v.voucher_no}</td>
+      <td className="m-hide" data-label="Date">{date}</td>
+      <td className="num">{formatMoney(v.amount)}</td>
+    </LedgerRow>
+  </tbody>
+</table>
+```
+
+- `.m-hide` — this column leaves the mobile grid and appears in the panel,
+  titled by its `data-label`. It also works on a whole `<tr>`.
+- `<th className="lt-toggle" aria-hidden />` is **not optional**: without it the
+  header band stops short of the chevron column and leaves a notch. CSS cannot
+  close that gap — a missing cell's area is painted with the *table's*
+  background, not the row's or the row group's.
+- A summary/total row that is a plain `<tr>` needs `<td className="lt-toggle" />`
+  as its last cell so its figures stay under the column above.
+
+**Three kinds of table deliberately keep every column instead:**
+
+1. Tables that already expand on tap — the GL statements (`GlReportView`), the
+   Chart-of-Account tree, the company statement. A second chevron would fight
+   the first; they drop optional comparison columns instead.
+2. The reconciliation matching panes, where the row tap selects for pairing.
+3. `MonthlyMatrix` — a 12-month grid cannot shed months. It pins the account
+   column and scrolls, wrapped in `.table-scroll` for the edge-fade cue.
+
+`.table-scroll` is the escape hatch for any table that genuinely cannot fold.
+
+### Type and controls
+
+The top of the type scale steps down under 768px (`.text-3xl` → 30px,
+`.num-hero` → 36px) because a seven-figure sum at 40px wraps onto two lines
+with "RM" stranded alone. The canonical hero pattern is
+`text-[30px] sm:text-[44px] md:text-hero`.
+
+Every form control is forced to **16px** below 768px. This is not a style
+choice: iOS Safari zooms the viewport on focus for anything smaller and does
+not zoom back, so every tap on every field left the user pinching out. It ships
+with `!important` for that reason — see the comment block in `globals.css`.
+Controls also get `min-height: 44px`, which is the touch target the
+Accessibility section below asks for.
 
 ---
 

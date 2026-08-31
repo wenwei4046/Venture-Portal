@@ -1,6 +1,7 @@
 import dayjs from 'dayjs'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import LedgerRow from '@/components/LedgerRow'
 
 interface Props {
   searchParams: Promise<{ resource?: string; page?: string }>
@@ -86,28 +87,29 @@ export default async function AuditLogPage({ searchParams }: Props) {
             <thead>
               <tr>
                 <th>When</th>
-                <th>User</th>
-                <th>Role</th>
-                <th>Resource</th>
+                <th className="m-hide">User</th>
+                <th className="m-hide">Role</th>
+                <th className="m-hide">Resource</th>
                 <th>Action</th>
-                <th>Details</th>
+                <th className="m-hide">Details</th>
+                <th className="lt-toggle" aria-hidden />
               </tr>
             </thead>
             <tbody>
               {logs.map((log) => (
-                <tr key={log.id}>
+                <LedgerRow key={log.id}>
                   <td className="font-mono text-[11px] text-graphite whitespace-nowrap">
                     {dayjs(log.created_at).format('D MMM YY HH:mm')}
                   </td>
-                  <td className="font-serif text-[15px] text-ink">
+                  <td className="font-serif text-[15px] text-ink m-hide" data-label="User">
                     {log.user_email ?? '—'}
                   </td>
-                  <td>
+                  <td className="m-hide" data-label="Role">
                     <span className="font-serif italic text-graphite text-sm">
                       {log.user_role ?? '—'}
                     </span>
                   </td>
-                  <td className="font-mono text-[12px] text-ink">
+                  <td className="font-mono text-[12px] text-ink m-hide" data-label="Resource">
                     {formatResource(log.resource_type)}
                     {log.resource_id ? (
                       <span className="text-graphite ml-1">#{log.resource_id.slice(0, 8)}</span>
@@ -116,12 +118,12 @@ export default async function AuditLogPage({ searchParams }: Props) {
                   <td className="font-serif italic text-sm text-graphite">
                     {log.action}
                   </td>
-                  <td className="font-mono text-[11px] text-graphite max-w-[200px] truncate">
+                  <td className="font-mono text-[11px] text-graphite max-w-[200px] truncate m-hide" data-label="Details">
                     {log.metadata && Object.keys(log.metadata as object).length > 0
                       ? JSON.stringify(log.metadata)
                       : '—'}
                   </td>
-                </tr>
+                </LedgerRow>
               ))}
             </tbody>
           </table>

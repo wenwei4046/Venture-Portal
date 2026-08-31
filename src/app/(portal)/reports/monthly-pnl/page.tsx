@@ -99,7 +99,7 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
 
       {/* Provider bridges the rail's search box to the matrix that owns the rows. */}
       <ReportSearchProvider>
-        <div className="flex gap-8 items-start">
+        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch lg:items-start">
           <MonthlyReportControls period={period} segment={segment} hideSegment={isDeptMgr} extraSegments={extraReportSegments(primedRegistryRows())} />
           <div className="min-w-0 flex-1">
             <MonthlyMatrix columns={data.columns} rows={rows} pctBaseByColumn={data.salesByColumn} />

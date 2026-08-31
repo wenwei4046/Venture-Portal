@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import { fetchAllRows } from '@/lib/paginate'
 import PnlCharts from '../dept-pool/_components/PnlCharts'
+import LedgerRow from '@/components/LedgerRow'
 
 // Post 2026-05-26 re-import: Venture Pool data is derived from journal_lines
 // where segment IN ('corporate', 'treasury') on HV bank accounts, NOT the
@@ -139,7 +140,7 @@ export default async function VenturePoolPage() {
         <div className="lg:col-span-7 hero-walnut px-6 py-6 md:px-8 md:py-7">
           <div className="font-serif italic text-graphite text-sm mb-1">Running balance</div>
           <div
-            className={`font-serif text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${
+            className={`font-serif text-[30px] sm:text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${
               balance < 0 ? 'text-danger' : 'text-num-ink'
             }`}
           >
@@ -208,11 +209,12 @@ export default async function VenturePoolPage() {
             <table className="ledger-table">
               <thead>
                 <tr>
-                  <th className="text-left">Date</th>
-                  <th className="text-left">Type</th>
-                  <th className="text-left">Direction</th>
+                  <th className="text-left m-hide">Date</th>
+                  <th className="text-left m-hide">Type</th>
+                  <th className="text-left m-hide">Direction</th>
                   <th className="text-left">Description</th>
                   <th className="text-right">Amount</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
@@ -223,14 +225,14 @@ export default async function VenturePoolPage() {
                   const signed = isIn ? dr : -cr
                   const desc = l.description ?? l.journal_entries.description ?? '—'
                   return (
-                    <tr key={l.id}>
-                      <td className="font-mono text-xs text-muted">
+                    <LedgerRow key={l.id}>
+                      <td className="font-mono text-xs text-muted m-hide" data-label="Date">
                         {dayjs(l.journal_entries.transaction_date).format('D MMM YYYY')}
                       </td>
-                      <td className="font-serif italic text-graphite text-sm">
+                      <td className="font-serif italic text-graphite text-sm m-hide" data-label="Type">
                         {refLabel(l.journal_entries.reference_type)}
                       </td>
-                      <td>
+                      <td className="m-hide" data-label="Direction">
                         <span
                           className={
                             isIn
@@ -245,7 +247,7 @@ export default async function VenturePoolPage() {
                       <td className={`num ${isIn ? 'text-ledger' : ''}`}>
                         {isIn ? formatMoney(signed) : <span className="neg">{formatMoney(signed)}</span>}
                       </td>
-                    </tr>
+                    </LedgerRow>
                   )
                 })}
               </tbody>

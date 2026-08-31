@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
 import type { Ledger, LedgerLine } from '@/lib/cfo-reports'
+import LedgerRow from '@/components/LedgerRow'
 
 /** Sentinel facet token for an empty segment / journal type. */
 const BLANK = ' blank'
@@ -358,14 +359,15 @@ function LedgerSection({ led, lines }: { led: Ledger; lines: LedgerLine[] }) {
         <thead>
           <tr>
             <th>Date</th>
-            <th>Acc. Desc.</th>
-            <th>Journal Type</th>
-            <th>Ref. 1</th>
-            <th>Dept</th>
-            <th>Desc.</th>
-            <th className="num">Home DR</th>
-            <th className="num">Home CR</th>
+            <th className="m-hide">Acc. Desc.</th>
+            <th className="m-hide">Journal Type</th>
+            <th className="m-hide">Ref. 1</th>
+            <th className="m-hide">Dept</th>
+            <th className="m-hide">Desc.</th>
+            <th className="num m-hide">Home DR</th>
+            <th className="num m-hide">Home CR</th>
             <th className="num">Home Balance</th>
+            <th className="lt-toggle" aria-hidden />
           </tr>
         </thead>
         <tbody>
@@ -373,32 +375,33 @@ function LedgerSection({ led, lines }: { led: Ledger; lines: LedgerLine[] }) {
             <td colSpan={6} className="font-mono text-xs text-ink font-semibold">
               Acc. No.: {led.code} · {led.accountName}
             </td>
-            <td className="num font-semibold">
+            <td className="num font-semibold m-hide">
               {led.periodTotals.debit > 0 ? formatMoney(led.periodTotals.debit) : '—'}
             </td>
-            <td className="num font-semibold">
+            <td className="num font-semibold m-hide">
               {led.periodTotals.credit > 0 ? formatMoney(led.periodTotals.credit) : '—'}
             </td>
             <td className="num font-semibold">{formatSignedBalance(led.closingBalance)}</td>
+            <td className="lt-toggle" />
           </tr>
           {lines.map((l, i) => {
             const isBf = isBfLine(l)
             return (
-              <tr key={i} className={isBf ? 'text-graphite italic' : ''}>
+              <LedgerRow key={i} className={isBf ? 'text-graphite italic' : ''}>
                 <td className="font-mono text-xs">
                   {l.entryDate ? dayjs(l.entryDate).format('D MMM YYYY') : '—'}
                 </td>
-                <td className="font-mono text-xs">{l.accountDesc}</td>
-                <td className="font-mono text-xs uppercase tracking-wide text-accent">
+                <td className="font-mono text-xs m-hide" data-label="Acc. Desc.">{l.accountDesc}</td>
+                <td className="font-mono text-xs uppercase tracking-wide text-accent m-hide" data-label="Journal Type">
                   {l.journalType}
                 </td>
-                <td className="font-mono text-sm text-ink">{l.ref}</td>
-                <td className="font-mono text-xs text-graphite">{segmentShort(l.segment)}</td>
-                <td className="text-sm">{l.description}</td>
-                <td className="num">{l.debit > 0 ? formatMoney(l.debit) : '—'}</td>
-                <td className="num">{l.credit > 0 ? formatMoney(l.credit) : '—'}</td>
+                <td className="font-mono text-sm text-ink m-hide" data-label="Ref. 1">{l.ref}</td>
+                <td className="font-mono text-xs text-graphite m-hide" data-label="Dept">{segmentShort(l.segment)}</td>
+                <td className="text-sm m-hide" data-label="Desc.">{l.description}</td>
+                <td className="num m-hide" data-label="Home DR">{l.debit > 0 ? formatMoney(l.debit) : '—'}</td>
+                <td className="num m-hide" data-label="Home CR">{l.credit > 0 ? formatMoney(l.credit) : '—'}</td>
                 <td className="num">{formatSignedBalance(l.runningBalance)}</td>
-              </tr>
+              </LedgerRow>
             )
           })}
         </tbody>
@@ -407,15 +410,16 @@ function LedgerSection({ led, lines }: { led: Ledger; lines: LedgerLine[] }) {
             <td colSpan={6} className="font-mono text-xs text-ink font-semibold">
               {led.code} {led.accountName} — total
             </td>
-            <td className="num font-semibold">
+            <td className="num font-semibold m-hide">
               {led.periodTotals.debit > 0 ? formatMoney(led.periodTotals.debit) : '—'}
             </td>
-            <td className="num font-semibold">
+            <td className="num font-semibold m-hide">
               {led.periodTotals.credit > 0 ? formatMoney(led.periodTotals.credit) : '—'}
             </td>
             <td className="num font-semibold text-num-ink">
               {formatSignedBalance(led.closingBalance)}
             </td>
+            <td className="lt-toggle" />
           </tr>
         </tfoot>
       </table>

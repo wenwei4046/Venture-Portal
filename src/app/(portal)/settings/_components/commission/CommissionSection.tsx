@@ -230,7 +230,7 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
               target is what a <em>scheme-target</em> salesperson climbs to each month; leave it
               blank for a rank nobody can reach on volume alone.
             </Hint>
-            <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+            <div className="border border-hairline rounded-md bg-surface overflow-x-auto table-scroll">
               <table className="ledger-table">
                 <thead>
                   <tr>
@@ -334,7 +334,7 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
               base</em> — the allowance already paid for it. Most are bundled free in the ERP
               (quantity, zero price), which is exactly the case this exists to reward.
             </Hint>
-            <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+            <div className="border border-hairline rounded-md bg-surface overflow-x-auto table-scroll">
               <table className="ledger-table">
                 <thead>
                   <tr>
@@ -540,7 +540,7 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
             </ActionForm>
 
             {activeBrand ? (
-              <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+              <div className="border border-hairline rounded-md bg-surface overflow-x-auto table-scroll">
                 <table className="ledger-table">
                   <thead>
                     <tr>
@@ -634,7 +634,7 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
               gate the engine applies is the group-sales target on the ladder above. Rows sharing an
               <em> Alt</em> group must all hold; different groups are alternatives.
             </Hint>
-            <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+            <div className="border border-hairline rounded-md bg-surface overflow-x-auto table-scroll">
               <table className="ledger-table">
                 <thead>
                   <tr>
@@ -697,7 +697,7 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
                 </p>
               </div>
             ) : (
-              <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+              <div className="border border-hairline rounded-md bg-surface overflow-x-auto table-scroll">
                 <table className="ledger-table">
                   <thead>
                     <tr>

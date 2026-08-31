@@ -11,6 +11,7 @@ import {
 } from '../actions'
 import type { AllocatorData, TemplateRow } from './types'
 import { unwrap } from './unwrap'
+import LedgerRow from '@/components/LedgerRow'
 
 const inputCls =
   'px-2.5 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border'
@@ -166,16 +167,16 @@ export default function SetupTab({ data }: { data: AllocatorData }) {
         <div className="overflow-x-auto border border-hairline rounded-md mb-3">
           <table className="ledger-table w-full">
             <thead>
-              <tr><th>Name</th><th>Method</th><th className="num">Default RM</th><th>Category</th><th>%</th><th>Status</th><th></th></tr>
+              <tr><th>Name</th><th className="m-hide">Method</th><th className="num">Default RM</th><th className="m-hide">Category</th><th className="m-hide">%</th><th className="m-hide">Status</th><th className="m-hide"></th><th className="lt-toggle" aria-hidden /></tr>
             </thead>
             <tbody>
               {data.templates.map((t) => (
-                <tr key={t.id}>
+                <LedgerRow key={t.id}>
                   <td className="font-serif text-md text-ink">{t.name}</td>
-                  <td><span className="px-2 py-0.5 bg-surface-2 rounded-md font-mono text-[10px] uppercase">{t.method}</span></td>
+                  <td className="m-hide" data-label="Method"><span className="px-2 py-0.5 bg-surface-2 rounded-md font-mono text-[10px] uppercase">{t.method}</span></td>
                   <td className="num font-mono tabular">{t.amount > 0 ? t.amount.toLocaleString('en-MY', { minimumFractionDigits: 2 }) : '—'}</td>
-                  <td className="text-sm text-graphite">{data.categories.find((c) => c.id === t.categoryId)?.name ?? '—'}</td>
-                  <td>
+                  <td className="text-sm text-graphite m-hide" data-label="Category">{data.categories.find((c) => c.id === t.categoryId)?.name ?? '—'}</td>
+                  <td className="m-hide" data-label="%">
                     <div className="flex flex-wrap gap-1 py-1">
                       {t.splits.map((s) => (
                         <span key={s.companyId} className="px-1.5 py-0.5 bg-accent-bg border border-accent-border rounded font-mono text-[10px]">
@@ -184,15 +185,15 @@ export default function SetupTab({ data }: { data: AllocatorData }) {
                       ))}
                     </div>
                   </td>
-                  <td className="font-mono text-[10px] uppercase text-muted">{t.status}</td>
-                  <td className="text-right whitespace-nowrap">
+                  <td className="font-mono text-[10px] uppercase text-muted m-hide" data-label="Status">{t.status}</td>
+                  <td className="text-right whitespace-nowrap m-hide">
                     <button type="button" onClick={() => startTpl(t)} className="text-accent hover:text-accent-hover font-serif italic text-sm mr-3">Edit</button>
                     <button type="button" onClick={() => run(async () => { unwrap(await deleteAllocTemplate(t.id)) })} disabled={isPending} className="text-muted hover:text-danger font-mono text-sm">×</button>
                   </td>
-                </tr>
+                </LedgerRow>
               ))}
               {data.templates.length === 0 ? (
-                <tr><td colSpan={7} className="font-serif italic text-muted text-sm">还没有模板。</td></tr>
+                <tr><td colSpan={8} className="font-serif italic text-muted text-sm">还没有模板。</td></tr>
               ) : null}
             </tbody>
           </table>

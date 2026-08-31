@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import UploadStatementForm from './_components/UploadStatementForm'
 import SessionRowActions from './_components/SessionRowActions'
+import LedgerRow from '@/components/LedgerRow'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,10 +87,11 @@ export default async function ReconciliationPage() {
             <thead>
               <tr>
                 <th>Bank</th>
-                <th>Account</th>
-                <th className="num">Cache balance</th>
-                <th className="num">GL balance</th>
+                <th className="m-hide">Account</th>
+                <th className="num m-hide">Cache balance</th>
+                <th className="num m-hide">GL balance</th>
                 <th className="num">Difference</th>
+                <th className="lt-toggle" aria-hidden />
               </tr>
             </thead>
             <tbody>
@@ -97,15 +99,15 @@ export default async function ReconciliationPage() {
                 const gl = b.gl_account_code ? (glMap.get(b.gl_account_code) ?? 0) : 0
                 const diff = Math.round((Number(b.current_balance) - gl) * 100) / 100
                 return (
-                  <tr key={b.id}>
+                  <LedgerRow key={b.id}>
                     <td className="font-serif text-[15px] text-ink">{b.bank_name}</td>
-                    <td className="font-mono text-[12px] text-graphite">{b.account_number ?? '—'}</td>
-                    <td className="num">{formatMoney(Number(b.current_balance))}</td>
-                    <td className="num">{formatMoney(gl)}</td>
+                    <td className="font-mono text-[12px] text-graphite m-hide" data-label="Account">{b.account_number ?? '—'}</td>
+                    <td className="num m-hide" data-label="Cache balance">{formatMoney(Number(b.current_balance))}</td>
+                    <td className="num m-hide" data-label="GL balance">{formatMoney(gl)}</td>
                     <td className={`num font-semibold ${diff === 0 ? 'text-ledger' : 'text-danger'}`}>
                       {diff === 0 ? '✓ 0.00' : formatMoney(diff)}
                     </td>
-                  </tr>
+                  </LedgerRow>
                 )
               })}
             </tbody>
@@ -144,11 +146,12 @@ export default async function ReconciliationPage() {
                 <tr>
                   <th>Bank</th>
                   <th>Month</th>
-                  <th>File</th>
-                  <th className="num">Matched</th>
+                  <th className="m-hide">File</th>
+                  <th className="num m-hide">Matched</th>
                   <th className="num">Open items</th>
-                  <th>Status</th>
-                  <th className="right">Actions</th>
+                  <th className="m-hide">Status</th>
+                  <th className="right m-hide">Actions</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
@@ -162,28 +165,28 @@ export default async function ReconciliationPage() {
                   const c = countsBySession.get(s.id) ?? { total: 0, matched: 0, ignored: 0 }
                   const open = c.total - c.matched - c.ignored
                   return (
-                    <tr key={s.id}>
+                    <LedgerRow key={s.id}>
                       <td className="font-serif text-[15px] text-ink">
                         {bankById.get(s.bank_account_id)?.bank_name ?? '—'}
                       </td>
                       <td className="font-mono text-[12px] text-graphite">
                         {dayjs(s.period_month).format('MMM YYYY')}
                       </td>
-                      <td className="font-mono text-[11px] text-muted max-w-[200px] truncate">
+                      <td className="font-mono text-[11px] text-muted max-w-[200px] truncate m-hide" data-label="File">
                         {s.source_filename ?? '—'}
                       </td>
-                      <td className="num">
+                      <td className="num m-hide" data-label="Matched">
                         {c.matched} / {c.total}
                       </td>
                       <td className={`num font-semibold ${open === 0 ? 'text-ledger' : 'text-alert'}`}>
                         {open === 0 ? '✓ 0' : open}
                       </td>
-                      <td>
+                      <td className="m-hide" data-label="Status">
                         <em className={`font-serif text-sm ${s.status === 'done' ? 'text-ledger' : 'text-alert'}`}>
                           {s.status}
                         </em>
                       </td>
-                      <td className="text-right">
+                      <td className="text-right m-hide">
                         <Link
                           href={`/reconciliation/${s.id}`}
                           className="text-sm text-accent hover:text-accent-hover font-serif italic mr-3"
@@ -198,7 +201,7 @@ export default async function ReconciliationPage() {
                         </Link>
                         <SessionRowActions sessionId={s.id} status={s.status as 'open' | 'done'} />
                       </td>
-                    </tr>
+                    </LedgerRow>
                   )
                 })}
               </tbody>

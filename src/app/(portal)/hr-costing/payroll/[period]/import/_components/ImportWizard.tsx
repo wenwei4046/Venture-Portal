@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { formatMoney } from '@/lib/utils'
 import { parseInfotechPayroll, type InfotechRow } from '@/lib/import/infotech-payroll'
 import { previewInfotechImport, applyInfotechImport, type PreviewResult } from '../actions'
+import LedgerRow from '@/components/LedgerRow'
 
 interface Props {
   period: string
@@ -178,28 +179,29 @@ export default function ImportWizard({ period }: Props) {
               <thead>
                 <tr>
                   <th>Staff</th>
-                  <th>Action</th>
-                  <th>Matched by</th>
-                  <th className="num">Gross</th>
+                  <th className="m-hide">Action</th>
+                  <th className="m-hide">Matched by</th>
+                  <th className="num m-hide">Gross</th>
                   <th className="num">Net</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
                 {[...preview.toCreate.map(r => ({ ...r, action: 'create' as const })),
                   ...preview.toUpdate.map(r => ({ ...r, action: 'overwrite' as const }))].map(u => (
-                  <tr key={`${u.action}-${u.rowIndex}`}>
+                  <LedgerRow key={`${u.action}-${u.rowIndex}`}>
                     <td>{u.staffName}</td>
-                    <td>
+                    <td className="m-hide" data-label="Action">
                       <span className={`font-serif italic text-xs ${u.action === 'create' ? 'text-ledger' : 'text-alert'}`}>
                         {u.action}
                       </span>
                     </td>
-                    <td className="font-sans text-xs text-muted">
+                    <td className="font-sans text-xs text-muted m-hide" data-label="Matched by">
                       {u.matchedBy === 'employee_code' ? 'code' : 'name'}
                     </td>
-                    <td className="num">{formatMoney(u.gross)}</td>
+                    <td className="num m-hide" data-label="Gross">{formatMoney(u.gross)}</td>
                     <td className="num">{formatMoney(u.net)}</td>
-                  </tr>
+                  </LedgerRow>
                 ))}
               </tbody>
             </table>

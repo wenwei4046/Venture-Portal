@@ -10,6 +10,7 @@ import MarketingPnlView from '../_components/MarketingPnlView'
 import RequestPaymentForm from '../_components/RequestPaymentForm'
 import RequestCreditForm from '../_components/RequestCreditForm'
 import StageBadge from '../_components/StageBadge'
+import LedgerRow from '@/components/LedgerRow'
 
 interface Props {
   searchParams: Promise<{ tab?: string; filter?: string }>
@@ -116,7 +117,7 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
               <div className="font-serif italic text-graphite text-sm mb-1">
                 Pool balance
               </div>
-              <div className={`font-serif text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${balance < 0 ? 'text-danger' : 'text-num-ink'}`}>
+              <div className={`font-serif text-[30px] sm:text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${balance < 0 ? 'text-danger' : 'text-num-ink'}`}>
                 {formatMoney(balance)}
               </div>
               <div className="font-mono text-xs text-muted mt-2">
@@ -224,31 +225,32 @@ async function RequestCreditTabContent({ deptId }: { deptId: string }) {
               <thead>
                 <tr>
                   <th>Submitted</th>
-                  <th>Period</th>
-                  <th>Description</th>
-                  <th className="right">Lines</th>
+                  <th className="m-hide">Period</th>
+                  <th className="m-hide">Description</th>
+                  <th className="right m-hide">Lines</th>
                   <th>Status</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
                 {(requests ?? []).map((r) => {
                   const lineCount = Array.isArray(r.line_items) ? r.line_items.length : 0
                   return (
-                    <tr key={r.id}>
+                    <LedgerRow key={r.id}>
                       <td>
                         <div className="font-mono text-xs text-muted">
                           {dayjs(r.requested_at).format('D MMM HH:mm')}
                         </div>
                       </td>
-                      <td>
+                      <td className="m-hide" data-label="Period">
                         <div className="font-mono text-xs text-graphite">
                           {dayjs(r.period_month).format('MMM YYYY')}
                         </div>
                       </td>
-                      <td>
+                      <td className="m-hide" data-label="Description">
                         <div className="font-serif italic text-graphite">{r.description}</div>
                       </td>
-                      <td className="num text-graphite">{lineCount}</td>
+                      <td className="num text-graphite m-hide" data-label="Lines">{lineCount}</td>
                       <td>
                         <span
                           className={
@@ -260,7 +262,7 @@ async function RequestCreditTabContent({ deptId }: { deptId: string }) {
                           {STATUS_LABEL[r.status] ?? r.status}
                         </span>
                       </td>
-                    </tr>
+                    </LedgerRow>
                   )
                 })}
               </tbody>
@@ -345,31 +347,32 @@ async function RequestPaymentTabContent({
               <thead>
                 <tr>
                   <th>Submitted</th>
-                  <th>Payee</th>
-                  <th>Description</th>
-                  <th>Stage</th>
+                  <th className="m-hide">Payee</th>
+                  <th className="m-hide">Description</th>
+                  <th className="m-hide">Stage</th>
                   <th className="right">Amount</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
                 {(requests ?? []).map((r) => (
-                  <tr key={r.id}>
+                  <LedgerRow key={r.id}>
                     <td>
                       <div className="font-mono text-xs text-muted">
                         {dayjs(r.requested_at).format('D MMM HH:mm')}
                       </div>
                     </td>
-                    <td>
+                    <td className="m-hide" data-label="Payee">
                       <div className="font-serif italic text-graphite">{r.payee_name}</div>
                     </td>
-                    <td>
+                    <td className="m-hide" data-label="Description">
                       <div className="font-serif italic text-graphite">{r.description}</div>
                     </td>
-                    <td>
+                    <td className="m-hide" data-label="Stage">
                       <StageBadge status={r.status} />
                     </td>
                     <td className="num">{formatMoney(Number(r.amount))}</td>
-                  </tr>
+                  </LedgerRow>
                 ))}
               </tbody>
             </table>
