@@ -40,10 +40,12 @@ These six rules are non-negotiable for any new or amended page. The CSS / Tailwi
    phone has ~343px of content width — enough for two columns and a chevron.
    Mark the demoted columns `m-hide` + `data-label`, wrap the row in
    `<LedgerRow>`, and end the `<thead>` with `<th className="lt-toggle" aria-hidden />`.
-   `SortableTable` does it from its column config instead. Full rules, including
-   the three cases that legitimately keep every column, are in
-   **Responsive** below. A hero figure uses `text-[30px] sm:text-[44px] md:text-hero`,
-   never a bare `text-[44px]`.
+   `SortableTable` does it from its column config instead. **Never fold a row
+   that a single form wraps** — the panel would duplicate its named inputs and
+   the stale hidden copy is what gets submitted; use `.table-scroll` there.
+   Full rules, including the four cases that legitimately keep every column,
+   are in **Responsive** below. A hero figure uses
+   `text-[30px] sm:text-[44px] md:text-hero`, never a bare `text-[44px]`.
 
 ### Canonical reference pages
 
@@ -779,13 +781,28 @@ annotations, so the existing desktop markup is untouched:
 - A summary/total row that is a plain `<tr>` needs `<td className="lt-toggle" />`
   as its last cell so its figures stay under the column above.
 
-**Three kinds of table deliberately keep every column instead:**
+**Four kinds of table deliberately keep every column instead:**
 
-1. Tables that already expand on tap — the GL statements (`GlReportView`), the
+1. **A form spans the whole row.** Check this one first — it is the only
+   exception that corrupts data rather than merely looking wrong. The panel
+   renders each folded cell's children a *second* time, so a `<td>` holding a
+   named input produces two fields with the same `name`. `FormData` returns the
+   first, which is the hidden copy still carrying the original `defaultValue` —
+   the user's edit in the panel is silently discarded and the stale value is
+   saved. The commission settings grids (`ProductsSection`,
+   `CommissionSection`) wrap one `ActionForm` around every row and are exactly
+   this shape.
+
+   A `<form>` **inside a single cell** is fine — the duplicate is a complete,
+   independent form and either copy submits correctly (see `/overdue` and the
+   HR-costing submissions table). So is a controlled input that is read from
+   React state rather than submitted (`MoneyInput` on the Director Pool
+   calculator, the date pickers on `StatutoryTable`).
+2. Tables that already expand on tap — the GL statements (`GlReportView`), the
    Chart-of-Account tree, the company statement. A second chevron would fight
    the first; they drop optional comparison columns instead.
-2. The reconciliation matching panes, where the row tap selects for pairing.
-3. `MonthlyMatrix` — a 12-month grid cannot shed months. It pins the account
+3. The reconciliation matching panes, where the row tap selects for pairing.
+4. `MonthlyMatrix` — a 12-month grid cannot shed months. It pins the account
    column and scrolls, wrapped in `.table-scroll` for the edge-fade cue.
 
 `.table-scroll` is the escape hatch for any table that genuinely cannot fold.
