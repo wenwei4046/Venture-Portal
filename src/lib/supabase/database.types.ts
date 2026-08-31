@@ -1130,6 +1130,1071 @@ export type Database = {
           },
         ]
       }
+      comm_agent_aliases: {
+        Row: {
+          agent_key: string
+          agent_name_sample: string
+          created_at: string
+          created_by: string | null
+          id: string
+          staff_id: string
+        }
+        Insert: {
+          agent_key: string
+          agent_name_sample: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          staff_id: string
+        }
+        Update: {
+          agent_key?: string
+          agent_name_sample?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_agent_aliases_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_agent_aliases_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "hr_staff_costs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comm_brands: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          item_code_prefixes: string[]
+          name: string
+          note: string | null
+          scheme_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          item_code_prefixes?: string[]
+          name: string
+          note?: string | null
+          scheme_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          item_code_prefixes?: string[]
+          name?: string
+          note?: string | null
+          scheme_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_brands_scheme_id_fkey"
+            columns: ["scheme_id"]
+            isOneToOne: false
+            referencedRelation: "comm_schemes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comm_hierarchy: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          effective_to: string | null
+          id: string
+          rank_id: string
+          rate_mode: Database["public"]["Enums"]["comm_rate_mode"] | null
+          scheme_id: string
+          staff_id: string
+          upline_staff_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          effective_from: string
+          effective_to?: string | null
+          id?: string
+          rank_id: string
+          rate_mode?: Database["public"]["Enums"]["comm_rate_mode"] | null
+          scheme_id: string
+          staff_id: string
+          upline_staff_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          rank_id?: string
+          rate_mode?: Database["public"]["Enums"]["comm_rate_mode"] | null
+          scheme_id?: string
+          staff_id?: string
+          upline_staff_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_hierarchy_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_hierarchy_rank_id_fkey"
+            columns: ["rank_id"]
+            isOneToOne: false
+            referencedRelation: "comm_ranks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_hierarchy_scheme_id_fkey"
+            columns: ["scheme_id"]
+            isOneToOne: false
+            referencedRelation: "comm_schemes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_hierarchy_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "hr_staff_costs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_hierarchy_upline_staff_id_fkey"
+            columns: ["upline_staff_id"]
+            isOneToOne: false
+            referencedRelation: "hr_staff_costs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comm_item_groups: {
+        Row: {
+          commissionable: boolean
+          created_at: string
+          id: string
+          item_group: string
+          note: string | null
+          scheme_id: string
+        }
+        Insert: {
+          commissionable: boolean
+          created_at?: string
+          id?: string
+          item_group: string
+          note?: string | null
+          scheme_id: string
+        }
+        Update: {
+          commissionable?: boolean
+          created_at?: string
+          id?: string
+          item_group?: string
+          note?: string | null
+          scheme_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_item_groups_scheme_id_fkey"
+            columns: ["scheme_id"]
+            isOneToOne: false
+            referencedRelation: "comm_schemes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comm_kpi_items: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          effective_to: string | null
+          id: string
+          kpi_amount: number
+          product_code: string
+          product_name: string | null
+          scheme_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          effective_from: string
+          effective_to?: string | null
+          id?: string
+          kpi_amount: number
+          product_code: string
+          product_name?: string | null
+          scheme_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          kpi_amount?: number
+          product_code?: string
+          product_name?: string | null
+          scheme_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_kpi_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_kpi_items_scheme_id_fkey"
+            columns: ["scheme_id"]
+            isOneToOne: false
+            referencedRelation: "comm_schemes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comm_kpi_thresholds: {
+        Row: {
+          bonus_pct: number
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          id: string
+          min_qty: number
+          scheme_id: string
+          tier_label: string | null
+        }
+        Insert: {
+          bonus_pct: number
+          created_at?: string
+          effective_from: string
+          effective_to?: string | null
+          id?: string
+          min_qty: number
+          scheme_id: string
+          tier_label?: string | null
+        }
+        Update: {
+          bonus_pct?: number
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          min_qty?: number
+          scheme_id?: string
+          tier_label?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_kpi_thresholds_scheme_id_fkey"
+            columns: ["scheme_id"]
+            isOneToOne: false
+            referencedRelation: "comm_schemes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comm_margin_bands: {
+        Row: {
+          band_key: string
+          brand_id: string
+          commission_multiplier: number
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["comm_margin_band_kind"]
+          label: string
+          margin_pct: number
+          monthly_incentive: number
+          scheme_id: string
+          sort_order: number
+        }
+        Insert: {
+          band_key: string
+          brand_id: string
+          commission_multiplier?: number
+          created_at?: string
+          id?: string
+          kind: Database["public"]["Enums"]["comm_margin_band_kind"]
+          label: string
+          margin_pct: number
+          monthly_incentive?: number
+          scheme_id: string
+          sort_order?: number
+        }
+        Update: {
+          band_key?: string
+          brand_id?: string
+          commission_multiplier?: number
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["comm_margin_band_kind"]
+          label?: string
+          margin_pct?: number
+          monthly_incentive?: number
+          scheme_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_margin_bands_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "comm_brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_margin_bands_scheme_id_fkey"
+            columns: ["scheme_id"]
+            isOneToOne: false
+            referencedRelation: "comm_schemes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comm_open_bill_rules: {
+        Row: {
+          bill_rank: number
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          id: string
+          pct: number
+          scheme_id: string
+        }
+        Insert: {
+          bill_rank: number
+          created_at?: string
+          effective_from: string
+          effective_to?: string | null
+          id?: string
+          pct: number
+          scheme_id: string
+        }
+        Update: {
+          bill_rank?: number
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          pct?: number
+          scheme_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_open_bill_rules_scheme_id_fkey"
+            columns: ["scheme_id"]
+            isOneToOne: false
+            referencedRelation: "comm_schemes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comm_order_releases: {
+        Row: {
+          id: string
+          order_no: string
+          order_period_month: string
+          period_month: string
+          product_revenue: number
+          released_at: string
+          run_id: string
+          staff_id: string
+        }
+        Insert: {
+          id?: string
+          order_no: string
+          order_period_month: string
+          period_month: string
+          product_revenue?: number
+          released_at?: string
+          run_id: string
+          staff_id: string
+        }
+        Update: {
+          id?: string
+          order_no?: string
+          order_period_month?: string
+          period_month?: string
+          product_revenue?: number
+          released_at?: string
+          run_id?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_order_releases_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "comm_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_order_releases_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "hr_staff_costs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comm_products: {
+        Row: {
+          brand_code: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          item_code: string
+          item_group: string | null
+          note: string | null
+          product_name: string | null
+          unit_cost: number | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          brand_code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          item_code: string
+          item_group?: string | null
+          note?: string | null
+          product_name?: string | null
+          unit_cost?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          brand_code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          item_code?: string
+          item_group?: string | null
+          note?: string | null
+          product_name?: string | null
+          unit_cost?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_products_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comm_promotion_rules: {
+        Row: {
+          alternative_group: number
+          consecutive_months: number | null
+          created_at: string
+          criterion: Database["public"]["Enums"]["comm_promotion_criterion"]
+          from_rank_key: string
+          id: string
+          is_enforced: boolean
+          margin_band_key: string | null
+          note: string | null
+          scheme_id: string
+          threshold_amount: number | null
+          threshold_qty: number | null
+          to_rank_key: string
+        }
+        Insert: {
+          alternative_group?: number
+          consecutive_months?: number | null
+          created_at?: string
+          criterion: Database["public"]["Enums"]["comm_promotion_criterion"]
+          from_rank_key: string
+          id?: string
+          is_enforced?: boolean
+          margin_band_key?: string | null
+          note?: string | null
+          scheme_id: string
+          threshold_amount?: number | null
+          threshold_qty?: number | null
+          to_rank_key: string
+        }
+        Update: {
+          alternative_group?: number
+          consecutive_months?: number | null
+          created_at?: string
+          criterion?: Database["public"]["Enums"]["comm_promotion_criterion"]
+          from_rank_key?: string
+          id?: string
+          is_enforced?: boolean
+          margin_band_key?: string | null
+          note?: string | null
+          scheme_id?: string
+          threshold_amount?: number | null
+          threshold_qty?: number | null
+          to_rank_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_promotion_rules_scheme_id_fkey"
+            columns: ["scheme_id"]
+            isOneToOne: false
+            referencedRelation: "comm_schemes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comm_ranks: {
+        Row: {
+          can_recruit: boolean
+          created_at: string
+          group_sales_threshold: number | null
+          id: string
+          label: string
+          product_rate: number
+          rank_key: string
+          scheme_id: string
+          sort_order: number
+          tier_key: string
+          tier_label: string
+        }
+        Insert: {
+          can_recruit?: boolean
+          created_at?: string
+          group_sales_threshold?: number | null
+          id?: string
+          label: string
+          product_rate: number
+          rank_key: string
+          scheme_id: string
+          sort_order?: number
+          tier_key: string
+          tier_label: string
+        }
+        Update: {
+          can_recruit?: boolean
+          created_at?: string
+          group_sales_threshold?: number | null
+          id?: string
+          label?: string
+          product_rate?: number
+          rank_key?: string
+          scheme_id?: string
+          sort_order?: number
+          tier_key?: string
+          tier_label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_ranks_scheme_id_fkey"
+            columns: ["scheme_id"]
+            isOneToOne: false
+            referencedRelation: "comm_schemes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comm_runs: {
+        Row: {
+          applied_at: string | null
+          applied_by: string | null
+          batch_id: string | null
+          computed_at: string | null
+          computed_by: string | null
+          created_at: string
+          deferred_orders: Json
+          id: string
+          penalised_orders: Json
+          period_month: string
+          released_orders: Json
+          reopened_at: string | null
+          reopened_by: string | null
+          scheme_id: string
+          staff_count: number
+          status: Database["public"]["Enums"]["comm_run_status"]
+          sub_department_id: string
+          total_commission: number
+          warnings: Json
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
+          batch_id?: string | null
+          computed_at?: string | null
+          computed_by?: string | null
+          created_at?: string
+          deferred_orders?: Json
+          id?: string
+          penalised_orders?: Json
+          period_month: string
+          released_orders?: Json
+          reopened_at?: string | null
+          reopened_by?: string | null
+          scheme_id: string
+          staff_count?: number
+          status?: Database["public"]["Enums"]["comm_run_status"]
+          sub_department_id: string
+          total_commission?: number
+          warnings?: Json
+        }
+        Update: {
+          applied_at?: string | null
+          applied_by?: string | null
+          batch_id?: string | null
+          computed_at?: string | null
+          computed_by?: string | null
+          created_at?: string
+          deferred_orders?: Json
+          id?: string
+          penalised_orders?: Json
+          period_month?: string
+          released_orders?: Json
+          reopened_at?: string | null
+          reopened_by?: string | null
+          scheme_id?: string
+          staff_count?: number
+          status?: Database["public"]["Enums"]["comm_run_status"]
+          sub_department_id?: string
+          total_commission?: number
+          warnings?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_runs_applied_by_fkey"
+            columns: ["applied_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_runs_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "sales_import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_runs_computed_by_fkey"
+            columns: ["computed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_runs_reopened_by_fkey"
+            columns: ["reopened_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_runs_scheme_id_fkey"
+            columns: ["scheme_id"]
+            isOneToOne: false
+            referencedRelation: "comm_schemes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_runs_sub_department_id_fkey"
+            columns: ["sub_department_id"]
+            isOneToOne: false
+            referencedRelation: "comm_sub_departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comm_schemes: {
+        Row: {
+          cloned_from_scheme_id: string | null
+          created_at: string
+          created_by: string | null
+          default_rate_mode: Database["public"]["Enums"]["comm_rate_mode"]
+          deposit_threshold_pct: number | null
+          effective_from: string
+          effective_to: string | null
+          enable_kpi: boolean
+          enable_margin_incentive: boolean
+          enable_margin_penalty: boolean
+          enable_open_bill: boolean
+          enable_override: boolean
+          enable_product_revenue: boolean
+          id: string
+          is_active: boolean
+          open_bill_basis: Database["public"]["Enums"]["comm_open_bill_basis"]
+          override_includes_kpi: boolean
+          scheme_name: string
+          sub_department_id: string
+          updated_at: string
+        }
+        Insert: {
+          cloned_from_scheme_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_rate_mode?: Database["public"]["Enums"]["comm_rate_mode"]
+          deposit_threshold_pct?: number | null
+          effective_from: string
+          effective_to?: string | null
+          enable_kpi?: boolean
+          enable_margin_incentive?: boolean
+          enable_margin_penalty?: boolean
+          enable_open_bill?: boolean
+          enable_override?: boolean
+          enable_product_revenue?: boolean
+          id?: string
+          is_active?: boolean
+          open_bill_basis?: Database["public"]["Enums"]["comm_open_bill_basis"]
+          override_includes_kpi?: boolean
+          scheme_name: string
+          sub_department_id: string
+          updated_at?: string
+        }
+        Update: {
+          cloned_from_scheme_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_rate_mode?: Database["public"]["Enums"]["comm_rate_mode"]
+          deposit_threshold_pct?: number | null
+          effective_from?: string
+          effective_to?: string | null
+          enable_kpi?: boolean
+          enable_margin_incentive?: boolean
+          enable_margin_penalty?: boolean
+          enable_open_bill?: boolean
+          enable_override?: boolean
+          enable_product_revenue?: boolean
+          id?: string
+          is_active?: boolean
+          open_bill_basis?: Database["public"]["Enums"]["comm_open_bill_basis"]
+          override_includes_kpi?: boolean
+          scheme_name?: string
+          sub_department_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_schemes_cloned_from_scheme_id_fkey"
+            columns: ["cloned_from_scheme_id"]
+            isOneToOne: false
+            referencedRelation: "comm_schemes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_schemes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_schemes_sub_department_id_fkey"
+            columns: ["sub_department_id"]
+            isOneToOne: false
+            referencedRelation: "comm_sub_departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comm_statement_brand_margins: {
+        Row: {
+          brand_code: string
+          cost: number
+          id: string
+          margin_pct: number | null
+          revenue: number
+          statement_id: string
+          top_band_key: string | null
+        }
+        Insert: {
+          brand_code: string
+          cost?: number
+          id?: string
+          margin_pct?: number | null
+          revenue?: number
+          statement_id: string
+          top_band_key?: string | null
+        }
+        Update: {
+          brand_code?: string
+          cost?: number
+          id?: string
+          margin_pct?: number | null
+          revenue?: number
+          statement_id?: string
+          top_band_key?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_statement_brand_margins_statement_id_fkey"
+            columns: ["statement_id"]
+            isOneToOne: false
+            referencedRelation: "comm_statements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comm_statement_lines: {
+        Row: {
+          amount: number
+          basis_amount: number
+          component: Database["public"]["Enums"]["comm_component"]
+          created_at: string
+          id: string
+          note: string | null
+          qty: number | null
+          rate: number | null
+          source_line_id: string | null
+          source_order_id: string | null
+          source_staff_id: string | null
+          statement_id: string
+        }
+        Insert: {
+          amount: number
+          basis_amount?: number
+          component: Database["public"]["Enums"]["comm_component"]
+          created_at?: string
+          id?: string
+          note?: string | null
+          qty?: number | null
+          rate?: number | null
+          source_line_id?: string | null
+          source_order_id?: string | null
+          source_staff_id?: string | null
+          statement_id: string
+        }
+        Update: {
+          amount?: number
+          basis_amount?: number
+          component?: Database["public"]["Enums"]["comm_component"]
+          created_at?: string
+          id?: string
+          note?: string | null
+          qty?: number | null
+          rate?: number | null
+          source_line_id?: string | null
+          source_order_id?: string | null
+          source_staff_id?: string | null
+          statement_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_statement_lines_source_line_id_fkey"
+            columns: ["source_line_id"]
+            isOneToOne: false
+            referencedRelation: "sales_order_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_statement_lines_source_order_id_fkey"
+            columns: ["source_order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_statement_lines_source_staff_id_fkey"
+            columns: ["source_staff_id"]
+            isOneToOne: false
+            referencedRelation: "hr_staff_costs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_statement_lines_statement_id_fkey"
+            columns: ["statement_id"]
+            isOneToOne: false
+            referencedRelation: "comm_statements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comm_statements: {
+        Row: {
+          base_rank_key: string | null
+          created_at: string
+          deferred_revenue: number
+          excluded_revenue: number
+          group_revenue: number
+          id: string
+          kpi_base: number
+          kpi_commission: number
+          kpi_qty: number
+          kpi_threshold_pct: number
+          margin_band_key: string | null
+          margin_cost: number
+          margin_incentive: number
+          margin_pct: number | null
+          margin_penalty_withheld: number
+          margin_revenue: number
+          open_bill_bonus: number
+          override_commission: number
+          penalty_weighted_revenue: number
+          product_commission: number
+          product_rate: number
+          product_revenue: number
+          qualifies_for_rank_key: string | null
+          rank_key: string | null
+          rate_mode: Database["public"]["Enums"]["comm_rate_mode"] | null
+          run_id: string
+          staff_id: string
+          tier_key: string | null
+          total_commission: number
+          upline_staff_id: string | null
+        }
+        Insert: {
+          base_rank_key?: string | null
+          created_at?: string
+          deferred_revenue?: number
+          excluded_revenue?: number
+          group_revenue?: number
+          id?: string
+          kpi_base?: number
+          kpi_commission?: number
+          kpi_qty?: number
+          kpi_threshold_pct?: number
+          margin_band_key?: string | null
+          margin_cost?: number
+          margin_incentive?: number
+          margin_pct?: number | null
+          margin_penalty_withheld?: number
+          margin_revenue?: number
+          open_bill_bonus?: number
+          override_commission?: number
+          penalty_weighted_revenue?: number
+          product_commission?: number
+          product_rate?: number
+          product_revenue?: number
+          qualifies_for_rank_key?: string | null
+          rank_key?: string | null
+          rate_mode?: Database["public"]["Enums"]["comm_rate_mode"] | null
+          run_id: string
+          staff_id: string
+          tier_key?: string | null
+          total_commission?: number
+          upline_staff_id?: string | null
+        }
+        Update: {
+          base_rank_key?: string | null
+          created_at?: string
+          deferred_revenue?: number
+          excluded_revenue?: number
+          group_revenue?: number
+          id?: string
+          kpi_base?: number
+          kpi_commission?: number
+          kpi_qty?: number
+          kpi_threshold_pct?: number
+          margin_band_key?: string | null
+          margin_cost?: number
+          margin_incentive?: number
+          margin_pct?: number | null
+          margin_penalty_withheld?: number
+          margin_revenue?: number
+          open_bill_bonus?: number
+          override_commission?: number
+          penalty_weighted_revenue?: number
+          product_commission?: number
+          product_rate?: number
+          product_revenue?: number
+          qualifies_for_rank_key?: string | null
+          rank_key?: string | null
+          rate_mode?: Database["public"]["Enums"]["comm_rate_mode"] | null
+          run_id?: string
+          staff_id?: string
+          tier_key?: string | null
+          total_commission?: number
+          upline_staff_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_statements_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "comm_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_statements_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "hr_staff_costs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_statements_upline_staff_id_fkey"
+            columns: ["upline_staff_id"]
+            isOneToOne: false
+            referencedRelation: "hr_staff_costs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comm_sub_departments: {
+        Row: {
+          code: string | null
+          created_at: string
+          created_by: string | null
+          department_id: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          department_id: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          department_id?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_sub_departments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_sub_departments_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commission_inputs: {
         Row: {
           created_at: string
@@ -1432,6 +2497,7 @@ export type Database = {
           id: string
           is_internal: boolean
           name: string
+          payroll_source: string
           pool_gl_code: string | null
           segment_key: string | null
         }
@@ -1441,6 +2507,7 @@ export type Database = {
           id?: string
           is_internal?: boolean
           name: string
+          payroll_source?: string
           pool_gl_code?: string | null
           segment_key?: string | null
         }
@@ -1450,6 +2517,7 @@ export type Database = {
           id?: string
           is_internal?: boolean
           name?: string
+          payroll_source?: string
           pool_gl_code?: string | null
           segment_key?: string | null
         }
@@ -2816,6 +3884,7 @@ export type Database = {
           statutory_overridden_by: string | null
           unpaid_leave_days: number
           updated_at: string
+          withholding_tax: number
         }
         Insert: {
           basic_salary?: number
@@ -2848,6 +3917,7 @@ export type Database = {
           statutory_overridden_by?: string | null
           unpaid_leave_days?: number
           updated_at?: string
+          withholding_tax?: number
         }
         Update: {
           basic_salary?: number
@@ -2880,6 +3950,7 @@ export type Database = {
           statutory_overridden_by?: string | null
           unpaid_leave_days?: number
           updated_at?: string
+          withholding_tax?: number
         }
         Relationships: [
           {
@@ -3042,8 +4113,10 @@ export type Database = {
           socso_category: Database["public"]["Enums"]["socso_category"]
           socso_er: number | null
           status: Database["public"]["Enums"]["hr_staff_status"]
+          tax_mode: Database["public"]["Enums"]["hr_tax_mode"]
           total_ctc: number | null
           updated_at: string
+          withholding_rate: number
         }
         Insert: {
           address?: string | null
@@ -3077,8 +4150,10 @@ export type Database = {
           socso_category?: Database["public"]["Enums"]["socso_category"]
           socso_er?: number | null
           status?: Database["public"]["Enums"]["hr_staff_status"]
+          tax_mode?: Database["public"]["Enums"]["hr_tax_mode"]
           total_ctc?: number | null
           updated_at?: string
+          withholding_rate?: number
         }
         Update: {
           address?: string | null
@@ -3112,8 +4187,10 @@ export type Database = {
           socso_category?: Database["public"]["Enums"]["socso_category"]
           socso_er?: number | null
           status?: Database["public"]["Enums"]["hr_staff_status"]
+          tax_mode?: Database["public"]["Enums"]["hr_tax_mode"]
           total_ctc?: number | null
           updated_at?: string
+          withholding_rate?: number
         }
         Relationships: [
           {
@@ -4660,6 +5737,285 @@ export type Database = {
           },
         ]
       }
+      sales_import_batches: {
+        Row: {
+          cancelled_count: number
+          created_at: string
+          file_hash: string | null
+          file_name: string
+          id: string
+          imported_by: string | null
+          notes: string | null
+          order_count: number
+          out_of_period_count: number
+          period_month: string
+          row_count: number
+          sheet_name: string | null
+          status: Database["public"]["Enums"]["sales_import_status"]
+          superseded_at: string | null
+          unmatched_agent_count: number
+        }
+        Insert: {
+          cancelled_count?: number
+          created_at?: string
+          file_hash?: string | null
+          file_name: string
+          id?: string
+          imported_by?: string | null
+          notes?: string | null
+          order_count?: number
+          out_of_period_count?: number
+          period_month: string
+          row_count?: number
+          sheet_name?: string | null
+          status?: Database["public"]["Enums"]["sales_import_status"]
+          superseded_at?: string | null
+          unmatched_agent_count?: number
+        }
+        Update: {
+          cancelled_count?: number
+          created_at?: string
+          file_hash?: string | null
+          file_name?: string
+          id?: string
+          imported_by?: string | null
+          notes?: string | null
+          order_count?: number
+          out_of_period_count?: number
+          period_month?: string
+          row_count?: number
+          sheet_name?: string | null
+          status?: Database["public"]["Enums"]["sales_import_status"]
+          superseded_at?: string | null
+          unmatched_agent_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_import_batches_imported_by_fkey"
+            columns: ["imported_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_order_lines: {
+        Row: {
+          brand_code: string | null
+          cost_amount: number | null
+          description2: string | null
+          id: string
+          item_group: string
+          line_amount: number
+          line_no: number
+          location: string | null
+          order_id: string
+          product_code: string
+          product_name: string | null
+          qty: number
+          raw: Json | null
+          unit_price: number
+          uom: string | null
+        }
+        Insert: {
+          brand_code?: string | null
+          cost_amount?: number | null
+          description2?: string | null
+          id?: string
+          item_group: string
+          line_amount?: number
+          line_no: number
+          location?: string | null
+          order_id: string
+          product_code: string
+          product_name?: string | null
+          qty?: number
+          raw?: Json | null
+          unit_price?: number
+          uom?: string | null
+        }
+        Update: {
+          brand_code?: string | null
+          cost_amount?: number | null
+          description2?: string | null
+          id?: string
+          item_group?: string
+          line_amount?: number
+          line_no?: number
+          location?: string | null
+          order_id?: string
+          product_code?: string
+          product_name?: string | null
+          qty?: number
+          raw?: Json | null
+          unit_price?: number
+          uom?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_order_lines_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_order_open_bill_tags: {
+        Row: {
+          auto_suggested: boolean
+          bill_rank: number
+          event_date: string
+          id: string
+          order_id: string
+          staff_id: string
+          tagged_at: string
+          tagged_by: string | null
+        }
+        Insert: {
+          auto_suggested?: boolean
+          bill_rank: number
+          event_date: string
+          id?: string
+          order_id: string
+          staff_id: string
+          tagged_at?: string
+          tagged_by?: string | null
+        }
+        Update: {
+          auto_suggested?: boolean
+          bill_rank?: number
+          event_date?: string
+          id?: string
+          order_id?: string
+          staff_id?: string
+          tagged_at?: string
+          tagged_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_order_open_bill_tags_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "sales_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_order_open_bill_tags_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "hr_staff_costs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_order_open_bill_tags_tagged_by_fkey"
+            columns: ["tagged_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_orders: {
+        Row: {
+          agent_key: string
+          agent_name: string
+          balance: number | null
+          batch_id: string
+          brand_code: string | null
+          cancelled: boolean
+          created_at: string
+          customer_name: string | null
+          debtor_code: string | null
+          event_date: string
+          id: string
+          location: string | null
+          manual_margin_at: string | null
+          manual_margin_by: string | null
+          manual_margin_pct: number | null
+          order_date: string
+          order_no: string
+          order_total: number
+          paid_amount: number | null
+          period_month: string
+          raw: Json | null
+          sequence_in_day: number | null
+          staff_id: string | null
+        }
+        Insert: {
+          agent_key: string
+          agent_name: string
+          balance?: number | null
+          batch_id: string
+          brand_code?: string | null
+          cancelled?: boolean
+          created_at?: string
+          customer_name?: string | null
+          debtor_code?: string | null
+          event_date: string
+          id?: string
+          location?: string | null
+          manual_margin_at?: string | null
+          manual_margin_by?: string | null
+          manual_margin_pct?: number | null
+          order_date: string
+          order_no: string
+          order_total?: number
+          paid_amount?: number | null
+          period_month: string
+          raw?: Json | null
+          sequence_in_day?: number | null
+          staff_id?: string | null
+        }
+        Update: {
+          agent_key?: string
+          agent_name?: string
+          balance?: number | null
+          batch_id?: string
+          brand_code?: string | null
+          cancelled?: boolean
+          created_at?: string
+          customer_name?: string | null
+          debtor_code?: string | null
+          event_date?: string
+          id?: string
+          location?: string | null
+          manual_margin_at?: string | null
+          manual_margin_by?: string | null
+          manual_margin_pct?: number | null
+          order_date?: string
+          order_no?: string
+          order_total?: number
+          paid_amount?: number | null
+          period_month?: string
+          raw?: Json | null
+          sequence_in_day?: number | null
+          staff_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_orders_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "sales_import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_orders_manual_margin_by_fkey"
+            columns: ["manual_margin_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_orders_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "hr_staff_costs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_contracts: {
         Row: {
           amount: number | null
@@ -5178,6 +6534,7 @@ export type Database = {
         Args: { p_loan_id: string; p_payload: Json }
         Returns: undefined
       }
+      apply_commission_run: { Args: { p_run_id: string }; Returns: Json }
       apply_pool_adjustment: {
         Args: {
           p_amount: number
@@ -5648,6 +7005,24 @@ export type Database = {
         Args: { p_department_id: string; p_segment_key: string }
         Returns: Json
       }
+      reassign_invoice_gl_account: {
+        Args: {
+          p_invoice_id: string
+          p_new_account: string
+          p_old_account?: string
+          p_reason: string
+        }
+        Returns: Json
+      }
+      reassign_voucher_gl_account: {
+        Args: {
+          p_new_account: string
+          p_old_account: string
+          p_reason: string
+          p_voucher_id: string
+        }
+        Returns: number
+      }
       refresh_base_rate: { Args: { p_op_margin: number }; Returns: string }
       reject_dept_payment_request: {
         Args: { p_approval_id: string }
@@ -5665,6 +7040,7 @@ export type Database = {
         Args: { p_new: string; p_old: string }
         Returns: Json
       }
+      reopen_commission_run: { Args: { p_run_id: string }; Returns: Json }
       reopen_director_salary: {
         Args: { p_period: string; p_user_id: string }
         Returns: undefined
@@ -5684,6 +7060,33 @@ export type Database = {
       reverse_voucher_pool_rows: {
         Args: { p_voucher_no: string }
         Returns: number
+      }
+      rnp_invoice_events: {
+        Args: { p_segment?: string }
+        Returns: {
+          amount: number
+          company_id: string
+          event_date: string
+          event_kind: string
+          invoice_id: string
+          invoice_no: string
+          party_fallback: string
+        }[]
+      }
+      save_commission_run: {
+        Args: {
+          p_batch_id: string
+          p_deferred_orders: Json
+          p_penalised_orders: Json
+          p_period_month: string
+          p_released_orders: Json
+          p_scheme_id: string
+          p_statements: Json
+          p_sub_department_id: string
+          p_total_commission: number
+          p_warnings: Json
+        }
+        Returns: string
       }
       save_director_salary_results: { Args: { p_data: Json }; Returns: Json }
       set_fund_source_notes: {
@@ -5806,6 +7209,22 @@ export type Database = {
       cash_flow_category: "operating" | "investing" | "financing"
       claim_status: "pending" | "approved" | "rejected" | "paid"
       claim_type: "project" | "benefit"
+      comm_component:
+        | "product_revenue"
+        | "kpi_item"
+        | "kpi_threshold"
+        | "open_bill"
+        | "override"
+        | "margin_incentive"
+      comm_margin_band_kind: "incentive" | "reference" | "penalty"
+      comm_open_bill_basis: "uplift_on_commission" | "pct_of_revenue"
+      comm_promotion_criterion:
+        | "personal_sales"
+        | "group_sales"
+        | "kpi_items_per_pax"
+        | "margin_band"
+      comm_rate_mode: "fixed" | "variable"
+      comm_run_status: "draft" | "computed" | "applied" | "locked"
       commission_base_source:
         | "staff_sales_count"
         | "staff_sales_amount"
@@ -5854,9 +7273,14 @@ export type Database = {
         | "director"
         | "revenue_department"
       hr_employment_type: "salaried" | "commission_eligible"
-      hr_monthly_payroll_source: "imported" | "manual" | "carried_forward"
+      hr_monthly_payroll_source:
+        | "imported"
+        | "manual"
+        | "carried_forward"
+        | "commission"
       hr_monthly_payroll_status: "draft" | "submitted" | "paid"
       hr_staff_status: "active" | "inactive"
+      hr_tax_mode: "pcb" | "withholding" | "none"
       hv_fund_txn_type:
         | "profit_in"
         | "expense_out"
@@ -5904,6 +7328,7 @@ export type Database = {
         | "rejected"
       pcb_category: "KA1" | "KA2" | "KA3"
       repayment_type: "principal" | "interest" | "penalty" | "netting"
+      sales_import_status: "draft" | "committed" | "superseded"
       socso_category: "first" | "second"
       statement_direction: "receivable" | "payable"
       statement_line_type: "invoice" | "contra"
@@ -6089,6 +7514,24 @@ export const Constants = {
       cash_flow_category: ["operating", "investing", "financing"],
       claim_status: ["pending", "approved", "rejected", "paid"],
       claim_type: ["project", "benefit"],
+      comm_component: [
+        "product_revenue",
+        "kpi_item",
+        "kpi_threshold",
+        "open_bill",
+        "override",
+        "margin_incentive",
+      ],
+      comm_margin_band_kind: ["incentive", "reference", "penalty"],
+      comm_open_bill_basis: ["uplift_on_commission", "pct_of_revenue"],
+      comm_promotion_criterion: [
+        "personal_sales",
+        "group_sales",
+        "kpi_items_per_pax",
+        "margin_band",
+      ],
+      comm_rate_mode: ["fixed", "variable"],
+      comm_run_status: ["draft", "computed", "applied", "locked"],
       commission_base_source: [
         "staff_sales_count",
         "staff_sales_amount",
@@ -6143,9 +7586,15 @@ export const Constants = {
         "revenue_department",
       ],
       hr_employment_type: ["salaried", "commission_eligible"],
-      hr_monthly_payroll_source: ["imported", "manual", "carried_forward"],
+      hr_monthly_payroll_source: [
+        "imported",
+        "manual",
+        "carried_forward",
+        "commission",
+      ],
       hr_monthly_payroll_status: ["draft", "submitted", "paid"],
       hr_staff_status: ["active", "inactive"],
+      hr_tax_mode: ["pcb", "withholding", "none"],
       hv_fund_txn_type: [
         "profit_in",
         "expense_out",
@@ -6199,6 +7648,7 @@ export const Constants = {
       ],
       pcb_category: ["KA1", "KA2", "KA3"],
       repayment_type: ["principal", "interest", "penalty", "netting"],
+      sales_import_status: ["draft", "committed", "superseded"],
       socso_category: ["first", "second"],
       statement_direction: ["receivable", "payable"],
       statement_line_type: ["invoice", "contra"],

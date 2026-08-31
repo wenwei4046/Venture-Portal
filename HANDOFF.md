@@ -1,4 +1,4 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-08-08 · Bank Recon live)
+# HOUZS Venture Portal — Session Handoff (checkpoint 2026-08-31 · Revenue commission module, incl. the run)
 
 ## ═══ CHECKPOINT 2026-08-08 — read this first ═══
 
@@ -43,6 +43,283 @@ migrations applied live + archived; detailed sections follow this block):
    staff table is `hr_staff_costs` (no `staff` table); dept staff→segment map
    HR/Finance/Marketing/Director Office (+director from director_monthly_
    payroll); 还款 PVs are typed 'expense' with fund_source_id links.
+
+## SESSION 2026-08-31 — Revenue Department commission payroll (NEW MODULE)
+
+**MERGED TO MAIN 2026-08-31 — PR #24, merge commit `283dd3d`.** The four
+migrations had already been applied to the live database during development, so
+the merge applied nothing: the 22 tables, three RPCs and the fourth value on
+`hr_monthly_payroll_source` were live before it landed. Built in worktree
+`.claude/worktrees/revenue-commission-payroll` on branch
+`worktree-revenue-commission-payroll`, with main merged in at `c4227dc`
+(Walnut palette).
+Suite 710 passing, `next build` clean, `tsc --noEmit` clean (installing
+@xyflow/react also pulled in @anthropic-ai/sdk, html-to-image and pdf2json,
+which package.json declared but nobody had installed).
+
+**The module is now feature-complete except for the data it needs.** The run
+itself — compute, review, apply, reopen — was built in the second sitting; see
+"The run" below. What still blocks a real July is that 39 of the 40 ERP agents
+do not exist as staff, and that nothing has a cost.
+
+Full spec: `docs/module-spec-revenue-commission.md`. Read that before touching
+any of this — everything below is a summary of it.
+
+### What the module is
+
+A SECOND payroll **type**. Every existing `hr_monthly_payroll` row arrives
+already-computed from InfoTech; the Revenue Department's is *derived* from an
+ERP sales-order export instead. Its staff have **no basic salary and no
+statutory allowance** — 100% commission — and pay **Withholding Tax 2% instead
+of PCB**.
+
+**The architectural decision that matters: the commission engine is an upstream
+FEEDER, not a parallel payroll.** It writes exactly ONE existing field,
+`hr_monthly_payroll.commission_amount`. Statutory lookups, payroll runs,
+funding, accrual JVs, PVs and GL are untouched. "Type" in the DB is
+`departments.payroll_source ∈ (imported, commission)`.
+
+### Org shape
+
+`departments (Revenue Department) → comm_sub_departments (Fair) → comm_schemes
+→ {ranks, item groups, KPI items, thresholds, open-bill rules, brands, margin
+bands, promotion rules, hierarchy}`.
+
+**"Fair" is a SUB-DEPARTMENT, not the whole department** — the roadshow/event
+team, which is where the 3-day event and the Open Bill bonus come from. Each
+sub-department calculates differently, so a new one either CLONES an existing
+scheme or starts blank, and every component can be switched off at scheme level.
+
+### The money rules (all in the engine, 91 tests)
+
+Ladder, 6 rungs: Revenue Specialist 5% → 6% · Team Assistant 7% → 8% · Team
+Leader 9% · Senior Team Leader 10%. **There is no 7% Revenue Specialist.**
+`rs_5` cannot recruit; 6% unlocks it.
+
+- **Rate mode, per person.** `variable` = "entitled to the scheme target"
+  (recomputed monthly off group sales, drops back when missed). `fixed` =
+  "flexible" (whatever title a human moved them to sticks). UI says
+  Scheme / Manual.
+- **Group sales** = own + the WHOLE downline subtree. 300k promotes 6% → 7%.
+  It is a SALES figure, so the margin penalty does NOT reduce it.
+- **Deposit gate.** No commission on an order until the customer has deposited
+  ≥ 50% of the ORDER TOTAL (header total, transport included). Holds the whole
+  order — product commission, KPI and Open Bill together. Nothing is lost: it
+  pays in the month the deposit clears, and `comm_order_releases` (UNIQUE on
+  order_no) makes double-paying impossible.
+- **Open Bill** = the 1st/2nd/3rd bill of an event day earns +50/40/30% ON TOP
+  of that bill's commission, at the person's CURRENT rate. Additive.
+- **KPI items** pay a flat RM per unit and their revenue LEAVES the commission
+  base. 10 units → +20% on the whole KPI amount. Most are bundled free in the
+  ERP, which is the case it exists to reward.
+- **Override** = differential roll-up, unlimited levels, equal rates compress
+  to 0. **The below-margin penalty cuts the upline's override too**, via a
+  penalty-weighted revenue base.
+- **Margin bands follow the BRAND** (Akemi / Zanotti / Ergotex). Incentive
+  rungs read "margin ≥ this" and STACK (36% → 1,000; 43% → +1,500 = 2,500);
+  penalty rungs read "margin ≤ this" and the MOST SEVERE wins (27% → ×0.5,
+  25% → ×0.25, 24% → ×0). **Penalty is PER BILL; incentive is MONTHLY and
+  judged brand by brand — EVERY brand sold must clear the tier.** Three
+  weekends of Akemi at Tier 2 plus one weekend of Zanotti below it is a Tier 1
+  month. A brand with no cost, no ladder (Ergotex today) or no brand code
+  BLOCKS the whole incentive loudly rather than paying on the judgeable ones.
+- **Promotion criteria are RECORDED, NOT ENFORCED** (`comm_promotion_rules`,
+  `is_enforced = FALSE` on all 10 rows) — the user asked for them written down
+  while the rules settle. The only live gate is
+  `comm_ranks.group_sales_threshold`.
+- Margin = goods only (TRANS/OTHER excluded) but INCLUDING free KPI giveaways,
+  because their cost is real and giving them away is meant to hurt.
+
+### Where cost comes from (the ERP export has none)
+
+1. **Settings → Product List** (Principal only) — `comm_products`, item code →
+   unit cost + brand, with a spreadsheet bulk paste. The importer stamps
+   `qty × unit_cost` onto `sales_order_lines.cost_amount` ONCE, so changing a
+   price later cannot rewrite a run already computed against the old one.
+2. **`sales_orders.manual_margin_pct`** — margin typed per bill, which
+   OVERRIDES anything derived from cost. The stop-gap while the list fills up.
+
+No cost and no keyed margin → the penalty is skipped and the run says so.
+
+### The ERP export — five traps, all handled
+
+Confirmed against `July SO.xlsx`: 3,261 lines → 691 orders → 40 agents;
+July 473 orders RM2,861,361.30, commissionable RM2,831,707.30 after dropping
+RM29,654 of TRANS/OTHER. 324 paid / 360 part-paid / 6 unpaid.
+
+1. **`Total` and `Tax` appear TWICE** (order-header block + line block).
+   Resolve columns RELATIVE TO `Item Group` or every package order looks
+   discounted. With that fixed all 691 orders tally exactly.
+2. **Package pricing** — 607/691 orders put the whole value on ONE line and
+   bundle the rest at qty > 0, amount 0. A per-line amount is NOT a per-product
+   revenue split.
+3. **Agent is free text, no code, and dirty** (trailing spaces, mixed case,
+   plus `OTHERS` / `Test Sales Director` / `HOUZS CENTURY`). Hence
+   `comm_agent_aliases`.
+4. **No time of day** — intra-day order comes only from the running `Doc. No.`
+5. **The export is a date RANGE, not a month** (a "July" file ran to 15 Aug).
+
+### Live now (applied 2026-08-31, verified)
+
+22 tables, 44 policies, Fair + 6 ranks + 3 brands + 8 margin bands + 10
+promotion rules seeded, Revenue Department flipped to `commission`.
+
+Applied with `apply_migration`, NOT `supabase db push` — the remote records 394
+migrations against 391 local files, so db push cannot be trusted here.
+
+Verified after applying: **no existing payroll row was touched** (newest
+`updated_at` across all 38 rows is still 2026-08-03, total WHT 0, nobody off
+PCB), and a rolled-back functional test proved the cycle trigger refuses a
+manager-under-own-downline, the one-position exclusion refuses an overlap, and
+a pure-commission salesperson on withholding gives gross 8,000 → statutory 0 →
+PCB 0 → WHT 160 → net 7,840.
+
+### UI built
+
+- **Settings → Commission** (Principal + HR): nine sections — sub-department
+  picker with Generate New, scheme switches, tier ladder, item groups, KPI
+  items, KPI thresholds, Open Bill rates, brands + margin bands, promotion
+  criteria (read-only), salespeople table.
+- **Settings → Product List** (Principal), with a red "missing a cost" counter.
+- **/hr-costing/commission** landing + `[period]` page (surfaces unmatched
+  agents, lines without cost/brand, orders under the deposit gate).
+- **/hr-costing/commission/org-chart** — `@xyflow/react`. Drop a card onto a
+  manager OR draw a line. Illegal drops grey out and are refused client-side;
+  the DB trigger is the backstop. Layout is hand-rolled
+  (`src/lib/commission/org-layout.ts`) so orphans and cycles are PLACED, not
+  dropped.
+- **/hr-costing/commission/[period]/import** — browser-parsed wizard that leads
+  with what it will DROP, does agent matching, stamps cost + brand, and seeds
+  the Open Bill picks from the document numbers as suggestions.
+
+`setPosition()` NEVER mutates a position a closed month has run against: it
+closes the old `comm_hierarchy` row the day before the current period and
+inserts a new one (edits in place only when the row started this month).
+
+### The run (second sitting, 2026-08-31)
+
+Compute → review → apply → reopen. The engine already existed and is unchanged;
+what was missing was everything around it.
+
+**Shape.** `run-actions.ts` loads the rows, `src/lib/commission/run-payload.ts`
+maps them onto `EngineInput` and maps the result back onto an RPC payload, the
+engine does the maths, and ONE SQL function writes. The seam is a pure module
+with 16 tests of its own because a mapping slip there does not throw — it
+quietly pays the wrong person the wrong amount.
+
+**Three RPCs, all SECURITY INVOKER** (migration `20260831040000`). RLS is the
+outer wall (principal + hr only; hr may only touch a *draft* payroll row) and
+the guards inside are the inner one. A SECURITY DEFINER would have handed HR
+the ability to rewrite a submitted month.
+
+- `save_commission_run` — replaces the month's statements in one transaction.
+  Refuses a payload whose lines do not sum to the statement total, or whose
+  statements do not sum to the run total, or a run that is already applied.
+- `apply_commission_run` — the ONLY place `hr_monthly_payroll.commission_amount`
+  is written. Refuses while any warning stands, refuses a payroll month that has
+  settled, refuses an order another run already paid.
+- `reopen_commission_run` — undoes an apply exactly: commission back to 0, the
+  releases deleted so the orders return to the pool.
+
+**`comm_runs` now snapshots what the run saw** (migration `20260831030000`):
+`released_orders`, `deferred_orders`, `penalised_orders` as JSONB, plus
+`reopened_at` / `reopened_by`. These are NOT recomputed on the page. Re-importing
+a month replaces every `sales_orders` row, so a page that re-derived its own
+history would disagree with the money already in payroll.
+
+**`hr_monthly_payroll_source` gained `commission`.** The other three values all
+describe a human putting the number there; a Revenue row is derived and is
+rewritten on every Apply, so a hand edit will not survive the next run. (Its own
+migration, because `ALTER TYPE ... ADD VALUE` cannot be USED in the transaction
+that adds it.)
+
+**Carry-forward works.** A run's input is every committed order up to and
+including its month that no applied run has paid for — so a June order the
+deposit gate held pays in July, at its original `period_month`, labelled
+"carried from 2026-06". Orders an earlier run already paid are still passed to
+the engine, flagged, because dropping them at the query would erase their
+revenue from GROUP sales, and group sales drive promotions.
+
+**UI.** The run dashboard on `…/[period]` (hero total, warnings, per-person
+table, penalised bills, orders waiting on a deposit, Compute / Apply / Reopen);
+the statement drill-down at `…/[period]/statement/[staffId]` (figures, margin
+brand by brand, a section per component down to the individual lines); and the
+Open Bill board at `…/[period]/open-bill` — which defaults to hiding everything
+already reviewed, because in a real month most days have one obvious answer and
+what deserves a person's attention is the day where the suggestion might be
+wrong. Both review-board edits (Open Bill rank, hand-keyed margin) refuse once
+the run has paid.
+
+**Proved on the live schema**, in a rolled-back transaction: both tally guards
+refuse, warnings block the apply, an applied run refuses to be recomputed, a
+*rejected* payroll run does not block while a *submitted* one does, and
+apply → reopen leaves payroll exactly where it started. Full chain for a
+commission-only salesperson on withholding: gross 10,000 → PCB 0 → WHT 200 →
+net 9,800, then back to 0 on reopen. Nothing pre-existing moved (all 38 rows
+still at `updated_at` 2026-08-03).
+
+**Two things found while doing it, both real:**
+
+1. **The July 2026 payroll run is `approved`.** The first attempt to prove the
+   apply used July and was refused by the guard — correctly. A real July
+   commission run cannot be applied until that payroll run is reopened.
+2. **A period holds several `payroll_runs` rows** — 2026-06-01 has both a
+   `rejected` and an `approved` one. The first cut of the guard asked "is there
+   a row that is not draft?", which a dead rejected run answers yes to. It now
+   asks whether any run has SETTLED (submitted / approved / paid). Corrected on
+   the live database by migration `commission_run_payroll_guard_ignores_rejected`
+   and folded back into `20260831040000` in the repo, so replaying the file
+   gives the same end state — the remote therefore records one migration name
+   that has no local file, on top of the pre-existing 394-vs-391 drift.
+
+**The payroll side is closed too.** The grid's Commission cell is read-only for
+anyone in a `payroll_source = 'commission'` department, with a `from commission
+run` badge linking to that month's statement (or `awaiting the run` when none
+has been computed). The Server Action enforces the same thing —
+`resolveCommissionWrite` drops an unchanged value riding along with a
+legitimate edit and refuses one that would move the number — so a crafted
+request cannot get past it either.
+
+Two Withholding Tax holes closed while there: PCB and WHT are mutually
+exclusive and only PCB was ever displayed, so a Revenue payslip would have
+shown a Net Pay that did not equal Gross minus Total Deductions; and
+`updateStaffStatutory` recomputed net without subtracting WHT, so overriding
+any statutory on a Revenue row would have quietly handed back their tax.
+
+`src/lib/supabase/database.types.ts` was **regenerated** at this point — four
+migrations of drift had accumulated and `withholding_tax` was not in it. All 22
+comm_* / sales_* tables are now typed. The untyped-client casts across the
+module still compile unchanged; `tsc --noEmit` is clean and the suite went
+710 → 717.
+
+### ⛔ Blocked / next
+
+1. **39 of the 40 ERP agents do not exist in `hr_staff_costs`** (only
+   `SIA JONAS`, and he is in Marketing). Nothing can run until they are created
+   under HR → Staff in the Revenue Department with basic 0, then placed on the
+   org chart. This is the practical first move.
+2. ~~The commission run itself~~ — **done**, and so is the payroll-side
+   lockdown (see "The run" above). What remains on that side is one operational
+   step: reopening the approved July 2026 payroll run before a real July
+   commission run can be applied.
+3. **KPI product list unchosen.** Sizing: RM50 on the five commonest pillow
+   codes would have paid ≈ RM63,000 of KPI in July against ≈ RM141,000 of
+   product commission at a flat 5%.
+4. **Zanotti / Ergotex ladders and Item Code prefixes** unknown. Selling a
+   brand with no ladder blocks that person's incentive — by design, but fill
+   them in.
+5. **WHT remittance** — PCB files through the statutory export; WHT goes to
+   LHDN on a different form and that section does not exist yet. Needed before
+   the first Revenue payroll is actually paid out.
+6. Open spec questions: group-sales targets above 300k, and confirming 5% → 6%
+   is measured on PERSONAL sales.
+
+### ⚠️ Landmine found while verifying (pre-existing, not introduced)
+
+Re-firing `compute_hr_monthly_payroll` on InfoTech-imported rows replaces the
+file's verbatim statutory with recomputed JADUAL values — **31 of the 38 live
+rows move** if anyone runs a bulk `UPDATE hr_monthly_payroll SET x = x`. Do not
+do that without accounting for it.
 
 ## SESSION 2026-08-29 — reassign-GL day + report ghost fixes + sidebar
 

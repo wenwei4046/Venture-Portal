@@ -84,6 +84,11 @@ access-matrix.md — 4 roles × 9 modules, RLS patterns, data visibility
 module-spec-phase1.md — Dashboard, Fund IN, Fund OUT, Overdue & Netting
 module-spec-phase2.md — Dept Pool, Service Billing (5 modes)
 module-spec-phase3.md — Director Salary Engine, HR Costing, Reports
+module-spec-revenue-commission.md — Revenue Department commission payroll: the
+  second payroll TYPE (ERP sales orders → commission engine → the one
+  `hr_monthly_payroll.commission_amount` field). Sub-departments, the tier
+  ladder, deposit gate, brand margin bands, Withholding Tax. Read this before
+  touching anything under `comm_*` / `sales_*` or `/hr-costing/commission`.
 DESIGN.md — v3.0 Ledger-Dense design system. **Single source of truth for all UI.** Colors, typography, components, page anatomy, the v3.0 utility classes (`.num`, `.ledger-table`, `.page-head`, etc), and canonical reference pages.
 ALWAYS reference these docs before implementing any feature.
 

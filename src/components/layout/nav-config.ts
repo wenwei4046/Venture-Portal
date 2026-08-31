@@ -111,6 +111,9 @@ export const navEntries: NavEntry[] = [
     children: [
       { href: '/hr-costing', label: 'Overview', exact: true, visible: isHRorPrincipal },
       { href: '/hr-costing/payroll', label: 'Payroll', visible: isHRorPrincipal },
+      // Revenue Department commission run (merged from main 2026-08-31) — the
+      // second payroll TYPE, feeding hr_monthly_payroll.commission_amount.
+      { href: '/hr-costing/commission', label: 'Commission', visible: isHRorPrincipal },
       { href: '/hr-costing/payment', label: 'Payment', visible: isHRorPrincipal },
       { href: '/hr-costing/staff', label: 'Staff', visible: isHRorPrincipal },
     ],
