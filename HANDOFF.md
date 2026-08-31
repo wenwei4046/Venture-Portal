@@ -46,12 +46,13 @@ migrations applied live + archived; detailed sections follow this block):
 
 ## SESSION 2026-08-31 — Revenue Department commission payroll (NEW MODULE)
 
-**⚠️ READ FIRST: the work lives on branch `worktree-revenue-commission-payroll`,
-NOT on main — but its FOUR migrations are ALREADY APPLIED to the live
-database.** So the schema is ahead of main. Merging the branch is the obvious
-next housekeeping step; until then, main has no record of 22 live tables, three
-live RPCs and a fourth value on `hr_monthly_payroll_source`.
-Worktree: `.claude/worktrees/revenue-commission-payroll`.
+**⚠️ READ FIRST: this is open as PR #24 and NOT yet merged — but its FOUR
+migrations are ALREADY APPLIED to the live database.** So the schema is ahead
+of main until the PR lands, and **merging applies nothing**; the 22 tables,
+three RPCs and the fourth value on `hr_monthly_payroll_source` are already
+there. Branch `worktree-revenue-commission-payroll`, worktree
+`.claude/worktrees/revenue-commission-payroll`, main merged in at `c4227dc`
+(Walnut palette).
 Suite 710 passing, `next build` clean, `tsc --noEmit` clean (installing
 @xyflow/react also pulled in @anthropic-ai/sdk, html-to-image and pdf2json,
 which package.json declared but nobody had installed).
