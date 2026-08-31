@@ -149,11 +149,11 @@ export default function MonthlyMatrix({
         ))}
       </div>
 
-      <div className="overflow-x-auto border border-hairline rounded-md">
+      <div className="overflow-x-auto table-scroll border border-hairline rounded-md">
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="border-b border-hairline">
-              <th className="sticky left-0 z-10 bg-surface text-left font-sans text-xs uppercase tracking-wide text-muted px-4 py-3 min-w-[220px]">
+              <th className="sticky left-0 z-10 bg-surface text-left font-sans text-xs uppercase tracking-wide text-muted px-4 py-3 min-w-[130px] sm:min-w-[220px]">
                 Item
               </th>
               {columns.map((c) => (

@@ -10,6 +10,7 @@ import {
   applyDirectorPayrollImport,
   type DirectorPayrollPreview,
 } from '../../payroll-actions'
+import LedgerRow from '@/components/LedgerRow'
 
 interface Props {
   period: string
@@ -209,10 +210,11 @@ export default function DirectorImportWizard({ period }: Props) {
               <thead>
                 <tr>
                   <th>Name</th>
-                  <th>Director</th>
-                  <th>Action</th>
-                  <th className="right">Gross</th>
+                  <th className="m-hide">Director</th>
+                  <th className="m-hide">Action</th>
+                  <th className="right m-hide">Gross</th>
                   <th className="right">Net</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
@@ -220,16 +222,16 @@ export default function DirectorImportWizard({ period }: Props) {
                   ...preview.toCreate.map(r => ({ ...r, action: 'create' as const })),
                   ...preview.toUpdate.map(r => ({ ...r, action: 'overwrite' as const })),
                 ].map(u => (
-                  <tr key={`${u.action}-${u.rowIndex}`}>
+                  <LedgerRow key={`${u.action}-${u.rowIndex}`}>
                     <td>{u.name}</td>
-                    <td>
+                    <td className="m-hide" data-label="Director">
                       {u.directorCode ? (
                         <span className="font-mono text-sm text-ink">{u.directorCode}</span>
                       ) : (
                         <span className="font-serif italic text-xs text-alert">unmatched</span>
                       )}
                     </td>
-                    <td>
+                    <td className="m-hide" data-label="Action">
                       <span
                         className={`font-serif italic text-xs ${
                           u.action === 'create' ? 'text-ledger' : 'text-alert'
@@ -238,9 +240,9 @@ export default function DirectorImportWizard({ period }: Props) {
                         {u.action}
                       </span>
                     </td>
-                    <td className="num">{formatMoney(u.gross)}</td>
+                    <td className="num m-hide" data-label="Gross">{formatMoney(u.gross)}</td>
                     <td className="num">{formatMoney(u.net)}</td>
-                  </tr>
+                  </LedgerRow>
                 ))}
               </tbody>
             </table>

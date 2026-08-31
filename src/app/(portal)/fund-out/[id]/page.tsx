@@ -10,6 +10,7 @@ import RepaymentForm from '../_components/RepaymentForm'
 import FundingSourceEditor from './_components/FundingSourceEditor'
 import RepaymentStartEditor from './_components/RepaymentStartEditor'
 import VoidRepaymentButton from './_components/VoidRepaymentButton'
+import LedgerRow from '@/components/LedgerRow'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -341,29 +342,30 @@ export default async function LoanDetailPage({ params }: Props) {
               <thead>
                 <tr>
                   <th>Date</th>
-                  <th>Type</th>
+                  <th className="m-hide">Type</th>
                   <th className="right">Amount</th>
-                  <th>Notes</th>
-                  {isFinanceSide ? <th className="right">Action</th> : null}
+                  <th className="m-hide">Notes</th>
+                  {isFinanceSide ? <th className="right m-hide">Action</th> : null}
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
                 {repaymentList.map((r) => (
-                  <tr key={r.id}>
+                  <LedgerRow key={r.id}>
                     <td className="font-mono tabular text-ink">
                       {dayjs(r.payment_date).format('D MMM YYYY')}
                     </td>
-                    <td className="font-serif italic text-graphite">
+                    <td className="font-serif italic text-graphite m-hide" data-label="Type">
                       {r.payment_type}
                     </td>
                     <td className="num">
                       {formatMoney(Number(r.amount))}
                     </td>
-                    <td className="text-sm text-muted italic font-serif">
+                    <td className="text-sm text-muted italic font-serif m-hide" data-label="Notes">
                       {r.notes ?? '—'}
                     </td>
                     {isFinanceSide ? (
-                      <td className="text-right">
+                      <td className="text-right m-hide">
                         <VoidRepaymentButton
                           repaymentId={r.id as string}
                           loanId={loan.id as string}
@@ -371,7 +373,7 @@ export default async function LoanDetailPage({ params }: Props) {
                         />
                       </td>
                     ) : null}
-                  </tr>
+                  </LedgerRow>
                 ))}
               </tbody>
             </table>

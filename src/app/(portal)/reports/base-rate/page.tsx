@@ -3,6 +3,7 @@ import { requireRole } from '@/lib/auth'
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import BaseRateTrendChart from './_components/BaseRateTrendChart'
+import LedgerRow from '@/components/LedgerRow'
 
 export default async function BaseRateHistoryPage() {
   await requireRole(['principal', 'finance'])
@@ -64,27 +65,28 @@ export default async function BaseRateHistoryPage() {
               <thead>
                 <tr>
                   <th>Quarter</th>
-                  <th className="right">Wtd Cost</th>
-                  <th className="right">Margin</th>
+                  <th className="right m-hide">Wtd Cost</th>
+                  <th className="right m-hide">Margin</th>
                   <th className="right">Base Rate</th>
-                  <th>Approved</th>
+                  <th className="m-hide">Approved</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
                 {history.map(h => (
-                  <tr key={h.id}>
+                  <LedgerRow key={h.id}>
                     <td>
                       <div className="font-serif text-md text-ink">{h.quarter}</div>
                     </td>
-                    <td className="num text-graphite">{(Number(h.weighted_cost) * 100).toFixed(3)}%</td>
-                    <td className="num text-graphite">{(Number(h.op_margin) * 100).toFixed(3)}%</td>
+                    <td className="num text-graphite m-hide" data-label="Wtd Cost">{(Number(h.weighted_cost) * 100).toFixed(3)}%</td>
+                    <td className="num text-graphite m-hide" data-label="Margin">{(Number(h.op_margin) * 100).toFixed(3)}%</td>
                     <td className="num text-num-ink font-semibold">{(Number(h.base_rate) * 100).toFixed(3)}%</td>
-                    <td>
+                    <td className="m-hide" data-label="Approved">
                       <div className="font-mono text-xs text-muted">
                         {h.approved_at ? dayjs(h.approved_at).format('D MMM YYYY') : '—'}
                       </div>
                     </td>
-                  </tr>
+                  </LedgerRow>
                 ))}
               </tbody>
             </table>

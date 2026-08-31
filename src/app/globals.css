@@ -786,9 +786,14 @@ table.ledger-table tr.lt-detail {
 }
 
 @media (max-width: 767px) {
-  /* Columns demoted to the detail panel leave the grid entirely. */
+  /* Columns demoted to the detail panel leave the grid entirely. A whole <tr>
+     can carry it too — the company statement's second header row holds only
+     sub-headers for columns that are themselves folded away. */
   table.ledger-table th.m-hide,
   table.ledger-table td.m-hide {
+    display: none;
+  }
+  table.ledger-table tr.m-hide {
     display: none;
   }
 
