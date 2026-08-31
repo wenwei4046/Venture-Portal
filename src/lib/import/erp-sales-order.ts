@@ -60,6 +60,13 @@ export interface ErpSalesOrder {
   orderNo: string
   /** YYYY-MM-DD */
   orderDate: string
+  /**
+   * The event day the Open Bill race is run on. Defaults to the order date —
+   * the ERP has nothing better — but stays a separate field because a 3-day
+   * roadshow can straddle a cut-off and late-entered orders get the following
+   * day's date.
+   */
+  eventDate: string
   /** YYYY-MM-01 — commission settles per calendar month. */
   periodMonth: string
   debtorCode: string | null
@@ -281,6 +288,7 @@ export function parseErpSalesGrid(grid: Grid, sheetName = ''): ErpParseResult {
       order = {
         orderNo,
         orderDate: isoDate,
+        eventDate: isoDate,
         periodMonth: periodOf(isoDate),
         debtorCode: map.debtorCode >= 0 ? text(row[map.debtorCode]) || null : null,
         customerName: map.debtorName >= 0 ? text(row[map.debtorName]) : '',

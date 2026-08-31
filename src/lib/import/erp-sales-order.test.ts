@@ -193,6 +193,15 @@ describe('parseErpSalesGrid', () => {
     expect(so.periodMonth).toBe('2026-07-01')
   })
 
+  it('seeds the event day from the order date, as its own field', () => {
+    // The Open Bill race runs per event day. The ERP has nothing better than
+    // the order date, but a roadshow straddling a cut-off needs the two to be
+    // separately editable later.
+    const so = result.orders.find(o => o.orderNo === 'SO-012579')!
+    expect(so.eventDate).toBe(so.orderDate)
+    expect(so.eventDate).toBe('2026-07-01')
+  })
+
   it('keeps package pricing intact — one priced line, the rest at zero', () => {
     const so = result.orders.find(o => o.orderNo === 'SO-012579')!
     expect(so.lines.map(l => l.lineAmount)).toEqual([6400, 0, 0])

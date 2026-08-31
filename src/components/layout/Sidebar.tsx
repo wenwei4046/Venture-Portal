@@ -105,6 +105,7 @@ const navEntries: NavEntry[] = [
     children: [
       { href: '/hr-costing', label: 'Overview', exact: true, visible: isHRorPrincipal },
       { href: '/hr-costing/payroll', label: 'Payroll', visible: isHRorPrincipal },
+      { href: '/hr-costing/commission', label: 'Commission', visible: isHRorPrincipal },
       { href: '/hr-costing/payment', label: 'Payment', visible: isHRorPrincipal },
       { href: '/hr-costing/staff', label: 'Staff', visible: isHRorPrincipal },
     ],
