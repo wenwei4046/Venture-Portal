@@ -244,6 +244,15 @@ the page runs behind and between them.
 headers) so the two can be tuned independently, and `.sidebar-contrast` reads
 `var(--chrome)` rather than repeating the literal, so rail and header cannot drift.
 
+**Tune the chrome step by measurement, not by eye.** The first attempt at
+`232 227 219` was only **ΔL\* 4.1** from the page — inside the barely-perceptible
+band. It looked fine in a mockup and read as *no header at all* on a 60px strip in
+the real app. The shipped value `222 215 202` is **ΔL\* 8.3**. Rule of thumb:
+ΔL\* ~4 is invisible, ~6 is noticeable, ~8–10 is unambiguously a separate surface.
+Keep any future chrome above ~6, and re-tune `.sidebar-contrast`'s `--surface-2`
+(nav hover) and `--hairline` alongside it — they sit relative to `--chrome`, and
+if it moves without them the hover state silently disappears.
+
 **Why not a bottom border on the header.** The v3.0 rule stopped dead where the
 sidebar edge began, leaving an L-shaped band that never closed — the original
 complaint this palette answers. Removing it fixed the corner but overshot: on
