@@ -41,7 +41,7 @@ export default function MonthlyReportControls({
   }
 
   return (
-    <aside className="shrink-0 w-52 space-y-6">
+    <aside className="shrink-0 w-full lg:w-52 space-y-6">
       <div>
         <div className="text-xs uppercase tracking-wide text-muted font-sans mb-2">Up to month</div>
         <input
