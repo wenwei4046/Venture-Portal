@@ -1,55 +1,14 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@/types'
 import { getRoleLabel } from '@/lib/roles'
+import { officeClock } from '@/lib/office-clock'
 import { isPrincipalAccount, isMasked } from '@/lib/view-as'
 import { setViewAs } from './view-as-actions'
 import ThemeToggle from './ThemeToggle'
-
-function getGreeting(hour: number): string {
-  if (hour < 12) return 'Good morning'
-  if (hour < 18) return 'Good afternoon'
-  return 'Good evening'
-}
-
-interface Clock {
-  greeting: string
-  date: string
-  quarter: string
-}
-
-/**
- * The header clock, read AFTER mount.
- *
- * Greeting, date and quarter are all the viewer's local time, and the server
- * has no idea what that is — it renders in UTC, eight hours behind Malaysia.
- * Computing them during SSR therefore shipped text the client immediately
- * disagreed with: React hydration error #418, on every page in the portal, for
- * the eight hours a day the two clocks fall on different sides of a boundary.
- * (Caught on production at 23:04 local — the server had sent "Good afternoon".)
- *
- * Returning null on the server AND on the first client render is the whole
- * trick: both agree there is nothing there, hydration matches, and the effect
- * fills it in a frame later.
- */
-function useClock(): Clock | null {
-  const [clock, setClock] = useState<Clock | null>(null)
-
-  useEffect(() => {
-    const now = dayjs()
-    setClock({
-      greeting: getGreeting(now.hour()),
-      date: now.format('ddd D MMM YYYY'),
-      quarter: `Q${Math.floor(now.month() / 3) + 1} ${now.year()}`,
-    })
-  }, [])
-
-  return clock
-}
 
 interface TopBarProps {
   user: User
@@ -68,7 +27,7 @@ export default function TopBar({ user }: TopBarProps) {
     router.refresh()
   }
 
-  const clock = useClock()
+  const clock = officeClock()
   const displayName = user.name || getRoleLabel(user.role)
 
   // The header is a floating chrome panel — a peer of the sidebar rail, same
@@ -97,11 +56,13 @@ export default function TopBar({ user }: TopBarProps) {
         {/* pr-1: `truncate` clips overflow, and the name renders in italic —
             without the gutter the final letter's tail is shaved off. */}
         <div className="font-serif text-[18px] md:text-[20px] text-ink truncate leading-none pr-1">
-          {/* Deliberately NOT width-reserved. The three greetings differ by
-              16px, so holding the widest would leave a ragged gap before the
-              name on the other two — every load, rather than the one frame
-              the reflow costs. */}
-          <span className="hidden sm:inline">{clock ? `${clock.greeting}, ` : null}</span>
+          {/* suppressHydrationWarning covers the sliver the fixed zone cannot:
+              server and client render the same string unless the request and
+              the hydration land either side of an hour boundary, which is a
+              sub-second window. Scoped to the clock, never to anything else. */}
+          <span className="hidden sm:inline" suppressHydrationWarning>
+            {clock.greeting},{' '}
+          </span>
           <span className="italic text-accent">{displayName}</span>
           <span className="hidden sm:inline">.</span>
         </div>
@@ -144,13 +105,9 @@ export default function TopBar({ user }: TopBarProps) {
               {getRoleLabel(user.role)}
             </span>
           ) : null}
-          {clock ? (
-            <>
-              <span>{clock.date}</span>
-              <span className="text-muted/70">·</span>
-              <span>{clock.quarter}</span>
-            </>
-          ) : null}
+          <span suppressHydrationWarning>{clock.date}</span>
+          <span className="text-muted/70">·</span>
+          <span suppressHydrationWarning>{clock.quarter}</span>
         </div>
         <ThemeToggle />
         {/* Sign out is in the More sheet on mobile — repeating it here cost
