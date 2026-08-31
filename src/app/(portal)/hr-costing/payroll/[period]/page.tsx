@@ -17,6 +17,7 @@ import PeriodPicker from '../_components/PeriodPicker'
 import RequestPayrollPaymentButton, {
   type RequestState,
 } from '../_components/RequestPayrollPaymentButton'
+import LedgerRow from '@/components/LedgerRow'
 
 interface PageProps {
   params: Promise<{ period: string }>
@@ -540,30 +541,31 @@ function DirectorSalarySection({
           <thead>
             <tr>
               <th>Director</th>
-              <th className="right">Pool Slice</th>
-              <th className="right">Gross (75%)</th>
-              <th className="right">EPF ER</th>
-              <th className="right">SOCSO+EIS ER</th>
-              <th className="right">PCB</th>
+              <th className="right m-hide">Pool Slice</th>
+              <th className="right m-hide">Gross (75%)</th>
+              <th className="right m-hide">EPF ER</th>
+              <th className="right m-hide">SOCSO+EIS ER</th>
+              <th className="right m-hide">PCB</th>
               <th className="right">Net</th>
-              <th>Status</th>
-              <th className="right"></th>
+              <th className="m-hide">Status</th>
+              <th className="right m-hide"></th>
+              <th className="lt-toggle" aria-hidden />
             </tr>
           </thead>
           <tbody>
             {rows.map(d => (
-              <tr key={d.id}>
+              <LedgerRow key={d.id}>
                 <td>
                   <div className="font-serif text-[15px] text-ink">{d.director_code}</div>
                   <div className="font-mono text-[11px] text-graphite mt-0.5">{d.director_name}</div>
                 </td>
-                <td className="num">{formatMoney(d.gross_amount)}</td>
-                <td className="num">{formatMoney(d.payroll_gross)}</td>
-                <td className="num">{formatMoney(d.payroll_epf_er)}</td>
-                <td className="num">{formatMoney(d.payroll_socso_er + d.payroll_eis_er)}</td>
-                <td className="num">{formatMoney(d.payroll_pcb)}</td>
+                <td className="num m-hide" data-label="Pool Slice">{formatMoney(d.gross_amount)}</td>
+                <td className="num m-hide" data-label="Gross (75%)">{formatMoney(d.payroll_gross)}</td>
+                <td className="num m-hide" data-label="EPF ER">{formatMoney(d.payroll_epf_er)}</td>
+                <td className="num m-hide" data-label="SOCSO+EIS ER">{formatMoney(d.payroll_socso_er + d.payroll_eis_er)}</td>
+                <td className="num m-hide" data-label="PCB">{formatMoney(d.payroll_pcb)}</td>
                 <td className="num font-semibold">{formatMoney(d.payroll_net)}</td>
-                <td>
+                <td className="m-hide" data-label="Status">
                   <em
                     className={`font-serif italic text-sm not-italic ${
                       d.status === 'draft'
@@ -576,7 +578,7 @@ function DirectorSalarySection({
                     {d.status}
                   </em>
                 </td>
-                <td className="right">
+                <td className="right m-hide">
                   <Link
                     href={`/director-salary/${d.director_id}?period=${period}`}
                     className="text-sm text-accent hover:text-accent-hover font-serif italic"
@@ -584,7 +586,7 @@ function DirectorSalarySection({
                     Detail
                   </Link>
                 </td>
-              </tr>
+              </LedgerRow>
             ))}
           </tbody>
         </table>
