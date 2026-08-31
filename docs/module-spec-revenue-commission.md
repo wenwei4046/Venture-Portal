@@ -641,6 +641,13 @@ PCB 0, WHT 200, net 9,800, then back to 0).
 > a principal + finance page with no sidebar entry for HR, so the one screen
 > that configures HR's own payroll was reachable by URL alone. The layout below
 > is unchanged.
+>
+> The Product List moving too was a judgement call rather than part of the ask,
+> so it was offered back — **the user confirmed it stays here** (2026-08-31).
+> It exists for one reason, feeding the margin a run is judged against, and
+> leaving it in Settings would have kept an admin page alive for a single
+> commission screen. Still Principal-only: HR sets the rules, not what a
+> product costs.
 
 One **Commission** tab holds every rule, threshold and per-person tick, laid out
 as dense tables following `DESIGN.md` v3.0 (`.ledger-table`, `.num`,
