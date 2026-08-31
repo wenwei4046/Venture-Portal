@@ -280,12 +280,12 @@ export default function CreateMultiLineInvoiceButton({
 
       {open && (
         <div
-          className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
+          className="fixed inset-0 z-50 bg-scrim/45 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
           onClick={() => !isPending && setOpen(false)}
         >
           <div
             ref={modalContentRef}
-            className="bg-paper border border-hairline rounded-md shadow-xl w-full max-w-3xl my-4"
+            className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-3xl my-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-baseline justify-between px-6 py-4 border-b border-hairline">

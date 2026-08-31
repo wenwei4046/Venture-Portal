@@ -42,6 +42,12 @@ const config: Config = {
           DEFAULT: 'rgb(var(--info) / <alpha-value>)',
           bg: 'rgb(var(--info-bg) / <alpha-value>)',
         },
+
+        // Walnut — the one dark object (hero figures, primary buttons, scrim).
+        // Deliberately NOT a semantic colour and never a large chrome surface;
+        // see the header comment in globals.css.
+        walnut: 'rgb(var(--walnut) / <alpha-value>)',
+        scrim: 'rgb(var(--scrim) / <alpha-value>)',
       },
 
       // ─── Typography ──────────────────────────────────────────────────────
@@ -77,11 +83,24 @@ const config: Config = {
         '18': '72px',
       },
 
-      // ─── Radius (rounded-md max, nothing bigger) ──────────────────────────
+      // ─── Radius scale (2026-08-31) ────────────────────────────────────────
+      // Four steps, each with a job. Random `rounded-lg` everywhere is what
+      // makes an interface look templated; a named scale is what makes it look
+      // designed. Guardrail: round the CONTAINER, never the rows — a ledger
+      // table sits in a `rounded-card` well with overflow-hidden, but every
+      // <tr> inside stays square, because rounded rows break the vertical
+      // alignment the eye uses to scan a column of figures.
+      // `md` is the codebase default (~950 uses) and carries the general
+      // softening — nudged 6→8px so everything reads a touch rounder without
+      // touching a single component. The named steps below are for the places
+      // that should be deliberately softer than the default.
       borderRadius: {
         sm: '4px',
-        md: '6px',
-        lg: '8px',
+        md: '8px',
+        lg: '10px',
+        control: '6px', // inputs, buttons — tighter than the default on purpose
+        card: '12px', // cards, table wells
+        panel: '16px', // modals, the sidebar rail
       },
 
       // ─── Shadows (subtle, warm) ───────────────────────────────────────────

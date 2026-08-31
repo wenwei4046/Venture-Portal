@@ -811,6 +811,10 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-14 mb-16">
         {/* LEFT 7 columns — Venture Pool hero */}
         <div className="lg:col-span-7">
+          {/* The one dark object — see .hero-walnut in globals.css. Everything
+              else on the page is light, so the figure is the heaviest thing on
+              screen, which is what you came here to read. */}
+          <div className="hero-walnut px-6 py-6 md:px-8 md:py-7 mb-6">
           <div className="font-serif italic text-accent text-base mb-1">
             Venture Pool
           </div>
@@ -830,9 +834,11 @@ export default async function DashboardPage() {
             {hasAnyData ? ' · live ledger' : ' · no fund sources yet'}
           </div>
 
-          {/* Sparkline placeholder — 12-month trend belongs to /reports */}
+          {/* Sparkline placeholder — 12-month trend belongs to /reports.
+              Strokes bind to rgb(var(--ink)) / rgb(var(--hairline)), which
+              .hero-walnut has already flipped to the light end. */}
           <svg
-            className="w-full h-12 my-7"
+            className="w-full h-12 mt-6 -mb-1"
             viewBox="0 0 600 48"
             preserveAspectRatio="none"
             aria-hidden="true"
@@ -868,6 +874,8 @@ export default async function DashboardPage() {
               />
             )}
           </svg>
+          </div>
+          {/* ── back on the page: light again ── */}
 
           {hasAnyData ? (
             <>

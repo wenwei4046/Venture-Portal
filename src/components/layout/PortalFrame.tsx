@@ -41,7 +41,7 @@ export default function PortalFrame({
       {mobileNavOpen ? (
         <div
           onClick={() => setMobileNavOpen(false)}
-          className="fixed inset-0 bg-ink/40 backdrop-blur-sm z-40 md:hidden print:hidden"
+          className="fixed inset-0 bg-scrim/45 backdrop-blur-sm z-40 md:hidden print:hidden"
           aria-label="Close navigation"
         />
       ) : null}
