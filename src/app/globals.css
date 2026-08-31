@@ -56,6 +56,12 @@
      instead of being grey-washed. */
   --walnut: 90 62 43;
   --scrim: 90 62 43;
+
+  /* Chrome — the tone shared by the two floating panels, sidebar rail and
+     header. Plaster one step down. It gets its own token rather than
+     borrowing --surface-2 (which means zebra rows and table headers), so the
+     two can be tuned independently. */
+  --chrome: 232 227 219;
 }
 
 /* ─── Dark mode — warm charcoal, not cold ───
@@ -89,6 +95,7 @@
 
   --walnut: 122 88 62;
   --scrim: 14 10 8;
+  --chrome: 37 32 27;
 }
 
 /* ─── Sidebar panel skin (2026-08-31, Walnut) ───
@@ -100,8 +107,11 @@
    and the dark moved to a card-sized object instead (see --walnut).
    No shadow — a light panel that casts one reads as dirty. */
 .sidebar-contrast {
-  --paper: 232 227 219;
-  --surface: 232 227 219;
+  /* Reads --chrome rather than repeating its literal, so the rail and the
+     header panel can never drift apart. It also auto-follows the theme: the
+     dark block below only needs to restate what actually differs. */
+  --paper: var(--chrome);
+  --surface: var(--chrome);
   --surface-2: 222 215 205;
   --hairline: 218 211 200;
   --ink: 51 36 27;
@@ -118,8 +128,8 @@
    light side is one step below it — in both themes the rail is the adjacent
    tone, never the extreme one. */
 [data-theme="dark"] .sidebar-contrast {
-  --paper: 37 32 27;
-  --surface: 37 32 27;
+  --paper: var(--chrome);
+  --surface: var(--chrome);
   --surface-2: 50 43 36;
   --hairline: 74 64 55;
   --ink: 234 226 217;
@@ -236,6 +246,7 @@
 
     --walnut: 122 88 62;
     --scrim: 14 10 8;
+    --chrome: 37 32 27;
   }
 
   :root:not([data-theme="light"]) .sidebar-contrast {

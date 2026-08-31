@@ -48,6 +48,9 @@ const config: Config = {
         // see the header comment in globals.css.
         walnut: 'rgb(var(--walnut) / <alpha-value>)',
         scrim: 'rgb(var(--scrim) / <alpha-value>)',
+
+        // Chrome — shared by the two floating panels (sidebar rail, header).
+        chrome: 'rgb(var(--chrome) / <alpha-value>)',
       },
 
       // ─── Typography ──────────────────────────────────────────────────────

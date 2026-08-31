@@ -234,11 +234,21 @@ It re-declares the palette tokens for its subtree — the same technique as
 because a hero carrying `text-danger` for a negative balance would otherwise render
 dark red on dark walnut and disappear.
 
-### Chrome — the frame closes
+### Chrome — two floating panels
 
-The header has **no bottom border**. The old rule stopped dead where the sidebar edge
-began, leaving an L-shaped band that never closed — that was the original complaint
-this palette answers. The header now simply sits on the page.
+The sidebar rail and the header are **peers**: same tone (`--chrome`, Plaster one step
+down), same 10px inset, same `rounded-panel` corners. Together they are the chrome;
+the page runs behind and between them.
+
+`--chrome` has its own token rather than borrowing `--surface-2` (zebra rows, table
+headers) so the two can be tuned independently, and `.sidebar-contrast` reads
+`var(--chrome)` rather than repeating the literal, so rail and header cannot drift.
+
+**Why not a bottom border on the header.** The v3.0 rule stopped dead where the
+sidebar edge began, leaving an L-shaped band that never closed — the original
+complaint this palette answers. Removing it fixed the corner but overshot: on
+`bg-paper` the header had no definition at all and dissolved into the page. Giving it
+the rail's surface resolves both, because nothing has to butt up against anything.
 
 ---
 
