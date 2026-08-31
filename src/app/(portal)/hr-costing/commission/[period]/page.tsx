@@ -264,8 +264,8 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                     <strong className="text-danger">{linesWithoutCost} lines</strong> have no cost,
                     so their bills have no margin — the below-margin penalty and the monthly
                     incentive are both skipped for them. Fill{' '}
-                    <Link href="/settings?tab=products" className="text-accent hover:underline">
-                      Settings → Product List
+                    <Link href="/hr-costing/commission/products" className="text-accent hover:underline">
+                      the Product list
                     </Link>{' '}
                     and re-import, or key a margin onto those orders.
                   </li>
@@ -275,8 +275,8 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                     <strong className="text-danger">{linesWithoutBrand} lines</strong> resolve to no
                     brand, which blocks the margin incentive for whoever sold them. Set the Item Code
                     prefixes on each brand in{' '}
-                    <Link href="/settings?tab=commission" className="text-accent hover:underline">
-                      Settings → Commission
+                    <Link href="/hr-costing/commission/rules" className="text-accent hover:underline">
+                      Rules
                     </Link>
                     .
                   </li>

@@ -1,8 +1,8 @@
-import Link from 'next/link'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import OrgChart, { type OrgPerson, type OrgRank } from './_components/OrgChart'
+import CommissionTabs from '../_components/CommissionTabs'
 
 /**
  * The payroll-purpose org chart: who overrides whom.
@@ -13,7 +13,7 @@ import OrgChart, { type OrgPerson, type OrgRank } from './_components/OrgChart'
  * from.
  */
 export default async function OrgChartPage() {
-  await requireRole(['principal', 'hr'])
+  const user = await requireRole(['principal', 'hr'])
   const supabase = (await createClient()) as unknown as SupabaseClient
 
   const [{ data: subDepts }, { data: schemes }, { data: rankRows }] = await Promise.all([
@@ -103,16 +103,12 @@ export default async function OrgChartPage() {
             it was computed against.
           </p>
         </div>
-        <Link
-          href="/settings?tab=commission"
-          className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-        >
-          Commission settings →
-        </Link>
       </div>
 
+      <CommissionTabs active="org-chart" canSeeProducts={user.role === 'principal'} />
+
       {people.length === 0 ? (
-        <div className="py-16 text-center border border-hairline rounded-md bg-surface">
+        <div className="py-16 text-center border border-hairline rounded-card bg-surface">
           <p className="font-serif text-2xl text-ink mb-3">Nobody to chart yet.</p>
           <p className="font-serif italic text-muted text-sm max-w-md mx-auto">
             Add salespeople under HR → Staff with a commission department, then place them here.

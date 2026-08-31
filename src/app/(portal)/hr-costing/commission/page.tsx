@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
+import CommissionTabs from './_components/CommissionTabs'
 
 function label(period: string): string {
   return new Date(period + 'T00:00:00Z').toLocaleString('en-US', {
@@ -18,7 +19,7 @@ function label(period: string): string {
  * them into payroll hangs off each month.
  */
 export default async function CommissionLandingPage() {
-  await requireRole(['principal', 'hr'])
+  const user = await requireRole(['principal', 'hr'])
   const supabase = (await createClient()) as unknown as SupabaseClient
 
   const thisPeriod = getPeriodMonth()
@@ -58,27 +59,21 @@ export default async function CommissionLandingPage() {
           </div>
           <h1 className="page-title">Commission</h1>
         </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/hr-costing/commission/org-chart"
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-          >
-            Org chart
-          </Link>
-          <Link
-            href={`/hr-costing/commission/${thisPeriod}/import`}
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-          >
-            Import sales orders
-          </Link>
-        </div>
+        <Link
+          href={`/hr-costing/commission/${thisPeriod}/import`}
+          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+        >
+          Import sales orders
+        </Link>
       </div>
+
+      <CommissionTabs active="months" canSeeProducts={user.role === 'principal'} />
 
       {!configured ? (
         <div className="bg-surface-2 border border-hairline text-graphite rounded-md p-4 mb-8 text-sm font-sans">
-          No commission sub-department is configured yet. Set the rules up in{' '}
-          <Link href="/settings?tab=commission" className="text-accent hover:underline">
-            Settings → Commission
+          No commission sub-department is configured yet. Set it up under{' '}
+          <Link href="/hr-costing/commission/rules" className="text-accent hover:underline">
+            Rules
           </Link>{' '}
           before importing.
         </div>

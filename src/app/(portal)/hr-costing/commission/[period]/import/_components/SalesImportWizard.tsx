@@ -171,8 +171,8 @@ export default function SalesImportWizard({ period, staff, aliases }: Props) {
             <p className="font-serif italic text-graphite text-sm mt-5 max-w-2xl">
               Those lines have no cost, so their bills have no margin and the below-margin penalty
               will be skipped on them. Fill the gaps in{' '}
-              <Link href="/settings?tab=products" className="text-accent hover:underline">
-                Settings → Product List
+              <Link href="/hr-costing/commission/products" className="text-accent hover:underline">
+                the Product list
               </Link>
               , or key a margin straight onto the affected orders.
             </p>
