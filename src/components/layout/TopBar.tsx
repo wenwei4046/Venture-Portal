@@ -41,8 +41,22 @@ export default function TopBar({ user, onMenuClick }: TopBarProps) {
   const quarter = `Q${Math.floor(now.month() / 3) + 1} ${now.year()}`
   const displayName = user.name || getRoleLabel(user.role)
 
+  // The header is a floating chrome panel — a peer of the sidebar rail, same
+  // tone and same 10px inset, not a band bolted to the top of the page.
+  //
+  // It used to carry a bottom rule that stopped dead where the sidebar edge
+  // began, leaving an L-shape that never closed. Removing the rule fixed the
+  // corner but overshot: on `bg-paper` the header had no definition left at
+  // all and dissolved into the page. Giving it the rail's surface resolves
+  // both — the chrome now reads as two panels, and nothing has to butt up
+  // against anything.
+  //
+  // Desktop insets by 10px to line up with the rail; mobile stays full-bleed
+  // (the rail is off-canvas there) and relies on the tone alone. Inner padding
+  // is 22px on md so text lands on the same 32px gutter as the page content
+  // below (10px margin + 22px padding).
   return (
-    <div className="h-[60px] bg-paper border-b border-hairline px-4 md:px-8 flex items-center justify-between shrink-0 gap-3">
+    <div className="h-[60px] bg-chrome px-4 md:px-[22px] md:mt-2.5 md:mx-2.5 md:rounded-panel md:border md:border-hairline flex items-center justify-between shrink-0 gap-3">
       <div className="flex items-center gap-3 min-w-0">
         {/* Hamburger — mobile only */}
         {onMenuClick ? (

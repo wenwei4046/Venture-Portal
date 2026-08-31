@@ -136,7 +136,7 @@ export default async function VenturePoolPage() {
 
       {/* ───────── Hero: balance + this-month summary ───────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
-        <div className="lg:col-span-7">
+        <div className="lg:col-span-7 hero-walnut px-6 py-6 md:px-8 md:py-7">
           <div className="font-serif italic text-graphite text-sm mb-1">Running balance</div>
           <div
             className={`font-serif text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${

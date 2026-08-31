@@ -71,8 +71,8 @@ export default function ReassignInvoiceGlButton({
       </button>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={() => !isPending && setOpen(false)}>
-          <div className="bg-paper border border-hairline rounded-lg shadow-xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/45 p-4" onClick={() => !isPending && setOpen(false)}>
+          <div className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-hairline">
               <div className="font-serif italic text-accent text-sm">Reassign GL account</div>
               <div className="font-serif text-lg text-ink">改发票 {invoiceNo ?? invoiceId.slice(0, 8)} 的收入科目</div>
