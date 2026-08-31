@@ -174,9 +174,75 @@ All 3 fonts are free. No licensing cost.
 
 ---
 
-## Color Palette — Warm Paper
+## Color Palette — Walnut (v3.1, 2026-08-31)
 
-### Base (v3.0 — Finance-readability deepened)
+> **v3.1 replaced the cream / deep-green / rust palette.** The v3.0 values below the
+> Walnut block are kept for reference only — they describe what shipped between
+> 2026-04 and 2026-08 and are **no longer live**. Read this section first.
+
+### The three values
+
+| | RGB | Job |
+|---|---|---|
+| **Plaster** | `242 239 234` | The page. Warm neutral greige — warmth without cream's yellow cast. |
+| **Walnut** | `90 62 43` | The **one** dark thing: hero cards, primary buttons, money ink, modal scrim. |
+| **Harbour** | `46 92 138` | The **only** signal: active nav, links, focus rings. |
+
+### Rule 1 — a surface is free, a signal is not
+
+`--accent` must stay clear of the red / amber / green lanes, because those three are
+load-bearing: `--danger` = overdue, `--alert` = pending, `--ledger` = settled. Users
+learn them, so they can't move.
+
+The v3.0 rust accent sat **4° from `--danger`** on the colour wheel (16.7° vs 12.7°),
+with `--alert` a further 21° away — three of five meaningful colours crowded into one
+25° wedge. An active nav item, an overdue badge and a pending warning were the same
+broad hue separated only by lightness, which is why the accent never read as *"you are
+here"* rather than *"something's wrong"*. **Minimum gap is now 40°.**
+
+That leaves blue for the accent — and it's why the palette can still be warm. A
+*surface* reports no status, so its hue is unconstrained: Walnut owns the hero card,
+the buttons, the money ink and the scrim without any of this applying to it.
+
+**Never propose a warm accent.** It is the one colour on the page that has to dodge.
+
+### Rule 2 — dark is limited by area, not hue
+
+Three coloured sidebar rails were tried and rejected (deep green, Prussian, basalt).
+The variable that mattered was **area**: a full-height rail is the largest surface in
+the app and the only one carrying no numbers, so any weight it holds is weight the
+reader carries all day.
+
+So the rail carries **no colour at all** — Plaster one step down (`232 227 219`),
+floated as a rounded inset panel so the page colour runs behind it, separated by a
+hairline rather than by weight. The dark moved to `.hero-walnut`, a card-sized object
+holding the figure the page exists to show.
+
+Corollary worth remembering: a *desaturated* dark never registers as a hue — the eye
+files it as black. The fix for "this reads as black" is to **re-saturate**, not to
+lighten.
+
+### `.hero-walnut`
+
+The one dark object. Applied to the `lg:col-span-7` hero column on Dashboard, Fund IN,
+Fund OUT, Venture Pool and Dept Pool.
+
+It re-declares the palette tokens for its subtree — the same technique as
+`.sidebar-contrast` — so markup inside keeps using `text-num-ink` / `text-muted` /
+`text-accent` unchanged and inverts for free, including SVG strokes bound to
+`rgb(var(--ink))`. **Semantics are re-lit too** (`--danger`, `--ledger`, `--alert`),
+because a hero carrying `text-danger` for a negative balance would otherwise render
+dark red on dark walnut and disappear.
+
+### Chrome — the frame closes
+
+The header has **no bottom border**. The old rule stopped dead where the sidebar edge
+began, leaving an L-shaped band that never closed — that was the original complaint
+this palette answers. The header now simply sits on the page.
+
+---
+
+### Legacy v3.0 base (superseded — reference only)
 
 These values come from the v3.0 readability pass. **Always reference via Tailwind classes (`bg-paper`, `text-ink`, `border-hairline`) — never copy the hex into a component.** The hex literals here exist only for designer reference; the runtime uses RGB triplets in `globals.css` so dark mode + `<alpha-value>` work.
 
@@ -321,20 +387,44 @@ All combinations exceed WCAG AA. Numbers updated for the deeper palette:
 - **Card padding:** 20-24px
 - **Max content width:** 1280px (sidebar 220px + main max 1060px)
 
-### Radius (rounded-md default, never xl)
+### Radius — named scale (v3.1, 2026-08-31)
 
-```
---radius-sm: 4px   /* status pills, small buttons */
---radius-md: 6px   /* DEFAULT — cards, inputs, buttons */
---radius-lg: 8px   /* modals, large cards */
---radius-full: 9999px  /* avatars only */
-```
+Four steps, each with a job. Scattered `rounded-lg` is what makes an interface look
+templated; a named scale is what makes it look designed.
 
-**Absolutely no `rounded-xl` (12px) or `rounded-2xl` (16px).** Those belong to SaaS landing pages, not a ledger.
+| Tailwind | px | Use for |
+|---|---|---|
+| `rounded-control` | 6 | Inputs, buttons — deliberately tighter than the default |
+| `rounded-md` | 8 | **The default.** ~950 existing uses; carries the general softening |
+| `rounded-card` | 12 | Cards, table wells |
+| `rounded-panel` | 16 | Modals, the sidebar rail, `.hero-walnut` |
+| `rounded-full` | — | Status pills, toggles, avatars |
+
+**The guardrail: round the container, never the rows.** A ledger table lives inside a
+`rounded-card` well with `overflow-hidden`, but every `<tr>` inside stays square.
+Rounded rows break the vertical alignment the eye uses to scan a column of figures,
+and that is the one thing a ledger cannot afford.
+
+> **Supersedes the v3.0 rule** ("absolutely no `rounded-xl` / `rounded-2xl`"). That
+> ban existed to keep the portal from drifting toward SaaS-landing-page softness, and
+> the concern is still right — which is why 12px and 16px are *named for specific
+> jobs* rather than available as free-floating utilities. Overlays and the one dark
+> object get the curve; data surfaces do not. Requested by the user 2026-08-31
+> ("加一点点的圆弧设计…可能是 pop-up window 什么之类的").
 
 ### Shadows
 
 **No shadows on cards.** Elevation comes from hairline borders (`--hairline`), not drop shadows.
+The sidebar rail carries none either — a light panel that casts a shadow reads as dirty.
+Overlay panels (`shadow-xl`) are the one exception: they float above the page and should say so.
+
+### Scrim
+
+Modal backdrops use `bg-scrim/45`, **never a neutral black.** `--scrim` is Walnut in
+light mode and near-black in dark. A neutral overlay grey-washes everything beneath it;
+a scrim tinted with the palette's own dark keeps the page looking like itself, just
+recessed. (The image lightbox in `AttachmentList` is the deliberate exception — it
+wants to go properly dark.)
 
 **Allowed shadows (rare):**
 - Modal overlay: `0 10px 40px rgba(26, 22, 19, 0.15)` — warm, subtle

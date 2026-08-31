@@ -616,11 +616,11 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
       {/* Batch-settle modal */}
       {showSettleModal ? (
         <div
-          className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
+          className="fixed inset-0 z-50 bg-scrim/45 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
           onClick={() => !isPending && setShowSettleModal(false)}
         >
           <div
-            className="bg-paper border border-hairline rounded-md shadow-xl w-full max-w-lg my-12"
+            className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-lg my-12"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-baseline justify-between px-6 py-4 border-b border-hairline">

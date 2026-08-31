@@ -294,7 +294,7 @@ function FacetFilter({
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden />
           <div
-            className="fixed z-50 w-64 bg-paper border border-hairline rounded-md shadow-xl p-2 text-left font-sans normal-case"
+            className="fixed z-50 w-64 bg-paper border border-hairline rounded-panel shadow-xl p-2 text-left font-sans normal-case"
             style={{ top: anchor.top, left: anchor.left }}
             onClick={(e) => e.stopPropagation()}
           >

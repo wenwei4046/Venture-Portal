@@ -215,7 +215,7 @@ function CalculatorModal({ open, onClose }: { open: boolean; onClose: () => void
   if (!open) return null
   return (
     <div
-      className="fixed inset-0 z-50 bg-ink/40 flex items-start justify-center pt-24 px-4"
+      className="fixed inset-0 z-50 bg-scrim/45 flex items-start justify-center pt-24 px-4"
       onClick={onClose}
     >
       <div
@@ -726,7 +726,7 @@ function PvModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-ink/40 flex items-start justify-center pt-24 px-4"
+      className="fixed inset-0 z-50 bg-scrim/45 flex items-start justify-center pt-24 px-4"
       onClick={onClose}
     >
       <div

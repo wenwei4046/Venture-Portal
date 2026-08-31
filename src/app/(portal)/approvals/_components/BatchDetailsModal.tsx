@@ -144,13 +144,13 @@ export default function BatchDetailsModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/45 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       onClick={onClose}
     >
       <div
-        className="bg-paper border border-hairline rounded-lg shadow-xl max-w-3xl w-[92vw] max-h-[85vh] overflow-hidden flex flex-col"
+        className="bg-paper border border-hairline rounded-panel shadow-xl max-w-3xl w-[92vw] max-h-[85vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-6 py-4 border-b border-hairline flex items-baseline justify-between">

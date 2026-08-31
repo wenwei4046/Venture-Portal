@@ -221,13 +221,13 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
       {/* Editor — modal popup; overlay click or Esc cancels. */}
       {edit ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/45 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           onClick={() => setEdit(null)}
         >
         <div
-          className="bg-paper border border-hairline rounded-lg shadow-xl max-w-2xl w-[92vw] max-h-[85vh] overflow-y-auto p-5 space-y-3"
+          className="bg-paper border border-hairline rounded-panel shadow-xl max-w-2xl w-[92vw] max-h-[85vh] overflow-y-auto p-5 space-y-3"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="font-serif italic text-accent text-sm">
@@ -374,13 +374,13 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
           )
         return (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/45 backdrop-blur-sm"
             role="dialog"
             aria-modal="true"
             onClick={() => setSnapView(null)}
           >
             <div
-              className="bg-paper border border-hairline rounded-lg shadow-xl max-w-3xl w-[92vw] max-h-[85vh] overflow-y-auto p-5 space-y-4"
+              className="bg-paper border border-hairline rounded-panel shadow-xl max-w-3xl w-[92vw] max-h-[85vh] overflow-y-auto p-5 space-y-4"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-baseline justify-between gap-3 flex-wrap">

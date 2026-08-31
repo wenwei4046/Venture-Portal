@@ -109,7 +109,7 @@ export default async function FundOutPage({ searchParams }: Props) {
 
       {/* ───────── Hero: outstanding + rate ───────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
-        <div className="lg:col-span-7">
+        <div className="lg:col-span-7 hero-walnut px-6 py-6 md:px-8 md:py-7">
           <div className="font-serif italic text-accent text-base mb-1">
             Total outstanding
           </div>

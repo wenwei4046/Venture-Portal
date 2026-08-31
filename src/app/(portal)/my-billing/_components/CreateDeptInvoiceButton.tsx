@@ -79,11 +79,11 @@ export default function CreateDeptInvoiceButton({ deptName, companies, contracts
 
       {open ? (
         <div
-          className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-scrim/45 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => !isPending && setOpen(false)}
         >
           <div
-            className="bg-paper border border-hairline rounded-md shadow-xl w-full max-w-lg max-h-[92vh] overflow-y-auto"
+            className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-lg max-h-[92vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-baseline justify-between px-6 py-4 border-b border-hairline">

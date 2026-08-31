@@ -90,11 +90,15 @@ const config: Config = {
       // table sits in a `rounded-card` well with overflow-hidden, but every
       // <tr> inside stays square, because rounded rows break the vertical
       // alignment the eye uses to scan a column of figures.
+      // `md` is the codebase default (~950 uses) and carries the general
+      // softening — nudged 6→8px so everything reads a touch rounder without
+      // touching a single component. The named steps below are for the places
+      // that should be deliberately softer than the default.
       borderRadius: {
         sm: '4px',
-        md: '6px',
-        lg: '8px',
-        control: '6px', // inputs, buttons
+        md: '8px',
+        lg: '10px',
+        control: '6px', // inputs, buttons — tighter than the default on purpose
         card: '12px', // cards, table wells
         panel: '16px', // modals, the sidebar rail
       },

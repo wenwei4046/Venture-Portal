@@ -155,6 +155,17 @@
   --accent-bg: 104 74 52;
   --accent-border: 132 100 76;
   --accent-hover: 222 190 156;
+  /* Semantics must be re-lit too — a hero figure carrying `text-danger` for a
+     negative balance would otherwise render dark red on dark walnut and all
+     but disappear. Same hues, lifted to read on the dark ground. */
+  --danger: 244 150 140;
+  --danger-bg: 122 62 50;
+  --ledger: 138 206 168;
+  --ledger-bg: 46 82 62;
+  --alert: 232 190 110;
+  --alert-bg: 110 84 40;
+  --info: 208 196 182;
+  --info-bg: 110 86 66;
   background: rgb(var(--walnut));
   border-radius: 16px;
 }
