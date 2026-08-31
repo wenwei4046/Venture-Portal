@@ -64,6 +64,15 @@ export interface SalesOrder {
   /** True when an earlier applied run already paid this order's commission.
    *  Guards the carry-forward path against double-paying. */
   alreadyReleased?: boolean
+  /**
+   * Margin keyed in by hand for this one bill, 0.36 = 36%.
+   *
+   * This is the stop-gap while the Product List fills up (user 2026-08-31):
+   * until every Item Code has a unit cost, a human can type the margin on the
+   * order and the penalty applies immediately. It OVERRIDES anything derived
+   * from line costs, so a correction by hand always wins.
+   */
+  manualMarginPct?: number | null
   lines: SalesLine[]
 }
 
@@ -274,6 +283,9 @@ export interface StatementLine {
   note: string
 }
 
+/** Where a bill's margin came from. */
+export type MarginSource = 'manual' | 'cost' | 'none'
+
 /** One brand's slice of a salesperson's month. */
 export interface BrandMargin {
   /** null only in the degenerate case of sales that carry no brand at all. */
@@ -304,6 +316,7 @@ export interface PenalisedOrder {
   orderNo: string
   brandCode: string | null
   marginPct: number
+  marginSource: MarginSource
   bandKey: string
   bandLabel: string
   multiplier: number

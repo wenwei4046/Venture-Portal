@@ -126,6 +126,7 @@ interface OrderOpts {
   orderTotal?: number
   alreadyReleased?: boolean
   periodMonth?: string
+  manualMarginPct?: number
 }
 
 function order(
@@ -147,6 +148,7 @@ function order(
     // Default to fully paid so a test only opts into the deposit gate.
     paidAmount: opts.paidAmount ?? total,
     alreadyReleased: opts.alreadyReleased,
+    manualMarginPct: opts.manualMarginPct,
     lines: lines.map(([itemGroup, productCode, qty, lineAmount, costAmount, brandCode], i) => ({
       id: `${id}-L${i + 1}`,
       itemGroup,
@@ -937,12 +939,47 @@ describe('below-margin penalty, end to end', () => {
     expect(r.penalised).toEqual([])
   })
 
-  it('skips the penalty and warns loudly when there is no cost data', () => {
+  it('takes a hand-keyed margin over the line costs', () => {
+    // Line costs say 40% (a clean bill); the human says 26%. The human wins.
+    const r = run({
+      orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 6_000]], { manualMarginPct: 0.26 })],
+    })
+    const rs = find(r.statements, 'rs')
+    expect(rs.productCommission).toBe(250) // halved by Below Tier 1
+    expect(r.penalised[0]).toMatchObject({ marginSource: 'manual', bandKey: 'below_tier_1' })
+  })
+
+  it('works with a hand-keyed margin and NO cost data at all', () => {
+    // The stop-gap while the Product List fills up.
+    const r = run({
+      orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, undefined, 'AKEMI']], {
+        manualMarginPct: 0.24,
+      })],
+    })
+    expect(find(r.statements, 'rs').productCommission).toBe(0) // Below Tier 3
+    expect(r.warnings.join(' ')).not.toMatch(/no margin/)
+  })
+
+  it('folds the hand-keyed margin into the month at the implied cost', () => {
+    // 10,000 at a keyed 45% implies 5,500 of cost, so the monthly blend agrees
+    // with the bill instead of drifting from it.
+    const r = run({
+      orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, undefined, 'AKEMI']], {
+        manualMarginPct: 0.45,
+      })],
+    })
+    const rs = find(r.statements, 'rs')
+    expect(rs.marginCost).toBe(5_500)
+    expect(rs.marginPct).toBeCloseTo(0.45, 10)
+    expect(rs.marginIncentive).toBe(2_500) // Akemi Tier 2
+  })
+
+  it('skips the penalty and warns loudly when there is neither cost nor a keyed margin', () => {
     const r = run({ orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000]])] })
     const rs = find(r.statements, 'rs')
     expect(rs.productCommission).toBe(500) // full, not penalised
     expect(rs.marginPct).toBeNull()
-    expect(r.warnings.join(' ')).toMatch(/no cost data/)
+    expect(r.warnings.join(' ')).toMatch(/no margin/)
   })
 
   it('can be switched off per sub-department', () => {

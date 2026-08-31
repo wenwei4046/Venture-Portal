@@ -31,6 +31,7 @@ import type {
   KpiItem,
   KpiThreshold,
   MarginBand,
+  MarginSource,
   OpenBillRank,
   PenalisedOrder,
   Rank,
@@ -214,6 +215,35 @@ export function marginPctOf(base: { revenue: number; cost: number; complete: boo
   if (!base.complete) return null
   if (base.revenue <= 0) return null
   return (base.revenue - base.cost) / base.revenue
+}
+
+export interface BillMargin {
+  pct: number | null
+  source: MarginSource
+  /** Cost to fold into the month's per-brand blend. Derived from the manual
+   *  percentage when that is what was used, so the monthly figure stays
+   *  consistent with the per-bill one. */
+  cost: number
+}
+
+/**
+ * One bill's margin. A hand-keyed percentage WINS over anything derived from
+ * line costs (user 2026-08-31): the Product List is being filled in over time,
+ * and a human correction on the order must not be silently overruled by a
+ * stale or partial cost table.
+ *
+ * When the manual figure is used, the implied cost `revenue × (1 − margin)` is
+ * what feeds the month's per-brand blend, so the monthly margin agrees with
+ * the bills it is made of.
+ */
+export function billMargin(order: SalesOrder, base: MarginBase): BillMargin {
+  const manual = order.manualMarginPct
+  if (manual !== undefined && manual !== null && Number.isFinite(manual)) {
+    return { pct: manual, source: 'manual', cost: round2(base.revenue * (1 - manual)) }
+  }
+  const derived = marginPctOf(base)
+  if (derived === null) return { pct: null, source: 'none', cost: 0 }
+  return { pct: derived, source: 'cost', cost: base.cost }
 }
 
 /**
@@ -703,32 +733,33 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
           `Order ${order.orderNo} carries lines from more than one brand, which should not happen — the dominant brand's margin ladder was used.`,
         )
       }
+      const bill = billMargin(order, base)
+
       if (base.revenue > 0) {
         if (base.brandCode === null) draft.missingBrand = true
         else {
           const tally = draft.marginByBrand.get(base.brandCode) ?? { revenue: 0, cost: 0, complete: true }
           tally.revenue = round2(tally.revenue + base.revenue)
-          tally.cost = round2(tally.cost + base.cost)
-          if (!base.complete) tally.complete = false
+          tally.cost = round2(tally.cost + bill.cost)
+          if (bill.source === 'none') tally.complete = false
           draft.marginByBrand.set(base.brandCode, tally)
         }
       }
 
-      const billMargin = marginPctOf(base)
       let multiplier = 1
       let penaltyBand: MarginBand | null = null
       if (scheme.enableMarginPenalty) {
-        if (billMargin === null) {
+        if (bill.pct === null) {
           if (base.revenue > 0) ordersWithoutCost++
         } else {
-          penaltyBand = penaltyBandFor(billMargin, base.brandCode, input.marginBands)
+          penaltyBand = penaltyBandFor(bill.pct, base.brandCode, input.marginBands)
           if (penaltyBand) multiplier = penaltyBand.commissionMultiplier
         }
       }
       draft.penaltyWeightedRevenue = round2(draft.penaltyWeightedRevenue + opr * multiplier)
 
       const penaltyNote = penaltyBand
-        ? ` · ${penaltyBand.label} (${round2(billMargin! * 100)}% margin) × ${multiplier}`
+        ? ` · ${penaltyBand.label} (${round2(bill.pct! * 100)}% margin${bill.source === 'manual' ? ', keyed in' : ''}) × ${multiplier}`
         : ''
       let withheldOnThisBill = 0
 
@@ -810,7 +841,8 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
           orderId: order.id,
           orderNo: order.orderNo,
           brandCode: base.brandCode,
-          marginPct: billMargin!,
+          marginPct: bill.pct!,
+          marginSource: bill.source,
           bandKey: penaltyBand.bandKey,
           bandLabel: penaltyBand.label,
           multiplier,
@@ -835,7 +867,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
 
   if (ordersWithoutCost > 0) {
     warnings.push(
-      `${ordersWithoutCost} order(s) carry no cost data, so their margin could not be computed and the below-margin penalty was skipped. The ERP sales-order export has no cost column — a cost source is needed before the penalty can bite.`,
+      `${ordersWithoutCost} order(s) have no margin: neither a unit cost on every line (Settings → Product List) nor a margin keyed in on the order. The below-margin penalty was skipped for them.`,
     )
   }
 

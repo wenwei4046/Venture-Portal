@@ -366,6 +366,48 @@ COMMENT ON TABLE comm_brands IS
     'Brands whose margin ladders differ. item_code_prefixes maps ERP Item Codes onto a brand because the sales-order export carries no brand column.';
 
 -- ----------------------------------------------------------------------------
+-- TABLE: comm_products
+-- The Product List the Principal keys costs into (user 2026-08-31). This is
+-- the ONLY source of cost in the system: the ERP sales-order export carries
+-- none, so without a row here a line has no cost and its bill has no margin.
+--
+-- Deliberately NOT scheme-scoped. A product's cost is a company fact, not a
+-- commission rule, so one list serves every sub-department. brand_code lives
+-- here too because it is the same keying exercise, and an explicit
+-- product-level brand beats guessing from comm_brands.item_code_prefixes.
+--
+-- While this list is still being filled, sales_orders.manual_margin_pct lets a
+-- human type a bill's margin directly and it OVERRIDES anything derived here.
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE comm_products (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    item_code TEXT NOT NULL,
+    product_name TEXT,
+    brand_code TEXT,
+    item_group TEXT,
+    unit_cost DECIMAL(15, 2),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    note TEXT,
+    updated_by UUID REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT unit_cost_non_negative CHECK (unit_cost IS NULL OR unit_cost >= 0)
+);
+
+COMMENT ON TABLE comm_products IS
+    'Principal-maintained product cost list. unit_cost NULL = not keyed in yet, which leaves that line without cost and its bill without a derived margin.';
+COMMENT ON COLUMN comm_products.unit_cost IS
+    'Cost per unit. The importer stamps qty x unit_cost onto sales_order_lines.cost_amount, so a later cost change does NOT silently rewrite a run that already used the old one.';
+
+-- Item codes are matched case-insensitively and trimmed, the same way the
+-- engine matches KPI items, so uniqueness has to be on the same shape.
+CREATE UNIQUE INDEX uq_comm_products_item_code
+    ON comm_products ((UPPER(BTRIM(item_code))));
+CREATE INDEX idx_comm_products_brand ON comm_products (brand_code);
+
+-- ----------------------------------------------------------------------------
 -- TABLE: comm_margin_bands
 -- One brand's margin ladder. From the user's worked example:
 --
@@ -625,6 +667,14 @@ CREATE TABLE sales_orders (
     -- engine warns if the lines ever disagree.
     brand_code TEXT,
     order_total DECIMAL(15, 2) NOT NULL DEFAULT 0,
+    -- Margin keyed in by hand for this one bill, 0.36 = 36%. The stop-gap while
+    -- the Product List fills up: it OVERRIDES anything derived from line costs,
+    -- so a human correction always wins.
+    manual_margin_pct DECIMAL(9, 6)
+        CONSTRAINT manual_margin_sane
+        CHECK (manual_margin_pct IS NULL OR (manual_margin_pct >= -1 AND manual_margin_pct <= 1)),
+    manual_margin_by UUID REFERENCES users(id),
+    manual_margin_at TIMESTAMPTZ,
     -- ERP BALANCE — outstanding amount. Recorded so a future "pay commission
     -- on collection" rule has the data; nothing reads it today.
     balance DECIMAL(15, 2),
@@ -1086,5 +1136,16 @@ BEGIN
     END LOOP;
 END;
 $rls$;
+
+-- comm_products is the Principal's tab: HR needs to READ it (the importer
+-- stamps costs from it) but must not change what a product costs.
+ALTER TABLE comm_products ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY comm_products_principal_all ON comm_products FOR ALL
+    USING (current_user_role() = 'principal')
+    WITH CHECK (current_user_role() = 'principal');
+
+CREATE POLICY comm_products_hr_select ON comm_products FOR SELECT
+    USING (current_user_role() = 'hr');
 
 -- finance / dept_manager: no policy -> DENY ALL. Deliberate — see the header.

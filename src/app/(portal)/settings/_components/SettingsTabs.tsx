@@ -15,6 +15,8 @@ export type SettingsTab =
   | 'accounts'
   | 'periods'
   | 'simulator'
+  | 'commission'
+  | 'products'
 
 const ALL_TABS: TabItem[] = [
   { key: 'treasury', label: 'Treasury' },
@@ -27,12 +29,18 @@ const ALL_TABS: TabItem[] = [
   { key: 'accounts', label: 'Accounts' },
   { key: 'periods', label: 'Periods' },
   { key: 'simulator', label: 'Simulator' },
+  { key: 'commission', label: 'Commission' },
+  { key: 'products', label: 'Product List' },
 ]
 
 // Finance sees Accounts (the unified COA) + Departments (add-only, 2026-08-24)
 // — every other Settings tab is Principal-only (treasury config, period locks,
 // base rate simulator, splits).
 const FINANCE_TABS: SettingsTab[] = ['accounts', 'departments']
+
+// HR runs the commission payroll, so they configure its rules — but not what a
+// product COSTS, which stays with the Principal (user 2026-08-31).
+const HR_TABS: SettingsTab[] = ['commission']
 
 export function isSettingsTab(s: string | undefined): s is SettingsTab {
   return !!s && ALL_TABS.some((t) => t.key === s)
@@ -42,8 +50,10 @@ export default function SettingsTabs({ active, role }: { active: SettingsTab; ro
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const tabs = role === 'finance'
-    ? ALL_TABS.filter((t) => FINANCE_TABS.includes(t.key as SettingsTab))
+  const allowed =
+    role === 'finance' ? FINANCE_TABS : role === 'hr' ? HR_TABS : null
+  const tabs = allowed
+    ? ALL_TABS.filter((t) => allowed.includes(t.key as SettingsTab))
     : ALL_TABS
 
   function handleTabChange(key: string) {
