@@ -30,8 +30,9 @@ export interface SalesLine {
    *  usually sits on the main item's line and the bundled items are 0. */
   lineAmount: number
   /**
-   * Which brand's margin ladder this line answers to (Acami / Zanotti /
-   * Ergotax). Margin thresholds and incentives are per brand.
+   * Which brand's margin ladder this line answers to (Akemi / Zanotti /
+   * Ergotex). Margin thresholds and incentives are per brand, and a single
+   * sales order never crosses brands (user 2026-08-31).
    */
   brandCode?: string
   /**
@@ -116,7 +117,7 @@ export type MarginBandKind =
 
 /**
  * One rung of a brand's margin ladder (user brief 2026-08-31). Thresholds are
- * per BRAND because what counts as a good margin differs — Acami's incentive
+ * per BRAND because what counts as a good margin differs — Akemi's incentive
  * Tier 1 is 36% where Zanotti's is 33%.
  *
  * The worked example the user gave, for one brand:
@@ -129,8 +130,10 @@ export type MarginBandKind =
  *   below tier 2       25%   → x 25%
  *   below tier 3       24%   → x 0
  *
- * Incentives are evaluated on the salesperson's MONTHLY margin and stack up the
- * ladder; penalties are evaluated PER BILL and the most severe match wins.
+ * Incentives are evaluated on the salesperson's MONTHLY margin PER BRAND and
+ * stack up the ladder — and EVERY brand they sold must clear a tier for them to
+ * be entitled to it. Penalties are evaluated PER BILL and the most severe match
+ * wins.
  */
 export interface MarginBand {
   brandCode: string
@@ -271,6 +274,16 @@ export interface StatementLine {
   note: string
 }
 
+/** One brand's slice of a salesperson's month. */
+export interface BrandMargin {
+  /** null only in the degenerate case of sales that carry no brand at all. */
+  brandCode: string | null
+  revenue: number
+  cost: number
+  /** null when cost data was missing for that brand. */
+  marginPct: number | null
+}
+
 /** An order held back because its deposit has not reached the threshold. */
 export interface DeferredOrder {
   staffId: string
@@ -317,6 +330,9 @@ export interface Statement {
   /** Own commissionable revenue: excludes KPI items, excluded groups, and
    *  orders held by the deposit gate. */
   productRevenue: number
+  /** Σ (each bill's revenue × its margin multiplier) — the base an upline
+   *  overrides on, so a bill cut for bad margin cuts the override too. */
+  penaltyWeightedRevenue: number
   /** Own + entire downline subtree — what the promotion threshold measures. */
   groupRevenue: number
   /** Revenue dropped because its item group isn't commissionable. */
@@ -333,13 +349,14 @@ export interface Statement {
   openBillBonus: number
   overrideCommission: number
 
-  /** Monthly margin across their eligible orders (goods only). */
+  /** Monthly margin across their eligible orders (goods only), all brands. */
   marginRevenue: number
   marginCost: number
-  /** null when no cost data was supplied — no penalty, no incentive, a warning. */
+  /** Blended across brands. null when cost data was missing anywhere. */
   marginPct: number | null
-  /** Brand with the largest commissionable revenue this month. */
-  marginBrandCode: string | null
+  /** Per-brand breakdown — the incentive is judged brand by brand. */
+  marginByBrand: BrandMargin[]
+  /** Highest incentive tier cleared by EVERY brand they sold. */
   marginBandKey: string | null
   /** RM1,000 / RM2,500 etc. Paid as its own statement line. */
   marginIncentive: number

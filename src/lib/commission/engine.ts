@@ -10,8 +10,8 @@
  *   C  resolve the EFFECTIVE RATE (fixed vs variable, off group revenue)
  *   D  C1 product revenue · C2 KPI items · C3 Open Bill,
  *      each bill scaled by its BELOW-MARGIN PENALTY
- *   E  C4 override, using the effective rates from C
- *   F  the monthly MARGIN INCENTIVE
+ *   E  C4 override, on the PENALTY-WEIGHTED revenue of each downline
+ *   F  the monthly MARGIN INCENTIVE, which every brand must clear
  *
  * Rounding rule: every statement LINE is rounded to 2dp, and every subtotal is
  * the sum of its rounded lines. That makes `Σ lines === total` exact, which is
@@ -21,6 +21,7 @@
  */
 
 import type {
+  BrandMargin,
   CommissionComponent,
   DeferredOrder,
   EngineInput,
@@ -162,8 +163,10 @@ export interface MarginBase {
   cost: number
   /** false when at least one line in scope had no cost — margin is unknowable. */
   complete: boolean
-  /** Brand with the largest revenue in scope. */
+  /** The order's brand. A sales order never crosses brands (user 2026-08-31). */
   brandCode: string | null
+  /** true when the lines disagree about the brand — a data-integrity problem. */
+  mixedBrand: boolean
 }
 
 /**
@@ -203,11 +206,11 @@ export function marginBase(
     }
   }
 
-  return { revenue, cost, complete, brandCode }
+  return { revenue, cost, complete, brandCode, mixedBrand: byBrand.size > 1 }
 }
 
 /** (revenue − cost) / revenue, or null when it cannot be known. */
-export function marginPctOf(base: MarginBase): number | null {
+export function marginPctOf(base: { revenue: number; cost: number; complete: boolean }): number | null {
   if (!base.complete) return null
   if (base.revenue <= 0) return null
   return (base.revenue - base.cost) / base.revenue
@@ -242,29 +245,81 @@ export interface IncentiveResult {
   amount: number
   bandKey: string | null
   bandLabel: string | null
+  /** Set when the incentive could not be judged at all. */
+  blockedReason: string | null
+}
+
+/** Incentive bands of one brand that a margin clears, by band key. */
+function clearedBandKeys(
+  marginPct: number,
+  brandCode: string,
+  bands: MarginBand[],
+): Set<string> {
+  const cleared = new Set<string>()
+  for (const b of bands) {
+    if (b.kind !== 'incentive' || b.brandCode !== brandCode) continue
+    if (marginPct + 1e-9 >= b.marginPct) cleared.add(b.bandKey)
+  }
+  return cleared
+}
+
+function brandHasIncentiveBands(brandCode: string, bands: MarginBand[]): boolean {
+  return bands.some(b => b.kind === 'incentive' && b.brandCode === brandCode)
 }
 
 /**
- * Monthly margin incentive. Incentive bands are read as "margin at or ABOVE
- * this threshold" and STACK: clearing Tier 1 (36%) pays RM1,000, and also
- * clearing Tier 2 (43%) pays a further RM1,500 for RM2,500 in total (user
- * brief 2026-08-31). The reported band is the highest one reached.
+ * The monthly margin incentive.
+ *
+ * Thresholds follow the BRAND, and **every brand the salesperson sold that
+ * month must clear the tier** (user brief 2026-08-31): three weekends of a
+ * brand at Tier 2 and a fourth weekend of another brand below it does NOT earn
+ * Tier 2. The entitled tiers are therefore the INTERSECTION of what each
+ * brand's own monthly margin clears, and the amounts stack up that
+ * intersection — RM1,000 at Tier 1, a further RM1,500 at Tier 2.
+ *
+ * Anything that makes a brand unjudgeable (no cost data, no ladder configured,
+ * no brand on the order at all) blocks the whole incentive and says why, rather
+ * than quietly paying on the brands that happen to be judgeable.
  */
-export function marginIncentiveFor(
-  marginPct: number,
-  brandCode: string | null,
+export function marginIncentiveAcrossBrands(
+  brands: BrandMargin[],
   bands: MarginBand[],
 ): IncentiveResult {
-  let amount = 0
-  let top: MarginBand | null = null
-  for (const b of bands) {
-    if (b.kind !== 'incentive') continue
-    if (brandCode !== null && b.brandCode !== brandCode) continue
-    if (marginPct + 1e-9 < b.marginPct) continue
-    amount = round2(amount + b.monthlyIncentive)
-    if (!top || b.marginPct > top.marginPct) top = b
+  const none: IncentiveResult = { amount: 0, bandKey: null, bandLabel: null, blockedReason: null }
+  if (brands.length === 0) return none
+
+  const unbranded = brands.find(b => !b.brandCode)
+  if (unbranded) {
+    return { ...none, blockedReason: 'some sales carry no brand' }
   }
-  return { amount, bandKey: top?.bandKey ?? null, bandLabel: top?.label ?? null }
+  const noMargin = brands.find(b => b.marginPct === null)
+  if (noMargin) {
+    return { ...none, blockedReason: `no cost data for ${noMargin.brandCode}` }
+  }
+  const noLadder = brands.find(b => !brandHasIncentiveBands(b.brandCode!, bands))
+  if (noLadder) {
+    return { ...none, blockedReason: `no incentive ladder configured for ${noLadder.brandCode}` }
+  }
+
+  // Intersect what each brand clears: a tier counts only if EVERY brand got there.
+  let entitled = clearedBandKeys(brands[0].marginPct!, brands[0].brandCode!, bands)
+  for (const b of brands.slice(1)) {
+    const cleared = clearedBandKeys(b.marginPct!, b.brandCode!, bands)
+    entitled = new Set([...entitled].filter(k => cleared.has(k)))
+  }
+  if (entitled.size === 0) return none
+
+  // Amounts should agree across brands; take the lowest if they ever disagree.
+  let amount = 0
+  let top: { key: string; label: string; pct: number } | null = null
+  for (const key of entitled) {
+    const defs = bands.filter(b => b.kind === 'incentive' && b.bandKey === key)
+    amount = round2(amount + Math.min(...defs.map(d => d.monthlyIncentive)))
+    const pct = Math.max(...defs.map(d => d.marginPct))
+    if (!top || pct > top.pct) top = { key, label: defs[0].label, pct }
+  }
+
+  return { amount, bandKey: top?.key ?? null, bandLabel: top?.label ?? null, blockedReason: null }
 }
 
 // ─── Group revenue ──────────────────────────────────────────────────────────
@@ -274,6 +329,9 @@ export function marginIncentiveFor(
  * promotion threshold measures. The brief's example: a Revenue Specialist with
  * 200k of their own and two downlines on 100k each has group sales of 400k,
  * which clears the 300k gate for Team Assistant.
+ *
+ * This is a SALES figure, so it is the raw revenue: a below-margin penalty cuts
+ * commission, not the volume that was actually sold.
  *
  * Implemented by pushing each producer's revenue up their own chain, so a
  * broken or cyclic chain degrades locally instead of corrupting every total.
@@ -384,7 +442,9 @@ export interface OverrideCredit {
  *   RS 5% (own) · TA 2% · TL 2% · STL 1%  →  10% total
  *
  * `rateOf` supplies the EFFECTIVE rate, so a variable-rate upline who cleared
- * their target this month overrides at the higher rate.
+ * their target this month overrides at the higher rate. `baseByStaff` supplies
+ * the PENALTY-WEIGHTED revenue, so a bill cut for bad margin cuts the upline's
+ * override in the same proportion (user decision 2026-08-31).
  */
 export function computeOverrides(
   nodes: Map<string, HierarchyNode>,
@@ -449,22 +509,29 @@ export function computeOverrides(
 
 // ─── Engine ─────────────────────────────────────────────────────────────────
 
+interface BrandTally {
+  revenue: number
+  cost: number
+  complete: boolean
+}
+
 interface Draft {
   staffId: string
   node: HierarchyNode | undefined
   lines: StatementLine[]
   eligibleOrders: SalesOrder[]
   productRevenue: number
+  /** Σ (order product revenue × that bill's margin multiplier) — the override base. */
+  penaltyWeightedRevenue: number
   excludedRevenue: number
   deferredRevenue: number
   kpiRevenue: number
   kpiQty: number
   kpiBase: number
   kpiThresholdPct: number
-  marginRevenue: number
-  marginCost: number
-  marginComplete: boolean
-  marginBrandRevenue: Map<string, number>
+  marginByBrand: Map<string, BrandTally>
+  /** true when some eligible order carried no brand at all. */
+  missingBrand: boolean
   marginPenaltyWithheld: number
 }
 
@@ -586,16 +653,15 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       lines: [],
       eligibleOrders,
       productRevenue,
+      penaltyWeightedRevenue: 0,
       excludedRevenue,
       deferredRevenue,
       kpiRevenue: 0,
       kpiQty: 0,
       kpiBase: 0,
       kpiThresholdPct: 0,
-      marginRevenue: 0,
-      marginCost: 0,
-      marginComplete: true,
-      marginBrandRevenue: new Map(),
+      marginByBrand: new Map(),
+      missingBrand: false,
       marginPenaltyWithheld: 0,
     })
   }
@@ -629,16 +695,23 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       const carried = order.periodMonth !== input.periodMonth
       const carriedNote = carried ? ` · carried from ${order.periodMonth.slice(0, 7)}` : ''
 
-      // This bill's margin decides whether its commission is cut.
+      // A sales order never crosses brands (user 2026-08-31); if one does, the
+      // import has a problem and the margin ladder becomes ambiguous.
       const base = marginBase(order.lines, kpiIndex, groupIndex)
-      draft.marginRevenue = round2(draft.marginRevenue + base.revenue)
-      draft.marginCost = round2(draft.marginCost + base.cost)
-      if (!base.complete) draft.marginComplete = false
-      if (base.brandCode) {
-        draft.marginBrandRevenue.set(
-          base.brandCode,
-          round2((draft.marginBrandRevenue.get(base.brandCode) ?? 0) + base.revenue),
+      if (base.mixedBrand) {
+        warnings.push(
+          `Order ${order.orderNo} carries lines from more than one brand, which should not happen — the dominant brand's margin ladder was used.`,
         )
+      }
+      if (base.revenue > 0) {
+        if (base.brandCode === null) draft.missingBrand = true
+        else {
+          const tally = draft.marginByBrand.get(base.brandCode) ?? { revenue: 0, cost: 0, complete: true }
+          tally.revenue = round2(tally.revenue + base.revenue)
+          tally.cost = round2(tally.cost + base.cost)
+          if (!base.complete) tally.complete = false
+          draft.marginByBrand.set(base.brandCode, tally)
+        }
       }
 
       const billMargin = marginPctOf(base)
@@ -652,6 +725,8 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
           if (penaltyBand) multiplier = penaltyBand.commissionMultiplier
         }
       }
+      draft.penaltyWeightedRevenue = round2(draft.penaltyWeightedRevenue + opr * multiplier)
+
       const penaltyNote = penaltyBand
         ? ` · ${penaltyBand.label} (${round2(billMargin! * 100)}% margin) × ${multiplier}`
         : ''
@@ -728,7 +803,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
         }
       }
 
-      if (penaltyBand && withheldOnThisBill > 0) {
+      if (penaltyBand) {
         draft.marginPenaltyWithheld = round2(draft.marginPenaltyWithheld + withheldOnThisBill)
         penalised.push({
           staffId: draft.staffId,
@@ -764,13 +839,15 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     )
   }
 
-  // ── Pass E: overrides, off the settled per-person bases ────────────────
+  // ── Pass E: overrides, on the PENALTY-WEIGHTED revenue ─────────────────
   if (scheme.enableOverride) {
     const baseByStaff = new Map<string, number>()
     for (const d of drafts.values()) {
       baseByStaff.set(
         d.staffId,
-        scheme.overrideIncludesKpi ? round2(d.productRevenue + d.kpiRevenue) : d.productRevenue,
+        scheme.overrideIncludesKpi
+          ? round2(d.penaltyWeightedRevenue + d.kpiRevenue)
+          : d.penaltyWeightedRevenue,
       )
     }
 
@@ -789,40 +866,58 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     }
   }
 
-  // ── Pass F: monthly margin incentive ───────────────────────────────────
-  const monthlyMargin = new Map<string, { pct: number | null; brand: string | null; band: string | null }>()
+  // ── Pass F: monthly margin incentive, every brand must clear ───────────
+  const marginSummary = new Map<
+    string,
+    { brands: BrandMargin[]; overall: number | null; bandKey: string | null }
+  >()
+  const incentiveBlocked = new Map<string, string>()
+
   for (const d of drafts.values()) {
-    let brand: string | null = null
-    let best = -Infinity
-    for (const [b, rev] of d.marginBrandRevenue) {
-      if (rev > best) {
-        best = rev
-        brand = b
-      }
+    const brands: BrandMargin[] = [...d.marginByBrand.entries()].map(([brandCode, t]) => ({
+      brandCode,
+      revenue: t.revenue,
+      cost: t.cost,
+      marginPct: marginPctOf(t),
+    }))
+    if (d.missingBrand) {
+      brands.push({ brandCode: null, revenue: 0, cost: 0, marginPct: null })
     }
-    const pct = marginPctOf({
-      revenue: d.marginRevenue,
-      cost: d.marginCost,
-      complete: d.marginComplete,
-      brandCode: brand,
+
+    const totalRevenue = sum(brands.map(b => b.revenue))
+    const totalCost = sum(brands.map(b => b.cost))
+    const overall = marginPctOf({
+      revenue: totalRevenue,
+      cost: totalCost,
+      complete: brands.every(b => b.marginPct !== null),
     })
 
     let bandKey: string | null = null
-    if (scheme.enableMarginIncentive && pct !== null) {
-      const inc = marginIncentiveFor(pct, brand, input.marginBands)
+    if (scheme.enableMarginIncentive && brands.length > 0) {
+      const inc = marginIncentiveAcrossBrands(brands, input.marginBands)
       bandKey = inc.bandKey
+      if (inc.blockedReason) incentiveBlocked.set(d.staffId, inc.blockedReason)
       if (inc.amount > 0) {
         d.lines.push({
           component: 'margin_incentive',
-          basisAmount: d.marginRevenue,
-          rate: pct,
+          basisAmount: totalRevenue,
+          rate: overall,
           qty: null,
           amount: inc.amount,
-          note: `${inc.bandLabel} · ${round2(pct * 100)}% monthly margin${brand ? ` · ${brand}` : ''}`,
+          note:
+            `${inc.bandLabel} · cleared by every brand · ` +
+            brands
+              .map(b => `${b.brandCode} ${b.marginPct === null ? '?' : round2(b.marginPct * 100) + '%'}`)
+              .join(', '),
         })
       }
     }
-    monthlyMargin.set(d.staffId, { pct, brand, band: bandKey })
+
+    marginSummary.set(d.staffId, { brands, overall, bandKey })
+  }
+
+  for (const [staffId, reason] of incentiveBlocked) {
+    warnings.push(`Margin incentive skipped for staff ${staffId} — ${reason}.`)
   }
 
   // ── Assemble ───────────────────────────────────────────────────────────
@@ -841,7 +936,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     )
 
     const rank = resolved.get(d.staffId)
-    const margin = monthlyMargin.get(d.staffId)
+    const margin = marginSummary.get(d.staffId)
 
     // Someone with no orders, no downline volume, nothing deferred and no
     // rank contributes nothing — don't clutter the run with empty statements.
@@ -865,6 +960,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       qualifiesForRankKey: rank?.qualifiesFor?.rankKey ?? null,
       uplineStaffId: d.node?.uplineStaffId ?? null,
       productRevenue: d.productRevenue,
+      penaltyWeightedRevenue: d.penaltyWeightedRevenue,
       groupRevenue: groupRevenue.get(d.staffId) ?? d.productRevenue,
       excludedRevenue: d.excludedRevenue,
       deferredRevenue: d.deferredRevenue,
@@ -875,11 +971,11 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       kpiCommission,
       openBillBonus,
       overrideCommission,
-      marginRevenue: d.marginRevenue,
-      marginCost: d.marginCost,
-      marginPct: margin?.pct ?? null,
-      marginBrandCode: margin?.brand ?? null,
-      marginBandKey: margin?.band ?? null,
+      marginRevenue: sum((margin?.brands ?? []).map(b => b.revenue)),
+      marginCost: sum((margin?.brands ?? []).map(b => b.cost)),
+      marginPct: margin?.overall ?? null,
+      marginByBrand: margin?.brands ?? [],
+      marginBandKey: margin?.bandKey ?? null,
       marginIncentive,
       marginPenaltyWithheld: d.marginPenaltyWithheld,
       totalCommission,

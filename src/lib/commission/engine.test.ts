@@ -10,7 +10,7 @@ import {
   isDepositMet,
   kpiThresholdPct,
   marginBase,
-  marginIncentiveFor,
+  marginIncentiveAcrossBrands,
   marginPctOf,
   orderProductRevenue,
   penaltyBandFor,
@@ -60,25 +60,26 @@ const RANKS: Rank[] = [
 
 /**
  * The brand ladder from the user's worked example (2026-08-31). Thresholds are
- * per brand: Acami's incentive Tier 1 is 36% where Zanotti's is 33%.
+ * per brand: Akemi's incentive Tier 1 is 36% where Zanotti's is 33%.
  */
-const ACAMI_BANDS: MarginBand[] = [
-  { brandCode: 'ACAMI', bandKey: 'incentive_tier_2', label: 'Incentive Tier 2', kind: 'incentive', marginPct: 0.43, commissionMultiplier: 1, monthlyIncentive: 1_500 },
-  { brandCode: 'ACAMI', bandKey: 'incentive_tier_1', label: 'Incentive Tier 1', kind: 'incentive', marginPct: 0.36, commissionMultiplier: 1, monthlyIncentive: 1_000 },
-  { brandCode: 'ACAMI', bandKey: 'standard', label: 'Standard margin', kind: 'reference', marginPct: 0.33, commissionMultiplier: 1, monthlyIncentive: 0 },
-  { brandCode: 'ACAMI', bandKey: 'low', label: 'Low margin', kind: 'reference', marginPct: 0.30, commissionMultiplier: 1, monthlyIncentive: 0 },
-  { brandCode: 'ACAMI', bandKey: 'below_tier_1', label: 'Below margin Tier 1', kind: 'penalty', marginPct: 0.27, commissionMultiplier: 0.5, monthlyIncentive: 0 },
-  { brandCode: 'ACAMI', bandKey: 'below_tier_2', label: 'Below margin Tier 2', kind: 'penalty', marginPct: 0.25, commissionMultiplier: 0.25, monthlyIncentive: 0 },
-  { brandCode: 'ACAMI', bandKey: 'below_tier_3', label: 'Below margin Tier 3', kind: 'penalty', marginPct: 0.24, commissionMultiplier: 0, monthlyIncentive: 0 },
+const AKEMI_BANDS: MarginBand[] = [
+  { brandCode: 'AKEMI', bandKey: 'incentive_tier_2', label: 'Incentive Tier 2', kind: 'incentive', marginPct: 0.43, commissionMultiplier: 1, monthlyIncentive: 1_500 },
+  { brandCode: 'AKEMI', bandKey: 'incentive_tier_1', label: 'Incentive Tier 1', kind: 'incentive', marginPct: 0.36, commissionMultiplier: 1, monthlyIncentive: 1_000 },
+  { brandCode: 'AKEMI', bandKey: 'standard', label: 'Standard margin', kind: 'reference', marginPct: 0.33, commissionMultiplier: 1, monthlyIncentive: 0 },
+  { brandCode: 'AKEMI', bandKey: 'low', label: 'Low margin', kind: 'reference', marginPct: 0.30, commissionMultiplier: 1, monthlyIncentive: 0 },
+  { brandCode: 'AKEMI', bandKey: 'below_tier_1', label: 'Below margin Tier 1', kind: 'penalty', marginPct: 0.27, commissionMultiplier: 0.5, monthlyIncentive: 0 },
+  { brandCode: 'AKEMI', bandKey: 'below_tier_2', label: 'Below margin Tier 2', kind: 'penalty', marginPct: 0.25, commissionMultiplier: 0.25, monthlyIncentive: 0 },
+  { brandCode: 'AKEMI', bandKey: 'below_tier_3', label: 'Below margin Tier 3', kind: 'penalty', marginPct: 0.24, commissionMultiplier: 0, monthlyIncentive: 0 },
 ]
 
 /** Zanotti clears at a lower bar — the reason bands are per brand. */
 const ZANOTTI_BANDS: MarginBand[] = [
+  { brandCode: 'ZANOTTI', bandKey: 'incentive_tier_2', label: 'Incentive Tier 2', kind: 'incentive', marginPct: 0.40, commissionMultiplier: 1, monthlyIncentive: 1_500 },
   { brandCode: 'ZANOTTI', bandKey: 'incentive_tier_1', label: 'Incentive Tier 1', kind: 'incentive', marginPct: 0.33, commissionMultiplier: 1, monthlyIncentive: 1_000 },
   { brandCode: 'ZANOTTI', bandKey: 'below_tier_1', label: 'Below margin Tier 1', kind: 'penalty', marginPct: 0.20, commissionMultiplier: 0.5, monthlyIncentive: 0 },
 ]
 
-const MARGIN_BANDS = [...ACAMI_BANDS, ...ZANOTTI_BANDS]
+const MARGIN_BANDS = [...AKEMI_BANDS, ...ZANOTTI_BANDS]
 
 const SCHEME: CommissionScheme = {
   openBillBasis: 'uplift_on_commission',
@@ -153,7 +154,7 @@ function order(
       qty,
       lineAmount,
       costAmount,
-      brandCode: brandCode ?? (costAmount === undefined ? undefined : 'ACAMI'),
+      brandCode: brandCode ?? (costAmount === undefined ? undefined : 'AKEMI'),
     })),
   }
 }
@@ -775,15 +776,15 @@ describe('margin base', () => {
   it('picks the brand with the most revenue on the bill', () => {
     const o = order('1', 'rs', [
       ['MATTRESS', 'M1', 1, 3_000, 2_000, 'ZANOTTI'],
-      ['SOFA', 'S1', 1, 9_000, 6_000, 'ACAMI'],
+      ['SOFA', 'S1', 1, 9_000, 6_000, 'AKEMI'],
     ])
-    expect(marginBase(o.lines, kpiIndex, groupIndex).brandCode).toBe('ACAMI')
+    expect(marginBase(o.lines, kpiIndex, groupIndex).brandCode).toBe('AKEMI')
   })
 })
 
 describe('penaltyBandFor — the most severe match wins', () => {
   it("matches the user's ladder exactly", () => {
-    const at = (m: number) => penaltyBandFor(m, 'ACAMI', MARGIN_BANDS)?.bandKey ?? null
+    const at = (m: number) => penaltyBandFor(m, 'AKEMI', MARGIN_BANDS)?.bandKey ?? null
     expect(at(0.28)).toBeNull() // above every penalty band
     expect(at(0.27)).toBe('below_tier_1') // "27 and below"
     expect(at(0.26)).toBe('below_tier_1')
@@ -796,32 +797,71 @@ describe('penaltyBandFor — the most severe match wins', () => {
   it('reads the ladder of the bill\'s own brand', () => {
     // 22% is a Tier-1 penalty for Zanotti (bar at 20%? no — 22 > 20, so clear)
     expect(penaltyBandFor(0.22, 'ZANOTTI', MARGIN_BANDS)).toBeNull()
-    expect(penaltyBandFor(0.22, 'ACAMI', MARGIN_BANDS)?.bandKey).toBe('below_tier_3')
+    expect(penaltyBandFor(0.22, 'AKEMI', MARGIN_BANDS)?.bandKey).toBe('below_tier_3')
     expect(penaltyBandFor(0.19, 'ZANOTTI', MARGIN_BANDS)?.bandKey).toBe('below_tier_1')
   })
 })
 
-describe('marginIncentiveFor — incentives stack up the ladder', () => {
-  const at = (m: number) => marginIncentiveFor(m, 'ACAMI', MARGIN_BANDS)
+describe('marginIncentiveAcrossBrands — every brand must clear the tier', () => {
+  const brand = (brandCode: string, marginPct: number | null) =>
+    ({ brandCode, revenue: 10_000, cost: 0, marginPct })
 
   it('pays nothing below Tier 1', () => {
-    expect(at(0.35).amount).toBe(0)
+    expect(marginIncentiveAcrossBrands([brand('AKEMI', 0.35)], MARGIN_BANDS).amount).toBe(0)
   })
 
-  it('pays RM1,000 at Tier 1', () => {
-    expect(at(0.36).amount).toBe(1_000)
-    expect(at(0.36).bandKey).toBe('incentive_tier_1')
+  it('pays RM1,000 at Tier 1 and RM2,500 at Tier 2', () => {
+    expect(marginIncentiveAcrossBrands([brand('AKEMI', 0.36)], MARGIN_BANDS).amount).toBe(1_000)
+    expect(marginIncentiveAcrossBrands([brand('AKEMI', 0.43)], MARGIN_BANDS).amount).toBe(2_500)
+    expect(marginIncentiveAcrossBrands([brand('AKEMI', 0.50)], MARGIN_BANDS).bandKey)
+      .toBe('incentive_tier_2')
   })
 
-  it('pays RM1,000 + RM1,500 at Tier 2', () => {
-    expect(at(0.43).amount).toBe(2_500)
-    expect(at(0.50).amount).toBe(2_500)
-    expect(at(0.43).bandKey).toBe('incentive_tier_2')
+  it("uses each brand's own bar — Zanotti clears Tier 1 at 33%, Akemi at 36%", () => {
+    expect(marginIncentiveAcrossBrands([brand('ZANOTTI', 0.33)], MARGIN_BANDS).amount).toBe(1_000)
+    expect(marginIncentiveAcrossBrands([brand('AKEMI', 0.33)], MARGIN_BANDS).amount).toBe(0)
   })
 
-  it("uses the brand's own bar — Zanotti clears Tier 1 at 33%", () => {
-    expect(marginIncentiveFor(0.33, 'ZANOTTI', MARGIN_BANDS).amount).toBe(1_000)
-    expect(marginIncentiveFor(0.33, 'ACAMI', MARGIN_BANDS).amount).toBe(0)
+  it("matches the brief's four-weekend example", () => {
+    // Three weekends of Akemi at 45% clear Tier 2, but the fourth weekend of
+    // Zanotti at 35% only clears Tier 1 — so the month is a Tier 1 month.
+    const r = marginIncentiveAcrossBrands(
+      [brand('AKEMI', 0.45), brand('ZANOTTI', 0.35)], MARGIN_BANDS)
+    expect(r.amount).toBe(1_000)
+    expect(r.bandKey).toBe('incentive_tier_1')
+  })
+
+  it('drops to nothing when one brand clears no tier at all', () => {
+    const r = marginIncentiveAcrossBrands(
+      [brand('AKEMI', 0.45), brand('ZANOTTI', 0.30)], MARGIN_BANDS)
+    expect(r.amount).toBe(0)
+  })
+
+  it('pays Tier 2 when BOTH brands clear their own Tier 2', () => {
+    const r = marginIncentiveAcrossBrands(
+      [brand('AKEMI', 0.44), brand('ZANOTTI', 0.41)], MARGIN_BANDS)
+    expect(r.amount).toBe(2_500)
+  })
+
+  it('blocks rather than guessing when a brand has no cost data', () => {
+    const r = marginIncentiveAcrossBrands(
+      [brand('AKEMI', 0.45), brand('ZANOTTI', null)], MARGIN_BANDS)
+    expect(r.amount).toBe(0)
+    expect(r.blockedReason).toMatch(/no cost data for ZANOTTI/)
+  })
+
+  it('blocks when a brand has no ladder configured', () => {
+    const r = marginIncentiveAcrossBrands(
+      [brand('AKEMI', 0.45), brand('ERGOTEX', 0.45)], MARGIN_BANDS)
+    expect(r.amount).toBe(0)
+    expect(r.blockedReason).toMatch(/no incentive ladder configured for ERGOTEX/)
+  })
+
+  it('blocks when sales carry no brand at all', () => {
+    const r = marginIncentiveAcrossBrands(
+      [{ brandCode: null, revenue: 1_000, cost: 0, marginPct: 0.5 }], MARGIN_BANDS)
+    expect(r.amount).toBe(0)
+    expect(r.blockedReason).toMatch(/no brand/)
   })
 })
 
@@ -870,6 +910,23 @@ describe('below-margin penalty, end to end', () => {
     expect(r.penalised[0]).toMatchObject({
       orderNo: 'SO-1', bandKey: 'below_tier_1', multiplier: 0.5, withheld: 250,
     })
+  })
+
+  it("cuts the upline's override in the same proportion", () => {
+    const r = run({ orders: [badBill] })
+    // The bill is halved, so every level's share of it is halved: the 10,000
+    // behaves like 5,000 all the way up the chain.
+    expect(find(r.statements, 'rs').productCommission).toBe(250) // 5% of 5,000
+    expect(find(r.statements, 'ta').overrideCommission).toBe(100) // (7-5)% of 5,000
+    expect(find(r.statements, 'tl').overrideCommission).toBe(100) // (9-7)% of 5,000
+    expect(find(r.statements, 'stl').overrideCommission).toBe(50) // (10-9)% of 5,000
+    expect(r.totalCommission).toBe(500) // 10% of 5,000, never more than the top rate
+  })
+
+  it('kills the override outright when the bill is killed', () => {
+    const r = run({ orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 7_700]])] })
+    expect(find(r.statements, 'ta').overrideCommission).toBe(0)
+    expect(r.totalCommission).toBe(0)
   })
 
   it('leaves a good-margin bill alone', () => {
@@ -928,6 +985,35 @@ describe('monthly margin incentive, end to end', () => {
       scheme: { ...SCHEME, enableMarginIncentive: false },
     })
     expect(find(r.statements, 'rs').marginIncentive).toBe(0)
+  })
+
+  it("the four-weekend case, end to end: a weak fourth brand caps the month", () => {
+    const r = run({
+      orders: [
+        // three weekends of Akemi at 45%
+        order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 5_500, 'AKEMI']]),
+        order('2', 'rs', [['MATTRESS', 'M2', 1, 10_000, 5_500, 'AKEMI']]),
+        order('3', 'rs', [['MATTRESS', 'M3', 1, 10_000, 5_500, 'AKEMI']]),
+        // a fourth weekend of Zanotti at 35% — clears Zanotti Tier 1, not Tier 2
+        order('4', 'rs', [['SOFA', 'S1', 1, 10_000, 6_500, 'ZANOTTI']]),
+      ],
+    })
+    const rs = find(r.statements, 'rs')
+    expect(rs.marginByBrand.map(b => b.brandCode).sort()).toEqual(['AKEMI', 'ZANOTTI'])
+    expect(rs.marginByBrand.find(b => b.brandCode === 'AKEMI')!.marginPct).toBeCloseTo(0.45, 10)
+    expect(rs.marginByBrand.find(b => b.brandCode === 'ZANOTTI')!.marginPct).toBeCloseTo(0.35, 10)
+    expect(rs.marginIncentive).toBe(1_000) // Tier 1, not Tier 2
+    expect(rs.marginBandKey).toBe('incentive_tier_1')
+  })
+
+  it('warns when a bill crosses brands, which the ERP should never produce', () => {
+    const r = run({
+      orders: [order('1', 'rs', [
+        ['MATTRESS', 'M1', 1, 6_000, 3_000, 'AKEMI'],
+        ['SOFA', 'S1', 1, 4_000, 2_000, 'ZANOTTI'],
+      ])],
+    })
+    expect(r.warnings.join(' ')).toMatch(/more than one brand/)
   })
 
   it('keeps the line-sum invariant with an incentive present', () => {

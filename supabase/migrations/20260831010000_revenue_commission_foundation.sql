@@ -342,8 +342,8 @@ COMMENT ON TABLE comm_open_bill_rules IS
 -- ----------------------------------------------------------------------------
 -- TABLE: comm_brands
 -- Margin thresholds, incentives and KPI expectations follow the BRAND
--- (user 2026-08-31): Acami, Zanotti, Ergotax. What counts as a good margin
--- differs - Acami's incentive Tier 1 is 36% where Zanotti's is 33%.
+-- (user 2026-08-31): Akemi, Zanotti, Ergotex. What counts as a good margin
+-- differs - Akemi's incentive Tier 1 is 36% where Zanotti's is 33%.
 --
 -- The ERP export has no brand column, so item_code_prefixes lets the importer
 -- tag each line from its Item Code (AK-... -> Acami, and so on).
@@ -620,6 +620,10 @@ CREATE TABLE sales_orders (
     -- Branch: KL / PG / SRW / SBH. Salespeople work across branches, so this
     -- is descriptive only — it never drives the hierarchy.
     location TEXT,
+    -- A sales order never crosses brands (user 2026-08-31), so the brand is an
+    -- order-level fact. The importer resolves it from the Item Codes and the
+    -- engine warns if the lines ever disagree.
+    brand_code TEXT,
     order_total DECIMAL(15, 2) NOT NULL DEFAULT 0,
     -- ERP BALANCE — outstanding amount. Recorded so a future "pay commission
     -- on collection" rule has the data; nothing reads it today.
@@ -771,7 +775,12 @@ CREATE TABLE comm_statements (
     upline_staff_id UUID REFERENCES hr_staff_costs(id),
 
     product_revenue DECIMAL(15, 2) NOT NULL DEFAULT 0,
-    -- Own + the entire downline subtree - what the promotion threshold measures.
+    -- Sum of (each bill's revenue x its margin multiplier). This is the base an
+    -- upline overrides on, so a bill cut for bad margin cuts the override in the
+    -- same proportion (user decision 2026-08-31).
+    penalty_weighted_revenue DECIMAL(15, 2) NOT NULL DEFAULT 0,
+    -- Own + the entire downline subtree. A SALES figure, so it is the raw
+    -- revenue: the margin penalty cuts commission, not the volume sold.
     group_revenue DECIMAL(15, 2) NOT NULL DEFAULT 0,
     -- Commissionable revenue held back by the deposit gate this month.
     deferred_revenue DECIMAL(15, 2) NOT NULL DEFAULT 0,
@@ -794,7 +803,7 @@ CREATE TABLE comm_statements (
     margin_cost DECIMAL(15, 2) NOT NULL DEFAULT 0,
     -- NULL when no cost data was available: no penalty, no incentive, a warning.
     margin_pct DECIMAL(9, 6),
-    margin_brand_code TEXT,
+    -- Highest incentive tier cleared by EVERY brand they sold this month.
     margin_band_key TEXT,
     margin_incentive DECIMAL(15, 2) NOT NULL DEFAULT 0,
     -- Memo: commission the below-margin penalty removed. Already reflected in
@@ -837,6 +846,31 @@ CREATE TABLE comm_statement_lines (
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- ----------------------------------------------------------------------------
+-- TABLE: comm_statement_brand_margins
+-- One row per (statement x brand). The monthly incentive is judged brand by
+-- brand and EVERY brand must clear a tier, so the breakdown has to be visible:
+-- three weekends of Akemi at Tier 2 and a fourth of Zanotti below it is a
+-- Tier 1 month, and the salesperson needs to see which brand capped them.
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE comm_statement_brand_margins (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    statement_id UUID NOT NULL REFERENCES comm_statements(id) ON DELETE CASCADE,
+    brand_code TEXT NOT NULL,
+    revenue DECIMAL(15, 2) NOT NULL DEFAULT 0,
+    cost DECIMAL(15, 2) NOT NULL DEFAULT 0,
+    margin_pct DECIMAL(9, 6),
+    top_band_key TEXT,
+
+    CONSTRAINT uq_statement_brand UNIQUE (statement_id, brand_code)
+);
+
+COMMENT ON TABLE comm_statement_brand_margins IS
+    'Per-brand margin behind one statement. margin_pct NULL = no cost data for that brand, which blocks the whole incentive.';
+
+CREATE INDEX idx_statement_brand_margins ON comm_statement_brand_margins (statement_id);
 
 COMMENT ON TABLE comm_statement_lines IS
     'Every ringgit traced to the order, order line, tagged bill or downline that produced it. Sum of lines.amount = statement.total_commission is verified by apply_commission_run before it commits.';
@@ -938,13 +972,17 @@ BEGIN
     -- items, and at what amount, is the user's call in Settings. The July
     -- export has 26 distinct ACC codes to choose from.
 
-    -- ── Brands. item_code_prefixes are EMPTY on purpose: the mapping from ERP
-    -- Item Codes to these names has not been confirmed (is "Acami" the AK-
-    -- prefix, i.e. AKEMI?). Filled in Settings.
-    INSERT INTO comm_brands (scheme_id, code, name, note) VALUES
-        (v_scheme, 'ACAMI',   'Acami',   'Margin ladder below is the user''s worked example.'),
-        (v_scheme, 'ZANOTTI', 'Zanotti', 'Incentive Tier 1 is 33% - the rest of the ladder is pending.'),
-        (v_scheme, 'ERGOTAX', 'Ergotax', 'Ladder pending.');
+    -- ── Brands. Akemi's prefixes are safe (the July export's AK- codes carry
+    -- AKEMI product descriptions); Zanotti's and Ergotex's are unknown and get
+    -- filled in Settings. An order whose lines resolve to no brand BLOCKS that
+    -- salesperson's margin incentive rather than paying it blind.
+    INSERT INTO comm_brands (scheme_id, code, name, item_code_prefixes, note) VALUES
+        (v_scheme, 'AKEMI',   'Akemi',   ARRAY['AK-', 'AKE'],
+         'Margin ladder below is the user''s worked example.'),
+        (v_scheme, 'ZANOTTI', 'Zanotti', ARRAY[]::TEXT[],
+         'Incentive Tier 1 is 33%; the rest of the ladder and the Item Code prefixes are pending.'),
+        (v_scheme, 'ERGOTEX', 'Ergotex', ARRAY[]::TEXT[],
+         'Ladder and prefixes to be set later in Settings (user 2026-08-31).');
 
     -- Acami's full ladder, exactly as briefed.
     INSERT INTO comm_margin_bands
@@ -961,7 +999,7 @@ BEGIN
         ('below_tier_2',     'Below margin Tier 2', 'penalty',   0.25, 0.25,    0.00, 60),
         ('below_tier_3',     'Below margin Tier 3', 'penalty',   0.24, 0.00,    0.00, 70)
     ) AS x(band_key, label, kind, margin_pct, multiplier, incentive, sort_order)
-    WHERE b.scheme_id = v_scheme AND b.code = 'ACAMI';
+    WHERE b.scheme_id = v_scheme AND b.code = 'AKEMI';
 
     -- Zanotti: only the one threshold the user gave.
     INSERT INTO comm_margin_bands
@@ -1029,7 +1067,7 @@ BEGIN
         'sales_import_batches', 'sales_orders', 'sales_order_lines',
         'sales_order_open_bill_tags',
         'comm_runs', 'comm_statements', 'comm_statement_lines',
-        'comm_order_releases'
+        'comm_statement_brand_margins', 'comm_order_releases'
     ]
     LOOP
         EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', t);
