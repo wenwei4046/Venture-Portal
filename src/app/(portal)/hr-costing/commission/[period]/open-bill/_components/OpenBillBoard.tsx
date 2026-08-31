@@ -143,7 +143,7 @@ export default function OpenBillBoard({ orders, rates, readOnly }: Props) {
         <select
           value={person}
           onChange={e => setPerson(e.target.value)}
-          className="px-3 py-1.5 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+          className="px-3 py-1.5 bg-paper border border-hairline rounded-control text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
         >
           <option value="">Everyone</option>
           {people.map(p => (
@@ -169,7 +169,7 @@ export default function OpenBillBoard({ orders, rates, readOnly }: Props) {
       ) : null}
 
       {shown.length === 0 ? (
-        <div className="py-14 text-center border border-hairline rounded-md bg-surface">
+        <div className="py-14 text-center border border-hairline rounded-card bg-surface">
           <p className="font-serif text-xl text-ink mb-2">Nothing left to review.</p>
           <p className="font-serif italic text-muted text-sm">
             Every salesperson-day has a pick a human has confirmed.
@@ -178,8 +178,10 @@ export default function OpenBillBoard({ orders, rates, readOnly }: Props) {
       ) : (
         <div className="space-y-6">
           {shown.map(g => (
-            <div key={g.key} className="border border-hairline rounded-md bg-surface overflow-hidden">
-              <div className="flex items-baseline justify-between px-4 py-3 border-b border-hairline bg-surface-2">
+            <div key={g.key}>
+              {/* .ledger-table draws its own surface, border and radius, so the
+                  group heading sits above it rather than inside a second card. */}
+              <div className="flex items-baseline justify-between mb-2">
                 <div>
                   <span className="font-serif text-[15px] text-ink">{g.staffName}</span>
                   <span className="font-mono text-[11px] text-graphite ml-3">{g.eventDate}</span>
@@ -218,7 +220,7 @@ export default function OpenBillBoard({ orders, rates, readOnly }: Props) {
                               onClick={() => pick(o, o.rank === r ? null : r)}
                               disabled={readOnly || isPending}
                               className={[
-                                'font-mono text-[11px] px-2.5 py-1 rounded-md border transition-colors disabled:opacity-40',
+                                'font-mono text-[11px] px-2.5 py-1 rounded-control border transition-colors disabled:opacity-40',
                                 o.rank === r
                                   ? 'bg-accent border-accent text-white'
                                   : 'bg-paper border-hairline text-graphite hover:border-accent-border',
@@ -254,7 +256,7 @@ export default function OpenBillBoard({ orders, rates, readOnly }: Props) {
 
 function Tile({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
   return (
-    <div className="border border-hairline rounded-md bg-surface px-4 py-3">
+    <div className="border border-hairline rounded-card bg-surface px-4 py-3">
       <div className="font-mono text-[0.6rem] tracking-wide text-muted uppercase mb-1">{label}</div>
       <div
         className={[

@@ -194,19 +194,20 @@ export default async function CommissionStatementPage({ params }: PageProps) {
         </div>
         <Link
           href={`/hr-costing/commission/${period}`}
-          className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+          className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
         >
           ← The run
         </Link>
       </div>
 
-      <section className="mb-10">
-        <div className="border border-hairline rounded-md bg-surface p-5">
+      {/* The page's one dark object — .hero-walnut in globals.css. */}
+      <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
+        <div className="lg:col-span-7 hero-walnut px-6 py-6 md:px-8 md:py-7">
           <div className="font-serif italic text-accent text-base mb-1">Commission earned</div>
-          <div className="font-serif text-[40px] text-num-ink leading-none tabular tracking-[-0.01em]">
+          <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
             {formatMoney(total)}
           </div>
-          <div className="font-mono text-[11px] text-graphite mt-3 tracking-[0.02em] font-medium uppercase">
+          <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium uppercase">
             {lines.length} LINES · {label(period).toUpperCase()}
           </div>
           {s.qualifies_for_rank_key && s.qualifies_for_rank_key !== s.rank_key ? (
@@ -282,7 +283,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
             brand with no cost data, or no ladder, blocks the incentive entirely rather than paying
             on the ones that can be judged.
           </p>
-          <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+          <div className="overflow-x-auto">
             <table className="ledger-table">
               <thead>
                 <tr>
@@ -331,7 +332,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
               {COMPONENT_NOTE[group.component]}
             </p>
           ) : null}
-          <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+          <div className="overflow-x-auto">
             <table className="ledger-table">
               <thead>
                 <tr>
@@ -372,7 +373,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
           <h2>Total</h2>
           <span className="rule" aria-hidden />
         </div>
-        <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+        <div className="overflow-x-auto">
           <table className="ledger-table">
             <tbody>
               <Sum name="Product commission" value={Number(s.product_commission)} />
@@ -413,7 +414,7 @@ function Fig({
   warn?: boolean
 }) {
   return (
-    <div className="border border-hairline rounded-md bg-surface px-4 py-3">
+    <div className="border border-hairline rounded-card bg-surface px-4 py-3">
       <div className="font-mono text-[0.6rem] tracking-wide text-muted uppercase mb-1">{text}</div>
       <div
         className={[

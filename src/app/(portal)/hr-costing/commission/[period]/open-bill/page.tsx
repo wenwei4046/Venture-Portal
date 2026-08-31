@@ -127,14 +127,14 @@ export default async function OpenBillPage({ params }: PageProps) {
         </div>
         <Link
           href={`/hr-costing/commission/${period}`}
-          className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+          className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
         >
           ← The run
         </Link>
       </div>
 
       {!batchId ? (
-        <div className="py-16 text-center border border-hairline rounded-md bg-surface">
+        <div className="py-16 text-center border border-hairline rounded-card bg-surface">
           <p className="font-serif text-2xl text-ink mb-3">Nothing imported for this month.</p>
           <p className="font-serif italic text-muted text-sm max-w-lg mx-auto">
             Import the ERP sales-order export first — the picks are seeded from it.

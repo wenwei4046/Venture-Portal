@@ -206,13 +206,13 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         <div className="flex items-center gap-3">
           <Link
             href="/hr-costing/commission"
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
           >
             ← All months
           </Link>
           <Link
             href={`/hr-costing/commission/${period}/import`}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
           >
             {batchRow ? 'Re-import' : 'Import sales orders'}
           </Link>
@@ -220,7 +220,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
       </div>
 
       {!batchRow ? (
-        <div className="py-16 text-center border border-hairline rounded-md bg-surface">
+        <div className="py-16 text-center border border-hairline rounded-card bg-surface">
           <p className="font-serif text-2xl text-ink mb-3">Nothing imported for this month.</p>
           <p className="font-serif italic text-muted text-sm max-w-lg mx-auto">
             Import the ERP sales-order export to begin.
@@ -295,27 +295,30 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
               </span>
             </div>
 
-            <div className="border border-hairline rounded-md bg-surface p-5 mb-6">
-              <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <div className="font-serif italic text-accent text-base mb-1">
-                    Commission this month
-                  </div>
-                  <div className="font-serif text-[40px] text-num-ink leading-none tabular tracking-[-0.01em]">
-                    {formatMoney(runTotal)}
-                  </div>
-                  <div className="font-mono text-[11px] text-graphite mt-3 tracking-[0.02em] font-medium uppercase">
-                    {run
-                      ? `${run.staff_count} STATEMENTS · ${(run.deferred_orders ?? []).length} ORDERS WAITING ON A DEPOSIT`
-                      : 'RUN IT TO SEE WHAT THE MONTH PAYS'}
-                  </div>
-                  {run?.applied_at ? (
-                    <div className="font-serif italic text-ledger text-xs mt-2">
-                      Written into the {period.slice(0, 7)} payroll.
-                    </div>
-                  ) : null}
+            {/* The page's one dark object — .hero-walnut in globals.css. The
+                controls stay on the light ground beside it: an accent button
+                inside the walnut block would be tan-on-tan. */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+              <div className="lg:col-span-7 hero-walnut px-6 py-6 md:px-8 md:py-7">
+                <div className="font-serif italic text-accent text-base mb-1">
+                  Commission this month
                 </div>
+                <div className="font-serif text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
+                  {formatMoney(runTotal)}
+                </div>
+                <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium uppercase">
+                  {run
+                    ? `${run.staff_count} STATEMENTS · ${(run.deferred_orders ?? []).length} ORDERS WAITING ON A DEPOSIT`
+                    : 'RUN IT TO SEE WHAT THE MONTH PAYS'}
+                </div>
+                {run?.applied_at ? (
+                  <div className="font-serif italic text-ledger text-xs mt-3">
+                    Written into the {period.slice(0, 7)} payroll.
+                  </div>
+                ) : null}
+              </div>
 
+              <div className="lg:col-span-5 flex flex-col items-start lg:items-end justify-between gap-4">
                 <RunControls
                   period={period}
                   runId={run?.id ?? null}
@@ -323,24 +326,24 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                   warningCount={warnings.length}
                   hasImport={Boolean(batchRow)}
                 />
-              </div>
 
-              {warnings.length > 0 ? (
-                <div className="mt-5 border-t border-hairline pt-4">
-                  <div className="font-mono text-[10.5px] uppercase tracking-wide text-danger mb-2">
-                    {warnings.length} thing(s) to settle before this can pay
+                {warnings.length > 0 ? (
+                  <div className="w-full border border-hairline rounded-card bg-surface p-4">
+                    <div className="font-mono text-[10.5px] uppercase tracking-wide text-danger mb-2">
+                      {warnings.length} thing(s) to settle before this can pay
+                    </div>
+                    <ul className="space-y-1.5 font-serif text-sm text-graphite list-disc pl-5">
+                      {warnings.map((w, i) => (
+                        <li key={i}>{w}</li>
+                      ))}
+                    </ul>
                   </div>
-                  <ul className="space-y-1.5 font-serif text-sm text-graphite list-disc pl-5">
-                    {warnings.map((w, i) => (
-                      <li key={i}>{w}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
+                ) : null}
+              </div>
             </div>
 
             {statements.length > 0 ? (
-              <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+              <div className="overflow-x-auto">
                 <table className="ledger-table">
                   <thead>
                     <tr>
@@ -415,7 +418,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                 Judged per bill, most severe band wins. What the penalty removes is taken off the
                 upline&apos;s override in the same proportion.
               </p>
-              <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+              <div className="overflow-x-auto">
                 <table className="ledger-table">
                   <thead>
                     <tr>
@@ -462,7 +465,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                 Below {Math.round(threshold * 100)}% of the order total, so none of their commission
                 is released yet. Nothing is lost — each one pays in the month its deposit clears.
               </p>
-              <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+              <div className="overflow-x-auto">
                 <table className="ledger-table">
                   <thead>
                     <tr>
@@ -507,7 +510,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
               <span className="rule" aria-hidden />
               <span className="count">{people.length} PEOPLE</span>
             </div>
-            <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+            <div className="overflow-x-auto">
               <table className="ledger-table">
                 <thead>
                   <tr>
@@ -555,7 +558,7 @@ function Tile({
   big?: boolean
 }) {
   return (
-    <div className="border border-hairline rounded-md bg-surface px-4 py-3">
+    <div className="border border-hairline rounded-card bg-surface px-4 py-3">
       <div className="font-mono text-[0.6rem] tracking-wide text-muted uppercase mb-1">{text}</div>
       <div
         className={[

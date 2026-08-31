@@ -116,7 +116,7 @@ export default function RunControls({ period, runId, status, warningCount, hasIm
           <button
             onClick={() => setConfirming('reopen')}
             disabled={isPending || status === 'locked'}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-50"
           >
             Reopen
           </button>
@@ -126,7 +126,7 @@ export default function RunControls({ period, runId, status, warningCount, hasIm
               onClick={compute}
               disabled={isPending || !hasImport}
               title={hasImport ? undefined : 'Import the month first'}
-              className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50"
+              className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-50"
             >
               {isPending ? 'Computing…' : status === 'none' ? 'Compute run' : 'Recompute'}
             </button>
@@ -140,7 +140,7 @@ export default function RunControls({ period, runId, status, warningCount, hasIm
                     ? `${warningCount} warning(s) to clear first`
                     : undefined
               }
-              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-40"
+              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-40"
             >
               Apply to payroll →
             </button>
@@ -155,7 +155,7 @@ export default function RunControls({ period, runId, status, warningCount, hasIm
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-end gap-2 bg-surface border border-accent-border rounded-md p-4 max-w-md text-right">
+    <div className="flex flex-col items-end gap-2 bg-surface border border-accent-border rounded-card p-4 max-w-md text-right">
       {children}
     </div>
   )
@@ -178,7 +178,7 @@ function Primary({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md disabled:opacity-50"
+      className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-control disabled:opacity-50"
     >
       {children}
     </button>
