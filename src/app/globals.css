@@ -58,10 +58,15 @@
   --scrim: 90 62 43;
 
   /* Chrome — the tone shared by the two floating panels, sidebar rail and
-     header. Plaster one step down. It gets its own token rather than
-     borrowing --surface-2 (which means zebra rows and table headers), so the
-     two can be tuned independently. */
-  --chrome: 232 227 219;
+     header. Its own token rather than borrowing --surface-2 (which means zebra
+     rows and table headers), so the two can be tuned independently.
+
+     The step off --paper is deliberately measured, not eyeballed: the first
+     attempt at 232 227 219 was only delta-L* 4.1 from the page, which is inside
+     the "barely perceptible" band — it read as no header at all on a 60px
+     strip. 222 215 202 is delta-L* 8.3, a clear separate surface. Keep any
+     future tuning above delta-L* ~6. */
+  --chrome: 222 215 202;
 }
 
 /* ─── Dark mode — warm charcoal, not cold ───
@@ -95,7 +100,7 @@
 
   --walnut: 122 88 62;
   --scrim: 14 10 8;
-  --chrome: 37 32 27;
+  --chrome: 48 42 35;
 }
 
 /* ─── Sidebar panel skin (2026-08-31, Walnut) ───
@@ -112,8 +117,10 @@
      dark block below only needs to restate what actually differs. */
   --paper: var(--chrome);
   --surface: var(--chrome);
-  --surface-2: 222 215 205;
-  --hairline: 218 211 200;
+  /* One step down from --chrome again, for nav hover. Must be re-tuned
+     whenever --chrome moves or hover silently disappears. */
+  --surface-2: 210 201 185;
+  --hairline: 204 195 178;
   --ink: 51 36 27;
   --graphite: 74 64 58;
   --muted: 152 142 130;
@@ -130,8 +137,8 @@
 [data-theme="dark"] .sidebar-contrast {
   --paper: var(--chrome);
   --surface: var(--chrome);
-  --surface-2: 50 43 36;
-  --hairline: 74 64 55;
+  --surface-2: 63 55 46;
+  --hairline: 84 74 62;
   --ink: 234 226 217;
   --graphite: 166 152 138;
   --muted: 120 109 98;
@@ -246,14 +253,16 @@
 
     --walnut: 122 88 62;
     --scrim: 14 10 8;
-    --chrome: 37 32 27;
+    --chrome: 48 42 35;
   }
 
   :root:not([data-theme="light"]) .sidebar-contrast {
-    --paper: 37 32 27;
-    --surface: 37 32 27;
-    --surface-2: 50 43 36;
-    --hairline: 74 64 55;
+    /* Must mirror [data-theme="dark"] .sidebar-contrast exactly — this is the
+       branch system-dark users land on when they never touched the toggle. */
+    --paper: var(--chrome);
+    --surface: var(--chrome);
+    --surface-2: 63 55 46;
+    --hairline: 84 74 62;
     --ink: 234 226 217;
     --graphite: 166 152 138;
     --muted: 120 109 98;
