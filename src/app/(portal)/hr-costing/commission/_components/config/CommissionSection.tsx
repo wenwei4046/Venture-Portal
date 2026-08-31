@@ -21,8 +21,11 @@ import { setPositionFromForm, updateStaffTax } from '../../hierarchy-actions'
 import {
   ActionButton,
   ActionForm,
+  Choice,
   Field,
+  Hidden,
   Hint,
+  RowForm,
   SaveButton,
   SectionHead,
   Tick,
@@ -125,7 +128,7 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
             <ActionForm action={updateScheme}>
               {({ pending }) => (
                 <div className="border border-hairline rounded-md bg-surface overflow-hidden">
-                  <input type="hidden" name="scheme_id" value={scheme.id} />
+                  <Hidden name="scheme_id" value={scheme.id} />
                   <table className="ledger-table">
                     <thead>
                       <tr>
@@ -244,15 +247,15 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
                 </thead>
                 <tbody>
                   {data.ranks.map(r => (
-                    <ActionForm key={r.id} action={upsertRank} className="contents">
+                    <RowForm key={r.id} action={upsertRank}>
                       {({ pending }) => (
                         <tr>
                           <td>
-                            <input type="hidden" name="id" value={r.id} />
-                            <input type="hidden" name="scheme_id" value={scheme.id} />
-                            <input type="hidden" name="tier_key" value={r.tier_key} />
-                            <input type="hidden" name="rank_key" value={r.rank_key} />
-                            <input type="hidden" name="sort_order" value={r.sort_order} />
+                            <Hidden name="id" value={r.id} />
+                            <Hidden name="scheme_id" value={scheme.id} />
+                            <Hidden name="tier_key" value={r.tier_key} />
+                            <Hidden name="rank_key" value={r.rank_key} />
+                            <Hidden name="sort_order" value={r.sort_order} />
                             <Field name="tier_label" defaultValue={r.tier_label} width="w-44" />
                           </td>
                           <td><Field name="label" defaultValue={r.label} width="w-52" /></td>
@@ -266,7 +269,7 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
                           <td><SaveButton pending={pending} /></td>
                         </tr>
                       )}
-                    </ActionForm>
+                    </RowForm>
                   ))}
                 </tbody>
               </table>
@@ -293,12 +296,12 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
                 </thead>
                 <tbody>
                   {data.itemGroups.map(g => (
-                    <ActionForm key={g.id} action={upsertItemGroup} className="contents">
+                    <RowForm key={g.id} action={upsertItemGroup}>
                       {({ pending }) => (
                         <tr>
                           <td className="font-mono text-xs">
-                            <input type="hidden" name="scheme_id" value={scheme.id} />
-                            <input type="hidden" name="item_group" value={g.item_group} />
+                            <Hidden name="scheme_id" value={scheme.id} />
+                            <Hidden name="item_group" value={g.item_group} />
                             {g.item_group}
                           </td>
                           <td><Tick name="commissionable" defaultChecked={g.commissionable} ariaLabel={`${g.item_group} commissionable`} /></td>
@@ -306,13 +309,13 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
                           <td><SaveButton pending={pending} /></td>
                         </tr>
                       )}
-                    </ActionForm>
+                    </RowForm>
                   ))}
-                  <ActionForm action={upsertItemGroup} className="contents">
+                  <RowForm action={upsertItemGroup}>
                     {({ pending }) => (
                       <tr className="bg-surface-2/40">
                         <td>
-                          <input type="hidden" name="scheme_id" value={scheme.id} />
+                          <Hidden name="scheme_id" value={scheme.id} />
                           <Field name="item_group" placeholder="NEW GROUP" width="w-40" required />
                         </td>
                         <td><Tick name="commissionable" defaultChecked ariaLabel="new group commissionable" /></td>
@@ -320,7 +323,7 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
                         <td><SaveButton pending={pending} label="Add" /></td>
                       </tr>
                     )}
-                  </ActionForm>
+                  </RowForm>
                 </tbody>
               </table>
             </div>
@@ -347,14 +350,14 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
                 </thead>
                 <tbody>
                   {data.kpiItems.map(k => (
-                    <ActionForm key={k.id} action={upsertKpiItem} className="contents">
+                    <RowForm key={k.id} action={upsertKpiItem}>
                       {({ pending }) => (
                         <tr>
                           <td className="font-mono text-xs">
-                            <input type="hidden" name="id" value={k.id} />
-                            <input type="hidden" name="scheme_id" value={scheme.id} />
-                            <input type="hidden" name="product_code" value={k.product_code} />
-                            <input type="hidden" name="effective_from" value={k.effective_from} />
+                            <Hidden name="id" value={k.id} />
+                            <Hidden name="scheme_id" value={scheme.id} />
+                            <Hidden name="product_code" value={k.product_code} />
+                            <Hidden name="effective_from" value={k.effective_from} />
                             {k.product_code}
                           </td>
                           <td><Field name="product_name" defaultValue={k.product_name} /></td>
@@ -371,13 +374,13 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
                           </td>
                         </tr>
                       )}
-                    </ActionForm>
+                    </RowForm>
                   ))}
-                  <ActionForm action={upsertKpiItem} className="contents">
+                  <RowForm action={upsertKpiItem}>
                     {({ pending }) => (
                       <tr className="bg-surface-2/40">
                         <td>
-                          <input type="hidden" name="scheme_id" value={scheme.id} />
+                          <Hidden name="scheme_id" value={scheme.id} />
                           <Field name="product_code" placeholder="ERP item code" width="w-56" required />
                         </td>
                         <td><Field name="product_name" placeholder="name" /></td>
@@ -386,7 +389,7 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
                         <td><SaveButton pending={pending} label="Add" /></td>
                       </tr>
                     )}
-                  </ActionForm>
+                  </RowForm>
                 </tbody>
               </table>
             </div>
@@ -411,13 +414,13 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
                 </thead>
                 <tbody>
                   {data.kpiThresholds.map(t => (
-                    <ActionForm key={t.id} action={upsertKpiThreshold} className="contents">
+                    <RowForm key={t.id} action={upsertKpiThreshold}>
                       {({ pending }) => (
                         <tr>
                           <td>
-                            <input type="hidden" name="id" value={t.id} />
-                            <input type="hidden" name="scheme_id" value={scheme.id} />
-                            <input type="hidden" name="effective_from" value={t.effective_from} />
+                            <Hidden name="id" value={t.id} />
+                            <Hidden name="scheme_id" value={scheme.id} />
+                            <Hidden name="effective_from" value={t.effective_from} />
                             <Field name="tier_label" defaultValue={t.tier_label} width="w-32" />
                           </td>
                           <td className="num"><Field name="min_qty" type="number" step="1" width="w-24" defaultValue={t.min_qty} /></td>
@@ -428,13 +431,13 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
                           </td>
                         </tr>
                       )}
-                    </ActionForm>
+                    </RowForm>
                   ))}
-                  <ActionForm action={upsertKpiThreshold} className="contents">
+                  <RowForm action={upsertKpiThreshold}>
                     {({ pending }) => (
                       <tr className="bg-surface-2/40">
                         <td>
-                          <input type="hidden" name="scheme_id" value={scheme.id} />
+                          <Hidden name="scheme_id" value={scheme.id} />
                           <Field name="tier_label" placeholder="Tier 2" width="w-32" />
                         </td>
                         <td className="num"><Field name="min_qty" type="number" step="1" width="w-24" placeholder="25" required /></td>
@@ -442,7 +445,7 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
                         <td><SaveButton pending={pending} label="Add" /></td>
                       </tr>
                     )}
-                  </ActionForm>
+                  </RowForm>
                 </tbody>
               </table>
             </div>
@@ -466,18 +469,18 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
                 </thead>
                 <tbody>
                   {data.openBillRules.map(o => (
-                    <ActionForm key={o.id} action={updateOpenBillRule} className="contents">
+                    <RowForm key={o.id} action={updateOpenBillRule}>
                       {({ pending }) => (
                         <tr>
                           <td>
-                            <input type="hidden" name="id" value={o.id} />
+                            <Hidden name="id" value={o.id} />
                             {o.bill_rank === 1 ? '1st bill' : o.bill_rank === 2 ? '2nd bill' : '3rd bill'}
                           </td>
                           <td className="num"><Field name="pct" type="number" step="0.01" width="w-24" defaultValue={toPct(o.pct)} /></td>
                           <td><SaveButton pending={pending} /></td>
                         </tr>
                       )}
-                    </ActionForm>
+                    </RowForm>
                   ))}
                 </tbody>
               </table>
@@ -516,8 +519,8 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
             <ActionForm action={upsertBrand} className="mb-4">
               {({ pending }) => (
                 <div className="border border-hairline rounded-md bg-surface p-4 flex flex-wrap items-end gap-4">
-                  <input type="hidden" name="scheme_id" value={scheme.id} />
-                  {activeBrand ? <input type="hidden" name="id" value={activeBrand.id} /> : null}
+                  <Hidden name="scheme_id" value={scheme.id} />
+                  {activeBrand ? <Hidden name="id" value={activeBrand.id} /> : null}
                   <label className="text-xs font-sans text-graphite">
                     <span className="block mb-1">Code</span>
                     <Field name="code" defaultValue={activeBrand?.code} width="w-28" required />
@@ -556,28 +559,28 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
                     {data.marginBands
                       .filter(b => b.brand_id === activeBrand.id)
                       .map(b => (
-                        <ActionForm key={b.id} action={upsertMarginBand} className="contents">
+                        <RowForm key={b.id} action={upsertMarginBand}>
                           {({ pending }) => (
                             <tr>
                               <td>
-                                <input type="hidden" name="id" value={b.id} />
-                                <input type="hidden" name="scheme_id" value={scheme.id} />
-                                <input type="hidden" name="brand_id" value={activeBrand.id} />
-                                <input type="hidden" name="band_key" value={b.band_key} />
-                                <input type="hidden" name="sort_order" value={b.sort_order} />
+                                <Hidden name="id" value={b.id} />
+                                <Hidden name="scheme_id" value={scheme.id} />
+                                <Hidden name="brand_id" value={activeBrand.id} />
+                                <Hidden name="band_key" value={b.band_key} />
+                                <Hidden name="sort_order" value={b.sort_order} />
                                 <Field name="label" defaultValue={b.label} width="w-48" />
                               </td>
                               <td>
-                                <select
+                                <Choice
                                   name="kind"
                                   defaultValue={b.kind}
-                                  aria-label={`${b.band_key} kind`}
-                                  className="px-2 py-1 bg-paper border border-hairline rounded text-xs text-ink"
+                                  ariaLabel={`${b.band_key} kind`}
+                                  width="w-auto"
                                 >
                                   <option value="incentive">incentive ≥</option>
                                   <option value="reference">reference</option>
                                   <option value="penalty">penalty ≤</option>
-                                </select>
+                                </Choice>
                               </td>
                               <td className="num"><Field name="margin_pct" type="number" step="0.01" width="w-20" defaultValue={toPct(b.margin_pct)} /></td>
                               <td className="num"><Field name="commission_multiplier" type="number" step="0.01" width="w-20" defaultValue={b.commission_multiplier} /></td>
@@ -588,38 +591,38 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
                               </td>
                             </tr>
                           )}
-                        </ActionForm>
+                        </RowForm>
                       ))}
-                    <ActionForm action={upsertMarginBand} className="contents">
+                    <RowForm action={upsertMarginBand}>
                       {({ pending }) => (
                         <tr className="bg-surface-2/40">
                           <td>
-                            <input type="hidden" name="scheme_id" value={scheme.id} />
-                            <input type="hidden" name="brand_id" value={activeBrand.id} />
+                            <Hidden name="scheme_id" value={scheme.id} />
+                            <Hidden name="brand_id" value={activeBrand.id} />
                             <Field name="band_key" placeholder="band_key" width="w-36" required />
                           </td>
                           <td>
-                            <select
+                            <Choice
                               name="kind"
                               defaultValue="penalty"
-                              aria-label="new band kind"
-                              className="px-2 py-1 bg-paper border border-hairline rounded text-xs text-ink"
+                              ariaLabel="new band kind"
+                              width="w-auto"
                             >
                               <option value="incentive">incentive ≥</option>
                               <option value="reference">reference</option>
                               <option value="penalty">penalty ≤</option>
-                            </select>
+                            </Choice>
                           </td>
                           <td className="num"><Field name="margin_pct" type="number" step="0.01" width="w-20" placeholder="27" required /></td>
                           <td className="num"><Field name="commission_multiplier" type="number" step="0.01" width="w-20" defaultValue={1} /></td>
                           <td className="num"><Field name="monthly_incentive" type="number" step="0.01" width="w-24" defaultValue={0} /></td>
                           <td>
-                            <input type="hidden" name="label" value="New band" />
+                            <Hidden name="label" value="New band" />
                             <SaveButton pending={pending} label="Add" />
                           </td>
                         </tr>
                       )}
-                    </ActionForm>
+                    </RowForm>
                   </tbody>
                 </table>
               </div>
@@ -723,7 +726,7 @@ export default function CommissionSection({ data }: { data: CommissionSettingsDa
                           <ActionForm action={updateStaffTax}>
                             {({ pending }) => (
                               <div className="flex items-center gap-2">
-                                <input type="hidden" name="staff_id" value={p.staff_id} />
+                                <Hidden name="staff_id" value={p.staff_id} />
                                 <Tick name="withholding" defaultChecked={p.tax_mode === 'withholding'} ariaLabel={`${p.employee_name} withholding`} />
                                 <Field name="withholding_rate" type="number" step="0.01" width="w-16" defaultValue={toPct(p.withholding_rate)} ariaLabel="withholding rate" />
                                 <span className="text-xs text-muted">%</span>
@@ -769,54 +772,52 @@ function PositionCells({
   )
 
   return (
-    <ActionForm action={setPositionFromForm} className="contents">
+    <RowForm action={setPositionFromForm}>
       {({ pending }) => (
         <>
           <td>
-            <input type="hidden" name="staff_id" value={person.staff_id} />
-            <input type="hidden" name="scheme_id" value={schemeId} />
-            <select
+            <Hidden name="staff_id" value={person.staff_id} />
+            <Hidden name="scheme_id" value={schemeId} />
+            <Choice
               name="upline_staff_id"
               defaultValue={person.upline_staff_id ?? ''}
-              aria-label={`${person.employee_name} upline`}
-              className="px-2 py-1 bg-paper border border-hairline rounded text-sm text-ink w-40"
+              ariaLabel={`${person.employee_name} upline`}
             >
               <option value="">— top of a tree —</option>
               {canBeUpline.map(u => (
                 <option key={u.staff_id} value={u.staff_id}>{u.employee_name}</option>
               ))}
-            </select>
+            </Choice>
           </td>
           <td>
-            <select
+            <Choice
               name="rank_id"
               defaultValue={person.rank_id ?? ''}
               required
-              aria-label={`${person.employee_name} rank`}
-              className="px-2 py-1 bg-paper border border-hairline rounded text-sm text-ink w-48"
+              ariaLabel={`${person.employee_name} rank`}
+              width="w-48"
             >
               <option value="">— not placed —</option>
               {data.ranks.map(r => (
                 <option key={r.id} value={r.id}>{r.label}</option>
               ))}
-            </select>
+            </Choice>
           </td>
           <td>
-            <select
+            <Choice
               name="rate_mode"
               defaultValue={person.rate_mode ?? ''}
-              aria-label={`${person.employee_name} rate mode`}
-              className="px-2 py-1 bg-paper border border-hairline rounded text-sm text-ink w-40"
+              ariaLabel={`${person.employee_name} rate mode`}
             >
               <option value="">scheme default</option>
               <option value="fixed">Manual</option>
               <option value="variable">Scheme target</option>
-            </select>
+            </Choice>
             <span className="ml-2"><SaveButton pending={pending} label="✓" /></span>
           </td>
         </>
       )}
-    </ActionForm>
+    </RowForm>
   )
 }
 

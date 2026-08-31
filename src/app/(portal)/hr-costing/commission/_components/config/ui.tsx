@@ -1,6 +1,15 @@
 'use client'
 
-import { useState, useTransition, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useId,
+  useState,
+  useTransition,
+  type ReactNode,
+} from 'react'
+import { createPortal } from 'react-dom'
 
 /**
  * Small shared pieces for the Commission tab. The tab is nine tables of ticks
@@ -82,6 +91,97 @@ export function ActionForm({
   )
 }
 
+/**
+ * A form for one table row.
+ *
+ * `<form>` is not a legal child of `<tbody>` or `<tr>`, and neither is the
+ * wrapper `<div>` ActionForm renders. Doing it anyway — even with
+ * `display: contents`, which makes it LOOK right — is a hydration error: the
+ * browser's parser moves the tags, React finds a tree it did not build, and
+ * every one of these grids logged three errors on load.
+ *
+ * The fix is the one HTML provides for exactly this case. The form element
+ * lives outside the table (portalled to <body>, empty and hidden) and each
+ * field points at it by id through the `form` attribute, which is a
+ * document-wide reference. The browser still gathers the FormData, Enter still
+ * submits, checkbox semantics are still the browser's own.
+ *
+ * This component renders nothing structural — it is a Fragment — so the caller
+ * decides whether its children are a `<tr>` or a run of `<td>`s inside someone
+ * else's row.
+ *
+ * Fields wire themselves up: Field, Tick, Hidden, Choice and SaveButton read
+ * the id from context. A raw `<input>` or `<select>` inside a RowForm will NOT
+ * be submitted — use those components, or `useRowFormId()`.
+ */
+interface RowFormState {
+  formId: string
+  pending: boolean
+  error: string | null
+}
+
+const RowFormContext = createContext<RowFormState | null>(null)
+
+/** The id a raw control must carry as `form={id}` to be part of the row. */
+export function useRowFormId(): string | undefined {
+  return useContext(RowFormContext)?.formId
+}
+
+export function RowForm({
+  action,
+  children,
+  onDone,
+  confirm,
+}: {
+  action: (fd: FormData) => Promise<unknown>
+  children: (state: { pending: boolean }) => ReactNode
+  onDone?: () => void
+  confirm?: string
+}) {
+  // useId is stable across server and client; the punctuation React puts in it
+  // is legal in an id but awkward everywhere else, so it is stripped.
+  const formId = 'rowform-' + useId().replace(/[^a-zA-Z0-9_-]/g, '')
+  const [pending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+
+  // The portal target only exists in the browser. Until it mounts the row
+  // renders exactly as the server sent it, which is the point.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
+  return (
+    <RowFormContext.Provider value={{ formId, pending, error }}>
+      {children({ pending })}
+      {mounted
+        ? createPortal(
+            <form
+              id={formId}
+              hidden
+              action={(fd: FormData) => {
+                if (confirm && !window.confirm(confirm)) return
+                setError(null)
+                startTransition(async () => {
+                  try {
+                    await action(fd)
+                    onDone?.()
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : 'Something went wrong')
+                  }
+                })
+              }}
+            />,
+            document.body,
+          )
+        : null}
+    </RowFormContext.Provider>
+  )
+}
+
+/** A value the row submits but nobody edits. */
+export function Hidden({ name, value }: { name: string; value: string | number }) {
+  return <input type="hidden" name={name} value={value} form={useRowFormId()} />
+}
+
 /** A button that runs a non-form action, with its own error slot. */
 export function ActionButton({
   run,
@@ -154,6 +254,7 @@ export function Field({
       type={type}
       step={step}
       required={required}
+      form={useRowFormId()}
       aria-label={ariaLabel ?? name}
       defaultValue={defaultValue ?? undefined}
       placeholder={placeholder}
@@ -175,6 +276,7 @@ export function Tick({
     <input
       type="checkbox"
       name={name}
+      form={useRowFormId()}
       aria-label={ariaLabel ?? name}
       defaultChecked={defaultChecked}
       className="h-4 w-4 accent-[var(--accent)] align-middle"
@@ -183,14 +285,54 @@ export function Tick({
 }
 
 export function SaveButton({ pending, label = 'Save' }: { pending: boolean; label?: string }) {
+  // Inside a RowForm the error has nowhere structural to go — a <tr> cannot be
+  // inserted mid-row — so it appears beside the button that was pressed, which
+  // is where the reader is looking anyway.
+  const row = useContext(RowFormContext)
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="bg-accent hover:bg-accent-hover text-white font-serif italic text-xs px-3 py-1 rounded transition-colors disabled:opacity-50"
+    <span className="inline-flex items-center gap-2">
+      {row?.error ? (
+        <span className="font-serif italic text-danger text-xs">{row.error}</span>
+      ) : null}
+      <button
+        type="submit"
+        form={row?.formId}
+        disabled={pending}
+        className="bg-accent hover:bg-accent-hover text-white font-serif italic text-xs px-3 py-1 rounded transition-colors disabled:opacity-50"
+      >
+        {pending ? 'Saving…' : label}
+      </button>
+    </span>
+  )
+}
+
+/** A `<select>` that joins its row's form. Options are the children. */
+export function Choice({
+  name,
+  defaultValue,
+  required,
+  ariaLabel,
+  width = 'w-40',
+  children,
+}: {
+  name: string
+  defaultValue?: string | null
+  required?: boolean
+  ariaLabel?: string
+  width?: string
+  children: ReactNode
+}) {
+  return (
+    <select
+      name={name}
+      form={useRowFormId()}
+      required={required}
+      defaultValue={defaultValue ?? ''}
+      aria-label={ariaLabel ?? name}
+      className={`px-2 py-1 bg-paper border border-hairline rounded text-sm text-ink ${width}`}
     >
-      {pending ? 'Saving…' : label}
-    </button>
+      {children}
+    </select>
   )
 }
 

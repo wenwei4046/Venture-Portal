@@ -3,7 +3,18 @@
 import { useMemo, useState, useTransition } from 'react'
 import { bulkUpsertProducts, deleteProduct, upsertProduct } from '../../product-actions'
 import { parseProductPaste } from '@/lib/commission/product-paste'
-import { ActionButton, ActionForm, ErrorNote, Field, Hint, SaveButton, SectionHead, Tick } from './ui'
+import {
+  ActionButton,
+  ActionForm,
+  ErrorNote,
+  Field,
+  Hidden,
+  Hint,
+  RowForm,
+  SaveButton,
+  SectionHead,
+  Tick,
+} from './ui'
 import type { ProductRow } from './types'
 
 /**
@@ -103,7 +114,7 @@ export default function ProductsSection({ products }: { products: ProductRow[] }
               </tr>
             </thead>
             <tbody>
-              <ActionForm action={upsertProduct} className="contents">
+              <RowForm action={upsertProduct}>
                 {({ pending }) => (
                   <tr className="bg-surface-2/40">
                     <td><Field name="item_code" placeholder="ERP item code" width="w-56" required /></td>
@@ -115,15 +126,15 @@ export default function ProductsSection({ products }: { products: ProductRow[] }
                     <td><SaveButton pending={pending} label="Add" /></td>
                   </tr>
                 )}
-              </ActionForm>
+              </RowForm>
 
               {shown.map(p => (
-                <ActionForm key={p.id} action={upsertProduct} className="contents">
+                <RowForm key={p.id} action={upsertProduct}>
                   {({ pending }) => (
                     <tr>
                       <td className="font-mono text-xs">
-                        <input type="hidden" name="id" value={p.id} />
-                        <input type="hidden" name="item_code" value={p.item_code} />
+                        <Hidden name="id" value={p.id} />
+                        <Hidden name="item_code" value={p.item_code} />
                         {p.item_code}
                       </td>
                       <td><Field name="product_name" defaultValue={p.product_name} /></td>
@@ -151,7 +162,7 @@ export default function ProductsSection({ products }: { products: ProductRow[] }
                       </td>
                     </tr>
                   )}
-                </ActionForm>
+                </RowForm>
               ))}
 
               {shown.length === 0 ? (
