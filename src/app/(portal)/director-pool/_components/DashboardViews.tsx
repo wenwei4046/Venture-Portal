@@ -32,6 +32,7 @@ import {
 } from '@/lib/director-pool-engine'
 import type { DpCompany } from '@/lib/director-pool-data'
 import { fmt, fmtRM, Money, MoneyInput, MonthTabs, Dot, TopUpHint } from './DirectorPoolClient'
+import LedgerRow from '@/components/LedgerRow'
 
 // Chart-series palette for companies (data colours, mirrors the HTML tool)
 const CO_COLORS = ['#4a9eff', '#f5a623', '#2ec4b6', '#e74c3c', '#9b8dd9', '#20b2aa', '#b39ddb']
@@ -269,10 +270,11 @@ function CompanyView({ results, companies }: DashProps) {
             <tr>
               <th>Month</th>
               <th>Company</th>
-              <th className="right">Salary</th>
-              <th className="right">KPI</th>
-              <th className="right">Allowance</th>
+              <th className="right m-hide">Salary</th>
+              <th className="right m-hide">KPI</th>
+              <th className="right m-hide">Allowance</th>
               <th className="right">Total</th>
+              <th className="lt-toggle" aria-hidden />
             </tr>
           </thead>
           <tbody>
@@ -284,23 +286,24 @@ function CompanyView({ results, companies }: DashProps) {
                 if (t === 0) return null
                 gS += co?.salary ?? 0; gK += co?.kpi ?? 0; gA += co?.allowance ?? 0; gT += t
                 return (
-                  <tr key={`${m.id}-${c.id}`}>
+                  <LedgerRow key={`${m.id}-${c.id}`}>
                     <td className="font-mono text-xs text-graphite">{m.name}</td>
                     <td className="font-serif text-sm text-ink">{c.name}</td>
-                    <td className="num">{co?.salary ? fmt(co.salary) : '—'}</td>
-                    <td className="num">{co?.kpi ? fmt(co.kpi) : '—'}</td>
-                    <td className="num">{co?.allowance ? fmt(co.allowance) : '—'}</td>
+                    <td className="num m-hide" data-label="Salary">{co?.salary ? fmt(co.salary) : '—'}</td>
+                    <td className="num m-hide" data-label="KPI">{co?.kpi ? fmt(co.kpi) : '—'}</td>
+                    <td className="num m-hide" data-label="Allowance">{co?.allowance ? fmt(co.allowance) : '—'}</td>
                     <td className="num font-medium">{fmt(t)}</td>
-                  </tr>
+                  </LedgerRow>
                 )
               }),
             ])}
             <tr className="border-t border-hairline">
               <td colSpan={2} className="font-serif italic text-ink">Total</td>
-              <td className="num font-medium">{fmt(r2(gS))}</td>
-              <td className="num font-medium">{fmt(r2(gK))}</td>
-              <td className="num font-medium">{fmt(r2(gA))}</td>
+              <td className="num font-medium m-hide">{fmt(r2(gS))}</td>
+              <td className="num font-medium m-hide">{fmt(r2(gK))}</td>
+              <td className="num font-medium m-hide">{fmt(r2(gA))}</td>
               <td className="num font-medium text-num-ink">{fmt(r2(gT))}</td>
+              <td className="lt-toggle" />
             </tr>
           </tbody>
         </table>
@@ -325,15 +328,16 @@ function DirectorView({ results }: DashProps) {
             <tr>
               <th>Month</th>
               <th>Director</th>
-              <th className="right">Weight</th>
-              <th className="right">Sal+KPI Gross</th>
-              <th className="right">Allow Gross</th>
-              <th className="right">Total Saving</th>
-              <th className="right">Gross Bal</th>
-              <th className="right">Allow Bal (95%)</th>
+              <th className="right m-hide">Weight</th>
+              <th className="right m-hide">Sal+KPI Gross</th>
+              <th className="right m-hide">Allow Gross</th>
+              <th className="right m-hide">Total Saving</th>
+              <th className="right m-hide">Gross Bal</th>
+              <th className="right m-hide">Allow Bal (95%)</th>
               <th className="right">Total Pay</th>
-              <th className="right">Vr KPI</th>
-              <th className="right">Accum. Advance</th>
+              <th className="right m-hide">Vr KPI</th>
+              <th className="right m-hide">Accum. Advance</th>
+              <th className="lt-toggle" aria-hidden />
             </tr>
           </thead>
           <tbody>
@@ -343,41 +347,42 @@ function DirectorView({ results }: DashProps) {
                 g.skg += d.salKpiGross; g.ag += d.allowGross; g.save += d.totalSaving
                 g.gb += d.salKpiGB; g.ab += d.allowBalance; g.pay += d.totalPay
                 return (
-                  <tr key={`${m.id}-${d.id}`}>
+                  <LedgerRow key={`${m.id}-${d.id}`}>
                     <td className="font-mono text-xs text-graphite">{m.name}</td>
                     <td className="whitespace-nowrap"><Dot color={d.color} /><span className="font-mono text-sm text-ink">{d.code}</span></td>
-                    <td className="num">{d.weight}%</td>
-                    <td className="num">{fmt(d.salKpiGross)}</td>
-                    <td className="num">{d.allowGross > 0 ? fmt(d.allowGross) : '—'}</td>
-                    <td className="num">{fmt(d.totalSaving)}</td>
-                    <td className="num">{m.fullPayout ? '—' : fmt(d.salKpiGB)}</td>
-                    <td className="num">{d.allowGross > 0 ? fmt(d.allowBalance) : '—'}</td>
+                    <td className="num m-hide" data-label="Weight">{d.weight}%</td>
+                    <td className="num m-hide" data-label="Sal+KPI Gross">{fmt(d.salKpiGross)}</td>
+                    <td className="num m-hide" data-label="Allow Gross">{d.allowGross > 0 ? fmt(d.allowGross) : '—'}</td>
+                    <td className="num m-hide" data-label="Total Saving">{fmt(d.totalSaving)}</td>
+                    <td className="num m-hide" data-label="Gross Bal">{m.fullPayout ? '—' : fmt(d.salKpiGB)}</td>
+                    <td className="num m-hide" data-label="Allow Bal (95%)">{d.allowGross > 0 ? fmt(d.allowBalance) : '—'}</td>
                     <td className="num font-medium">{fmt(d.totalPay)}</td>
-                    <td className="num">
+                    <td className="num m-hide" data-label="Vr KPI">
                       {Math.abs(d.vrKpi) < 0.005 ? '—' : (
                         <span className={d.vrKpi < 0 ? 'text-danger' : 'text-ledger'}>{fmt(d.vrKpi)}</span>
                       )}
                     </td>
-                    <td className="num">
+                    <td className="num m-hide" data-label="Accum. Advance">
                       {Math.abs(d.accumulated) < 0.005 ? '—' : (
                         <span className={d.accumulated < 0 ? 'text-danger' : ''}>
                           {d.accumulated < 0 ? `(${fmt(Math.abs(d.accumulated))})` : fmt(d.accumulated)}
                         </span>
                       )}
                     </td>
-                  </tr>
+                  </LedgerRow>
                 )
               }),
             ])}
             <tr className="border-t border-hairline">
               <td colSpan={3} className="font-serif italic text-ink">Total</td>
-              <td className="num font-medium">{fmt(r2(g.skg))}</td>
-              <td className="num font-medium">{fmt(r2(g.ag))}</td>
-              <td className="num font-medium">{fmt(r2(g.save))}</td>
-              <td className="num font-medium">{fmt(r2(g.gb))}</td>
-              <td className="num font-medium">{fmt(r2(g.ab))}</td>
+              <td className="num font-medium m-hide">{fmt(r2(g.skg))}</td>
+              <td className="num font-medium m-hide">{fmt(r2(g.ag))}</td>
+              <td className="num font-medium m-hide">{fmt(r2(g.save))}</td>
+              <td className="num font-medium m-hide">{fmt(r2(g.gb))}</td>
+              <td className="num font-medium m-hide">{fmt(r2(g.ab))}</td>
               <td className="num font-medium text-num-ink">{fmt(r2(g.pay))}</td>
-              <td colSpan={2} />
+              <td colSpan={2} className="m-hide" />
+              <td className="lt-toggle" />
             </tr>
           </tbody>
         </table>
@@ -444,15 +449,16 @@ function AdvanceView(p: DashProps) {
               <th>Month</th>
               <th>Director</th>
               <th className="right">Total Pay</th>
-              <th className="right">Fixed Salary</th>
-              <th className="right">Vr KPI</th>
-              <th className="right">Adv This Month</th>
-              <th className="right">Adv Stat</th>
-              <th className="right">Allow Stat</th>
-              <th className="right">Prev. Accum</th>
-              <th className="right">Accum. Advance</th>
-              <th className="right">✏️ Override Adv</th>
-              <th className="right">✏️ Override Accum.</th>
+              <th className="right m-hide">Fixed Salary</th>
+              <th className="right m-hide">Vr KPI</th>
+              <th className="right m-hide">Adv This Month</th>
+              <th className="right m-hide">Adv Stat</th>
+              <th className="right m-hide">Allow Stat</th>
+              <th className="right m-hide">Prev. Accum</th>
+              <th className="right m-hide">Accum. Advance</th>
+              <th className="right m-hide">✏️ Override Adv</th>
+              <th className="right m-hide">✏️ Override Accum.</th>
+              <th className="lt-toggle" aria-hidden />
             </tr>
           </thead>
           <tbody>
@@ -463,53 +469,54 @@ function AdvanceView(p: DashProps) {
                 g.pay += d.totalPay; g.fixed += d.dirFixed; g.vr += d.vrKpi; g.adv += d.advThisMonth
                 g.advStat += d.advStatAmount; g.allowStat += d.allowStatAmount
                 return (
-                  <tr key={`${m.id}-${d.id}`} className={d.hasOverride ? 'row-summary-strong' : undefined}>
+                  <LedgerRow key={`${m.id}-${d.id}`} className={d.hasOverride ? 'row-summary-strong' : undefined}>
                     <td className="font-mono text-xs text-graphite">{m.name}</td>
                     <td className="whitespace-nowrap">
                       <Dot color={d.color} /><span className="font-mono text-sm text-ink">{d.code}</span>
                       {d.hasOverride && <em className="font-serif text-[10px] text-alert ml-1">✏️</em>}
                     </td>
                     <td className="num">{fmt(d.totalPay)}</td>
-                    <td className="num">{fmt(d.dirFixed)}</td>
-                    <td className="num">
+                    <td className="num m-hide" data-label="Fixed Salary">{fmt(d.dirFixed)}</td>
+                    <td className="num m-hide" data-label="Vr KPI">
                       {Math.abs(d.vrKpi) < 0.005 ? '—' : <span className={d.vrKpi < 0 ? 'text-danger' : 'text-ledger'}>{fmt(d.vrKpi)}</span>}
                     </td>
-                    <td className="num">{d.advThisMonth < 0 ? <span className="text-danger">({fmt(Math.abs(d.advThisMonth))})</span> : '—'}</td>
-                    <td className="num">{d.advStatAmount > 0 ? <span className="text-danger">{fmt(d.advStatAmount)}</span> : '—'}</td>
-                    <td className="num">{d.allowStatAmount > 0 ? <span className="text-alert">{fmt(d.allowStatAmount)}</span> : '—'}</td>
-                    <td className="num">
+                    <td className="num m-hide" data-label="Adv This Month">{d.advThisMonth < 0 ? <span className="text-danger">({fmt(Math.abs(d.advThisMonth))})</span> : '—'}</td>
+                    <td className="num m-hide" data-label="Adv Stat">{d.advStatAmount > 0 ? <span className="text-danger">{fmt(d.advStatAmount)}</span> : '—'}</td>
+                    <td className="num m-hide" data-label="Allow Stat">{d.allowStatAmount > 0 ? <span className="text-alert">{fmt(d.allowStatAmount)}</span> : '—'}</td>
+                    <td className="num m-hide" data-label="Prev. Accum">
                       {Math.abs(d.prevAccum) < 0.005 ? '—' : (
                         <span className={d.prevAccum < 0 ? 'text-danger' : ''}>
                           {d.prevAccum < 0 ? `(${fmt(Math.abs(d.prevAccum))})` : fmt(d.prevAccum)}
                         </span>
                       )}
                     </td>
-                    <td className="num font-medium">
+                    <td className="num font-medium m-hide" data-label="Accum. Advance">
                       {Math.abs(d.accumulated) < 0.005 ? '—' : (
                         <span className={d.accumulated < 0 ? 'text-danger' : ''}>
                           {d.accumulated < 0 ? `(${fmt(Math.abs(d.accumulated))})` : fmt(d.accumulated)}
                         </span>
                       )}
                     </td>
-                    <td className="num">
+                    <td className="num m-hide" data-label="✏️ Override Adv">
                       <MoneyInput value={inp.advOverrideThis ?? null} placeholder="—" onCommit={(v) => p.onDirInput(m.id, d.id, 'advOverrideThis', v)} className="w-24" />
                     </td>
-                    <td className="num">
+                    <td className="num m-hide" data-label="✏️ Override Accum.">
                       <MoneyInput value={inp.advOverrideAccum ?? null} placeholder="—" onCommit={(v) => p.onDirInput(m.id, d.id, 'advOverrideAccum', v)} className="w-24" />
                     </td>
-                  </tr>
+                  </LedgerRow>
                 )
               }),
             ])}
             <tr className="border-t border-hairline">
               <td colSpan={2} className="font-serif italic text-ink">Total</td>
               <td className="num font-medium">{fmt(r2(g.pay))}</td>
-              <td className="num">{fmt(r2(g.fixed))}</td>
-              <td className="num"><span className={g.vr < 0 ? 'text-danger' : 'text-ledger'}>{fmt(r2(g.vr))}</span></td>
-              <td className="num">{g.adv < 0 ? <span className="text-danger">({fmt(Math.abs(r2(g.adv)))})</span> : '—'}</td>
-              <td className="num">{g.advStat > 0 ? <span className="text-danger">{fmt(r2(g.advStat))}</span> : '—'}</td>
-              <td className="num">{g.allowStat > 0 ? <span className="text-alert">{fmt(r2(g.allowStat))}</span> : '—'}</td>
-              <td colSpan={4} />
+              <td className="num m-hide">{fmt(r2(g.fixed))}</td>
+              <td className="num m-hide"><span className={g.vr < 0 ? 'text-danger' : 'text-ledger'}>{fmt(r2(g.vr))}</span></td>
+              <td className="num m-hide">{g.adv < 0 ? <span className="text-danger">({fmt(Math.abs(r2(g.adv)))})</span> : '—'}</td>
+              <td className="num m-hide">{g.advStat > 0 ? <span className="text-danger">{fmt(r2(g.advStat))}</span> : '—'}</td>
+              <td className="num m-hide">{g.allowStat > 0 ? <span className="text-alert">{fmt(r2(g.allowStat))}</span> : '—'}</td>
+              <td colSpan={4} className="m-hide" />
+              <td className="lt-toggle" />
             </tr>
           </tbody>
         </table>
@@ -609,14 +616,15 @@ function BillingView(p: DashProps) {
             <tr>
               <th>Month</th>
               <th>Director</th>
-              <th className="right">25% Invoice (Salary)</th>
-              <th className="right">25% Statutory (自己填)</th>
-              <th className="right">25% Invoice (Allow)</th>
-              <th className="right">25% Statutory (Allow 自己填)</th>
+              <th className="right m-hide">25% Invoice (Salary)</th>
+              <th className="right m-hide">25% Statutory (自己填)</th>
+              <th className="right m-hide">25% Invoice (Allow)</th>
+              <th className="right m-hide">25% Statutory (Allow 自己填)</th>
               <th className="right">Total 25%</th>
-              <th className="right">Adv. Deduct</th>
-              <th className="right">Net 25% Billing</th>
-              <th className="right">Include Billing?</th>
+              <th className="right m-hide">Adv. Deduct</th>
+              <th className="right m-hide">Net 25% Billing</th>
+              <th className="right m-hide">Include Billing?</th>
+              <th className="lt-toggle" aria-hidden />
             </tr>
           </thead>
           <tbody>
@@ -658,23 +666,23 @@ function BillingView(p: DashProps) {
                 g.total += row.total; g.advDeduct += advDeduct; g.net += net
                 const dash = <span className="text-graphite">—</span>
                 return (
-                  <tr key={`${m.id}-${d.id}`}>
+                  <LedgerRow key={`${m.id}-${d.id}`}>
                     <td className="font-mono text-xs text-graphite">{m.name}</td>
                     <td className="whitespace-nowrap"><Dot color={d.color} /><span className="font-mono text-sm text-ink">{d.code}</span></td>
-                    <td className="num">{m.fullPayout ? dash : fmt(row.salSys)}</td>
-                    <td className="num">
+                    <td className="num m-hide" data-label="25% Invoice (Salary)">{m.fullPayout ? dash : fmt(row.salSys)}</td>
+                    <td className="num m-hide" data-label="25% Statutory">
                       {m.fullPayout ? dash : (
                         <MoneyInput value={inp.billingStat ?? null} placeholder="填写" onCommit={(v) => p.onDirInput(m.id, d.id, 'billingStat', v)} className="w-28" />
                       )}
                     </td>
-                    <td className="num">{m.fullPayout ? dash : d.allowGross > 0 ? fmt(row.alSys) : '—'}</td>
-                    <td className="num">
+                    <td className="num m-hide" data-label="25% Invoice (Allow)">{m.fullPayout ? dash : d.allowGross > 0 ? fmt(row.alSys) : '—'}</td>
+                    <td className="num m-hide" data-label="25% Statutory (Allow)">
                       {m.fullPayout || !sas ? dash : (
                         <MoneyInput value={inp.allowBillingStat ?? null} placeholder="填写" onCommit={(v) => p.onDirInput(m.id, d.id, 'allowBillingStat', v)} className="w-24" />
                       )}
                     </td>
                     <td className="num font-semibold">{m.fullPayout ? dash : fmt(row.total)}</td>
-                    <td className="num">
+                    <td className="num m-hide" data-label="Adv. Deduct">
                       {m.fullPayout || !m.billingDeductAdv ? dash : advDeduct > 0 ? (
                         <span className="text-danger">
                           ({fmt(advDeduct)})
@@ -683,24 +691,25 @@ function BillingView(p: DashProps) {
                         </span>
                       ) : '—'}
                     </td>
-                    <td className="num font-medium">{m.fullPayout || !m.billingDeductAdv ? dash : <span className="text-alert">{fmt(net)}</span>}</td>
-                    <td className="num">
+                    <td className="num font-medium m-hide" data-label="Net 25% Billing">{m.fullPayout || !m.billingDeductAdv ? dash : <span className="text-alert">{fmt(net)}</span>}</td>
+                    <td className="num m-hide" data-label="Include Billing?">
                       {m.fullPayout ? <span className="text-graphite">N/A</span> : m.includeBilling ? <span className="text-ledger">✅ Yes</span> : <span className="text-graphite">No</span>}
                     </td>
-                  </tr>
+                  </LedgerRow>
                 )
               }),
             ])}
             <tr className="border-t border-hairline">
               <td colSpan={2} className="font-serif italic text-ink">Total</td>
-              <td className="num font-medium">{fmt(r2(g.salSys))}</td>
-              <td className="num font-medium">{fmt(r2(g.statSal))}</td>
-              <td className="num font-medium">{fmt(r2(g.alSys))}</td>
-              <td className="num font-medium">{fmt(r2(g.statAl))}</td>
+              <td className="num font-medium m-hide">{fmt(r2(g.salSys))}</td>
+              <td className="num font-medium m-hide">{fmt(r2(g.statSal))}</td>
+              <td className="num font-medium m-hide">{fmt(r2(g.alSys))}</td>
+              <td className="num font-medium m-hide">{fmt(r2(g.statAl))}</td>
               <td className="num font-semibold text-num-ink">{fmt(r2(g.total))}</td>
-              <td className="num">{g.advDeduct > 0 ? <span className="text-danger">({fmt(r2(g.advDeduct))})</span> : '—'}</td>
-              <td className="num font-medium">{g.net > 0 ? <span className="text-alert">{fmt(r2(g.net))}</span> : '—'}</td>
-              <td />
+              <td className="num m-hide">{g.advDeduct > 0 ? <span className="text-danger">({fmt(r2(g.advDeduct))})</span> : '—'}</td>
+              <td className="num font-medium m-hide">{g.net > 0 ? <span className="text-alert">{fmt(r2(g.net))}</span> : '—'}</td>
+              <td className="m-hide" />
+              <td className="lt-toggle" />
             </tr>
           </tbody>
         </table>
@@ -748,11 +757,12 @@ function SavingView(p: DashProps) {
             <tr>
               <th>Month</th>
               <th>Director</th>
-              <th className="right">Sal+KPI Saving</th>
-              <th className="right">Allowance Saving</th>
-              <th className="right">Total Saving</th>
-              <th className="right">Withdraw (自己填)</th>
+              <th className="right m-hide">Sal+KPI Saving</th>
+              <th className="right m-hide">Allowance Saving</th>
+              <th className="right m-hide">Total Saving</th>
+              <th className="right m-hide">Withdraw (自己填)</th>
               <th className="right">Accum. Saving</th>
+              <th className="lt-toggle" aria-hidden />
             </tr>
           </thead>
           <tbody>
@@ -763,27 +773,28 @@ function SavingView(p: DashProps) {
                 const wd = dirInputs[wKey]?.savingWithdrawal ?? null
                 g.sk += d.salKpiSaving; g.al += d.allowSaving; g.tot += d.totalSaving; g.wd += wd ?? 0
                 return (
-                  <tr key={`${m.id}-${d.id}`}>
+                  <LedgerRow key={`${m.id}-${d.id}`}>
                     <td className="font-mono text-xs text-graphite">{m.name}</td>
                     <td className="whitespace-nowrap"><Dot color={d.color} /><span className="font-mono text-sm text-ink">{d.code}</span></td>
-                    <td className="num">{fmt(d.salKpiSaving)}</td>
-                    <td className="num">{d.allowGross > 0 ? fmt(d.allowSaving) : '—'}</td>
-                    <td className="num font-medium">{fmt(d.totalSaving)}</td>
-                    <td className="num">
+                    <td className="num m-hide" data-label="Sal+KPI Saving">{fmt(d.salKpiSaving)}</td>
+                    <td className="num m-hide" data-label="Allowance Saving">{d.allowGross > 0 ? fmt(d.allowSaving) : '—'}</td>
+                    <td className="num font-medium m-hide" data-label="Total Saving">{fmt(d.totalSaving)}</td>
+                    <td className="num m-hide" data-label="Withdraw">
                       <MoneyInput value={wd} placeholder="RM" onCommit={(v) => p.onDirInput(m.id, d.id, 'savingWithdrawal', v)} className="w-24" />
                     </td>
                     <td className="num font-medium text-ledger">{fmt(savingAccum(d.id, m.id, results, dirInputs))}</td>
-                  </tr>
+                  </LedgerRow>
                 )
               }),
             ])}
             <tr className="border-t border-hairline">
               <td colSpan={2} className="font-serif italic text-ink">Total</td>
-              <td className="num font-medium">{fmt(r2(g.sk))}</td>
-              <td className="num font-medium">{g.al > 0 ? fmt(r2(g.al)) : '—'}</td>
-              <td className="num font-medium">{fmt(r2(g.tot))}</td>
-              <td className="num">{g.wd > 0 ? <span className="text-danger">({fmt(r2(g.wd))})</span> : '—'}</td>
+              <td className="num font-medium m-hide">{fmt(r2(g.sk))}</td>
+              <td className="num font-medium m-hide">{g.al > 0 ? fmt(r2(g.al)) : '—'}</td>
+              <td className="num font-medium m-hide">{fmt(r2(g.tot))}</td>
+              <td className="num m-hide">{g.wd > 0 ? <span className="text-danger">({fmt(r2(g.wd))})</span> : '—'}</td>
               <td className="num font-medium text-ledger">{fmt(r2(g.tot - g.wd))}</td>
+              <td className="lt-toggle" />
             </tr>
           </tbody>
         </table>
@@ -829,9 +840,10 @@ function AllowStatView(p: DashProps) {
             <tr>
               <th>Month</th>
               <th>Director</th>
-              <th className="right">75% Allowance</th>
-              <th className="right">Statutory (自己填)</th>
+              <th className="right m-hide">75% Allowance</th>
+              <th className="right m-hide">Statutory (自己填)</th>
               <th className="right">Accum. Statutory</th>
+              <th className="lt-toggle" aria-hidden />
             </tr>
           </thead>
           <tbody>
@@ -841,26 +853,27 @@ function AllowStatView(p: DashProps) {
                 const inp = dirInputs[d.statKey] ?? {}
                 g.allow += d.allowGB; g.stat += inp.allowPayStat ?? 0
                 return (
-                  <tr key={`${m.id}-${d.id}`}>
+                  <LedgerRow key={`${m.id}-${d.id}`}>
                     <td className="font-mono text-xs text-graphite">{m.name}</td>
                     <td className="whitespace-nowrap"><Dot color={d.color} /><span className="font-mono text-sm text-ink">{d.code}</span></td>
-                    <td className="num">{m.fullPayout ? '—' : fmt(d.allowGB)}</td>
-                    <td className="num">
+                    <td className="num m-hide" data-label="75% Allowance">{m.fullPayout ? '—' : fmt(d.allowGB)}</td>
+                    <td className="num m-hide" data-label="Statutory">
                       <MoneyInput value={inp.allowPayStat ?? null} placeholder="填写" onCommit={(v) => p.onDirInput(m.id, d.id, 'allowPayStat', v)} className="w-24" />
                       {!m.fullPayout && <TopUpHint d={d} />}
                     </td>
                     <td className="num font-medium text-ledger">
                       {allowStatAccum(d.id, m.id, results, dirInputs) > 0 ? fmt(allowStatAccum(d.id, m.id, results, dirInputs)) : '—'}
                     </td>
-                  </tr>
+                  </LedgerRow>
                 )
               }),
             ])}
             <tr className="border-t border-hairline">
               <td colSpan={2} className="font-serif italic text-ink">Total</td>
-              <td className="num font-medium">{fmt(r2(g.allow))}</td>
-              <td className="num font-medium">{g.stat > 0 ? fmt(r2(g.stat)) : '—'}</td>
+              <td className="num font-medium m-hide">{fmt(r2(g.allow))}</td>
+              <td className="num font-medium m-hide">{g.stat > 0 ? fmt(r2(g.stat)) : '—'}</td>
               <td className="num font-medium text-ledger">{g.stat > 0 ? fmt(r2(g.stat)) : '—'}</td>
+              <td className="lt-toggle" />
             </tr>
           </tbody>
         </table>

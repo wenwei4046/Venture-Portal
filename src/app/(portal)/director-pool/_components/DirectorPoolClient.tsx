@@ -32,6 +32,7 @@ import {
   type DpDirectorInputField,
 } from '../actions'
 import DashboardViews from './DashboardViews'
+import LedgerRow from '@/components/LedgerRow'
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -50,6 +51,10 @@ export function Money({ v, dash = '—' }: { v: number; dash?: string }) {
 }
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+// The three per-company input columns are rendered from a loop, so the mobile
+// detail panel needs their labels by field key.
+const FIELD_LABEL = { salary: 'Salary (RM)', kpi: 'KPI (RM)', allowance: 'Allowance (RM)' } as const
 function monthName(iso: string, multiYear: boolean): string {
   const [y, m] = iso.split('-')
   const label = MONTH_LABELS[Number(m) - 1] ?? iso
@@ -792,10 +797,11 @@ function CalculatorTab(p: CalcProps) {
               <thead>
                 <tr>
                   <th>Company 公司</th>
-                  <th className="right">Salary (RM)</th>
-                  <th className="right">KPI (RM)</th>
-                  <th className="right">Allowance (RM)</th>
+                  <th className="right m-hide">Salary (RM)</th>
+                  <th className="right m-hide">KPI (RM)</th>
+                  <th className="right m-hide">Allowance (RM)</th>
                   <th className="right">Row Total</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
@@ -804,10 +810,10 @@ function CalculatorTab(p: CalcProps) {
                     companyId: c.id, salary: 0, kpi: 0, allowance: 0,
                   }
                   return (
-                    <tr key={c.id}>
+                    <LedgerRow key={c.id}>
                       <td className="font-serif text-sm text-ink whitespace-nowrap">{c.name}</td>
                       {(['salary', 'kpi', 'allowance'] as const).map((f) => (
-                        <td key={f} className="num">
+                        <td key={f} className="num m-hide" data-label={FIELD_LABEL[f]}>
                           <MoneyInput
                             value={co[f] || null}
                             onCommit={(v) => p.onCo(m.id, c.id, f, v)}
@@ -816,15 +822,16 @@ function CalculatorTab(p: CalcProps) {
                         </td>
                       ))}
                       <td className="num font-medium">{fmt(r2(co.salary + co.kpi + co.allowance))}</td>
-                    </tr>
+                    </LedgerRow>
                   )
                 })}
                 <tr className="border-t border-hairline">
                   <td className="font-serif italic text-ink">Total</td>
-                  <td className="num font-medium">{fmt(totSal)}</td>
-                  <td className="num font-medium">{fmt(totKpi)}</td>
-                  <td className="num font-medium">{fmt(totAllow)}</td>
+                  <td className="num font-medium m-hide">{fmt(totSal)}</td>
+                  <td className="num font-medium m-hide">{fmt(totKpi)}</td>
+                  <td className="num font-medium m-hide">{fmt(totAllow)}</td>
                   <td className="num font-medium text-num-ink">{fmt(r2(totSal + totKpi + totAllow))}</td>
+                  <td className="lt-toggle" />
                 </tr>
               </tbody>
             </table>
@@ -872,31 +879,36 @@ function CalculatorTab(p: CalcProps) {
             </p>
           )}
           <div className="overflow-x-auto border border-hairline rounded-md">
-            <table className="ledger-table text-[12px] min-w-[2100px]">
+            {/* The widest table in the portal — 22 columns of calculator. The
+                min-width is desktop-only: on a phone the fold keeps Director +
+                Total Pay and stacks the other twenty (inputs included) in the
+                row's panel, which beats scrolling 2100px sideways. */}
+            <table className="ledger-table text-[12px] md:min-w-[2100px]">
               <thead>
                 <tr>
                   <th>Director</th>
-                  <th>Weight</th>
-                  <th className="right">Gross (Sal+KPI)</th>
-                  <th className="right">Allow Gross</th>
-                  <th className="right">Sal+KPI Saving</th>
-                  <th className="right">Allow Saving</th>
-                  <th className="right">Total Saving</th>
-                  <th className="right">Sal+KPI Bal (95%)</th>
-                  <th className="right">Allow Bal (95%)</th>
-                  <th className="right">{gb}% Gross Balance</th>
-                  <th className="right">{gb}% Allowance</th>
-                  <th className="right">Statutory (Allow 自己填)</th>
-                  <th className="right">{r2(100 - gb)}% Bill Inv (Sal)</th>
-                  <th className="right">{r2(100 - gb)}% Statutory (自己填)</th>
-                  <th className="right">{r2(100 - gb)}% Bill Inv (Allow)</th>
-                  {anyAllowStat && <th className="right">{r2(100 - gb)}% Statutory (Allow 自己填)</th>}
-                  <th className="right">Total {r2(100 - gb)}% Bill Inv</th>
+                  <th className="m-hide">Weight</th>
+                  <th className="right m-hide">Gross (Sal+KPI)</th>
+                  <th className="right m-hide">Allow Gross</th>
+                  <th className="right m-hide">Sal+KPI Saving</th>
+                  <th className="right m-hide">Allow Saving</th>
+                  <th className="right m-hide">Total Saving</th>
+                  <th className="right m-hide">Sal+KPI Bal (95%)</th>
+                  <th className="right m-hide">Allow Bal (95%)</th>
+                  <th className="right m-hide">{gb}% Gross Balance</th>
+                  <th className="right m-hide">{gb}% Allowance</th>
+                  <th className="right m-hide">Statutory (Allow 自己填)</th>
+                  <th className="right m-hide">{r2(100 - gb)}% Bill Inv (Sal)</th>
+                  <th className="right m-hide">{r2(100 - gb)}% Statutory (自己填)</th>
+                  <th className="right m-hide">{r2(100 - gb)}% Bill Inv (Allow)</th>
+                  {anyAllowStat && <th className="right m-hide">{r2(100 - gb)}% Statutory (Allow 自己填)</th>}
+                  <th className="right m-hide">Total {r2(100 - gb)}% Bill Inv</th>
                   <th className="right">Total Pay</th>
-                  <th className="right">Vr KPI</th>
-                  <th className="right">Adv This Month</th>
-                  <th className="right">Adv Statutory (自己填)</th>
-                  <th className="right">Accum. Advance</th>
+                  <th className="right m-hide">Vr KPI</th>
+                  <th className="right m-hide">Adv This Month</th>
+                  <th className="right m-hide">Adv Statutory (自己填)</th>
+                  <th className="right m-hide">Accum. Advance</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
@@ -919,19 +931,19 @@ function CalculatorTab(p: CalcProps) {
                         d.salKpiBillInv + (inp.billingStat ?? 0) + d.allowBillInv + (sas ? (inp.allowBillingStat ?? 0) : 0),
                       )
                       return (
-                        <tr key={`${mr.id}-${d.id}`}>
+                        <LedgerRow key={`${mr.id}-${d.id}`}>
                           <td className="whitespace-nowrap"><Dot color={d.color} /><span className="font-mono text-sm text-ink">{d.code}</span></td>
-                          <td className="font-mono text-xs text-graphite">{d.weight}%</td>
-                          <td className="num font-medium">{fmt(d.salKpiGross)}</td>
-                          <td className="num">{d.allowGross > 0 ? fmt(d.allowGross) : '—'}</td>
-                          <td className="num">{fmt(d.salKpiSaving)}</td>
-                          <td className="num">{d.allowGross > 0 ? fmt(d.allowSaving) : '—'}</td>
-                          <td className="num font-medium">{fmt(d.totalSaving)}</td>
-                          <td className="num">{fmt(d.salKpiBalance)}</td>
-                          <td className="num">{d.allowGross > 0 ? fmt(d.allowBalance) : '—'}</td>
-                          <td className="num font-medium">{mr.fullPayout ? '—' : fmt(d.salKpiGB)}</td>
-                          <td className="num">{mr.fullPayout ? '—' : d.allowGross > 0 ? fmt(d.allowGB) : '—'}</td>
-                          <td className="num">
+                          <td className="font-mono text-xs text-graphite m-hide" data-label="Weight">{d.weight}%</td>
+                          <td className="num font-medium m-hide" data-label="Gross (Sal+KPI)">{fmt(d.salKpiGross)}</td>
+                          <td className="num m-hide" data-label="Allow Gross">{d.allowGross > 0 ? fmt(d.allowGross) : '—'}</td>
+                          <td className="num m-hide" data-label="Sal+KPI Saving">{fmt(d.salKpiSaving)}</td>
+                          <td className="num m-hide" data-label="Allow Saving">{d.allowGross > 0 ? fmt(d.allowSaving) : '—'}</td>
+                          <td className="num font-medium m-hide" data-label="Total Saving">{fmt(d.totalSaving)}</td>
+                          <td className="num m-hide" data-label="Sal+KPI Bal">{fmt(d.salKpiBalance)}</td>
+                          <td className="num m-hide" data-label="Allow Bal">{d.allowGross > 0 ? fmt(d.allowBalance) : '—'}</td>
+                          <td className="num font-medium m-hide" data-label={`${gb}% Gross Balance`}>{mr.fullPayout ? '—' : fmt(d.salKpiGB)}</td>
+                          <td className="num m-hide" data-label={`${gb}% Allowance`}>{mr.fullPayout ? '—' : d.allowGross > 0 ? fmt(d.allowGB) : '—'}</td>
+                          <td className="num m-hide" data-label="Statutory (Allow)">
                             {mr.fullPayout ? '—' : (
                               <>
                                 <MoneyInput
@@ -944,8 +956,8 @@ function CalculatorTab(p: CalcProps) {
                               </>
                             )}
                           </td>
-                          <td className="num">{mr.fullPayout ? '—' : fmt(d.salKpiBillInv)}</td>
-                          <td className="num">
+                          <td className="num m-hide" data-label={`${r2(100 - gb)}% Bill Inv (Sal)`}>{mr.fullPayout ? '—' : fmt(d.salKpiBillInv)}</td>
+                          <td className="num m-hide" data-label={`${r2(100 - gb)}% Statutory`}>
                             {mr.fullPayout ? '—' : (
                               <MoneyInput
                                 value={inp.billingStat ?? null}
@@ -955,9 +967,9 @@ function CalculatorTab(p: CalcProps) {
                               />
                             )}
                           </td>
-                          <td className="num">{mr.fullPayout ? '—' : d.allowGross > 0 ? fmt(d.allowBillInv) : '—'}</td>
+                          <td className="num m-hide" data-label={`${r2(100 - gb)}% Bill Inv (Allow)`}>{mr.fullPayout ? '—' : d.allowGross > 0 ? fmt(d.allowBillInv) : '—'}</td>
                           {anyAllowStat && (
-                            <td className="num">
+                            <td className="num m-hide" data-label={`${r2(100 - gb)}% Statutory (Allow)`}>
                               {mr.fullPayout || !sas ? '—' : (
                                 <MoneyInput
                                   value={inp.allowBillingStat ?? null}
@@ -968,9 +980,9 @@ function CalculatorTab(p: CalcProps) {
                               )}
                             </td>
                           )}
-                          <td className="num font-semibold">{mr.fullPayout ? '—' : fmt(total25)}</td>
+                          <td className="num font-semibold m-hide" data-label={`Total ${r2(100 - gb)}% Bill Inv`}>{mr.fullPayout ? '—' : fmt(total25)}</td>
                           <td className="num font-semibold text-num-ink">{fmt(d.totalPay)}</td>
-                          <td className="num">
+                          <td className="num m-hide" data-label="Vr KPI">
                             {Math.abs(d.vrKpi) < 0.005 ? '—' : (
                               <span className={d.vrKpi < 0 ? 'text-danger' : 'text-ledger'}>
                                 {fmt(d.vrKpi)}{' '}
@@ -978,10 +990,10 @@ function CalculatorTab(p: CalcProps) {
                               </span>
                             )}
                           </td>
-                          <td className="num">
+                          <td className="num m-hide" data-label="Adv This Month">
                             {d.advThisMonth < 0 ? <span className="text-danger">({fmt(Math.abs(d.advThisMonth))})</span> : '—'}
                           </td>
-                          <td className="num">
+                          <td className="num m-hide" data-label="Adv Statutory">
                             {d.advThisMonth < 0 ? (
                               <MoneyInput
                                 value={inp.advStat ?? null}
@@ -993,44 +1005,45 @@ function CalculatorTab(p: CalcProps) {
                               '—'
                             )}
                           </td>
-                          <td className="num font-medium">
+                          <td className="num font-medium m-hide" data-label="Accum. Advance">
                             {Math.abs(d.accumulated) < 0.005 ? '—' : (
                               <span className={d.accumulated < 0 ? 'text-danger' : 'text-ledger'}>
                                 {d.accumulated < 0 ? `(${fmt(Math.abs(d.accumulated))})` : fmt(d.accumulated)}
                               </span>
                             )}
                           </td>
-                        </tr>
+                        </LedgerRow>
                       )
                     }),
                   ]
                 })}
                 <tr className="border-t border-hairline">
                   <td colSpan={2} className="font-serif italic text-ink">Total{showAll ? ' (All Months)' : ''}</td>
-                  <td className="num font-medium">{fmt(tot.salKpi)}</td>
-                  <td className="num">{fmt(tot.allow)}</td>
-                  <td className="num">{fmt(tot.skSave)}</td>
-                  <td className="num">{fmt(tot.alSave)}</td>
-                  <td className="num font-medium">{fmt(tot.totSave)}</td>
-                  <td className="num">{fmt(tot.bal)}</td>
-                  <td className="num">{fmt(tot.alBal)}</td>
-                  <td className="num font-medium">{fmt(tot.gbAmt)}</td>
-                  <td className="num">{fmt(tot.alGB)}</td>
-                  <td className="num">{tot.alPayStat > 0 ? fmt(tot.alPayStat) : '—'}</td>
-                  <td className="num">{fmt(tot.skBI)}</td>
-                  <td className="num">{fmt(tot.statSal)}</td>
-                  <td className="num">{tot.alBI > 0 ? fmt(tot.alBI) : '—'}</td>
-                  {anyAllowStat && <td className="num">{fmt(tot.statAl)}</td>}
-                  <td className="num font-semibold">{fmt(r2(tot.skBI + tot.statSal + tot.alBI + tot.statAl))}</td>
+                  <td className="num font-medium m-hide">{fmt(tot.salKpi)}</td>
+                  <td className="num m-hide">{fmt(tot.allow)}</td>
+                  <td className="num m-hide">{fmt(tot.skSave)}</td>
+                  <td className="num m-hide">{fmt(tot.alSave)}</td>
+                  <td className="num font-medium m-hide">{fmt(tot.totSave)}</td>
+                  <td className="num m-hide">{fmt(tot.bal)}</td>
+                  <td className="num m-hide">{fmt(tot.alBal)}</td>
+                  <td className="num font-medium m-hide">{fmt(tot.gbAmt)}</td>
+                  <td className="num m-hide">{fmt(tot.alGB)}</td>
+                  <td className="num m-hide">{tot.alPayStat > 0 ? fmt(tot.alPayStat) : '—'}</td>
+                  <td className="num m-hide">{fmt(tot.skBI)}</td>
+                  <td className="num m-hide">{fmt(tot.statSal)}</td>
+                  <td className="num m-hide">{tot.alBI > 0 ? fmt(tot.alBI) : '—'}</td>
+                  {anyAllowStat && <td className="num m-hide">{fmt(tot.statAl)}</td>}
+                  <td className="num font-semibold m-hide">{fmt(r2(tot.skBI + tot.statSal + tot.alBI + tot.statAl))}</td>
                   <td className="num font-semibold text-num-ink">{fmt(tot.pay)}</td>
-                  <td className="num">
+                  <td className="num m-hide">
                     <span className={tot.vr < 0 ? 'text-danger' : tot.vr > 0 ? 'text-ledger' : ''}>{fmt(tot.vr)}</span>
                   </td>
-                  <td className="num">{tot.advThis < 0 ? <span className="text-danger">({fmt(Math.abs(tot.advThis))})</span> : '—'}</td>
-                  <td className="num">{tot.advStat > 0 ? <span className="text-danger">{fmt(tot.advStat)}</span> : '—'}</td>
-                  <td className="num">
+                  <td className="num m-hide">{tot.advThis < 0 ? <span className="text-danger">({fmt(Math.abs(tot.advThis))})</span> : '—'}</td>
+                  <td className="num m-hide">{tot.advStat > 0 ? <span className="text-danger">{fmt(tot.advStat)}</span> : '—'}</td>
+                  <td className="num m-hide">
                     {tot.accum < 0 ? <span className="text-danger">({fmt(Math.abs(tot.accum))})</span> : tot.accum > 0 ? fmt(tot.accum) : '—'}
                   </td>
+                  <td className="lt-toggle" />
                 </tr>
               </tbody>
             </table>
