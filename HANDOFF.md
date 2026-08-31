@@ -271,10 +271,25 @@ still at `updated_at` 2026-08-03).
    gives the same end state — the remote therefore records one migration name
    that has no local file, on top of the pre-existing 394-vs-391 drift.
 
-**Not built:** the payroll grid's Commission cell is still editable for Revenue
-staff. It should be read-only with a "from commission run" badge linking to the
-statement, or a hand edit will silently diverge from the audit trail until the
-next Apply overwrites it.
+**The payroll side is closed too.** The grid's Commission cell is read-only for
+anyone in a `payroll_source = 'commission'` department, with a `from commission
+run` badge linking to that month's statement (or `awaiting the run` when none
+has been computed). The Server Action enforces the same thing —
+`resolveCommissionWrite` drops an unchanged value riding along with a
+legitimate edit and refuses one that would move the number — so a crafted
+request cannot get past it either.
+
+Two Withholding Tax holes closed while there: PCB and WHT are mutually
+exclusive and only PCB was ever displayed, so a Revenue payslip would have
+shown a Net Pay that did not equal Gross minus Total Deductions; and
+`updateStaffStatutory` recomputed net without subtracting WHT, so overriding
+any statutory on a Revenue row would have quietly handed back their tax.
+
+`src/lib/supabase/database.types.ts` was **regenerated** at this point — four
+migrations of drift had accumulated and `withholding_tax` was not in it. All 22
+comm_* / sales_* tables are now typed. The untyped-client casts across the
+module still compile unchanged; `tsc --noEmit` is clean and the suite went
+710 → 717.
 
 ### ⛔ Blocked / next
 
@@ -282,9 +297,10 @@ next Apply overwrites it.
    `SIA JONAS`, and he is in Marketing). Nothing can run until they are created
    under HR → Staff in the Revenue Department with basic 0, then placed on the
    org chart. This is the practical first move.
-2. ~~The commission run itself~~ — **done** (see "The run" above). What remains
-   on that side is the read-only Commission cell in the payroll grid, and
-   reopening the approved July payroll run before a real July can be applied.
+2. ~~The commission run itself~~ — **done**, and so is the payroll-side
+   lockdown (see "The run" above). What remains on that side is one operational
+   step: reopening the approved July 2026 payroll run before a real July
+   commission run can be applied.
 3. **KPI product list unchosen.** Sizing: RM50 on the five commonest pillow
    codes would have paid ≈ RM63,000 of KPI in July against ≈ RM141,000 of
    product commission at a flat 5%.

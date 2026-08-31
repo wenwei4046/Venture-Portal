@@ -63,9 +63,9 @@ export default async function PayrollGridPage({ params }: PageProps) {
         ot_hours, ot_amount, commission_amount, unpaid_leave_days,
         deduction_amount, skbbk_amount,
         prorata_days_worked, prorata_days_in_month,
-        epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb,
+        epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb, withholding_tax,
         gross, net,
-        hr_staff_costs (employee_name, departments (name))
+        hr_staff_costs (employee_name, departments (name, payroll_source))
       `)
       .eq('period_month', period)
       .order('id'),
@@ -95,6 +95,21 @@ export default async function PayrollGridPage({ params }: PageProps) {
       .eq('period_month', period)
       .order('director_id'),
   ])
+
+  // Which salespeople have a statement behind this month's Commission figure.
+  // The badge on a derived row links to it; without a computed run there is
+  // nothing to link to yet and the cell says so instead.
+  const { data: commRunRows } = await supabase
+    .from('comm_runs')
+    .select('id')
+    .eq('period_month', period)
+    .in('status', ['computed', 'applied', 'locked'])
+  const commRunIds = (commRunRows ?? []).map(r => r.id)
+
+  const { data: commStatementRows } = commRunIds.length
+    ? await supabase.from('comm_statements').select('staff_id').in('run_id', commRunIds)
+    : { data: null }
+  const hasStatement = new Set((commStatementRows ?? []).map(r => r.staff_id))
 
   // Latest payment request for this run (if run exists). Order by created_at
   // desc so we can spot an active one first; uniqueness is enforced at DB,
@@ -192,8 +207,13 @@ export default async function PayrollGridPage({ params }: PageProps) {
       eis_er: Number(r.eis_er),
       eis_ee: Number(r.eis_ee),
       pcb: Number(r.pcb),
+      withholding_tax: Number(r.withholding_tax ?? 0),
       gross: Number(r.gross),
       net: Number(r.net),
+      commission_is_derived: staff?.departments?.payroll_source === 'commission',
+      commission_statement_href: hasStatement.has(r.staff_id)
+        ? `/hr-costing/commission/${period}/statement/${r.staff_id}`
+        : null,
     }
   })
 

@@ -31,7 +31,7 @@ export default async function PayslipPage({ params }: PageProps) {
       ot_hours, ot_amount, commission_amount, unpaid_leave_days,
       deduction_amount, skbbk_amount,
       prorata_days_worked, prorata_days_in_month,
-      epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb,
+      epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb, withholding_tax,
       gross, net, status, statutory_overridden_at,
       hr_staff_costs (
         employee_name, employee_code, epf_category, socso_category, pcb_category,
@@ -48,9 +48,14 @@ export default async function PayslipPage({ params }: PageProps) {
   const staff = (row as any).hr_staff_costs
   const deptName = staff?.departments?.name ?? '—'
 
+  // PCB and Withholding Tax are mutually exclusive — whichever the staff record
+  // selects applies and the other is 0 — but both belong in the total, or a
+  // Revenue salesperson's payslip would show a Net Pay that does not equal
+  // Gross minus Total Deductions.
+  const withholding = Number(row.withholding_tax ?? 0)
   const totalDeductions =
     Number(row.epf_ee) + Number(row.socso_ee) + Number(row.eis_ee) + Number(row.pcb) +
-    Number(row.skbbk_amount ?? 0)
+    withholding + Number(row.skbbk_amount ?? 0)
   const totalEr = Number(row.epf_er) + Number(row.socso_er) + Number(row.eis_er)
 
   const prorated = `${row.prorata_days_worked}/${row.prorata_days_in_month} days`
@@ -139,10 +144,17 @@ export default async function PayslipPage({ params }: PageProps) {
               <span className="font-serif">EIS (Employee)</span>
               <EditableStatLine payrollId={row.id} field="eis_ee" value={Number(row.eis_ee)} readOnly={row.status !== 'draft'} />
             </div>
-            <div className="flex items-baseline justify-between">
-              <span className="font-serif">PCB ({staff.pcb_category})</span>
-              <EditableStatLine payrollId={row.id} field="pcb" value={Number(row.pcb)} readOnly={row.status !== 'draft'} />
-            </div>
+            {withholding > 0 ? (
+              <div className="flex items-baseline justify-between">
+                <span className="font-serif">Withholding Tax</span>
+                <span className="num">{formatMoney(withholding)}</span>
+              </div>
+            ) : (
+              <div className="flex items-baseline justify-between">
+                <span className="font-serif">PCB ({staff.pcb_category})</span>
+                <EditableStatLine payrollId={row.id} field="pcb" value={Number(row.pcb)} readOnly={row.status !== 'draft'} />
+              </div>
+            )}
             {Number(row.skbbk_amount ?? 0) > 0 && (
               <div className="flex items-baseline justify-between">
                 <span className="font-serif">SKBBK</span>

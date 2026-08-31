@@ -772,10 +772,21 @@ the same project, so this is the closest match to the reference. Every drop
 writes a new effective-dated `comm_hierarchy` row; the cycle trigger rejects an
 illegal drop, and a drop under a `can_recruit = false` rank is refused in the UI.
 
-**Payroll grid change** (`PayrollRow.tsx`): for staff in a
-`payroll_source = 'commission'` department the Commission cell becomes
-**read-only** with a `from commission run` badge linking to the statement, so a
-hand-edit can't silently diverge from the audit trail.
+**Payroll grid change** (`PayrollRow.tsx`, built): for staff in a
+`payroll_source = 'commission'` department the Commission cell is **read-only**
+with a `from commission run` badge linking to that month's statement — or
+`awaiting the run` when no statement exists yet. A hand edit cannot silently
+diverge from the audit trail, and it cannot get past the Server Action either:
+`resolveCommissionWrite` (`src/lib/commission/derived-commission.ts`, 7 tests)
+drops an unchanged value that rode along with a legitimate edit and refuses one
+that would actually move the number.
+
+**Withholding Tax on the grid and the payslip.** PCB and WHT are mutually
+exclusive, and both the expanded grid panel and the payslip showed only PCB —
+so a Revenue salesperson's payslip reported a Net Pay that did not equal Gross
+minus Total Deductions. Both now show whichever tax applies, and
+`updateStaffStatutory` subtracts WHT when it recomputes net, or overriding any
+statutory on a Revenue row would have quietly handed back their tax.
 
 ---
 
@@ -793,7 +804,7 @@ hand-edit can't silently diverge from the audit trail.
 | 8 | Import wizard + agent matching | ✅ built |
 | 9 | Open Bill board | ✅ built |
 | 10 | `save_` / `apply_` / `reopen_commission_run` RPCs + run dashboard + statement drill-down | ✅ built, **applied live** 2026-08-31 |
-| 11 | Payroll read-only Commission cell for `payroll_source = 'commission'` staff | not started |
+| 11 | Payroll read-only Commission cell + WHT on the grid and the payslip | ✅ built |
 | 12 | Cost feed → margin penalty and incentive go live | ⛔ blocked — the SO export has no cost column (Q1) |
 | 13 | WHT remittance in the statutory export | before the first real payout |
 | 14 | Revenue Dept P&L / pool 1090 wiring | separate scope |

@@ -48,7 +48,7 @@ export default function PayrollRow({
     edit.non_statutory_allowance !== row.non_statutory_allowance ||
     edit.ot_hours !== row.ot_hours ||
     edit.ot_amount !== row.ot_amount ||
-    edit.commission_amount !== row.commission_amount ||
+    (!row.commission_is_derived && edit.commission_amount !== row.commission_amount) ||
     edit.unpaid_leave_days !== row.unpaid_leave_days ||
     edit.deduction_amount !== row.deduction_amount ||
     edit.skbbk_amount !== row.skbbk_amount
@@ -115,7 +115,33 @@ export default function PayrollRow({
         <td className="py-5 pr-4 text-right">{cell('statutory_allowance', edit.statutory_allowance)}</td>
         <td className="py-5 pr-4 text-right">{cell('non_statutory_allowance', edit.non_statutory_allowance)}</td>
         <td className="py-5 pr-4 text-right">{cell('ot_amount', edit.ot_amount)}</td>
-        <td className="py-5 pr-4 text-right">{cell('commission_amount', edit.commission_amount)}</td>
+        <td className="py-5 pr-4 text-right">
+          {row.commission_is_derived ? (
+            <div className="flex flex-col items-end">
+              <span className="font-mono tabular text-sm text-graphite px-1 py-1">
+                {formatMoneyBare(row.commission_amount)}
+              </span>
+              {row.commission_statement_href ? (
+                <a
+                  href={row.commission_statement_href}
+                  className="font-mono text-[9.5px] uppercase tracking-wide text-accent hover:underline"
+                  title="This figure comes from the commission run — open the statement behind it"
+                >
+                  from commission run
+                </a>
+              ) : (
+                <span
+                  className="font-mono text-[9.5px] uppercase tracking-wide text-muted"
+                  title="Compute the commission run for this month to fill this in"
+                >
+                  awaiting the run
+                </span>
+              )}
+            </div>
+          ) : (
+            cell('commission_amount', edit.commission_amount)
+          )}
+        </td>
         <td className="py-5 pr-4 text-right">{cell('unpaid_leave_days', edit.unpaid_leave_days, '0.5')}</td>
         <td className="py-5 pr-4 text-right">{cell('deduction_amount', edit.deduction_amount)}</td>
         <td className="py-5 pr-4 text-right">{cell('skbbk_amount', edit.skbbk_amount)}</td>
@@ -183,8 +209,16 @@ export default function PayrollRow({
                 </div>
               </div>
               <div>
-                <div className="text-xs uppercase tracking-wide text-muted font-sans">PCB</div>
-                <div className="font-mono tabular text-ink mt-1">{formatMoney(row.pcb)}</div>
+                {/* PCB and Withholding Tax are mutually exclusive: whichever
+                    one the staff record selects applies, the other is 0. A
+                    Revenue salesperson pays WHT, so showing only PCB would
+                    report a zero deduction on a row that has one. */}
+                <div className="text-xs uppercase tracking-wide text-muted font-sans">
+                  {row.withholding_tax > 0 ? 'Withholding Tax' : 'PCB'}
+                </div>
+                <div className="font-mono tabular text-ink mt-1">
+                  {formatMoney(row.withholding_tax > 0 ? row.withholding_tax : row.pcb)}
+                </div>
               </div>
               <div>
                 <div className="text-xs uppercase tracking-wide text-muted font-sans">Status</div>

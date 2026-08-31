@@ -4,6 +4,10 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
+import {
+  resolveCommissionWrite,
+  type DerivedCommissionRow,
+} from '@/lib/commission/derived-commission'
 import { assertPeriodOpen } from '@/lib/period-lock'
 
 /**
@@ -72,6 +76,58 @@ export interface PayrollRowUpdate {
 }
 
 /**
+ * Commission is not HR's to type for a Revenue salesperson — the commission run
+ * owns that field. Looks up who is on commission payroll and hands each row to
+ * `resolveCommissionWrite`, which decides between passing it, dropping an
+ * unchanged value, and refusing an edit that would actually move the number.
+ *
+ * The grid renders the same cell read-only. This is the half a crafted request
+ * cannot get past.
+ */
+async function stripDerivedCommission(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  rows: { id: string; fields: PayrollRowUpdate }[],
+): Promise<{ id: string; fields: PayrollRowUpdate }[]> {
+  const withCommission = rows.filter(r => r.fields.commission_amount !== undefined)
+  if (withCommission.length === 0) return rows
+
+  const { data } = await supabase
+    .from('hr_monthly_payroll')
+    .select('id, commission_amount, hr_staff_costs!inner (employee_name, departments!inner (payroll_source))')
+    .in('id', withCommission.map(r => r.id))
+
+  const derived = new Map<string, DerivedCommissionRow>(
+    ((data ?? []) as unknown as Array<{
+      id: string
+      commission_amount: number | string
+      hr_staff_costs: {
+        employee_name: string
+        departments: { payroll_source: string } | { payroll_source: string }[]
+      }
+    }>).map(r => {
+      // PostgREST returns an embedded one-to-one as an object or, when it
+      // cannot prove the relationship is singular, a one-element array.
+      const dept = Array.isArray(r.hr_staff_costs.departments)
+        ? r.hr_staff_costs.departments[0]
+        : r.hr_staff_costs.departments
+      return [
+        r.id,
+        {
+          isDerived: dept?.payroll_source === 'commission',
+          stored: Number(r.commission_amount),
+          name: r.hr_staff_costs.employee_name,
+        },
+      ]
+    }),
+  )
+
+  return rows.map(r => ({
+    id: r.id,
+    fields: resolveCommissionWrite(r.fields, derived.get(r.id)),
+  }))
+}
+
+/**
  * Update one payroll row. The DB trigger recomputes pro-rata + statutory + gross/net.
  * Only allowed while status='draft'.
  */
@@ -82,9 +138,11 @@ export async function updatePayrollRow(
   await requireRole(['hr', 'principal'])
   const supabase = await createClient()
 
+  const [row] = await stripDerivedCommission(supabase, [{ id, fields }])
+
   const { error } = await supabase
     .from('hr_monthly_payroll')
-    .update(fields)
+    .update(row.fields)
     .eq('id', id)
     .eq('status', 'draft')
 
@@ -106,10 +164,11 @@ export async function updatePayrollRows(
   if (updates.length === 0) return { saved: 0 }
 
   const supabase = await createClient()
+  const cleaned = await stripDerivedCommission(supabase, updates)
 
   let saved = 0
   const failures: string[] = []
-  for (const u of updates) {
+  for (const u of cleaned) {
     const { error } = await supabase
       .from('hr_monthly_payroll')
       .update(u.fields)
@@ -173,21 +232,25 @@ export async function updateStaffStatutory(
 
   const { data: row, error: fetchErr } = await supabase
     .from('hr_monthly_payroll')
-    .select('id, status, gross, epf_ee, socso_ee, eis_ee, pcb')
+    .select('id, status, gross, epf_ee, socso_ee, eis_ee, pcb, withholding_tax')
     .eq('id', id)
     .single()
   if (fetchErr || !row) throw new Error('Payroll row not found')
   if (row.status !== 'draft') throw new Error('Cannot edit statutory on a non-draft payroll row')
 
-  // Net = gross - epf_ee - socso_ee - eis_ee - pcb. Apply the override values
-  // for whichever EE fields the caller passed; existing values stand for the rest.
+  // Net = gross - epf_ee - socso_ee - eis_ee - pcb - withholding tax. Apply the
+  // override values for whichever EE fields the caller passed; existing values
+  // stand for the rest. Withholding Tax is never one of them — it is not an
+  // overridable statutory field — but it must stay in the formula or overriding
+  // any statutory on a Revenue salesperson would quietly hand back their tax.
   const merged = { ...row, ...writes }
   const net = Math.round(
     (Number(merged.gross ?? 0) -
       Number(merged.epf_ee ?? 0) -
       Number(merged.socso_ee ?? 0) -
       Number(merged.eis_ee ?? 0) -
-      Number(merged.pcb ?? 0)) * 100
+      Number(merged.pcb ?? 0) -
+      Number(row.withholding_tax ?? 0)) * 100
   ) / 100
 
   const { error: updErr } = await supabase
