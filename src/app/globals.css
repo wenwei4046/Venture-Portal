@@ -695,7 +695,11 @@ table.ledger-table.tight tbody td.group-cell {
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: 10px 16px 10px 13px;
+  /* Same height as every other band in the table: 42px of band, which is what
+     the header row is, and which puts the divider's ROW at 43px once its
+     hairline is counted — exactly a person row. Even rhythm down the page. */
+  min-height: 42px;
+  padding: 0 16px 0 13px;
   border: 0;
   border-left: 3px solid rgb(var(--band));
   background: rgb(var(--band));
