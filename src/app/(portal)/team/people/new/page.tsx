@@ -1,10 +1,10 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import AddStaffForm from '../_components/AddStaffForm'
 
 export default async function NewStaffPage() {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('team')
   const supabase = await createClient()
 
   // is_internal=false excludes the hidden 'Venture Office' pseudo-department —

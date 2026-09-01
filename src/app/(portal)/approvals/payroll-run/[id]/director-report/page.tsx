@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import LedgerRow from '@/components/LedgerRow'
 
@@ -17,7 +17,7 @@ function formatPeriodLabel(period: string): string {
 export default async function DirectorReportPage({ params }: PageProps) {
   // PDPA: only Principal + HR may see per-director calculation detail.
   // Finance gets lump-sum OPEX on the parent approval page.
-  await requireRole(['principal', 'hr'])
+  await requirePermission('director_salary')
 
   const { id } = await params
   const supabase = await createClient()

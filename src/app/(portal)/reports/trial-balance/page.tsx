@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import { fetchTrialBalance } from '@/lib/cfo-reports'
 import dayjs from 'dayjs'
@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default async function TrialBalancePage({ searchParams }: Props) {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('reports')
   const supabase = await createClient()
 
   const { as_of: rawAsOf, show_zero: rawShowZero } = await searchParams

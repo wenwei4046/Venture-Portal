@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 
 /**
  * Moving somebody in the company org chart.
@@ -22,7 +22,7 @@ export async function setReportsTo(
   staffId: string,
   reportsToId: string | null,
 ): Promise<void> {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('team')
 
   if (!staffId) throw new Error('Which person?')
   if (reportsToId && reportsToId === staffId) {

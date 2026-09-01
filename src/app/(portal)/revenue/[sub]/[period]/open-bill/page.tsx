@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { revenuePath } from '@/lib/revenue'
 import OpenBillBoard, { type BoardOrder } from './_components/OpenBillBoard'
@@ -30,7 +30,7 @@ function label(period: string): string {
  * spreadsheet exercise across 473 orders.
  */
 export default async function OpenBillPage({ params }: PageProps) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   const { sub, period } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()
 

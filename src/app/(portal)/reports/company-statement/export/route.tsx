@@ -15,7 +15,7 @@ import React from 'react'
 import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { fetchCounterpartyStatement } from '@/lib/counterparty-statement-data'
 import type { PositionRow } from '@/lib/counterparty-statement'
 import { buildXlsxBuffer, type XlsxSectionBreak } from '@/lib/export/excel'
@@ -52,7 +52,7 @@ function payoffLabel(item: PositionRow): string {
 }
 
 export async function GET(request: Request) {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('reports')
   const supabase = (await createClient()) as unknown as SupabaseClient
   const { rows: allRows } = await fetchCounterpartyStatement(supabase)
 

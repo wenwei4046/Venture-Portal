@@ -1,13 +1,13 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import GenerateStatementsButton from '../_components/GenerateStatementsButton'
 import StatementsPeriodTable from '../_components/StatementsPeriodTable'
 
 export default async function MonthlyStatementsPage() {
-  const user = await requireRole(['principal', 'finance'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   const [{ data: statements }, { data: companies }] = await Promise.all([

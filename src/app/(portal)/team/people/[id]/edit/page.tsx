@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import EditStaffForm from '../../_components/EditStaffForm'
 
 interface PageProps {
@@ -9,7 +9,7 @@ interface PageProps {
 }
 
 export default async function EditStaffPage({ params }: PageProps) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('team')
   const { id } = await params
   const supabase = await createClient()
 

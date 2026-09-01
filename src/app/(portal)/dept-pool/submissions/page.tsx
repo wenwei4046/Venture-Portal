@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { executeHrCosting } from '../../hr-costing/actions'
@@ -38,7 +38,7 @@ function executionLabel(state: string): { text: string; className: string } {
 }
 
 export default async function PastMonthSubmissionsPage() {
-  const user = await requireRole(['principal', 'finance', 'dept_manager'])
+  const user = await requirePermission('dept_pool')
   const supabase = await createClient()
 
   const { data: raw } = await supabase.rpc('get_hr_cost_submissions_list')

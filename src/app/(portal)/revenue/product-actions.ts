@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { parseProductPaste } from '@/lib/commission/product-paste'
 
 /**
@@ -28,7 +28,7 @@ function refresh() {
 }
 
 export async function upsertProduct(formData: FormData) {
-  const user = await requireRole(['principal'])
+  const user = await requirePermission('product_list')
   const supabase = await client()
 
   const id = ((formData.get('id') as string) ?? '').trim()
@@ -70,7 +70,7 @@ export async function upsertProduct(formData: FormData) {
  * meaningful state ("known product, cost not keyed in yet"), not a zero.
  */
 export async function bulkUpsertProducts(raw: string): Promise<{ written: number; skipped: number }> {
-  const user = await requireRole(['principal'])
+  const user = await requirePermission('product_list')
   const supabase = await client()
 
   const { parsed, skipped } = parseProductPaste(raw)
@@ -117,7 +117,7 @@ export async function bulkUpsertProducts(raw: string): Promise<{ written: number
 }
 
 export async function deleteProduct(id: string) {
-  await requireRole(['principal'])
+  await requirePermission('product_list')
   const supabase = await client()
   const { error } = await supabase.from('comm_products').delete().eq('id', id)
   if (error) throw new Error(`Could not remove the product: ${error.message}`)

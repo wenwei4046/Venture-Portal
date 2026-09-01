@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import dayjs from 'dayjs'
 import NewClaimForm from './_components/NewClaimForm'
@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default async function ClaimsPage({ searchParams }: Props) {
-  const user = await requireRole(['principal', 'finance', 'hr', 'dept_manager'])
+  const user = await requirePermission('claims')
   const supabase = await createClient()
 
   const { tab } = await searchParams

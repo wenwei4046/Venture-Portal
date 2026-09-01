@@ -5,14 +5,14 @@
 // Mirrors /billing/invoice-doc but for payment vouchers / official receipts.
 
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { exportPdfResponse } from '@/lib/export/response'
 import { formatPoolLabel } from '@/lib/voucher-detail'
 import { VoucherDocPdf, type VoucherDocData } from '../_format/voucher-doc-pdf'
 import dayjs from 'dayjs'
 
 export async function GET(req: Request) {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('treasury')
   const url = new URL(req.url)
   const id = url.searchParams.get('id')?.trim() || null
   const idsParam = url.searchParams.get('ids')?.trim() || null

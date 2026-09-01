@@ -1,6 +1,6 @@
 import PrintButton from './PrintButton'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { formatMoney, formatMoneyBare, getPeriodMonth } from '@/lib/utils'
 import dayjs from 'dayjs'
 
@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default async function PrintPayoutPage({ params, searchParams }: Props) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('director_salary')
   const supabase = await createClient()
 
   const { directorId } = await params

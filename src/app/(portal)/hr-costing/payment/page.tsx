@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { formatMoney, formatMoneyBare, getPeriodMonth } from '@/lib/utils'
 import { paymentHeroTotal, round2 } from '@/lib/payroll-funding'
 import RequestPayrollPaymentButton, {
@@ -22,7 +22,7 @@ export default async function HRPaymentPage({
 }: {
   searchParams: Promise<{ period?: string }>
 }) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('hr_costing')
   const supabase = await createClient()
 
   // Month selector (2026-07-21, user request): ?period=YYYY-MM-01 — a payroll

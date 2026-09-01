@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { fetchLedger } from '@/lib/cfo-reports'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildLedgerXlsx } from './_format/xlsx'
@@ -7,7 +7,7 @@ import { LedgerPdf } from './_format/pdf'
 import dayjs from 'dayjs'
 
 export async function GET(req: Request) {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('reports')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   const code = url.searchParams.get('code')

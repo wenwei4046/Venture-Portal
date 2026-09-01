@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import type { Company } from '@/types'
 import type { AccountType } from '@/lib/coa'
@@ -7,7 +7,7 @@ import NewFundSourceForm from '../_components/NewFundSourceForm'
 import type { AccountOption } from '@/components/AccountPicker'
 
 export default async function NewFundInPage() {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const supabase = await createClient()
 
   // Item 4: directors no longer needed — director_loan + outsource use free text.

@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 
 /**
  * Committing an ERP sales-order import.
@@ -93,7 +93,7 @@ function norm(code: string): string {
 }
 
 export async function commitSalesImport(input: CommitInput): Promise<CommitResult> {
-  const user = await requireRole(['principal', 'hr'])
+  const user = await requirePermission('revenue')
   const supabase = await client()
 
   if (!/^\d{4}-\d{2}-01$/.test(input.periodMonth)) {
@@ -326,7 +326,7 @@ export async function loadAgentMatchingData(): Promise<{
   staff: Array<{ id: string; name: string; code: string | null }>
   aliases: Record<string, string>
 }> {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   const supabase = await client()
 
   const [{ data: staffRows }, { data: aliasRows }] = await Promise.all([

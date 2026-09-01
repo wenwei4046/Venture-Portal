@@ -1,7 +1,7 @@
 import dayjs from 'dayjs'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { fetchAllJournalLines, fetchCoaAccounts } from '@/lib/gl-reports'
 import { eliminateInterBilling, fetchInterBillingElimination } from '@/lib/consolidation'
 import { buildPnlAccounts, buildCustomPnlRows, defaultPnlLayout } from '@/lib/pnl-custom'
@@ -19,7 +19,7 @@ interface Props {
 }
 
 export default async function MonthlyPnlPage({ searchParams }: Props) {
-  const user = await requireRole(['principal', 'finance', 'dept_manager'])
+  const user = await requirePermission('dept_reports')
   const supabase = await createClient()
 
   const params = await searchParams

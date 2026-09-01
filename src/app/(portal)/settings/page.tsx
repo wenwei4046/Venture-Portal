@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/paginate'
 import type { TreasuryConfig, OverdueConfig, Company } from '@/types'
@@ -41,7 +41,7 @@ export default async function SettingsPage({ searchParams }: Props) {
   // HR is no longer admitted at all: Commission and Product List moved out
   // (user 2026-08-31) and they were the only reason HR was ever here. They now
   // live under /revenue — the Revenue Department's own group (2026-09-01).
-  const user = await requireRole(['principal', 'finance'])
+  const user = await requirePermission('categories')
   const isPrincipal = user.role === 'principal'
 
   const { tab: rawTab } = await searchParams

@@ -1,9 +1,13 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
+import { canAccessAuditLog, canManagePermissions } from '@/lib/roles'
 import ActivityLog from '../../_components/ActivityLog'
+import PersonPermissions, {
+  type PersonPermissionRow,
+} from '../../_components/PersonPermissions'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -23,7 +27,7 @@ const PCB_LABELS: Record<string, string> = {
 }
 
 export default async function StaffDetailPage({ params }: PageProps) {
-  const viewer = await requireRole(['principal', 'hr'])
+  const viewer = await requirePermission('team')
   const { id } = await params
   const supabase = await createClient()
 
@@ -44,9 +48,64 @@ export default async function StaffDetailPage({ params }: PageProps) {
   const account = row.users as
     | { id: string; name: string; email: string; role: string; is_active: boolean }
     | null
-  // access_log is Principal-or-self; an HR reader would only ever see an empty
-  // panel here, so the section is not rendered for them at all.
-  const canSeeActivity = viewer.role === 'principal' && !!account
+  // access_log is Principal-or-self; a reader without the audit permission
+  // would only ever see an empty panel, so it is not rendered for them at all.
+  const canSeeActivity = canAccessAuditLog(viewer) && !!account
+
+  // What this person's account actually resolves to: their title's list if it
+  // has one, otherwise the defaults for the role the account was created with,
+  // and then any exception filed against the person.
+  let permissionRows: PersonPermissionRow[] = []
+  let permissionSource = ''
+  if (account) {
+    const [{ data: defs }, { data: titleGrants }, { data: roleGrants }, { data: overrides }] =
+      await Promise.all([
+        supabase
+          .from('permission_defs')
+          .select('key, label, section')
+          .order('sort_order'),
+        row.title_id
+          ? supabase.from('title_permissions').select('permission_key').eq('title_id', row.title_id)
+          : Promise.resolve({ data: [] as { permission_key: string }[] }),
+        supabase
+          .from('role_default_permissions')
+          .select('permission_key')
+          .eq('role', account.role as 'principal' | 'finance' | 'hr' | 'dept_manager'),
+        supabase
+          .from('user_permissions')
+          .select('permission_key, granted')
+          .eq('user_id', account.id),
+      ])
+
+    const titleKeys = (titleGrants ?? []).map(g => (g as { permission_key: string }).permission_key)
+    const configured = titleKeys.length > 0
+    const inherited = new Set(
+      configured
+        ? titleKeys
+        : (roleGrants ?? []).map(g => (g as { permission_key: string }).permission_key),
+    )
+    permissionSource = configured
+      ? `the ${titleName ?? 'title'} title`
+      : `the ${account.role} role, because ${titleName ?? 'their title'} has no permissions of its own`
+
+    const overrideBy = new Map(
+      (overrides ?? []).map(o => {
+        const r = o as { permission_key: string; granted: boolean }
+        return [r.permission_key, r.granted]
+      }),
+    )
+
+    permissionRows = (defs ?? []).map(d => {
+      const def = d as { key: string; label: string; section: string }
+      return {
+        key: def.key,
+        label: def.label,
+        section: def.section,
+        inherited: inherited.has(def.key),
+        override: overrideBy.has(def.key) ? overrideBy.get(def.key)! : null,
+      }
+    })
+  }
 
   return (
     <div>
@@ -156,6 +215,15 @@ export default async function StaffDetailPage({ params }: PageProps) {
           <Field label="Children" value={String(staff.children_count ?? 0)} mono />
         </Section>
       </div>
+
+      {account ? (
+        <PersonPermissions
+          userId={account.id}
+          rows={permissionRows}
+          source={permissionSource}
+          canEdit={canManagePermissions(viewer)}
+        />
+      ) : null}
 
       {canSeeActivity ? <ActivityLog userId={account!.id} /> : null}
     </div>

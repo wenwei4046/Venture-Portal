@@ -62,7 +62,7 @@ export default function MoreSheet({ user, navData, open, onClose }: Props) {
     }
   }, [open, onClose])
 
-  const visible = buildNavEntries(navData).filter((entry) => entry.visible(user.role))
+  const visible = buildNavEntries(navData).filter((entry) => entry.visible(user))
 
   // Group consecutive entries by section label, same pass the sidebar makes.
   const sections: { label: string | null; entries: NavEntry[] }[] = []
@@ -88,10 +88,10 @@ export default function MoreSheet({ user, navData, open, onClose }: Props) {
   // one tap in, and a second tap to reveal children turns a lookup into a
   // hunt. Every level is listed and the sheet scrolls.
   function renderEntry(entry: NavEntry, depth: number): React.ReactNode {
-    if (!entry.visible(user.role)) return null
+    if (!entry.visible(user)) return null
 
     if (isGroup(entry)) {
-      const children = entry.children.filter((c) => c.visible(user.role))
+      const children = entry.children.filter((c) => c.visible(user))
       if (children.length === 0) return null
       // A group with a page of its own usually shares it with its first child
       // (Fair and its Commission Calculation are the same URL) — listing it

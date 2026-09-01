@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { validateAllocationRows, type AllocationRow } from '@/lib/staff-allocation'
 
@@ -20,7 +20,7 @@ export async function saveStaffAllocation(
   periodMonth: string,
   rows: AllocationRow[],
 ): Promise<void> {
-  const user = await requireRole(['hr', 'principal'])
+  const user = await requirePermission('hr_costing')
   const supabase = await createClient()
 
   if (!staffId) throw new Error('Staff id is required')
@@ -63,7 +63,7 @@ export async function saveStaffAllocation(
 export async function copyAllocationsFromLastMonth(periodMonth: string): Promise<{
   copiedStaff: number
 }> {
-  const user = await requireRole(['hr', 'principal'])
+  const user = await requirePermission('hr_costing')
   const supabase = await createClient()
 
   const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')

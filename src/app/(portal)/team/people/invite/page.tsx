@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import InviteUserForm, {
   type InviteDepartment,
@@ -20,7 +20,7 @@ interface PageProps {
  * filed yet (a roster row is created alongside the account).
  */
 export default async function InviteUserPage({ searchParams }: PageProps) {
-  await requireRole(['principal'])
+  await requirePermission('team_invite')
   const { staff: staffId } = await searchParams
   const supabase = await createClient()
 

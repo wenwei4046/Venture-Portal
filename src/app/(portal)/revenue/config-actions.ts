@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { RESERVED_SUB_DEPT_SLUGS, subDeptSlug } from '@/lib/revenue'
 
 /**
@@ -67,7 +67,7 @@ function check(error: { message: string } | null, what: string) {
  * cloned_from_scheme_id, so it is obvious later where a ruleset came from.
  */
 export async function createSubDepartment(formData: FormData) {
-  const user = await requireRole(['principal', 'hr'])
+  const user = await requirePermission('revenue')
   const supabase = await client()
 
   const departmentId = required(formData, 'department_id', 'Department')
@@ -211,7 +211,7 @@ async function cloneSchemeChildren(
 // ─── Scheme switches ────────────────────────────────────────────────────────
 
 export async function updateScheme(formData: FormData) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   const supabase = await client()
 
   const id = required(formData, 'scheme_id', 'Scheme')
@@ -259,7 +259,7 @@ export async function updateScheme(formData: FormData) {
 // ─── Tier ladder ────────────────────────────────────────────────────────────
 
 export async function upsertRank(formData: FormData) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   const supabase = await client()
 
   const id = text(formData, 'id')
@@ -293,7 +293,7 @@ export async function upsertRank(formData: FormData) {
 // ─── Item groups ────────────────────────────────────────────────────────────
 
 export async function upsertItemGroup(formData: FormData) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   const supabase = await client()
 
   const row = {
@@ -318,7 +318,7 @@ export async function upsertItemGroup(formData: FormData) {
 // ─── KPI items and thresholds ───────────────────────────────────────────────
 
 export async function upsertKpiItem(formData: FormData) {
-  const user = await requireRole(['principal', 'hr'])
+  const user = await requirePermission('revenue')
   const supabase = await client()
 
   const id = text(formData, 'id')
@@ -345,14 +345,14 @@ export async function upsertKpiItem(formData: FormData) {
 }
 
 export async function deleteKpiItem(id: string) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   const supabase = await client()
   check((await supabase.from('comm_kpi_items').delete().eq('id', id)).error, 'Could not remove the KPI item')
   refresh()
 }
 
 export async function upsertKpiThreshold(formData: FormData) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   const supabase = await client()
 
   const id = text(formData, 'id')
@@ -380,7 +380,7 @@ export async function upsertKpiThreshold(formData: FormData) {
 }
 
 export async function deleteKpiThreshold(id: string) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   const supabase = await client()
   check((await supabase.from('comm_kpi_thresholds').delete().eq('id', id)).error, 'Could not remove the threshold')
   refresh()
@@ -389,7 +389,7 @@ export async function deleteKpiThreshold(id: string) {
 // ─── Open Bill ──────────────────────────────────────────────────────────────
 
 export async function updateOpenBillRule(formData: FormData) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   const supabase = await client()
 
   const id = required(formData, 'id', 'Rule')
@@ -403,7 +403,7 @@ export async function updateOpenBillRule(formData: FormData) {
 // ─── Brands and margin bands ────────────────────────────────────────────────
 
 export async function upsertBrand(formData: FormData) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   const supabase = await client()
 
   const id = text(formData, 'id')
@@ -433,7 +433,7 @@ export async function upsertBrand(formData: FormData) {
 }
 
 export async function upsertMarginBand(formData: FormData) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   const supabase = await client()
 
   const id = text(formData, 'id')
@@ -475,7 +475,7 @@ export async function upsertMarginBand(formData: FormData) {
 }
 
 export async function deleteMarginBand(id: string) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   const supabase = await client()
   check((await supabase.from('comm_margin_bands').delete().eq('id', id)).error, 'Could not remove the band')
   refresh()

@@ -103,7 +103,20 @@ ALWAYS reference these docs before implementing any feature.
 Other project docs (at repo root):
 TODOS.md — Phase 1.5 tech debt, Phase 2/3 prerequisites, compliance gates
 .gstack/qa-reports/qa-report-phase1-2026-04-10.md — Phase 1 acceptance audit (6 findings, 2 fixed, 3 deferred to 1.5)
-4 Roles
+Permissions (2026-09-01 — replaced the four hard-coded roles)
+Every gate in the portal reads a PERMISSION, not a role. A permission is granted
+by a TITLE (Team → Role & Permission), with a per-person exception available on
+somebody's page. `permission_defs` is the catalog; `has_scope()` derives the
+table-level scopes RLS asks about, so a title cannot be granted a page whose
+queries then come back empty.
+  App:  `requirePermission('treasury')`, `can(user, 'reports')`, `canAccessX(user)`
+  DB:   `(SELECT has_scope(ARRAY['treasury']))`
+A title with NO permissions of its own falls back to the role its holder's
+account was created with — which is why the cutover changed nobody's access.
+`users.role` survives ONLY for that fallback and for the 16 dept_manager
+row-scoped policies no scope can express. Do not add new gates that read it.
+
+4 Roles (now: the fallback each account is created with)
 Role	DB Value	Access
 Principal	`principal`	Everything + Approve + Settings
 Finance	`finance`	Treasury + Billing + Reports — no individual salary, no Director Salary module, no Director Pool (v2 2026-07-21: calculator is Principal + HR only)

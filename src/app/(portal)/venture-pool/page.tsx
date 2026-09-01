@@ -1,5 +1,5 @@
 import dayjs from 'dayjs'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import { fetchAllRows } from '@/lib/paginate'
@@ -14,7 +14,7 @@ import LedgerRow from '@/components/LedgerRow'
 // captures generic HV expenses + historical OFFICE-tagged manual_jv.
 
 export default async function VenturePoolPage() {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('venture_pool')
   const supabase = await createClient()
 
   const period = getPeriodMonth()

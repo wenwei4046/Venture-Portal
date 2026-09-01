@@ -8,7 +8,7 @@
 import { revalidatePath } from 'next/cache'
 import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import {
   allocateExpense,
@@ -64,7 +64,7 @@ async function saveAllocStaffInner(payload: {
   department: string
   splits: StaffSplitInput[]
 }): Promise<void> {
-  const user = await requireRole(['finance', 'principal'])
+  const user = await requirePermission('billing')
   const supabase = await allocClient()
 
   const name = payload.name.trim()
@@ -109,7 +109,7 @@ async function saveAllocStaffInner(payload: {
 }
 
 async function deleteAllocStaffInner(id: string): Promise<void> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('billing')
   const supabase = await allocClient()
   const { error } = await supabase.from('alloc_staff').delete().eq('id', id)
   if (error) throw new Error(error.message)
@@ -119,7 +119,7 @@ async function deleteAllocStaffInner(id: string): Promise<void> {
 
 /** Replace `period`'s headcount snapshot with the live list. */
 async function saveAllocSnapshotInner(period: string): Promise<void> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('billing')
   await snapshotPeriod(period)
   revalidatePath('/billing-allocator')
 }
@@ -168,7 +168,7 @@ async function snapshotPeriod(period: string): Promise<void> {
  * a staff whose splits total under 100% gets the remainder as "HV own".
  */
 async function importAllocStaffFromHrInner(hrPeriod: string): Promise<{ imported: number }> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('billing')
   const supabase = await allocClient()
   const pd = periodDate(hrPeriod)
 
@@ -240,7 +240,7 @@ async function importAllocStaffFromHrInner(hrPeriod: string): Promise<{ imported
 /** Toggle whether a company appears in the allocator's pickers/targets.
  *  Allocator-scoped only — companies.is_active is untouched. */
 async function setAllocCompanyEnabledInner(companyId: string, enabled: boolean): Promise<void> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('billing')
   const supabase = await allocClient()
   const { error } = await supabase
     .from('alloc_company_settings')
@@ -265,7 +265,7 @@ export interface SnapshotDetailRow {
 async function getAllocSnapshotInner(
   period: string,
 ): Promise<{ rows: SnapshotDetailRow[]; savedAt: string | null }> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('billing')
   const supabase = await allocClient()
   const pd = periodDate(period)
   const { data, error } = await supabase
@@ -292,7 +292,7 @@ async function getAllocSnapshotInner(
 // ─── Categories ──────────────────────────────────────────────────────────────
 
 async function saveAllocCategoryInner(payload: { id?: string; name: string; coaCode: string }): Promise<void> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('billing')
   const supabase = await allocClient()
   const name = payload.name.trim()
   if (!name) throw new Error('Category name is required')
@@ -309,7 +309,7 @@ async function saveAllocCategoryInner(payload: { id?: string; name: string; coaC
 }
 
 async function deleteAllocCategoryInner(id: string): Promise<void> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('billing')
   const supabase = await allocClient()
   const { error } = await supabase.from('alloc_categories').delete().eq('id', id)
   if (error) throw new Error(error.message)
@@ -327,7 +327,7 @@ async function saveAllocTemplateInner(payload: {
   status: 'active' | 'inactive'
   splits: { companyId: string; pct: number }[]
 }): Promise<void> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('billing')
   const supabase = await allocClient()
   const name = payload.name.trim()
   if (!name) throw new Error('Template name is required')
@@ -365,7 +365,7 @@ async function saveAllocTemplateInner(payload: {
 }
 
 async function deleteAllocTemplateInner(id: string): Promise<void> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('billing')
   const supabase = await allocClient()
   const { error } = await supabase.from('alloc_templates').delete().eq('id', id)
   if (error) throw new Error(error.message)
@@ -485,7 +485,7 @@ async function saveAllocBatchInner(payload: {
   hcPeriod?: string
   expenses: ExpenseBatchInput[]
 }): Promise<{ txnNos: string[] }> {
-  const user = await requireRole(['finance', 'principal'])
+  const user = await requirePermission('billing')
   const supabase = await allocClient()
   const pd = periodDate(payload.period)
   if (!payload.expenses || payload.expenses.length === 0) throw new Error('No expenses to save')
@@ -580,7 +580,7 @@ async function updateAllocTxnInner(payload: {
   hcPeriod?: string
   expense: ExpenseBatchInput
 }): Promise<{ txnNo: string }> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('billing')
   const supabase = await allocClient()
 
   const { data: txn, error: getErr } = await supabase
@@ -641,7 +641,7 @@ async function updateAllocTxnInner(payload: {
 }
 
 async function deleteAllocTxnInner(id: string): Promise<void> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('billing')
   const supabase = await allocClient()
   const { data: txn, error: getErr } = await supabase
     .from('alloc_txns')
@@ -691,7 +691,7 @@ export interface GenerateResult {
  * batches are never touched.
  */
 async function generateAllocatorInvoicesInner(period: string): Promise<GenerateResult> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('billing')
   const supabase = await allocClient()
   const pd = periodDate(period)
   const baseRef = refFor(period)

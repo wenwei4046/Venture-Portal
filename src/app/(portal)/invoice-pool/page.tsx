@@ -1,10 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import RequestReleaseButton from './_components/RequestReleaseButton'
 
 export default async function InvoicePoolPage() {
-  const user = await requireRole(['principal', 'finance'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   const { data: transactions } = await supabase

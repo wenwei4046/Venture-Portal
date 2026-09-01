@@ -1,5 +1,5 @@
 import dayjs from 'dayjs'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { resolveLiveApprovalAmounts } from '@/lib/approval-amounts'
@@ -20,7 +20,7 @@ interface ApprovalRow {
 }
 
 export default async function ApprovalsPage() {
-  await requireRole(['principal'])
+  await requirePermission('approvals')
   const supabase = await createClient()
 
   const [

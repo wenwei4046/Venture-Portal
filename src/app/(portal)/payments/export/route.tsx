@@ -1,6 +1,6 @@
 import React from 'react'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { fetchReceiptExtras, filterReceiptExtras } from '@/lib/receipt-extras'
@@ -34,7 +34,7 @@ const POOL_LABELS: Record<string, string> = {
 }
 
 export async function GET(req: Request) {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('treasury')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
 

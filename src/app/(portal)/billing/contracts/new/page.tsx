@@ -1,11 +1,11 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import ContractForm from '../../_components/ContractForm'
 
 export default async function NewContractPage() {
-  const user = await requireRole(['finance', 'dept_manager', 'principal'])
+  const user = await requirePermission('billing', 'my_billing')
   const supabase = await createClient()
 
   // Dept Manager restriction: must be Marketing's manager (it's the only

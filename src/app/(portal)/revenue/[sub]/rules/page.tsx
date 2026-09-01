@@ -1,4 +1,4 @@
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import CommissionSection from '../../_components/config/CommissionSection'
 import { loadCommissionSettings } from '../../_components/config/load'
 import { requireSubDepartment } from '../../_lib/sub-departments'
@@ -19,7 +19,7 @@ interface PageProps {
  * while IR is the one on screen.
  */
 export default async function RevenueRulesPage({ params }: PageProps) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   const { sub } = await params
   const subDept = await requireSubDepartment(sub)
   const data = await loadCommissionSettings(subDept.schemeId)

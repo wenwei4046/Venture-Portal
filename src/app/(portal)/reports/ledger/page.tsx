@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { fetchLedgers } from '@/lib/cfo-reports'
 import { type AccountType } from '@/lib/coa'
 import LedgerPicker from './_components/LedgerPicker'
@@ -28,7 +28,7 @@ function parseCodes(codes: string | undefined, code: string | undefined): string
 }
 
 export default async function LedgerPage({ searchParams }: Props) {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('reports')
   const supabase = await createClient()
 
   const params = await searchParams

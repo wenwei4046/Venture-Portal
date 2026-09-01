@@ -1,12 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import BaseRateTrendChart from './_components/BaseRateTrendChart'
 import LedgerRow from '@/components/LedgerRow'
 
 export default async function BaseRateHistoryPage() {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('reports')
   const supabase = await createClient()
 
   const { data: history } = await supabase

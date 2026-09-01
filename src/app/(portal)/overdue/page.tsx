@@ -1,5 +1,5 @@
 import dayjs from 'dayjs'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { markOverduePaid } from './actions'
@@ -22,7 +22,7 @@ type OverdueRow = {
 }
 
 export default async function OverduePage() {
-  const user = await requireRole(['principal', 'finance'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   const [{ data: overdueRows }, { data: loans }, { data: companies }, { data: outstandingRows }] =

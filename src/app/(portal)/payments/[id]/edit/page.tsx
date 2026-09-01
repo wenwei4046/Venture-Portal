@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import EditPaymentForm from './_components/EditPaymentForm'
 
@@ -20,7 +20,7 @@ interface SourceRow {
 }
 
 export default async function EditPaymentPage({ params }: Props) {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('treasury')
   const { id } = await params
   const supabase = await createClient()
 

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 
 /**
  * Stage E — Finance generates a payroll funding Payment Voucher against a
@@ -47,7 +47,7 @@ export async function generatePvFromRequest(
   sources: PayrollPoolSource[],
   paymentDate: string,
 ): Promise<string> {
-  const user = await requireRole(['finance', 'principal'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   if (!Array.isArray(sources) || sources.length === 0) {
@@ -295,7 +295,7 @@ export async function financeCancelRequest(
   requestId: string,
   reason: string,
 ): Promise<void> {
-  const user = await requireRole(['finance', 'principal'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   const trimmed = reason.trim()

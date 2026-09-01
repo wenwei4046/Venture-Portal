@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import ImportWizard from './_components/ImportWizard'
 import PeriodPicker from '../../_components/PeriodPicker'
 
@@ -14,7 +14,7 @@ function formatPeriodLabel(period: string): string {
 }
 
 export default async function ImportPage({ params }: PageProps) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('hr_costing')
   const { period } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()
 

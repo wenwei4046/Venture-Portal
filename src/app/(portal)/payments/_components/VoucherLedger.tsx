@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/paginate'
 import { fetchReceiptExtras, filterReceiptExtras } from '@/lib/receipt-extras'
@@ -44,7 +44,7 @@ export default async function VoucherLedger({
   direction: 'debit' | 'credit'
   params: LedgerSearchParams
 }) {
-  const user = await requireRole(['principal', 'finance'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
   const isReceipts = direction === 'credit'
   const statusFilter = params.status

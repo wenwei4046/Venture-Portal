@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
@@ -109,7 +109,7 @@ interface LineRow {
  * would make an old month drift every time a rate is edited under Rules.
  */
 export default async function CommissionStatementPage({ params }: PageProps) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   const { sub, period, staffId } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()
 

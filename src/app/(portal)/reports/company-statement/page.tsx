@@ -9,14 +9,14 @@ import dayjs from 'dayjs'
 import Link from 'next/link'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { fetchCounterpartyStatement } from '@/lib/counterparty-statement-data'
 import StatementView from './_components/StatementView'
 
 export const dynamic = 'force-dynamic'
 
 export default async function CompanyStatementPage() {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('reports')
   // Untyped client — database.types.ts predates repayment_start_month (same
   // convention as lib/loan-monitor's caller).
   const supabase = (await createClient()) as unknown as SupabaseClient

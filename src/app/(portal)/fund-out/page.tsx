@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, fundingSourceFromTerms } from '@/lib/utils'
 import ExportCSVButton from './_components/ExportCSVButton'
@@ -32,7 +32,7 @@ interface Props {
 }
 
 export default async function FundOutPage({ searchParams }: Props) {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('treasury')
   const supabase = await createClient()
   const { status: statusFilter } = await searchParams
 

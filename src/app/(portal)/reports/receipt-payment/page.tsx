@@ -11,7 +11,7 @@
 import dayjs from 'dayjs'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import {
   applyGlRefs,
   buildCashFlow,
@@ -41,7 +41,7 @@ interface Props {
 const r2 = (n: number) => Math.round(n * 100) / 100
 
 export default async function ReceiptPaymentPage({ searchParams }: Props) {
-  const user = await requireRole(['principal', 'finance', 'dept_manager'])
+  const user = await requirePermission('dept_reports')
   const supabase = await createClient()
 
   const params = await searchParams

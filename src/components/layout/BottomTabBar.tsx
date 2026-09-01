@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import type { UserRole } from '@/types'
 import { createClient } from '@/lib/supabase/client'
 import { canApprove } from '@/lib/roles'
-import { tabsForRole, type TabDef } from './nav-config'
+import { tabsForRole, type NavViewer, type TabDef } from './nav-config'
 
 // Mobile navigation (2026-08-31). Replaces the hamburger + off-canvas drawer:
 // the user asked for a bottom tab bar, the shape every phone app uses, so the
@@ -132,11 +132,12 @@ function tabActive(tab: TabDef, pathname: string): boolean {
 
 interface Props {
   role: UserRole
+  viewer: NavViewer
   moreOpen: boolean
   onMoreClick: () => void
 }
 
-export default function BottomTabBar({ role, moreOpen, onMoreClick }: Props) {
+export default function BottomTabBar({ role, viewer, moreOpen, onMoreClick }: Props) {
   const pathname = usePathname() ?? ''
   const router = useRouter()
   const tabs = tabsForRole(role)
@@ -147,7 +148,7 @@ export default function BottomTabBar({ role, moreOpen, onMoreClick }: Props) {
   // the query entirely.
   const [pending, setPending] = useState<number | null>(null)
   useEffect(() => {
-    if (!tabs.some((t) => t.badge) || !canApprove(role)) return
+    if (!tabs.some((t) => t.badge) || !canApprove(viewer)) return
     let cancelled = false
     const supabase = createClient()
     supabase

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import type { InfotechRow } from '@/lib/import/infotech-payroll'
 
 export interface PreviewResult {
@@ -49,7 +49,7 @@ export async function previewInfotechImport(
   rows: InfotechRow[],
   period: string,
 ): Promise<PreviewResult> {
-  await requireRole(['hr', 'principal'])
+  await requirePermission('hr_costing')
   const supabase = await createClient()
 
   const [{ data: staffList }, { data: payroll }] = await Promise.all([
@@ -159,7 +159,7 @@ export async function applyInfotechImport(
   rows: InfotechRow[],
   period: string,
 ): Promise<{ updated: number; created: number; skipped: number; failed: number }> {
-  const user = await requireRole(['hr', 'principal'])
+  const user = await requirePermission('hr_costing')
   const supabase = await createClient()
   const preview = await previewInfotechImport(rows, period)
 

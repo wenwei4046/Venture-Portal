@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
@@ -30,7 +30,7 @@ function label(period: string): string {
  * sub-department's runs alone.
  */
 export default async function CommissionCalculationPage({ params }: PageProps) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   const { sub } = await params
   const subDept = await requireSubDepartment(sub)
   const supabase = (await createClient()) as unknown as SupabaseClient

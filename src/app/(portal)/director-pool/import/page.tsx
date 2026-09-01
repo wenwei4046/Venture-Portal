@@ -1,8 +1,8 @@
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import ImportWizard from './_components/ImportWizard'
 
 export default async function DirectorPoolImportPage() {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('director_pool')
   return (
     <div>
       <div className="page-head">

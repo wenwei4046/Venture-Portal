@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 
 /**
  * The payroll-purpose org chart: who is under who, at what rank, on which rate
@@ -59,7 +59,7 @@ export interface PositionInput {
  * day before its own start would violate the effective-window CHECK.
  */
 export async function setPosition(input: PositionInput): Promise<void> {
-  const user = await requireRole(['principal', 'hr'])
+  const user = await requirePermission('revenue')
   const supabase = await client()
 
   if (input.uplineStaffId === input.staffId) {
@@ -194,7 +194,7 @@ export async function setPositionFromForm(formData: FormData): Promise<void> {
  * commission rule — a person could move sub-department and keep it.
  */
 export async function updateStaffTax(formData: FormData): Promise<void> {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   const supabase = await client()
 
   const staffId = ((formData.get('staff_id') as string) ?? '').trim()

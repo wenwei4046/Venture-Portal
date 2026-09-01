@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import type { UserRole } from '@/types'
+import type { NavViewer } from './nav-config'
 import {
   buildNavEntries,
   groupActive,
@@ -16,7 +16,7 @@ import {
 } from './nav-config'
 
 interface SidebarProps {
-  role: UserRole
+  viewer: NavViewer
   /** Database-backed nav rows (Revenue's sub-departments), read by the layout. */
   navData: NavData
 }
@@ -24,14 +24,14 @@ interface SidebarProps {
 // Desktop-only since 2026-08-31. Mobile navigation moved to BottomTabBar +
 // MoreSheet; the off-canvas drawer this used to double as is gone, so there
 // is no `mobileOpen` / `onClose` any more.
-export default function Sidebar({ role, navData }: SidebarProps) {
+export default function Sidebar({ viewer, navData }: SidebarProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
   const basisParam = searchParams.get('basis')
   const router = useRouter()
 
-  const visible = buildNavEntries(navData).filter((entry) => entry.visible(role))
+  const visible = buildNavEntries(navData).filter((entry) => entry.visible(viewer))
 
   // Group consecutive entries by section label so we can render dividers.
   const sections: { label: string | null; entries: NavEntry[] }[] = []
@@ -126,7 +126,7 @@ export default function Sidebar({ role, navData }: SidebarProps) {
 
   function renderEntries(entries: NavEntry[], depth: number, prefix: string) {
     return entries
-      .filter((entry) => entry.visible(role))
+      .filter((entry) => entry.visible(viewer))
       .map((entry) =>
         isGroup(entry) ? renderGroup(entry, depth, prefix) : renderItem(entry as NavItem, depth),
       )

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { redirect } from 'next/navigation'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
@@ -33,7 +33,7 @@ export default async function DeptPoolPage({
 }: {
   searchParams: Promise<{ basis?: string }>
 }) {
-  const user = await requireRole(['principal', 'finance', 'dept_manager'])
+  const user = await requirePermission('dept_pool')
   const supabase = await createClient()
 
   const { basis: basisParam } = await searchParams

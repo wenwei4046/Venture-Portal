@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 
 // ─── Detect overdue loans (Finance) — Phase 7 Step 12 calendar-month rule ────
@@ -20,7 +20,7 @@ import { assertPeriodOpen } from '@/lib/period-lock'
 // is_overdue=true.
 
 export async function detectOverdue() {
-  const user = await requireRole(['finance', 'principal'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   const now = dayjs()
@@ -117,7 +117,7 @@ export async function detectOverdue() {
 // ─── Submit escalation (Finance → Principal approval) ────────────────────────
 
 export async function submitEscalation(formData: FormData) {
-  const user = await requireRole(['finance', 'principal'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   const overdueId = (formData.get('overdue_id') as string) ?? ''
@@ -178,7 +178,7 @@ export async function submitEscalation(formData: FormData) {
 // ─── Mark overdue as paid (Finance — after payment received) ─────────────────
 
 export async function markOverduePaid(formData: FormData) {
-  const user = await requireRole(['finance', 'principal'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''

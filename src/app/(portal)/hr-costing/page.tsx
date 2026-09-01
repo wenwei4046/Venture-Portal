@@ -1,6 +1,6 @@
 import dayjs from 'dayjs'
 import Link from 'next/link'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import SubmitHRCostButton from './_components/SubmitHRCostButton'
@@ -29,7 +29,7 @@ interface LiveDeptRow {
 export default async function HRCostingPage() {
   // Finance no longer accesses this page — they see aggregates on Dept Pool
   // and execute approved snapshots from /dept-pool/submissions.
-  const user = await requireRole(['principal', 'hr'])
+  const user = await requirePermission('hr_costing')
   const supabase = await createClient()
 
   const currentPeriod = getPeriodMonth()

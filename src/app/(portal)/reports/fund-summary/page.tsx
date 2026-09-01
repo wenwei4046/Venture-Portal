@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { formatMoney } from '@/lib/utils'
 import Link from 'next/link'
@@ -7,7 +7,7 @@ import dayjs from 'dayjs'
 import FundPieChart from './_components/FundPieChart'
 
 export default async function FundSummaryPage() {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('reports')
   const supabase = await createClient()
 
   // Resolve cash account codes for the Venture Pool computation.

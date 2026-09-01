@@ -16,7 +16,7 @@ export default async function PortalLayout({
   // created — so those rows have to be read per request. Only for the two
   // roles that can see the group; nobody else pays for the query.
   let navData: NavData = emptyNavData
-  if (canAccessRevenue(user.role)) {
+  if (canAccessRevenue(user)) {
     navData = { revenueSubDepts: await listSubDepartments() }
   }
 

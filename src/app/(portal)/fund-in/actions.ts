@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import type { FundSourceType } from '@/types'
@@ -16,7 +16,7 @@ import type { Json } from '@/lib/supabase/database.types'
 // Only the fields the form sends are changed. The existing updateFundSource
 // path stays for pending_approval edits by Finance.
 export async function amendFundSource(formData: FormData): Promise<{ error: string } | undefined> {
-  await requireRole(['principal'])
+  await requirePermission('override')
   const supabase = await createClient()
 
   const id = (formData.get('fund_source_id') as string) ?? ''
@@ -72,7 +72,7 @@ interface CreateFundSourceInput {
 const VALID_TYPES: FundSourceType[] = ['subsidiary', 'director_loan', 'department_pool', 'outsource']
 
 export async function createFundSource(formData: FormData) {
-  const user = await requireRole(['finance', 'principal'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   const raw: CreateFundSourceInput = {
@@ -281,7 +281,7 @@ export async function createFundSource(formData: FormData) {
 export type FundSourceActionResult = { error: string } | undefined
 
 export async function updateFundSource(formData: FormData): Promise<FundSourceActionResult> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -407,7 +407,7 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
 // approval card in one transaction — Finance's own RLS can't touch
 // approval_requests, so this must not be done with inline updates.
 export async function withdrawFundSource(id: string): Promise<{ error: string } | undefined> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const supabase = await createClient()
 
   if (!id) return { error: 'Fund source id is required' }
@@ -432,7 +432,7 @@ export async function setFundSourceRepaymentStart(
   id: string,
   month: string
 ): Promise<{ error: string } | undefined> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const supabase = await createClient()
 
   if (!id) return { error: 'Fund source id is required' }
@@ -457,7 +457,7 @@ export async function setFundSourceNotes(
   id: string,
   notes: string
 ): Promise<{ error: string } | undefined> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const supabase = await createClient()
 
   if (!id) return { error: 'Fund source id is required' }
@@ -476,7 +476,7 @@ export async function setFundSourceNotes(
 // ─── Cancel Fund Source (requires Principal approval) ────────────────────────
 
 export async function cancelFundSource(formData: FormData) {
-  const user = await requireRole(['finance', 'principal'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -517,7 +517,7 @@ export async function cancelFundSource(formData: FormData) {
 }
 
 export async function markFundSourceMatured(formData: FormData) {
-  const user = await requireRole(['finance', 'principal'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -572,7 +572,7 @@ export interface PayableFundSource {
 export async function listPayableFundSources(
   opts?: { includeSettledInMonth?: string },
 ): Promise<PayableFundSource[]> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const supabase = await createClient()
 
   const [

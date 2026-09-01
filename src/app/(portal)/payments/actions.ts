@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { postJournalEntry, r2 } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
 import { ACCOUNT_TYPES, type AccountType } from '@/lib/coa'
@@ -54,7 +54,7 @@ async function interBillingNatureSplitsForMirror(
 // ─── Create payment voucher (Finance) ────────────────────────────────────────
 
 async function createPaymentVoucherInner(formData: FormData) {
-  const user = await requireRole(['finance', 'principal'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   const voucherType = formData.get('voucher_type') as string
@@ -751,7 +751,7 @@ export async function createPaymentVoucher(
 // ─── Submit for approval (Finance) ───────────────────────────────────────────
 
 export async function submitForApproval(formData: FormData) {
-  const user = await requireRole(['finance', 'principal'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -805,7 +805,7 @@ export async function submitForApproval(formData: FormData) {
 // card; whoever then clicks Submit for approval becomes the new submitter.
 // Nothing financial has posted at pending stage, so this is bookkeeping-free.
 export async function returnVoucherToDraft(formData: FormData) {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -828,7 +828,7 @@ export async function returnVoucherToDraft(formData: FormData) {
 // the money + marks the voucher paid in the same action.
 
 export async function approveVoucher(formData: FormData) {
-  const user = await requireRole(['principal'])
+  const user = await requirePermission('approvals')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -881,7 +881,7 @@ export async function approveVoucher(formData: FormData) {
 // Transaction-specific links (invoice/loan/fund_source/repayment_breakdown) are
 // deliberately NOT copied — a copy is a new expense, not a re-run of a repayment.
 export async function copyPaymentVoucher(formData: FormData): Promise<void> {
-  const user = await requireRole(['finance', 'principal'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   const sourceId = (formData.get('voucher_id') as string) ?? ''
@@ -950,7 +950,7 @@ export async function copyPaymentVoucher(formData: FormData): Promise<void> {
 }
 
 export async function updatePaymentVoucher(formData: FormData) {
-  const user = await requireRole(['finance', 'principal'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -1168,7 +1168,7 @@ export async function reassignVoucherGlAccount(
   formData: FormData,
 ): Promise<{ error?: string; changed?: number }> {
   try {
-    await requireRole(['finance', 'principal'])
+    await requirePermission('treasury')
     const supabase = await createClient()
 
     const id = ((formData.get('id') as string) ?? '').trim()
@@ -1200,7 +1200,7 @@ export async function reassignVoucherGlAccount(
 // ─── Void voucher (Finance, only draft/pending) ─────────────────────────────
 
 export async function voidVoucher(formData: FormData) {
-  const user = await requireRole(['finance', 'principal'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -1243,7 +1243,7 @@ export async function voidVoucher(formData: FormData) {
 // a wrong receipt can be undone. Steps: reverse bank cache, reverse each linked
 // GL entry, reverse the pool credits, un-settle the invoice(s), mark voided.
 export async function voidPaidReceipt(formData: FormData) {
-  const user = await requireRole(['finance', 'principal'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -1403,7 +1403,7 @@ export async function voidPaidReceipt(formData: FormData) {
 // pointer to the right flow — reversing them generically would leave their
 // downstream records (loans, payroll accruals, claims, dept requests) dangling.
 export async function reversePaidPayment(formData: FormData) {
-  const user = await requireRole(['finance', 'principal'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -1587,7 +1587,7 @@ export async function reversePaidPayment(formData: FormData) {
 export async function getAttachmentSignedUrl(
   attachmentId: string,
 ): Promise<{ url: string; fileName: string }> {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('treasury')
   const supabase = await createClient()
 
   const { data: attachment, error } = await supabase
@@ -1626,7 +1626,7 @@ function isPreviewableType(fileType: string): boolean {
 export async function getAttachmentPreviewUrls(
   attachmentIds: string[],
 ): Promise<{ id: string; url: string }[]> {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('treasury')
   if (attachmentIds.length === 0) return []
   const supabase = await createClient()
 
@@ -1680,7 +1680,7 @@ const ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png', '.xlsx', '.xls', '.docx', 
 const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
 
 export async function uploadVoucherAttachment(formData: FormData): Promise<{ count: number }> {
-  const user = await requireRole(['principal', 'finance'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   const voucherId = (formData.get('voucher_id') as string) ?? ''

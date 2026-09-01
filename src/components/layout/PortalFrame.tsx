@@ -62,7 +62,7 @@ export default function PortalFrame({
   return (
     <div className="flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible">
       <div className="print:hidden contents">
-        <Sidebar role={user.role} navData={navData} />
+        <Sidebar viewer={user} navData={navData} />
       </div>
 
       <div className="flex flex-col flex-1 overflow-hidden print:overflow-visible">
@@ -82,6 +82,7 @@ export default function PortalFrame({
 
       <BottomTabBar
         role={user.role}
+        viewer={user}
         moreOpen={moreOpen}
         onMoreClick={() => setMoreOpen((o) => !o)}
       />

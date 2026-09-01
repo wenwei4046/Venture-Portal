@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { revenuePath } from '@/lib/revenue'
 import { loadAgentMatchingData } from '../../../import-actions'
 import SalesImportWizard from './_components/SalesImportWizard'
@@ -26,7 +26,7 @@ function label(period: string): string {
  * salesperson sits in when a run reads it.
  */
 export default async function SalesImportPage({ params }: PageProps) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   const { sub, period } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()
 

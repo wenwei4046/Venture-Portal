@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { writeReportLayout, type ReportLayout } from '@/lib/report-layouts'
 
@@ -15,7 +15,7 @@ const REVALIDATE: Record<string, string[]> = {
 
 // Save a company-wide custom report layout (cash flow / P&L).
 export async function saveReportLayout(reportKey: string, layout: ReportLayout): Promise<void> {
-  const user = await requireRole(['principal', 'finance'])
+  const user = await requirePermission('reports')
   if (!(reportKey in REVALIDATE)) throw new Error(`Unknown report layout: ${reportKey}`)
   const supabase = await createClient()
 

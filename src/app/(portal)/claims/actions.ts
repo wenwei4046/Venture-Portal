@@ -2,11 +2,11 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 
 export async function submitClaim(formData: FormData) {
-  const user = await requireRole(['principal', 'finance', 'hr', 'dept_manager'])
+  const user = await requirePermission('claims')
   const supabase = await createClient()
 
   const claimType = formData.get('claim_type') as 'project' | 'benefit'
@@ -30,7 +30,7 @@ export async function submitClaim(formData: FormData) {
 }
 
 export async function approveClaim(claimId: string) {
-  const user = await requireRole(['principal', 'finance', 'hr'])
+  const user = await requirePermission('claims_approve')
   const supabase = await createClient()
 
   const { data: claim } = await supabase
@@ -153,7 +153,7 @@ export async function approveClaim(claimId: string) {
 }
 
 export async function rejectClaim(claimId: string) {
-  const user = await requireRole(['principal', 'finance', 'hr'])
+  const user = await requirePermission('claims_approve')
   const supabase = await createClient()
 
   const { error } = await supabase
@@ -167,7 +167,7 @@ export async function rejectClaim(claimId: string) {
 }
 
 export async function markClaimPaid(claimId: string) {
-  const user = await requireRole(['principal', 'finance', 'hr'])
+  const user = await requirePermission('claims_approve')
   const supabase = await createClient()
 
   const { data: claim } = await supabase

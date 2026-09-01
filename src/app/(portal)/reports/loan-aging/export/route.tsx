@@ -7,7 +7,7 @@
 
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { formatMoneyBare } from '@/lib/utils'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildXlsxBuffer } from '@/lib/export/excel'
@@ -36,7 +36,7 @@ const outLabel = (o: OutstandingRow) => `${o.counterparty} — ${compact(o.detai
 const sc = (s?: string | null) => (s ? `[${s}]` : '')
 
 export async function GET(req: Request) {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('reports')
   const params = new URL(req.url).searchParams
   const format = params.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   const view = params.get('view') === 'outstanding' ? 'outstanding' : 'aging'
