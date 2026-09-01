@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import type { User } from '@/types'
 import { dropSelectionsForPath } from '@/lib/selection-store'
-import { navRootPaths } from './nav-config'
+import { navRootPaths, type NavData } from './nav-config'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 import BottomTabBar from './BottomTabBar'
@@ -23,9 +23,12 @@ import BackToTop from '@/components/BackToTop'
 // in the header.
 export default function PortalFrame({
   user,
+  navData,
   children,
 }: {
   user: User
+  /** The nav rows that come from the database — Revenue's sub-departments. */
+  navData: NavData
   children: React.ReactNode
 }) {
   const [moreOpen, setMoreOpen] = useState(false)
@@ -37,15 +40,17 @@ export default function PortalFrame({
   // A list's checkbox selection outlives the drill-down into a row's detail
   // page (it lives in lib/selection-store.ts, not in the unmounted list), so
   // this is the one place that can notice the reader has actually left for
-  // another tab and expire it.
+  // another tab and expire it. The roots include the Revenue sub-departments,
+  // so landing on /revenue/fair counts as leaving, exactly like /payments does.
+  const roots = useMemo(() => navRootPaths(navData), [navData])
   useEffect(() => {
-    if (pathname) dropSelectionsForPath(pathname, navRootPaths)
-  }, [pathname])
+    if (pathname) dropSelectionsForPath(pathname, roots)
+  }, [pathname, roots])
 
   return (
     <div className="flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible">
       <div className="print:hidden contents">
-        <Sidebar role={user.role} />
+        <Sidebar role={user.role} navData={navData} />
       </div>
 
       <div className="flex flex-col flex-1 overflow-hidden print:overflow-visible">
@@ -68,7 +73,12 @@ export default function PortalFrame({
         moreOpen={moreOpen}
         onMoreClick={() => setMoreOpen((o) => !o)}
       />
-      <MoreSheet user={user} open={moreOpen} onClose={() => setMoreOpen(false)} />
+      <MoreSheet
+        user={user}
+        navData={navData}
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+      />
 
       <BackToTop />
     </div>

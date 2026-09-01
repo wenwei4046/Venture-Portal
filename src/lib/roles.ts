@@ -35,6 +35,20 @@ export function canAccessVenturePool(role: UserRole): boolean {
   return role === 'principal' || role === 'finance'
 }
 
+export function canAccessRevenue(role: UserRole): boolean {
+  // Revenue Department — the commission-paid sales teams. Principal + HR, the
+  // same pair that owns every other payroll surface. Moved out of HR Costing
+  // into its own Departments group on 2026-09-01: it is a department, not one
+  // of HR's monthly chores.
+  return role === 'principal' || role === 'hr'
+}
+
+export function canAccessProductList(role: UserRole): boolean {
+  // Item code → unit cost. Principal only (user 2026-08-31): HR sets the
+  // commission rules, but what a product COSTS is not payroll's call.
+  return role === 'principal'
+}
+
 export function canAccessHRCosting(role: UserRole): boolean {
   // HR submits monthly snapshots; Principal approves via the Approvals queue.
   // Finance no longer sees the tab — they consume the aggregate from Dept Pool

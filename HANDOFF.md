@@ -176,24 +176,35 @@ PCB 0 → WHT 160 → net 7,840.
 
 ### UI built
 
-- **`/hr-costing/commission/rules`** (Principal + HR): nine sections — sub-department
-  picker with Generate New, scheme switches, tier ladder, item groups, KPI
-  items, KPI thresholds, Open Bill rates, brands + margin bands, promotion
-  criteria (read-only), salespeople table.
-- **`/hr-costing/commission/products`** (Principal), with a red "missing a cost"
-  counter. Both of these were Settings tabs until 2026-08-31; they are tabs of
-  the Commission module now, because Settings has no sidebar entry for HR and
-  the page configuring HR's own payroll was reachable by URL alone.
-- **/hr-costing/commission** landing + `[period]` page (surfaces unmatched
-  agents, lines without cost/brand, orders under the deposit gate).
-- **/hr-costing/commission/org-chart** — `@xyflow/react`. Drop a card onto a
-  manager OR draw a line. Illegal drops grey out and are refused client-side;
-  the DB trigger is the backstop. Layout is hand-rolled
+> **Routes moved 2026-09-01.** The module left HR Costing for its own Revenue
+> group under Departments, and every page is now addressed by sub-department
+> (`/revenue/fair/...`). The old `/hr-costing/commission/*` paths redirect to
+> `/revenue`, which forwards to the first sub-department. See
+> `docs/module-spec-revenue-commission.md` §3.0.
+
+- **`/revenue/<sub>/rules`** (Principal + HR) — the **Rules** tab: nine
+  sections — sub-department + Generate New, scheme switches, tier ladder, item
+  groups, KPI items, KPI thresholds, Open Bill rates, brands + margin bands,
+  promotion criteria (read-only), salespeople table. Scoped by the route: it
+  loads that sub-department's scheme and nothing else.
+- **`/revenue/products`** (Principal), with a red "missing a cost" counter.
+  Department-wide — `comm_products` has no `scheme_id` — so it sits beside the
+  sub-departments rather than inside one. It and the rules were Settings tabs
+  until 2026-08-31; Settings has no sidebar entry for HR, and the page
+  configuring HR's own payroll was reachable by URL alone.
+- **`/revenue/<sub>`** — the **Commission Calculation** tab (months with sales
+  data) and `[period]` (surfaces unmatched agents, lines without cost/brand,
+  orders under the deposit gate). Compute passes the sub-department, so a
+  second one will not make `computeRun` ambiguous.
+- **`/revenue/<sub>/hierarchy`** — the **Staff Hierarchy** tab, `@xyflow/react`.
+  Drop a card onto a manager OR draw a line. Illegal drops grey out and are
+  refused client-side; the DB trigger is the backstop. Layout is hand-rolled
   (`src/lib/commission/org-layout.ts`) so orphans and cycles are PLACED, not
-  dropped.
-- **/hr-costing/commission/[period]/import** — browser-parsed wizard that leads
+  dropped. Shows this scheme's people plus anyone not yet placed anywhere.
+- **`/revenue/<sub>/[period]/import`** — browser-parsed wizard that leads
   with what it will DROP, does agent matching, stamps cost + brand, and seeds
-  the Open Bill picks from the document numbers as suggestions.
+  the Open Bill picks from the document numbers as suggestions. The import
+  itself is department-wide: one ERP export covers every sub-department.
 
 `setPosition()` NEVER mutates a position a closed month has run against: it
 closes the old `comm_hierarchy` row the day before the current period and

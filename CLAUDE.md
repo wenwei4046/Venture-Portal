@@ -37,6 +37,10 @@ src/
 │   │   ├── billing/                 (Phase 2)
 │   │   ├── director-salary/         (Phase 3)
 │   │   ├── hr-costing/              (Phase 3)
+│   │   ├── revenue/                 ← Revenue Department: [sub]/ = one sub-department
+│   │   │                              (Fair, …) with 3 tabs — page.tsx (Commission
+│   │   │                              Calculation) / hierarchy / rules — plus
+│   │   │                              [sub]/[period]/ runs and products/ (Principal)
 │   │   ├── reports/                 (Phase 3)
 │   │   └── settings/                ← 8 tabs: treasury / overdue / splits / directors / companies / banks / periods / simulator
 │   └── (no api/ folder — uses Server Actions, not Route Handlers)
@@ -88,7 +92,9 @@ module-spec-revenue-commission.md — Revenue Department commission payroll: the
   second payroll TYPE (ERP sales orders → commission engine → the one
   `hr_monthly_payroll.commission_amount` field). Sub-departments, the tier
   ladder, deposit gate, brand margin bands, Withholding Tax. Read this before
-  touching anything under `comm_*` / `sales_*` or `/hr-costing/commission`.
+  touching anything under `comm_*` / `sales_*` or `/revenue`. §3.0 explains the
+  routing: every page is scoped to a sub-department (`/revenue/fair/rules`) and
+  the sidebar's Revenue children are database rows, not constants.
 DESIGN.md — v3.0 Ledger-Dense design system. **Single source of truth for all UI.** Colors, typography, components, page anatomy, the v3.0 utility classes (`.num`, `.ledger-table`, `.page-head`, etc), and canonical reference pages.
 ALWAYS reference these docs before implementing any feature.
 
@@ -99,7 +105,7 @@ TODOS.md — Phase 1.5 tech debt, Phase 2/3 prerequisites, compliance gates
 Role	DB Value	Access
 Principal	`principal`	Everything + Approve + Settings
 Finance	`finance`	Treasury + Billing + Reports — no individual salary, no Director Salary module, no Director Pool (v2 2026-07-21: calculator is Principal + HR only)
-HR	`hr`	Staff costs + Director Salary + Claims + Director Pool (v2 calculator, granted 2026-07-21)
+HR	`hr`	Staff costs + Director Salary + Claims + Director Pool (v2 calculator, granted 2026-07-21) + Revenue Department (commission rules, hierarchy, runs — but NOT the Product List, which is Principal-only)
 Dept Manager	`dept_manager`	Own department only
 Key Business Rules
 Treasury
