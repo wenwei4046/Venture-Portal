@@ -385,10 +385,16 @@ export default function EditStaffForm({ staff, embedded, onSaved, onCancel }: Pr
 
       {/* Embedded, this bar sticks to the bottom of the card's scroll area —
           the form is taller than the window it now opens in, and a Save button
-          you have to scroll to find is a Save button people miss. */}
+          you have to scroll to find is a Save button people miss.
+          `-mb-5 pb-5` pulls it over the scroll area's own bottom padding:
+          without that the padding stays transparent and the next field scrolls
+          through the gap under the bar, which reads as a bar that is not fixed
+          to anything. */}
       <div
         className={`flex items-center gap-3 pt-4 border-t border-hairline ${
-          embedded ? 'sticky bottom-0 -mx-5 px-5 pb-3 bg-paper' : ''
+          embedded
+            ? 'sticky bottom-0 z-10 -mx-5 -mb-5 px-5 pb-5 bg-paper shadow-[0_-10px_16px_-12px_rgba(0,0,0,0.28)]'
+            : ''
         }`}
       >
         <button

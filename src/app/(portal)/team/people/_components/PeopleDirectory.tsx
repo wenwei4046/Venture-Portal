@@ -261,7 +261,16 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
                     </tr>
                     {open
                       ? group.rows.map(p => (
-                          <LedgerRow key={p.id}>
+                          // The whole row opens the card, not just the name.
+                          // The row already lights up under the cursor, so
+                          // anything less makes the highlight a promise the
+                          // row does not keep. The pencil and the name stop
+                          // the event so they keep their own meaning.
+                          <LedgerRow
+                            key={p.id}
+                            className="cursor-pointer"
+                            onClick={() => setCard({ id: p.id, editing: false })}
+                          >
                             <td>
                               <div className="flex items-center gap-2.5">
                                 <span
@@ -281,6 +290,9 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
                                     // meaning — open the full page in a tab.
                                     if (e.metaKey || e.ctrlKey || e.shiftKey) return
                                     e.preventDefault()
+                                    // The row opens the card too — without this
+                                    // the same click would run both handlers.
+                                    e.stopPropagation()
                                     setCard({ id: p.id, editing: false })
                                   }}
                                   // min-w-0 so the name can ellipsize: a flex
@@ -306,9 +318,13 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
                             <td className="m-hide" data-label="Employment">
                               <span className="whitespace-nowrap">
                                 {p.active ? (
-                                  <span className="chip ledger">Active</span>
+                                  <span className="chip ledger">
+                                    <span className="dot" aria-hidden />
+                                    Active
+                                  </span>
                                 ) : (
                                   <span className="chip">
+                                    <span className="dot" aria-hidden />
                                     {p.resignedOn
                                       ? `Resigned ${dayjs(p.resignedOn).format('D MMM YYYY')}`
                                       : 'Inactive'}
@@ -319,6 +335,7 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
                                     className="chip alert ml-1.5"
                                     title={`Missing ${p.missing.join(', ')} — blocks payroll or the InfoTech import`}
                                   >
+                                    <span className="dot" aria-hidden />
                                     {p.missing.length} missing
                                   </span>
                                 ) : null}
@@ -330,7 +347,10 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
                             <td className="text-right">
                               <button
                                 type="button"
-                                onClick={() => setCard({ id: p.id, editing: true })}
+                                onClick={e => {
+                                  e.stopPropagation()
+                                  setCard({ id: p.id, editing: true })
+                                }}
                                 className="icon-btn"
                                 title={`Edit ${p.name}`}
                                 aria-label={`Edit ${p.name}`}

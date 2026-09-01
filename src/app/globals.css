@@ -856,6 +856,20 @@ tr:hover .icon-btn { opacity: 1; }
   color: rgb(var(--graphite));
   border: 1px solid rgb(var(--hairline));
 }
+/* A state chip carries a dot in its own colour. It is what lets Active, No
+   login and "2 missing" tell apart down a column of otherwise identical pills —
+   the eye reads the dot before it reads the word. `currentColor`, so every
+   variant gets it right for free. Chips carrying a VALUE rather than a state
+   (an email address, a category) take no dot. */
+.chip .dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  margin-right: 5px;
+  vertical-align: 1px;
+}
 .chip.accent { background: rgb(var(--accent-bg)); color: rgb(var(--accent)); border-color: rgb(var(--accent-border)); }
 .chip.ledger { background: rgb(var(--ledger-bg)); color: rgb(var(--ledger)); border-color: rgb(var(--ledger) / 0.4); }
 .chip.alert  { background: rgb(var(--alert-bg));  color: rgb(var(--alert));  border-color: rgb(var(--alert) / 0.4); }
