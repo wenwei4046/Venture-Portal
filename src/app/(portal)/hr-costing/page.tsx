@@ -92,7 +92,7 @@ export default async function HRCostingPage() {
         </div>
         <div className="flex items-center gap-3">
           <Link
-            href="/hr-costing/staff"
+            href="/team/people"
             className="inline-block bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
           >
             Manage Staff

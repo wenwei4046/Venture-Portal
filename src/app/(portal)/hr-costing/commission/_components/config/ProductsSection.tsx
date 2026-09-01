@@ -14,7 +14,7 @@ import {
   SaveButton,
   SectionHead,
   Tick,
-} from './ui'
+} from '@/components/RowForm'
 import type { ProductRow } from './types'
 
 /**

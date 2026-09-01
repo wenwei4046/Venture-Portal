@@ -115,7 +115,9 @@ export const navEntries: NavEntry[] = [
       // second payroll TYPE, feeding hr_monthly_payroll.commission_amount.
       { href: '/hr-costing/commission', label: 'Commission', visible: isHRorPrincipal },
       { href: '/hr-costing/payment', label: 'Payment', visible: isHRorPrincipal },
-      { href: '/hr-costing/staff', label: 'Staff', visible: isHRorPrincipal },
+      // Staff left this group on 2026-09-01 — it is now Team > People
+      // Management, because the directory answers "who works here", not
+      // "what did they cost this month".
     ],
   },
   // HR reaches Director Salary here; Principal reaches it via the Director
@@ -131,6 +133,19 @@ export const navEntries: NavEntry[] = [
   { href: '/statements/monthly', label: 'Statements', section: 'Fund In / Out', visible: canAccessTreasury },
 
   // ── Departments ──
+  // Team owns the org itself — who works here, under which title, reporting to
+  // whom, with which account. Split out of HR Costing on 2026-09-01: the staff
+  // directory had been living beside payroll runs, which made "add a person"
+  // look like a costing exercise.
+  {
+    label: 'Team',
+    section: 'Departments',
+    visible: isHRorPrincipal,
+    children: [
+      { href: '/team/people', label: 'People Management', visible: isHRorPrincipal },
+      { href: '/team/roles', label: 'Role & Permission', visible: isHRorPrincipal },
+    ],
+  },
   {
     label: 'Dept Pool',
     section: 'Departments',
@@ -229,6 +244,20 @@ export const navRootPaths: ReadonlySet<string> = new Set(
     .map((item) => item.href.split('?')[0]),
 )
 
+/** Destination path → the label the sidebar gives it. The activity log reads
+ *  this to turn a logged pathname back into the name somebody clicked. */
+export const navLabelByPath: ReadonlyMap<string, string> = new Map(
+  navEntries
+    .flatMap((entry) =>
+      isGroup(entry)
+        ? entry.children.map((c) => [c.href.split('?')[0], `${entry.label} · ${c.label}`] as const)
+        : [[entry.href.split('?')[0], entry.label] as const],
+    )
+    // First writer wins: /settings appears once per tab and the group label is
+    // the same for all of them.
+    .reverse(),
+)
+
 // ── Mobile bottom tab bar ────────────────────────────────────────────────
 //
 // A tab bar holds five slots and no more; the portal has ~50 destinations for
@@ -271,7 +300,7 @@ const TABS_BY_ROLE: Record<UserRole, TabDef[]> = {
   hr: [
     { href: '/dashboard', label: '总览', icon: 'home' },
     { href: '/hr-costing/payroll', label: '薪资', icon: 'payroll' },
-    { href: '/hr-costing/staff', label: '员工', icon: 'staff' },
+    { href: '/team/people', label: '员工', icon: 'staff' },
     { href: '/director-salary', label: '董事', icon: 'director' },
   ],
   // Dept managers see one department. Billing and OPEX are the two pages they

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
+import ActivityLog from '../../_components/ActivityLog'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -22,51 +23,61 @@ const PCB_LABELS: Record<string, string> = {
 }
 
 export default async function StaffDetailPage({ params }: PageProps) {
-  await requireRole(['principal', 'hr'])
+  const viewer = await requireRole(['principal', 'hr'])
   const { id } = await params
   const supabase = await createClient()
 
   const { data: staff } = await supabase
     .from('hr_staff_costs')
-    .select('*, departments(name)')
+    .select(
+      '*, departments(name), titles(name), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active)',
+    )
     .eq('id', id)
     .maybeSingle()
 
   if (!staff) notFound()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const deptName = (staff as any).departments?.name ?? '—'
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+  const row = staff as any
+  const deptName: string = row.departments?.name ?? '—'
+  const titleName: string | null = row.titles?.name ?? row.designation ?? null
+  const account = row.users as
+    | { id: string; name: string; email: string; role: string; is_active: boolean }
+    | null
+  // access_log is Principal-or-self; an HR reader would only ever see an empty
+  // panel here, so the section is not rendered for them at all.
+  const canSeeActivity = viewer.role === 'principal' && !!account
 
   return (
     <div>
       <Link
-        href="/hr-costing/staff"
+        href="/team/people"
         className="text-sm text-muted hover:text-accent font-sans transition-colors"
       >
-        ← Back to Staff
+        ← Back to People
       </Link>
 
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> HR · STAFF · {(deptName ?? '—').toUpperCase()}
+            <em>I.</em> TEAM · PEOPLE · {deptName.toUpperCase()}
           </div>
           <h1 className="page-title">{staff.employee_name}</h1>
           <p className="font-serif italic text-graphite text-base mt-3">
             {staff.employee_code && (
               <span className="font-mono text-sm text-muted mr-2">{staff.employee_code}</span>
             )}
-            {staff.designation && <em className="mr-2">{staff.designation}</em>}
+            {titleName && <em className="mr-2">{titleName}</em>}
             {staff.resignation_date && (
               <em className="text-danger">Resigned {staff.resignation_date}</em>
             )}
-            {!staff.employee_code && !staff.designation && !staff.resignation_date && (
+            {!staff.employee_code && !titleName && !staff.resignation_date && (
               <em>Active employee.</em>
             )}
           </p>
         </div>
         <Link
-          href={`/hr-costing/staff/${staff.id}/edit`}
+          href={`/team/people/${staff.id}/edit`}
           className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors shrink-0"
         >
           Edit
@@ -74,6 +85,17 @@ export default async function StaffDetailPage({ params }: PageProps) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl">
+        <Section title="Assignment">
+          <Field label="Title" value={titleName} />
+          <Field label="Department" value={deptName} />
+          <Field
+            label="Account"
+            value={account ? account.email : null}
+            mono={!!account}
+          />
+          <Field label="Role" value={account ? account.role : null} />
+        </Section>
+
         <Section title="Identity">
           <Field label="NRIC" value={staff.nric} mono />
           <Field label="Employee Code" value={staff.employee_code} mono />
@@ -122,6 +144,8 @@ export default async function StaffDetailPage({ params }: PageProps) {
           <Field label="Children" value={String(staff.children_count ?? 0)} mono />
         </Section>
       </div>
+
+      {canSeeActivity ? <ActivityLog userId={account!.id} /> : null}
     </div>
   )
 }

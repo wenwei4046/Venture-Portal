@@ -31,7 +31,7 @@ export default function AddStaffForm({ departments }: Props) {
     startTransition(async () => {
       try {
         await addStaff(formData)
-        router.push('/hr-costing/staff')
+        router.push('/team/people')
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       }

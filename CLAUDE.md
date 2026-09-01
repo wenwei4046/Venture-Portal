@@ -35,8 +35,9 @@ src/
 │   │   ├── approvals/               ← Principal queue + detail + approve/reject
 │   │   ├── dept-pool/               (Phase 2)
 │   │   ├── billing/                 (Phase 2)
+│   │   ├── team/                    ← People Management + Role & Permission
 │   │   ├── director-salary/         (Phase 3)
-│   │   ├── hr-costing/              (Phase 3)
+│   │   ├── hr-costing/              (Phase 3 — staff directory moved to team/)
 │   │   ├── reports/                 (Phase 3)
 │   │   └── settings/                ← 8 tabs: treasury / overdue / splits / directors / companies / banks / periods / simulator
 │   └── (no api/ folder — uses Server Actions, not Route Handlers)

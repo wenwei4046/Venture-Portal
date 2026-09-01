@@ -12,9 +12,16 @@ import {
 import { createPortal } from 'react-dom'
 
 /**
- * Small shared pieces for the Commission tab. The tab is nine tables of ticks
- * and thresholds, so the repetition is worth factoring — but no further: each
- * table still writes its own columns, because their meanings differ.
+ * The editable-table kit.
+ *
+ * Written for the Commission settings tab (nine tables of ticks and
+ * thresholds) and moved up here on 2026-09-01 when the Team module's title
+ * table needed the same thing. Shared because the RowForm trick below is a
+ * project-wide rule, not a Commission detail — any table whose rows are forms
+ * has to use it.
+ *
+ * Factored this far and no further: each table still writes its own columns,
+ * because their meanings differ.
  */
 
 export function SectionHead({

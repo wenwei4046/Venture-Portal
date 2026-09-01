@@ -90,7 +90,7 @@ export async function updateStaff(id: string, formData: FormData) {
   }
 
   revalidatePath('/hr-costing')
-  revalidatePath(`/hr-costing/staff/${id}/edit`)
+  revalidatePath(`/team/people/${id}/edit`)
 }
 
 export async function deactivateStaff(id: string) {

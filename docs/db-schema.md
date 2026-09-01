@@ -425,12 +425,34 @@ hr_pool_allocation (
 )
 -- Constraint: 同 department + period_month 的 split_pct 加总 = 1.0
 ```
+5.1a titles  (Team module, 2026-09-01)
+```sql
+titles (
+    id              uuid PK DEFAULT gen_random_uuid()
+    name            text NOT NULL                    -- CHECK btrim(name) <> ''
+    department_id   uuid FK → departments NULL       -- 该 title 属于哪个部门
+    is_active       boolean NOT NULL DEFAULT true
+    sort_order      integer NOT NULL DEFAULT 0
+    created_by      uuid FK → users
+    created_at      timestamptz DEFAULT now()
+    updated_at      timestamptz DEFAULT now()
+
+    UNIQUE (lower(btrim(name)), department_id) NULLS NOT DISTINCT
+)
+```
+Job titles as controlled rows, replacing the free-text `hr_staff_costs.designation`
+(20 hand-typed spellings, backfilled into 20 titles). RLS: read = any signed-in
+user; insert/update = principal + hr; delete = principal. The permission matrix
+will hang off this table.
+
 5.2 hr_staff_costs
 ```sql
 hr_staff_costs (
     id              uuid PK DEFAULT gen_random_uuid()
     employee_name   text NOT NULL
     department_id   uuid FK → departments NOT NULL   -- 该员工属于哪个部门
+    title_id        uuid FK → titles NULL            -- ON DELETE SET NULL (2026-09-01)
+    user_id         uuid FK → users NULL             -- 登录账号，唯一，多数人为 NULL
     basic_salary    decimal(15,2) NOT NULL
     allowances      decimal(15,2) DEFAULT 0
     epf_er          decimal(15,2)                    -- 系统查表

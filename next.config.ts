@@ -12,6 +12,20 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '4mb',
     },
   },
+
+  // Staff moved out of HR Costing into the Team module on 2026-09-01. Deep
+  // links to a person, the edit form and the InfoTech import were all in use,
+  // so the old tree keeps resolving. Temporary rather than permanent: a 308 is
+  // cached by the browser forever, and this path may yet be reused.
+  async redirects() {
+    return [
+      {
+        source: '/hr-costing/staff/:path*',
+        destination: '/team/people/:path*',
+        permanent: false,
+      },
+    ]
+  },
 }
 
 export default nextConfig

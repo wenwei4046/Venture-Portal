@@ -23,15 +23,24 @@ export default async function AuditLogPage({ searchParams }: Props) {
     .order('created_at', { ascending: false })
     .range(offset, offset + PAGE_SIZE - 1)
 
-  if (resource) {
+  // Page views arrived on 2026-09-01 and outnumber everything else by an order
+  // of magnitude, so the default view is the one this page was built for — the
+  // privileged reads. 'page' and 'all' are a click away, and neither is hidden.
+  if (resource === 'page') {
+    query = query.eq('resource_type', 'page')
+  } else if (resource && resource !== 'all') {
     query = query.eq('resource_type', resource)
+  } else if (!resource) {
+    query = query.neq('resource_type', 'page')
   }
 
   const { data: logs, count } = await query
   const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE)
 
   const resourceTypes = [
-    { value: '', label: 'All' },
+    { value: '', label: 'Data access' },
+    { value: 'page', label: 'Page views' },
+    { value: 'all', label: 'Everything' },
     { value: 'director_payouts', label: 'Director Payouts' },
     { value: 'director_salary_print', label: 'Director Print' },
     { value: 'hr_staff_costs', label: 'HR Staff Costs' },
@@ -78,7 +87,7 @@ export default async function AuditLogPage({ searchParams }: Props) {
       {!logs || logs.length === 0 ? (
         <div className="border border-hairline rounded-md bg-surface p-8 text-center">
           <p className="font-serif italic text-muted text-sm">
-            No access log entries yet. Entries appear when users view sensitive pages.
+            Nothing recorded under this filter yet.
           </p>
         </div>
       ) : (
@@ -112,7 +121,11 @@ export default async function AuditLogPage({ searchParams }: Props) {
                   <td className="font-mono text-[12px] text-ink m-hide" data-label="Resource">
                     {formatResource(log.resource_type)}
                     {log.resource_id ? (
-                      <span className="text-graphite ml-1">#{log.resource_id.slice(0, 8)}</span>
+                      <span className="text-graphite ml-1">
+                        {log.resource_type === 'page'
+                          ? log.resource_id
+                          : `#${log.resource_id.slice(0, 8)}`}
+                      </span>
                     ) : null}
                   </td>
                   <td className="font-serif italic text-sm text-graphite">
@@ -160,6 +173,7 @@ function formatResource(type: string): string {
     director_payouts: 'Director Payouts',
     director_salary_print: 'Director Print',
     hr_staff_costs: 'HR Staff Costs',
+    page: 'Page',
   }
   return labels[type] ?? type
 }
