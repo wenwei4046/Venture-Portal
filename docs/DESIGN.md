@@ -707,6 +707,21 @@ Every data surface must handle 5 states:
 - Dashboard: "Some sections failed to load. [Retry failed]"
 - Statement: "5 of 7 companies generated. [Retry failed]"
 
+### Multi-select — ticks outlive a drill-down
+
+A list with checkboxes reads a row's detail page as part of the same job: you
+tick five, one of them is unclear, you open it, you come back and carry on
+ticking. So selection is not local `useState` — it lives in
+`lib/selection-store.ts`, keyed by the list's own path, and the list restores
+it on remount. It expires the moment the reader lands on another nav
+destination (a tab switch), never on a drill-down; `PortalFrame` owns that
+call. Ids that vanished while the reader was away — the row they just
+approved — are pruned, so the count and the bulk total stay honest.
+
+Use `useStickySelection(scope, visibleIds)` — see
+`approvals/_components/PendingApprovals.tsx`. Lists whose detail view is a
+modal (billing's `InvoicesList`) never unmount and need none of this.
+
 ---
 
 ## Responsive (mobile shipped 2026-08-31)

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
+import { useStickySelection } from '@/lib/useStickySelection'
 import CombinedApprovalCard from './CombinedApprovalCard'
 import { approveRequestsBulk, type BulkApproveResult } from '../actions'
 
@@ -36,9 +37,13 @@ export interface GroupItem {
 
 type PendingItem = SingleItem | GroupItem
 
+// Combined cards join the selection set under a g: key (user 2026-08-06:
+// "明明有5张我要approve, 按select all只选三张" — select-all must cover
+// groups too). Self-approval allowed, so every card is selectable.
+const groupKey = (g: GroupItem) => `g:${g.groupId}`
+
 export default function PendingApprovals({ items }: { items: PendingItem[] }) {
   const router = useRouter()
-  const [selected, setSelected] = useState<Set<string>>(new Set())
   const [confirming, setConfirming] = useState(false)
   const [notes, setNotes] = useState('')
   const [allowOverdraw, setAllowOverdraw] = useState(false)
@@ -53,10 +58,6 @@ export default function PendingApprovals({ items }: { items: PendingItem[] }) {
     () => items.filter((i): i is GroupItem => i.kind === 'group'),
     [items]
   )
-  // Combined cards join the selection set under a g: key (user 2026-08-06:
-  // "明明有5张我要approve, 按select all只选三张" — select-all must cover
-  // groups too). Self-approval allowed, so every card is selectable.
-  const groupKey = (g: GroupItem) => `g:${g.groupId}`
   // Same dedupe rule as the card's Total disbursement: cash out = the
   // payment_voucher amounts (a Loan OUT combo's new_loan duplicates its PV).
   const groupTotal = (g: GroupItem) => {
@@ -69,6 +70,15 @@ export default function PendingApprovals({ items }: { items: PendingItem[] }) {
   const selectableIds = useMemo(
     () => [...singles.map((s) => s.id), ...groups.map(groupKey)],
     [singles, groups]
+  )
+  // Ticks survive the trip into a row's detail page and back — user
+  // 2026-09-01: "勾选了 5-6 个东西，其中一个看不太懂就点进去看详情，看完出来
+  // 之前勾选过的全都要重新勾一遍". Leaving for another tab still clears them,
+  // and an item approved while we were away is pruned by the hook — see
+  // lib/selection-store.ts.
+  const { selected, toggle, replace, clear } = useStickySelection(
+    '/approvals',
+    selectableIds
   )
   const hasSelectable = selectableIds.length > 0
   const allSelected =
@@ -85,25 +95,13 @@ export default function PendingApprovals({ items }: { items: PendingItem[] }) {
       g.items.some((it) => it.request_type === 'payment_voucher')
     )
 
-  function toggle(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
   function toggleAll() {
-    setSelected((prev) =>
-      selectableIds.every((id) => prev.has(id))
-        ? new Set()
-        : new Set(selectableIds)
-    )
+    if (allSelected) clear()
+    else replace(selectableIds)
   }
 
   function clearSelection() {
-    setSelected(new Set())
+    clear()
     setConfirming(false)
     setNotes('')
     setAllowOverdraw(false)

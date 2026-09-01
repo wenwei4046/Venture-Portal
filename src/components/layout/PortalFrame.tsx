@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import type { User } from '@/types'
+import { dropSelectionsForPath } from '@/lib/selection-store'
+import { navRootPaths } from './nav-config'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 import BottomTabBar from './BottomTabBar'
@@ -35,6 +37,14 @@ export default function PortalFrame({
   // reading-width cap so the many month columns can use the full content area.
   const pathname = usePathname()
   const wide = pathname?.startsWith('/reports/monthly-') ?? false
+
+  // A list's checkbox selection outlives the drill-down into a row's detail
+  // page (it lives in lib/selection-store.ts, not in the unmounted list), so
+  // this is the one place that can notice the reader has actually left for
+  // another tab and expire it.
+  useEffect(() => {
+    if (pathname) dropSelectionsForPath(pathname, navRootPaths)
+  }, [pathname])
 
   return (
     <div className="flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible">

@@ -259,6 +259,16 @@ export function buildNavEntries(data: NavData): NavEntry[] {
   ]
 }
 
+/** Every nav destination's path, query stripped — the portal's "tabs".
+ *  Role visibility is irrelevant here: a path is a destination no matter who
+ *  can see the link. lib/selection-store.ts reads this to tell a tab switch
+ *  (forget the row selection) from a drill-down into a detail page (keep it). */
+export const navRootPaths: ReadonlySet<string> = new Set(
+  navEntries
+    .flatMap((entry) => (isGroup(entry) ? entry.children : [entry]))
+    .map((item) => item.href.split('?')[0]),
+)
+
 // ── Mobile bottom tab bar ────────────────────────────────────────────────
 //
 // A tab bar holds five slots and no more; the portal has ~50 destinations for
