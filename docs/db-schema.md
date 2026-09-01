@@ -425,6 +425,40 @@ hr_pool_allocation (
 )
 -- Constraint: 同 department + period_month 的 split_pct 加总 = 1.0
 ```
+0.1 Authorisation  (2026-09-01)
+```sql
+permission_defs (
+    key             text PK                          -- 'treasury', 'hr_costing', ...
+    label           text NOT NULL
+    section         text NOT NULL                    -- grouping in the matrix UI
+    scope           text NOT NULL                    -- admin | treasury | hr | shared | none
+    description     text
+    sort_order      integer NOT NULL DEFAULT 0
+)
+role_default_permissions (role user_role, permission_key -> permission_defs)   -- the fallback
+title_permissions        (title_id -> titles,  permission_key -> permission_defs)
+user_permissions         (user_id -> users,    permission_key, granted boolean)
+```
+Two levels, and they are not the same thing. A **permission** is what somebody
+may DO (module-shaped, one row per matrix tick). A **scope** is what they may
+read and write at the table level, and it is DERIVED — a scope is held when any
+permission mapped to it is held. RLS asks `has_scope(ARRAY['treasury'])`; the
+matrix grants `treasury`. Deriving one from the other is what stops a title
+being given a page whose queries then come back empty.
+
+Resolution order in `current_permissions()`: an explicit `user_permissions` row
+(allow or deny) → the holder's title, but only once that title has any rows at
+all → their role's defaults. That last step is why the cutover changed nobody's
+access: no title is configured yet, so every account still resolves through its
+role.
+
+The four scopes reproduce the four role sets the 235 role-only policies
+collapsed to — admin = {principal}, treasury = {principal, finance},
+hr = {principal, hr}, treasury+hr = {principal, finance, hr}. 252 policies were
+rewritten onto them; the 16 that mention `dept_manager` still read
+`current_user_role()`, because no scope admits dept_manager (its every grant is
+row-scoped to its own department). That is why `users.role` remains.
+
 5.1a titles  (Team module, 2026-09-01)
 ```sql
 titles (
