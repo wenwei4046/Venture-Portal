@@ -36,7 +36,7 @@ export default async function EditStaffPage({ params }: PageProps) {
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> HR · STAFF · EDIT
+            <em>I.</em> PEOPLE · EDIT PERSON
           </div>
           <h1 className="page-title">Edit Staff</h1>
           <p className="font-serif italic text-graphite text-base mt-3">

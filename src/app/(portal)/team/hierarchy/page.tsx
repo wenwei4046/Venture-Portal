@@ -2,7 +2,6 @@ import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { revenuePath } from '@/lib/revenue'
 import { listSubDepartments } from '../../revenue/_lib/sub-departments'
-import TeamTabs from '../_components/TeamTabs'
 import TeamOrgChart, { type ChartPerson } from './_components/TeamOrgChart'
 
 /**
@@ -78,7 +77,7 @@ export default async function TeamHierarchyPage() {
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> TEAM · HIERARCHY
+            <em>I.</em> PEOPLE · HIERARCHY
           </div>
           <h1 className="page-title">Hierarchy</h1>
           <p className="font-serif italic text-graphite text-base mt-3 max-w-2xl">
@@ -89,13 +88,11 @@ export default async function TeamHierarchyPage() {
         </div>
       </div>
 
-      <TeamTabs active="hierarchy" />
-
       {people.length === 0 ? (
         <div className="py-16 text-center border border-hairline rounded-card bg-surface">
           <p className="font-serif text-2xl text-ink mb-3">Nobody to chart yet.</p>
           <p className="font-serif italic text-muted text-sm max-w-md mx-auto">
-            Add people under Team → People Management first.
+            Add people under People → People Management first.
           </p>
         </div>
       ) : (

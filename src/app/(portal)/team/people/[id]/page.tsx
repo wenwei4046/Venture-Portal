@@ -119,7 +119,7 @@ export default async function StaffDetailPage({ params }: PageProps) {
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> TEAM · PEOPLE · {deptName.toUpperCase()}
+            <em>I.</em> PEOPLE · {deptName.toUpperCase()}
           </div>
           <h1 className="page-title">{staff.employee_name}</h1>
           <p className="font-serif italic text-graphite text-base mt-3">

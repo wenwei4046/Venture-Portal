@@ -173,7 +173,7 @@ export function buildNavEntries(data: NavData): NavEntry[] {
         // a department with its own teams, not one of HR's monthly chores. The
         // run still feeds hr_monthly_payroll.commission_amount either way.
         { href: '/hr-costing/payment', label: 'Payment', visible: isHRorPrincipal },
-        // Staff left this group on 2026-09-01 — it is now Team > People
+        // Staff left this group on 2026-09-01 — it is now People > People
         // Management, because the directory answers "who works here", not
         // "what did they cost this month".
       ],
@@ -191,20 +191,6 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     { href: '/statements/monthly', label: 'Statements', section: 'Fund In / Out', visible: canAccessTreasury },
 
     // ── Departments ──
-    // Team owns the org itself — who works here, under which title, reporting
-    // to whom, with which account. Split out of HR Costing on 2026-09-01: the
-    // staff directory had been living beside the payroll runs, which made
-    // "add a person" look like a costing exercise.
-    {
-      label: 'Team',
-      section: 'Departments',
-      visible: isHRorPrincipal,
-      children: [
-        { href: '/team/people', label: 'People Management', visible: isHRorPrincipal },
-        { href: '/team/hierarchy', label: 'Hierarchy', visible: isHRorPrincipal },
-        { href: '/team/roles', label: 'Role & Permission', visible: isHRorPrincipal },
-      ],
-    },
     {
       label: 'Dept Pool',
       section: 'Departments',
@@ -287,6 +273,22 @@ export function buildNavEntries(data: NavData): NavEntry[] {
       ],
     },
     { href: '/claims', label: 'Claims', section: 'Departments', visible: canAccessClaims },
+
+    // ── People ──
+    // Who works here, under which title, reporting to whom, with which account.
+    // A category of its own since 2026-09-01, sitting one below Departments
+    // (user: "它属于另外一个 category, 就好像 departments 和 daily operations
+    // 这样"). It spent a day as a "Team" group inside Departments, which filed
+    // the roster alongside Marketing and Revenue — but people are not one more
+    // department, they are who every department is made of.
+    //
+    // Flat, not a group: three pages, one section header, no chevron to open
+    // first. The sidebar is also the only way between the three now — the tab
+    // rail that used to sit on all of them came out with this move, the same
+    // way the Revenue sub-department views did.
+    { href: '/team/people', label: 'People Management', section: 'People', visible: isHRorPrincipal },
+    { href: '/team/hierarchy', label: 'Hierarchy', section: 'People', visible: isHRorPrincipal },
+    { href: '/team/roles', label: 'Role & Permission', section: 'People', visible: isHRorPrincipal },
 
     // ── Reports & Admin ──
     { href: '/reports/ledger', label: 'General Ledger', section: 'Reports & Admin', visible: canAccessReports },

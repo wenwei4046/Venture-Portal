@@ -35,7 +35,13 @@ src/
 │   │   ├── approvals/               ← Principal queue + detail + approve/reject
 │   │   ├── dept-pool/               (Phase 2)
 │   │   ├── billing/                 (Phase 2)
-│   │   ├── team/                    ← People Management + Role & Permission
+│   │   ├── team/                    ← the sidebar's **People** section (its own
+│   │   │                              category since 2026-09-01, below
+│   │   │                              Departments): People Management /
+│   │   │                              Hierarchy / Role & Permission, three flat
+│   │   │                              entries. No tab rail on the pages — the
+│   │   │                              sidebar is the only way between them.
+│   │   │                              Routes stay under /team/*.
 │   │   ├── director-salary/         (Phase 3)
 │   │   ├── hr-costing/              (Phase 3 — staff directory moved to team/)
 │   │   ├── revenue/                 ← Revenue Department: [sub]/ = one sub-department

@@ -71,7 +71,7 @@ export default async function InviteUserPage({ searchParams }: PageProps) {
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> TEAM · INVITE USER
+            <em>I.</em> PEOPLE · INVITE USER
           </div>
           <h1 className="page-title">{target ? `Invite ${target.employee_name}` : 'Invite user'}</h1>
           <p className="font-serif italic text-graphite text-base mt-3 max-w-2xl">

@@ -27,7 +27,7 @@ export default async function NewStaffPage() {
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> HR · STAFF · NEW
+            <em>I.</em> PEOPLE · NEW PERSON
           </div>
           <h1 className="page-title">Add Staff</h1>
         </div>

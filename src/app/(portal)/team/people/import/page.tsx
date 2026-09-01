@@ -17,7 +17,7 @@ export default async function ImportStaffPage() {
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> HR · STAFF · IMPORT
+            <em>I.</em> PEOPLE · IMPORT
           </div>
           <h1 className="page-title">Import Staff from InfoTech</h1>
         </div>
