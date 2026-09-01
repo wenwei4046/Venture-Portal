@@ -39,7 +39,8 @@ src/
 │   │   ├── director-salary/         (Phase 3)
 │   │   ├── hr-costing/              (Phase 3 — staff directory moved to team/)
 │   │   ├── revenue/                 ← Revenue Department: [sub]/ = one sub-department
-│   │   │                              (Fair, …) with 3 tabs — page.tsx (Commission
+│   │   │                              (Fair, …) with 3 views, reached from the
+│   │   │                              SIDEBAR not a tab rail — page.tsx (Commission
 │   │   │                              Calculation) / hierarchy / rules — plus
 │   │   │                              [sub]/[period]/ runs and products/ (Principal)
 │   │   ├── reports/                 (Phase 3)

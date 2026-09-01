@@ -123,6 +123,12 @@ describe('navRootPaths', () => {
     expect(withSubs.has('/revenue/fair/2026-08-01')).toBe(false)
   })
 
+  it("holds a sub-department's three views — they became nav entries", () => {
+    const withSubs = navRootPaths({ revenueSubDepts: [{ slug: 'fair', name: 'Fair' }] })
+    expect(withSubs.has('/revenue/fair/hierarchy')).toBe(true)
+    expect(withSubs.has('/revenue/fair/rules')).toBe(true)
+  })
+
   it('leaves the sub-departments out when none are passed', () => {
     expect(roots.has('/revenue/fair')).toBe(false)
     // The department-wide child is a constant, so it is always there.

@@ -4,7 +4,6 @@ import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { revenuePath } from '@/lib/revenue'
 import OrgChart, { type OrgPerson, type OrgRank } from './_components/OrgChart'
-import RevenueTabs from '../../_components/RevenueTabs'
 import { requireSubDepartment, type SubDepartment } from '../../_lib/sub-departments'
 
 interface PageProps {
@@ -125,8 +124,6 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
         </div>
       </div>
 
-      <RevenueTabs slug={subDept.slug} active="hierarchy" />
-
       {people.length === 0 ? (
         <div className="py-16 text-center border border-hairline rounded-card bg-surface">
           <p className="font-serif text-2xl text-ink mb-3">Nobody to chart yet.</p>
@@ -152,8 +149,6 @@ function NoScheme({ subDept }: { subDept: SubDepartment }) {
           <h1 className="page-title">Staff Hierarchy</h1>
         </div>
       </div>
-
-      <RevenueTabs slug={subDept.slug} active="hierarchy" />
 
       <div className="py-16 text-center border border-hairline rounded-card bg-surface">
         <p className="font-serif text-2xl text-ink mb-3">{subDept.name} has no scheme yet.</p>

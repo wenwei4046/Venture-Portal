@@ -114,7 +114,10 @@ II. DEPARTMENTS
       · Director Salary
       · Director Pool
   ▾ Revenue
-      · Fair                ← one entry per sub-department, read from the DB
+      ▾ Fair                ← one entry per sub-department, read from the DB
+          · Comm Cal        ← /revenue/fair
+          · Staff Hierarchy
+          · Rules
       · Product List        ← department-wide, Principal only
   · Claims
 ```
@@ -125,14 +128,22 @@ More sheet through `NavData` (see `nav-config.ts`). Creating a sub-department
 therefore adds a sidebar entry, which is why `createSubDepartment` revalidates
 the whole shell.
 
-Each sub-department opens a **three-tab page**, because each one calculates
+Each sub-department has **three views**, because each one calculates
 differently and there is no meaningful department-level view of a calculation:
 
-| Tab | Route | What it is |
+| View | Route | What it is |
 |---|---|---|
-| Commission Calculation | `/revenue/<sub>` | the months, and this sub-department's run against each |
+| Comm Cal | `/revenue/<sub>` | the months, and this sub-department's run against each. Titled *Commission Calculation* on the page |
 | Staff Hierarchy | `…/hierarchy` | who is under who — the org chart (§10) |
 | Rules | `…/rules` | every rule the engine reads (§9) |
+
+They are **children of the sub-department in the sidebar**, not a tab rail on
+the page (user, 2026-09-01: "这个其实是进去 subtab 的选择,而不是在这个里面").
+Choosing which view of Fair to open is navigation, so it lives where the rest
+of the navigation lives; the page itself only ever renders the one view it is.
+Fair's own row stays a link — one click still lands on the calculation — and
+the chevron beside it folds the three away. The sidebar label is *Comm Cal*
+because the full name does not fit the 220px rail three levels in.
 
 The slug is derived from the sub-department's **name** (`Fair` → `fair`), which
 is what `uq_sub_department_name` makes unique; `code` is nullable and
@@ -820,9 +831,9 @@ that URL is only where Back returns to.
 | Route | Purpose |
 |---|---|
 | `/revenue` | no page of its own — redirects to the first sub-department. Serves the old `/hr-costing/commission/*` links and the not-set-up-yet case |
-| `/revenue/<sub>` | **Commission Calculation** tab — months with sales data and this sub-department's run status against each |
-| `…/<sub>/hierarchy` | **Staff Hierarchy** tab — the org chart (below) |
-| `…/<sub>/rules` | **Rules** tab — every rule the engine reads (§9) |
+| `/revenue/<sub>` | **Commission Calculation** — months with sales data and this sub-department's run status against each. Sidebar: *Comm Cal* |
+| `…/<sub>/hierarchy` | **Staff Hierarchy** — the org chart (below) |
+| `…/<sub>/rules` | **Rules** — every rule the engine reads (§9) |
 | `…/<sub>/[period]` | run dashboard: hero total, per-salesperson `.ledger-table` (PR / group / C1 / KPI / Open Bill / Override / Incentive / Total), warnings, penalised bills, orders waiting on a deposit, Compute + Apply + Reopen |
 | `…/<sub>/[period]/statement/[staffId]` | one salesperson's month ringgit by ringgit — the figures, margin brand by brand, and a section per component drilling into `comm_statement_lines` |
 | `…/<sub>/[period]/import` | ERP import wizard: parse → period + cancelled report → **agent matching** → commit. Department-wide |

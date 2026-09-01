@@ -49,11 +49,24 @@ describe('describePagePath', () => {
     // The Revenue group's children are comm_sub_departments rows, so the map
     // only knows /revenue/fair when the caller hands the rows in.
     const withFair = navLabelByPath({ revenueSubDepts: [{ slug: 'fair', name: 'Fair' }] })
-    expect(describePagePath('/revenue/fair/rules', withFair)).toEqual({
+    // A sub-department shares its href with its own Comm Cal child; the
+    // shorter of the two labels is the one worth reading.
+    expect(describePagePath('/revenue/fair', withFair)).toEqual({
       target: 'Revenue · Fair',
-      detail: 'Rules',
+      detail: null,
     })
-    // Without them it is just a path, not a wrong label.
+    // Its other two views are nav destinations of their own since they moved
+    // into the sidebar, so they are named in full rather than left as detail.
+    expect(describePagePath('/revenue/fair/rules', withFair)).toEqual({
+      target: 'Revenue · Fair · Rules',
+      detail: null,
+    })
+    // A month under the calculation is still a drill-down, not a destination,
+    // so it resolves through the sub-department rather than naming itself.
+    expect(describePagePath('/revenue/fair/2026-08-01', withFair).target).toBe(
+      'Revenue · Fair',
+    )
+    // Without the rows it is just a path, not a wrong label.
     expect(describePagePath('/revenue/fair/rules', L).target).toBe('Rules')
   })
 

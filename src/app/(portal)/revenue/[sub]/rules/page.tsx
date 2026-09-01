@@ -1,5 +1,4 @@
 import { requireRole } from '@/lib/auth'
-import RevenueTabs from '../../_components/RevenueTabs'
 import CommissionSection from '../../_components/config/CommissionSection'
 import { loadCommissionSettings } from '../../_components/config/load'
 import { requireSubDepartment } from '../../_lib/sub-departments'
@@ -39,8 +38,6 @@ export default async function RevenueRulesPage({ params }: PageProps) {
           </p>
         </div>
       </div>
-
-      <RevenueTabs slug={subDept.slug} active="rules" />
 
       <CommissionSection data={data} subDept={subDept} />
     </div>

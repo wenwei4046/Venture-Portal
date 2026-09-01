@@ -71,14 +71,38 @@ export function itemActive(
 export interface NavGroup {
   label: string
   section?: string
+  /** A group's own landing page, when it has one.
+   *
+   *  Most groups are pure headers — "HR Costing" is a label over four links and
+   *  nothing else. A sub-department is not: `/revenue/fair` is a real page, so
+   *  its header is a link and only the chevron collapses it. One click still
+   *  lands on the Commission Calculation it always did. */
+  href?: string
   visible: (role: UserRole) => boolean
-  children: NavItem[]
+  /** `NavEntry`, not `NavItem` — a group may hold a group. The Revenue
+   *  Department runs three levels: Revenue › Fair › Comm Cal. */
+  children: NavEntry[]
 }
 
 export type NavEntry = NavItem | NavGroup
 
 export function isGroup(entry: NavEntry): entry is NavGroup {
   return 'children' in entry
+}
+
+/** Is anything inside this group the page being read? Recurses, so a Revenue
+ *  group knows it is active when Fair's Rules page is open two levels down. */
+export function groupActive(
+  group: NavGroup,
+  pathname: string,
+  tabParam: string | null,
+  basisParam: string | null,
+): boolean {
+  return group.children.some((child) =>
+    isGroup(child)
+      ? groupActive(child, pathname, tabParam, basisParam)
+      : itemActive(child, pathname, tabParam, basisParam),
+  )
 }
 
 const isHR = (role: UserRole) => role === 'hr'
@@ -203,20 +227,46 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     },
     // Revenue Department — the commission-paid sales teams (moved out of HR
     // Costing 2026-09-01). Its children are SUB-DEPARTMENTS, read from the
-    // database: Fair, the roadshow team, is the first and more follow. Each
-    // opens a three-tab page — Commission Calculation, Staff Hierarchy, Rules —
-    // because each sub-department calculates differently. The Product List is
-    // the one department-wide child: `comm_products` has no scheme, and what a
-    // product costs stays with the Principal.
+    // database: Fair, the roadshow team, is the first and more follow.
+    //
+    // Each sub-department is itself a group of three, because each one
+    // calculates differently and the three views are three different questions
+    // about it. They used to be a tab rail on the page; the user moved them
+    // here on 2026-09-01 ("这个其实是进去 subtab 的选择,而不是在这个里面") —
+    // choosing which view of Fair to open is navigation, and navigation lives
+    // in the sidebar. Fair itself stays a link, so one click still lands on
+    // Commission Calculation the way it did before.
+    //
+    // The Product List is the one department-wide child: `comm_products` has no
+    // scheme, and what a product costs stays with the Principal.
     {
       label: 'Revenue',
       section: 'Departments',
       visible: canAccessRevenue,
       children: [
         ...data.revenueSubDepts.map((s) => ({
-          href: revenuePath(s.slug),
           label: s.name,
+          href: revenuePath(s.slug),
           visible: canAccessRevenue,
+          children: [
+            {
+              href: revenuePath(s.slug),
+              // "Comm Cal", not "Commission Calculation" (user 2026-09-01):
+              // three levels in, the full name is wider than the 220px rail and
+              // ellipsised to "Commission Calcu…", which reads worse than the
+              // short form. The page it opens still says Commission Calculation
+              // in full.
+              label: 'Comm Cal',
+              // A month opened from the calculation list — /revenue/fair/
+              // 2026-08-01 and the import, open-bill and statement pages under
+              // it — is still Calculation, so no `exact` here. Only the two
+              // siblings own a subtree of their own.
+              notPaths: [revenuePath(s.slug, 'hierarchy'), revenuePath(s.slug, 'rules')],
+              visible: canAccessRevenue,
+            },
+            { href: revenuePath(s.slug, 'hierarchy'), label: 'Staff Hierarchy', visible: canAccessRevenue },
+            { href: revenuePath(s.slug, 'rules'), label: 'Rules', visible: canAccessRevenue },
+          ],
         })),
         { href: PRODUCT_LIST_PATH, label: 'Product List', visible: canAccessProductList },
       ],
@@ -285,10 +335,17 @@ export function buildNavEntries(data: NavData): NavEntry[] {
  *  a static list could not know its name. Pass `emptyNavData` where only the
  *  constant destinations matter. */
 export function navRootPaths(data: NavData): ReadonlySet<string> {
-  return new Set(
-    buildNavEntries(data)
-      .flatMap((entry) => (isGroup(entry) ? entry.children : [entry]))
-      .map((item) => item.href.split('?')[0]),
+  return new Set(navHrefs(buildNavEntries(data)).map((href) => href.split('?')[0]))
+}
+
+/** Every href in the tree, at any depth — a group's own landing page included.
+ *  Recursive since 2026-09-01: a sub-department's three views are nav entries
+ *  two levels down, and each of them is a destination in its own right. */
+function navHrefs(entries: NavEntry[]): string[] {
+  return entries.flatMap((entry) =>
+    isGroup(entry)
+      ? [...(entry.href ? [entry.href] : []), ...navHrefs(entry.children)]
+      : [entry.href],
   )
 }
 
@@ -297,18 +354,30 @@ export function navRootPaths(data: NavData): ReadonlySet<string> {
  *  `NavData` for the same reason navRootPaths does. */
 export function navLabelByPath(data: NavData): ReadonlyMap<string, string> {
   return new Map(
-    buildNavEntries(data)
-      .flatMap((entry) =>
-        isGroup(entry)
-          ? entry.children.map(
-              (c) => [c.href.split('?')[0], `${entry.label} · ${c.label}`] as const,
-            )
-          : [[entry.href.split('?')[0], entry.label] as const],
-      )
-      // First writer wins: /settings appears once per tab and the group label
-      // is the same for all of them.
-      .reverse(),
+    // First writer wins: /settings appears once per tab and the group label is
+    // the same for all of them, and a sub-department shares its href with its
+    // own Comm Cal child — "Revenue · Fair" is the better of those two.
+    navLabelPairs(buildNavEntries(data), []).reverse(),
   )
+}
+
+/** `[path, label]` for every destination, the label being the chain of names
+ *  down to it — "Revenue · Fair · Rules". Recursive since the nav runs three
+ *  levels; a group contributes its own href too, when it has one. */
+function navLabelPairs(
+  entries: NavEntry[],
+  trail: string[],
+): Array<readonly [string, string]> {
+  return entries.flatMap((entry) => {
+    const chain = [...trail, entry.label]
+    const name = chain.join(' · ')
+    return isGroup(entry)
+      ? [
+          ...(entry.href ? [[entry.href.split('?')[0], name] as const] : []),
+          ...navLabelPairs(entry.children, chain),
+        ]
+      : [[entry.href.split('?')[0], name] as const]
+  })
 }
 
 // ── Mobile bottom tab bar ────────────────────────────────────────────────
