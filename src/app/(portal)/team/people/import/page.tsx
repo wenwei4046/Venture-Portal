@@ -8,7 +8,7 @@ export default async function ImportStaffPage() {
   return (
     <div>
       <Link
-        href="/hr-costing/staff"
+        href="/team/people"
         className="text-sm text-muted hover:text-accent font-sans transition-colors"
       >
         ← Back to Staff

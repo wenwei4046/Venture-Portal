@@ -4114,8 +4114,10 @@ export type Database = {
           socso_er: number | null
           status: Database["public"]["Enums"]["hr_staff_status"]
           tax_mode: Database["public"]["Enums"]["hr_tax_mode"]
+          title_id: string | null
           total_ctc: number | null
           updated_at: string
+          user_id: string | null
           withholding_rate: number
         }
         Insert: {
@@ -4151,8 +4153,10 @@ export type Database = {
           socso_er?: number | null
           status?: Database["public"]["Enums"]["hr_staff_status"]
           tax_mode?: Database["public"]["Enums"]["hr_tax_mode"]
+          title_id?: string | null
           total_ctc?: number | null
           updated_at?: string
+          user_id?: string | null
           withholding_rate?: number
         }
         Update: {
@@ -4188,8 +4192,10 @@ export type Database = {
           socso_er?: number | null
           status?: Database["public"]["Enums"]["hr_staff_status"]
           tax_mode?: Database["public"]["Enums"]["hr_tax_mode"]
+          title_id?: string | null
           total_ctc?: number | null
           updated_at?: string
+          user_id?: string | null
           withholding_rate?: number
         }
         Relationships: [
@@ -4205,6 +4211,20 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_staff_costs_title_id_fkey"
+            columns: ["title_id"]
+            isOneToOne: false
+            referencedRelation: "titles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_staff_costs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -6164,6 +6184,54 @@ export type Database = {
           sort_order?: number
         }
         Relationships: []
+      }
+      titles: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          department_id: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "titles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "titles_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       treasury_config: {
         Row: {

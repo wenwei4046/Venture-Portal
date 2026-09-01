@@ -31,7 +31,7 @@ import {
   SectionHead,
   Tick,
   toPct,
-} from './ui'
+} from '@/components/RowForm'
 import type { CommissionSettingsData } from './types'
 
 /**

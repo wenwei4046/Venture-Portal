@@ -54,7 +54,7 @@ export default function StaffActions({ staffId, staffName }: Props) {
   return (
     <div className="flex items-center gap-3 justify-end">
       <Link
-        href={`/hr-costing/staff/${staffId}/edit`}
+        href={`/team/people/${staffId}/edit`}
         className="text-xs font-sans text-muted hover:text-accent transition-colors"
       >
         Edit

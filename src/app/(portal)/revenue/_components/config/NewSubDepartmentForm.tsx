@@ -1,7 +1,7 @@
 'use client'
 
 import { createSubDepartment } from '../../config-actions'
-import { ActionForm, Field, SaveButton } from './ui'
+import { ActionForm, Field, SaveButton } from '@/components/RowForm'
 import type { CommissionSettingsData } from './types'
 
 /**

@@ -244,7 +244,7 @@ export default async function DashboardPage() {
                 status={staffCount > 0 ? `${staffCount} active staff · ${staffDepts.length} dept${staffDepts.length === 1 ? '' : 's'}` : 'No staff yet'}
                 statusTone={staffCount > 0 ? 'ok' : 'idle'}
                 ctaLabel={staffCount > 0 ? 'Manage / re-import →' : 'Import Employment List →'}
-                ctaHref="/hr-costing/staff"
+                ctaHref="/team/people"
               />
               <ActionCard
                 n="II"

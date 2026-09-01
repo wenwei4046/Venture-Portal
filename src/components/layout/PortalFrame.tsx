@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import type { User } from '@/types'
 import { dropSelectionsForPath } from '@/lib/selection-store'
+import { logPageView } from '@/app/(portal)/activity-actions'
 import { navRootPaths, type NavData } from './nav-config'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
@@ -46,6 +47,17 @@ export default function PortalFrame({
   useEffect(() => {
     if (pathname) dropSelectionsForPath(pathname, roots)
   }, [pathname, roots])
+
+  // One access_log row per navigation, so a person's Activity tab can answer
+  // "what were they in today". Fired after paint and never awaited: the trail
+  // must not sit in front of the page. The ref keeps a re-render (or React's
+  // development double-effect) from logging the same path twice.
+  const loggedPath = useRef<string | null>(null)
+  useEffect(() => {
+    if (!pathname || loggedPath.current === pathname) return
+    loggedPath.current = pathname
+    void logPageView(pathname)
+  }, [pathname])
 
   return (
     <div className="flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible">
