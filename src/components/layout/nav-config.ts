@@ -262,12 +262,19 @@ export function buildNavEntries(data: NavData): NavEntry[] {
 /** Every nav destination's path, query stripped — the portal's "tabs".
  *  Role visibility is irrelevant here: a path is a destination no matter who
  *  can see the link. lib/selection-store.ts reads this to tell a tab switch
- *  (forget the row selection) from a drill-down into a detail page (keep it). */
-export const navRootPaths: ReadonlySet<string> = new Set(
-  navEntries
-    .flatMap((entry) => (isGroup(entry) ? entry.children : [entry]))
-    .map((item) => item.href.split('?')[0]),
-)
+ *  (forget the row selection) from a drill-down into a detail page (keep it).
+ *
+ *  Takes the same `NavData` as `buildNavEntries` (2026-09-01) because one group
+ *  is now data-driven: `/revenue/fair` is as much a tab as `/payments` is, and
+ *  a static list could not know its name. Pass `emptyNavData` where only the
+ *  constant destinations matter. */
+export function navRootPaths(data: NavData): ReadonlySet<string> {
+  return new Set(
+    buildNavEntries(data)
+      .flatMap((entry) => (isGroup(entry) ? entry.children : [entry]))
+      .map((item) => item.href.split('?')[0]),
+  )
+}
 
 // ── Mobile bottom tab bar ────────────────────────────────────────────────
 //

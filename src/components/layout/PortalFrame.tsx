@@ -1,15 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import type { User } from '@/types'
 import { dropSelectionsForPath } from '@/lib/selection-store'
-import { navRootPaths } from './nav-config'
+import { navRootPaths, type NavData } from './nav-config'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 import BottomTabBar from './BottomTabBar'
 import MoreSheet from './MoreSheet'
-import type { NavData } from './nav-config'
 import BackToTop from '@/components/BackToTop'
 
 // Portal shell.
@@ -41,10 +40,12 @@ export default function PortalFrame({
   // A list's checkbox selection outlives the drill-down into a row's detail
   // page (it lives in lib/selection-store.ts, not in the unmounted list), so
   // this is the one place that can notice the reader has actually left for
-  // another tab and expire it.
+  // another tab and expire it. The roots include the Revenue sub-departments,
+  // so landing on /revenue/fair counts as leaving, exactly like /payments does.
+  const roots = useMemo(() => navRootPaths(navData), [navData])
   useEffect(() => {
-    if (pathname) dropSelectionsForPath(pathname, navRootPaths)
-  }, [pathname])
+    if (pathname) dropSelectionsForPath(pathname, roots)
+  }, [pathname, roots])
 
   return (
     <div className="flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible">
