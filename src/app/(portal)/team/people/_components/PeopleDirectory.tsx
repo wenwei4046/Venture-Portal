@@ -1,9 +1,13 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import Link from 'next/link'
+import dayjs from 'dayjs'
+import relativeTime from 'dayjs/plugin/relativeTime'
 import LedgerRow from '@/components/LedgerRow'
-import StaffActions from './StaffActions'
+import PersonCard from './PersonCard'
+
+dayjs.extend(relativeTime)
 
 export interface PersonRow {
   id: string
@@ -11,8 +15,14 @@ export interface PersonRow {
   code: string | null
   title: string | null
   department: string | null
+  /** Employment, from hr_staff_costs.status — not the same fact as the account. */
+  active: boolean
+  resignedOn: string | null
   accountEmail: string | null
   accountActive: boolean | null
+  lastSeenAt: string | null
+  /** Fields whose absence breaks payroll or the import, computed server-side. */
+  missing: string[]
 }
 
 export interface AccountRow {
@@ -32,28 +42,47 @@ interface Props {
 }
 
 const NO_DEPT = '— No department'
+/** Past this, a login nobody has touched is worth a second look. */
+const STALE_DAYS = 42
 
+type StatusFilter = 'active' | 'inactive' | 'all'
+
+/**
+ * The roster: one line per person.
+ *
+ * Rebuilt 2026-09-01 from a two-line, five-column table that ran 2,100px for
+ * 24 people. Three changes carry most of it — the department column left
+ * (the group header two inches above already says it), the name and title
+ * stopped stacking, and the email address gave up the widest column on the
+ * page to `Last seen`, because whether somebody *can* sign in is now told by
+ * the tint on their monogram and the more useful question is whether the login
+ * is still being used.
+ */
 export default function PeopleDirectory({ people, unattachedAccounts, canSeeActivity }: Props) {
   const [query, setQuery] = useState('')
-  const [deptFilter, setDeptFilter] = useState<string | null>(null)
+  const [status, setStatus] = useState<StatusFilter>('active')
+  const [folded, setFolded] = useState<Set<string>>(new Set())
+  const [card, setCard] = useState<{ id: string; editing: boolean } | null>(null)
 
-  // Distinct departments from the data, A→Z, people without one last.
-  const departments = useMemo(() => {
-    const set = new Set<string>()
-    let hasNone = false
-    for (const p of people) {
-      if (p.department) set.add(p.department)
-      else hasNone = true
+  const counts = useMemo(() => {
+    const active = people.filter(p => p.active).length
+    return {
+      total: people.length,
+      active,
+      inactive: people.length - active,
+      withLogin: people.filter(p => p.accountEmail).length,
+      incomplete: people.filter(p => p.missing.length > 0).length,
+      departments: new Set(people.map(p => p.department ?? NO_DEPT)).size,
     }
-    const list = [...set].sort((a, b) => a.localeCompare(b))
-    if (hasNone) list.push(NO_DEPT)
-    return list
   }, [people])
+
+  const searching = query.trim() !== ''
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return people.filter(p => {
-      if (deptFilter && (p.department ?? NO_DEPT) !== deptFilter) return false
+      if (status === 'active' && !p.active) return false
+      if (status === 'inactive' && p.active) return false
       if (!q) return true
       return (
         p.name.toLowerCase().includes(q) ||
@@ -63,7 +92,7 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
         (p.accountEmail ?? '').toLowerCase().includes(q)
       )
     })
-  }, [people, query, deptFilter])
+  }, [people, query, status])
 
   // Group by department (A→Z, no-dept last), names A→Z inside each group.
   const groups = useMemo(() => {
@@ -86,64 +115,89 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
       }))
   }, [filtered])
 
-  const withAccount = people.filter(p => p.accountEmail).length
+  function toggleFold(dept: string) {
+    setFolded(prev => {
+      const next = new Set(prev)
+      if (next.has(dept)) next.delete(dept)
+      else next.add(dept)
+      return next
+    })
+  }
 
   return (
     <div className="mb-12">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
         <input
           type="search"
           value={query}
           onChange={e => setQuery(e.target.value)}
-          placeholder="Search name, title, department or email…"
+          placeholder="Search name, code, title or email…"
           className="flex-1 sm:max-w-md px-3 py-2 bg-paper border border-hairline rounded-control text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border font-sans"
           aria-label="Search people"
         />
-        <div className="font-mono text-xs text-muted shrink-0">
-          {filtered.length} of {people.length} {people.length === 1 ? 'person' : 'people'}
-          <span className="mx-2 text-hairline">·</span>
-          {withAccount} with an account
+        {/* Employment filter. Deactivating somebody used to delete them from
+            the only page that lists people; now it moves them one tab over. */}
+        <div
+          className="inline-flex bg-surface-2 border border-hairline rounded-control p-0.5 gap-0.5 self-start"
+          role="group"
+          aria-label="Employment status"
+        >
+          {(
+            [
+              ['active', 'Active', counts.active],
+              ['inactive', 'Inactive', counts.inactive],
+              ['all', 'All', counts.total],
+            ] as const
+          ).map(([key, label, n]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setStatus(key)}
+              aria-pressed={status === key}
+              className={`font-serif italic text-sm px-3 py-1 rounded-[5px] transition-colors ${
+                status === key
+                  ? 'bg-surface text-ink shadow-sm'
+                  : 'text-graphite hover:text-ink'
+              }`}
+            >
+              {label}
+              <span
+                className={`font-mono not-italic text-[10.5px] ml-1.5 ${
+                  status === key ? 'text-accent' : 'text-muted'
+                }`}
+              >
+                {n}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Department filter chips */}
-      <div className="flex flex-wrap items-center gap-2 mb-6">
-        <button
-          type="button"
-          onClick={() => setDeptFilter(null)}
-          aria-pressed={deptFilter === null}
-          className={`font-serif italic text-sm px-3 py-1.5 rounded-control border transition-colors ${
-            deptFilter === null
-              ? 'bg-accent border-accent text-white'
-              : 'bg-surface border-hairline text-graphite hover:bg-surface-2'
-          }`}
-        >
-          All
-        </button>
-        {departments.map(dept => {
-          const count = people.filter(p => (p.department ?? NO_DEPT) === dept).length
-          const active = deptFilter === dept
-          return (
-            <button
-              key={dept}
-              type="button"
-              onClick={() => setDeptFilter(active ? null : dept)}
-              aria-pressed={active}
-              className={`font-serif italic text-sm px-3 py-1.5 rounded-control border transition-colors ${
-                active
-                  ? 'bg-accent border-accent text-white'
-                  : 'bg-surface border-hairline text-graphite hover:bg-surface-2'
-              }`}
-            >
-              {dept}
-              <span
-                className={`font-mono not-italic text-[11px] ml-1.5 ${active ? 'text-white/70' : 'text-muted'}`}
-              >
-                {count}
-              </span>
-            </button>
-          )
-        })}
+      {/* Counts somebody would otherwise scroll to find — and the one that
+          turns the roster into a worklist. */}
+      <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 mb-5 px-3 py-2 bg-surface border border-hairline rounded-control font-mono text-[11px] text-muted">
+        <span>
+          <b className="text-num-ink text-[12.5px] font-semibold">{counts.total}</b> people
+        </span>
+        <span>
+          <b className="text-num-ink text-[12.5px] font-semibold">{counts.departments}</b>{' '}
+          departments
+        </span>
+        <span>
+          <b className="text-num-ink text-[12.5px] font-semibold">{counts.withLogin}</b>{' '}
+          {counts.withLogin === 1 ? 'has a login' : 'have a login'}
+        </span>
+        {counts.incomplete > 0 ? (
+          <span>
+            <b className="text-alert text-[12.5px] font-semibold">{counts.incomplete}</b> with
+            missing details
+          </span>
+        ) : null}
+        {counts.inactive > 0 ? (
+          <span>
+            <b className="text-num-ink text-[12.5px] font-semibold">{counts.inactive}</b> inactive
+          </span>
+        ) : null}
       </div>
 
       {filtered.length === 0 ? (
@@ -154,20 +208,153 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
         </div>
       ) : (
         <div className="table-scroll">
-          <table className="ledger-table">
+          <table className="ledger-table tight">
             <thead>
+              {/* The widths are in globals.css under `.tight` — fixed layout,
+                  so the columns stay on the same vertical edges from the first
+                  row to the last, and below 768px the name gets whatever the
+                  two remaining columns do not need. */}
               <tr>
-                <th>Name</th>
-                <th className="m-hide">Title</th>
-                <th className="m-hide">Department</th>
-                <th className="m-hide">Account</th>
-                <th className="text-right">Actions</th>
+                <th className="col-name">Name</th>
+                {/* Below 768px the name needs the row to itself, so every other
+                    column folds into LedgerRow's panel. */}
+                <th className="col-title m-hide">Title</th>
+                <th className="col-code m-hide">Code</th>
+                <th className="col-emp m-hide">Employment</th>
+                <th className="col-seen m-hide whitespace-nowrap">Last seen</th>
+                <th className="col-act text-right" aria-label="Actions" />
+                {/* Matches the chevron cell LedgerRow adds to every body row;
+                    without it the fixed layout has one column fewer than the
+                    rows do and the last column loses its width. */}
+                <th className="lt-toggle" aria-hidden />
               </tr>
             </thead>
             <tbody>
-              {groups.map(group => (
-                <GroupRows key={group.dept} dept={group.dept} rows={group.rows} />
-              ))}
+              {groups.map(group => {
+                const open = searching || !folded.has(group.dept)
+                const incomplete = group.rows.filter(p => p.missing.length > 0).length
+                return (
+                  <Fragment key={group.dept}>
+                    <tr>
+                      <td className="group-cell" colSpan={6}>
+                        <button
+                          type="button"
+                          className="group-btn"
+                          onClick={() => toggleFold(group.dept)}
+                          aria-expanded={open}
+                        >
+                          <span className="chev" aria-hidden>
+                            ▼
+                          </span>
+                          <span>{group.dept}</span>
+                          <span className="count">
+                            {group.rows.length} {group.rows.length === 1 ? 'person' : 'people'}
+                            {incomplete > 0 ? (
+                              <>
+                                {' · '}
+                                <em>{incomplete} incomplete</em>
+                              </>
+                            ) : null}
+                          </span>
+                        </button>
+                      </td>
+                    </tr>
+                    {open
+                      ? group.rows.map(p => (
+                          <LedgerRow key={p.id}>
+                            <td>
+                              <div className="flex items-center gap-2.5">
+                                <span
+                                  className={`mono-tile ${p.accountEmail ? 'linked' : ''}`}
+                                  title={
+                                    p.accountEmail
+                                      ? `Can sign in — ${p.accountEmail}`
+                                      : 'No login account'
+                                  }
+                                >
+                                  {initials(p.name)}
+                                </span>
+                                <Link
+                                  href={`/team/people/${p.id}`}
+                                  onClick={e => {
+                                    // Cmd/ctrl/shift-click keeps its usual
+                                    // meaning — open the full page in a tab.
+                                    if (e.metaKey || e.ctrlKey || e.shiftKey) return
+                                    e.preventDefault()
+                                    setCard({ id: p.id, editing: false })
+                                  }}
+                                  // min-w-0 so the name can ellipsize: a flex
+                                  // item defaults to min-width:auto, which
+                                  // makes the longest name on the roster set
+                                  // the whole column's width.
+                                  className="clip min-w-0 font-sans text-ink hover:text-accent transition-colors"
+                                >
+                                  {p.name}
+                                </Link>
+                              </div>
+                            </td>
+                            <td className="m-hide" data-label="Title">
+                              <span className="clip text-ink" title={p.title ?? undefined}>
+                                {p.title ?? '—'}
+                              </span>
+                            </td>
+                            <td className="m-hide" data-label="Code">
+                              <span className="font-mono text-[11px] text-muted">
+                                {p.code ?? '—'}
+                              </span>
+                            </td>
+                            <td className="m-hide" data-label="Employment">
+                              <span className="whitespace-nowrap">
+                                {p.active ? (
+                                  <span className="chip ledger">Active</span>
+                                ) : (
+                                  <span className="chip">
+                                    {p.resignedOn
+                                      ? `Resigned ${dayjs(p.resignedOn).format('D MMM YYYY')}`
+                                      : 'Inactive'}
+                                  </span>
+                                )}
+                                {p.missing.length > 0 ? (
+                                  <span
+                                    className="chip alert ml-1.5"
+                                    title={`Missing ${p.missing.join(', ')} — blocks payroll or the InfoTech import`}
+                                  >
+                                    {p.missing.length} missing
+                                  </span>
+                                ) : null}
+                              </span>
+                            </td>
+                            <td className="m-hide whitespace-nowrap" data-label="Last seen">
+                              <LastSeen person={p} />
+                            </td>
+                            <td className="text-right">
+                              <button
+                                type="button"
+                                onClick={() => setCard({ id: p.id, editing: true })}
+                                className="icon-btn"
+                                title={`Edit ${p.name}`}
+                                aria-label={`Edit ${p.name}`}
+                              >
+                                <svg
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.8"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="w-[15px] h-[15px]"
+                                >
+                                  <path d="M12 20h9" />
+                                  <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                                </svg>
+                              </button>
+                            </td>
+                          </LedgerRow>
+                        ))
+                      : null}
+                  </Fragment>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -185,8 +372,8 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
             </span>
           </div>
           <p className="font-serif italic text-muted text-sm mb-4 max-w-2xl">
-            These can sign in but are not on the roster above. Attaching one to a
-            person is what Invite User will do.
+            These can sign in but are not on the roster above. Attaching one to a person is what
+            Invite User will do.
           </p>
           <div className="table-scroll">
             <table className="ledger-table">
@@ -233,50 +420,56 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
           </div>
         </section>
       ) : null}
+
+      {card ? (
+        <PersonCard
+          personId={card.id}
+          startEditing={card.editing}
+          onClose={() => setCard(null)}
+        />
+      ) : null}
     </div>
   )
 }
 
-function GroupRows({ dept, rows }: { dept: string; rows: PersonRow[] }) {
+/**
+ * Four different facts, four different weights. A dash is "no account at all",
+ * which is not the same as an account that has never been used — and an active
+ * login nobody has touched in six weeks is the one worth acting on.
+ */
+function LastSeen({ person }: { person: PersonRow }) {
+  if (!person.accountEmail) {
+    return (
+      <span className="font-mono text-[11px] text-muted" title="No login account">
+        —
+      </span>
+    )
+  }
+  if (person.accountActive === false) {
+    return <span className="chip danger">Disabled</span>
+  }
+  if (!person.lastSeenAt) {
+    return <span className="font-mono text-[11px] text-muted">never</span>
+  }
+  const at = dayjs(person.lastSeenAt)
+  const stale = dayjs().diff(at, 'day') >= STALE_DAYS
   return (
-    <>
-      <tr className="bg-surface">
-        <td colSpan={5}>
-          <span className="font-serif italic text-accent text-sm">{dept}</span>
-          <span className="font-mono text-[11px] text-muted ml-2">
-            · {rows.length} {rows.length === 1 ? 'person' : 'people'}
-          </span>
-        </td>
-      </tr>
-      {rows.map(p => (
-        <LedgerRow key={p.id}>
-          <td>
-            <Link
-              href={`/team/people/${p.id}`}
-              className="font-serif text-md text-ink hover:text-accent hover:underline underline-offset-4 decoration-1 transition-colors"
-            >
-              {p.name}
-            </Link>
-            {p.code && <div className="font-mono text-[11px] text-muted mt-0.5">{p.code}</div>}
-          </td>
-          <td className="m-hide" data-label="Title">
-            <span className="font-serif italic text-graphite">{p.title ?? '—'}</span>
-          </td>
-          <td className="m-hide" data-label="Department">
-            <span className="font-serif italic text-graphite">{p.department ?? '—'}</span>
-          </td>
-          <td className="m-hide" data-label="Account">
-            {p.accountEmail ? (
-              <span className="font-mono text-xs text-graphite">{p.accountEmail}</span>
-            ) : (
-              <span className="font-serif italic text-muted">No account</span>
-            )}
-          </td>
-          <td className="text-right">
-            <StaffActions staffId={p.id} staffName={p.name} />
-          </td>
-        </LedgerRow>
-      ))}
-    </>
+    <span
+      className={`font-mono text-[11px] ${stale ? 'text-alert' : 'text-graphite'}`}
+      title={at.format('D MMM YYYY, HH:mm')}
+    >
+      {stale ? '● ' : ''}
+      {at.fromNow()}
+    </span>
   )
+}
+
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(w => w[0])
+    .join('')
+    .toUpperCase()
 }

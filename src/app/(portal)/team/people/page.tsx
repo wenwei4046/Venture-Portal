@@ -19,10 +19,12 @@ export default async function PeopleManagementPage() {
   const [{ data: staff }, { data: accounts }] = await Promise.all([
     supabase
       .from('hr_staff_costs')
+      // Every status, not just 'active'. Deactivating somebody used to remove
+      // them from the only page that lists people, which left no way back
+      // except the database — the roster filters by status instead.
       .select(
-        'id, employee_name, employee_code, designation, user_id, status, titles(name), departments(name), users!hr_staff_costs_user_id_fkey(email, is_active)',
+        'id, employee_name, employee_code, designation, user_id, status, resignation_date, nric, bank_account_no, hire_date, titles(name), departments(name), users!hr_staff_costs_user_id_fkey(email, is_active, last_seen_at)',
       )
-      .eq('status', 'active')
       .order('employee_name'),
     supabase.from('users').select('id, name, email, role, is_active').order('name'),
   ])
@@ -36,6 +38,7 @@ export default async function PeopleManagementPage() {
   const rows: PersonRow[] = (staff ?? []).map(s => {
     /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
     const r = s as any
+    const active = r.status !== 'inactive'
     return {
       id: r.id,
       name: r.employee_name,
@@ -44,8 +47,23 @@ export default async function PeopleManagementPage() {
       // backfilled from and still what the InfoTech import writes.
       title: r.titles?.name ?? r.designation ?? null,
       department: r.departments?.name ?? null,
+      active,
+      resignedOn: r.resignation_date ?? null,
       accountEmail: r.users?.email ?? null,
       accountActive: r.users?.is_active ?? null,
+      lastSeenAt: r.users?.last_seen_at ?? null,
+      // The three fields whose absence breaks something downstream: payroll
+      // needs an NRIC for the statutory files and an account number to pay
+      // into, and the InfoTech import matches on the hire date. Only asked of
+      // people still employed — a resigned row missing a bank account is not
+      // a chore anybody has to do.
+      missing: active
+        ? [
+            !r.nric && 'NRIC',
+            !r.bank_account_no && 'bank account',
+            !r.hire_date && 'hire date',
+          ].filter((x): x is string => typeof x === 'string')
+        : [],
     }
   })
 

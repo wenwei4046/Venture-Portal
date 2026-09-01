@@ -526,6 +526,26 @@ These are the load-bearing classes that make a page feel "v3.0 ledger-dense" ins
 | `.ledger-table` | Surface bg + 1px hairline border + 6px radius + zebra rows + `surface-2` thead + accent-bg hover + `td.num` right-align | Every data list table. Replaces ad-hoc `<table className="w-full text-sm">…border-b…hover:bg-surface-2/40`. |
 | `.chip` | Rounded pill: 99px radius + 10.5px mono + variant colors (`accent` / `ledger` / `alert` / `danger` / `info`) | Status tags, category labels. Inline only; do not use as button. |
 
+### Roster density (v3.2, 2026-09-01 — People Management)
+
+A directory is not a ledger: its cells are short strings, not figures, so the
+money-table padding turned 27 people into two and a half screens. These four
+belong together — use them for people and other reference lists, never for
+money tables, which keep the roomier default.
+
+| Class | What it does | Where to use |
+|---|---|---|
+| `.ledger-table.tight` | `table-layout: fixed` + 7px cell padding — one line per person, so names, titles and codes line up on the same vertical edges from the first row to the last. Column widths come from `th.col-*` classes, **not** inline styles | Directory / reference lists. Fixed layout is load-bearing: under auto layout the longest cell sets the column, and a group header's `colspan` keeps folded-away columns alive on a phone. |
+| `.group-btn` (in `td.group-cell`) | Full-width button row that folds its group away; carries the count and an amber sub-count | Grouped tables where one group is half the list (Marketing is 12 of 27). |
+| `.mono-tile` / `.mono-tile-lg` / `.mono-tile.linked` | Initials in a rounded tile; `.linked` tints it accent | Standing in for a photograph, and carrying a binary fact — on the roster a tinted tile means "this person can sign in", which is what freed a whole column for `Last seen`. |
+| `.icon-btn` (`.solid`, `.danger`) | 28px icon control, 62% opacity resting, full on row hover or focus | Row actions. A pencil reads as a control where the words *Edit* and *Deactivate* in identical grey read as neither — and it stops the destructive one shouting as loudly as the everyday one. `.solid` for a card header, where the icon is the primary control rather than a row affordance. |
+
+Two mobile rules the fixed layout needs, both already in `globals.css`: a
+`display: none` header cell still holds its column slot, so `th.col-name` takes
+`width: 100%` below 768px to claim what the folded columns would otherwise
+split; and it must be a plain percentage — a `calc()` width on a table cell is
+treated as auto and the name collapses to 60px.
+
 ### `.page-head` example (mandatory shape)
 
 ```tsx

@@ -615,6 +615,143 @@ table.ledger-table td {
 table.ledger-table td.num,
 table.ledger-table td.right { text-align: right; }
 
+/* ── Roster density (2026-09-01, People Management) ────────────────────────
+   A directory is not a ledger: its cells are short strings, not figures, and
+   24 people at the default 14px padding ran to two and a half screens. `.tight`
+   is one line per person — every field in its own column, so names, titles and
+   codes line up on four vertical edges. Use it for people/reference lists;
+   money tables keep the roomier default. */
+/* Fixed, not auto — but only where every column is on screen. Fixed layout
+   takes its widths from the header row in order, so once `.m-hide` removes
+   columns on a phone the remaining ones keep the wrong shares and the row ends
+   up mostly empty. Below 768px the folded table goes back to auto and sizes to
+   the one column it still shows. */
+/* Fixed layout at every width, and the column widths live here rather than on
+   the markup. Two reasons it has to be fixed: under auto layout a cell's
+   intrinsic width beats the table's own `width: 100%`, so the longest name on
+   the roster sets the column and pushes the pencil off a phone screen; and a
+   group header's `colspan` cell keeps the columns it spans alive even when
+   `.m-hide` has taken them off the screen. Under fixed layout only the header
+   row defines columns, so both problems disappear and `.clip` truncates the way
+   it was put there to. */
+table.ledger-table.tight { table-layout: fixed; }
+table.ledger-table.tight th.col-act { width: 52px; }
+/* Phone: a `display: none` header cell still holds its column slot under fixed
+   layout, so the four folded-away columns quietly keep a share of the row and
+   the name is left with 60px. Zero them and the name takes everything the
+   pencil and the chevron do not. */
+@media (max-width: 767px) {
+  /* A percentage, not calc(): a calc() width on a table cell is treated as
+     auto here, and the folded-away columns then split the row four ways and
+     leave the name 60px. 100% simply means "everything the two pixel-width
+     columns do not take". */
+  table.ledger-table.tight th.col-name { width: 100%; }
+}
+@media (min-width: 768px) {
+  table.ledger-table.tight th.col-name { width: 27%; }
+  table.ledger-table.tight th.col-title { width: 27%; }
+  table.ledger-table.tight th.col-code { width: 9%; }
+  table.ledger-table.tight th.col-emp { width: 16%; }
+  table.ledger-table.tight th.col-seen { width: 15%; }
+  table.ledger-table.tight th.col-act { width: 6%; }
+}
+table.ledger-table.tight tbody td { padding: 7px 16px; vertical-align: middle; }
+table.ledger-table.tight tbody td .clip {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The group row inside a `.tight` table: a whole-width button that folds its
+   department away. Marketing alone is half the roster. */
+table.ledger-table td.group-cell { padding: 0; }
+.group-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 16px;
+  border: 0;
+  background: rgb(var(--surface-2) / 0.65);
+  color: rgb(var(--accent));
+  font-family: inherit;
+  font-size: 13px;
+  font-style: italic;
+  text-align: left;
+  cursor: pointer;
+}
+.group-btn:hover { background: rgb(var(--surface-2)); }
+.group-btn .chev {
+  font-size: 9px;
+  font-style: normal;
+  color: rgb(var(--muted));
+  transition: transform 0.18s ease;
+}
+.group-btn[aria-expanded='false'] .chev { transform: rotate(-90deg); }
+.group-btn .count {
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-style: normal;
+  font-size: 10.5px;
+  color: rgb(var(--muted));
+}
+.group-btn .count em { font-style: normal; color: rgb(var(--alert)); }
+
+/* Monogram tile. The roster has no photographs and should not need any —
+   initials give each row a shape to recognise, and the tinted variant is how
+   "this person can sign in" reads across a whole screen without spending a
+   column on an email address. */
+.mono-tile {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 6px;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: rgb(var(--surface-2));
+  color: rgb(var(--graphite));
+  border: 1px solid rgb(var(--hairline));
+}
+.mono-tile.linked {
+  background: rgb(var(--accent-bg));
+  color: rgb(var(--accent));
+  border-color: rgb(var(--accent-border));
+}
+.mono-tile-lg { width: 42px; height: 42px; border-radius: 10px; font-size: 14px; }
+
+/* Icon action button — a pencil that reads as a control. Text links called
+   "Edit" and "Deactivate" in the same grey gave the destructive one the same
+   weight as the everyday one; this is the everyday one. */
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgb(var(--graphite));
+  opacity: 0.62;
+  cursor: pointer;
+  transition: opacity 0.14s, background 0.14s, color 0.14s, border-color 0.14s;
+}
+.icon-btn:hover,
+.icon-btn:focus-visible {
+  opacity: 1;
+  background: rgb(var(--surface));
+  border-color: rgb(var(--hairline));
+  color: rgb(var(--accent));
+}
+.icon-btn.danger:hover { color: rgb(var(--danger)); }
+/* In a card header the pencil is the primary control, not a row affordance
+   that should wait for hover. */
+.icon-btn.solid { opacity: 1; }
+tr:hover .icon-btn { opacity: 1; }
+
 /* Page header — eyebrow + accent rule under the title (newspaper editorial).
    Mobile-first: stack vertically so right-side action/control doesn't get
    squeezed off-screen. At sm (640px) and above, switch to row alignment. */
