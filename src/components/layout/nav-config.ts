@@ -353,18 +353,30 @@ function navHrefs(entries: NavEntry[]): string[] {
  *  `NavData` for the same reason navRootPaths does. */
 export function navLabelByPath(data: NavData): ReadonlyMap<string, string> {
   return new Map(
-    buildNavEntries(data)
-      .flatMap((entry) =>
-        isGroup(entry)
-          ? entry.children.map(
-              (c) => [c.href.split('?')[0], `${entry.label} · ${c.label}`] as const,
-            )
-          : [[entry.href.split('?')[0], entry.label] as const],
-      )
-      // First writer wins: /settings appears once per tab and the group label
-      // is the same for all of them.
-      .reverse(),
+    // First writer wins: /settings appears once per tab and the group label is
+    // the same for all of them, and a sub-department shares its href with its
+    // own Comm Cal child — "Revenue · Fair" is the better of those two.
+    navLabelPairs(buildNavEntries(data), []).reverse(),
   )
+}
+
+/** `[path, label]` for every destination, the label being the chain of names
+ *  down to it — "Revenue · Fair · Rules". Recursive since the nav runs three
+ *  levels; a group contributes its own href too, when it has one. */
+function navLabelPairs(
+  entries: NavEntry[],
+  trail: string[],
+): Array<readonly [string, string]> {
+  return entries.flatMap((entry) => {
+    const chain = [...trail, entry.label]
+    const name = chain.join(' · ')
+    return isGroup(entry)
+      ? [
+          ...(entry.href ? [[entry.href.split('?')[0], name] as const] : []),
+          ...navLabelPairs(entry.children, chain),
+        ]
+      : [[entry.href.split('?')[0], name] as const]
+  })
 }
 
 // ── Mobile bottom tab bar ────────────────────────────────────────────────
