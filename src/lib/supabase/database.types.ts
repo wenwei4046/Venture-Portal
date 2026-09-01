@@ -6398,6 +6398,7 @@ export type Database = {
           email: string
           id: string
           is_active: boolean
+          last_seen_at: string | null
           name: string
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
@@ -6408,6 +6409,7 @@ export type Database = {
           email: string
           id: string
           is_active?: boolean
+          last_seen_at?: string | null
           name: string
           role: Database["public"]["Enums"]["user_role"]
           updated_at?: string
@@ -6418,6 +6420,7 @@ export type Database = {
           email?: string
           id?: string
           is_active?: boolean
+          last_seen_at?: string | null
           name?: string
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string

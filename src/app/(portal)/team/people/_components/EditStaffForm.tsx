@@ -4,7 +4,7 @@ import { useState, useTransition, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { updateStaff } from '../actions'
 
-interface StaffRow {
+export interface StaffRow {
   id: string
   employee_name: string
   designation: string | null
@@ -34,9 +34,18 @@ interface StaffRow {
 
 interface Props {
   staff: StaffRow
+  /** Rendered inside the person card, which supplies its own panel and
+   *  padding — so the form drops the card chrome it wears on its own page. */
+  embedded?: boolean
+  /** Told after a successful save, so the card can leave edit mode and the
+   *  row behind it can be re-read. */
+  onSaved?: () => void
+  /** Shown beside Save when the form is embedded — leaving edit mode has to
+   *  be reachable without scrolling back to the card header. */
+  onCancel?: () => void
 }
 
-export default function EditStaffForm({ staff }: Props) {
+export default function EditStaffForm({ staff, embedded, onSaved, onCancel }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -63,6 +72,7 @@ export default function EditStaffForm({ staff }: Props) {
         await updateStaff(staff.id, formData)
         setSaved(true)
         router.refresh()
+        onSaved?.()
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       }
@@ -70,7 +80,7 @@ export default function EditStaffForm({ staff }: Props) {
   }
 
   return (
-    <form ref={formRef} action={handleSubmit} className="bg-surface border border-hairline rounded-md p-6 max-w-3xl">
+    <form ref={formRef} action={handleSubmit} className={embedded ? '' : 'bg-surface border border-hairline rounded-md p-6 max-w-3xl'}>
       {/* Section 1 — Identity */}
       <h3 className="font-serif text-lg text-ink mb-4">Identity</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -118,11 +128,14 @@ export default function EditStaffForm({ staff }: Props) {
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
             NRIC <span className="text-xs text-muted ml-1 font-normal">(12 digits, for statutory files)</span>
           </label>
+          {/* The dash in the pattern has to be escaped: unescaped between `9`
+              and `\s` the browser reads it as a range, throws under the `v`
+              flag, and silently drops the constraint altogether. */}
           <input
             name="nric"
             defaultValue={staff.nric ?? ''}
             placeholder="850101141234"
-            pattern="[0-9-\s]*"
+            pattern="[0-9\-\s]*"
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
           />
         </div>
@@ -370,7 +383,14 @@ export default function EditStaffForm({ staff }: Props) {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 pt-4 border-t border-hairline">
+      {/* Embedded, this bar sticks to the bottom of the card's scroll area —
+          the form is taller than the window it now opens in, and a Save button
+          you have to scroll to find is a Save button people miss. */}
+      <div
+        className={`flex items-center gap-3 pt-4 border-t border-hairline ${
+          embedded ? 'sticky bottom-0 -mx-5 px-5 pb-3 bg-paper' : ''
+        }`}
+      >
         <button
           type="submit"
           disabled={isPending}
@@ -378,6 +398,16 @@ export default function EditStaffForm({ staff }: Props) {
         >
           {isPending ? 'Saving...' : 'Save changes'}
         </button>
+        {onCancel ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isPending}
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        ) : null}
         {saved && <span className="text-sm font-serif italic text-ledger">Saved.</span>}
         {error && <span className="text-sm font-serif italic text-danger">{error}</span>}
       </div>
