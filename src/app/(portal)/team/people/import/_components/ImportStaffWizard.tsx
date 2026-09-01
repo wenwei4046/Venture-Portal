@@ -279,7 +279,7 @@ export default function ImportStaffWizard() {
             </summary>
             <p className="text-xs font-sans text-muted italic mt-2 mb-3">
               Add these departments in the portal first, or extend the dept code map in
-              <code className="mx-1 font-mono">src/app/(portal)/hr-costing/staff/import/actions.ts</code>.
+              <code className="mx-1 font-mono">src/app/(portal)/team/people/import/actions.ts</code>.
             </p>
             <div className="space-y-1">
               {preview.deptMissing.map(d => (
@@ -336,7 +336,7 @@ export default function ImportStaffWizard() {
       )}
       <div className="flex gap-3 mt-6">
         <Link
-          href="/hr-costing/staff"
+          href="/team/people"
           className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md"
         >
           Back to Staff →

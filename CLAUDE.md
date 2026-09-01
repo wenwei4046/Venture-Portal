@@ -35,8 +35,9 @@ src/
 │   │   ├── approvals/               ← Principal queue + detail + approve/reject
 │   │   ├── dept-pool/               (Phase 2)
 │   │   ├── billing/                 (Phase 2)
+│   │   ├── team/                    ← People Management + Role & Permission
 │   │   ├── director-salary/         (Phase 3)
-│   │   ├── hr-costing/              (Phase 3)
+│   │   ├── hr-costing/              (Phase 3 — staff directory moved to team/)
 │   │   ├── revenue/                 ← Revenue Department: [sub]/ = one sub-department
 │   │   │                              (Fair, …) with 3 tabs — page.tsx (Commission
 │   │   │                              Calculation) / hierarchy / rules — plus
