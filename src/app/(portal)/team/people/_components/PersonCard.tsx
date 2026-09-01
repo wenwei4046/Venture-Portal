@@ -115,17 +115,28 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
               {person ? (
                 <div className="flex flex-wrap items-center gap-2 mt-2">
                   {person.active ? (
-                    <span className="chip ledger">Active</span>
+                    <span className="chip ledger">
+                      <span className="dot" aria-hidden />
+                      Active
+                    </span>
                   ) : (
                     <span className="chip">
+                      <span className="dot" aria-hidden />
                       {person.resignedOn ? `Resigned ${person.resignedOn}` : 'Inactive'}
                     </span>
                   )}
                   {person.account ? (
                     <>
-                      <span className={`chip ${person.account.isActive ? 'accent' : 'danger'}`}>
-                        {person.account.isActive ? person.account.email : 'Login disabled'}
-                      </span>
+                      {/* The address is a value, not a state, so it carries no
+                          dot — a disabled login is a state and does. */}
+                      {person.account.isActive ? (
+                        <span className="chip accent">{person.account.email}</span>
+                      ) : (
+                        <span className="chip danger">
+                          <span className="dot" aria-hidden />
+                          Login disabled
+                        </span>
+                      )}
                       <span className="font-mono text-[11px] text-muted">
                         {person.account.lastSeenAt
                           ? `seen ${dayjs(person.account.lastSeenAt).fromNow()}`
@@ -133,8 +144,20 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
                       </span>
                     </>
                   ) : (
-                    <span className="chip">No login</span>
+                    <span className="chip">
+                      <span className="dot" aria-hidden />
+                      No login
+                    </span>
                   )}
+                  {person.missing.length > 0 ? (
+                    <span
+                      className="chip alert"
+                      title={`Missing ${person.missing.join(', ')} — blocks payroll or the InfoTech import`}
+                    >
+                      <span className="dot" aria-hidden />
+                      {person.missing.length} missing
+                    </span>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -193,11 +216,16 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
           </div>
         </div>
 
-        <div className="overflow-y-auto px-5 py-5">
+        {/* No bottom padding on the scroll box itself: a sticky element cannot
+            be pushed past its containing block, so the form's Save bar would
+            stop 20px short of the bottom and the next field would scroll
+            through the gap under it. Each panel carries its own bottom space
+            instead, and the edit form's bar takes the edge. */}
+        <div className="overflow-y-auto px-5 pt-5">
           {error ? (
-            <p className="font-serif italic text-danger text-sm">{error}</p>
+            <p className="font-serif italic text-danger text-sm pb-5">{error}</p>
           ) : !person ? (
-            <p className="font-serif italic text-muted text-sm">Reading their record…</p>
+            <p className="font-serif italic text-muted text-sm pb-5">Reading their record…</p>
           ) : tab === 'details' ? (
             editing ? (
               <EditStaffForm
@@ -211,16 +239,20 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
                 onCancel={() => setEditing(false)}
               />
             ) : (
-              <Details person={person} />
+              <div className="pb-5">
+                <Details person={person} />
+              </div>
             )
           ) : tab === 'permissions' ? (
             person.permissions && person.account ? (
-              <PersonPermissions
-                userId={person.account.id}
-                rows={person.permissions.rows}
-                source={person.permissions.source}
-                canEdit={person.canManagePermissions}
-              />
+              <div className="pb-5">
+                <PersonPermissions
+                  userId={person.account.id}
+                  rows={person.permissions.rows}
+                  source={person.permissions.source}
+                  canEdit={person.canManagePermissions}
+                />
+              </div>
             ) : (
               <EmptyPanel>
                 {person.staff.employee_name} has no login, so there is nothing to resolve.
@@ -233,7 +265,7 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
                 Nothing recorded yet. Page visits are logged from the moment they next sign in.
               </EmptyPanel>
             ) : (
-              <ol className="border-t border-hairline">
+              <ol className="border-t border-hairline pb-5">
                 {person.activity.map((line, i) => (
                   <li
                     key={`${line.at}-${i}`}
@@ -381,7 +413,7 @@ function Field({ label, value, mono }: { label: string; value: string | null; mo
 
 function EmptyPanel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="font-serif italic text-muted text-sm py-8 text-center max-w-md mx-auto">
+    <p className="font-serif italic text-muted text-sm py-8 pb-12 text-center max-w-md mx-auto">
       {children}
     </p>
   )

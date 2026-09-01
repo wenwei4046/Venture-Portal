@@ -27,6 +27,8 @@ export interface PersonCardData {
   active: boolean
   resignedOn: string | null
   reportsTo: string | null
+  /** The same three payroll-blocking gaps the roster row marks. */
+  missing: string[]
   account: { id: string; email: string; role: string; isActive: boolean; lastSeenAt: string | null } | null
   permissions: { rows: PersonPermissionRow[]; source: string } | null
   canManagePermissions: boolean
@@ -140,6 +142,14 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
     active: row.status !== 'inactive',
     resignedOn: row.resignation_date ? dayjs(row.resignation_date).format('D MMM YYYY') : null,
     reportsTo,
+    missing:
+      row.status !== 'inactive'
+        ? [
+            !row.nric && 'NRIC',
+            !row.bank_account_no && 'bank account',
+            !row.hire_date && 'hire date',
+          ].filter((x): x is string => typeof x === 'string')
+        : [],
     account: acct
       ? {
           id: acct.id,
