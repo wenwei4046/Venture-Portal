@@ -5,28 +5,31 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { UserRole } from '@/types'
 import {
-  navEntries,
+  buildNavEntries,
   itemActive,
   isGroup,
+  type NavData,
   type NavEntry,
   type NavItem,
 } from './nav-config'
 
 interface SidebarProps {
   role: UserRole
+  /** Database-backed nav rows (Revenue's sub-departments), read by the layout. */
+  navData: NavData
 }
 
 // Desktop-only since 2026-08-31. Mobile navigation moved to BottomTabBar +
 // MoreSheet; the off-canvas drawer this used to double as is gone, so there
 // is no `mobileOpen` / `onClose` any more.
-export default function Sidebar({ role }: SidebarProps) {
+export default function Sidebar({ role, navData }: SidebarProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
   const basisParam = searchParams.get('basis')
   const router = useRouter()
 
-  const visible = navEntries.filter((entry) => entry.visible(role))
+  const visible = buildNavEntries(navData).filter((entry) => entry.visible(role))
 
   // Group consecutive entries by section label so we can render dividers.
   const sections: { label: string | null; entries: NavEntry[] }[] = []

@@ -38,9 +38,9 @@ export default async function SettingsPage({ searchParams }: Props) {
   // re-checks role inside the conditional below and renders nothing otherwise.
   // SettingsTabs hides the disallowed tabs from the rail.
   //
-  // HR is no longer admitted at all: Commission and Product List moved to
-  // /hr-costing/commission (user 2026-08-31), and they were the only reason HR
-  // was ever here.
+  // HR is no longer admitted at all: Commission and Product List moved out
+  // (user 2026-08-31) and they were the only reason HR was ever here. They now
+  // live under /revenue — the Revenue Department's own group (2026-09-01).
   const user = await requireRole(['principal', 'finance'])
   const isPrincipal = user.role === 'principal'
 

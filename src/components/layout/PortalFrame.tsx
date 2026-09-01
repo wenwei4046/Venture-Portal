@@ -7,6 +7,7 @@ import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 import BottomTabBar from './BottomTabBar'
 import MoreSheet from './MoreSheet'
+import type { NavData } from './nav-config'
 import BackToTop from '@/components/BackToTop'
 
 // Portal shell.
@@ -21,9 +22,12 @@ import BackToTop from '@/components/BackToTop'
 // in the header.
 export default function PortalFrame({
   user,
+  navData,
   children,
 }: {
   user: User
+  /** The nav rows that come from the database — Revenue's sub-departments. */
+  navData: NavData
   children: React.ReactNode
 }) {
   const [moreOpen, setMoreOpen] = useState(false)
@@ -35,7 +39,7 @@ export default function PortalFrame({
   return (
     <div className="flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible">
       <div className="print:hidden contents">
-        <Sidebar role={user.role} />
+        <Sidebar role={user.role} navData={navData} />
       </div>
 
       <div className="flex flex-col flex-1 overflow-hidden print:overflow-visible">
@@ -58,7 +62,12 @@ export default function PortalFrame({
         moreOpen={moreOpen}
         onMoreClick={() => setMoreOpen((o) => !o)}
       />
-      <MoreSheet user={user} open={moreOpen} onClose={() => setMoreOpen(false)} />
+      <MoreSheet
+        user={user}
+        navData={navData}
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+      />
 
       <BackToTop />
     </div>
