@@ -440,6 +440,12 @@ titles (
     UNIQUE (lower(btrim(name)), department_id) NULLS NOT DISTINCT
 )
 ```
+Invite User (2026-09-01) writes three rows in order — `auth.users` (service role,
+the only use of `lib/supabase/admin.ts`), then `public.users`, then the
+`hr_staff_costs` link — and deletes the credential again if either later step
+fails. Phone lives on the person (`contact_number`), not on the account, so
+there is one source of truth for it.
+
 `reports_to` is the org chart: current state, no history, every department. It is
 NOT `comm_hierarchy`, which is effective-dated because it drives override
 commission — the Team canvas draws that line but never writes it. Guarded by
