@@ -1,7 +1,6 @@
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { canManagePermissions } from '@/lib/roles'
-import TeamTabs from '../_components/TeamTabs'
 import TitlesSection, { type TitleRow, type DepartmentOption } from './_components/TitlesSection'
 import PermissionMatrix, {
   type MatrixTitle,
@@ -105,7 +104,7 @@ export default async function RolesPage() {
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> TEAM · ROLE &amp; PERMISSION
+            <em>I.</em> PEOPLE · ROLE &amp; PERMISSION
           </div>
           <h1 className="page-title">Roles</h1>
           <p className="font-serif italic text-graphite text-base mt-3 max-w-2xl">
@@ -116,8 +115,6 @@ export default async function RolesPage() {
           </p>
         </div>
       </div>
-
-      <TeamTabs active="roles" />
 
       <TitlesSection
         titles={rows}

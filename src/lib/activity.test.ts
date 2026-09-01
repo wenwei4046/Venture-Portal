@@ -28,12 +28,18 @@ describe('describePagePath', () => {
   })
 
   it('carries the group label for a grouped child', () => {
-    expect(describePagePath('/team/people', L).target).toBe('Team · People Management')
+    expect(describePagePath('/hr-costing/payroll', L).target).toBe('HR Costing · Payroll')
+  })
+
+  it('names a section child by itself — the section is not part of the label', () => {
+    // People Management sits directly under the People section header since
+    // 2026-09-01, so there is no group name in front of it any more.
+    expect(describePagePath('/team/people', L).target).toBe('People Management')
   })
 
   it('names the readable segments of a deeper path', () => {
     const { target, detail } = describePagePath('/team/people/new', L)
-    expect(target).toBe('Team · People Management')
+    expect(target).toBe('People Management')
     expect(detail).toBe('New')
   })
 

@@ -51,7 +51,7 @@ export default async function AccountDetailPage({ params }: PageProps) {
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> TEAM · ACCOUNT
+            <em>I.</em> PEOPLE · ACCOUNT
           </div>
           <h1 className="page-title">{account.name}</h1>
           <p className="font-serif italic text-graphite text-base mt-3">

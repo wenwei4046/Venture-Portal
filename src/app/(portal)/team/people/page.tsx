@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import TeamTabs from '../_components/TeamTabs'
 import PeopleDirectory, { type PersonRow, type AccountRow } from './_components/PeopleDirectory'
 
 /**
@@ -66,7 +65,7 @@ export default async function PeopleManagementPage() {
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> TEAM · PEOPLE MANAGEMENT
+            <em>I.</em> PEOPLE · MANAGEMENT
           </div>
           <h1 className="page-title">People</h1>
           <p className="font-serif italic text-graphite text-base mt-3 max-w-2xl">
@@ -98,8 +97,6 @@ export default async function PeopleManagementPage() {
           </Link>
         </div>
       </div>
-
-      <TeamTabs active="people" />
 
       <PeopleDirectory
         people={rows}
