@@ -76,6 +76,14 @@ export default async function PeopleManagementPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {user.role === 'principal' ? (
+            <Link
+              href="/team/people/invite"
+              className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
+            >
+              Invite user
+            </Link>
+          ) : null}
           <Link
             href="/team/people/import"
             className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"

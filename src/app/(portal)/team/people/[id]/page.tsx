@@ -76,12 +76,24 @@ export default async function StaffDetailPage({ params }: PageProps) {
             )}
           </p>
         </div>
-        <Link
-          href={`/team/people/${staff.id}/edit`}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors shrink-0"
-        >
-          Edit
-        </Link>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* One person, one login — so this is offered only while they have
+              none, and only to the role that may mint one. */}
+          {viewer.role === 'principal' && !account ? (
+            <Link
+              href={`/team/people/invite?staff=${staff.id}`}
+              className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
+            >
+              Invite
+            </Link>
+          ) : null}
+          <Link
+            href={`/team/people/${staff.id}/edit`}
+            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+          >
+            Edit
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl">
