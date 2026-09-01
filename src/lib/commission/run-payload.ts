@@ -2,7 +2,7 @@
  * Between the database and the engine.
  *
  * The engine (engine.ts) is pure and knows nothing about Postgres; the Server
- * Action (hr-costing/commission/run-actions.ts) knows nothing about commission
+ * Action (revenue/run-actions.ts) knows nothing about commission
  * maths. This file is the seam, and it is pure so the mapping can be tested —
  * which matters more than it sounds, because a mapping slip here does not throw,
  * it quietly pays the wrong person the wrong amount.

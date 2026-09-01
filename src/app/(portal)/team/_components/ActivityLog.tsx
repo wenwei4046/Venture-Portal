@@ -1,6 +1,7 @@
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { navLabelByPath } from '@/components/layout/nav-config'
+import { listSubDepartments } from '../../revenue/_lib/sub-departments'
 import { describeActivity, type ActivityRow } from '@/lib/activity'
 
 /**
@@ -19,13 +20,22 @@ export default async function ActivityLog({
 }) {
   const supabase = await createClient()
 
-  const { data } = await supabase
-    .from('access_log')
-    .select('resource_type, resource_id, action, metadata, created_at')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(limit)
+  // The Revenue group's children are database rows, so the label map needs
+  // them too — otherwise a visit to /revenue/fair reads as "Fair" the bare
+  // segment rather than "Revenue · Fair".
+  const [{ data }, subDepts] = await Promise.all([
+    supabase
+      .from('access_log')
+      .select('resource_type, resource_id, action, metadata, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit),
+    listSubDepartments(),
+  ])
 
+  const labels = navLabelByPath({
+    revenueSubDepts: subDepts.map(s => ({ slug: s.slug, name: s.name })),
+  })
   const rows = (data ?? []) as ActivityRow[]
 
   return (
@@ -48,7 +58,7 @@ export default async function ActivityLog({
       ) : (
         <ol className="border-t border-hairline">
           {rows.map((row, i) => {
-            const line = describeActivity(row, navLabelByPath)
+            const line = describeActivity(row, labels)
             const at = dayjs(row.created_at)
             return (
               <li

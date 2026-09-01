@@ -90,16 +90,56 @@ departments (Revenue Department)
               └── comm_hierarchy          who is under who, effective-dated
 ```
 
-Settings gets a **Generate New Sub-Department** action. Creating one either
-**clones** an existing sub-department's scheme (every rule row copied, with
-`cloned_from_scheme_id` recorded) or starts empty for a bespoke ruleset. Because
-each component can be switched off at scheme level
+The Rules page gets a **Generate New Sub-Department** action. Creating one
+either **clones** an existing sub-department's scheme (every rule row copied,
+with `cloned_from_scheme_id` recorded) or starts empty for a bespoke ruleset.
+Because each component can be switched off at scheme level
 (`enable_product_revenue` / `enable_kpi` / `enable_open_bill` /
 `enable_override`), a sub-department that only pays a flat percentage reuses the
 same engine instead of getting a bespoke one.
 
 `comm_hierarchy` enforces **one position per person at a time** across all
 schemes, so nobody can sit in two sub-departments and be paid twice.
+
+### 3.0 Where it lives in the portal
+
+**Moved 2026-09-01.** Commission was a page under **HR Costing**, beside
+Payroll and Payment. The user's correction: *"它其实是 Revenue Department"* — it
+is a department with its own teams, not one of HR's monthly chores. It now has
+its own group under **Departments**, alongside Director:
+
+```
+II. DEPARTMENTS
+  ▾ Director
+      · Director Salary
+      · Director Pool
+  ▾ Revenue
+      · Fair                ← one entry per sub-department, read from the DB
+      · Product List        ← department-wide, Principal only
+  · Claims
+```
+
+The group's children are **rows in `comm_sub_departments`**, not constants:
+`(portal)/layout.tsx` reads them and hands them to the sidebar and the mobile
+More sheet through `NavData` (see `nav-config.ts`). Creating a sub-department
+therefore adds a sidebar entry, which is why `createSubDepartment` revalidates
+the whole shell.
+
+Each sub-department opens a **three-tab page**, because each one calculates
+differently and there is no meaningful department-level view of a calculation:
+
+| Tab | Route | What it is |
+|---|---|---|
+| Commission Calculation | `/revenue/<sub>` | the months, and this sub-department's run against each |
+| Staff Hierarchy | `…/hierarchy` | who is under who — the org chart (§10) |
+| Rules | `…/rules` | every rule the engine reads (§9) |
+
+The slug is derived from the sub-department's **name** (`Fair` → `fair`), which
+is what `uq_sub_department_name` makes unique; `code` is nullable and
+unconstrained, so it cannot address a row. `createSubDepartment` refuses a name
+that would slug to a reserved static child (`products`) or collide with an
+existing one — a shadowed sub-department would be unreachable rather than
+broken, and only its creator would ever find out.
 
 ### 3.1 The tier ladder
 
@@ -565,7 +605,7 @@ src/lib/commission/
   run-payload.ts       — the seam: Postgres rows -> EngineInput, EngineResult
                          -> the save_commission_run payload
   run-payload.test.ts  — 16 tests on the mapping itself
-src/app/(portal)/hr-costing/commission/
+src/app/(portal)/revenue/
   run-actions.ts       — computeRun / applyRun / reopenRun, plus the two
                          review-board edits (Open Bill rank, manual margin)
 ```
@@ -635,25 +675,30 @@ PCB 0, WHT 200, net 9,800, then back to 0).
 
 ## 9. The consolidated rules page
 
-> **Moved 2026-08-31.** This was a tab inside Settings. It is now
-> `/hr-costing/commission/rules`, a tab of the Commission module itself, with
-> the Product List beside it at `/hr-costing/commission/products`. Settings is
-> a principal + finance page with no sidebar entry for HR, so the one screen
-> that configures HR's own payroll was reachable by URL alone. The layout below
-> is unchanged.
+> **Moved 2026-08-31**, out of a tab inside Settings — a principal + finance
+> page with no sidebar entry for HR, so the one screen that configures HR's own
+> payroll was reachable by URL alone.
 >
-> The Product List moving too was a judgement call rather than part of the ask,
-> so it was offered back — **the user confirmed it stays here** (2026-08-31).
-> It exists for one reason, feeding the margin a run is judged against, and
-> leaving it in Settings would have kept an admin page alive for a single
-> commission screen. Still Principal-only: HR sets the rules, not what a
-> product costs.
+> **Moved again 2026-09-01** with the rest of the module (§3.0). It is now
+> `/revenue/<sub-department>/rules`, the third tab of a sub-department. The
+> Product List went with it and stayed at department level,
+> `/revenue/products`: `comm_products` carries no `scheme_id` — there is one
+> cost master for the whole department — and the user confirmed on 2026-08-31
+> that it stays with the module rather than returning to Settings. Still
+> Principal-only: HR sets the rules, not what a product costs.
+>
+> The layout below is unchanged apart from the picker (see next paragraph).
 
-One **Commission** tab holds every rule, threshold and per-person tick, laid out
-as dense tables following `DESIGN.md` v3.0 (`.ledger-table`, `.num`,
-`.sect-head`). A sub-department picker at the top scopes everything below it,
-with **+ Generate New Sub-Department** beside it (clone an existing scheme, or
-start blank).
+One page holds every rule, threshold and per-person tick, laid out as dense
+tables following `DESIGN.md` v3.0 (`.ledger-table`, `.num`, `.sect-head`).
+
+**Scoping is the route's job, not a picker's** (2026-09-01). It used to open a
+sub-department picker at the top and filter the page from it; the sidebar now
+asks the same question one level up, and `/revenue/fair/rules` loads Fair's
+scheme and nothing else. Two answers to one question is how a ladder gets
+edited while another team's name is on screen. **+ Generate New Sub-Department**
+stays on the page — a new one usually starts as a clone of the ruleset you are
+looking at — and the new sub-department appears in the sidebar.
 
 **I. Scheme rules** — one row per switch, so the whole calculation is visible at a glance.
 
@@ -766,16 +811,26 @@ move; a person who qualifies for a higher rank than they hold shows a
 
 ## 10. Other UI
 
+Every route below `/revenue/<sub>` is scoped to that sub-department: its runs
+(`uq_comm_run_per_sub_dept_period`), its scheme's rules, its people. The sales
+import is the one exception — one ERP export per month covers the whole
+department, so `sales_import_batches` is keyed by period alone and the slug in
+that URL is only where Back returns to.
+
 | Route | Purpose |
 |---|---|
-| `/hr-costing/commission` | period landing — months with sales data, run status per sub-department |
-| `…/[period]` | run dashboard: hero total, per-salesperson `.ledger-table` (PR / group / C1 / KPI / Open Bill / Override / Incentive / Total), warnings, penalised bills, orders waiting on a deposit, Compute + Apply + Reopen |
-| `…/[period]/statement/[staffId]` | one salesperson's month ringgit by ringgit — the figures, margin brand by brand, and a section per component drilling into `comm_statement_lines` |
-| `…/[period]/import` | ERP import wizard: parse → period + cancelled report → **agent matching** → commit |
-| `…/[period]/open-bill` | day-by-day board, pre-filled from `sequence_in_day`, reviewed by a human. Defaults to the salesperson-days still on a suggestion |
-| `/hr-costing/commission/org-chart` | the org chart (below) |
-| `…/rules` | every rule the engine reads (§9) — Principal + HR |
-| `…/products` | item code → unit cost + brand — Principal only |
+| `/revenue` | no page of its own — redirects to the first sub-department. Serves the old `/hr-costing/commission/*` links and the not-set-up-yet case |
+| `/revenue/<sub>` | **Commission Calculation** tab — months with sales data and this sub-department's run status against each |
+| `…/<sub>/hierarchy` | **Staff Hierarchy** tab — the org chart (below) |
+| `…/<sub>/rules` | **Rules** tab — every rule the engine reads (§9) |
+| `…/<sub>/[period]` | run dashboard: hero total, per-salesperson `.ledger-table` (PR / group / C1 / KPI / Open Bill / Override / Incentive / Total), warnings, penalised bills, orders waiting on a deposit, Compute + Apply + Reopen |
+| `…/<sub>/[period]/statement/[staffId]` | one salesperson's month ringgit by ringgit — the figures, margin brand by brand, and a section per component drilling into `comm_statement_lines` |
+| `…/<sub>/[period]/import` | ERP import wizard: parse → period + cancelled report → **agent matching** → commit. Department-wide |
+| `…/<sub>/[period]/open-bill` | day-by-day board, pre-filled from `sequence_in_day`, reviewed by a human. Defaults to the salesperson-days still on a suggestion |
+| `/revenue/products` | item code → unit cost + brand — department-wide, Principal only |
+
+All of `/revenue` is Principal + HR (`canAccessRevenue`); the Product List
+narrows to Principal (`canAccessProductList`).
 
 The deferred-orders list is a section on the run dashboard rather than a page
 of its own: it is read once, alongside the total it is holding back.

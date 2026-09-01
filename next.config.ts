@@ -13,15 +13,31 @@ const nextConfig: NextConfig = {
     },
   },
 
-  // Staff moved out of HR Costing into the Team module on 2026-09-01. Deep
-  // links to a person, the edit form and the InfoTech import were all in use,
-  // so the old tree keeps resolving. Temporary rather than permanent: a 308 is
-  // cached by the browser forever, and this path may yet be reused.
+  // Two moves on 2026-09-01, each leaving live bookmarks behind. Temporary
+  // rather than permanent: a 308 is cached by the browser forever, and
+  // either path may yet be reused.
   async redirects() {
     return [
+      // Staff moved out of HR Costing into the Team module. Deep links to a
+      // person, the edit form and the InfoTech import were all in use, so the
+      // old tree keeps resolving.
       {
         source: '/hr-costing/staff/:path*',
         destination: '/team/people/:path*',
+        permanent: false,
+      },
+      // Commission left HR Costing for its own Departments group on
+      // 2026-09-01 (`/revenue/<sub-department>`). A bookmark cannot know which
+      // sub-department it meant, so everything lands on /revenue, which sends
+      // on to the first one.
+      {
+        source: '/hr-costing/commission',
+        destination: '/revenue',
+        permanent: false,
+      },
+      {
+        source: '/hr-costing/commission/:path*',
+        destination: '/revenue',
         permanent: false,
       },
     ]

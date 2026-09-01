@@ -6,7 +6,14 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { User } from '@/types'
 import { createClient } from '@/lib/supabase/client'
 import { getRoleLabel } from '@/lib/roles'
-import { navEntries, isGroup, itemActive, tabHrefs, type NavEntry } from './nav-config'
+import {
+  buildNavEntries,
+  isGroup,
+  itemActive,
+  tabHrefs,
+  type NavData,
+  type NavEntry,
+} from './nav-config'
 
 // The fifth tab. Everything the four promoted tabs don't cover — for a
 // Principal that is ~45 destinations — rendered as one scrolling sheet
@@ -18,13 +25,15 @@ import { navEntries, isGroup, itemActive, tabHrefs, type NavEntry } from './nav-
 
 interface Props {
   user: User
+  /** Database-backed nav rows (Revenue's sub-departments), read by the layout. */
+  navData: NavData
   open: boolean
   onClose: () => void
 }
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII']
 
-export default function MoreSheet({ user, open, onClose }: Props) {
+export default function MoreSheet({ user, navData, open, onClose }: Props) {
   const pathname = usePathname() ?? ''
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -53,7 +62,7 @@ export default function MoreSheet({ user, open, onClose }: Props) {
     }
   }, [open, onClose])
 
-  const visible = navEntries.filter((entry) => entry.visible(user.role))
+  const visible = buildNavEntries(navData).filter((entry) => entry.visible(user.role))
 
   // Group consecutive entries by section label, same pass the sidebar makes.
   const sections: { label: string | null; entries: NavEntry[] }[] = []

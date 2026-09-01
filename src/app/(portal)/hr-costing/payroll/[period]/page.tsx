@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
+import { revenuePath, subDeptSlug } from '@/lib/revenue'
 import { round2 } from '@/lib/payroll-funding'
 import PayrollGrid, { type PayrollRowData } from '../_components/PayrollGrid'
 import CopyFromLastMonthButton from '../_components/CopyFromLastMonthButton'
@@ -100,17 +101,32 @@ export default async function PayrollGridPage({ params }: PageProps) {
   // Which salespeople have a statement behind this month's Commission figure.
   // The badge on a derived row links to it; without a computed run there is
   // nothing to link to yet and the cell says so instead.
+  //
+  // The statement lives under its own sub-department's slug, so the run's
+  // sub-department comes along and the link is built per person — two
+  // sub-departments can both have a run for the same month.
   const { data: commRunRows } = await supabase
     .from('comm_runs')
-    .select('id')
+    .select('id, comm_sub_departments (name)')
     .eq('period_month', period)
     .in('status', ['computed', 'applied', 'locked'])
-  const commRunIds = (commRunRows ?? []).map(r => r.id)
+  const commRuns = (commRunRows ?? []) as unknown as Array<{
+    id: string
+    comm_sub_departments: { name: string } | null
+  }>
+  const subDeptOfRun = new Map(commRuns.map(r => [r.id, r.comm_sub_departments?.name ?? null]))
 
-  const { data: commStatementRows } = commRunIds.length
-    ? await supabase.from('comm_statements').select('staff_id').in('run_id', commRunIds)
+  const { data: commStatementRows } = commRuns.length
+    ? await supabase
+        .from('comm_statements')
+        .select('staff_id, run_id')
+        .in('run_id', commRuns.map(r => r.id))
     : { data: null }
-  const hasStatement = new Set((commStatementRows ?? []).map(r => r.staff_id))
+  const statementSlug = new Map<string, string>()
+  for (const r of (commStatementRows ?? []) as Array<{ staff_id: string; run_id: string }>) {
+    const name = subDeptOfRun.get(r.run_id)
+    if (name) statementSlug.set(r.staff_id, subDeptSlug(name))
+  }
 
   // Latest payment request for this run (if run exists). Order by created_at
   // desc so we can spot an active one first; uniqueness is enforced at DB,
@@ -212,8 +228,8 @@ export default async function PayrollGridPage({ params }: PageProps) {
       gross: Number(r.gross),
       net: Number(r.net),
       commission_is_derived: staff?.departments?.payroll_source === 'commission',
-      commission_statement_href: hasStatement.has(r.staff_id)
-        ? `/hr-costing/commission/${period}/statement/${r.staff_id}`
+      commission_statement_href: statementSlug.has(r.staff_id)
+        ? revenuePath(statementSlug.get(r.staff_id)!, period, 'statement', r.staff_id)
         : null,
     }
   })

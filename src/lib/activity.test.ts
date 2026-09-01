@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { describeActivity, describePagePath, type ActivityRow } from './activity'
-import { navLabelByPath } from '@/components/layout/nav-config'
+import { emptyNavData, navLabelByPath } from '@/components/layout/nav-config'
 
-const L = navLabelByPath
+// The constant destinations are enough here; the Revenue group's children come
+// from the database and are covered by their own case below.
+const L = navLabelByPath(emptyNavData)
 
 describe('describePagePath', () => {
   it('names a top-level page the way the sidebar does', () => {
@@ -36,11 +38,23 @@ describe('describePagePath', () => {
   })
 
   it('treats a period segment as an id, not a page name', () => {
-    expect(describePagePath('/hr-costing/commission/2026-08', L).detail).toBe('detail 2026-08')
+    expect(describePagePath('/hr-costing/payroll/2026-08', L).detail).toBe('detail 2026-08')
   })
 
   it('ignores a query string', () => {
     expect(describePagePath('/dept-pool?basis=accrual', L).target).toBe('Dept Pool · Cash')
+  })
+
+  it('names a data-driven Revenue sub-department', () => {
+    // The Revenue group's children are comm_sub_departments rows, so the map
+    // only knows /revenue/fair when the caller hands the rows in.
+    const withFair = navLabelByPath({ revenueSubDepts: [{ slug: 'fair', name: 'Fair' }] })
+    expect(describePagePath('/revenue/fair/rules', withFair)).toEqual({
+      target: 'Revenue · Fair',
+      detail: 'Rules',
+    })
+    // Without them it is just a path, not a wrong label.
+    expect(describePagePath('/revenue/fair/rules', L).target).toBe('Rules')
   })
 
   it('falls back to the last segment for a path under no nav entry', () => {
