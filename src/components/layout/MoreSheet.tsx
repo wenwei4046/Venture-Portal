@@ -82,6 +82,61 @@ export default function MoreSheet({ user, navData, open, onClose }: Props) {
 
   let romanIdx = 0
 
+  // The nav runs three levels since the Revenue Department arrived — Revenue ›
+  // Fair › Comm Cal — so this recurses rather than assuming a group holds only
+  // links. Still no accordions: on a sheet you are already
+  // one tap in, and a second tap to reveal children turns a lookup into a
+  // hunt. Every level is listed and the sheet scrolls.
+  function renderEntry(entry: NavEntry, depth: number): React.ReactNode {
+    if (!entry.visible(user.role)) return null
+
+    if (isGroup(entry)) {
+      const children = entry.children.filter((c) => c.visible(user.role))
+      if (children.length === 0) return null
+      // A group with a page of its own usually shares it with its first child
+      // (Fair and its Commission Calculation are the same URL) — listing it
+      // twice would just be noise. It only earns a row of its own when no
+      // child carries it.
+      const ownDestination =
+        entry.href && !children.some((c) => !isGroup(c) && c.href === entry.href)
+          ? entry.href
+          : null
+      return (
+        <li key={`${entry.label}-${depth}`} className={depth === 0 ? 'mb-1.5' : 'mb-1'}>
+          {ownDestination ? (
+            <SheetLink
+              href={ownDestination}
+              label={entry.label}
+              active={pathname === ownDestination}
+              dimmed={promoted.has(ownDestination)}
+            />
+          ) : (
+            <div
+              className={`font-serif italic text-graphite px-1 ${
+                depth === 0 ? 'text-[13px] pt-1.5 pb-1' : 'text-[12px] pt-1 pb-0.5'
+              }`}
+            >
+              {entry.label}
+            </div>
+          )}
+          <ul className="pl-3 border-l border-hairline ml-1">
+            {children.map((child) => renderEntry(child, depth + 1))}
+          </ul>
+        </li>
+      )
+    }
+
+    return (
+      <SheetLink
+        key={entry.href}
+        href={entry.href}
+        label={entry.label}
+        active={itemActive(entry, pathname, tabParam, basisParam)}
+        dimmed={promoted.has(entry.href)}
+      />
+    )
+  }
+
   return (
     <div
       className={`md:hidden print:hidden fixed inset-0 z-50 flex flex-col transition-opacity duration-200 ${
@@ -143,41 +198,7 @@ export default function MoreSheet({ user, navData, open, onClose }: Props) {
                   </div>
                 ) : null}
 
-                <ul>
-                  {section.entries.map((entry) => {
-                    if (isGroup(entry)) {
-                      const children = entry.children.filter((c) => c.visible(user.role))
-                      if (children.length === 0) return null
-                      return (
-                        <li key={entry.label} className="mb-1.5">
-                          <div className="font-serif italic text-[13px] text-graphite px-1 pt-1.5 pb-1">
-                            {entry.label}
-                          </div>
-                          <ul className="pl-3 border-l border-hairline ml-1">
-                            {children.map((child) => (
-                              <SheetLink
-                                key={child.href}
-                                href={child.href}
-                                label={child.label}
-                                active={itemActive(child, pathname, tabParam, basisParam)}
-                                dimmed={promoted.has(child.href)}
-                              />
-                            ))}
-                          </ul>
-                        </li>
-                      )
-                    }
-                    return (
-                      <SheetLink
-                        key={entry.href}
-                        href={entry.href}
-                        label={entry.label}
-                        active={itemActive(entry, pathname, tabParam, basisParam)}
-                        dimmed={promoted.has(entry.href)}
-                      />
-                    )
-                  })}
-                </ul>
+                <ul>{section.entries.map((entry) => renderEntry(entry, 0))}</ul>
               </div>
             )
           })}

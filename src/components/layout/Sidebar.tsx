@@ -6,10 +6,12 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { UserRole } from '@/types'
 import {
   buildNavEntries,
+  groupActive,
   itemActive,
   isGroup,
   type NavData,
   type NavEntry,
+  type NavGroup,
   type NavItem,
 } from './nav-config'
 
@@ -43,43 +45,53 @@ export default function Sidebar({ role, navData }: SidebarProps) {
     }
   }
 
-  // Track which groups are open. Auto-open if current path matches a child.
-  const getInitialOpen = () => {
+  // Open state is keyed by the group's path through the tree ("Revenue/Fair"),
+  // not by its label alone: the tree is three levels deep since the Revenue
+  // Department arrived, and a sub-department is free to be named after a group
+  // above it.
+  const groupKey = (label: string, prefix: string) => (prefix ? `${prefix}/${label}` : label)
+
+  /** Every group on the path to the page being read, keyed and open. */
+  function openOnPath(entries: NavEntry[], prefix: string): Record<string, boolean> {
     const open: Record<string, boolean> = {}
-    for (const entry of visible) {
-      if (isGroup(entry)) {
-        open[entry.label] = entry.children.some((c) => itemActive(c, pathname, tabParam, basisParam))
+    for (const entry of entries) {
+      if (!isGroup(entry)) continue
+      const key = groupKey(entry.label, prefix)
+      if (groupActive(entry, pathname, tabParam, basisParam)) {
+        open[key] = true
+        Object.assign(open, openOnPath(entry.children, key))
       }
     }
     return open
   }
-  const [groupOpen, setGroupOpen] = useState(getInitialOpen)
 
-  function toggleGroup(label: string) {
-    setGroupOpen((prev) => ({ ...prev, [label]: !prev[label] }))
+  // Track which groups are open. Auto-open if current path matches a child.
+  const [groupOpen, setGroupOpen] = useState(() => openOnPath(visible, ''))
+
+  function toggleGroup(key: string) {
+    setGroupOpen((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
   // Eagerly prefetch ALL visible routes on mount for instant navigation
   useEffect(() => {
-    visible.forEach((entry) => {
-      if (isGroup(entry)) {
-        entry.children.forEach((child) => {
-          if (child.href !== pathname) router.prefetch(child.href)
-        })
-      } else if (entry.href !== pathname) {
-        router.prefetch(entry.href)
-      }
-    })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-open group when navigating to a child page
-  useEffect(() => {
-    for (const entry of visible) {
-      if (isGroup(entry)) {
-        const match = entry.children.some((c) => itemActive(c, pathname, tabParam, basisParam))
-        if (match) setGroupOpen((prev) => ({ ...prev, [entry.label]: true }))
+    const prefetch = (entries: NavEntry[]) => {
+      for (const entry of entries) {
+        if (isGroup(entry)) {
+          if (entry.href && entry.href !== pathname) router.prefetch(entry.href)
+          prefetch(entry.children)
+        } else if (entry.href !== pathname) {
+          router.prefetch(entry.href)
+        }
       }
     }
+    prefetch(visible)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-open every group on the way to the page being read — both Revenue and
+  // the sub-department inside it, so arriving at /revenue/fair/rules from a
+  // link shows the rail that page belongs to.
+  useEffect(() => {
+    setGroupOpen((prev) => ({ ...prev, ...openOnPath(visible, '') }))
   }, [pathname, tabParam]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Desktop pin (2026-08-29 "固定钉住需要"): keeps the panel permanently open.
@@ -103,6 +115,118 @@ export default function Sidebar({ role, navData }: SidebarProps) {
   // Roman numeral counter for labeled sections only (skip the unlabeled overview).
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII']
   let romanIdx = 0
+
+  // ── Rendering ────────────────────────────────────────────────────────────
+  //
+  // One recursive pass, because the nav is no longer a fixed two levels: the
+  // Revenue Department reads Revenue › Fair › Commission Calculation. `depth`
+  // picks type size and indent and nothing else — a row has the same shape at
+  // every level, which is what keeps the third one reading as part of the nav
+  // rather than as a panel bolted inside it.
+
+  function renderEntries(entries: NavEntry[], depth: number, prefix: string) {
+    return entries
+      .filter((entry) => entry.visible(role))
+      .map((entry) =>
+        isGroup(entry) ? renderGroup(entry, depth, prefix) : renderItem(entry as NavItem, depth),
+      )
+  }
+
+  function renderGroup(group: NavGroup, depth: number, prefix: string) {
+    const key = groupKey(group.label, prefix)
+    const isOpen = !!groupOpen[key]
+    // Collapsed, a group wears its active child's highlight — that is the only
+    // sign left that the page being read is in there. Open, the child wears it.
+    const lit = groupActive(group, pathname, tabParam, basisParam) && !isOpen
+
+    const chevron = (
+      <span className={`text-[10px] transition-transform ${isOpen ? 'rotate-180' : ''}`}>▼</span>
+    )
+
+    return (
+      <div key={key}>
+        {group.href ? (
+          // A group with a page of its own: the label navigates, the chevron
+          // folds. Fair stays one click from the sidebar, the way it was before
+          // its three views moved in underneath it.
+          <div
+            className={
+              'nav-link relative flex items-center mb-0.5 rounded-md ' +
+              (lit ? 'bg-accent-bg text-accent' : 'text-graphite hover:bg-surface-2 hover:text-ink')
+            }
+          >
+            <Marker active={lit} depth={depth} />
+            <Link
+              href={group.href}
+              className={
+                'flex-1 min-w-0 truncate ' +
+                (lit
+                  ? `${labelPad(depth, true)} font-serif italic ${labelSize(depth, true)}`
+                  : `${labelPad(depth, false)} font-sans tracking-[0.005em] ${labelSize(depth, false)}`)
+              }
+            >
+              {group.label}
+            </Link>
+            <button
+              type="button"
+              onClick={() => toggleGroup(key)}
+              className="shrink-0 pl-1 pr-3 py-1.5 leading-none"
+              aria-expanded={isOpen}
+              aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${group.label}`}
+            >
+              {chevron}
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => toggleGroup(key)}
+            aria-expanded={isOpen}
+            className={
+              'nav-link relative w-full flex items-center justify-between mb-0.5 rounded-md ' +
+              (lit
+                ? `bg-accent-bg text-accent font-serif italic ${labelPad(depth, true)} ${labelSize(depth, true)}`
+                : `text-graphite hover:bg-surface-2 hover:text-ink font-sans tracking-[0.005em] ${labelPad(depth, false)} ${labelSize(depth, false)}`)
+            }
+          >
+            <Marker active={lit} depth={depth} />
+            {group.label}
+            {chevron}
+          </button>
+        )}
+        {isOpen ? (
+          <div
+            className={
+              depth === 0
+                ? 'ml-3 border-l border-hairline pl-2'
+                : 'ml-2 border-l border-hairline pl-1.5'
+            }
+          >
+            {renderEntries(group.children, depth + 1, key)}
+          </div>
+        ) : null}
+      </div>
+    )
+  }
+
+  function renderItem(item: NavItem, depth: number) {
+    const active = itemActive(item, pathname, tabParam, basisParam)
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        className={
+          'nav-link relative block truncate mb-0.5 rounded-md ' +
+          (active
+            ? `bg-accent-bg text-accent font-serif italic ${labelPad(depth, true)} ${labelSize(depth, true)}`
+            : `text-graphite hover:bg-surface-2 hover:text-ink font-sans tracking-[0.005em] ${labelPad(depth, false)} ${labelSize(depth, false)}`)
+        }
+      >
+        <Marker active={active} depth={depth} />
+        {item.label}
+      </Link>
+    )
+  }
 
   // Desktop (2026-08-29, user: "background colour 可以换一下…然后做成隐藏的,
   // 鼠标划过去才显示" + "固定钉住需要"): the sidebar rests as a slim 16px rail
@@ -201,96 +325,7 @@ export default function Sidebar({ role, navData }: SidebarProps) {
                   />
                 </div>
               ) : null}
-              {section.entries.map((entry) => {
-                if (isGroup(entry)) {
-                  const groupActive = entry.children.some((c) =>
-                    itemActive(c, pathname, tabParam, basisParam)
-                  )
-                  const isOpen = !!groupOpen[entry.label]
-                  return (
-                    <div key={entry.label}>
-                      <button
-                        type="button"
-                        onClick={() => toggleGroup(entry.label)}
-                        className={
-                          groupActive && !isOpen
-                            ? 'nav-link relative w-full flex items-center justify-between pl-[18px] pr-3 py-[7px] mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[15.5px]'
-                            : 'nav-link relative w-full flex items-center justify-between pl-[18px] pr-3 py-1.5 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-[13px] font-sans tracking-[0.005em]'
-                        }
-                      >
-                        <span
-                          aria-hidden
-                          className={
-                            groupActive && !isOpen
-                              ? 'absolute left-[6px] top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-sm bg-accent'
-                              : 'absolute left-[8px] top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full bg-muted opacity-40'
-                          }
-                        />
-                        {entry.label}
-                        <span
-                          className={`text-[10px] transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                        >
-                          ▼
-                        </span>
-                      </button>
-                      {isOpen ? (
-                        <div className="ml-3 border-l border-hairline pl-2">
-                          {entry.children
-                            .filter((c) => c.visible(role))
-                            .map((child) => {
-                              const active = itemActive(child, pathname, tabParam, basisParam)
-                              return (
-                                <Link
-                                  key={child.href}
-                                  href={child.href}
-                                  className={
-                                    active
-                                      ? 'nav-link relative block pl-[18px] pr-3 py-[5px] mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[14px]'
-                                      : 'nav-link relative block pl-[18px] pr-3 py-1 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-[12.5px] font-sans tracking-[0.005em]'
-                                  }
-                                >
-                                  <span
-                                    aria-hidden
-                                    className={
-                                      active
-                                        ? 'absolute left-[6px] top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-sm bg-accent'
-                                        : 'absolute left-[8px] top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full bg-muted opacity-40'
-                                    }
-                                  />
-                                  {child.label}
-                                </Link>
-                              )
-                            })}
-                        </div>
-                      ) : null}
-                    </div>
-                  )
-                }
-
-                const item = entry as NavItem
-                const active = itemActive(item, pathname, tabParam, basisParam)
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={
-                      active
-                        ? 'nav-link relative block pl-[18px] pr-3 py-[7px] mb-0.5 rounded-md bg-accent-bg text-accent font-serif italic text-[15.5px]'
-                        : 'nav-link relative block pl-[18px] pr-3 py-1.5 mb-0.5 rounded-md text-graphite hover:bg-surface-2 hover:text-ink text-[13px] font-sans tracking-[0.005em]'
-                    }
-                  >
-                    <span
-                      aria-hidden
-                      className={
-                        active
-                          ? 'absolute left-[6px] top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-sm bg-accent'
-                          : 'absolute left-[8px] top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full bg-muted opacity-40'
-                      }
-                    />
-                    {item.label}
-                  </Link>
-                )
-              })}
+              {renderEntries(section.entries, 0, '')}
             </div>
           )
         })}
@@ -306,5 +341,38 @@ export default function Sidebar({ role, navData }: SidebarProps) {
       </div>
       </div>
     </aside>
+  )
+}
+
+// Type shrinks one step per level so three levels still read as a hierarchy
+// inside 220px. An active row sits a shade larger and in the serif italic —
+// the portal's "you are here" everywhere else too.
+function labelSize(depth: number, active: boolean): string {
+  if (depth === 0) return active ? 'text-[15.5px]' : 'text-[13px]'
+  if (depth === 1) return active ? 'text-[14px]' : 'text-[12.5px]'
+  return active ? 'text-[13px]' : 'text-[12px]'
+}
+
+function labelPad(depth: number, active: boolean): string {
+  if (depth >= 2) return active ? 'pl-[16px] pr-2 py-[3px]' : 'pl-[16px] pr-2 py-1'
+  if (depth === 1) return active ? 'pl-[18px] pr-3 py-[5px]' : 'pl-[18px] pr-3 py-1'
+  return active ? 'pl-[18px] pr-3 py-[7px]' : 'pl-[18px] pr-3 py-1.5'
+}
+
+/** The left gutter mark: a bar when the row is the page being read, a dot
+ *  otherwise. Both tuck in with depth so the third level does not shout. */
+function Marker({ active, depth }: { active: boolean; depth: number }) {
+  const barHeight = depth === 0 ? 'h-4' : depth === 1 ? 'h-3' : 'h-2.5'
+  const barLeft = depth >= 2 ? 'left-[5px]' : 'left-[6px]'
+  const dotLeft = depth >= 2 ? 'left-[7px]' : 'left-[8px]'
+  return (
+    <span
+      aria-hidden
+      className={
+        active
+          ? `absolute ${barLeft} top-1/2 -translate-y-1/2 w-[3px] ${barHeight} rounded-sm bg-accent`
+          : `absolute ${dotLeft} top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full bg-muted opacity-40`
+      }
+    />
   )
 }

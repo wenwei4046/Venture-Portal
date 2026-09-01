@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
 import LedgerRow from '@/components/LedgerRow'
-import RevenueTabs from '../_components/RevenueTabs'
 import { requireSubDepartment } from '../_lib/sub-departments'
 
 interface PageProps {
@@ -80,8 +79,6 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
           Import sales orders
         </Link>
       </div>
-
-      <RevenueTabs slug={subDept.slug} active="calculation" />
 
       {!subDept.schemeId ? (
         <div className="bg-surface-2 border border-hairline text-graphite rounded-md p-4 mb-8 text-sm font-sans">
