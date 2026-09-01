@@ -4109,6 +4109,7 @@ export type Database = {
           non_statutory_allowance: number
           nric: string | null
           pcb_category: Database["public"]["Enums"]["pcb_category"]
+          reports_to: string | null
           resignation_date: string | null
           socso_category: Database["public"]["Enums"]["socso_category"]
           socso_er: number | null
@@ -4148,6 +4149,7 @@ export type Database = {
           non_statutory_allowance?: number
           nric?: string | null
           pcb_category?: Database["public"]["Enums"]["pcb_category"]
+          reports_to?: string | null
           resignation_date?: string | null
           socso_category?: Database["public"]["Enums"]["socso_category"]
           socso_er?: number | null
@@ -4187,6 +4189,7 @@ export type Database = {
           non_statutory_allowance?: number
           nric?: string | null
           pcb_category?: Database["public"]["Enums"]["pcb_category"]
+          reports_to?: string | null
           resignation_date?: string | null
           socso_category?: Database["public"]["Enums"]["socso_category"]
           socso_er?: number | null
@@ -4211,6 +4214,13 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_staff_costs_reports_to_fkey"
+            columns: ["reports_to"]
+            isOneToOne: false
+            referencedRelation: "hr_staff_costs"
             referencedColumns: ["id"]
           },
           {
