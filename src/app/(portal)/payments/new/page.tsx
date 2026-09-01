@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { fundingSourceFromTerms } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
 import type { AccountType } from '@/lib/coa'
@@ -26,7 +26,7 @@ interface Props {
 }
 
 export default async function NewPaymentPage({ searchParams }: Props) {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const supabase = await createClient()
 
   const { invoice_id: invoiceId, preset, mode } = await searchParams

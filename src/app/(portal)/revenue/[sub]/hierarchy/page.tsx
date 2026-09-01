@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { revenuePath } from '@/lib/revenue'
 import OrgChart, { type OrgPerson, type OrgRank } from './_components/OrgChart'
@@ -25,7 +25,7 @@ interface PageProps {
  * second one.
  */
 export default async function StaffHierarchyPage({ params }: PageProps) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   const { sub } = await params
   const subDept = await requireSubDepartment(sub)
 

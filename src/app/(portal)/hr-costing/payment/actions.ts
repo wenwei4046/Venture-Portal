@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 
 interface DisbursementResult {
   group_id: string
@@ -25,7 +25,7 @@ export async function createPayrollDisbursement(
   scope: PayrollScope,
   paymentDate: string,
 ): Promise<DisbursementResult> {
-  await requireRole(['hr', 'principal'])
+  await requirePermission('hr_costing')
   const supabase = await createClient()
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) {
@@ -61,7 +61,7 @@ export async function generateStatutoryScheme(
   scheme: StatutoryScheme,
   paymentDate?: string,
 ): Promise<void> {
-  await requireRole(['hr', 'finance', 'principal'])
+  await requirePermission('hr_costing', 'treasury')
   const supabase = await createClient()
 
   if (paymentDate && !/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) {
@@ -97,7 +97,7 @@ export async function generateStatutoryDirectorTopup(
   scheme: StatutoryScheme,
   paymentDate?: string,
 ): Promise<void> {
-  await requireRole(['hr', 'finance', 'principal'])
+  await requirePermission('hr_costing', 'treasury')
   const supabase = await createClient()
 
   if (paymentDate && !/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) {
@@ -125,7 +125,7 @@ export async function generateStatutoryDirectorTopup(
  * editor is Finance-gated, but payroll payment dates are HR's knowledge).
  */
 export async function setPayrollPvDate(voucherId: string, paymentDate: string): Promise<void> {
-  await requireRole(['hr', 'finance', 'principal'])
+  await requirePermission('hr_costing', 'treasury')
   const supabase = await createClient()
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) throw new Error('Invalid payment date')

@@ -7,22 +7,37 @@
 // the definition has to live in one place or the three drift apart.
 
 import type { UserRole } from '@/types'
+import type { PermissionHolder } from '@/lib/permissions'
 import { PRODUCT_LIST_PATH, revenuePath } from '@/lib/revenue'
 import {
-  canAccessTreasury,
-  canAccessDeptPool,
-  canAccessDirectorSalary,
-  canAccessDirectorPool,
-  canAccessProductList,
-  canAccessRevenue,
-  canAccessVenturePool,
-  canAccessClaims,
-  canAccessReports,
-  canAccessDeptReports,
-  canAccessSettings,
+  canAccessAuditLog,
   canAccessCategories,
+  canAccessClaims,
+  canAccessDeptPool,
+  canAccessDeptReports,
+  canAccessDirectorPool,
+  canAccessDirectorSalary,
+  canAccessMyBilling,
+  canAccessOpex,
+  canAccessProductList,
+  canAccessReconciliation,
+  canAccessReports,
+  canAccessRevenue,
+  canAccessSettings,
+  canAccessTeam,
+  canAccessTreasury,
+  canAccessVenturePool,
   canApprove,
 } from '@/lib/roles'
+
+/**
+ * Who the nav is being built for.
+ *
+ * Permissions decide what shows; `role` survives only for the two entries that
+ * are about somebody having ONE department of their own, which no permission
+ * expresses.
+ */
+export type NavViewer = PermissionHolder & { role: UserRole }
 
 export interface NavItem {
   href: string
@@ -45,7 +60,7 @@ export interface NavItem {
   // Never active on these path prefixes (a sibling entry owns them,
   // e.g. Payments must not light up on /payments/new — that's Receipt's).
   notPaths?: string[]
-  visible: (role: UserRole) => boolean
+  visible: (viewer: NavViewer) => boolean
 }
 
 // Shared active-state test for items and group children.
@@ -78,7 +93,7 @@ export interface NavGroup {
    *  its header is a link and only the chevron collapses it. One click still
    *  lands on the Commission Calculation it always did. */
   href?: string
-  visible: (role: UserRole) => boolean
+  visible: (viewer: NavViewer) => boolean
   /** `NavEntry`, not `NavItem` — a group may hold a group. The Revenue
    *  Department runs three levels: Revenue › Fair › Comm Cal. */
   children: NavEntry[]
@@ -105,8 +120,8 @@ export function groupActive(
   )
 }
 
-const isHR = (role: UserRole) => role === 'hr'
-const isHRorPrincipal = (role: UserRole) => role === 'hr' || role === 'principal'
+const isHR = (v: NavViewer) => v.role === 'hr'
+const isHRorPrincipal = (v: NavViewer) => canAccessTeam(v)
 
 /**
  * The parts of the nav that cannot be written down ahead of time.
@@ -206,20 +221,20 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     // OPEX shows a department's payroll breakdown (per-employee Basic / KPI /
     // Allowance / ER statutory). Dept Manager sees own dept only; Principal
     // picks any dept via the in-page switcher.
-    { href: '/opex', label: 'OPEX', section: 'Departments', visible: (r) => r === 'dept_manager' || r === 'principal' },
+    { href: '/opex', label: 'OPEX', section: 'Departments', visible: canAccessOpex },
     // Dept-manager billing workbench (2026-08-20): own-segment invoices with
     // 回款 status, 开单 (draft-only), contract tracking with expiry.
-    { href: '/my-billing', label: 'My Billing', section: 'Departments', visible: (r) => r === 'dept_manager' },
+    { href: '/my-billing', label: 'My Billing', section: 'Departments', visible: canAccessMyBilling },
     // Marketing dept_manager can create service contracts for their dept
     // (mig 207 RLS). The page self-gates on Marketing dept — other dept_managers
     // clicking this would hit notFound().
-    { href: '/billing/contracts/new', label: 'New Contract', section: 'Departments', visible: (r) => r === 'dept_manager' },
+    { href: '/billing/contracts/new', label: 'New Contract', section: 'Departments', visible: canAccessMyBilling },
     {
       label: 'Director',
       section: 'Departments',
       // Group shows when any child is visible: Principal + HR (Director Pool v2
       // dropped Finance's access, so Finance no longer sees the group at all).
-      visible: (r) => canAccessDirectorSalary(r) || canAccessDirectorPool(r),
+      visible: (v) => canAccessDirectorSalary(v) || canAccessDirectorPool(v),
       children: [
         { href: '/director-salary', label: 'Director Salary', visible: canAccessDirectorSalary },
         { href: '/director-pool', label: 'Director Pool', visible: canAccessDirectorPool },

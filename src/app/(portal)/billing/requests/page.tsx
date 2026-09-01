@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import RequestActionButtons from './_components/RequestActionButtons'
@@ -11,7 +11,7 @@ interface LineItem {
 }
 
 export default async function InvoiceRequestsPage() {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('billing')
   const supabase = await createClient()
 
   const [{ data: requests }, { data: companies }] = await Promise.all([

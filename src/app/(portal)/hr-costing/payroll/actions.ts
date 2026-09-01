@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import {
   resolveCommissionWrite,
   type DerivedCommissionRow,
@@ -17,7 +17,7 @@ import { assertPeriodOpen } from '@/lib/period-lock'
  * billing view + payment-request flow unlock immediately).
  */
 export async function submitToFinance(period: string): Promise<void> {
-  const user = await requireRole(['hr', 'principal'])
+  const user = await requirePermission('hr_costing')
   const supabase = await createClient()
 
   // Period-lock gate — RPC assumes caller already checked.
@@ -45,7 +45,7 @@ export async function submitToFinance(period: string): Promise<void> {
  * Blocked once a payment request is in flight.
  */
 export async function reopenPayroll(period: string): Promise<void> {
-  const user = await requireRole(['hr', 'principal'])
+  const user = await requirePermission('hr_costing')
   const supabase = await createClient()
 
   await assertPeriodOpen(supabase, period)
@@ -135,7 +135,7 @@ export async function updatePayrollRow(
   id: string,
   fields: PayrollRowUpdate,
 ): Promise<void> {
-  await requireRole(['hr', 'principal'])
+  await requirePermission('hr_costing')
   const supabase = await createClient()
 
   const [row] = await stripDerivedCommission(supabase, [{ id, fields }])
@@ -160,7 +160,7 @@ export async function updatePayrollRow(
 export async function updatePayrollRows(
   updates: { id: string; fields: PayrollRowUpdate }[],
 ): Promise<{ saved: number }> {
-  await requireRole(['hr', 'principal'])
+  await requirePermission('hr_costing')
   if (updates.length === 0) return { saved: 0 }
 
   const supabase = await createClient()
@@ -213,7 +213,7 @@ export async function updateStaffStatutory(
   id: string,
   fields: StaffStatutoryUpdate,
 ): Promise<void> {
-  const user = await requireRole(['hr', 'principal'])
+  const user = await requirePermission('hr_costing')
   const supabase = await createClient()
 
   const allowed = new Set<StaffStatutoryField>(STAFF_STAT_FIELDS)
@@ -269,7 +269,7 @@ export async function updateStaffStatutory(
 }
 
 export async function resetStaffStatutoryToLookup(id: string): Promise<void> {
-  await requireRole(['hr', 'principal'])
+  await requirePermission('hr_costing')
   const supabase = await createClient()
 
   // Pull basic_salary so we can fire a no-op UPDATE that re-triggers the
@@ -312,7 +312,7 @@ export async function deletePayrollRows(
   ids: string[],
   period: string,
 ): Promise<{ deleted: number }> {
-  await requireRole(['hr', 'principal'])
+  await requirePermission('hr_costing')
   if (ids.length === 0) return { deleted: 0 }
 
   const supabase = await createClient()
@@ -343,7 +343,7 @@ export async function deletePayrollRows(
  * submitted/paid rows (which can only exist under a live run anyway) survive.
  */
 export async function deletePayrollPeriod(period: string): Promise<{ deleted: number }> {
-  await requireRole(['hr', 'principal'])
+  await requirePermission('hr_costing')
   const supabase = await createClient()
 
   await assertPeriodOpen(supabase, period)
@@ -382,7 +382,7 @@ export async function deletePayrollPeriod(period: string): Promise<{ deleted: nu
  * Same behavior as migration 126 backfill, now callable from the UI.
  */
 export async function createPayrollPeriod(period: string): Promise<{ created: number }> {
-  await requireRole(['hr', 'principal'])
+  await requirePermission('hr_costing')
   const supabase = await createClient()
 
   const { data: staff, error: staffErr } = await supabase
@@ -425,7 +425,7 @@ export async function createPayrollPeriod(period: string): Promise<{ created: nu
  *   - there's already an active request (UNIQUE partial index raises 23505)
  */
 export async function requestPayrollPayment(runId: string): Promise<string> {
-  const user = await requireRole(['hr', 'principal'])
+  const user = await requirePermission('hr_costing')
   const supabase = await createClient()
 
   const { data: run, error: readErr } = await supabase
@@ -483,7 +483,7 @@ export async function cancelPayrollPaymentRequest(
   requestId: string,
   reason: string,
 ): Promise<void> {
-  const user = await requireRole(['hr', 'principal'])
+  const user = await requirePermission('hr_costing')
   const supabase = await createClient()
 
   const trimmed = reason.trim()
@@ -536,7 +536,7 @@ export async function cancelPayrollPaymentRequest(
  * Only affects existing draft rows for p_period — does not create new rows.
  */
 export async function copyFromLastMonth(period: string): Promise<{ copied: number }> {
-  await requireRole(['hr', 'principal'])
+  await requirePermission('hr_costing')
   const supabase = await createClient()
 
   const periodDate = new Date(period + 'T00:00:00Z')

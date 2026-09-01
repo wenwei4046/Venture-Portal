@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import TeamTabs from '../_components/TeamTabs'
 import PeopleDirectory, { type PersonRow, type AccountRow } from './_components/PeopleDirectory'
 
@@ -14,7 +14,7 @@ import PeopleDirectory, { type PersonRow, type AccountRow } from './_components/
  * an unattached account is exactly the thing somebody needs to see and fix.
  */
 export default async function PeopleManagementPage() {
-  const user = await requireRole(['principal', 'hr'])
+  const user = await requirePermission('team')
   const supabase = await createClient()
 
   const [{ data: staff }, { data: accounts }] = await Promise.all([

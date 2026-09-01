@@ -1,4 +1,4 @@
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { revenuePath } from '@/lib/revenue'
 import { listSubDepartments } from '../../revenue/_lib/sub-departments'
@@ -24,7 +24,7 @@ import TeamOrgChart, { type ChartPerson } from './_components/TeamOrgChart'
  * now visible instead of implicit.
  */
 export default async function TeamHierarchyPage() {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('team')
   const supabase = await createClient()
 
   const [{ data: staffRows }, { data: positions }, subDepts] = await Promise.all([

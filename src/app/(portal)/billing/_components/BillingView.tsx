@@ -3,7 +3,7 @@
 // share one implementation. All internal component paths are preserved.
 
 import dayjs from 'dayjs'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import type { CreateInvoiceMode } from '../actions'
@@ -36,7 +36,7 @@ interface DeptSummary {
 }
 
 export default async function BillingView({ searchParams }: Props) {
-  const user = await requireRole(['principal', 'finance'])
+  const user = await requirePermission('billing')
   // Unified portal (2026-07-16): Principal creates/generates invoices and
   // contracts with the same buttons Finance sees.
   const canFinanceCreate = user.role === 'finance' || user.role === 'principal'

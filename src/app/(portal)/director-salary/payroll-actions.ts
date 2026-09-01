@@ -7,7 +7,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import type { InfotechRow } from '@/lib/import/infotech-payroll'
 import { matchDirector, normaliseName } from '@/lib/import/director-payroll-match'
@@ -29,7 +29,7 @@ export async function previewDirectorPayrollImport(
   rows: InfotechRow[],
   period: string,
 ): Promise<DirectorPayrollPreview> {
-  await requireRole(['hr', 'principal'])
+  await requirePermission('director_salary')
   const supabase = await createClient()
   const periodNorm = dayjs(period).startOf('month').format('YYYY-MM-DD')
 
@@ -80,7 +80,7 @@ export async function applyDirectorPayrollImport(
   rows: InfotechRow[],
   period: string,
 ): Promise<{ created: number; updated: number; skipped: number; failed: number }> {
-  const user = await requireRole(['hr', 'principal'])
+  const user = await requirePermission('director_salary')
   const supabase = await createClient()
   const periodNorm = dayjs(period).startOf('month').format('YYYY-MM-DD')
 
@@ -176,7 +176,7 @@ export type DirectorPayrollUpdate = Partial<Record<EditableField, number>>
  * so the grid can show it diverged from the file.
  */
 export async function updateDirectorPayrollRow(id: string, fields: DirectorPayrollUpdate) {
-  await requireRole(['hr', 'principal'])
+  await requirePermission('director_salary')
   const supabase = await createClient()
 
   const writes: Record<string, number> = {}
@@ -209,7 +209,7 @@ export async function updateDirectorPayrollRow(id: string, fields: DirectorPayro
 }
 
 export async function deleteDirectorPayrollRows(ids: string[], period: string) {
-  await requireRole(['hr', 'principal'])
+  await requirePermission('director_salary')
   const supabase = await createClient()
   if (ids.length === 0) throw new Error('No rows selected')
 

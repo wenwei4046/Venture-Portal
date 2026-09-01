@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import PrintButton from './_components/PrintButton'
 import EditableStatLine from './_components/EditableStatLine'
@@ -17,7 +17,7 @@ function formatPeriodLabel(period: string): string {
 }
 
 export default async function PayslipPage({ params }: PageProps) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('hr_costing')
   const { period, staffId } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()
 

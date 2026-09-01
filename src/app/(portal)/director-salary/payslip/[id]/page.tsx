@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import dayjs from 'dayjs'
 import PayslipNav from './_components/PayslipNav'
@@ -19,7 +19,7 @@ function formatPeriodLabel(period: string): string {
 }
 
 export default async function DirectorPayslipPage({ params }: PageProps) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('director_salary')
   const { id } = await params
 
   const supabase = await createClient()

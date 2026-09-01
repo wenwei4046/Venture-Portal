@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatMoneyBare, formatDate } from '@/lib/utils'
 import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
@@ -24,7 +24,7 @@ interface Props {
 }
 
 export default async function FundSourceDetailPage({ params }: Props) {
-  const user = await requireRole(['principal', 'finance'])
+  const user = await requirePermission('treasury')
   const { id } = await params
 
   const supabase = await createClient()

@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 
 // ─── Manual Journal Voucher actions ───────────────────────────────────────────
 //
@@ -39,7 +39,7 @@ function normalizeLines(lines: JournalVoucherLineInput[]) {
 }
 
 export async function createJournalVoucher(input: JournalVoucherInput): Promise<void> {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('reconciliation')
   const supabase = await createClient()
 
   const { error } = await supabase.rpc('create_manual_journal_voucher' as never, {
@@ -59,7 +59,7 @@ export async function updateJournalVoucher(
   id: string,
   input: JournalVoucherInput
 ): Promise<void> {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('reconciliation')
   const supabase = await createClient()
 
   const { error } = await supabase.rpc('update_manual_journal_voucher' as never, {
@@ -77,7 +77,7 @@ export async function updateJournalVoucher(
 }
 
 export async function deleteJournalVoucher(id: string): Promise<void> {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('reconciliation')
   const supabase = await createClient()
 
   const { error } = await supabase.rpc('delete_manual_journal_voucher' as never, {

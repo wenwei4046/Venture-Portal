@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { computeCommissionRun as runEngine } from '@/lib/commission/engine'
 import { toEngineInput, toRunPayload } from '@/lib/commission/run-payload'
 import type {
@@ -68,7 +68,7 @@ export interface ComputeSummary {
  * draft the human reviews. Nothing reaches payroll until Apply.
  */
 export async function computeRun(period: string, subDepartmentId?: string): Promise<ComputeSummary> {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   assertPeriod(period)
   const supabase = await client()
   const asAt = periodEnd(period)
@@ -270,7 +270,7 @@ export interface ApplySummary {
  * no order another run has already paid.
  */
 export async function applyRun(runId: string): Promise<ApplySummary> {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   const supabase = await client()
 
   const { data, error } = await supabase.rpc('apply_commission_run', { p_run_id: runId })
@@ -293,7 +293,7 @@ export async function applyRun(runId: string): Promise<ApplySummary> {
 
 /** Pull an applied run back to draft, undoing the payroll figures it wrote. */
 export async function reopenRun(runId: string): Promise<void> {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('revenue')
   const supabase = await client()
 
   const { error } = await supabase.rpc('reopen_commission_run', { p_run_id: runId })
@@ -317,7 +317,7 @@ export async function reopenRun(runId: string): Promise<void> {
  * suggestion almost always means swapping two orders.
  */
 export async function setOpenBillRank(orderId: string, rank: 1 | 2 | 3 | null): Promise<void> {
-  const user = await requireRole(['principal', 'hr'])
+  const user = await requirePermission('revenue')
   const supabase = await client()
 
   const { data: orderRow } = await supabase
@@ -372,7 +372,7 @@ export async function setOpenBillRank(orderId: string, rank: 1 | 2 | 3 | null): 
  * wins. Passing null hands the bill back to its costs.
  */
 export async function setManualMargin(orderId: string, marginPct: number | null): Promise<void> {
-  const user = await requireRole(['principal', 'hr'])
+  const user = await requirePermission('revenue')
   const supabase = await client()
 
   if (marginPct !== null && (marginPct < -1 || marginPct > 1)) {

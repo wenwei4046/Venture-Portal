@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { adminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { validateInvite } from '@/lib/invite'
 
 /**
@@ -34,7 +34,7 @@ const str = (formData: FormData, key: string): string | null =>
 export async function inviteUser(formData: FormData): Promise<void> {
   // Minting a login is the Principal's, not HR's: HR runs the roster, but an
   // account is access to the money pages.
-  const actor = await requireRole(['principal'])
+  const actor = await requirePermission('team_invite')
   const supabase = await createClient()
 
   // Shape and rules live in lib/invite.ts, where they are unit-tested. staffId

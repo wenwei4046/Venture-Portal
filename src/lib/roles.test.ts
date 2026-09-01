@@ -9,117 +9,122 @@ import {
   canAccessReports,
   canAccessSettings,
   canApprove,
+  canApproveClaims,
   canSeeIndividualSalary,
+  canAccessTeam,
 } from './roles'
 import type { UserRole } from '@/types'
 
+// The seed in the permission_catalog migration, transcribed. Two things are
+// being pinned at once: that the helpers read permissions, and that the seed
+// still reproduces what the four roles could do before 2026-09-01 — which is
+// the whole argument for why that cutover changed nobody's access.
+const ROLE_DEFAULTS: Record<UserRole, string[]> = {
+  principal: [
+    'dashboard', 'approvals', 'treasury', 'billing', 'categories', 'hr_costing',
+    'revenue', 'product_list', 'director_salary', 'director_pool', 'team',
+    'team_invite', 'salary_individual', 'dept_pool', 'venture_pool', 'opex',
+    'claims', 'claims_approve', 'reports', 'dept_reports', 'reconciliation',
+    'audit_log', 'settings', 'override', 'permissions_manage',
+  ],
+  finance: [
+    'dashboard', 'treasury', 'billing', 'categories', 'dept_pool',
+    'venture_pool', 'claims', 'claims_approve', 'reports', 'dept_reports',
+    'reconciliation',
+  ],
+  hr: [
+    'dashboard', 'hr_costing', 'revenue', 'director_salary', 'director_pool',
+    'team', 'salary_individual', 'claims', 'claims_approve',
+  ],
+  dept_manager: ['dashboard', 'dept_pool', 'opex', 'my_billing', 'claims', 'dept_reports'],
+}
+
 const ALL_ROLES: UserRole[] = ['principal', 'finance', 'hr', 'dept_manager']
+const as = (role: UserRole) => ({ permissions: ROLE_DEFAULTS[role] })
 
-describe('canAccessTreasury', () => {
-  it('allows principal and finance', () => {
-    expect(canAccessTreasury('principal')).toBe(true)
-    expect(canAccessTreasury('finance')).toBe(true)
+/** Assert exactly which roles a gate lets through, so a widening is a failure. */
+function allows(gate: (u: { permissions: string[] }) => boolean, expected: UserRole[]) {
+  for (const role of ALL_ROLES) {
+    expect(
+      gate(as(role)),
+      `${role} should ${expected.includes(role) ? '' : 'not '}pass`,
+    ).toBe(expected.includes(role))
+  }
+}
+
+describe('the gates, on the seeded role defaults', () => {
+  it('canAccessTreasury: principal + finance', () => {
+    allows(canAccessTreasury, ['principal', 'finance'])
   })
 
-  it('denies hr and dept_manager', () => {
-    expect(canAccessTreasury('hr')).toBe(false)
-    expect(canAccessTreasury('dept_manager')).toBe(false)
-  })
-})
-
-describe('canAccessBilling', () => {
-  it('allows principal and finance', () => {
-    expect(canAccessBilling('principal')).toBe(true)
-    expect(canAccessBilling('finance')).toBe(true)
+  it('canAccessBilling: principal + finance', () => {
+    allows(canAccessBilling, ['principal', 'finance'])
   })
 
-  it('denies hr and dept_manager', () => {
-    expect(canAccessBilling('hr')).toBe(false)
-    expect(canAccessBilling('dept_manager')).toBe(false)
-  })
-})
-
-describe('canAccessDeptPool', () => {
-  // Phase 2: Finance also reads dept pools per module-spec-phase2.
-  // The spec says "Principal: 只读全部 + 审批支出" and "Finance: 只读全部".
-  // Dept Manager gets read+write scoped to their own department — that
-  // restriction is enforced in the page + RPC, not in the role check.
-  it('allows principal, finance, and dept_manager', () => {
-    expect(canAccessDeptPool('principal')).toBe(true)
-    expect(canAccessDeptPool('finance')).toBe(true)
-    expect(canAccessDeptPool('dept_manager')).toBe(true)
+  it('canAccessDeptPool: principal + finance + dept manager', () => {
+    allows(canAccessDeptPool, ['principal', 'finance', 'dept_manager'])
   })
 
-  it('denies hr', () => {
-    expect(canAccessDeptPool('hr')).toBe(false)
+  it('canAccessHRCosting: principal + hr', () => {
+    allows(canAccessHRCosting, ['principal', 'hr'])
   })
-})
 
-describe('canAccessHRCosting', () => {
-  it('allows principal and hr only', () => {
-    expect(canAccessHRCosting('principal')).toBe(true)
-    expect(canAccessHRCosting('hr')).toBe(true)
-    expect(canAccessHRCosting('finance')).toBe(false)
-    expect(canAccessHRCosting('dept_manager')).toBe(false)
+  it('canAccessDirectorSalary: principal + hr, never finance', () => {
+    // Segregation of duties: Finance sees aggregates, never a director's salary.
+    allows(canAccessDirectorSalary, ['principal', 'hr'])
   })
-})
 
-describe('canAccessDirectorSalary', () => {
-  it('allows principal and hr only (finance excluded — segregation of duties)', () => {
-    expect(canAccessDirectorSalary('principal')).toBe(true)
-    expect(canAccessDirectorSalary('hr')).toBe(true)
-    expect(canAccessDirectorSalary('finance')).toBe(false)
-    expect(canAccessDirectorSalary('dept_manager')).toBe(false)
+  it('canAccessDirectorPool: principal + hr', () => {
+    allows(canAccessDirectorPool, ['principal', 'hr'])
   })
-})
 
-describe('canAccessDirectorPool', () => {
-  // Director Pool v2 is the standalone calculator with full per-director
-  // detail (weights, advances, savings) — Principal + HR (user decision
-  // 2026-07-21). Finance lost the old aggregate view when the ledger page
-  // was replaced (2026-07-17).
-  it('allows principal and hr only', () => {
-    expect(canAccessDirectorPool('principal')).toBe(true)
-    expect(canAccessDirectorPool('finance')).toBe(false)
-    expect(canAccessDirectorPool('hr')).toBe(true)
-    expect(canAccessDirectorPool('dept_manager')).toBe(false)
+  it('canAccessReports: principal + finance', () => {
+    allows(canAccessReports, ['principal', 'finance'])
+  })
+
+  it('canAccessSettings: principal alone', () => {
+    allows(canAccessSettings, ['principal'])
+  })
+
+  it('canApprove: principal alone', () => {
+    allows(canApprove, ['principal'])
+  })
+
+  it('canApproveClaims: everyone but a dept manager', () => {
+    allows(canApproveClaims, ['principal', 'finance', 'hr'])
+  })
+
+  it('canSeeIndividualSalary: principal + hr, never finance', () => {
+    allows(canSeeIndividualSalary, ['principal', 'hr'])
+  })
+
+  it('canAccessTeam: principal + hr', () => {
+    allows(canAccessTeam, ['principal', 'hr'])
   })
 })
 
-describe('canAccessReports', () => {
-  it('allows principal and finance only', () => {
-    expect(canAccessReports('principal')).toBe(true)
-    expect(canAccessReports('finance')).toBe(true)
-    expect(canAccessReports('hr')).toBe(false)
-    expect(canAccessReports('dept_manager')).toBe(false)
+describe('the gates, on a configured title', () => {
+  // Once a title carries permissions the role behind the account stops
+  // mattering — that is the point of the whole exercise.
+  it('lets a title grant what the role never could', () => {
+    const marketingManager = { permissions: ['dashboard', 'treasury', 'reports'] }
+    expect(canAccessTreasury(marketingManager)).toBe(true)
+    expect(canAccessReports(marketingManager)).toBe(true)
+    expect(canAccessSettings(marketingManager)).toBe(false)
+    expect(canApprove(marketingManager)).toBe(false)
   })
-})
 
-describe('canAccessSettings', () => {
-  it('allows principal only', () => {
-    for (const role of ALL_ROLES) {
-      expect(canAccessSettings(role)).toBe(role === 'principal')
+  it('lets a title withhold what the role would have given', () => {
+    const juniorFinance = { permissions: ['dashboard', 'treasury'] }
+    expect(canAccessTreasury(juniorFinance)).toBe(true)
+    expect(canAccessReports(juniorFinance)).toBe(false)
+    expect(canAccessDeptPool(juniorFinance)).toBe(false)
+  })
+
+  it('holds nothing for an empty set', () => {
+    const nobody = { permissions: [] }
+    for (const gate of [canAccessTreasury, canAccessHRCosting, canApprove, canAccessSettings]) {
+      expect(gate(nobody)).toBe(false)
     }
-  })
-})
-
-describe('canApprove', () => {
-  it('allows principal only', () => {
-    for (const role of ALL_ROLES) {
-      expect(canApprove(role)).toBe(role === 'principal')
-    }
-  })
-})
-
-describe('canSeeIndividualSalary — PDPA gate', () => {
-  // CLAUDE.md: "Finance CANNOT see individual employee salaries — only
-  // department lump sum." This is the most important access boundary in
-  // the whole portal. If this test breaks, someone reduced access on a
-  // data-visibility column and needs a corresponding RLS policy check.
-  it('only principal and hr can see individual salary breakdown', () => {
-    expect(canSeeIndividualSalary('principal')).toBe(true)
-    expect(canSeeIndividualSalary('hr')).toBe(true)
-    expect(canSeeIndividualSalary('finance')).toBe(false)
-    expect(canSeeIndividualSalary('dept_manager')).toBe(false)
   })
 })

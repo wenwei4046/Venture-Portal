@@ -1,4 +1,4 @@
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import Link from 'next/link'
 
 const reports = [
@@ -60,7 +60,7 @@ const reports = [
 ]
 
 export default async function ReportsPage() {
-  await requireRole(['principal', 'finance', 'hr'])
+  await requirePermission('reports', 'hr_costing')
 
   return (
     <div>

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { notFound } from 'next/navigation'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import DeptPoolTabs from '../_components/DeptPoolTabs'
@@ -17,7 +17,7 @@ interface Props {
 }
 
 export default async function MarketingDeptPoolPage({ searchParams }: Props) {
-  const user = await requireRole(['principal', 'finance', 'dept_manager'])
+  const user = await requirePermission('dept_pool')
   const supabase = await createClient()
 
   const { tab: rawTab, filter: rawFilter } = await searchParams

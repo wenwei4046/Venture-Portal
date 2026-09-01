@@ -2,14 +2,14 @@
 
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { verifyPin, isLockedOut, getLockoutUntil, hashPin, MAX_ATTEMPTS } from '@/lib/director-pin'
 
 const PIN_COOKIE = 'director_pin_verified'
 const PIN_SESSION_TTL = 300 // 5 minutes
 
 export async function verifyDirectorPin(formData: FormData): Promise<{ ok: boolean; error?: string }> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const supabase = await createClient()
 
   const pin = (formData.get('pin') as string) ?? ''
@@ -71,7 +71,7 @@ export async function isDirectorPinVerified(): Promise<boolean> {
 }
 
 export async function setDirectorPin(formData: FormData): Promise<{ ok: boolean; error?: string }> {
-  await requireRole(['principal'])
+  await requirePermission('settings')
   const supabase = await createClient()
 
   const pin = (formData.get('pin') as string) ?? ''

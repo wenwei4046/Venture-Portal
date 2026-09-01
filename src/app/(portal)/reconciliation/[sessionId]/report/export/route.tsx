@@ -9,7 +9,7 @@ import dayjs from 'dayjs'
 import type { NextRequest } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { fetchReconReport } from '@/lib/recon-report-data'
 import type { ReconReportItem } from '@/lib/recon-report'
 import { buildXlsxBuffer, type XlsxSectionBreak } from '@/lib/export/excel'
@@ -23,7 +23,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> },
 ) {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('reconciliation')
   const { sessionId } = await params
   const supabase = (await createClient()) as unknown as SupabaseClient
 

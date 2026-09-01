@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { issueStatement, markStatementPaid } from '../actions'
@@ -11,7 +11,7 @@ interface Props {
 }
 
 export default async function StatementDetailPage({ params }: Props) {
-  const user = await requireRole(['principal', 'finance'])
+  const user = await requirePermission('treasury')
   const { id } = await params
   const supabase = await createClient()
 

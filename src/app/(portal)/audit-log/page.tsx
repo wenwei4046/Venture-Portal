@@ -1,5 +1,5 @@
 import dayjs from 'dayjs'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import LedgerRow from '@/components/LedgerRow'
 
@@ -10,7 +10,7 @@ interface Props {
 const PAGE_SIZE = 50
 
 export default async function AuditLogPage({ searchParams }: Props) {
-  await requireRole(['principal'])
+  await requirePermission('audit_log')
   const supabase = await createClient()
 
   const { resource, page: rawPage } = await searchParams

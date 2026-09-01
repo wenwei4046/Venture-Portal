@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { loanMonthlyInstallment, isLoanUnscheduled, isBeforeFirstInstallment, compoundInterestState } from '@/lib/treasury-schedule'
 import { fundingSourceFromTerms } from '@/lib/utils'
@@ -20,7 +20,7 @@ export default async function RepaymentSchedulePage({
 }: {
   searchParams: Promise<{ month?: string }>
 }) {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const supabase = await createClient()
 
   // Which month's schedule to show — default to the current month; ?month=YYYY-MM

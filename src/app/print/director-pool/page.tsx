@@ -10,7 +10,7 @@
 
 import type { Metadata } from 'next'
 import PrintButton from './PrintButton'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { loadDirectorPoolData } from '@/lib/director-pool-data'
 import {
   calcAll,
@@ -37,7 +37,7 @@ const fmt = (v: number) =>
   })
 
 export default async function DirectorPoolPrintPage({ searchParams }: Props) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('director_pool')
   const { month: rawMonth, director: rawDirector } = await searchParams
 
   const data = await loadDirectorPoolData()

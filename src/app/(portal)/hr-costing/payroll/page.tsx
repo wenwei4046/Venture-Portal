@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { getPeriodMonth } from '@/lib/utils'
 import CreatePeriodButton from './_components/CreatePeriodButton'
 import ImportInfotechEntryButton from './_components/ImportInfotechEntryButton'
@@ -16,7 +16,7 @@ function formatPeriodLabel(period: string): string {
 }
 
 export default async function PayrollLandingPage() {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('hr_costing')
   const supabase = await createClient()
 
   const thisPeriod = getPeriodMonth()

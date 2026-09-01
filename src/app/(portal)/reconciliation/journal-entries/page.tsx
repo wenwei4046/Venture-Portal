@@ -1,10 +1,10 @@
 import Link from 'next/link'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import JvList, { type JvRow } from './_components/JvList'
 
 export default async function JournalEntriesPage() {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('reconciliation')
   const supabase = await createClient()
 
   // Manual journal vouchers + the auto payroll accrual JVs (user 2026-08-07:

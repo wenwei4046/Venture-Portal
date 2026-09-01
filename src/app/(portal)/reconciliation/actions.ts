@@ -12,7 +12,7 @@ import dayjs from 'dayjs'
 import * as XLSX from 'xlsx'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import {
   autoMatch, csvToRows, parseStatementRows,
   type BookLine, type StatementLine,
@@ -90,7 +90,7 @@ function internalFlipEntries(
 }
 
 export async function uploadStatement(formData: FormData): Promise<{ error: string } | void> {
-  const user = await requireRole(['finance', 'principal'])
+  const user = await requirePermission('reconciliation')
   const supabase = await reconClient()
 
   const bankAccountId = (formData.get('bank_account_id') as string) || ''
@@ -233,7 +233,7 @@ export async function manualMatch(
   statementLineIds: string[],
   journalLineIds: string[],
 ): Promise<{ error?: string }> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('reconciliation')
   const supabase = await reconClient()
 
   const sIds = Array.from(new Set(statementLineIds.filter(Boolean)))
@@ -309,7 +309,7 @@ export async function contraBookLines(
   sessionId: string,
   journalLineIds: string[],
 ): Promise<{ error?: string }> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('reconciliation')
   const supabase = await reconClient()
 
   const jIds = Array.from(new Set(journalLineIds.filter(Boolean)))
@@ -348,7 +348,7 @@ export async function contraBookLines(
 
 /** Dissolve a whole match/contra group by its group id. */
 export async function dissolveGroup(groupId: string): Promise<{ error?: string }> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('reconciliation')
   const supabase = await reconClient()
   const { data: members } = await supabase
     .from('bank_recon_matches')
@@ -379,7 +379,7 @@ export async function dissolveGroup(groupId: string): Promise<{ error?: string }
 
 /** Unmatch the WHOLE group containing this statement line. */
 export async function unmatchLine(lineId: string): Promise<{ error?: string }> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('reconciliation')
   const supabase = await reconClient()
   const { data: groups } = await supabase
     .from('bank_recon_matches')
@@ -411,7 +411,7 @@ export async function unmatchLine(lineId: string): Promise<{ error?: string }> {
 }
 
 export async function setLineIgnored(lineId: string, ignored: boolean): Promise<{ error?: string }> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('reconciliation')
   const supabase = await reconClient()
   if (ignored) {
     // An ignored line holds no matches.
@@ -434,7 +434,7 @@ export async function setSessionStatus(
   sessionId: string,
   status: 'open' | 'done',
 ): Promise<{ error?: string }> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('reconciliation')
   const supabase = await reconClient()
   const { error } = await supabase
     .from('bank_recon_sessions')
@@ -447,7 +447,7 @@ export async function setSessionStatus(
 }
 
 export async function deleteSession(sessionId: string): Promise<{ error?: string }> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('reconciliation')
   const supabase = await reconClient()
   const { error } = await supabase.from('bank_recon_sessions').delete().eq('id', sessionId)
   if (error) return { error: error.message }

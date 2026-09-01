@@ -1,7 +1,7 @@
 import dayjs from 'dayjs'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { fetchAllJournalLines, fetchCoaAccounts } from '@/lib/gl-reports'
 import { buildPnlAccounts, defaultPnlLayout } from '@/lib/pnl-custom'
 import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
@@ -10,7 +10,7 @@ import ReportLayoutEditor from '../../_components/ReportLayoutEditor'
 export const dynamic = 'force-dynamic'
 
 export default async function PnlLayoutPage() {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('reports')
   const supabase = await createClient()
 
   const period = dayjs().format('YYYY-MM')

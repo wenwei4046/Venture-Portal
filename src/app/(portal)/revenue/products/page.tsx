@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { revenuePath } from '@/lib/revenue'
 import ProductsSection from '../_components/config/ProductsSection'
 import { loadProducts } from '../_components/config/load'
@@ -23,7 +23,7 @@ import { listSubDepartments } from '../_lib/sub-departments'
  * each line once, so this list is what a run's margin is judged against.
  */
 export default async function ProductListPage() {
-  await requireRole(['principal'])
+  await requirePermission('product_list')
   const [products, subDepts] = await Promise.all([loadProducts(), listSubDepartments()])
 
   return (

@@ -1,7 +1,7 @@
 import dayjs from 'dayjs'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { formatMoney } from '@/lib/utils'
 import { buildDebtorAging, type RawInvoice } from '@/lib/debtor-aging'
@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function DebtorAgingPage() {
   // dept_manager sees only their own segment's invoices (RLS on invoices).
-  await requireRole(['principal', 'finance', 'dept_manager'])
+  await requirePermission('dept_reports')
   const supabase = await createClient()
 
   const [invoices, companies, departments] = await Promise.all([

@@ -2,7 +2,7 @@
 
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { buildPnl, fetchAllJournalLines, fetchCoaAccounts, monthPeriod } from '@/lib/gl-reports'
 import { eliminateInterBilling, fetchInterBillingElimination } from '@/lib/consolidation'
 import { pnlBlocks } from '@/lib/gl-report-blocks'
@@ -12,7 +12,7 @@ import { segmentFilterFor } from '../../_components/report-segments'
 const YM = /^\d{4}-\d{2}$/
 
 export async function GET(req: Request) {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('reports')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? ('pdf' as const) : ('xlsx' as const)
   const period = url.searchParams.get('period') ?? dayjs().format('YYYY-MM')

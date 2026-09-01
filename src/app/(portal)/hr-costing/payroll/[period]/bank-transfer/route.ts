@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { generateAllianceBankCsv, type PayslipPayee } from '@/lib/bank-transfer/alliance-bank'
 
 /**
@@ -21,7 +21,7 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ period: string }> },
 ) {
-  await requireRole(['principal', 'finance', 'hr'])
+  await requirePermission('hr_costing', 'treasury')
   const { period } = await context.params
 
   if (!/^\d{4}-\d{2}-01$/.test(period)) {

@@ -1,11 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { formatMoney } from '@/lib/utils'
 import Link from 'next/link'
 
 export default async function ClaimsSummaryPage() {
-  await requireRole(['principal', 'finance', 'hr'])
+  await requirePermission('reports', 'claims_approve')
   const supabase = await createClient()
 
   const claims = await fetchAllRows((lo, hi) => supabase.from('claims').select('claim_type, status, amount').order('id', { ascending: true }).range(lo, hi))

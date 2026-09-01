@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import type { InfotechStaffRow } from '@/lib/import/infotech-staff'
 
 /**
@@ -76,7 +76,7 @@ export interface StaffPreviewResult {
 export async function previewInfotechStaffImport(
   rows: InfotechStaffRow[],
 ): Promise<StaffPreviewResult> {
-  await requireRole(['hr', 'principal'])
+  await requirePermission('team')
   const supabase = await createClient()
 
   const [{ data: existing }, { data: departments }] = await Promise.all([
@@ -196,7 +196,7 @@ export async function applyInfotechStaffImport(
   deptMissing: number
   failed: Array<{ rowIndex: number; employee_code: string; reason: string }>
 }> {
-  const user = await requireRole(['hr', 'principal'])
+  const user = await requirePermission('team')
   const supabase = await createClient()
   const preview = await previewInfotechStaffImport(rows)
 

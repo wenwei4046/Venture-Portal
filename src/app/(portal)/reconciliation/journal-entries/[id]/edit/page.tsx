@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import JournalVoucherForm from '../../_components/JournalVoucherForm'
 
@@ -9,7 +9,7 @@ export default async function EditJournalVoucherPage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('reconciliation')
   const { id } = await params
   const supabase = await createClient()
 

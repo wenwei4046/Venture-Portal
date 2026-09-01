@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import { revenuePath, subDeptSlug } from '@/lib/revenue'
 import { round2 } from '@/lib/payroll-funding'
@@ -45,7 +45,7 @@ function formatPeriodLabel(period: string): string {
 }
 
 export default async function PayrollGridPage({ params }: PageProps) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('hr_costing')
   const { period } = await params
 
   // Validate period is YYYY-MM-01 format

@@ -5,14 +5,14 @@ import React from 'react'
 import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { fetchDailyBank } from '@/lib/daily-bank-data'
 import { sumAmounts } from '@/lib/daily-bank'
 import { PdfDocument, PdfTable, type PdfColumn, type PdfRowKind } from '@/lib/export/pdf'
 import { exportPdfResponse } from '@/lib/export/response'
 
 export async function GET(request: Request) {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const supabase = (await createClient()) as unknown as SupabaseClient
 
   const url = new URL(request.url)

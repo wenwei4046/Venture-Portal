@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { formatMoney, formatMoneyBare, getPeriodMonth } from '@/lib/utils'
 import dayjs from 'dayjs'
 import Link from 'next/link'
@@ -13,7 +13,7 @@ interface Props {
 }
 
 export default async function PayoutDetailPage({ params, searchParams }: Props) {
-  const user = await requireRole(['principal', 'hr'])
+  const user = await requirePermission('director_salary')
   const supabase = await createClient()
 
   const { directorId } = await params

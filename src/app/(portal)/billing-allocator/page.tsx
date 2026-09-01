@@ -1,6 +1,6 @@
 import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import AllocatorTabs from './_components/AllocatorTabs'
 import type {
@@ -17,7 +17,7 @@ interface Props {
 }
 
 export default async function BillingAllocatorPage({ searchParams }: Props) {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('billing')
   // alloc_* tables aren't in the generated database.types yet — untyped client,
   // same convention as lib/cfo-reports.ts; shapes narrowed manually below.
   const supabase = (await createClient()) as unknown as SupabaseClient

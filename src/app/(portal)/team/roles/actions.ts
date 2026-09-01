@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 
 /**
  * Titles.
@@ -34,7 +34,7 @@ function readDepartmentId(formData: FormData): string | null {
 }
 
 export async function createTitle(formData: FormData): Promise<void> {
-  const user = await requireRole(['principal', 'hr'])
+  const user = await requirePermission('team')
   const supabase = await createClient()
 
   const { error } = await supabase.from('titles').insert({
@@ -56,7 +56,7 @@ export async function createTitle(formData: FormData): Promise<void> {
 }
 
 export async function updateTitle(formData: FormData): Promise<void> {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('team')
   const supabase = await createClient()
 
   const id = ((formData.get('id') as string) ?? '').trim()
@@ -89,7 +89,7 @@ export async function updateTitle(formData: FormData): Promise<void> {
  * that into a refusal that says who is in the way.
  */
 export async function deleteTitle(id: string): Promise<void> {
-  await requireRole(['principal'])
+  await requirePermission('permissions_manage')
   const supabase = await createClient()
 
   const { count } = await supabase

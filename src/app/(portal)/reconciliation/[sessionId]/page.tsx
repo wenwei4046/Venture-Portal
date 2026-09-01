@@ -5,7 +5,7 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import { notFound } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/paginate'
 import { windowStart } from '@/lib/recon-report'
@@ -20,7 +20,7 @@ export default async function ReconSessionPage({
 }: {
   params: Promise<{ sessionId: string }>
 }) {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('reconciliation')
   const { sessionId } = await params
   const supabase = (await createClient()) as unknown as SupabaseClient
 

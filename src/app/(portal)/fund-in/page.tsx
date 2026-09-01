@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import dayjs from 'dayjs'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import FundSourceTabs from './_components/FundSourceTabs'
@@ -36,7 +36,7 @@ interface Props {
 }
 
 export default async function FundInPage({ searchParams }: Props) {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('treasury')
   const supabase = await createClient()
   const { status: statusFilter } = await searchParams
 

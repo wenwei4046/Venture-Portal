@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import ContractForm from '../../../_components/ContractForm'
 
@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default async function EditContractPage({ params }: Props) {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('billing')
   const supabase = await createClient()
   const { id } = await params
 

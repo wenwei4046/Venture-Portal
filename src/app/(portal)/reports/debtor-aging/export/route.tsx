@@ -1,6 +1,6 @@
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { formatMoneyBare } from '@/lib/utils'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
@@ -58,7 +58,7 @@ const m = (v: number) => (v ? formatMoneyBare(v) : '—')
 
 export async function GET(req: Request) {
   // dept_manager may export their own segment's aging (RLS scopes invoices).
-  await requireRole(['principal', 'finance', 'dept_manager'])
+  await requirePermission('dept_reports')
   const params = new URL(req.url).searchParams
   const format = params.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   // view: 'detail' (one row per invoice) or 'summary' (aging matrix by customer).

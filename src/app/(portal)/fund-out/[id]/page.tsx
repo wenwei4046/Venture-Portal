@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
 import { isLoanUnscheduled } from '@/lib/treasury-schedule'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { cancelLoan } from '../actions'
@@ -17,7 +17,7 @@ interface Props {
 }
 
 export default async function LoanDetailPage({ params }: Props) {
-  const user = await requireRole(['principal', 'finance'])
+  const user = await requirePermission('treasury')
   const { id } = await params
   const supabase = await createClient()
 

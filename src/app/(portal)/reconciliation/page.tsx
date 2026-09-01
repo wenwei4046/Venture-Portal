@@ -6,7 +6,7 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import UploadStatementForm from './_components/UploadStatementForm'
@@ -16,7 +16,7 @@ import LedgerRow from '@/components/LedgerRow'
 export const dynamic = 'force-dynamic'
 
 export default async function ReconciliationPage() {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('reconciliation')
   const supabase = (await createClient()) as unknown as SupabaseClient
 
   const [{ data: bankAccounts }, { data: glBalances }, { data: sessions }, { data: lineRows }] =

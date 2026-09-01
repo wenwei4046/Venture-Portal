@@ -5,12 +5,12 @@
 // calculation with Advance, 25% Billing and Saving running ledgers.
 
 import Link from 'next/link'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { loadDirectorPoolData } from '@/lib/director-pool-data'
 import DirectorPoolClient from './_components/DirectorPoolClient'
 
 export default async function DirectorPoolPage() {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('director_pool')
   const data = await loadDirectorPoolData()
 
   return (

@@ -7,7 +7,7 @@
 import Link from 'next/link'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import BaView, {
   type BaRow,
   type CompanyOption,
@@ -24,7 +24,7 @@ export default async function BaPage({
 }: {
   searchParams: Promise<{ calc?: string }>
 }) {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const supabase = (await createClient()) as unknown as SupabaseClient
   const { calc } = await searchParams
 

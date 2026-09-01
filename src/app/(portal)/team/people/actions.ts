@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 
 function trimOrNull(v: FormDataEntryValue | null): string | null {
   if (typeof v !== 'string') return null
@@ -11,7 +11,7 @@ function trimOrNull(v: FormDataEntryValue | null): string | null {
 }
 
 export async function addStaff(formData: FormData) {
-  const user = await requireRole(['hr', 'principal'])
+  const user = await requirePermission('team')
   const supabase = await createClient()
 
   const { data: dept } = await supabase
@@ -45,7 +45,7 @@ export async function addStaff(formData: FormData) {
 }
 
 export async function updateStaff(id: string, formData: FormData) {
-  await requireRole(['hr', 'principal'])
+  await requirePermission('team')
   const supabase = await createClient()
 
   const hireDate = (formData.get('hire_date') as string) || null
@@ -94,7 +94,7 @@ export async function updateStaff(id: string, formData: FormData) {
 }
 
 export async function deactivateStaff(id: string) {
-  await requireRole(['hr', 'principal'])
+  await requirePermission('team')
   const supabase = await createClient()
 
   const { error } = await supabase

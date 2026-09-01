@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import PeriodPicker from '../../payroll/_components/PeriodPicker'
 import AllocationEditor, { type StaffAllocationData } from '../_components/AllocationEditor'
@@ -22,7 +22,7 @@ function formatPeriodLabel(period: string): string {
 // Finance reads the aggregate per dept × company on /billing (RPC
 // get_staff_billing_allocation) — no names, no individual salaries.
 export default async function AllocationPage({ params }: PageProps) {
-  const user = await requireRole(['principal', 'hr'])
+  const user = await requirePermission('hr_costing')
   const { period } = await params
 
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()

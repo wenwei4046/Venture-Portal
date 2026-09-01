@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { postJournalEntry } from '@/lib/journal'
 import { validateDisbursementAccount } from '@/lib/loan-disbursement'
@@ -26,7 +26,7 @@ import type { Json } from '@/lib/supabase/database.types'
 export type CreateLoanResult = { error: string } | undefined
 
 export async function createLoan(formData: FormData): Promise<CreateLoanResult> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const supabase = await createClient()
 
   const companyId = (formData.get('company_id') as string) ?? ''
@@ -194,7 +194,7 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
 // ─── Record repayment (Finance) ───────────────────────────────────────────────
 
 export async function recordRepayment(formData: FormData) {
-  const user = await requireRole(['finance', 'principal'])
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   const loanId = (formData.get('loan_id') as string) ?? ''
@@ -375,7 +375,7 @@ export async function recordRepayment(formData: FormData) {
 // proven recordRepayment logic (one call per non-zero type). Mirrors the
 // outgoing payment form's "this is a loan repayment" option.
 export async function recordLoanRepaymentReceived(formData: FormData) {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const loanId = (formData.get('loan_id') as string) ?? ''
   const paymentDate = (formData.get('payment_date') as string) ?? ''
   const bankAccountId = (formData.get('bank_account_id') as string) || ''
@@ -427,7 +427,7 @@ export async function setLoanRepaymentStart(
   id: string,
   month: string
 ): Promise<{ error: string } | undefined> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const supabase = await createClient()
 
   if (!id) return { error: 'Loan id is required' }
@@ -453,7 +453,7 @@ export async function setLoanRepaymentStart(
 // Built after a Hookka repayment landed on the wrong loan — void here, then
 // re-record on the right one.
 export async function voidRepayment(formData: FormData): Promise<{ error: string } | undefined> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const supabase = await createClient()
 
   const repaymentId = (formData.get('repayment_id') as string) ?? ''
@@ -479,7 +479,7 @@ export async function voidRepayment(formData: FormData): Promise<{ error: string
 // fields the form sends are changed. Finance-initiated edits that route through
 // the approval queue are a separate follow-up.
 export async function amendLoan(formData: FormData): Promise<{ error: string } | undefined> {
-  await requireRole(['principal'])
+  await requirePermission('override')
   const supabase = await createClient()
 
   const loanId = (formData.get('loan_id') as string) ?? ''
@@ -525,7 +525,7 @@ export async function amendLoan(formData: FormData): Promise<{ error: string } |
 export async function setLoanFundingSource(
   formData: FormData
 ): Promise<{ error: string } | undefined> {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const supabase = await createClient()
 
   const loanId = (formData.get('loan_id') as string) ?? ''
@@ -557,7 +557,7 @@ export async function setLoanFundingSource(
 //                        and reverses the bank/venture-pool/JE side.
 
 export async function cancelLoan(formData: FormData) {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -606,7 +606,7 @@ export async function cancelLoan(formData: FormData) {
 // flag. Used by the "this is a loan repayment" checkbox in the voucher form.
 
 export async function listPayableLoans() {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const supabase = await createClient()
 
   const [{ data: loans }, { data: outstanding }, { data: overdues }, { data: companies }] =
@@ -656,7 +656,7 @@ export async function listPayableLoans() {
 // ─── Export loan portfolio as CSV ─────────────────────────────────────────────
 
 export async function exportLoansCSV(): Promise<string> {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('treasury')
   const supabase = await createClient()
 
   const { data: loans } = await supabase

@@ -14,6 +14,11 @@ export interface User {
   // Set only while a Principal is masked by the view-as switcher: `role`
   // carries the masked role driving gates/UI, `actualRole` the real one.
   actualRole?: UserRole
+  // Every permission key this account holds, resolved by the database from
+  // their title (or their role, while no title says otherwise). This is what
+  // every gate in the portal reads; `role` survives only for the handful of
+  // dept_manager row policies no scope can express.
+  permissions: string[]
 }
 
 export interface Company {

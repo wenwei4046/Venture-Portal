@@ -1,97 +1,129 @@
 import type { UserRole } from '@/types'
+import { can, type PermissionHolder } from '@/lib/permissions'
 
-export function canAccessTreasury(role: UserRole): boolean {
-  return role === 'principal' || role === 'finance'
+// What each part of the portal needs.
+//
+// These used to answer "is this role allowed here". Since 2026-09-01 they
+// answer "does this account hold the permission", which a title grants and the
+// four roles only supply as a default. The names stayed because the call sites
+// read well — `canAccessTreasury(user)` — and because keeping them is what let
+// the switch be one mechanical pass rather than 130 judgement calls.
+//
+// The catalog lives in `permission_defs`; the keys are mirrored in
+// lib/permissions.ts so the compiler checks the spelling.
+
+export function canAccessTreasury(u: PermissionHolder): boolean {
+  return can(u, 'treasury')
 }
 
-export function canAccessBilling(role: UserRole): boolean {
-  return role === 'principal' || role === 'finance'
+export function canAccessBilling(u: PermissionHolder): boolean {
+  return can(u, 'billing')
 }
 
-export function canAccessDeptPool(role: UserRole): boolean {
-  // Principal + Finance read everything. Dept Manager reads their own dept
-  // only — that restriction is enforced in the page guard + RPC, not here.
-  return role === 'principal' || role === 'finance' || role === 'dept_manager'
+export function canAccessDeptPool(u: PermissionHolder): boolean {
+  // Principal and Finance read every department; a dept manager reads their
+  // own only — that restriction is enforced in the page guard and the RPC, not
+  // here.
+  return can(u, 'dept_pool')
 }
 
-export function canAccessDirectorSalary(role: UserRole): boolean {
-  // Director Salary engine — Principal + HR only.
-  // Finance is excluded; they see aggregated totals via /director-pool,
-  // never per-director salary detail (segregation of duties).
-  return role === 'principal' || role === 'hr'
+export function canAccessRevenue(u: PermissionHolder): boolean {
+  // Revenue Department — the commission-paid sales teams.
+  return can(u, 'revenue')
 }
 
-export function canAccessDirectorPool(role: UserRole): boolean {
-  // Director Pool v2 (2026-07-17) is the standalone calculator — full
-  // per-director detail (weights, advances, savings). Principal + HR
-  // (HR access granted by user 2026-07-21). Finance lost the old
-  // aggregate-bucket view when the ledger page was replaced.
-  return role === 'principal' || role === 'hr'
+export function canAccessProductList(u: PermissionHolder): boolean {
+  // Item code → unit cost. What a product COSTS is not payroll's call
+  // (user 2026-08-31), so it is its own permission.
+  return can(u, 'product_list')
 }
 
-export function canAccessVenturePool(role: UserRole): boolean {
-  // Venture Pool = HV holding-company cash ledger (5 txn types).
-  // Mirrors Director Pool gating: Principal + Finance only.
-  return role === 'principal' || role === 'finance'
+export function canAccessHRCosting(u: PermissionHolder): boolean {
+  return can(u, 'hr_costing')
 }
 
-export function canAccessRevenue(role: UserRole): boolean {
-  // Revenue Department — the commission-paid sales teams. Principal + HR, the
-  // same pair that owns every other payroll surface. Moved out of HR Costing
-  // into its own Departments group on 2026-09-01: it is a department, not one
-  // of HR's monthly chores.
-  return role === 'principal' || role === 'hr'
+export function canAccessDirectorSalary(u: PermissionHolder): boolean {
+  return can(u, 'director_salary')
 }
 
-export function canAccessProductList(role: UserRole): boolean {
-  // Item code → unit cost. Principal only (user 2026-08-31): HR sets the
-  // commission rules, but what a product COSTS is not payroll's call.
-  return role === 'principal'
+export function canAccessDirectorPool(u: PermissionHolder): boolean {
+  return can(u, 'director_pool')
 }
 
-export function canAccessHRCosting(role: UserRole): boolean {
-  // HR submits monthly snapshots; Principal approves via the Approvals queue.
-  // Finance no longer sees the tab — they consume the aggregate from Dept Pool
-  // and mark approved snapshots as executed from /dept-pool/submissions.
-  return role === 'principal' || role === 'hr'
+export function canAccessVenturePool(u: PermissionHolder): boolean {
+  return can(u, 'venture_pool')
 }
 
-export function canAccessReports(role: UserRole): boolean {
-  return role === 'principal' || role === 'finance'
+export function canAccessReports(u: PermissionHolder): boolean {
+  // Whole-company reports: balance sheet, trial balance, ledger, fund summary.
+  return can(u, 'reports')
 }
 
-// Segment-scoped reports (P&L, Cash Flow, Debtor Aging) a dept_manager may see
-// for THEIR OWN department only — RLS restricts every row to their segment, so
-// even a hand-typed ?segment= returns empty. Whole-company reports (balance
-// sheet, trial balance, ledger, fund summary) stay principal/finance via
-// canAccessReports. (2026-07: give Marketing their own department reports.)
-export function canAccessDeptReports(role: UserRole): boolean {
-  return role === 'principal' || role === 'finance' || role === 'dept_manager'
+export function canAccessDeptReports(u: PermissionHolder): boolean {
+  // Segment-scoped reports (P&L, Cash Flow, Debtor Aging) somebody may see for
+  // THEIR OWN department. RLS restricts every row to their segment, so even a
+  // hand-typed ?segment= returns empty.
+  return can(u, 'dept_reports')
 }
 
-export function canAccessClaims(role: UserRole): boolean {
-  return role === 'principal' || role === 'finance' || role === 'hr' || role === 'dept_manager'
+export function canAccessClaims(u: PermissionHolder): boolean {
+  return can(u, 'claims')
 }
 
-export function canAccessSettings(role: UserRole): boolean {
-  return role === 'principal'
+export function canApproveClaims(u: PermissionHolder): boolean {
+  // Deciding a claim is not submitting one.
+  return can(u, 'claims_approve')
 }
 
-// Categories drive GL routing for every PV — Finance creates PVs all day so
-// they need to add/edit categories themselves rather than blocking on Principal.
-// Principal still sees all Settings tabs; Finance only sees Categories.
-export function canAccessCategories(role: UserRole): boolean {
-  return role === 'principal' || role === 'finance'
+export function canAccessSettings(u: PermissionHolder): boolean {
+  return can(u, 'settings')
 }
 
-export function canApprove(role: UserRole): boolean {
-  return role === 'principal'
+export function canAccessCategories(u: PermissionHolder): boolean {
+  // Categories drive GL routing for every voucher, and Finance creates
+  // vouchers all day, so they add and edit these themselves.
+  return can(u, 'categories')
 }
 
-export function canSeeIndividualSalary(role: UserRole): boolean {
-  return role === 'principal' || role === 'hr'
+export function canApprove(u: PermissionHolder): boolean {
+  return can(u, 'approvals')
 }
 
+export function canSeeIndividualSalary(u: PermissionHolder): boolean {
+  return can(u, 'salary_individual')
+}
+
+export function canManagePermissions(u: PermissionHolder): boolean {
+  return can(u, 'permissions_manage')
+}
+
+export function canInviteUsers(u: PermissionHolder): boolean {
+  return can(u, 'team_invite')
+}
+
+export function canAccessTeam(u: PermissionHolder): boolean {
+  return can(u, 'team')
+}
+
+export function canAccessAuditLog(u: PermissionHolder): boolean {
+  return can(u, 'audit_log')
+}
+
+export function canAccessReconciliation(u: PermissionHolder): boolean {
+  return can(u, 'reconciliation')
+}
+
+export function canAccessOpex(u: PermissionHolder): boolean {
+  return can(u, 'opex')
+}
+
+export function canAccessMyBilling(u: PermissionHolder): boolean {
+  return can(u, 'my_billing')
+}
+
+// The one thing still keyed off the role: a dept manager's pages read their
+// own `department_id`, and 16 RLS policies scope rows the same way. No
+// permission expresses "their own department", so this stays.
 export function isDeptManager(role: UserRole): boolean {
   return role === 'dept_manager'
 }

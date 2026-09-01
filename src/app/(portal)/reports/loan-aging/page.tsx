@@ -8,7 +8,7 @@
 import dayjs from 'dayjs'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import { fetchLoanMonitorData, type MonitorSide } from '@/lib/loan-monitor'
 
@@ -163,7 +163,7 @@ function OutstandingTables({ side }: { side: MonitorSide }) {
 }
 
 export default async function LoanMonitorPage() {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('reports')
   const supabase = await createClient()
 
   const data = await fetchLoanMonitorData(supabase)

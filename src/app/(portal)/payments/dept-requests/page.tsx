@@ -1,13 +1,13 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import GenerateDeptPvForm from './_components/GenerateDeptPvForm'
 import { cancelDeptRequest } from './actions'
 
 export default async function DeptRequestsPage() {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const supabase = await createClient()
 
   const [{ data: requests }, { data: banks }] = await Promise.all([

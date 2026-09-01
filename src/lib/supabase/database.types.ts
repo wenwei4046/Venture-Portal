@@ -5635,6 +5635,33 @@ export type Database = {
           },
         ]
       }
+      permission_defs: {
+        Row: {
+          description: string | null
+          key: string
+          label: string
+          scope: string
+          section: string
+          sort_order: number
+        }
+        Insert: {
+          description?: string | null
+          key: string
+          label: string
+          scope: string
+          section: string
+          sort_order?: number
+        }
+        Update: {
+          description?: string | null
+          key?: string
+          label?: string
+          scope?: string
+          section?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       rent_splits: {
         Row: {
           company_id: string | null
@@ -5764,6 +5791,29 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      role_default_permissions: {
+        Row: {
+          permission_key: string
+          role: Database["public"]["Enums"]["user_role"]
+        }
+        Insert: {
+          permission_key: string
+          role: Database["public"]["Enums"]["user_role"]
+        }
+        Update: {
+          permission_key?: string
+          role?: Database["public"]["Enums"]["user_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_default_permissions_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "permission_defs"
+            referencedColumns: ["key"]
           },
         ]
       }
@@ -6195,6 +6245,36 @@ export type Database = {
         }
         Relationships: []
       }
+      title_permissions: {
+        Row: {
+          permission_key: string
+          title_id: string
+        }
+        Insert: {
+          permission_key: string
+          title_id: string
+        }
+        Update: {
+          permission_key?: string
+          title_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "title_permissions_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "permission_defs"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "title_permissions_title_id_fkey"
+            columns: ["title_id"]
+            isOneToOne: false
+            referencedRelation: "titles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       titles: {
         Row: {
           created_at: string
@@ -6272,6 +6352,39 @@ export type Database = {
           {
             foreignKeyName: "treasury_config_updated_by_fkey"
             columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_permissions: {
+        Row: {
+          granted: boolean
+          permission_key: string
+          user_id: string
+        }
+        Insert: {
+          granted: boolean
+          permission_key: string
+          user_id: string
+        }
+        Update: {
+          granted?: boolean
+          permission_key?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permissions_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "permission_defs"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "user_permissions_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -6786,6 +6899,7 @@ export type Database = {
         }
         Returns: Json
       }
+      current_permissions: { Args: never; Returns: string[] }
       current_user_department_id: { Args: never; Returns: string }
       current_user_role: {
         Args: never
@@ -6992,6 +7106,8 @@ export type Database = {
           submitted_by_name: string
         }[]
       }
+      has_perm: { Args: { p_key: string }; Returns: boolean }
+      has_scope: { Args: { p_scopes: string[] }; Returns: boolean }
       hr_dashboard_summary: { Args: { p_period?: string }; Returns: Json }
       is_period_locked: { Args: { p_date: string }; Returns: boolean }
       jv_apply_bank_cache: {

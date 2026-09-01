@@ -7,7 +7,7 @@
 // table + the per-subsidiary CTC split for billing.
 
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import {
   calculateDirectorGap,
@@ -46,7 +46,7 @@ interface ByCompanyRow {
 }
 
 export default async function DirectorSalaryPage({ searchParams }: Props) {
-  await requireRole(['principal', 'hr'])
+  await requirePermission('director_salary')
   const supabase = await createClient()
 
   const { period: rawPeriod, tab: rawTab } = await searchParams

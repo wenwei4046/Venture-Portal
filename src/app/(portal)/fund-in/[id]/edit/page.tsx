@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import type { AccountType } from '@/lib/coa'
 import type { AccountOption } from '@/components/AccountPicker'
@@ -12,7 +12,7 @@ interface Props {
 }
 
 export default async function EditFundSourcePage({ params }: Props) {
-  const user = await requireRole(['principal', 'finance'])
+  const user = await requirePermission('treasury')
   const { id } = await params
   const supabase = await createClient()
 

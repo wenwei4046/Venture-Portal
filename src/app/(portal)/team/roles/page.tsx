@@ -1,21 +1,34 @@
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { canManagePermissions } from '@/lib/roles'
 import TeamTabs from '../_components/TeamTabs'
 import TitlesSection, { type TitleRow, type DepartmentOption } from './_components/TitlesSection'
+import PermissionMatrix, {
+  type MatrixTitle,
+  type PermissionDef,
+  type RoleDefaults,
+} from './_components/PermissionMatrix'
 
 /**
  * Role & Permission.
  *
- * Half of it for now: what titles exist and which department each sits under.
- * The permission matrix that hangs off a title is the next phase — it replaces
- * the four hard-coded roles, so it lands with the RLS rewrite rather than
- * ahead of it.
+ * Two halves: which titles exist and which department each sits under, and
+ * what each title is allowed to do. The second is the portal's authorisation
+ * model since 2026-09-01 — RLS derives its scopes from the same permissions,
+ * so a title cannot be granted a page whose queries then come back empty.
  */
 export default async function RolesPage() {
-  const user = await requireRole(['principal', 'hr'])
+  const user = await requirePermission('team')
   const supabase = await createClient()
 
-  const [{ data: titles }, { data: departments }, { data: holders }] = await Promise.all([
+  const [
+    { data: titles },
+    { data: departments },
+    { data: holders },
+    { data: defs },
+    { data: grants },
+    { data: roleRows },
+  ] = await Promise.all([
     supabase
       .from('titles')
       .select('id, name, department_id, is_active, departments (name)')
@@ -26,6 +39,12 @@ export default async function RolesPage() {
       .select('title_id')
       .eq('status', 'active')
       .not('title_id', 'is', null),
+    supabase
+      .from('permission_defs')
+      .select('key, label, section, scope, description')
+      .order('sort_order'),
+    supabase.from('title_permissions').select('title_id, permission_key'),
+    supabase.from('role_default_permissions').select('role, permission_key'),
   ])
 
   const headcount = new Map<string, number>()
@@ -52,6 +71,35 @@ export default async function RolesPage() {
     name: d.name,
   }))
 
+  // A title with no rows inherits; one with rows is authoritative. Null and
+  // empty mean different things, so they are kept apart all the way to the UI.
+  const grantsByTitle = new Map<string, string[]>()
+  for (const g of grants ?? []) {
+    const row = g as { title_id: string; permission_key: string }
+    const list = grantsByTitle.get(row.title_id)
+    if (list) list.push(row.permission_key)
+    else grantsByTitle.set(row.title_id, [row.permission_key])
+  }
+
+  const matrixTitles: MatrixTitle[] = rows.map(t => ({
+    id: t.id,
+    name: t.name,
+    departmentName: t.departmentName,
+    people: t.people,
+    granted: grantsByTitle.get(t.id) ?? null,
+  }))
+
+  const byRole = new Map<string, string[]>()
+  for (const r of roleRows ?? []) {
+    const row = r as { role: string; permission_key: string }
+    const list = byRole.get(row.role)
+    if (list) list.push(row.permission_key)
+    else byRole.set(row.role, [row.permission_key])
+  }
+  const roleDefaults: RoleDefaults[] = ['principal', 'finance', 'hr', 'dept_manager'].map(
+    role => ({ role, keys: byRole.get(role) ?? [] }),
+  )
+
   return (
     <div>
       <div className="page-head">
@@ -61,8 +109,10 @@ export default async function RolesPage() {
           </div>
           <h1 className="page-title">Roles</h1>
           <p className="font-serif italic text-graphite text-base mt-3 max-w-2xl">
-            A title says what somebody is called and which department that role
-            belongs under. What each title is allowed to do lands here next.
+            A title says what somebody is called, which department that role
+            belongs under, and what it is allowed to do. A title with no
+            permissions of its own falls back to the role each holder&apos;s
+            account was created with.
           </p>
         </div>
       </div>
@@ -72,7 +122,14 @@ export default async function RolesPage() {
       <TitlesSection
         titles={rows}
         departments={deptOptions}
-        canDelete={user.role === 'principal'}
+        canDelete={canManagePermissions(user)}
+      />
+
+      <PermissionMatrix
+        defs={(defs ?? []) as PermissionDef[]}
+        titles={matrixTitles}
+        roleDefaults={roleDefaults}
+        canEdit={canManagePermissions(user)}
       />
     </div>
   )

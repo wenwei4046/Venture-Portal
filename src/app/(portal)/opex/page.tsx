@@ -1,7 +1,7 @@
 import dayjs from 'dayjs'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import OpexTrendChart from './_components/OpexTrendChart'
@@ -24,7 +24,7 @@ interface Props {
 }
 
 export default async function OpexPage({ searchParams }: Props) {
-  const user = await requireRole(['dept_manager', 'principal'])
+  const user = await requirePermission('opex')
   const supabase = await createClient()
 
   // Dept Manager is pinned to their own department; Principal picks any

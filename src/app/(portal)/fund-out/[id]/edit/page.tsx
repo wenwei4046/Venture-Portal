@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import LoanAmendForm from '../_components/LoanAmendForm'
 
@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default async function LoanEditPage({ params }: Props) {
-  await requireRole(['principal'])
+  await requirePermission('override')
   const { id } = await params
   const supabase = await createClient()
 

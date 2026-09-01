@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import { round2 } from '@/lib/payroll-funding'
 import GeneratePvForm, { type PoolBreakdownRow } from './_components/GeneratePvForm'
@@ -33,7 +33,7 @@ interface FundingInfo {
 }
 
 export default async function PayrollRequestsPage() {
-  await requireRole(['finance', 'principal'])
+  await requirePermission('treasury')
   const supabase = await createClient()
 
   const [{ data: requests }, { data: banks }] = await Promise.all([

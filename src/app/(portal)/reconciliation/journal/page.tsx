@@ -1,11 +1,11 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import { requireRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 
 export default async function JournalPage() {
-  await requireRole(['principal', 'finance'])
+  await requirePermission('reconciliation')
   const supabase = await createClient()
 
   // Fetch recent journal entries with their lines
