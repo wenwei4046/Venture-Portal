@@ -57,6 +57,15 @@
   --walnut: 90 62 43;
   --scrim: 90 62 43;
 
+  /* Band — walnut lifted a step, for the one dark object that REPEATS: the
+     department divider in a grouped table. Full walnut is right for a hero
+     card you meet once on a page; six of them down a roster is a lot of ink,
+     and this lighter cut carries the same weight without the page going heavy.
+     Its own token because --walnut inverts in dark mode (it becomes an ink
+     colour there) — reusing it would paint a light band under near-white text. */
+  --band: 110 76 54;
+  --band-ink: 246 238 230;
+
   /* Chrome — the tone shared by the two floating panels, sidebar rail and
      header. Its own token rather than borrowing --surface-2 (which means zebra
      rows and table headers), so the two can be tuned independently.
@@ -99,6 +108,8 @@
   --info-bg: 34 30 26;
 
   --walnut: 122 88 62;
+  --band: 92 68 50;
+  --band-ink: 248 242 235;
   --scrim: 14 10 8;
   --chrome: 48 42 35;
 }
@@ -667,12 +678,12 @@ table.ledger-table.tight tbody td .clip {
    department away. Marketing alone is half the roster.
 
    It has to read as a divider, not as another row. At `surface-2 / 0.65` it sat
-   barely a shade off the zebra stripe and the eye ran straight past it — three
-   things fix that together, and none of them is loudness: the band goes to full
-   `--surface-2` (the tone the table header already uses, so structure shares one
-   colour), the label drops out of the name's typeface into the uppercase mono
-   the portal uses for every other section label, and an accent spine marks the
-   left edge the way the sidebar marks the page you are on. */
+   barely a shade off the zebra stripe and the eye ran straight past it; a light
+   band in the mono label was better but still quiet. The band the user settled
+   on (2026-09-01) is dark: `--band`, walnut lifted a step, with the department
+   name reversed out of it in the portal's own text face at 12.5px. Mono was
+   tried at 10.5px and reads as a code rather than a proper name — a department
+   is a proper name, so it gets the text face, uppercase, tracking opened. */
 /* Specific enough to beat `.tight`'s own cell padding, or the band stops 16px
    short of both table edges and reads as a floating strip. */
 table.ledger-table td.group-cell,
@@ -683,37 +694,42 @@ table.ledger-table.tight tbody td.group-cell {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 16px 9px 13px;
+  gap: 11px;
+  padding: 10px 16px 10px 13px;
   border: 0;
-  border-left: 3px solid rgb(var(--accent));
-  box-shadow: inset 0 1px 0 rgb(var(--hairline));
-  background: rgb(var(--surface-2));
-  color: rgb(var(--ink));
-  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
-  font-size: 10.5px;
+  border-left: 3px solid rgb(var(--band));
+  background: rgb(var(--band));
+  /* The name is set in the portal's own text face, not the mono the smaller
+     labels use — at this size a monospace reads as a code, and a department is
+     a proper name. Uppercase with the tracking opened up keeps it a header
+     rather than a heading. */
+  color: rgb(var(--band-ink));
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 12.5px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   text-align: left;
   cursor: pointer;
   transition: background 0.14s;
 }
-.group-btn:hover { background: rgb(var(--accent-bg)); }
+.group-btn:hover { background: rgb(var(--band) / 0.88); }
 .group-btn .chev {
   font-size: 8px;
-  color: rgb(var(--accent));
+  color: rgb(var(--band-ink) / 0.7);
   transition: transform 0.18s ease;
 }
 .group-btn[aria-expanded='false'] .chev { transform: rotate(-90deg); }
+/* The count stays mono — it is a number, and numbers are mono everywhere here. */
 .group-btn .count {
-  font-size: 10px;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 10.5px;
   font-weight: 400;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: none;
-  color: rgb(var(--muted));
+  color: rgb(var(--band-ink) / 0.6);
 }
-.group-btn .count em { font-style: normal; color: rgb(var(--alert)); }
+.group-btn .count em { font-style: normal; color: rgb(246 214 150); }
 
 /* Monogram tile. The roster has no photographs and should not need any —
    initials give each row a shape to recognise, and the tinted variant is how
