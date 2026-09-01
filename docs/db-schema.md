@@ -440,6 +440,12 @@ titles (
     UNIQUE (lower(btrim(name)), department_id) NULLS NOT DISTINCT
 )
 ```
+`reports_to` is the org chart: current state, no history, every department. It is
+NOT `comm_hierarchy`, which is effective-dated because it drives override
+commission — the Team canvas draws that line but never writes it. Guarded by
+`hr_staff_costs_reports_to_not_self` (CHECK) and the
+`hr_staff_reports_to_no_cycle` trigger.
+
 Job titles as controlled rows, replacing the free-text `hr_staff_costs.designation`
 (20 hand-typed spellings, backfilled into 20 titles). RLS: read = any signed-in
 user; insert/update = principal + hr; delete = principal. The permission matrix
@@ -453,6 +459,7 @@ hr_staff_costs (
     department_id   uuid FK → departments NOT NULL   -- 该员工属于哪个部门
     title_id        uuid FK → titles NULL            -- ON DELETE SET NULL (2026-09-01)
     user_id         uuid FK → users NULL             -- 登录账号，唯一，多数人为 NULL
+    reports_to      uuid FK → hr_staff_costs NULL    -- 直属上司，全公司（2026-09-01）
     basic_salary    decimal(15,2) NOT NULL
     allowances      decimal(15,2) DEFAULT 0
     epf_er          decimal(15,2)                    -- 系统查表

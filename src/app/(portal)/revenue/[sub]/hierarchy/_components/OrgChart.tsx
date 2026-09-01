@@ -24,7 +24,7 @@ import {
   NODE_HEIGHT,
   NODE_WIDTH,
   type OrgNodeInput,
-} from '@/lib/commission/org-layout'
+} from '@/lib/org-layout'
 import { setPosition } from '../../../hierarchy-actions'
 
 export interface OrgRank {

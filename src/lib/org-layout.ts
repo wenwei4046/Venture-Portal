@@ -1,5 +1,9 @@
 /**
- * Tidy tree layout for the commission org chart.
+ * Tidy tree layout for an org chart.
+ *
+ * Two charts draw on it: the Revenue Department's commission hierarchy (who
+ * overrides whom) and the Team module's reporting hierarchy (who reports to
+ * whom). It knows nothing of either — id, parent, label.
  *
  * Hand-rolled rather than pulling in a graph-layout library: this is always a
  * forest of small trees (one node per salesperson, a handful of levels), and

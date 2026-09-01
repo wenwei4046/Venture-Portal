@@ -162,6 +162,7 @@ export function buildNavEntries(data: NavData): NavEntry[] {
       visible: isHRorPrincipal,
       children: [
         { href: '/team/people', label: 'People Management', visible: isHRorPrincipal },
+        { href: '/team/hierarchy', label: 'Hierarchy', visible: isHRorPrincipal },
         { href: '/team/roles', label: 'Role & Permission', visible: isHRorPrincipal },
       ],
     },

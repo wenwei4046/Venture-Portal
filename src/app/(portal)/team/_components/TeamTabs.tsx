@@ -3,24 +3,21 @@
 import { useRouter } from 'next/navigation'
 import { SlidingTabs, type TabItem } from '@/components/motion/SlidingTabs'
 
-export type TeamTab = 'people' | 'roles'
+export type TeamTab = 'people' | 'hierarchy' | 'roles'
 
 const HREF: Record<TeamTab, string> = {
   people: '/team/people',
+  hierarchy: '/team/hierarchy',
   roles: '/team/roles',
 }
 
-/**
- * The Team module's tab rail.
- *
- * Hierarchy joins these two once the global org canvas lands; until it does,
- * an empty tab would be worse than a missing one.
- */
+/** The Team module's tab rail. */
 export default function TeamTabs({ active }: { active: TeamTab }) {
   const router = useRouter()
 
   const items: TabItem[] = [
     { key: 'people', label: 'People Management' },
+    { key: 'hierarchy', label: 'Hierarchy' },
     { key: 'roles', label: 'Role & Permission' },
   ]
 
