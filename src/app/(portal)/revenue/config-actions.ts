@@ -256,7 +256,7 @@ export async function updateScheme(formData: FormData) {
   refresh()
 }
 
-// ─── Tier ladder ────────────────────────────────────────────────────────────
+// ─── Title ladder ────────────────────────────────────────────────────────────
 
 /**
  * One rung: its title (a Team → Role & Permission row), label, rate, whether

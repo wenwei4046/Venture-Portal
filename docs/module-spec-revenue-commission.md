@@ -809,7 +809,7 @@ Deposit gate                            [✓]        threshold  [ 50 ] % of orde
 Default rate mode                                  ( ) Fixed   (•) Variable
 ```
 
-**II. Tier ladder** — `comm_ranks`. The first column is a **dropdown of the
+**II. Title ladder** — `comm_ranks`. The first column is a **dropdown of the
 Revenue Department's titles** (2026-09-03, §3.1), and a blank row at the
 bottom adds a rung — its `rank_key` is minted from the label and it lands at
 the bottom of the ladder.

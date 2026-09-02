@@ -221,9 +221,9 @@ export default function CommissionSection({
             </ActionForm>
           </section>
 
-          {/* ── II. Tier ladder ─────────────────────────────────────────── */}
+          {/* ── II. Title ladder ─────────────────────────────────────────── */}
           <section>
-            <SectionHead title="II. Tier ladder" count={`${data.ranks.length} RANKS`} />
+            <SectionHead title="II. Title ladder" count={`${data.ranks.length} RANKS`} />
             <Hint>
               Each rung belongs to a <strong>title</strong> from Team → Role &amp; Permission. The
               rank is what a month pays; the title is what a person keeps — the month somebody is

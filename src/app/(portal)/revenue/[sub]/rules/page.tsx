@@ -9,7 +9,7 @@ interface PageProps {
 
 /**
  * Every rule the commission engine reads for ONE sub-department: its scheme
- * switches, the tier ladder, item groups, KPI items and thresholds, Open Bill
+ * switches, the title ladder, item groups, KPI items and thresholds, Open Bill
  * rates, brands and their margin bands, the recorded promotion criteria, and
  * the salespeople with their upline, rank, rate mode and tax tick.
  *
