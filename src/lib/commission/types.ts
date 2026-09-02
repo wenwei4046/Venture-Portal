@@ -162,15 +162,23 @@ export interface MarginBand {
  *   Revenue Specialist 5% → 6% · Team Assistant 7% → 8%
  *   Team Leader 9% · Senior Team Leader 10%
  * There is no 7% Revenue Specialist.
+ *
+ * Every rung belongs to a TITLE (Team → Role & Permission). The rank is what
+ * a month pays; the title is what a person keeps — see `titles.ts`.
  */
 export interface Rank {
   rankKey: string
-  tierKey: string
-  tierLabel: string
+  /** `titles.id` this rung belongs to. Several rungs may share one. */
+  titleId: string
+  titleLabel: string
   label: string
   /** 0.07 = 7% of commissionable product revenue. */
   productRate: number
-  /** A Revenue Specialist on 5% may not hold downlines; 6% unlocks it. */
+  /**
+   * A Revenue Specialist on 5% may not hold downlines; 6% unlocks it.
+   * Read through the TITLE (`titleCanRecruit`), not the month's rank, so a
+   * Team Assistant who slips back for a month keeps their team.
+   */
   canRecruit: boolean
   /**
    * GROUP sales needed to hold this rank — the person's own commissionable
@@ -202,6 +210,12 @@ export interface HierarchyNode {
    */
   baseRankKey: string
   rateMode: RateMode
+  /**
+   * The title they HOLD (`hr_staff_costs.title_id`) — the ratchet. Decides
+   * whether they may recruit and whether this month's rank would raise it.
+   * `null` when nobody has given them one yet; the base rank answers instead.
+   */
+  titleId: string | null
 }
 
 export interface CommissionScheme {
@@ -332,7 +346,14 @@ export interface Statement {
   rateMode: RateMode
   /** The rank actually used this month, after the variable-rate resolution. */
   effectiveRankKey: string | null
-  tierKey: string | null
+  /** The title that rank belongs to. */
+  rankTitleId: string | null
+  /**
+   * The title this month would raise them to when the run is applied, or
+   * null when the paid rank's title is not above the one they hold. A
+   * preview: `apply_commission_run` decides from the live record.
+   */
+  promotesToTitleId: string | null
   productRate: number
   /** Set when group sales qualify them for a rank above their base — the
    *  promotion prompt for a fixed-rate person, already applied for a variable. */

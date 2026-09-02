@@ -25,6 +25,12 @@ function pct(v: number | string | null, digits = 1): string {
   return `${(Number(v) * 100).toFixed(digits)}%`
 }
 
+/** PostgREST embeds a to-one relation as an object or a one-element array. */
+function oneOf<T>(v: T | T[] | null | undefined): T | null {
+  if (!v) return null
+  return Array.isArray(v) ? (v[0] ?? null) : v
+}
+
 /** The order components are paid in, so the drill-down reads top to bottom. */
 const COMPONENT_ORDER = [
   'product_revenue',
@@ -61,7 +67,11 @@ const COMPONENT_NOTE: Record<string, string> = {
 interface StatementRow {
   id: string
   staff_id: string
-  tier_key: string | null
+  rank_title_id: string | null
+  promotes_to_title_id: string | null
+  /** Embedded `titles (name)` for each of the two title columns. */
+  rank_title: { name: string } | { name: string }[] | null
+  promotes_to: { name: string } | { name: string }[] | null
   base_rank_key: string | null
   rank_key: string | null
   rate_mode: 'fixed' | 'variable' | null
@@ -127,7 +137,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
 
   const { data: stmtData } = await supabase
     .from('comm_statements')
-    .select('*')
+    .select('*, rank_title:titles!comm_statements_rank_title_id_fkey (name), promotes_to:titles!comm_statements_promotes_to_title_id_fkey (name)')
     .eq('run_id', run.id)
     .eq('staff_id', staffId)
     .maybeSingle()
@@ -189,6 +199,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
           </div>
           <h1 className="page-title">{me?.employee_name ?? staffId}</h1>
           <p className="font-serif italic text-graphite text-base mt-3">
+            {oneOf(s.rank_title)?.name ? `${oneOf(s.rank_title)!.name} · ` : ''}
             {s.rank_key ?? 'no rank'} at {pct(s.product_rate, 0)}
             {s.rate_mode === 'fixed' ? ' · Manual rate' : ' · Scheme rate'}
             {s.upline_staff_id
@@ -220,6 +231,15 @@ export default async function CommissionStatementPage({ params }: PageProps) {
               {s.rate_mode === 'fixed'
                 ? ' — a promotion to consider, not applied, because their rate is set manually.'
                 : ' — already applied this month.'}
+            </p>
+          ) : null}
+          {s.promotes_to_title_id ? (
+            <p className="font-serif italic text-accent text-sm mt-3">
+              {run.status === 'applied' ? 'Title raised to ' : 'Applying this run raises their title to '}
+              <strong>{oneOf(s.promotes_to)?.name ?? 'a higher title'}</strong>
+              {run.status === 'applied'
+                ? ' — and it stays there: a title only ever goes up.'
+                : ' — the rank paid this month sits above the title they hold.'}
             </p>
           ) : null}
         </div>

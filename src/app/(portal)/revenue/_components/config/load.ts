@@ -1,7 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import type { CommissionSettingsData, ProductRow, SalespersonRow, SchemeRow } from './types'
+import type { CommissionSettingsData, ProductRow, SalespersonRow, SchemeRow, TitleRow } from './types'
 
 /**
  * Everything the Rules page renders for ONE sub-department, in one round
@@ -32,15 +32,25 @@ export async function loadCommissionSettings(
 
   // The clone picker's raw material — deliberately every sub-department, not
   // just the one on screen.
-  const [subDepartments, allSchemes, departments] = await Promise.all([
+  const [subDepartments, allSchemes, departments, titles] = await Promise.all([
     supabase.from('comm_sub_departments').select('id, department_id, name, code, is_active').order('name'),
     supabase.from('comm_schemes').select('id, sub_department_id, scheme_name').eq('is_active', true).is('effective_to', null),
     supabase.from('departments').select('id, name').eq('payroll_source', 'commission').order('name'),
+    // The ladder's Tier column picks from these — the titles the Revenue side
+    // keeps under Team → Role & Permission. Unscoped like the lists above:
+    // a sub-department cloned under another commission department needs them.
+    supabase
+      .from('titles')
+      .select('id, name, departments!inner (payroll_source)')
+      .eq('departments.payroll_source', 'commission')
+      .eq('is_active', true)
+      .order('name'),
   ])
 
   const shell = {
     scheme: null,
     ranks: [],
+    titles: rows<{ id: string; name: string }>(titles.data).map(t => ({ id: t.id, name: t.name })) satisfies TitleRow[],
     itemGroups: [],
     kpiItems: [],
     kpiThresholds: [],
@@ -85,7 +95,7 @@ export async function loadCommissionSettings(
   // position, not drawing a second one.
   const { data: staffRows } = await supabase
     .from('hr_staff_costs')
-    .select('id, employee_name, employee_code, tax_mode, withholding_rate, departments!inner (name, payroll_source)')
+    .select('id, employee_name, employee_code, tax_mode, withholding_rate, title_id, titles (name), departments!inner (name, payroll_source)')
     .eq('status', 'active')
     .eq('departments.payroll_source', 'commission')
     .order('employee_name')
@@ -113,6 +123,8 @@ export async function loadCommissionSettings(
     employee_code: string | null
     tax_mode: 'pcb' | 'withholding' | 'none' | null
     withholding_rate: number | null
+    title_id: string | null
+    titles: { name: string } | { name: string }[] | null
   }>(staffRows)
     .filter(s => {
       const pos = positionByStaff.get(s.id)
@@ -120,10 +132,13 @@ export async function loadCommissionSettings(
     })
     .map(s => {
       const pos = positionByStaff.get(s.id)
+      const title = Array.isArray(s.titles) ? (s.titles[0] ?? null) : s.titles
       return {
         staff_id: s.id,
         employee_name: s.employee_name,
         employee_code: s.employee_code,
+        title_id: s.title_id ?? null,
+        title_name: title?.name ?? null,
         hierarchy_id: pos?.id ?? null,
         upline_staff_id: pos?.upline_staff_id ?? null,
         rank_id: pos?.rank_id ?? null,

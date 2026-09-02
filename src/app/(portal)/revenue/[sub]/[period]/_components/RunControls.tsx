@@ -65,13 +65,15 @@ export default function RunControls({
   const apply = () =>
     run(async () => {
       const s = await applyRun(runId as string)
-      return `Written into payroll: ${s.staffWritten} salesperson(s), ${s.ordersReleased} order(s) closed.`
+      return `Written into payroll: ${s.staffWritten} salesperson(s), ${s.ordersReleased} order(s) closed${
+        s.titlesPromoted > 0 ? `, ${s.titlesPromoted} title(s) raised` : ''
+      }.`
     })
 
   const reopen = () =>
     run(async () => {
       await reopenRun(runId as string)
-      return 'Reopened. The commission figures have been taken back out of payroll.'
+      return 'Reopened. The commission figures have been taken back out of payroll. A title this run raised stays raised.'
     })
 
   const canApply = status === 'computed' && warningCount === 0

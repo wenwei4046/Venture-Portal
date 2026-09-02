@@ -25,6 +25,12 @@ function pct(v: number | null): string {
   return v === null ? '—' : `${(v * 100).toFixed(1)}%`
 }
 
+/** PostgREST embeds a to-one relation as an object or a one-element array. */
+function one<T>(v: T | T[] | null | undefined): T | null {
+  if (!v) return null
+  return Array.isArray(v) ? (v[0] ?? null) : v
+}
+
 interface RunRow {
   id: string
   status: 'draft' | 'computed' | 'applied' | 'locked'
@@ -57,6 +63,9 @@ interface StatementRow {
   staff_id: string
   rank_key: string | null
   qualifies_for_rank_key: string | null
+  /** The engine's preview of the ratchet — embedded `titles (name)`. */
+  promotes_to_title_id: string | null
+  promotes_to: { name: string } | { name: string }[] | null
   product_rate: number | string
   product_revenue: number | string
   group_revenue: number | string
@@ -161,7 +170,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   const { data: statementData } = run
     ? await supabase
         .from('comm_statements')
-        .select('id, staff_id, rank_key, qualifies_for_rank_key, product_rate, product_revenue, group_revenue, deferred_revenue, product_commission, kpi_commission, open_bill_bonus, override_commission, margin_incentive, margin_pct, margin_penalty_withheld, total_commission')
+        .select('id, staff_id, rank_key, qualifies_for_rank_key, promotes_to_title_id, promotes_to:titles!comm_statements_promotes_to_title_id_fkey (name), product_rate, product_revenue, group_revenue, deferred_revenue, product_commission, kpi_commission, open_bill_bonus, override_commission, margin_incentive, margin_pct, margin_penalty_withheld, total_commission')
         .eq('run_id', run.id)
     : { data: null }
   const statements = ((statementData ?? []) as unknown as StatementRow[]).sort(
@@ -381,6 +390,13 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                           {s.qualifies_for_rank_key && s.qualifies_for_rank_key !== s.rank_key ? (
                             <div className="font-mono text-[10.5px] text-accent mt-0.5">
                               QUALIFIES FOR {s.qualifies_for_rank_key.toUpperCase()}
+                            </div>
+                          ) : null}
+                          {s.promotes_to_title_id ? (
+                            <div className="font-mono text-[10.5px] text-accent mt-0.5">
+                              {run?.status === 'applied' ? 'TITLE RAISED TO' : 'TITLE → '}{' '}
+                              {(one(s.promotes_to)?.name ?? 'a higher title').toUpperCase()}
+                              {run?.status === 'applied' ? '' : ' ON APPLY'}
                             </div>
                           ) : null}
                         </td>

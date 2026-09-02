@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { revenuePath } from '@/lib/revenue'
+import { titleCanRecruit } from '@/lib/commission/titles'
 import {
   deleteKpiItem,
   deleteKpiThreshold,
@@ -224,16 +225,19 @@ export default function CommissionSection({
           <section>
             <SectionHead title="II. Tier ladder" count={`${data.ranks.length} RANKS`} />
             <Hint>
-              Rates can repeat across tiers, so the <em>rank key</em> is the identity, not the rate.
-              A rank that may not recruit cannot be chosen as anybody&apos;s upline. The group-sales
-              target is what a <em>scheme-target</em> salesperson climbs to each month; leave it
-              blank for a rank nobody can reach on volume alone.
+              Each rung belongs to a <strong>title</strong> from Team → Role &amp; Permission. The
+              rank is what a month pays; the title is what a person keeps — the month somebody is
+              paid a rung above the title they hold, their title is raised to it and{' '}
+              <em>never lowered</em>. Whether a title may recruit follows the title, so a Team
+              Assistant back on 5% for a month keeps their team. The group-sales target is what a{' '}
+              <em>scheme-target</em> salesperson climbs to each month; leave it blank for a rung
+              nobody can reach on volume alone.
             </Hint>
             <div className="border border-hairline rounded-md bg-surface overflow-x-auto table-scroll">
               <table className="ledger-table">
                 <thead>
                   <tr>
-                    <th>Tier</th>
+                    <th>Title</th>
                     <th>Rank</th>
                     <th className="right">Rate %</th>
                     <th className="w-24">Can recruit</th>
@@ -249,10 +253,9 @@ export default function CommissionSection({
                           <td>
                             <Hidden name="id" value={r.id} />
                             <Hidden name="scheme_id" value={scheme.id} />
-                            <Hidden name="tier_key" value={r.tier_key} />
                             <Hidden name="rank_key" value={r.rank_key} />
                             <Hidden name="sort_order" value={r.sort_order} />
-                            <Field name="tier_label" defaultValue={r.tier_label} width="w-44" />
+                            <TitleChoice titles={data.titles} current={r.title_id} ariaLabel={`${r.rank_key} title`} />
                           </td>
                           <td><Field name="label" defaultValue={r.label} width="w-52" /></td>
                           <td className="num">
@@ -267,6 +270,25 @@ export default function CommissionSection({
                       )}
                     </RowForm>
                   ))}
+                  <RowForm action={upsertRank}>
+                    {({ pending }) => (
+                      <tr className="bg-surface-2/40">
+                        <td>
+                          <Hidden name="scheme_id" value={scheme.id} />
+                          <TitleChoice titles={data.titles} current={null} ariaLabel="new rank title" required />
+                        </td>
+                        <td><Field name="label" placeholder="Team Leader - 11%" width="w-52" required /></td>
+                        <td className="num">
+                          <Field name="product_rate" type="number" step="0.01" width="w-20" placeholder="11" required ariaLabel="new rank rate" />
+                        </td>
+                        <td><Tick name="can_recruit" defaultChecked ariaLabel="new rank can recruit" /></td>
+                        <td className="num">
+                          <Field name="group_sales_threshold" type="number" step="1" width="w-32" placeholder="—" ariaLabel="new rank group sales target" />
+                        </td>
+                        <td><SaveButton pending={pending} label="Add" /></td>
+                      </tr>
+                    )}
+                  </RowForm>
                 </tbody>
               </table>
             </div>
@@ -666,8 +688,10 @@ export default function CommissionSection({
               }
             />
             <Hint>
-              <strong>Manual</strong> keeps whatever title they were moved to, even in a month below
-              target. <strong>Scheme target</strong> recomputes the rate every month from group
+              <strong>Title</strong> is what they hold and only ever goes up — an applied run, or a
+              placement here, raises it; nothing here lowers it. <strong>Attained rank</strong> is
+              the floor a month pays from. <strong>Manual</strong> keeps that rank even in a month
+              below target; <strong>Scheme target</strong> recomputes the rate every month from group
               sales and drops back when the target is missed. Changing a rank or upline writes a new
               effective-dated position — a month already computed keeps the chart it was computed
               against.
@@ -686,6 +710,7 @@ export default function CommissionSection({
                   <thead>
                     <tr>
                       <th>Name</th>
+                      <th>Title</th>
                       <th>Upline</th>
                       <th>Attained rank</th>
                       <th className="w-44">Rate mode</th>
@@ -701,6 +726,9 @@ export default function CommissionSection({
                           {p.employee_code ? (
                             <span className="ml-2 font-mono text-xs text-muted">{p.employee_code}</span>
                           ) : null}
+                        </td>
+                        <td className="font-serif italic text-sm text-graphite">
+                          {p.title_name ?? <span className="text-muted">— none yet —</span>}
                         </td>
                         <PositionCells person={p} data={data} schemeId={scheme.id} />
                         <td>
@@ -730,6 +758,33 @@ export default function CommissionSection({
   )
 }
 
+/**
+ * The ladder's title picker. A title that was assigned but has since been
+ * deactivated still shows on its row, so the ladder never lies about itself.
+ */
+function TitleChoice({
+  titles,
+  current,
+  ariaLabel,
+  required,
+}: {
+  titles: CommissionSettingsData['titles']
+  current: string | null
+  ariaLabel: string
+  required?: boolean
+}) {
+  const known = current !== null && titles.some(t => t.id === current)
+  return (
+    <Choice name="title_id" defaultValue={current ?? ''} ariaLabel={ariaLabel} required={required} width="w-52">
+      {current === null ? <option value="">— pick a title —</option> : null}
+      {current !== null && !known ? <option value={current}>(inactive title)</option> : null}
+      {titles.map(t => (
+        <option key={t.id} value={t.id}>{t.name}</option>
+      ))}
+    </Choice>
+  )
+}
+
 /** Upline + rank + rate mode, saved together as one position. */
 function PositionCells({
   person,
@@ -740,10 +795,14 @@ function PositionCells({
   data: CommissionSettingsData
   schemeId: string
 }) {
-  const recruiters = data.ranks.filter(r => r.can_recruit).map(r => r.id)
-  const canBeUpline = data.salespeople.filter(
-    p => p.staff_id !== person.staff_id && p.rank_id && recruiters.includes(p.rank_id),
-  )
+  // Who may hold downlines follows the TITLE they hold; only somebody with no
+  // title yet is judged by the rank they were placed at (titles.ts).
+  const rungs = data.ranks.map(r => ({ titleId: r.title_id, canRecruit: r.can_recruit, sortOrder: r.sort_order }))
+  const rankCanRecruit = new Map(data.ranks.map(r => [r.id, r.can_recruit]))
+  const canBeUpline = data.salespeople.filter(p => {
+    if (p.staff_id === person.staff_id || !p.rank_id) return false
+    return titleCanRecruit(rungs, p.title_id) ?? rankCanRecruit.get(p.rank_id) ?? false
+  })
 
   return (
     <RowForm action={setPositionFromForm}>

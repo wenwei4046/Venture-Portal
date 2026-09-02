@@ -149,7 +149,7 @@ async function cloneSchemeChildren(
   toSchemeId: string,
 ) {
   const simple: Array<[table: string, columns: string[]]> = [
-    ['comm_ranks', ['tier_key', 'tier_label', 'rank_key', 'label', 'product_rate', 'can_recruit', 'group_sales_threshold', 'sort_order']],
+    ['comm_ranks', ['title_id', 'rank_key', 'label', 'product_rate', 'can_recruit', 'group_sales_threshold', 'sort_order']],
     ['comm_item_groups', ['item_group', 'commissionable', 'note']],
     ['comm_kpi_items', ['product_code', 'product_name', 'kpi_amount', 'effective_from', 'effective_to']],
     ['comm_kpi_thresholds', ['tier_label', 'min_qty', 'bonus_pct', 'effective_from', 'effective_to']],
@@ -258,36 +258,81 @@ export async function updateScheme(formData: FormData) {
 
 // ─── Tier ladder ────────────────────────────────────────────────────────────
 
+/**
+ * One rung: its title (a Team → Role & Permission row), label, rate, whether
+ * it may recruit, and the group-sales target that climbs to it.
+ *
+ * A NEW rung (no id) gets its identity here: `rank_key` is minted from the
+ * label — it is the key positions and statements hang off, so it never
+ * changes once written — and it lands at the bottom of the ladder unless a
+ * sort order was given. The tick ordering IS the ladder: a title sits where
+ * its lowest rung sits (titles.ts), so where a rung goes decides who
+ * outranks whom.
+ */
 export async function upsertRank(formData: FormData) {
   await requirePermission('revenue')
   const supabase = await client()
 
   const id = text(formData, 'id')
+  const schemeId = required(formData, 'scheme_id', 'Scheme')
+  const label = required(formData, 'label', 'Label')
   const rate = pct(formData, 'product_rate')
   if (rate === null || rate < 0 || rate > 1) {
     throw new Error('Commission rate must be between 0 and 100%')
   }
 
-  const row = {
-    scheme_id: required(formData, 'scheme_id', 'Scheme'),
-    tier_key: required(formData, 'tier_key', 'Tier'),
-    tier_label: required(formData, 'tier_label', 'Tier label'),
-    rank_key: required(formData, 'rank_key', 'Rank key'),
-    label: required(formData, 'label', 'Label'),
+  const base = {
+    scheme_id: schemeId,
+    title_id: required(formData, 'title_id', 'Title'),
+    label,
     product_rate: rate,
     can_recruit: formData.get('can_recruit') === 'on',
     group_sales_threshold: num(formData, 'group_sales_threshold'),
-    sort_order: num(formData, 'sort_order') ?? 0,
   }
 
-  check(
-    id
-      ? (await supabase.from('comm_ranks').update(row).eq('id', id)).error
-      : (await supabase.from('comm_ranks').insert(row)).error,
-    'Could not save the rank',
-  )
+  if (id) {
+    check(
+      (await supabase.from('comm_ranks').update({ ...base, sort_order: num(formData, 'sort_order') ?? 0 }).eq('id', id)).error,
+      'Could not save the rank',
+    )
+    refresh()
+    return
+  }
+
+  let sortOrder = num(formData, 'sort_order')
+  if (sortOrder === null) {
+    const { data: last } = await supabase
+      .from('comm_ranks')
+      .select('sort_order')
+      .eq('scheme_id', schemeId)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    sortOrder = ((last as { sort_order: number } | null)?.sort_order ?? 0) + 10
+  }
+
+  const { error } = await supabase.from('comm_ranks').insert({
+    ...base,
+    rank_key: text(formData, 'rank_key') || rankKeyFrom(label),
+    sort_order: sortOrder,
+  })
+  if (error?.code === '23505') {
+    throw new Error('A rank with that key already exists on this ladder — give it a different label')
+  }
+  check(error, 'Could not add the rank')
 
   refresh()
+}
+
+/** "Team Leader - 11%" → "team_leader_11". Stable, readable, unique per label. */
+function rankKeyFrom(label: string): string {
+  const key = label
+    .toLowerCase()
+    .replace(/%/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  if (!key) throw new Error('Give the rank a label the key can be made from')
+  return key
 }
 
 // ─── Item groups ────────────────────────────────────────────────────────────

@@ -75,8 +75,9 @@ export interface SchemeRow {
 
 export interface RankRow {
   rank_key: string
-  tier_key: string
-  tier_label: string
+  title_id: string
+  /** Embedded `titles (name)` — the label warnings use. */
+  titles: { name: string } | { name: string }[] | null
   label: string
   product_rate: Num
   can_recruit: boolean
@@ -124,6 +125,8 @@ export interface HierarchyRow {
   upline_staff_id: string | null
   rate_mode: RateMode | null
   comm_ranks: { rank_key: string } | { rank_key: string }[] | null
+  /** Embedded `hr_staff_costs (title_id)` — the title they hold, the ratchet. */
+  hr_staff_costs: { title_id: string | null } | { title_id: string | null }[] | null
 }
 
 export interface SalesLineRow {
@@ -201,8 +204,8 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
 
   const ranks: Rank[] = rows.ranks.map(r => ({
     rankKey: r.rank_key,
-    tierKey: r.tier_key,
-    tierLabel: r.tier_label,
+    titleId: r.title_id,
+    titleLabel: one(r.titles)?.name ?? r.label,
     label: r.label,
     productRate: num(r.product_rate),
     canRecruit: r.can_recruit,
@@ -260,6 +263,7 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
         uplineStaffId: h.upline_staff_id,
         baseRankKey: rank.rank_key,
         rateMode: h.rate_mode ?? rows.scheme.default_rate_mode,
+        titleId: one(h.hr_staff_costs)?.title_id ?? null,
       },
     ]
   })
@@ -342,7 +346,8 @@ export interface StatementLineDto {
 
 export interface StatementDto {
   staff_id: string
-  tier_key: string | null
+  rank_title_id: string | null
+  promotes_to_title_id: string | null
   base_rank_key: string | null
   rank_key: string | null
   rate_mode: RateMode
@@ -417,7 +422,8 @@ export function releasedOrders(input: EngineInput, result: EngineResult): Releas
 function toStatementDto(s: Statement): StatementDto {
   return {
     staff_id: s.staffId,
-    tier_key: s.tierKey,
+    rank_title_id: s.rankTitleId,
+    promotes_to_title_id: s.promotesToTitleId,
     base_rank_key: s.baseRankKey,
     rank_key: s.effectiveRankKey,
     rate_mode: s.rateMode,

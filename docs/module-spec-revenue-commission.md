@@ -164,6 +164,73 @@ broken, and only its creator would ever find out.
 > There is **no 7% Revenue Specialist** — 7% is where Team Assistant begins
 > (corrected by the user 2026-08-31).
 
+**Each rung belongs to a title** (2026-09-03). `comm_ranks.title_id` points at
+a row of `titles` — the same rows Team → Role & Permission manages — and the
+Rules page picks it from a dropdown rather than typing a tier label. The
+Revenue Department carries six titles and the live ladder maps 1:1:
+
+| Rung | Title |
+|---|---|
+| 5% | Revenue Specialist |
+| 6% | Senior Revenue Specialist |
+| 7% | Team Assistant |
+| 8% | Senior Team Assistant |
+| 9% | Team Leader |
+| 10% | Senior Team Leader |
+
+Several rungs may share a title; a title sits on the ladder where its lowest
+rung sits. Nothing reads `titles.sort_order`, and nothing reads the
+company-wide `title_levels` rungs (Assistant … Head of Department) either —
+those compare titles *across* departments for the People org chart, while the
+commission ladder is the one authority on which Revenue title outranks which,
+because that is what the rate follows.
+
+### 3.1.1 The title is a ratchet; the rank floats
+
+The user's rule (2026-09-02):
+
+> 如果他曾经 hit 到哪一个 tier level，就 hit 到相应的那个 grade。这个月是 6 月，他的
+> title 就变 Team Assistant 了；7 月没 hit 到 target，他的 percentage 就跌回去他之前的
+> percent，但是 title 还是 Team Assistant。Title 只会上，不会下。只有 rank 会上还是下，
+> 除非那个人是 fixed rank。
+
+So a salesperson carries **two facts that move differently**:
+
+| | Lives in | Up | Down |
+|---|---|---|---|
+| **Title** | `hr_staff_costs.title_id` (the People page's title) | the month a run is **applied** whose paid rank belongs to a higher title — and a manual placement at such a rank | **never by the engine**; a human demotes on People |
+| **Rank %** | `comm_hierarchy.rank_id` = the floor; the month's effective rank on the statement | group sales clear a rung (`variable`) | back to the floor when the target is missed (`variable`); pinned (`fixed`) |
+
+June: a Senior Revenue Specialist on `variable` clears 300k → paid at 7%,
+title raised to Team Assistant. July: misses it → paid at 6%, **title stays
+Team Assistant**. The floor rank is untouched by either month.
+
+Mechanics:
+
+- `comm_statements.rank_title_id` snapshots the title of the rank paid;
+  `promotes_to_title_id` is the engine's **preview** of the ratchet (the run
+  dashboard shows `TITLE → TEAM ASSISTANT ON APPLY`).
+- `apply_commission_run` decides afresh from the **live** staff record, raises
+  `hr_staff_costs.title_id` (mirroring `designation`, which the payroll export
+  reads), and writes one row to **`comm_title_promotions`** per raise. The
+  toast reports `N title(s) raised`.
+- `reopen_commission_run` takes the money back out of payroll and **does not
+  lower the title** — a ratchet only goes one way.
+- A manual placement on the Rules page or the org chart at a rank above the
+  held title raises it the same way, logged with `run_id = NULL`.
+- The People org chart's ladder rule (`hr_staff_respects_ladder`, SQLSTATE
+  `23LAD`) can refuse a raise that would stand above the person's
+  `reports_to` line on the company ladder. The apply then fails **loudly**,
+  naming the person and the line, and the whole month rolls back — commission
+  does not quietly step around a reporting line the People chart got wrong.
+
+**"Can recruit" follows the title, not the month's rank** (user 2026-09-03). A
+Team Assistant who slips back to 5% for a month keeps the team they built, and
+the run must not stall on it. A title may recruit when any rung it carries
+may; only somebody with no title yet is judged by the rank they were placed
+at. Enforced in three places with one helper (`src/lib/commission/titles.ts`):
+the engine's warning, `setPosition`'s guard, and the two pages' upline pickers.
+
 ### 3.2 Group sales — what the threshold measures
 
 **Group sales = the person's own commissionable revenue + their entire downline
@@ -193,7 +260,8 @@ Implementation: `comm_hierarchy.rank_id` is the **attained** rank — the whole
 story in fixed mode, and the floor a variable person can never drop below.
 `comm_ranks.group_sales_threshold` is what a variable person climbs to.
 `comm_schemes.default_rate_mode` is the common standard; a person's own
-`rate_mode` overrides it.
+`rate_mode` overrides it. The **title** is a separate fact and only ever goes
+up — §3.1.1.
 
 Either way the engine reports `qualifiesForRankKey`, so a **fixed** person who
 has just cleared 300k surfaces as *due a promotion* rather than silently staying
@@ -576,7 +644,7 @@ New tables. `sales_*` = imported facts, `comm_*` = config + results. The dormant
 |---|---|
 | `comm_sub_departments` | Fair, and whatever comes next |
 | `comm_schemes` | knobs, component switches, deposit threshold, default rate mode, `cloned_from_scheme_id` |
-| `comm_ranks` | tier, rank, rate, `can_recruit`, `group_sales_threshold` |
+| `comm_ranks` | `title_id` → `titles` (replaced `tier_key` / `tier_label` 2026-09-03), rank, rate, `can_recruit`, `group_sales_threshold` |
 | `comm_item_groups` | ERP group → commissionable? |
 | `comm_kpi_items` / `comm_kpi_thresholds` | KPI products and the qty ladder |
 | `comm_open_bill_rules` | 50 / 40 / 30% |
@@ -589,9 +657,10 @@ New tables. `sales_*` = imported facts, `comm_*` = config + results. The dormant
 | `sales_orders` / `sales_order_lines` | the raw facts, plus `brand_code`, `cost_amount` and `raw` JSONB |
 | `sales_order_open_bill_tags` | the picks, with `auto_suggested` |
 | `comm_runs` | one per sub-department per month |
-| `comm_statements` / `comm_statement_lines` | results + the audit trail |
+| `comm_statements` / `comm_statement_lines` | results + the audit trail; `rank_title_id` (title of the rank paid) and `promotes_to_title_id` (the ratchet, previewed) |
 | `comm_statement_brand_margins` | the per-brand margin behind one statement — which brand capped the incentive |
 | `comm_order_releases` | which orders have been paid — the deposit gate's safety net |
+| `comm_title_promotions` | every time a title was raised — by an applied run (`run_id`) or a manual placement (`run_id NULL`). Never lowered here; reopen writes nothing |
 
 Changes to existing tables: `departments.payroll_source`,
 `hr_staff_costs.tax_mode` + `withholding_rate`,
@@ -740,16 +809,20 @@ Deposit gate                            [✓]        threshold  [ 50 ] % of orde
 Default rate mode                                  ( ) Fixed   (•) Variable
 ```
 
-**II. Tier ladder** — `comm_ranks`.
+**II. Tier ladder** — `comm_ranks`. The first column is a **dropdown of the
+Revenue Department's titles** (2026-09-03, §3.1), and a blank row at the
+bottom adds a rung — its `rank_key` is minted from the label and it lands at
+the bottom of the ladder.
 
 ```
-TIER                 RANK     RATE    CAN RECRUIT   GROUP SALES TARGET
-Revenue Specialist   5%       5.00%      [ ]              —
-Revenue Specialist   6%       6.00%      [✓]              —
-Team Assistant       7%       7.00%      [✓]        300,000.00
-Team Assistant       8%       8.00%      [✓]              —
-Team Leader          9%       9.00%      [✓]              —
-Senior Team Leader   10%     10.00%      [✓]              —
+TITLE                       RANK                        RATE    CAN RECRUIT   GROUP SALES TARGET
+[Revenue Specialist      ▾] Revenue Specialist - 5%      5.00%      [ ]              —
+[Senior Revenue Special… ▾] Revenue Specialist - 6%      6.00%      [✓]              —
+[Team Assistant          ▾] Team Assistant - 7%          7.00%      [✓]        300,000.00
+[Senior Team Assistant   ▾] Team Assistant - 8%          8.00%      [✓]              —
+[Team Leader             ▾] Team Leader - 9%             9.00%      [✓]              —
+[Senior Team Leader      ▾] Senior Team Leader - 10%    10.00%      [✓]              —
+[— pick a title —        ▾] Team Leader - 11%               11      [✓]              —        [ Add ]
 ```
 
 **III. Item groups** — `comm_item_groups`, with last month's revenue beside each
@@ -818,21 +891,27 @@ FROM → TO      ALT   CRITERION              THRESHOLD        ENFORCED
 ```
 
 **IX. Salespeople** — the per-person tick table the whole tab exists for.
-"Manual" is the user's *flexible* (a human sets the title); "Scheme" is
-*entitled to the target scheme* (the monthly targets set it).
+"Manual" is the user's *flexible* (a human sets the rank); "Scheme" is
+*entitled to the target scheme* (the monthly targets set it). **Title** is
+read-only here: it is the ratchet (§3.1.1), raised by an applied run or by a
+placement at a higher rank, lowered only on the People page.
 
 ```
-NAME            SUB-DEPT   UPLINE        ATTAINED RANK   RATE MODE            WITHHOLDING   WHT %
-YUNY            Fair       —             Team Leader 9%  (•)Manual ( )Scheme     [✓]        2.00
-TAN KAR JIUN    Fair       YUNY          Team Asst 7%    ( )Manual (•)Scheme     [✓]        2.00
-LUCAS           Fair       YUNY          Rev Spec 6%     ( )Manual (•)Scheme     [ ]          —
-SALLY           Fair       TAN KAR JIUN  Rev Spec 5%     ( )Manual (•)Scheme     [✓]        2.00
+NAME            TITLE                 UPLINE        ATTAINED RANK   RATE MODE            WITHHOLDING   WHT %
+YUNY            Team Leader           —             Team Leader 9%  (•)Manual ( )Scheme     [✓]        2.00
+TAN KAR JIUN    Team Assistant        YUNY          Rev Spec 6%     ( )Manual (•)Scheme     [✓]        2.00
+LUCAS           Senior Rev Specialist YUNY          Rev Spec 6%     ( )Manual (•)Scheme     [ ]          —
+SALLY           Revenue Specialist    TAN KAR JIUN  Rev Spec 5%     ( )Manual (•)Scheme     [✓]        2.00
 ```
 
-Rules the table enforces inline: an upline whose rank has `can_recruit = false`
-cannot be chosen; changing a rank or upline writes a **new effective-dated
-`comm_hierarchy` row** rather than mutating the old one, so past runs never
-move; a person who qualifies for a higher rank than they hold shows a
+(TAN KAR JIUN above: title Team Assistant from a month that cleared 300k,
+floor rank still 6% — exactly the July of §3.1.1.)
+
+Rules the table enforces inline: an upline whose **title** may not recruit
+cannot be chosen (the rank only answers for somebody with no title yet);
+changing a rank or upline writes a **new effective-dated `comm_hierarchy`
+row** rather than mutating the old one, so past runs never move; a person who
+qualifies for a higher rank than they hold shows a
 `due promotion → Team Assistant 7%` chip with a one-click promote.
 
 ---
@@ -903,6 +982,7 @@ statutory on a Revenue row would have quietly handed back their tax.
 | 9 | Open Bill board | ✅ built |
 | 10 | `save_` / `apply_` / `reopen_commission_run` RPCs + run dashboard + statement drill-down | ✅ built, **applied live** 2026-08-31 |
 | 11 | Payroll read-only Commission cell + WHT on the grid and the payslip | ✅ built |
+| 11a | Rung → title, the title ratchet, can-recruit by title, `+ add rung` (§3.1.1) — `20260903030000_rank_title_ratchet.sql` | ✅ built, **applied live** 2026-09-03; apply → reopen walked in the browser |
 | 12 | Cost feed → margin penalty and incentive go live | ⛔ blocked — the SO export has no cost column (Q1) |
 | 13 | WHT remittance in the statutory export | before the first real payout |
 | 14 | Revenue Dept P&L / pool 1090 wiring | separate scope |
@@ -926,6 +1006,7 @@ Q1, Q8 and a separate scope.
 | **Q8** | **WHT remittance** — which LHDN form / schedule, so the statutory export can produce it. | legally required before the first payout |
 | **Q9** | Is the deposit threshold really **50%**, and is it the same for every sub-department? | it is a per-scheme setting; 50% is seeded |
 | **Q10** | Should the Revenue Dept manager (`dept_manager` role) see their team's commission? | RLS scope; DENY for now |
+| **Q11** | A 5% Revenue Specialist who sells 300k on their own is paid at **7% and titled Team Assistant**, skipping 6% — because the only live gate is the 300k group-sales rung, and the 5% → 6% rule (personal 100k × 2 months) is recorded, not enforced (§3.4). Intended, or should 6% be a stop on the way? | flagged 2026-09-03; changes `resolveRank` and the ratchet if not |
 
 ---
 
@@ -934,8 +1015,9 @@ Q1, Q8 and a separate scope.
 - No clawback / cancelled-order reversal across periods (an order cancelled
   after its commission was released does not retro-adjust a locked run) — needs
   its own rule.
-- No automatic promotion between ranks; the portal flags eligibility and a human
-  clicks.
+- No automatic promotion of the **floor rank**; the portal flags eligibility
+  and a human clicks. (The **title** does move by itself — up only — the month
+  a higher rank is paid; §3.1.1.)
 - No target / quota tracking or leaderboards beyond the group-sales figure.
 - No commission accrual JV separate from the existing payroll accrual.
 - The Revenue Department's own P&L, billing mode and pool 1090 flows are out of

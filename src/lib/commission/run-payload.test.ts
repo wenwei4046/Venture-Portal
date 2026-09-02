@@ -34,8 +34,8 @@ const SCHEME: RunSourceRows['scheme'] = {
 const RANKS: RunSourceRows['ranks'] = [
   {
     rank_key: 'rs_5',
-    tier_key: 'rs',
-    tier_label: 'Revenue Specialist',
+    title_id: 'title-rs',
+    titles: { name: 'Revenue Specialist' },
     label: 'Revenue Specialist 5%',
     product_rate: '0.050000',
     can_recruit: false,
@@ -44,8 +44,8 @@ const RANKS: RunSourceRows['ranks'] = [
   },
   {
     rank_key: 'rs_6',
-    tier_key: 'rs',
-    tier_label: 'Revenue Specialist',
+    title_id: 'title-rs',
+    titles: { name: 'Revenue Specialist' },
     label: 'Revenue Specialist 6%',
     product_rate: '0.060000',
     can_recruit: true,
@@ -73,7 +73,7 @@ function baseRows(overrides: Partial<RunSourceRows> = {}): RunSourceRows {
         staff_id: 'staff-a',
         upline_staff_id: null,
         rate_mode: null,
-        comm_ranks: { rank_key: 'rs_5' },
+        comm_ranks: { rank_key: 'rs_5' }, hr_staff_costs: null,
       },
     ],
     orders: [],
@@ -125,6 +125,28 @@ describe('toEngineInput', () => {
     expect(input.orders[0].lines[0].costAmount).toBe(6000)
   })
 
+  it('carries each rung\'s title, and the title a person holds, into the engine', () => {
+    const input = toEngineInput(
+      baseRows({
+        hierarchy: [
+          {
+            staff_id: 'staff-a',
+            upline_staff_id: null,
+            rate_mode: null,
+            comm_ranks: { rank_key: 'rs_5' },
+            hr_staff_costs: { title_id: 'title-ta' },
+          },
+        ],
+      }),
+    )
+    expect(input.ranks[0].titleId).toBe('title-rs')
+    expect(input.ranks[0].titleLabel).toBe('Revenue Specialist')
+    expect(input.hierarchy[0].titleId).toBe('title-ta')
+
+    // No staff embed at all → no title, and the engine falls back to the rank.
+    expect(toEngineInput(baseRows()).hierarchy[0].titleId).toBeNull()
+  })
+
   it('accepts an embedded relation as either an object or a one-element array', () => {
     const asArray = toEngineInput(
       baseRows({
@@ -133,7 +155,7 @@ describe('toEngineInput', () => {
             staff_id: 'staff-a',
             upline_staff_id: null,
             rate_mode: null,
-            comm_ranks: [{ rank_key: 'rs_6' }],
+            comm_ranks: [{ rank_key: 'rs_6' }], hr_staff_costs: null,
           },
         ],
       }),
@@ -152,7 +174,7 @@ describe('toEngineInput', () => {
             staff_id: 'staff-a',
             upline_staff_id: null,
             rate_mode: 'fixed',
-            comm_ranks: { rank_key: 'rs_5' },
+            comm_ranks: { rank_key: 'rs_5' }, hr_staff_costs: null,
           },
         ],
       }),
@@ -164,7 +186,7 @@ describe('toEngineInput', () => {
     const input = toEngineInput(
       baseRows({
         hierarchy: [
-          { staff_id: 'staff-a', upline_staff_id: null, rate_mode: null, comm_ranks: null },
+          { staff_id: 'staff-a', upline_staff_id: null, rate_mode: null, comm_ranks: null, hr_staff_costs: null },
         ],
       }),
     )
@@ -303,8 +325,8 @@ describe('toRunPayload', () => {
   it('drops a statement for someone with no sales and nothing earned', () => {
     const rows = baseRows({
       hierarchy: [
-        { staff_id: 'staff-a', upline_staff_id: null, rate_mode: null, comm_ranks: { rank_key: 'rs_6' } },
-        { staff_id: 'staff-idle', upline_staff_id: 'staff-a', rate_mode: null, comm_ranks: { rank_key: 'rs_5' } },
+        { staff_id: 'staff-a', upline_staff_id: null, rate_mode: null, comm_ranks: { rank_key: 'rs_6' }, hr_staff_costs: null },
+        { staff_id: 'staff-idle', upline_staff_id: 'staff-a', rate_mode: null, comm_ranks: { rank_key: 'rs_5' }, hr_staff_costs: null },
       ],
       orders: [order()],
     })
@@ -312,6 +334,20 @@ describe('toRunPayload', () => {
     const payload = toRunPayload(input, computeCommissionRun(input))
 
     expect(payload.p_statements.map(s => s.staff_id)).toEqual(['staff-a'])
+  })
+
+  it('writes the paid rank\'s title and the ratchet preview onto the statement', () => {
+    // Nobody has given staff-a a title yet, so the first paid rank's title is
+    // what the run would raise them to.
+    const rows = baseRows({ orders: [order()] })
+    const input = toEngineInput(rows)
+    const payload = toRunPayload(input, computeCommissionRun(input))
+
+    expect(payload.p_statements[0]).toMatchObject({
+      rank_key: 'rs_5',
+      rank_title_id: 'title-rs',
+      promotes_to_title_id: 'title-rs',
+    })
   })
 
   it('keeps a statement whose whole month is sitting behind the deposit gate', () => {

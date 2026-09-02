@@ -40,6 +40,7 @@ import type {
   Statement,
   StatementLine,
 } from './types'
+import { promotesTo, titleCanRecruit } from './titles'
 
 export * from './types'
 
@@ -585,15 +586,27 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     nodes.set(n.staffId, n)
   }
 
-  // A rank below the recruiting threshold must not hold downlines. Flag rather
+  // A title below the recruiting threshold must not hold downlines. Flag rather
   // than silently paying (or silently dropping) their override.
+  //
+  // The TITLE decides, not the month's rank (user 2026-09-03): a Team
+  // Assistant who slips back to 5% for a month keeps the team they built,
+  // and a run must not stall on it. Only somebody with no title yet is judged
+  // by the rank they were placed at.
   for (const n of nodes.values()) {
     if (!n.uplineStaffId) continue
     const up = nodes.get(n.uplineStaffId)
-    const upRank = up && rankByKey.get(up.baseRankKey)
-    if (upRank && !upRank.canRecruit) {
+    if (!up) continue
+    const upRank = rankByKey.get(up.baseRankKey)
+    const byTitle = titleCanRecruit(ranks, up.titleId)
+    const allowed = byTitle ?? upRank?.canRecruit ?? true
+    if (!allowed) {
+      const held =
+        byTitle === null
+          ? `rank (${upRank?.label ?? up.baseRankKey})`
+          : `title (${ranks.find(r => r.titleId === up.titleId)?.titleLabel ?? up.titleId})`
       warnings.push(
-        `Staff ${n.staffId} is placed under ${up!.staffId}, whose rank (${upRank.label}) is not allowed to recruit.`,
+        `Staff ${n.staffId} is placed under ${up.staffId}, whose ${held} is not allowed to recruit.`,
       )
     }
   }
@@ -987,7 +1000,10 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       baseRankKey: d.node?.baseRankKey ?? null,
       rateMode: d.node?.rateMode ?? scheme.defaultRateMode,
       effectiveRankKey: rank?.effective?.rankKey ?? null,
-      tierKey: rank?.effective?.tierKey ?? null,
+      rankTitleId: rank?.effective?.titleId ?? null,
+      // The ratchet, previewed: null unless this month's rank sits under a
+      // title above the one they hold. The RPC decides again at apply time.
+      promotesToTitleId: promotesTo(ranks, d.node?.titleId ?? null, rank?.effective?.titleId ?? null),
       productRate: rateOf.get(d.staffId) ?? 0,
       qualifiesForRankKey: rank?.qualifiesFor?.rankKey ?? null,
       uplineStaffId: d.node?.uplineStaffId ?? null,
