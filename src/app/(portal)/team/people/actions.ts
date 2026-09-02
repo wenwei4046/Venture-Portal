@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import { validateStaffForm, designationForTitle } from '@/lib/staff-form'
+import { validateStaffForm, designationForTitle, payFieldsForUpdate } from '@/lib/staff-form'
 
 function trimOrNull(v: FormDataEntryValue | null): string | null {
   if (typeof v !== 'string') return null
@@ -99,6 +99,23 @@ export async function updateStaff(id: string, formData: FormData) {
   const bankAccountNo = ((formData.get('bank_account_no') as string) || '').trim() || null
   const nric = ((formData.get('nric') as string) || '').replace(/[-\s]/g, '') || null
 
+  // Pay and statutory. lib/staff-form.ts decides what a save writes: the
+  // "Fully commission based" tick writes the four columns that say so and
+  // leaves the categories alone (they were not on the form); otherwise every
+  // field is on the form, and every one is checked before it is written.
+  const pay = payFieldsForUpdate({
+    fullCommission: formData.get('full_commission') === 'on',
+    employmentType: str(formData, 'employment_type'),
+    basicSalary: str(formData, 'basic_salary'),
+    allowances: str(formData, 'allowances'),
+    nonStatutoryAllowance: str(formData, 'non_statutory_allowance'),
+    epfCategory: str(formData, 'epf_category'),
+    socsoCategory: str(formData, 'socso_category'),
+    isEpfExempt: formData.get('is_epf_exempt') === 'on',
+    pcbCategory: str(formData, 'pcb_category'),
+    childrenCount: str(formData, 'children_count'),
+  })
+
   // The title dropdown. Department is fixed on this form, so the row says
   // which department a title has to fit. An unchanged title is left alone: a
   // title deactivated while somebody held it is still theirs (deactivating
@@ -131,18 +148,10 @@ export async function updateStaff(id: string, formData: FormData) {
     .update({
       employee_name: formData.get('name') as string,
       ...titleChange,
-      basic_salary: parseFloat(formData.get('basic_salary') as string) || 0,
-      allowances: parseFloat(formData.get('allowances') as string) || 0,
-      non_statutory_allowance: parseFloat(formData.get('non_statutory_allowance') as string) || 0,
+      ...pay,
       employee_code: employeeCode,
       hire_date: hireDate,
       resignation_date: resignDate,
-      epf_category: formData.get('epf_category') as 'A' | 'C' | 'E' | 'F',
-      socso_category: formData.get('socso_category') as 'first' | 'second',
-      is_epf_exempt: formData.get('is_epf_exempt') === 'on',
-      pcb_category: formData.get('pcb_category') as 'KA1' | 'KA2' | 'KA3',
-      children_count: parseInt(formData.get('children_count') as string, 10) || 0,
-      employment_type: formData.get('employment_type') as 'salaried' | 'commission_eligible',
       bank_name: bankName,
       bank_account_no: bankAccountNo,
       nric: nric,

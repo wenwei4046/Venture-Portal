@@ -75,7 +75,7 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
     supabase
       .from('hr_staff_costs')
       .select(
-        '*, departments(name), titles(id, name, level_id), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active, last_seen_at)',
+        '*, departments(name, payroll_source), titles(id, name, level_id), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active, last_seen_at)',
       )
       .eq('id', id)
       .maybeSingle(),
@@ -175,6 +175,7 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
       designation: row.designation ?? null,
       department_id: row.department_id,
       department_name: deptName ?? '—',
+      commission_dept: row.departments?.payroll_source === 'commission',
       title_id: row.title_id ?? null,
       basic_salary: Number(row.basic_salary ?? 0),
       allowances: Number(row.allowances ?? 0),

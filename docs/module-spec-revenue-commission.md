@@ -492,12 +492,21 @@ precedent), `hr_employment_type` already has `commission_eligible`
 allowance` — with both at 0, every statutory lookup returns 0 by itself.
 
 The Add Staff form (People → People Management → Add person) is where that is
-filed: picking any `payroll_source = 'commission'` department shows a **Full
-commission basis** tick, on by default, which locks basic / statutory
+filed: picking any `payroll_source = 'commission'` department shows a **Fully
+commission based** tick, on by default, which locks basic / statutory
 allowance / non-statutory allowance at 0.00 and saves the person as
 `commission_eligible`. Untick it for the odd Revenue hire who does draw a
 basic. The tick does not touch `tax_mode` — Withholding Tax stays the
 per-person tick on the sub-department's Staff Hierarchy page (§5).
+
+The Edit form (own page and the person card) carries the same tick for a
+person in such a department, in place of the Employment Type select. While
+it is on, the Salary and Statutory sections are not shown at all and a save
+writes only the four columns that say "fully commission based"; the statutory
+categories are left as they were. The card's Details panel and the person
+page read the same way (`isFullyCommissionBased` in `src/lib/staff-form.ts`:
+`commission_eligible` AND a commission department — outside one, the flag
+keeps its older "basic + commission rules" meaning and the pay fields stay).
 
 > ⚠️ **Remittance is not built.** PCB is filed to LHDN through the statutory
 > export; WHT goes to LHDN on a different form. The statutory route needs a WHT

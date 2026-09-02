@@ -3,7 +3,10 @@ import {
   validateStaffForm,
   titlesForDepartment,
   designationForTitle,
+  isFullyCommissionBased,
+  payFieldsForUpdate,
   type RawStaffForm,
+  type RawPayFields,
 } from './staff-form'
 
 const ok: RawStaffForm = {
@@ -160,5 +163,86 @@ describe('designationForTitle', () => {
       /no longer an active title/,
     )
     expect(() => designationForTitle(title, 'dept-hr')).toThrow(/belongs to another department/)
+  })
+})
+
+describe('isFullyCommissionBased', () => {
+  it('needs both the flag and a commission department', () => {
+    expect(
+      isFullyCommissionBased({ employment_type: 'commission_eligible', commission_dept: true }),
+    ).toBe(true)
+    // Outside a commission department the flag still means basic + commission.
+    expect(
+      isFullyCommissionBased({ employment_type: 'commission_eligible', commission_dept: false }),
+    ).toBe(false)
+    expect(isFullyCommissionBased({ employment_type: 'salaried', commission_dept: true })).toBe(false)
+  })
+})
+
+describe('payFieldsForUpdate', () => {
+  const salaried: RawPayFields = {
+    fullCommission: false,
+    employmentType: 'salaried',
+    basicSalary: '3500',
+    allowances: '200',
+    nonStatutoryAllowance: '50',
+    epfCategory: 'A',
+    socsoCategory: 'first',
+    isEpfExempt: false,
+    pcbCategory: 'KA1',
+    childrenCount: '2',
+  }
+
+  it('fully commission based writes the four pay columns and nothing else', () => {
+    // The statutory fields were not on the form; whatever the row holds stays.
+    expect(payFieldsForUpdate({ ...salaried, fullCommission: true })).toEqual({
+      employment_type: 'commission_eligible',
+      basic_salary: 0,
+      allowances: 0,
+      non_statutory_allowance: 0,
+    })
+  })
+
+  it('otherwise writes every pay and statutory field', () => {
+    expect(payFieldsForUpdate(salaried)).toEqual({
+      employment_type: 'salaried',
+      basic_salary: 3500,
+      allowances: 200,
+      non_statutory_allowance: 50,
+      epf_category: 'A',
+      socso_category: 'first',
+      is_epf_exempt: false,
+      pcb_category: 'KA1',
+      children_count: 2,
+    })
+  })
+
+  it('reads a missing Employment Type select as salaried', () => {
+    expect(payFieldsForUpdate({ ...salaried, employmentType: null }).employment_type).toBe('salaried')
+    expect(payFieldsForUpdate({ ...salaried, employmentType: 'commission_eligible' }).employment_type).toBe(
+      'commission_eligible',
+    )
+  })
+
+  it('checks the statutory categories instead of casting them', () => {
+    expect(() => payFieldsForUpdate({ ...salaried, epfCategory: 'Z' })).toThrow(
+      /EPF category is not a valid choice/,
+    )
+    expect(() => payFieldsForUpdate({ ...salaried, socsoCategory: null })).toThrow(
+      /SOCSO category is required/,
+    )
+    expect(() => payFieldsForUpdate({ ...salaried, pcbCategory: '' })).toThrow(/PCB category is required/)
+  })
+
+  it('reads children as a whole number, blank as 0', () => {
+    expect(payFieldsForUpdate({ ...salaried, childrenCount: '' })).toMatchObject({ children_count: 0 })
+    expect(() => payFieldsForUpdate({ ...salaried, childrenCount: '1.5' })).toThrow(/whole number/)
+    expect(() => payFieldsForUpdate({ ...salaried, childrenCount: '-1' })).toThrow(/whole number/)
+  })
+
+  it('refuses a negative amount by field name', () => {
+    expect(() => payFieldsForUpdate({ ...salaried, allowances: '-5' })).toThrow(
+      /Statutory allowance cannot be negative/,
+    )
   })
 })
