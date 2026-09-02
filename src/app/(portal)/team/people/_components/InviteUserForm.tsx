@@ -209,7 +209,7 @@ export default function InviteUserForm({
             </select>
             <span className="block font-serif italic text-muted text-xs mt-1">
               What the portal lets them touch today. The permission matrix on
-              Role &amp; Permission will take this over.
+              Permissions will take this over.
             </span>
           </label>
         </div>

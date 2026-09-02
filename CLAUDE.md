@@ -38,10 +38,16 @@ src/
 │   │   ├── team/                    ← the sidebar's **People** section (its own
 │   │   │                              category since 2026-09-01, below
 │   │   │                              Departments): People Management /
-│   │   │                              Hierarchy / Role & Permission, three flat
+│   │   │                              Hierarchy / Roles / Permissions, four flat
 │   │   │                              entries. No tab rail on the pages — the
 │   │   │                              sidebar is the only way between them.
-│   │   │                              Routes stay under /team/*.
+│   │   │                              Routes stay under /team/*. Roles =
+│   │   │                              titles + the **ladder** (Levels board,
+│   │   │                              2026-09-03: `title_levels`, one shared
+│   │   │                              scale; promotion climbs it, Hierarchy
+│   │   │                              obeys it — `lib/ladder.ts`).
+│   │   │                              Permissions = the matrix, split off the
+│   │   │                              same day.
 │   │   ├── director-salary/         (Phase 3)
 │   │   ├── hr-costing/              (Phase 3 — staff directory moved to team/)
 │   │   ├── revenue/                 ← Revenue Department: [sub]/ = one sub-department

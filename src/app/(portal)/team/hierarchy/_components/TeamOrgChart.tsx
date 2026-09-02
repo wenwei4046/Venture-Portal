@@ -26,6 +26,7 @@ import {
   NODE_WIDTH,
   type OrgNodeInput,
 } from '@/lib/org-layout'
+import { ladderAllows, ladderRefusal } from '@/lib/ladder'
 import { setReportsTo } from '../actions'
 
 export interface ChartPerson {
@@ -34,6 +35,10 @@ export interface ChartPerson {
   code: string | null
   title: string | null
   department: string | null
+  /** Where their title stands on the ladder. Null when it is not placed —
+   *  the ladder then has nothing to say about them. */
+  levelRank: number | null
+  levelName: string | null
   reportsTo: string | null
   /** Their Revenue upline, if they have one. Drawn, never written here. */
   commUplineId: string | null
@@ -56,8 +61,13 @@ const ALL = '__all__'
  * manager's bottom handle to somebody's top handle. Both call `setReportsTo`.
  *
  * Illegal moves are refused HERE, before the round trip, so the refusal is
- * instant and names the reason. The database trigger is still the backstop — a
- * loop would hang the layout walk, and being right twice is cheap.
+ * instant and names the reason. Two things are illegal: putting somebody under
+ * one of their own reports, and — since 2026-09-03 — putting somebody under a
+ * title the ladder ranks below theirs. The database trigger is still the
+ * backstop for both; being right twice is cheap.
+ *
+ * The ladder is a rule about titles, not a second chart: it says how high,
+ * never where. Moving a person between departments is still a drag here.
  */
 export default function TeamOrgChart(props: {
   people: ChartPerson[]
@@ -109,13 +119,20 @@ function Chart({
 
   const layout = useMemo(() => layoutTree(graph), [graph])
 
-  /** Everything the person being dragged may not be dropped on. */
+  /** Everything the person being dragged may not be dropped on: their own
+   *  reports, and anybody the ladder ranks below them. */
   const forbidden = useMemo(() => {
     if (!dragging) return new Set<string>()
     const out = descendantsOf(graph, dragging)
     out.add(dragging)
+    const mover = byId.get(dragging)
+    if (mover && mover.levelRank !== null) {
+      for (const p of people) {
+        if (!ladderAllows(mover.levelRank, p.levelRank)) out.add(p.id)
+      }
+    }
     return out
-  }, [dragging, graph])
+  }, [dragging, graph, byId, people])
 
   const nodes: Node<CardData>[] = useMemo(
     () =>
@@ -138,15 +155,24 @@ function Chart({
   )
 
   const edges: Edge[] = useMemo(() => {
+    // A line the ladder would refuse today — drawn after the ladder changed
+    // under it — is painted in the danger colour rather than hidden. The
+    // trigger does not go back over old lines, so the chart has to.
     const reporting: Edge[] = people
       .filter(p => p.reportsTo && byId.has(p.reportsTo))
-      .map(p => ({
-        id: `r:${p.reportsTo}->${p.id}`,
-        source: p.reportsTo!,
-        target: p.id,
-        type: 'smoothstep',
-        style: { stroke: 'var(--hairline-strong, #b9b0a2)', strokeWidth: 1.5 },
-      }))
+      .map(p => {
+        const manager = byId.get(p.reportsTo!)!
+        const broken = !ladderAllows(p.levelRank, manager.levelRank)
+        return {
+          id: `r:${p.reportsTo}->${p.id}`,
+          source: p.reportsTo!,
+          target: p.id,
+          type: 'smoothstep',
+          style: broken
+            ? { stroke: 'var(--danger)', strokeWidth: 1.75 }
+            : { stroke: 'var(--hairline-strong, #b9b0a2)', strokeWidth: 1.5 },
+        }
+      })
 
     // The commission line only when it differs from the reporting line — an
     // identical dashed edge under a solid one says nothing.
@@ -181,9 +207,19 @@ function Chart({
       if (child.reportsTo === parentId) return
 
       if (parentId) {
-        if (!byId.has(parentId)) return
+        const parent = byId.get(parentId)
+        if (!parent) return
         if (wouldCycle(graph, childId, parentId)) {
           setError(`That would put ${child.name} under their own report.`)
+          return
+        }
+        if (!ladderAllows(child.levelRank, parent.levelRank)) {
+          setError(
+            ladderRefusal(
+              { name: child.name, title: child.title, level: child.levelName },
+              { name: parent.name, title: parent.title, level: parent.levelName },
+            ),
+          )
           return
         }
       }
@@ -230,6 +266,12 @@ function Chart({
   const unplaced = people.filter(p => !p.reportsTo).length
   const crossed = people.filter(
     p => p.commUplineId && p.commUplineId !== p.reportsTo && byId.has(p.commUplineId),
+  ).length
+  const broken = people.filter(
+    p =>
+      p.reportsTo &&
+      byId.has(p.reportsTo) &&
+      !ladderAllows(p.levelRank, byId.get(p.reportsTo)!.levelRank),
   ).length
 
   return (
@@ -282,6 +324,12 @@ function Chart({
         <p className="font-serif italic text-muted text-xs">
           {people.length} people · {layout.roots.length} tree
           {layout.roots.length === 1 ? '' : 's'} · {unplaced} reporting to nobody
+          {broken > 0 ? (
+            <span className="text-danger">
+              {' '}
+              · {broken} {broken === 1 ? 'line breaks' : 'lines break'} the ladder
+            </span>
+          ) : null}
           {pending ? ' · saving…' : ''}
         </p>
         {selected ? (
@@ -337,6 +385,20 @@ function Chart({
           </svg>
           Reports to
         </span>
+        {broken > 0 ? (
+          <span className="inline-flex items-center gap-2 font-serif italic text-xs text-danger">
+            <svg width="26" height="6" aria-hidden>
+              <line x1="0" y1="3" x2="26" y2="3" stroke="var(--danger)" strokeWidth="1.75" />
+            </svg>
+            Breaks the ladder · {broken}
+            <Link
+              href="/team/roles"
+              className="ml-1 not-italic font-sans text-[11px] text-accent hover:underline"
+            >
+              see Levels →
+            </Link>
+          </span>
+        ) : null}
         <span className="inline-flex items-center gap-2 font-serif italic text-xs text-graphite">
           <svg width="26" height="6" aria-hidden>
             <line
@@ -364,8 +426,11 @@ function Chart({
 
       <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
         A greyed card cannot take the person being dragged — it is one of their
-        own reports. The dashed line is read-only here: it decides override
-        commission, and a month already run keeps the chart it was run against.
+        own reports, or the ladder ranks its title below theirs. A red line is
+        one the ladder would refuse today: move the line, or change the ladder
+        under Roles → Levels. The dashed line is read-only here: it decides
+        override commission, and a month already run keeps the chart it was run
+        against.
       </p>
     </div>
   )
@@ -390,7 +455,17 @@ function PersonCard({ data }: NodeProps<Node<CardData>>) {
       <Handle type="target" position={Position.Top} className="!bg-[var(--accent)] !w-2 !h-2" />
 
       <div className="font-serif text-sm text-ink leading-tight truncate">{person.name}</div>
-      <div className="font-mono text-[0.6rem] text-muted mt-0.5">{person.code ?? '—'}</div>
+      <div className="flex items-baseline justify-between gap-2 mt-0.5">
+        <span className="font-mono text-[0.6rem] text-muted">{person.code ?? '—'}</span>
+        {person.levelName ? (
+          <span
+            className="font-mono text-[0.55rem] uppercase tracking-wide text-accent truncate"
+            title={`Level ${person.levelRank} · ${person.levelName}`}
+          >
+            L{person.levelRank} · {person.levelName}
+          </span>
+        ) : null}
+      </div>
 
       <div className="font-serif italic text-xs text-graphite truncate mt-1.5">
         {person.title ?? 'no title'}

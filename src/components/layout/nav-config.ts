@@ -282,13 +282,18 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     // the roster alongside Marketing and Revenue — but people are not one more
     // department, they are who every department is made of.
     //
-    // Flat, not a group: three pages, one section header, no chevron to open
-    // first. The sidebar is also the only way between the three now — the tab
-    // rail that used to sit on all of them came out with this move, the same
-    // way the Revenue sub-department views did.
+    // Flat, not a group: four pages, one section header, no chevron to open
+    // first. The sidebar is also the only way between them — the tab rail that
+    // used to sit on all of them came out with this move, the same way the
+    // Revenue sub-department views did.
+    //
+    // Roles and Permissions were one page ("Role & Permission") until
+    // 2026-09-03, when the user asked for them apart: Roles is what a title IS
+    // (its department, its level on the ladder), Permissions is what it may DO.
     { href: '/team/people', label: 'People Management', section: 'People', visible: isHRorPrincipal },
     { href: '/team/hierarchy', label: 'Hierarchy', section: 'People', visible: isHRorPrincipal },
-    { href: '/team/roles', label: 'Role & Permission', section: 'People', visible: isHRorPrincipal },
+    { href: '/team/roles', label: 'Roles', section: 'People', visible: isHRorPrincipal },
+    { href: '/team/permissions', label: 'Permissions', section: 'People', visible: isHRorPrincipal },
 
     // ── Reports & Admin ──
     { href: '/reports/ledger', label: 'General Ledger', section: 'Reports & Admin', visible: canAccessReports },
