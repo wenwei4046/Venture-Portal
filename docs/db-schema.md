@@ -465,6 +465,7 @@ titles (
     id              uuid PK DEFAULT gen_random_uuid()
     name            text NOT NULL                    -- CHECK btrim(name) <> ''
     department_id   uuid FK → departments NULL       -- 该 title 属于哪个部门
+    level_id        uuid FK → title_levels NULL      -- 在 ladder 的哪一级；NULL = 还没放上去 (2026-09-03)
     is_active       boolean NOT NULL DEFAULT true
     sort_order      integer NOT NULL DEFAULT 0
     created_by      uuid FK → users
@@ -474,6 +475,35 @@ titles (
     UNIQUE (lower(btrim(name)), department_id) NULLS NOT DISTINCT
 )
 ```
+5.1b title_levels  (the ladder, 2026-09-03)
+```sql
+title_levels (
+    id              uuid PK DEFAULT gen_random_uuid()
+    rank            smallint NOT NULL                -- 1 = 最低一级；越大越高
+    name            text NOT NULL                    -- Assistant / Executive / … / Head of Department（seed 7 级）
+    created_at      timestamptz DEFAULT now()
+    updated_at      timestamptz DEFAULT now()
+
+    UNIQUE (rank) DEFERRABLE INITIALLY DEFERRED     -- 中间插一级要整体 +1，只在 commit 时查
+)
+```
+One scale for the whole company, not one per department: the org chart compares
+ACROSS departments (an IT executive under the Marketing manager), and only a
+shared scale can. Several titles may share a rung within one department; a
+title with `level_id` NULL is outside the rule. Edited on Roles → Levels; RLS
+read = signed-in, write = hr scope. `ladder_insert_level(p_rank, p_name)` and
+`ladder_delete_level(p_id)` shift the ranks around a change atomically.
+
+The rule, `hr_staff_respects_ladder` (BEFORE INSERT OR UPDATE OF reports_to,
+title_id on hr_staff_costs, errcode `23LAD`): nobody reports to a title that
+stands LOWER than their own; equal is allowed. Checked in the direction the
+change moves — a new line above, a title that rose (against the manager), a
+title that fell (against the direct reports) — and NOT re-checked elsewhere, so
+a ladder edited after the chart was drawn can leave lines that break it; the
+Hierarchy page paints those red and the Levels board counts them. The app
+refuses the same moves first (`lib/ladder.ts` — `ladderAllows`, `nextRung`).
+Promotion = `nextRung`: the lowest rung above the person's, in their own
+department, that has a title on it; several titles → a choice.
 Invite User (2026-09-01) writes three rows in order — `auth.users` (service role,
 the only use of `lib/supabase/admin.ts`), then `public.users`, then the
 `hr_staff_costs` link — and deletes the credential again if either later step

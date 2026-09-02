@@ -41,6 +41,11 @@ export async function setReportsTo(
     if (error.code === '23514') {
       throw new Error('That would put them under their own report')
     }
+    // 23LAD is the ladder trigger: the manager's title stands lower than the
+    // person's. Its message already names both people and both titles.
+    if (error.code === '23LAD') {
+      throw new Error(error.message)
+    }
     throw new Error(`Could not move them: ${error.message}`)
   }
 

@@ -6,6 +6,7 @@ import { requirePermission } from '@/lib/auth'
 import { canAccessAuditLog, canManagePermissions } from '@/lib/roles'
 import { navLabelByPath } from '@/components/layout/nav-config'
 import { describeActivity, type ActivityRow } from '@/lib/activity'
+import { ladderAllows, nextRung, type LadderTitle, type Rung } from '@/lib/ladder'
 import { listSubDepartments } from '../../revenue/_lib/sub-departments'
 import { resolvePersonPermissions } from '../_lib/person-permissions'
 import type { PersonPermissionRow } from '../_components/PersonPermissions'
@@ -19,6 +20,15 @@ export interface CardActivityLine {
   detail: string | null
 }
 
+export interface CardLadder {
+  /** The rung their title stands on; null when the title is not placed. */
+  level: string | null
+  /** The next rung up in their department and the titles on it, if any. */
+  next: { level: string; titles: Array<{ id: string; name: string }> } | null
+  /** Why Promote is off even though there is a rung above. */
+  blocker: string | null
+}
+
 export interface PersonCardData {
   staff: StaffRow
   code: string | null
@@ -27,6 +37,7 @@ export interface PersonCardData {
   active: boolean
   resignedOn: string | null
   reportsTo: string | null
+  ladder: CardLadder
   /** The same three payroll-blocking gaps the roster row marks. */
   missing: string[]
   account: { id: string; email: string; role: string; isActive: boolean; lastSeenAt: string | null } | null
@@ -46,6 +57,10 @@ export interface PersonCardData {
  * same `team` permission the roster is, and the two panels that are narrower
  * than that gate themselves — permissions editing on `canManagePermissions`,
  * activity on `canAccessAuditLog`.
+ *
+ * Since 2026-09-03 it also answers "what is the next level up": the rung
+ * above theirs in their own department, and whether promoting them there
+ * would put them above their line manager, which the ladder refuses.
  */
 export async function getPersonCard(id: string): Promise<PersonCardData> {
   const viewer = await requirePermission('team')
@@ -54,7 +69,7 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
   const { data: staff } = await supabase
     .from('hr_staff_costs')
     .select(
-      '*, departments(name), titles(id, name), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active, last_seen_at)',
+      '*, departments(name), titles(id, name, level_id), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active, last_seen_at)',
     )
     .eq('id', id)
     .maybeSingle()
@@ -69,24 +84,61 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
     | { id: string; name: string; email: string; role: string; is_active: boolean; last_seen_at: string | null }
     | null
 
-  // Whoever they report to is a staff row, not a join on this select.
+  // Whoever they report to is a staff row, not a join on this select. Their
+  // title's rung matters too: a promotion may not climb past it.
   let reportsTo: string | null = null
+  let manager: { name: string; title: string | null; levelId: string | null } | null = null
   if (row.reports_to) {
     const { data: mgr } = await supabase
       .from('hr_staff_costs')
-      .select('employee_name')
+      .select('employee_name, status, titles(name, level_id)')
       .eq('id', row.reports_to)
       .maybeSingle()
-    reportsTo = (mgr as { employee_name: string } | null)?.employee_name ?? null
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+    const m = mgr as any
+    if (m) {
+      reportsTo = m.employee_name
+      if (m.status === 'active') {
+        manager = {
+          name: m.employee_name,
+          title: m.titles?.name ?? null,
+          levelId: m.titles?.level_id ?? null,
+        }
+      }
+    }
   }
 
-  const permissions = acct
-    ? await resolvePersonPermissions(
-        supabase,
-        { id: acct.id, role: acct.role },
-        { id: row.title_id ?? null, name: titleName },
-      )
-    : null
+  const [{ data: levels }, { data: titles }, permissions] = await Promise.all([
+    supabase.from('title_levels').select('id, rank, name'),
+    supabase.from('titles').select('id, name, department_id, level_id').eq('is_active', true),
+    acct
+      ? resolvePersonPermissions(
+          supabase,
+          { id: acct.id, role: acct.role },
+          { id: row.title_id ?? null, name: titleName },
+        )
+      : Promise.resolve(null),
+  ])
+
+  const rungs: Rung[] = (levels ?? []).map(l => ({ id: l.id, rank: l.rank, name: l.name }))
+  const ladderTitles: LadderTitle[] = (titles ?? []).map(t => ({
+    id: t.id,
+    name: t.name,
+    departmentId: t.department_id,
+    levelId: t.level_id,
+  }))
+  const ownRung = rungs.find(r => r.id === row.titles?.level_id) ?? null
+  const next = row.title_id ? nextRung(ladderTitles, rungs, row.title_id) : null
+
+  let blocker: string | null = null
+  if (next && manager) {
+    const mgrRung = rungs.find(r => r.id === manager.levelId) ?? null
+    if (!ladderAllows(next.rung.rank, mgrRung?.rank ?? null)) {
+      blocker =
+        `Would stand above ${manager.name} (${manager.title ?? 'no title'}, ` +
+        `${mgrRung?.name ?? 'not on the ladder'}), who they report to — move the line first.`
+    }
+  }
 
   let activity: CardActivityLine[] | null = null
   if (acct && canAccessAuditLog(viewer)) {
@@ -142,6 +194,16 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
     active: row.status !== 'inactive',
     resignedOn: row.resignation_date ? dayjs(row.resignation_date).format('D MMM YYYY') : null,
     reportsTo,
+    ladder: {
+      level: ownRung?.name ?? null,
+      next: next
+        ? {
+            level: next.rung.name,
+            titles: next.titles.map(t => ({ id: t.id, name: t.name })),
+          }
+        : null,
+      blocker,
+    },
     missing:
       row.status !== 'inactive'
         ? [

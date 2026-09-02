@@ -7,6 +7,7 @@ import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import PersonPermissions from '../../_components/PersonPermissions'
 import EditStaffForm from './EditStaffForm'
+import Promotion from './Promotion'
 import { getPersonCard, type PersonCardData } from '../card-actions'
 
 dayjs.extend(relativeTime)
@@ -241,6 +242,19 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
             ) : (
               <div className="pb-5">
                 <Details person={person} />
+                {person.active ? (
+                  <Promotion
+                    personId={person.staff.id}
+                    personName={person.staff.employee_name}
+                    title={person.title}
+                    department={person.department}
+                    ladder={person.ladder}
+                    onDone={() => {
+                      void load()
+                      router.refresh()
+                    }}
+                  />
+                ) : null}
               </div>
             )
           ) : tab === 'permissions' ? (

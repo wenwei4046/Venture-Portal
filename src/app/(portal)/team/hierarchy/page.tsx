@@ -21,25 +21,33 @@ import TeamOrgChart, { type ChartPerson } from './_components/TeamOrgChart'
  * stops being an island you have to open a different page to see, and where
  * the two disagree — the commission upline is not the line manager — that is
  * now visible instead of implicit.
+ *
+ * Since 2026-09-03 the chart also obeys the ladder (Roles → Levels): nobody
+ * can be dropped under somebody whose title stands lower than theirs. The
+ * ladder is a rule about titles, set on the Roles page; this page only reads
+ * it. Moving people between departments stays a gesture here — the rule says
+ * how high, not where.
  */
 export default async function TeamHierarchyPage() {
   await requirePermission('team')
   const supabase = await createClient()
 
-  const [{ data: staffRows }, { data: positions }, subDepts] = await Promise.all([
-    supabase
-      .from('hr_staff_costs')
-      .select(
-        'id, employee_name, employee_code, reports_to, designation, titles(name), departments(name)',
-      )
-      .eq('status', 'active')
-      .order('employee_name'),
-    supabase
-      .from('comm_hierarchy')
-      .select('staff_id, upline_staff_id')
-      .is('effective_to', null),
-    listSubDepartments(),
-  ])
+  const [{ data: staffRows }, { data: positions }, { data: levels }, subDepts] =
+    await Promise.all([
+      supabase
+        .from('hr_staff_costs')
+        .select(
+          'id, employee_name, employee_code, reports_to, designation, titles(name, level_id), departments(name)',
+        )
+        .eq('status', 'active')
+        .order('employee_name'),
+      supabase
+        .from('comm_hierarchy')
+        .select('staff_id, upline_staff_id')
+        .is('effective_to', null),
+      supabase.from('title_levels').select('id, rank, name'),
+      listSubDepartments(),
+    ])
 
   const commUpline = new Map<string, string | null>(
     ((positions ?? []) as Array<{ staff_id: string; upline_staff_id: string | null }>).map(p => [
@@ -48,25 +56,34 @@ export default async function TeamHierarchyPage() {
     ]),
   )
 
+  const rungs = new Map(
+    ((levels ?? []) as Array<{ id: string; rank: number; name: string }>).map(l => [l.id, l]),
+  )
+
   const people: ChartPerson[] = ((staffRows ?? []) as unknown as Array<{
     id: string
     employee_name: string
     employee_code: string | null
     reports_to: string | null
     designation: string | null
-    titles: { name: string } | null
+    titles: { name: string; level_id: string | null } | null
     departments: { name: string } | null
-  }>).map(s => ({
-    id: s.id,
-    name: s.employee_name,
-    code: s.employee_code,
-    title: s.titles?.name ?? s.designation ?? null,
-    department: s.departments?.name ?? null,
-    reportsTo: s.reports_to,
-    // Only carried when it is a line the reporting tree does not already draw;
-    // an identical dashed edge on top of a solid one is noise.
-    commUplineId: commUpline.get(s.id) ?? null,
-  }))
+  }>).map(s => {
+    const rung = s.titles?.level_id ? (rungs.get(s.titles.level_id) ?? null) : null
+    return {
+      id: s.id,
+      name: s.employee_name,
+      code: s.employee_code,
+      title: s.titles?.name ?? s.designation ?? null,
+      department: s.departments?.name ?? null,
+      levelRank: rung?.rank ?? null,
+      levelName: rung?.name ?? null,
+      reportsTo: s.reports_to,
+      // Only carried when it is a line the reporting tree does not already draw;
+      // an identical dashed edge on top of a solid one is noise.
+      commUplineId: commUpline.get(s.id) ?? null,
+    }
+  })
 
   // One link is enough while Fair is the only sub-department; when there are
   // more, the first is still the right place to land.
@@ -82,7 +99,8 @@ export default async function TeamHierarchyPage() {
           <h1 className="page-title">Hierarchy</h1>
           <p className="font-serif italic text-graphite text-base mt-3 max-w-2xl">
             Drag somebody onto their manager, or draw a line from a manager down
-            to them. The dashed lines are the Revenue Department&apos;s
+            to them. Nobody can be put under a title the ladder ranks below
+            theirs. The dashed lines are the Revenue Department&apos;s
             commission uplines — shown here, changed on their own page.
           </p>
         </div>
