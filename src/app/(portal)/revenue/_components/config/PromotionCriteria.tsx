@@ -126,9 +126,11 @@ function StepBlock({
                     <td>
                       {CRITERION_LABEL[rule.criterion]}
                       {isLadderGate(step, rule) ? (
-                        <span className="chip ledger ml-2">LIVE · LADDER GATE</span>
+                        <span className="chip ledger ml-2 whitespace-nowrap">LIVE · LADDER GATE</span>
                       ) : null}
-                      {rule.is_enforced ? <span className="chip accent ml-2">ENFORCED</span> : null}
+                      {rule.is_enforced ? (
+                        <span className="chip accent ml-2 whitespace-nowrap">ENFORCED</span>
+                      ) : null}
                     </td>
                     <td className="num">{threshold(rule, bandLabel)}</td>
                     {noted ? (
