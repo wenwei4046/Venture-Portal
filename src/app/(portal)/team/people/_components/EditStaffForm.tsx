@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { updateStaff } from '../actions'
-import { titlesForDepartment, type TitleRow } from '@/lib/staff-form'
+import { isFullyCommissionBased, titlesForDepartment, type TitleRow } from '@/lib/staff-form'
 
 export interface StaffRow {
   id: string
@@ -11,6 +11,8 @@ export interface StaffRow {
   designation: string | null
   department_id: string
   department_name: string
+  /** True in a department the commission engine pays (`payroll_source = 'commission'`). */
+  commission_dept: boolean
   /** Authoritative since 2026-09-01; `designation` is the text it mirrors. */
   title_id: string | null
   basic_salary: number
@@ -67,6 +69,11 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
       ),
     [titles, staff.department_id, staff.title_id],
   )
+
+  // Fully commission based. In a commission department the tick stands in
+  // for the Employment Type select, and while it is on the pay and statutory
+  // fields are not asked at all — they would be 0, or decide nothing.
+  const [fullCommission, setFullCommission] = useState(isFullyCommissionBased(staff))
 
   useEffect(() => {
     if (error && formRef.current) {
@@ -165,17 +172,19 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
           />
         </div>
-        <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Employment Type</label>
-          <select
-            name="employment_type"
-            defaultValue={staff.employment_type}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
-          >
-            <option value="salaried">Salaried (fixed basic)</option>
-            <option value="commission_eligible">Commission-eligible (basic + commission rules)</option>
-          </select>
-        </div>
+        {staff.commission_dept ? null : (
+          <div>
+            <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Employment Type</label>
+            <select
+              name="employment_type"
+              defaultValue={staff.employment_type}
+              className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            >
+              <option value="salaried">Salaried (fixed basic)</option>
+              <option value="commission_eligible">Commission-eligible (basic + commission rules)</option>
+            </select>
+          </div>
+        )}
         <div>
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
             Hire Date <span className="text-xs text-muted ml-1 font-normal">(nullable)</span>
@@ -200,8 +209,43 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
         </div>
       </div>
 
-      {/* Section 2 — Salary */}
+      {/* Section 2 — Salary. In a commission department the tick below is
+          the whole answer: while it is on, the pay and statutory fields are
+          not on the form, and the save leaves the categories as they were. */}
       <h3 className="font-serif text-lg text-ink mb-4">Salary</h3>
+      {staff.commission_dept ? (
+        <label
+          htmlFor="edit-full-commission"
+          className="flex items-start gap-3 bg-surface-2 border border-hairline rounded-md p-3 mb-6 cursor-pointer"
+        >
+          <input
+            id="edit-full-commission"
+            type="checkbox"
+            name="full_commission"
+            checked={fullCommission}
+            onChange={e => setFullCommission(e.target.checked)}
+            className="w-4 h-4 accent-accent mt-0.5 shrink-0"
+          />
+          <span>
+            <span className="block text-sm font-sans font-medium text-ink">
+              Fully commission based
+            </span>
+            <span className="block font-serif italic text-graphite text-xs mt-0.5">
+              No basic salary and no allowances — 100% of pay is commission from the sales
+              import, so EPF / SOCSO / EIS come out at 0. Untick to give them a basic and set
+              their statutory categories. Withholding Tax is ticked per person on the
+              sub-department&apos;s Staff Hierarchy page.
+            </span>
+          </span>
+        </label>
+      ) : null}
+      {fullCommission ? (
+        <p className="font-serif italic text-muted text-sm mb-6">
+          Saved as fully commission based — basic, statutory allowance and non-statutory
+          allowance all 0.00.
+        </p>
+      ) : (
+        <>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div>
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
@@ -311,6 +355,8 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
           />
         </div>
       </div>
+        </>
+      )}
 
       {/* Section 4 — Bank account (Spec 5) */}
       <h3 className="font-serif text-lg text-ink mb-4">Bank account</h3>

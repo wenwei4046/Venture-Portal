@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import { canAccessAuditLog, canManagePermissions } from '@/lib/roles'
+import { isFullyCommissionBased } from '@/lib/staff-form'
 import ActivityLog from '../../_components/ActivityLog'
 import PersonPermissions, {
   type PersonPermissionRow,
@@ -35,7 +36,7 @@ export default async function StaffDetailPage({ params }: PageProps) {
   const { data: staff } = await supabase
     .from('hr_staff_costs')
     .select(
-      '*, departments(name), titles(name), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active)',
+      '*, departments(name, payroll_source), titles(name), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active)',
     )
     .eq('id', id)
     .maybeSingle()
@@ -46,6 +47,12 @@ export default async function StaffDetailPage({ params }: PageProps) {
   const row = staff as any
   const deptName: string = row.departments?.name ?? '—'
   const titleName: string | null = row.titles?.name ?? row.designation ?? null
+  // Paid 100% on commission: no basic, no allowances, statutory at 0 — so the
+  // salary and statutory sections have nothing to say and are not shown.
+  const fullCommission = isFullyCommissionBased({
+    employment_type: row.employment_type,
+    commission_dept: row.departments?.payroll_source === 'commission',
+  })
   const account = row.users as
     | { id: string; name: string; email: string; role: string; is_active: boolean }
     | null
@@ -133,7 +140,13 @@ export default async function StaffDetailPage({ params }: PageProps) {
           <Field label="Employee Code" value={staff.employee_code} mono />
           <Field
             label="Employment Type"
-            value={staff.employment_type === 'commission_eligible' ? 'Commission-eligible' : 'Salaried'}
+            value={
+              fullCommission
+                ? 'Fully commission based'
+                : staff.employment_type === 'commission_eligible'
+                  ? 'Commission-eligible'
+                  : 'Salaried'
+            }
           />
           <Field label="Hire Date" value={staff.hire_date} />
           <Field label="Resignation Date" value={staff.resignation_date} />
@@ -156,25 +169,34 @@ export default async function StaffDetailPage({ params }: PageProps) {
           <Field label="Account No" value={staff.bank_account_no} mono />
         </Section>
 
-        <Section title="Salary">
-          <Field label="Basic" value={formatMoney(Number(staff.basic_salary))} mono />
-          <Field label="Statutory Allowance" value={formatMoney(Number(staff.allowances))} mono />
-          <Field
-            label="Non-Statutory Allowance"
-            value={formatMoney(Number(staff.non_statutory_allowance ?? 0))}
-            mono
-          />
-        </Section>
+        {fullCommission ? (
+          <Section title="Salary">
+            <Field label="Pay basis" value="Fully commission based" />
+            <Field label="Basic" value="None — 100% of pay is commission" />
+          </Section>
+        ) : (
+          <>
+            <Section title="Salary">
+              <Field label="Basic" value={formatMoney(Number(staff.basic_salary))} mono />
+              <Field label="Statutory Allowance" value={formatMoney(Number(staff.allowances))} mono />
+              <Field
+                label="Non-Statutory Allowance"
+                value={formatMoney(Number(staff.non_statutory_allowance ?? 0))}
+                mono
+              />
+            </Section>
 
-        <Section title="Statutory">
-          <Field
-            label="EPF"
-            value={staff.is_epf_exempt ? 'Exempt' : (EPF_LABELS[staff.epf_category] ?? staff.epf_category)}
-          />
-          <Field label="SOCSO" value={staff.socso_category === 'second' ? 'Second' : 'First'} />
-          <Field label="PCB" value={PCB_LABELS[staff.pcb_category] ?? staff.pcb_category} />
-          <Field label="Children" value={String(staff.children_count ?? 0)} mono />
-        </Section>
+            <Section title="Statutory">
+              <Field
+                label="EPF"
+                value={staff.is_epf_exempt ? 'Exempt' : (EPF_LABELS[staff.epf_category] ?? staff.epf_category)}
+              />
+              <Field label="SOCSO" value={staff.socso_category === 'second' ? 'Second' : 'First'} />
+              <Field label="PCB" value={PCB_LABELS[staff.pcb_category] ?? staff.pcb_category} />
+              <Field label="Children" value={String(staff.children_count ?? 0)} mono />
+            </Section>
+          </>
+        )}
       </div>
 
       {account ? (

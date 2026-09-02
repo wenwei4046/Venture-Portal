@@ -7,6 +7,7 @@ import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import PersonPermissions from '../../_components/PersonPermissions'
 import EditStaffForm from './EditStaffForm'
+import { isFullyCommissionBased } from '@/lib/staff-form'
 import { getPersonCard, type PersonCardData } from '../card-actions'
 
 dayjs.extend(relativeTime)
@@ -374,12 +375,19 @@ function Details({ person }: { person: PersonCardData }) {
       </Section>
       <Section title="Payroll">
         <Field label="Bank" value={[s.bank_name, s.bank_account_no].filter(Boolean).join(' · ') || null} />
-        <Field label="Basic" value={s.basic_salary.toFixed(2)} mono />
-        <Field label="Allowance" value={s.allowances.toFixed(2)} mono />
-        <Field
-          label="EPF"
-          value={s.is_epf_exempt ? 'Exempt' : `Part ${s.epf_category}`}
-        />
+        {isFullyCommissionBased(s) ? (
+          // No basic, no allowance, statutory at 0 — the one line says it all.
+          <Field label="Pay basis" value="Fully commission based" />
+        ) : (
+          <>
+            <Field label="Basic" value={s.basic_salary.toFixed(2)} mono />
+            <Field label="Allowance" value={s.allowances.toFixed(2)} mono />
+            <Field
+              label="EPF"
+              value={s.is_epf_exempt ? 'Exempt' : `Part ${s.epf_category}`}
+            />
+          </>
+        )}
       </Section>
     </div>
   )

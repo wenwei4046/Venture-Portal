@@ -142,3 +142,98 @@ export function designationForTitle(title: TitleRow | null, departmentId: string
   }
   return title.name
 }
+
+/**
+ * Whether a person is paid 100% on commission: filed as commission-eligible
+ * AND sitting in a department the commission engine pays. Outside such a
+ * department `commission_eligible` keeps its older meaning — a basic plus
+ * commission rules — and the pay fields stay on show.
+ */
+export function isFullyCommissionBased(row: {
+  employment_type: string
+  commission_dept: boolean
+}): boolean {
+  return row.commission_dept && row.employment_type === 'commission_eligible'
+}
+
+export const EPF_PARTS = ['A', 'C', 'E', 'F'] as const
+export const SOCSO_CATEGORIES = ['first', 'second'] as const
+export const PCB_CATEGORIES = ['KA1', 'KA2', 'KA3'] as const
+
+export type EpfPart = (typeof EPF_PARTS)[number]
+export type SocsoCategory = (typeof SOCSO_CATEGORIES)[number]
+export type PcbCategory = (typeof PCB_CATEGORIES)[number]
+
+export interface RawPayFields {
+  /** The "Fully commission based" tick on the Edit form. */
+  fullCommission: boolean
+  employmentType?: string | null
+  basicSalary?: string | null
+  allowances?: string | null
+  nonStatutoryAllowance?: string | null
+  epfCategory?: string | null
+  socsoCategory?: string | null
+  isEpfExempt?: boolean
+  pcbCategory?: string | null
+  childrenCount?: string | null
+}
+
+export interface FullCommissionPay {
+  employment_type: 'commission_eligible'
+  basic_salary: 0
+  allowances: 0
+  non_statutory_allowance: 0
+}
+
+export interface SalariedPay {
+  employment_type: StaffEmploymentType
+  basic_salary: number
+  allowances: number
+  non_statutory_allowance: number
+  epf_category: EpfPart
+  socso_category: SocsoCategory
+  is_epf_exempt: boolean
+  pcb_category: PcbCategory
+  children_count: number
+}
+
+function oneOf<T extends string>(label: string, value: string | null | undefined, choices: readonly T[]): T {
+  const v = (value ?? '').trim()
+  if (v === '') throw new Error(`${label} is required`)
+  if (!(choices as readonly string[]).includes(v)) throw new Error(`${label} is not a valid choice`)
+  return v as T
+}
+
+/**
+ * The pay and statutory columns an Edit save writes.
+ *
+ * Fully commission based writes exactly the four columns that say so and
+ * leaves the statutory categories as they were: with a 0 base they decide
+ * nothing, and the fields were not on the form to be read. Otherwise every
+ * field is on the form and every one is written, checked rather than cast.
+ */
+export function payFieldsForUpdate(raw: RawPayFields): FullCommissionPay | SalariedPay {
+  if (raw.fullCommission) {
+    return { employment_type: 'commission_eligible', basic_salary: 0, allowances: 0, non_statutory_allowance: 0 }
+  }
+
+  const childrenText = (raw.childrenCount ?? '').trim()
+  const children = childrenText === '' ? 0 : Number(childrenText)
+  if (!Number.isInteger(children) || children < 0) {
+    throw new Error('Children must be a whole number')
+  }
+
+  return {
+    // The Employment Type select is not on the form for a commission
+    // department (the tick replaces it), so nothing read means salaried.
+    employment_type: raw.employmentType === 'commission_eligible' ? 'commission_eligible' : 'salaried',
+    basic_salary: money('Basic salary', raw.basicSalary),
+    allowances: money('Statutory allowance', raw.allowances),
+    non_statutory_allowance: money('Non-statutory allowance', raw.nonStatutoryAllowance),
+    epf_category: oneOf('EPF category', raw.epfCategory, EPF_PARTS),
+    socso_category: oneOf('SOCSO category', raw.socsoCategory, SOCSO_CATEGORIES),
+    is_epf_exempt: raw.isEpfExempt === true,
+    pcb_category: oneOf('PCB category', raw.pcbCategory, PCB_CATEGORIES),
+    children_count: children,
+  }
+}

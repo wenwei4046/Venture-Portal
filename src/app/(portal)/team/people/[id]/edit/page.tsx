@@ -15,7 +15,11 @@ export default async function EditStaffPage({ params }: PageProps) {
   const supabase = await createClient()
 
   const [{ data: staff }, { data: titles }] = await Promise.all([
-    supabase.from('hr_staff_costs').select('*, departments(name)').eq('id', id).maybeSingle(),
+    supabase
+      .from('hr_staff_costs')
+      .select('*, departments(name, payroll_source)')
+      .eq('id', id)
+      .maybeSingle(),
     supabase.from('titles').select('id, name, department_id, is_active').order('name'),
   ])
 
@@ -23,6 +27,8 @@ export default async function EditStaffPage({ params }: PageProps) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const deptName = (staff as any).departments?.name ?? '—'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const commissionDept = (staff as any).departments?.payroll_source === 'commission'
 
   return (
     <div>
@@ -53,6 +59,7 @@ export default async function EditStaffPage({ params }: PageProps) {
           designation: staff.designation ?? null,
           department_id: staff.department_id,
           department_name: deptName,
+          commission_dept: commissionDept,
           title_id: staff.title_id ?? null,
           basic_salary: Number(staff.basic_salary),
           allowances: Number(staff.allowances),
