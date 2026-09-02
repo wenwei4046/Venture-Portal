@@ -40,6 +40,8 @@ const RANKS: RunSourceRows['ranks'] = [
     product_rate: '0.050000',
     can_recruit: false,
     group_sales_threshold: null,
+    personal_sales_threshold: null,
+    consecutive_months: null,
     sort_order: 1,
   },
   {
@@ -50,6 +52,8 @@ const RANKS: RunSourceRows['ranks'] = [
     product_rate: '0.060000',
     can_recruit: true,
     group_sales_threshold: '100000.00',
+    personal_sales_threshold: null,
+    consecutive_months: null,
     sort_order: 2,
   },
 ]
@@ -78,6 +82,7 @@ function baseRows(overrides: Partial<RunSourceRows> = {}): RunSourceRows {
     ],
     orders: [],
     releasedOrderNos: [],
+    priorMonths: [],
     ...overrides,
   }
 }
@@ -145,6 +150,27 @@ describe('toEngineInput', () => {
 
     // No staff embed at all → no title, and the engine falls back to the rank.
     expect(toEngineInput(baseRows()).hierarchy[0].titleId).toBeNull()
+  })
+
+  it('carries a streak gate and the earlier months, most recent first', () => {
+    const input = toEngineInput(
+      baseRows({
+        ranks: [
+          RANKS[0],
+          { ...RANKS[1], group_sales_threshold: null, personal_sales_threshold: '100000.00', consecutive_months: 2 },
+        ],
+        priorMonths: [
+          { period_month: '2026-05-01', comm_statements: [{ staff_id: 'staff-a', product_revenue: '90000.00' }] },
+          { period_month: '2026-06-01', comm_statements: [{ staff_id: 'staff-a', product_revenue: '150000.50' }] },
+          { period_month: '2026-04-01', comm_statements: null },
+        ],
+      }),
+    )
+    expect(input.ranks[1].personalSalesThreshold).toBe(100000)
+    expect(input.ranks[1].consecutiveMonths).toBe(2)
+    expect(input.priorMonths.map(p => p.periodMonth)).toEqual(['2026-06-01', '2026-05-01', '2026-04-01'])
+    expect(input.priorMonths[0].personalRevenue['staff-a']).toBe(150000.5)
+    expect(input.priorMonths[2].personalRevenue).toEqual({})
   })
 
   it('accepts an embedded relation as either an object or a one-element array', () => {

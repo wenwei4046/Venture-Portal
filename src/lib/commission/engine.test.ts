@@ -12,9 +12,11 @@ import {
   marginBase,
   marginIncentiveAcrossBrands,
   marginPctOf,
+  monthsBefore,
   orderProductRevenue,
   penaltyBandFor,
   resolveRank,
+  type RankFigures,
 } from './engine'
 import type {
   CommissionScheme,
@@ -58,12 +60,12 @@ const T_TL = 'title-tl'
 const T_STL = 'title-stl'
 
 const RANKS: Rank[] = [
-  { rankKey: 'rs_5', titleId: T_RS, titleLabel: 'Revenue Specialist', label: 'Revenue Specialist · 5%', productRate: 0.05, canRecruit: false, groupSalesThreshold: null, sortOrder: 10 },
-  { rankKey: 'rs_6', titleId: T_SRS, titleLabel: 'Senior Revenue Specialist', label: 'Revenue Specialist · 6%', productRate: 0.06, canRecruit: true, groupSalesThreshold: null, sortOrder: 20 },
-  { rankKey: 'ta_7', titleId: T_TA, titleLabel: 'Team Assistant', label: 'Team Assistant · 7%', productRate: 0.07, canRecruit: true, groupSalesThreshold: 300_000, sortOrder: 30 },
-  { rankKey: 'ta_8', titleId: T_STA, titleLabel: 'Senior Team Assistant', label: 'Team Assistant · 8%', productRate: 0.08, canRecruit: true, groupSalesThreshold: null, sortOrder: 40 },
-  { rankKey: 'tl_9', titleId: T_TL, titleLabel: 'Team Leader', label: 'Team Leader · 9%', productRate: 0.09, canRecruit: true, groupSalesThreshold: null, sortOrder: 50 },
-  { rankKey: 'stl_10', titleId: T_STL, titleLabel: 'Senior Team Leader', label: 'Senior Team Leader · 10%', productRate: 0.10, canRecruit: true, groupSalesThreshold: null, sortOrder: 60 },
+  { rankKey: 'rs_5', titleId: T_RS, titleLabel: 'Revenue Specialist', label: 'Revenue Specialist · 5%', productRate: 0.05, canRecruit: false, groupSalesThreshold: null, personalSalesThreshold: null, consecutiveMonths: null, sortOrder: 10 },
+  { rankKey: 'rs_6', titleId: T_SRS, titleLabel: 'Senior Revenue Specialist', label: 'Revenue Specialist · 6%', productRate: 0.06, canRecruit: true, groupSalesThreshold: null, personalSalesThreshold: 100_000, consecutiveMonths: 2, sortOrder: 20 },
+  { rankKey: 'ta_7', titleId: T_TA, titleLabel: 'Team Assistant', label: 'Team Assistant · 7%', productRate: 0.07, canRecruit: true, groupSalesThreshold: 300_000, personalSalesThreshold: null, consecutiveMonths: null, sortOrder: 30 },
+  { rankKey: 'ta_8', titleId: T_STA, titleLabel: 'Senior Team Assistant', label: 'Team Assistant · 8%', productRate: 0.08, canRecruit: true, groupSalesThreshold: null, personalSalesThreshold: null, consecutiveMonths: null, sortOrder: 40 },
+  { rankKey: 'tl_9', titleId: T_TL, titleLabel: 'Team Leader', label: 'Team Leader · 9%', productRate: 0.09, canRecruit: true, groupSalesThreshold: null, personalSalesThreshold: null, consecutiveMonths: null, sortOrder: 50 },
+  { rankKey: 'stl_10', titleId: T_STL, titleLabel: 'Senior Team Leader', label: 'Senior Team Leader · 10%', productRate: 0.10, canRecruit: true, groupSalesThreshold: null, personalSalesThreshold: null, consecutiveMonths: null, sortOrder: 60 },
 ]
 
 /**
@@ -182,6 +184,7 @@ function run(partial: Partial<EngineInput>) {
     openBillTags: [],
     marginBands: MARGIN_BANDS,
     hierarchy: CHAIN,
+    priorMonths: [],
     ...partial,
   })
 }
@@ -360,39 +363,153 @@ describe('group revenue', () => {
   })
 })
 
+/** This month's figures for one person; group defaults to personal (no downline). */
+function fig(over: Partial<RankFigures> & { personalRevenue?: number; groupRevenue?: number } = {}): RankFigures {
+  const personal = over.personalRevenue ?? over.groupRevenue ?? 0
+  return {
+    periodMonth: '2026-07-01',
+    personalRevenue: personal,
+    groupRevenue: over.groupRevenue ?? personal,
+    priorMonths: over.priorMonths ?? [],
+  }
+}
+
 describe('resolveRank — fixed vs variable', () => {
   it('variable climbs to Team Assistant when group sales clear 300k', () => {
-    const r = resolveRank(node('x', null, 'rs_6', 'variable'), RANKS, 400_000)
+    const r = resolveRank(node('x', null, 'rs_6', 'variable'), RANKS, fig({ groupRevenue: 400_000 }))
     expect(r.effective?.rankKey).toBe('ta_7')
     expect(r.qualifiesFor?.rankKey).toBe('ta_7')
   })
 
   it('variable drops back to the base rank in a month that misses the target', () => {
-    const r = resolveRank(node('x', null, 'rs_6', 'variable'), RANKS, 250_000)
+    const r = resolveRank(node('x', null, 'rs_6', 'variable'), RANKS, fig({ groupRevenue: 250_000 }))
     expect(r.effective?.rankKey).toBe('rs_6')
     expect(r.qualifiesFor).toBeUndefined()
   })
 
   it('fixed keeps the attained rank but still reports the qualification', () => {
-    const r = resolveRank(node('x', null, 'rs_6', 'fixed'), RANKS, 400_000)
+    const r = resolveRank(node('x', null, 'rs_6', 'fixed'), RANKS, fig({ groupRevenue: 400_000 }))
     expect(r.effective?.rankKey).toBe('rs_6')
     expect(r.qualifiesFor?.rankKey).toBe('ta_7')
   })
 
   it('fixed keeps 7% in a month below target — the point of fixed', () => {
-    const r = resolveRank(node('x', null, 'ta_7', 'fixed'), RANKS, 10_000)
+    const r = resolveRank(node('x', null, 'ta_7', 'fixed'), RANKS, fig({ groupRevenue: 10_000 }))
     expect(r.effective?.rankKey).toBe('ta_7')
     expect(r.effective?.productRate).toBe(0.07)
   })
 
   it('never drops a variable person below their attained rank', () => {
-    const r = resolveRank(node('x', null, 'ta_7', 'variable'), RANKS, 0)
+    const r = resolveRank(node('x', null, 'ta_7', 'variable'), RANKS, fig({ groupRevenue: 0 }))
     expect(r.effective?.rankKey).toBe('ta_7')
   })
 
   it('the ladder has no 7% Revenue Specialist', () => {
     expect(RANKS.filter(r => r.titleLabel.endsWith('Revenue Specialist')).map(r => r.productRate))
       .toEqual([0.05, 0.06])
+  })
+})
+
+// ─── One rung at a time (user 2026-09-03, spec Q11) ─────────────────────────
+//
+//   "如果他只是单月达到 300k 的话，还是一样不能够跳过限制，他需要连续两个月达到那个
+//    criteria 才能变成 Senior Revenue Specialist，而不是直接升到 Team Assistant。"
+
+describe('the ladder is climbed one rung at a time', () => {
+  const june = { periodMonth: '2026-06-01', personalRevenue: { x: 150_000, y: 90_000 } }
+
+  it('monthsBefore walks back across a year end', () => {
+    expect(monthsBefore('2026-07-01', 1)).toBe('2026-06-01')
+    expect(monthsBefore('2026-01-01', 1)).toBe('2025-12-01')
+    expect(monthsBefore('2026-01-01', 2)).toBe('2025-11-01')
+  })
+
+  it('a 5% Specialist who sells 300k alone in one month is still a Specialist', () => {
+    // 300k clears the Team Assistant gate — but that gate is two rungs up.
+    const r = resolveRank(node('x', null, 'rs_5', 'variable', T_RS), RANKS, fig({ personalRevenue: 300_000 }))
+    expect(r.effective?.rankKey).toBe('rs_5')
+    expect(r.qualifiesFor).toBeUndefined()
+  })
+
+  it('two months in a row of 100k make them Senior — paid 6% in the second month', () => {
+    const r = resolveRank(
+      node('x', null, 'rs_5', 'variable', T_RS),
+      RANKS,
+      fig({ personalRevenue: 120_000, priorMonths: [june] }),
+    )
+    expect(r.effective?.rankKey).toBe('rs_6')
+    expect(r.qualifiesFor?.rankKey).toBe('rs_6')
+  })
+
+  it('a streak needs every month: 90k last month breaks it', () => {
+    const r = resolveRank(node('y', null, 'rs_5', 'variable', T_RS), RANKS, fig({ personalRevenue: 200_000, priorMonths: [june] }))
+    expect(r.effective?.rankKey).toBe('rs_5')
+  })
+
+  it('a month that was never run is unknown, not zero — no streak across it', () => {
+    const r = resolveRank(node('x', null, 'rs_5', 'variable', T_RS), RANKS, fig({ personalRevenue: 200_000 }))
+    expect(r.effective?.rankKey).toBe('rs_5')
+
+    // A run two months back does not stand in for last month.
+    const may = { periodMonth: '2026-05-01', personalRevenue: { x: 150_000 } }
+    const r2 = resolveRank(node('x', null, 'rs_5', 'variable', T_RS), RANKS, fig({ personalRevenue: 200_000, priorMonths: [may] }))
+    expect(r2.effective?.rankKey).toBe('rs_5')
+  })
+
+  it('the streak is not a rolling window once earned: a Senior below 100k stays Senior', () => {
+    // Title already raised to Senior Revenue Specialist; placed rank still 5%.
+    const r = resolveRank(node('x', null, 'rs_5', 'variable', T_SRS), RANKS, fig({ personalRevenue: 40_000 }))
+    expect(r.base?.rankKey).toBe('rs_6') // the earned floor
+    expect(r.effective?.rankKey).toBe('rs_6')
+  })
+
+  it('and only then does the 300k gate apply to them', () => {
+    const r = resolveRank(node('x', null, 'rs_5', 'variable', T_SRS), RANKS, fig({ groupRevenue: 320_000 }))
+    expect(r.effective?.rankKey).toBe('ta_7')
+  })
+
+  it("a Team Assistant's earned rung is still 6%: 7% was a monthly target", () => {
+    const r = resolveRank(node('x', null, 'rs_6', 'variable', T_TA), RANKS, fig({ groupRevenue: 200_000 }))
+    expect(r.base?.rankKey).toBe('rs_6')
+    expect(r.effective?.rankKey).toBe('rs_6')
+  })
+
+  it('a hand-set floor above the earned rung wins', () => {
+    const r = resolveRank(node('x', null, 'tl_9', 'variable', T_SRS), RANKS, fig({ groupRevenue: 0 }))
+    expect(r.effective?.rankKey).toBe('tl_9')
+  })
+
+  it('fixed mode is what the human set, whatever the title says', () => {
+    const r = resolveRank(node('x', null, 'rs_5', 'fixed', T_SRS), RANKS, fig({ personalRevenue: 500_000 }))
+    expect(r.effective?.rankKey).toBe('rs_5')
+  })
+
+  it('a rung with no gate cannot be climbed to by volume', () => {
+    // ta_8 carries neither gate: 900k of group sales leaves a Team Assistant at 7%.
+    const r = resolveRank(node('x', null, 'ta_7', 'variable', T_TA), RANKS, fig({ groupRevenue: 900_000 }))
+    expect(r.effective?.rankKey).toBe('ta_7')
+    expect(r.qualifiesFor).toBeUndefined()
+  })
+
+  it('end to end: the second streak month pays 6% and previews Senior Revenue Specialist', () => {
+    const r = run({
+      hierarchy: [node('x', null, 'rs_5', 'variable', T_RS)],
+      orders: [order('1', 'x', [['MATTRESS', 'M', 1, 120_000]])],
+      priorMonths: [june],
+    })
+    const x = find(r.statements, 'x')
+    expect(x.baseRankKey).toBe('rs_5')
+    expect(x.effectiveRankKey).toBe('rs_6')
+    expect(x.productCommission).toBe(7_200) // 120k × 6%
+    expect(x.promotesToTitleId).toBe(T_SRS)
+  })
+
+  it('end to end: the statement records the earned floor, not the placed rank', () => {
+    const r = run({
+      hierarchy: [node('x', null, 'rs_5', 'variable', T_SRS)],
+      orders: [order('1', 'x', [['MATTRESS', 'M', 1, 50_000]])],
+    })
+    expect(find(r.statements, 'x').baseRankKey).toBe('rs_6')
   })
 })
 
@@ -465,15 +582,24 @@ describe('title ratchet — previewed on the statement', () => {
 })
 
 describe('can recruit — the title decides, not the month\'s rank', () => {
-  it('a Team Assistant back on 5% for a month keeps their downline without a warning', () => {
+  it('a Team Assistant in a month below target keeps their downline without a warning', () => {
+    // Placed at 5% long ago; the title says Team Assistant, so the earned
+    // floor is 6% and the placed rank no longer matters for recruiting either.
     const team: HierarchyNode[] = [
       node('boss', null, 'rs_5', 'variable', T_TA),
       node('a', 'boss', 'rs_5', 'fixed', T_RS),
     ]
     const r = run({ hierarchy: team, orders: [order('1', 'a', [['MATTRESS', 'M', 1, 10_000, 6_000]])] })
     expect(r.warnings.join(' ')).not.toMatch(/not allowed to recruit/)
-    // …and the override still flows to them, at their 5% month: 0 differential.
-    expect(find(r.statements, 'boss').overrideCommission).toBe(0)
+    // …and the override flows to them at the earned 6%: a 1% differential.
+    expect(find(r.statements, 'boss').effectiveRankKey).toBe('rs_6')
+    expect(find(r.statements, 'boss').overrideCommission).toBe(100)
+  })
+
+  it('a placed-at-5% person with no title and a 5% downline is still flagged', () => {
+    const team: HierarchyNode[] = [node('boss', null, 'rs_5', 'variable', null), node('a', 'boss', 'rs_5')]
+    const r = run({ hierarchy: team, orders: [] })
+    expect(r.warnings.join(' ')).toMatch(/not allowed to recruit/)
   })
 
   it('a 6% floor under a 5% TITLE still may not hold downlines', () => {

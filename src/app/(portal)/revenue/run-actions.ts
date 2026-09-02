@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import { computeCommissionRun as runEngine } from '@/lib/commission/engine'
+import { computeCommissionRun as runEngine, monthsBefore } from '@/lib/commission/engine'
 import { toEngineInput, toRunPayload } from '@/lib/commission/run-payload'
 import type {
   HierarchyRow,
@@ -14,6 +14,7 @@ import type {
   MarginBandRow,
   OpenBillRuleRow,
   OpenBillTagRow,
+  PriorMonthRow,
   RankRow,
   SalesOrderRow,
   SchemeRow,
@@ -152,7 +153,7 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
   ] = await Promise.all([
     supabase
       .from('comm_ranks')
-      .select('rank_key, title_id, titles (name), label, product_rate, can_recruit, group_sales_threshold, sort_order')
+      .select('rank_key, title_id, titles (name), label, product_rate, can_recruit, group_sales_threshold, personal_sales_threshold, consecutive_months, sort_order')
       .eq('scheme_id', scheme.id)
       .order('sort_order'),
     supabase
@@ -202,11 +203,29 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
           .in('order_id', orderIds)
       : { data: [] }
 
+  // ── The months before, for the streak gates ────────────────────────────
+  // A rung with `personal_sales_threshold` × N months looks back N − 1 months
+  // at what those months' runs paid as own revenue. Only months that were
+  // run are passed: an unrun month is unknown, not zero, and the engine will
+  // not let a streak cross it.
+  const rankRows = rows<RankRow>(ranks.data)
+  const lookBack = Math.max(0, ...rankRows.map(r => (r.consecutive_months ?? 1) - 1))
+  const priorPeriods = Array.from({ length: lookBack }, (_, i) => monthsBefore(period, i + 1))
+  const { data: priorRows, error: priorError } =
+    priorPeriods.length > 0
+      ? await supabase
+          .from('comm_runs')
+          .select('period_month, comm_statements (staff_id, product_revenue)')
+          .eq('sub_department_id', scheme.sub_department_id)
+          .in('period_month', priorPeriods)
+      : { data: [], error: null }
+  if (priorError) throw new Error(`Could not read the earlier months: ${priorError.message}`)
+
   // ── Run it ─────────────────────────────────────────────────────────────
   const input = toEngineInput({
     periodMonth: period,
     scheme,
-    ranks: rows<RankRow>(ranks.data),
+    ranks: rankRows,
     itemGroups: rows<ItemGroupRow>(itemGroups.data),
     kpiItems: rows<KpiItemRow>(kpiItems.data),
     kpiThresholds: rows<KpiThresholdRow>(kpiThresholds.data),
@@ -216,6 +235,7 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
     hierarchy: rows<HierarchyRow>(hierarchy.data),
     orders: orderRows,
     releasedOrderNos,
+    priorMonths: rows<PriorMonthRow>(priorRows),
   })
 
   const result = runEngine(input)

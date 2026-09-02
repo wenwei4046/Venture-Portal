@@ -205,6 +205,36 @@ June: a Senior Revenue Specialist on `variable` clears 300k → paid at 7%,
 title raised to Team Assistant. July: misses it → paid at 6%, **title stays
 Team Assistant**. The floor rank is untouched by either month.
 
+**One rung at a time, and two kinds of gate** (user 2026-09-03, the answer to
+Q11):
+
+> 如果他只是单月达到 300k 的话，还是一样不能够跳过限制，他需要连续两个月达到那个
+> criteria 才能变成 Senior Revenue Specialist，而不是直接升到 Team Assistant。
+
+A month can lift somebody at most **one rung above their floor**, and only if
+*that* rung's gate holds. A rung carries at most one gate:
+
+| Gate | Column on `comm_ranks` | Kind | Today |
+|---|---|---|---|
+| Group sales this month | `group_sales_threshold` | **monthly** — paid that rung this month, back to the floor next month | 300k → Team Assistant |
+| Own sales, N months running | `personal_sales_threshold` × `consecutive_months` | **earned** — the title raised at apply is the record; every later month climbs from that rung | 100k × 2 → Senior Revenue Specialist |
+
+So the 5% Specialist who sells 300k alone is paid 5% (the 300k gate is two
+rungs up); two months running of 100k make them Senior and pay 6% in the
+second month; only *then* does the 300k gate apply to them. The earlier
+months' own revenue comes from those months' runs (`comm_statements.
+product_revenue`, deposit-cleared) — an unrun month is unknown, not zero, and
+no streak crosses it, so the first month a sub-department runs nobody can pass
+a two-month streak.
+
+The earned rung is why a Team Assistant drops to **6%**, not 5%, in July: the
+engine's floor is `max(placed rank, the highest streak-gated rung at or below
+the title's rung)` in `variable` mode (`earnedFloor`, `titles.ts`). A `fixed`
+person is paid exactly the rank a human placed them at. The statement's
+`base_rank_key` records the floor actually climbed from, and Rules IX says
+"paid from Revenue Specialist - 6% — earned by title" beside a placed rank the
+title has lifted.
+
 Mechanics:
 
 - `comm_statements.rank_title_id` snapshots the title of the rank paid;
@@ -271,30 +301,32 @@ effective-dated hierarchy row.
 The effective rate is what everything else uses: product commission, the Open
 Bill uplift, and the override differential.
 
-### 3.4 Promotion criteria — recorded, not enforced
+### 3.4 Promotion criteria — recorded; two of them live on the ladder
 
-> **Status: written down, nothing reads them.** The user's instruction
-> (2026-08-31): *"这个本身先不需要 set goal，等之后 fixed 的时候我再重新写进去，
-> 担心根据 restrictions 会有不同的算法。不过可以先写下来。"* They live in
-> `comm_promotion_rules` with `is_enforced = FALSE`. The only gate the engine
-> actually applies is `comm_ranks.group_sales_threshold`, which today carries
-> the single 300k rung to Team Assistant.
+> **Status: written down; the engine reads the ladder, not this table.** The
+> user's instruction (2026-08-31): *"这个本身先不需要 set goal，等之后 fixed 的
+> 时候我再重新写进去，担心根据 restrictions 会有不同的算法。不过可以先写下来。"*
+> They live in `comm_promotion_rules` with `is_enforced = FALSE`. The gates the
+> engine actually applies are the two on `comm_ranks` (§3.1.1): the 300k
+> group-sales rung to Team Assistant, and — since 2026-09-03 — the 100k × 2
+> months personal-sales streak to Senior Revenue Specialist. Rules VIII marks
+> a line `LIVE · LADDER GATE` when it matches one of those columns.
 
 Criteria sharing an `alternative_group` are **ANDed**; different groups are
 **ORed**. That models the 7% → 8% rule exactly.
 
 | From → To | Criteria |
 |---|---|
-| **5% → 6%** | Personal sales ≥ **100k for two consecutive months**. (At 5% you cannot hold a team, so it can only be personal.) |
-| **6% → 7%** | **Group sales ≥ 300k.** ← the one live gate |
+| **5% → 6%** | **Personal sales ≥ 100k for two consecutive months.** ← live since 2026-09-03 (`personal_sales_threshold` × `consecutive_months` on rs_6). At 5% you cannot hold a team, so it can only be personal. |
+| **6% → 7%** | **Group sales ≥ 300k.** ← live (`group_sales_threshold` on ta_7) |
 | **7% → 8%** | **Any one of:** (a) group sales ≥ 500k **and** 10 KPI items per head — a team of 5 needs 50 in total; (b) group sales ≥ 500k **and** margin at Tier 1; (c) group sales ≥ **700k** on its own, whatever the KPI and margin |
 | **8% → 9%** | **All three, compulsory:** group sales ≥ 700k **and** margin Tier 1 **and** 10 KPI items per head |
 | **9% → 10%** | Not yet specified — the user's "Tier 3" rules are still to come |
 
-Two of these need machinery the engine does not have yet, which is another
-reason not to enforce them today: `personal_sales … for 2 consecutive months`
-needs history across runs, and `kpi_items_per_pax` needs a head-count of the
-person's team.
+`kpi_items_per_pax` needs a head-count of the person's team, and the margin
+tier needs the cost feed (Q1); neither is wired, which is why the 7% → 8% and
+8% → 9% steps stay recorded only. The consecutive-months machinery now
+exists: a streak reads the earlier months' runs (§3.1.1).
 
 ---
 
@@ -644,7 +676,7 @@ New tables. `sales_*` = imported facts, `comm_*` = config + results. The dormant
 |---|---|
 | `comm_sub_departments` | Fair, and whatever comes next |
 | `comm_schemes` | knobs, component switches, deposit threshold, default rate mode, `cloned_from_scheme_id` |
-| `comm_ranks` | `title_id` → `titles` (replaced `tier_key` / `tier_label` 2026-09-03), rank, rate, `can_recruit`, `group_sales_threshold` |
+| `comm_ranks` | `title_id` → `titles` (replaced `tier_key` / `tier_label` 2026-09-03), rank, rate, `can_recruit`, the monthly `group_sales_threshold`, the earned `personal_sales_threshold` × `consecutive_months` |
 | `comm_item_groups` | ERP group → commissionable? |
 | `comm_kpi_items` / `comm_kpi_thresholds` | KPI products and the qty ladder |
 | `comm_open_bill_rules` | 50 / 40 / 30% |
@@ -812,17 +844,18 @@ Default rate mode                                  ( ) Fixed   (•) Variable
 **II. Title ladder** — `comm_ranks`. The first column is a **dropdown of the
 Revenue Department's titles** (2026-09-03, §3.1), and a blank row at the
 bottom adds a rung — its `rank_key` is minted from the label and it lands at
-the bottom of the ladder.
+the bottom of the ladder. A rung takes at most one gate: a monthly group-sales
+target, or an earned personal-sales streak (§3.1.1).
 
 ```
-TITLE                       RANK                        RATE    CAN RECRUIT   GROUP SALES TARGET
-[Revenue Specialist      ▾] Revenue Specialist - 5%      5.00%      [ ]              —
-[Senior Revenue Special… ▾] Revenue Specialist - 6%      6.00%      [✓]              —
-[Team Assistant          ▾] Team Assistant - 7%          7.00%      [✓]        300,000.00
-[Senior Team Assistant   ▾] Team Assistant - 8%          8.00%      [✓]              —
-[Team Leader             ▾] Team Leader - 9%             9.00%      [✓]              —
-[Senior Team Leader      ▾] Senior Team Leader - 10%    10.00%      [✓]              —
-[— pick a title —        ▾] Team Leader - 11%               11      [✓]              —        [ Add ]
+TITLE                       RANK                        RATE    CAN RECRUIT   GROUP SALES TARGET   PERSONAL SALES STREAK
+[Revenue Specialist      ▾] Revenue Specialist - 5%      5.00%      [ ]              —                  —
+[Senior Revenue Special… ▾] Revenue Specialist - 6%      6.00%      [✓]              —          100,000 × 2 mths
+[Team Assistant          ▾] Team Assistant - 7%          7.00%      [✓]        300,000.00                —
+[Senior Team Assistant   ▾] Team Assistant - 8%          8.00%      [✓]              —                  —
+[Team Leader             ▾] Team Leader - 9%             9.00%      [✓]              —                  —
+[Senior Team Leader      ▾] Senior Team Leader - 10%    10.00%      [✓]              —                  —
+[— pick a title —        ▾] Team Leader - 11%               11      [✓]              —                  —        [ Add ]
 ```
 
 **III. Item groups** — `comm_item_groups`, with last month's revenue beside each
@@ -983,6 +1016,7 @@ statutory on a Revenue row would have quietly handed back their tax.
 | 10 | `save_` / `apply_` / `reopen_commission_run` RPCs + run dashboard + statement drill-down | ✅ built, **applied live** 2026-08-31 |
 | 11 | Payroll read-only Commission cell + WHT on the grid and the payslip | ✅ built |
 | 11a | Rung → title, the title ratchet, can-recruit by title, `+ add rung` (§3.1.1) — `20260903030000_rank_title_ratchet.sql` | ✅ built, **applied live** 2026-09-03; apply → reopen walked in the browser |
+| 11b | One rung at a time + the earned personal-sales streak gate (100k × 2 → Senior Revenue Specialist) — `20260903040000_personal_sales_streak_gate.sql` | ✅ built, **applied live** 2026-09-03 |
 | 12 | Cost feed → margin penalty and incentive go live | ⛔ blocked — the SO export has no cost column (Q1) |
 | 13 | WHT remittance in the statutory export | before the first real payout |
 | 14 | Revenue Dept P&L / pool 1090 wiring | separate scope |
@@ -1006,7 +1040,7 @@ Q1, Q8 and a separate scope.
 | **Q8** | **WHT remittance** — which LHDN form / schedule, so the statutory export can produce it. | legally required before the first payout |
 | **Q9** | Is the deposit threshold really **50%**, and is it the same for every sub-department? | it is a per-scheme setting; 50% is seeded |
 | **Q10** | Should the Revenue Dept manager (`dept_manager` role) see their team's commission? | RLS scope; DENY for now |
-| **Q11** | A 5% Revenue Specialist who sells 300k on their own is paid at **7% and titled Team Assistant**, skipping 6% — because the only live gate is the 300k group-sales rung, and the 5% → 6% rule (personal 100k × 2 months) is recorded, not enforced (§3.4). Intended, or should 6% be a stop on the way? | flagged 2026-09-03; changes `resolveRank` and the ratchet if not |
+| ~~**Q11**~~ | ~~A 5% Revenue Specialist who sells 300k on their own is paid at 7% and titled Team Assistant, skipping 6%.~~ **Answered 2026-09-03: no skipping.** They stay a Specialist until two months running of 100k make them Senior; only then does the 300k gate apply. Built as the earned streak gate + one-rung-per-month rule (§3.1.1). | closed |
 
 ---
 

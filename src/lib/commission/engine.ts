@@ -34,13 +34,14 @@ import type {
   MarginSource,
   OpenBillRank,
   PenalisedOrder,
+  PriorMonth,
   Rank,
   SalesLine,
   SalesOrder,
   Statement,
   StatementLine,
 } from './types'
-import { promotesTo, titleCanRecruit } from './titles'
+import { earnedFloor, promotesTo, titleCanRecruit } from './titles'
 
 export * from './types'
 
@@ -411,37 +412,89 @@ export function computeGroupRevenue(
 export interface ResolvedRank {
   /** The rank actually used to pay this month. */
   effective: Rank | undefined
-  /** What they have attained — the floor. */
+  /**
+   * The floor this month climbs from: the rank they were placed at, lifted
+   * (variable mode) to the rung their EARNED title carries — see
+   * `earnedFloor`.
+   */
   base: Rank | undefined
-  /** Highest threshold rank their group sales clear, when above the base. */
+  /** The one rung above the floor, when this month's figures pass its gate. */
   qualifiesFor: Rank | undefined
 }
 
+/** The figures a month's rate resolution reads, for one person. */
+export interface RankFigures {
+  periodMonth: string
+  /** Own + entire downline, this month, deposit-cleared. */
+  groupRevenue: number
+  /** Own only, this month, deposit-cleared. */
+  personalRevenue: number
+  priorMonths: PriorMonth[]
+}
+
+/** YYYY-MM-01, `k` months before `periodMonth`. */
+export function monthsBefore(periodMonth: string, k: number): string {
+  const y = Number(periodMonth.slice(0, 4))
+  const m = Number(periodMonth.slice(5, 7)) - 1 - k
+  const d = new Date(Date.UTC(y, m, 1))
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`
+}
+
 /**
- * `fixed`    — "flexible" in the user's words: whatever title a human moved
- *              them to is their title, and it holds through a month below
- *              target.
- * `variable` — "entitled to the scheme target": the highest rank whose
- *              group-sales threshold this month's figures clear, never below
- *              the attained rank. Miss the target and it drops back.
+ * Does this month pass the gate INTO `rung`? Two kinds, never both:
+ *   group  — this month's group sales clear the target (300k → Team Assistant);
+ *   streak — own sales clear the target this month AND in each of the
+ *            `consecutiveMonths − 1` months before it, read from those months'
+ *            runs. A month with no run breaks the streak: the figure is not
+ *            zero, it is unknown, and unknown does not pass.
+ * A rung with neither gate cannot be climbed to by volume.
+ */
+export function gateHolds(rung: Rank, staffId: string, f: RankFigures): boolean {
+  if (rung.groupSalesThreshold !== null) {
+    return f.groupRevenue + 0.005 >= rung.groupSalesThreshold
+  }
+  if (rung.personalSalesThreshold !== null) {
+    const need = rung.personalSalesThreshold
+    if (f.personalRevenue + 0.005 < need) return false
+    for (let k = 1; k < (rung.consecutiveMonths ?? 1); k++) {
+      const month = f.priorMonths.find(p => p.periodMonth === monthsBefore(f.periodMonth, k))
+      if (!month) return false
+      if ((month.personalRevenue[staffId] ?? 0) + 0.005 < need) return false
+    }
+    return true
+  }
+  return false
+}
+
+/**
+ * `fixed`    — "flexible" in the user's words: whatever rank a human moved
+ *              them to is what they are paid, and it holds through a month
+ *              below target.
+ * `variable` — "entitled to the scheme target": climbed ONE rung above the
+ *              floor in a month that passes that rung's gate, back to the
+ *              floor in one that does not. Never two rungs in a month (user
+ *              2026-09-03, spec Q11): a 5% Specialist who sells 300k alone is
+ *              still a Specialist until two months in a row of 100k have
+ *              made them Senior — only then does the 300k gate to Team
+ *              Assistant apply to them.
  *
  * Either way `qualifiesFor` is reported, so a fixed-rate person who has just
- * cleared 300k shows up as due a promotion instead of silently staying put.
+ * cleared a gate shows up as due a promotion instead of silently staying put.
  */
 export function resolveRank(
   node: HierarchyNode,
   ranks: Rank[],
-  groupRevenue: number,
+  figures: RankFigures,
 ): ResolvedRank {
-  const byKey = new Map(ranks.map(r => [r.rankKey, r]))
-  const base = byKey.get(node.baseRankKey)
+  const ladder = [...ranks].sort((a, b) => a.sortOrder - b.sortOrder)
+  const placed = ladder.find(r => r.rankKey === node.baseRankKey)
+  const earned = node.rateMode === 'variable' ? earnedFloor(ladder, node.titleId) : undefined
+  const base = earned && (!placed || earned.sortOrder > placed.sortOrder) ? earned : placed
 
   let qualifies: Rank | undefined
-  for (const r of ranks) {
-    if (r.groupSalesThreshold === null) continue
-    if (groupRevenue + 0.005 < r.groupSalesThreshold) continue
-    if (base && r.sortOrder <= base.sortOrder) continue
-    if (!qualifies || r.sortOrder > qualifies.sortOrder) qualifies = r
+  if (base) {
+    const next = ladder.find(r => r.sortOrder > base.sortOrder)
+    if (next && gateHolds(next, node.staffId, figures)) qualifies = next
   }
 
   const effective = node.rateMode === 'variable' && qualifies ? qualifies : base
@@ -722,7 +775,12 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       rateOf.set(staffId, 0)
       continue
     }
-    const r = resolveRank(node, ranks, groupRevenue.get(staffId) ?? 0)
+    const r = resolveRank(node, ranks, {
+      periodMonth: input.periodMonth,
+      groupRevenue: groupRevenue.get(staffId) ?? 0,
+      personalRevenue: ownRevenue.get(staffId) ?? 0,
+      priorMonths: input.priorMonths,
+    })
     resolved.set(staffId, r)
     rateOf.set(staffId, r.effective?.productRate ?? 0)
   }
@@ -997,7 +1055,9 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
 
     statements.push({
       staffId: d.staffId,
-      baseRankKey: d.node?.baseRankKey ?? null,
+      // The floor the month climbed from — the placed rank, or the rung an
+      // earned title lifted it to.
+      baseRankKey: rank?.base?.rankKey ?? d.node?.baseRankKey ?? null,
       rateMode: d.node?.rateMode ?? scheme.defaultRateMode,
       effectiveRankKey: rank?.effective?.rankKey ?? null,
       rankTitleId: rank?.effective?.titleId ?? null,

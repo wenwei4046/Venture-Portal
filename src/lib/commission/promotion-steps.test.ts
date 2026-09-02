@@ -144,6 +144,25 @@ describe('isLadderGate', () => {
       expect(isLadderGate(steps[2], r)).toBe(false)
     }
   })
+
+  it('marks the personal-sales streak that matches the destination rung, amount AND months', () => {
+    // The 5% → 6% step went live on 2026-09-03: 100k × 2 months on rs_6.
+    const ladder = LADDER.map(r =>
+      r.rank_key === 'rs_6' ? { ...r, personal_sales_threshold: '100000.00', consecutive_months: 2 } : r,
+    )
+    const steps = buildPromotionSteps(ladder, RULES)
+    expect(steps[0].streakGate).toEqual({ amount: 100000, months: 2 })
+    const line = steps[0].routes[0].rules[0]
+    expect(line.criterion).toBe('personal_sales')
+    expect(isLadderGate(steps[0], line)).toBe(true)
+
+    // Same amount over a different streak length is a different rule.
+    expect(isLadderGate(steps[0], { ...line, consecutive_months: 3 })).toBe(false)
+    // A group-sales line at the streak's amount is not the streak.
+    expect(isLadderGate(steps[0], { ...line, criterion: 'group_sales' })).toBe(false)
+    // Without the ladder columns nothing on that step is live.
+    expect(isLadderGate(buildPromotionSteps(LADDER, RULES)[0], line)).toBe(false)
+  })
 })
 
 describe('stepLogic', () => {

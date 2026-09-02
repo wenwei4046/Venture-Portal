@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { revenuePath } from '@/lib/revenue'
-import { titleCanRecruit } from '@/lib/commission/titles'
+import { earnedFloor, titleCanRecruit } from '@/lib/commission/titles'
 import {
   deleteKpiItem,
   deleteKpiThreshold,
@@ -228,10 +228,13 @@ export default function CommissionSection({
               Each rung belongs to a <strong>title</strong> from Team → Role &amp; Permission. The
               rank is what a month pays; the title is what a person keeps — the month somebody is
               paid a rung above the title they hold, their title is raised to it and{' '}
-              <em>never lowered</em>. Whether a title may recruit follows the title, so a Team
-              Assistant back on 5% for a month keeps their team. The group-sales target is what a{' '}
-              <em>scheme-target</em> salesperson climbs to each month; leave it blank for a rung
-              nobody can reach on volume alone.
+              <em>never lowered</em>. Whether a title may recruit follows the title. The ladder is
+              climbed <strong>one rung at a time</strong>, and a rung carries at most one gate: a{' '}
+              <strong>group-sales target</strong> is monthly — a <em>scheme-target</em> salesperson
+              is paid that rung in a month that clears it and drops back in one that does not; a{' '}
+              <strong>personal-sales streak</strong> (so much, so many months running) is earned —
+              passing it raises the title for good and later months climb from there. Leave both
+              blank for a rung nobody can reach on volume alone.
             </Hint>
             <div className="border border-hairline rounded-md bg-surface overflow-x-auto table-scroll">
               <table className="ledger-table">
@@ -242,6 +245,7 @@ export default function CommissionSection({
                     <th className="right">Rate %</th>
                     <th className="w-24">Can recruit</th>
                     <th className="right">Group sales target</th>
+                    <th className="right">Personal sales streak</th>
                     <th className="w-24"></th>
                   </tr>
                 </thead>
@@ -257,13 +261,19 @@ export default function CommissionSection({
                             <Hidden name="sort_order" value={r.sort_order} />
                             <TitleChoice titles={data.titles} current={r.title_id} ariaLabel={`${r.rank_key} title`} />
                           </td>
-                          <td><Field name="label" defaultValue={r.label} width="w-52" /></td>
+                          <td><Field name="label" defaultValue={r.label} width="w-44" /></td>
                           <td className="num">
                             <Field name="product_rate" type="number" step="0.01" width="w-20" defaultValue={toPct(r.product_rate)} />
                           </td>
                           <td><Tick name="can_recruit" defaultChecked={r.can_recruit} ariaLabel={`${r.rank_key} can recruit`} /></td>
                           <td className="num">
-                            <Field name="group_sales_threshold" type="number" step="1" width="w-32" defaultValue={r.group_sales_threshold ?? ''} placeholder="—" />
+                            <Field name="group_sales_threshold" type="number" step="1" width="w-28" defaultValue={r.group_sales_threshold ?? ''} placeholder="—" />
+                          </td>
+                          <td className="num whitespace-nowrap">
+                            <Field name="personal_sales_threshold" type="number" step="1" width="w-28" defaultValue={r.personal_sales_threshold ?? ''} placeholder="—" ariaLabel={`${r.rank_key} personal sales target`} />
+                            <span className="mx-1 text-xs text-muted">×</span>
+                            <Field name="consecutive_months" type="number" step="1" width="w-14" defaultValue={r.consecutive_months ?? ''} placeholder="—" ariaLabel={`${r.rank_key} months running`} />
+                            <span className="ml-1 text-xs text-muted">mths</span>
                           </td>
                           <td><SaveButton pending={pending} /></td>
                         </tr>
@@ -277,13 +287,19 @@ export default function CommissionSection({
                           <Hidden name="scheme_id" value={scheme.id} />
                           <TitleChoice titles={data.titles} current={null} ariaLabel="new rank title" required />
                         </td>
-                        <td><Field name="label" placeholder="Team Leader - 11%" width="w-52" required /></td>
+                        <td><Field name="label" placeholder="Team Leader - 11%" width="w-44" required /></td>
                         <td className="num">
                           <Field name="product_rate" type="number" step="0.01" width="w-20" placeholder="11" required ariaLabel="new rank rate" />
                         </td>
                         <td><Tick name="can_recruit" defaultChecked ariaLabel="new rank can recruit" /></td>
                         <td className="num">
-                          <Field name="group_sales_threshold" type="number" step="1" width="w-32" placeholder="—" ariaLabel="new rank group sales target" />
+                          <Field name="group_sales_threshold" type="number" step="1" width="w-28" placeholder="—" ariaLabel="new rank group sales target" />
+                        </td>
+                        <td className="num whitespace-nowrap">
+                          <Field name="personal_sales_threshold" type="number" step="1" width="w-28" placeholder="—" ariaLabel="new rank personal sales target" />
+                          <span className="mx-1 text-xs text-muted">×</span>
+                          <Field name="consecutive_months" type="number" step="1" width="w-14" placeholder="—" ariaLabel="new rank months running" />
+                          <span className="ml-1 text-xs text-muted">mths</span>
                         </td>
                         <td><SaveButton pending={pending} label="Add" /></td>
                       </tr>
@@ -775,7 +791,7 @@ function TitleChoice({
 }) {
   const known = current !== null && titles.some(t => t.id === current)
   return (
-    <Choice name="title_id" defaultValue={current ?? ''} ariaLabel={ariaLabel} required={required} width="w-52">
+    <Choice name="title_id" defaultValue={current ?? ''} ariaLabel={ariaLabel} required={required} width="w-48">
       {current === null ? <option value="">— pick a title —</option> : null}
       {current !== null && !known ? <option value={current}>(inactive title)</option> : null}
       {titles.map(t => (
@@ -797,8 +813,21 @@ function PositionCells({
 }) {
   // Who may hold downlines follows the TITLE they hold; only somebody with no
   // title yet is judged by the rank they were placed at (titles.ts).
-  const rungs = data.ranks.map(r => ({ titleId: r.title_id, canRecruit: r.can_recruit, sortOrder: r.sort_order }))
+  const rungs = data.ranks.map(r => ({
+    id: r.id,
+    label: r.label,
+    titleId: r.title_id,
+    canRecruit: r.can_recruit,
+    sortOrder: r.sort_order,
+    personalSalesThreshold: r.personal_sales_threshold,
+  }))
   const rankCanRecruit = new Map(data.ranks.map(r => [r.id, r.can_recruit]))
+  // A title earned by a streak lifts the floor a scheme-target month climbs
+  // from above the placed rank (titles.ts). Say so beside the rank, or the
+  // table would show 5% for somebody the engine pays from 6%.
+  const placed = rungs.find(r => r.id === person.rank_id)
+  const earned = person.rate_mode === 'fixed' ? undefined : earnedFloor(rungs, person.title_id)
+  const liftedTo = earned && placed && earned.sortOrder > placed.sortOrder ? earned : undefined
   const canBeUpline = data.salespeople.filter(p => {
     if (p.staff_id === person.staff_id || !p.rank_id) return false
     return titleCanRecruit(rungs, p.title_id) ?? rankCanRecruit.get(p.rank_id) ?? false
@@ -835,6 +864,11 @@ function PositionCells({
                 <option key={r.id} value={r.id}>{r.label}</option>
               ))}
             </Choice>
+            {liftedTo ? (
+              <div className="font-serif italic text-xs text-muted mt-1">
+                paid from {liftedTo.label} — earned by title
+              </div>
+            ) : null}
           </td>
           <td>
             <Choice
