@@ -1,18 +1,66 @@
 'use client'
 
-import { useState, useTransition, useRef, useEffect } from 'react'
+import { useMemo, useState, useTransition, useRef, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { addStaff } from '../actions'
+import { titlesForDepartment, type TitleOption } from '@/lib/staff-form'
+import { BANK_NAMES } from '@/lib/banks'
 
-interface Props {
-  departments: { id: string; name: string }[]
+export interface AddStaffDepartment {
+  id: string
+  name: string
+  /** 'commission' is a department the commission engine pays (Revenue). */
+  payroll_source: string
 }
 
-export default function AddStaffForm({ departments }: Props) {
+interface Props {
+  departments: AddStaffDepartment[]
+  titles: TitleOption[]
+}
+
+const ZERO = '0.00'
+
+const textInput =
+  'w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border'
+const monoInput =
+  'w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border'
+const moneyInput =
+  'w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border disabled:bg-surface-2 disabled:text-muted disabled:cursor-not-allowed'
+const labelBase = 'block text-sm font-sans font-medium text-graphite mb-1.5'
+const hintBase = 'text-xs text-muted ml-1 font-normal'
+const rmPrefix =
+  'absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono text-muted pointer-events-none'
+
+/**
+ * Add Staff.
+ *
+ * Department comes first because two things hang off it. The titles on offer
+ * — a title belongs to a department (`titlesForDepartment`), so a Marketing
+ * hire cannot be filed as an Accounts Executive. And whether pay is asked at
+ * all: a commission department's staff (the Revenue Department) carry no
+ * basic and no statutory allowance, 100% of their pay is commission derived
+ * from the sales import. Picking one ticks "Full commission" and locks the
+ * three pay fields at 0.00; the tick can be cleared for the odd Revenue hire
+ * who does draw a basic.
+ */
+export default function AddStaffForm({ departments, titles }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
+
+  const [departmentId, setDepartmentId] = useState('')
+  const [titleId, setTitleId] = useState('')
+  const [fullCommission, setFullCommission] = useState(false)
+  const [pay, setPay] = useState({ basic: '', allowances: ZERO, nonStat: ZERO })
+
+  const department = departments.find(d => d.id === departmentId) ?? null
+  const isCommissionDept = department?.payroll_source === 'commission'
+  const titleChoices = useMemo(
+    () => titlesForDepartment(titles, departmentId),
+    [titles, departmentId],
+  )
 
   useEffect(() => {
     if (error && formRef.current) {
@@ -26,110 +74,198 @@ export default function AddStaffForm({ departments }: Props) {
     }
   }, [error])
 
+  function setFullCommissionTo(on: boolean) {
+    setFullCommission(on)
+    // On, every pay field reads 0.00 so the locked fields say what will be
+    // saved. Off again, a basic the tick had zeroed goes blank so `required`
+    // asks for a real figure instead of accepting the 0.00 it left behind.
+    setPay(prev =>
+      on
+        ? { basic: ZERO, allowances: ZERO, nonStat: ZERO }
+        : prev.basic === ZERO
+          ? { ...prev, basic: '' }
+          : prev,
+    )
+  }
+
+  function pickDepartment(id: string) {
+    setDepartmentId(id)
+    setTitleId('')
+    setFullCommissionTo(departments.find(d => d.id === id)?.payroll_source === 'commission')
+  }
+
   function handleSubmit(formData: FormData) {
     setError(null)
     startTransition(async () => {
       try {
         await addStaff(formData)
         router.push('/team/people')
+        router.refresh()
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       }
     })
   }
 
-  const moneyInputBase =
-    'w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border'
-  const labelBase = 'block text-sm font-sans font-medium text-graphite mb-1.5'
-  const hintBase = 'text-xs text-muted ml-1 font-normal'
-  const rmPrefix =
-    'absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono text-muted pointer-events-none'
+  const payHint = (normal: string) => (fullCommission ? 'none on full commission' : normal)
 
   return (
-    <form ref={formRef} id="add-staff-form" action={handleSubmit} className="bg-surface border border-hairline rounded-md p-6 max-w-2xl">
+    <form
+      ref={formRef}
+      id="add-staff-form"
+      action={handleSubmit}
+      className="bg-surface border border-hairline rounded-md p-6 max-w-2xl"
+    >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className={labelBase}>Name</label>
-          <input
-            name="name"
-            required
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
-          />
+          <label htmlFor="staff-name" className={labelBase}>
+            Name
+          </label>
+          <input id="staff-name" name="name" required className={textInput} />
         </div>
         <div>
-          <label className={labelBase}>Department</label>
+          <label htmlFor="staff-department" className={labelBase}>
+            Department
+          </label>
           <select
+            id="staff-department"
             name="department_id"
             required
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            value={departmentId}
+            onChange={e => pickDepartment(e.target.value)}
+            className={textInput}
           >
             <option value="">Select...</option>
             {departments.map(d => (
-              <option key={d.id} value={d.id}>{d.name}</option>
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
             ))}
           </select>
         </div>
         <div>
-          <label className={labelBase}>Designation <span className={hintBase}>(optional)</span></label>
-          <input
-            name="designation"
-            placeholder="e.g. Marketing Executive"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
-          />
+          <label htmlFor="staff-title" className={labelBase}>
+            Designation{' '}
+            <span className={hintBase}>(optional · a title from Role &amp; Permission)</span>
+          </label>
+          <select
+            id="staff-title"
+            name="title_id"
+            value={titleId}
+            onChange={e => setTitleId(e.target.value)}
+            className={textInput}
+          >
+            <option value="">— None</option>
+            {titleChoices.map(t => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+          {departmentId === '' ? (
+            <p className="font-serif italic text-muted text-xs mt-1">
+              Pick a department first — titles belong to one.
+            </p>
+          ) : titleChoices.length === 0 ? (
+            <p className="font-serif italic text-muted text-xs mt-1">
+              No titles for {department?.name} yet —{' '}
+              <Link href="/team/roles" className="text-accent hover:underline">
+                add one under Role &amp; Permission
+              </Link>
+              .
+            </p>
+          ) : null}
         </div>
       </div>
 
       <div className="border-t border-hairline my-6" />
 
+      {isCommissionDept && department ? (
+        <label
+          htmlFor="staff-full-commission"
+          className="flex items-start gap-3 bg-surface-2 border border-hairline rounded-md p-3 mb-4 cursor-pointer"
+        >
+          <input
+            id="staff-full-commission"
+            type="checkbox"
+            name="full_commission"
+            checked={fullCommission}
+            onChange={e => setFullCommissionTo(e.target.checked)}
+            className="w-4 h-4 accent-accent mt-0.5 shrink-0"
+          />
+          <span>
+            <span className="block text-sm font-sans font-medium text-ink">
+              Full commission basis
+            </span>
+            <span className="block font-serif italic text-graphite text-xs mt-0.5">
+              {department.name} staff carry no basic salary and no statutory allowance — 100% of
+              pay is commission from the sales import. EPF / SOCSO / EIS come out at 0 on their
+              own; Withholding Tax is ticked per person on the sub-department&apos;s Staff
+              Hierarchy page.
+            </span>
+          </span>
+        </label>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-4 mb-4">
         <div>
-          <label className={labelBase}>
-            Basic Salary <span className={hintBase}>attracts EPF / SOCSO / EIS</span>
+          <label htmlFor="staff-basic" className={labelBase}>
+            Basic Salary <span className={hintBase}>{payHint('attracts EPF / SOCSO / EIS')}</span>
           </label>
           <div className="relative">
             <span className={rmPrefix}>RM</span>
             <input
+              id="staff-basic"
               name="basic_salary"
               type="number"
               step="0.01"
               min="0"
-              required
+              required={!fullCommission}
+              disabled={fullCommission}
+              value={pay.basic}
+              onChange={e => setPay(p => ({ ...p, basic: e.target.value }))}
               placeholder="0.00"
-              className={moneyInputBase}
+              className={moneyInput}
             />
           </div>
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className={labelBase}>
-            Statutory Allow. <span className={hintBase}>attracts EPF</span>
+          <label htmlFor="staff-allowances" className={labelBase}>
+            Statutory Allow. <span className={hintBase}>{payHint('attracts EPF')}</span>
           </label>
           <div className="relative">
             <span className={rmPrefix}>RM</span>
             <input
+              id="staff-allowances"
               name="allowances"
               type="number"
               step="0.01"
               min="0"
-              defaultValue="0.00"
-              className={moneyInputBase}
+              disabled={fullCommission}
+              value={pay.allowances}
+              onChange={e => setPay(p => ({ ...p, allowances: e.target.value }))}
+              className={moneyInput}
             />
           </div>
         </div>
         <div>
-          <label className={labelBase}>
-            Non-Stat. Allow. <span className={hintBase}>no EPF</span>
+          <label htmlFor="staff-non-stat" className={labelBase}>
+            Non-Stat. Allow. <span className={hintBase}>{payHint('no EPF')}</span>
           </label>
           <div className="relative">
             <span className={rmPrefix}>RM</span>
             <input
+              id="staff-non-stat"
               name="non_statutory_allowance"
               type="number"
               step="0.01"
               min="0"
-              defaultValue="0.00"
-              className={moneyInputBase}
+              disabled={fullCommission}
+              value={pay.nonStat}
+              onChange={e => setPay(p => ({ ...p, nonStat: e.target.value }))}
+              className={moneyInput}
             />
           </div>
         </div>
@@ -137,64 +273,126 @@ export default function AddStaffForm({ departments }: Props) {
 
       <div className="border-t border-hairline my-6" />
 
-      <h3 className="font-serif text-md text-ink mb-1">Contact <span className={hintBase}>optional, editable later</span></h3>
+      <h3 className="font-serif text-md text-ink mb-1">
+        Bank account{' '}
+        <span className={hintBase}>optional, but payroll cannot pay them without it</span>
+      </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
         <div>
-          <label className={labelBase}>Phone</label>
+          <label htmlFor="staff-bank" className={labelBase}>
+            Bank
+          </label>
           <input
-            name="contact_number"
-            type="tel"
-            placeholder="012-345 6789"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+            id="staff-bank"
+            name="bank_name"
+            list="staff-bank-names"
+            autoComplete="off"
+            placeholder="Maybank"
+            className={textInput}
           />
+          <datalist id="staff-bank-names">
+            {BANK_NAMES.map(b => (
+              <option key={b} value={b} />
+            ))}
+          </datalist>
         </div>
         <div>
-          <label className={labelBase}>Email</label>
+          <label htmlFor="staff-bank-account" className={labelBase}>
+            Account No <span className={hintBase}>digits only</span>
+          </label>
           <input
-            name="email"
-            type="email"
-            placeholder="name@example.com"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <label className={labelBase}>Address</label>
-          <textarea
-            name="address"
-            rows={2}
-            placeholder="Street, city, postcode"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border resize-y"
+            id="staff-bank-account"
+            name="bank_account_no"
+            inputMode="numeric"
+            autoComplete="off"
+            placeholder="1234567890"
+            className={monoInput}
           />
         </div>
       </div>
 
       <div className="border-t border-hairline my-6" />
 
-      <h3 className="font-serif text-md text-ink mb-1">Emergency Contact <span className={hintBase}>optional</span></h3>
+      <h3 className="font-serif text-md text-ink mb-1">
+        Contact <span className={hintBase}>optional, editable later</span>
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+        <div>
+          <label htmlFor="staff-phone" className={labelBase}>
+            Phone
+          </label>
+          <input
+            id="staff-phone"
+            name="contact_number"
+            type="tel"
+            placeholder="012-345 6789"
+            className={monoInput}
+          />
+        </div>
+        <div>
+          <label htmlFor="staff-email" className={labelBase}>
+            Email
+          </label>
+          <input
+            id="staff-email"
+            name="email"
+            type="email"
+            placeholder="name@example.com"
+            className={textInput}
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="staff-address" className={labelBase}>
+            Address
+          </label>
+          <textarea
+            id="staff-address"
+            name="address"
+            rows={2}
+            placeholder="Street, city, postcode"
+            className={`${textInput} resize-y`}
+          />
+        </div>
+      </div>
+
+      <div className="border-t border-hairline my-6" />
+
+      <h3 className="font-serif text-md text-ink mb-1">
+        Emergency Contact <span className={hintBase}>optional</span>
+      </h3>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-3">
         <div>
-          <label className={labelBase}>Name</label>
+          <label htmlFor="staff-ec-name" className={labelBase}>
+            Name
+          </label>
           <input
+            id="staff-ec-name"
             name="emergency_contact_name"
             placeholder="Full name"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            className={textInput}
           />
         </div>
         <div>
-          <label className={labelBase}>Relationship</label>
+          <label htmlFor="staff-ec-rel" className={labelBase}>
+            Relationship
+          </label>
           <input
+            id="staff-ec-rel"
             name="emergency_contact_relationship"
             placeholder="Spouse, Parent…"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            className={textInput}
           />
         </div>
         <div>
-          <label className={labelBase}>Phone</label>
+          <label htmlFor="staff-ec-phone" className={labelBase}>
+            Phone
+          </label>
           <input
+            id="staff-ec-phone"
             name="emergency_contact_phone"
             type="tel"
             placeholder="012-345 6789"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+            className={monoInput}
           />
         </div>
       </div>

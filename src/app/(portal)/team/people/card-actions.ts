@@ -7,6 +7,7 @@ import { canAccessAuditLog, canManagePermissions } from '@/lib/roles'
 import { navLabelByPath } from '@/components/layout/nav-config'
 import { describeActivity, type ActivityRow } from '@/lib/activity'
 import { ladderAllows, nextRung, type LadderTitle, type Rung } from '@/lib/ladder'
+import type { TitleRow } from '@/lib/staff-form'
 import { listSubDepartments } from '../../revenue/_lib/sub-departments'
 import { resolvePersonPermissions } from '../_lib/person-permissions'
 import type { PersonPermissionRow } from '../_components/PersonPermissions'
@@ -31,6 +32,8 @@ export interface CardLadder {
 
 export interface PersonCardData {
   staff: StaffRow
+  /** For the edit form's title dropdown — every title, active or not. */
+  titles: TitleRow[]
   code: string | null
   title: string | null
   department: string | null
@@ -66,13 +69,19 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
   const viewer = await requirePermission('team')
   const supabase = await createClient()
 
-  const { data: staff } = await supabase
-    .from('hr_staff_costs')
-    .select(
-      '*, departments(name), titles(id, name, level_id), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active, last_seen_at)',
-    )
-    .eq('id', id)
-    .maybeSingle()
+  // One read of the title table serves both the edit form's dropdown (every
+  // title, active or not) and the ladder (active ones, with their rung).
+  const [{ data: staff }, { data: titleRows }, { data: levels }] = await Promise.all([
+    supabase
+      .from('hr_staff_costs')
+      .select(
+        '*, departments(name), titles(id, name, level_id), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active, last_seen_at)',
+      )
+      .eq('id', id)
+      .maybeSingle(),
+    supabase.from('titles').select('id, name, department_id, level_id, is_active').order('name'),
+    supabase.from('title_levels').select('id, rank, name'),
+  ])
 
   if (!staff) throw new Error('That person is no longer on the roster.')
 
@@ -108,25 +117,24 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
     }
   }
 
-  const [{ data: levels }, { data: titles }, permissions] = await Promise.all([
-    supabase.from('title_levels').select('id, rank, name'),
-    supabase.from('titles').select('id, name, department_id, level_id').eq('is_active', true),
-    acct
-      ? resolvePersonPermissions(
-          supabase,
-          { id: acct.id, role: acct.role },
-          { id: row.title_id ?? null, name: titleName },
-        )
-      : Promise.resolve(null),
-  ])
+  const permissions = acct
+    ? await resolvePersonPermissions(
+        supabase,
+        { id: acct.id, role: acct.role },
+        { id: row.title_id ?? null, name: titleName },
+      )
+    : null
 
+  const allTitles = titleRows ?? []
   const rungs: Rung[] = (levels ?? []).map(l => ({ id: l.id, rank: l.rank, name: l.name }))
-  const ladderTitles: LadderTitle[] = (titles ?? []).map(t => ({
-    id: t.id,
-    name: t.name,
-    departmentId: t.department_id,
-    levelId: t.level_id,
-  }))
+  const ladderTitles: LadderTitle[] = allTitles
+    .filter(t => t.is_active)
+    .map(t => ({
+      id: t.id,
+      name: t.name,
+      departmentId: t.department_id,
+      levelId: t.level_id,
+    }))
   const ownRung = rungs.find(r => r.id === row.titles?.level_id) ?? null
   const next = row.title_id ? nextRung(ladderTitles, rungs, row.title_id) : null
 
@@ -165,7 +173,9 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
       id: row.id,
       employee_name: row.employee_name,
       designation: row.designation ?? null,
+      department_id: row.department_id,
       department_name: deptName ?? '—',
+      title_id: row.title_id ?? null,
       basic_salary: Number(row.basic_salary ?? 0),
       allowances: Number(row.allowances ?? 0),
       non_statutory_allowance: Number(row.non_statutory_allowance ?? 0),
@@ -188,6 +198,12 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
       emergency_contact_phone: row.emergency_contact_phone ?? null,
       emergency_contact_relationship: row.emergency_contact_relationship ?? null,
     },
+    titles: allTitles.map(t => ({
+      id: t.id,
+      name: t.name,
+      department_id: t.department_id,
+      is_active: t.is_active,
+    })) as TitleRow[],
     code: row.employee_code ?? null,
     title: titleName,
     department: deptName,
