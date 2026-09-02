@@ -33,14 +33,20 @@ export interface SchemeRow {
 
 export interface RankRow {
   id: string
-  tier_key: string
-  tier_label: string
+  /** The title (Team → Role & Permission) this rung belongs to. */
+  title_id: string
   rank_key: string
   label: string
   product_rate: number
   can_recruit: boolean
   group_sales_threshold: number | null
   sort_order: number
+}
+
+/** A title the ladder may hang a rung on — the Revenue side's rows of `titles`. */
+export interface TitleRow {
+  id: string
+  name: string
 }
 
 export interface ItemGroupRow {
@@ -113,6 +119,9 @@ export interface SalespersonRow {
   staff_id: string
   employee_name: string
   employee_code: string | null
+  /** The title they HOLD — the ratchet; may sit above the rank they are paid. */
+  title_id: string | null
+  title_name: string | null
   hierarchy_id: string | null
   upline_staff_id: string | null
   rank_id: string | null
@@ -142,6 +151,8 @@ export interface CommissionSettingsData {
   /** Null while a sub-department exists but has no active scheme. */
   scheme: SchemeRow | null
   ranks: RankRow[]
+  /** Titles a rung may belong to: every active title of a commission department. */
+  titles: TitleRow[]
   itemGroups: ItemGroupRow[]
   kpiItems: KpiItemRow[]
   kpiThresholds: KpiThresholdRow[]

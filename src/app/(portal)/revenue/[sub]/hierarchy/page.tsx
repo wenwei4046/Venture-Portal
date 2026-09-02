@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { revenuePath } from '@/lib/revenue'
+import { titleCanRecruit } from '@/lib/commission/titles'
 import OrgChart, { type OrgPerson, type OrgRank } from './_components/OrgChart'
 import { requireSubDepartment, type SubDepartment } from '../../_lib/sub-departments'
 
@@ -38,12 +39,12 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
   const [{ data: rankRows }, { data: staffRows }, { data: positions }] = await Promise.all([
     supabase
       .from('comm_ranks')
-      .select('id, rank_key, label, product_rate, can_recruit, sort_order')
+      .select('id, rank_key, title_id, label, product_rate, can_recruit, sort_order')
       .eq('scheme_id', subDept.schemeId)
       .order('sort_order'),
     supabase
       .from('hr_staff_costs')
-      .select('id, employee_name, employee_code, departments!inner (payroll_source)')
+      .select('id, employee_name, employee_code, title_id, titles (name), departments!inner (payroll_source)')
       .eq('status', 'active')
       .eq('departments.payroll_source', 'commission')
       .order('employee_name'),
@@ -67,6 +68,7 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
   const ranks: OrgRank[] = ((rankRows ?? []) as Array<{
     id: string
     rank_key: string
+    title_id: string
     label: string
     product_rate: number | string
     can_recruit: boolean
@@ -74,6 +76,7 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
   }>).map(r => ({
     id: r.id,
     rankKey: r.rank_key,
+    titleId: r.title_id,
     label: r.label,
     productRate: Number(r.product_rate),
     canRecruit: r.can_recruit,
@@ -86,6 +89,8 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
     id: string
     employee_name: string
     employee_code: string | null
+    title_id: string | null
+    titles: { name: string } | { name: string }[] | null
   }>)
     .filter(s => {
       const pos = posByStaff.get(s.id)
@@ -94,15 +99,19 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
     .map(s => {
       const pos = posByStaff.get(s.id)
       const rank = pos ? rankById.get(pos.rank_id) : undefined
+      const title = Array.isArray(s.titles) ? (s.titles[0] ?? null) : s.titles
       return {
         staffId: s.id,
         name: s.employee_name,
         code: s.employee_code,
+        titleName: title?.name ?? null,
         uplineStaffId: pos?.upline_staff_id ?? null,
         rankId: pos?.rank_id ?? null,
         rankLabel: rank?.label ?? null,
         productRate: rank?.productRate ?? null,
-        canRecruit: rank?.canRecruit ?? false,
+        // Who may hold downlines follows the TITLE they hold (user 2026-09-03);
+        // only somebody with no title yet is judged by the rank they sit at.
+        canRecruit: titleCanRecruit(ranks, s.title_id ?? null) ?? rank?.canRecruit ?? false,
         rateMode: pos?.rate_mode ?? null,
         placedSince: pos?.effective_from ?? null,
       }

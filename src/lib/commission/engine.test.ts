@@ -49,13 +49,21 @@ const ITEM_GROUPS: ItemGroupRule[] = [
  * 7% is where Team Assistant starts. 300k of GROUP sales is what promotes a 6%
  * Specialist to Team Assistant.
  */
+// Titles 1:1 with the rungs, as the live ladder is since 2026-09-03.
+const T_RS = 'title-rs'
+const T_SRS = 'title-srs'
+const T_TA = 'title-ta'
+const T_STA = 'title-sta'
+const T_TL = 'title-tl'
+const T_STL = 'title-stl'
+
 const RANKS: Rank[] = [
-  { rankKey: 'rs_5', tierKey: 'revenue_specialist', tierLabel: 'Revenue Specialist', label: 'Revenue Specialist · 5%', productRate: 0.05, canRecruit: false, groupSalesThreshold: null, sortOrder: 10 },
-  { rankKey: 'rs_6', tierKey: 'revenue_specialist', tierLabel: 'Revenue Specialist', label: 'Revenue Specialist · 6%', productRate: 0.06, canRecruit: true, groupSalesThreshold: null, sortOrder: 20 },
-  { rankKey: 'ta_7', tierKey: 'team_assistant', tierLabel: 'Team Assistant', label: 'Team Assistant · 7%', productRate: 0.07, canRecruit: true, groupSalesThreshold: 300_000, sortOrder: 30 },
-  { rankKey: 'ta_8', tierKey: 'team_assistant', tierLabel: 'Team Assistant', label: 'Team Assistant · 8%', productRate: 0.08, canRecruit: true, groupSalesThreshold: null, sortOrder: 40 },
-  { rankKey: 'tl_9', tierKey: 'team_leader', tierLabel: 'Team Leader', label: 'Team Leader · 9%', productRate: 0.09, canRecruit: true, groupSalesThreshold: null, sortOrder: 50 },
-  { rankKey: 'stl_10', tierKey: 'senior_team_leader', tierLabel: 'Senior Team Leader', label: 'Senior Team Leader · 10%', productRate: 0.10, canRecruit: true, groupSalesThreshold: null, sortOrder: 60 },
+  { rankKey: 'rs_5', titleId: T_RS, titleLabel: 'Revenue Specialist', label: 'Revenue Specialist · 5%', productRate: 0.05, canRecruit: false, groupSalesThreshold: null, sortOrder: 10 },
+  { rankKey: 'rs_6', titleId: T_SRS, titleLabel: 'Senior Revenue Specialist', label: 'Revenue Specialist · 6%', productRate: 0.06, canRecruit: true, groupSalesThreshold: null, sortOrder: 20 },
+  { rankKey: 'ta_7', titleId: T_TA, titleLabel: 'Team Assistant', label: 'Team Assistant · 7%', productRate: 0.07, canRecruit: true, groupSalesThreshold: 300_000, sortOrder: 30 },
+  { rankKey: 'ta_8', titleId: T_STA, titleLabel: 'Senior Team Assistant', label: 'Team Assistant · 8%', productRate: 0.08, canRecruit: true, groupSalesThreshold: null, sortOrder: 40 },
+  { rankKey: 'tl_9', titleId: T_TL, titleLabel: 'Team Leader', label: 'Team Leader · 9%', productRate: 0.09, canRecruit: true, groupSalesThreshold: null, sortOrder: 50 },
+  { rankKey: 'stl_10', titleId: T_STL, titleLabel: 'Senior Team Leader', label: 'Senior Team Leader · 10%', productRate: 0.10, canRecruit: true, groupSalesThreshold: null, sortOrder: 60 },
 ]
 
 /**
@@ -108,8 +116,9 @@ function node(
   uplineStaffId: string | null,
   baseRankKey: string,
   rateMode: 'fixed' | 'variable' = 'fixed',
+  titleId: string | null = null,
 ): HierarchyNode {
-  return { staffId, uplineStaffId, baseRankKey, rateMode }
+  return { staffId, uplineStaffId, baseRankKey, rateMode, titleId }
 }
 
 /** STL 10% → TL 9% → TA 7% → RS 5%, all on fixed rates. */
@@ -382,8 +391,104 @@ describe('resolveRank — fixed vs variable', () => {
   })
 
   it('the ladder has no 7% Revenue Specialist', () => {
-    expect(RANKS.filter(r => r.tierKey === 'revenue_specialist').map(r => r.productRate))
+    expect(RANKS.filter(r => r.titleLabel.endsWith('Revenue Specialist')).map(r => r.productRate))
       .toEqual([0.05, 0.06])
+  })
+})
+
+// ─── The title ratchet (user 2026-09-02) ────────────────────────────────────
+//
+//   "如果他曾经 hit 到哪一个 tier level，就 hit 到相应的那个 grade … 7 月没 hit 到
+//    target，他的 percentage 就跌回去他之前的 percent，但是 title 还是一样
+//    Team Assistant。Title 只会上，不会下。"
+
+describe('title ratchet — previewed on the statement', () => {
+  const orders = [
+    order('1', 'boss', [['MATTRESS', 'M', 1, 200_000]]),
+    order('2', 'a', [['MATTRESS', 'M', 1, 100_000]]),
+    order('3', 'b', [['MATTRESS', 'M', 1, 100_000]]),
+  ]
+
+  it('June: a Senior Revenue Specialist who clears 300k is paid at 7% and due Team Assistant', () => {
+    const team = [
+      node('boss', null, 'rs_6', 'variable', T_SRS),
+      node('a', 'boss', 'rs_5', 'fixed', T_RS),
+      node('b', 'boss', 'rs_5', 'fixed', T_RS),
+    ]
+    const boss = find(run({ hierarchy: team, orders }).statements, 'boss')
+    expect(boss.effectiveRankKey).toBe('ta_7')
+    expect(boss.rankTitleId).toBe(T_TA)
+    expect(boss.promotesToTitleId).toBe(T_TA)
+  })
+
+  it('July: the same person misses the target — rate drops to 6%, the title does NOT drop', () => {
+    // Title already ratcheted to Team Assistant; floor rank still rs_6.
+    const team = [
+      node('boss', null, 'rs_6', 'variable', T_TA),
+      node('a', 'boss', 'rs_5', 'fixed', T_RS),
+    ]
+    const lean = [
+      order('1', 'boss', [['MATTRESS', 'M', 1, 100_000]]),
+      order('2', 'a', [['MATTRESS', 'M', 1, 50_000]]),
+    ]
+    const boss = find(run({ hierarchy: team, orders: lean }).statements, 'boss')
+    expect(boss.effectiveRankKey).toBe('rs_6')
+    expect(boss.productRate).toBe(0.06)
+    expect(boss.rankTitleId).toBe(T_SRS) // what the month paid
+    expect(boss.promotesToTitleId).toBeNull() // nothing to raise — and nothing lowered
+  })
+
+  it('a fixed-rank person is never previewed for a title they were not paid', () => {
+    const team = [
+      node('boss', null, 'rs_6', 'fixed', T_SRS),
+      node('a', 'boss', 'rs_5', 'fixed', T_RS),
+      node('b', 'boss', 'rs_5', 'fixed', T_RS),
+    ]
+    const boss = find(run({ hierarchy: team, orders }).statements, 'boss')
+    expect(boss.effectiveRankKey).toBe('rs_6')
+    expect(boss.qualifiesForRankKey).toBe('ta_7') // the prompt still shows
+    expect(boss.promotesToTitleId).toBeNull() // but the ratchet waits for the rank
+  })
+
+  it('somebody with no title yet is previewed for the title of the rank they are paid', () => {
+    const solo = [node('s', null, 'rs_5', 'fixed', null)]
+    const s = find(run({ hierarchy: solo, orders: [order('1', 's', [['MATTRESS', 'M', 1, 10_000]])] }).statements, 's')
+    expect(s.promotesToTitleId).toBe(T_RS)
+  })
+
+  it('a manual placement above the held title is previewed too', () => {
+    // HR moved them to the 9% floor but their title still says Team Assistant.
+    const solo = [node('s', null, 'tl_9', 'fixed', T_TA)]
+    const s = find(run({ hierarchy: solo, orders: [order('1', 's', [['MATTRESS', 'M', 1, 10_000]])] }).statements, 's')
+    expect(s.promotesToTitleId).toBe(T_TL)
+  })
+})
+
+describe('can recruit — the title decides, not the month\'s rank', () => {
+  it('a Team Assistant back on 5% for a month keeps their downline without a warning', () => {
+    const team: HierarchyNode[] = [
+      node('boss', null, 'rs_5', 'variable', T_TA),
+      node('a', 'boss', 'rs_5', 'fixed', T_RS),
+    ]
+    const r = run({ hierarchy: team, orders: [order('1', 'a', [['MATTRESS', 'M', 1, 10_000, 6_000]])] })
+    expect(r.warnings.join(' ')).not.toMatch(/not allowed to recruit/)
+    // …and the override still flows to them, at their 5% month: 0 differential.
+    expect(find(r.statements, 'boss').overrideCommission).toBe(0)
+  })
+
+  it('a 6% floor under a 5% TITLE still may not hold downlines', () => {
+    const team: HierarchyNode[] = [
+      node('boss', null, 'rs_6', 'fixed', T_RS),
+      node('a', 'boss', 'rs_5', 'fixed', T_RS),
+    ]
+    const r = run({ hierarchy: team, orders: [] })
+    expect(r.warnings.join(' ')).toMatch(/whose title \(Revenue Specialist\) is not allowed to recruit/)
+  })
+
+  it('falls back to the rank when the upline has no title yet', () => {
+    const team: HierarchyNode[] = [node('boss', null, 'rs_5', 'fixed', null), node('a', 'boss', 'rs_5')]
+    const r = run({ hierarchy: team, orders: [] })
+    expect(r.warnings.join(' ')).toMatch(/whose rank \(Revenue Specialist · 5%\) is not allowed to recruit/)
   })
 })
 
@@ -717,7 +822,7 @@ describe('run invariants', () => {
     const ta = find(result.statements, 'ta')
     expect(ta.baseRankKey).toBe('ta_7')
     expect(ta.effectiveRankKey).toBe('ta_7')
-    expect(ta.tierKey).toBe('team_assistant')
+    expect(ta.rankTitleId).toBe(T_TA)
     expect(ta.rateMode).toBe('fixed')
     expect(ta.productRate).toBe(0.07)
     expect(ta.uplineStaffId).toBe('tl')

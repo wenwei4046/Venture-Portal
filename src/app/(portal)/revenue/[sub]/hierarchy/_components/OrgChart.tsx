@@ -30,6 +30,8 @@ import { setPosition } from '../../../hierarchy-actions'
 export interface OrgRank {
   id: string
   rankKey: string
+  /** The title this rung belongs to — a title sits where its lowest rung sits. */
+  titleId: string
   label: string
   productRate: number
   canRecruit: boolean
@@ -40,10 +42,13 @@ export interface OrgPerson {
   staffId: string
   name: string
   code: string | null
+  /** The title they HOLD — the ratchet; may sit above the rank they are paid. */
+  titleName: string | null
   uplineStaffId: string | null
   rankId: string | null
   rankLabel: string | null
   productRate: number | null
+  /** Decided by the title they hold, not the rank of the month. */
   canRecruit: boolean
   rateMode: 'fixed' | 'variable' | null
   placedSince: string | null
@@ -151,7 +156,11 @@ function Chart({
         const parent = byId.get(parentId)
         if (!parent) return
         if (!parent.canRecruit) {
-          setError(`${parent.name} is a ${parent.rankLabel ?? 'rank'} — that rank cannot hold downlines.`)
+          setError(
+            `${parent.name} is a ${parent.titleName ?? parent.rankLabel ?? 'rank'} — that ${
+              parent.titleName ? 'title' : 'rank'
+            } cannot hold downlines.`,
+          )
           return
         }
         if (wouldCycle(graph, childId, parentId)) {
@@ -288,9 +297,10 @@ function Chart({
 
       <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
         A greyed card cannot take the person being dragged — either it is one of their own
-        downlines, or its rank is not allowed to recruit. Rates shown are the rank&apos;s; a
-        salesperson on <em>scheme target</em> may be paid a higher one in a month their group sales
-        clear it.
+        downlines, or the title they hold is not allowed to recruit. Rates shown are the rank&apos;s;
+        a salesperson on <em>scheme target</em> may be paid a higher one in a month their group
+        sales clear it. The small caps under a name is the title they hold — it only ever goes up,
+        and the rank beneath it may sit lower in a month below target.
       </p>
     </div>
   )
@@ -314,7 +324,10 @@ function PersonCard({ data }: NodeProps<Node<CardData>>) {
       <Handle type="target" position={Position.Top} className="!bg-[var(--accent)] !w-2 !h-2" />
 
       <div className="font-serif text-sm text-ink leading-tight truncate">{person.name}</div>
-      <div className="font-mono text-[0.6rem] text-muted mt-0.5">{person.code ?? '—'}</div>
+      <div className="font-mono text-[0.6rem] text-muted mt-0.5">
+        {person.code ?? '—'}
+        {person.titleName ? <span className="ml-1.5 uppercase tracking-wide">{person.titleName}</span> : null}
+      </div>
 
       <div className="flex items-baseline justify-between mt-1.5">
         <span className="font-serif italic text-xs text-graphite truncate">

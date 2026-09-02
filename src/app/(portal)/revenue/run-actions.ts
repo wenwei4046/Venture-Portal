@@ -152,7 +152,7 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
   ] = await Promise.all([
     supabase
       .from('comm_ranks')
-      .select('rank_key, tier_key, tier_label, label, product_rate, can_recruit, group_sales_threshold, sort_order')
+      .select('rank_key, title_id, titles (name), label, product_rate, can_recruit, group_sales_threshold, sort_order')
       .eq('scheme_id', scheme.id)
       .order('sort_order'),
     supabase
@@ -182,9 +182,11 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
       .select('band_key, label, kind, margin_pct, commission_multiplier, monthly_incentive, comm_brands (code)')
       .eq('scheme_id', scheme.id)
       .order('sort_order'),
+    // The title they HOLD rides along: it decides who may recruit and whether
+    // this month's rank would raise it (the ratchet — titles.ts).
     supabase
       .from('comm_hierarchy')
-      .select('staff_id, upline_staff_id, rate_mode, comm_ranks (rank_key)')
+      .select('staff_id, upline_staff_id, rate_mode, comm_ranks (rank_key), hr_staff_costs!comm_hierarchy_staff_id_fkey (title_id)')
       .eq('scheme_id', scheme.id)
       .lte('effective_from', asAt)
       .or(`effective_to.is.null,effective_to.gte.${asAt}`),
@@ -261,11 +263,14 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
 export interface ApplySummary {
   staffWritten: number
   ordersReleased: number
+  /** Titles the ratchet raised this apply — never lowered, never undone by reopen. */
+  titlesPromoted: number
   totalCommission: number
 }
 
 /**
- * Write the computed run into `hr_monthly_payroll.commission_amount`.
+ * Write the computed run into `hr_monthly_payroll.commission_amount`, and
+ * raise the title of anyone paid a rank above the title they hold.
  * The RPC does the checking: no outstanding warnings, payroll still draft,
  * no order another run has already paid.
  */
@@ -278,15 +283,19 @@ export async function applyRun(runId: string): Promise<ApplySummary> {
 
   revalidatePath('/revenue', 'layout')
   revalidatePath('/hr-costing/payroll', 'layout')
+  // A raised title shows on the People roster too.
+  revalidatePath('/team', 'layout')
 
   const out = data as {
     staff_written: number
     orders_released: number
+    titles_promoted: number
     total_commission: number
   }
   return {
     staffWritten: out.staff_written,
     ordersReleased: out.orders_released,
+    titlesPromoted: out.titles_promoted ?? 0,
     totalCommission: Number(out.total_commission),
   }
 }
