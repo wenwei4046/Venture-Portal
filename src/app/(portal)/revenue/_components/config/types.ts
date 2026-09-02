@@ -39,7 +39,11 @@ export interface RankRow {
   label: string
   product_rate: number
   can_recruit: boolean
+  /** MONTHLY gate: group sales this month. Paid this rung, back down next month. */
   group_sales_threshold: number | null
+  /** EARNED gate: own sales in `consecutive_months` months running. Raises the title for good. */
+  personal_sales_threshold: number | null
+  consecutive_months: number | null
   sort_order: number
 }
 

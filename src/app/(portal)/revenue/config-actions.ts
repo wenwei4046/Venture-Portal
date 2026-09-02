@@ -149,7 +149,7 @@ async function cloneSchemeChildren(
   toSchemeId: string,
 ) {
   const simple: Array<[table: string, columns: string[]]> = [
-    ['comm_ranks', ['title_id', 'rank_key', 'label', 'product_rate', 'can_recruit', 'group_sales_threshold', 'sort_order']],
+    ['comm_ranks', ['title_id', 'rank_key', 'label', 'product_rate', 'can_recruit', 'group_sales_threshold', 'personal_sales_threshold', 'consecutive_months', 'sort_order']],
     ['comm_item_groups', ['item_group', 'commissionable', 'note']],
     ['comm_kpi_items', ['product_code', 'product_name', 'kpi_amount', 'effective_from', 'effective_to']],
     ['comm_kpi_thresholds', ['tier_label', 'min_qty', 'bonus_pct', 'effective_from', 'effective_to']],
@@ -281,13 +281,31 @@ export async function upsertRank(formData: FormData) {
     throw new Error('Commission rate must be between 0 and 100%')
   }
 
+  // A rung carries at most one gate: a monthly group-sales target, or a
+  // personal-sales streak (so much, so many months running) that is earned
+  // for good. Both at once would leave the engine two answers.
+  const groupGate = num(formData, 'group_sales_threshold')
+  const streakAmount = num(formData, 'personal_sales_threshold')
+  const streakMonths = num(formData, 'consecutive_months')
+  if (groupGate !== null && streakAmount !== null) {
+    throw new Error('A rung takes either a group-sales target or a personal-sales streak, not both')
+  }
+  if ((streakAmount === null) !== (streakMonths === null)) {
+    throw new Error('A personal-sales streak needs both the amount and how many months running')
+  }
+  if (streakMonths !== null && (!Number.isInteger(streakMonths) || streakMonths < 1)) {
+    throw new Error('Months running must be a whole number of at least 1')
+  }
+
   const base = {
     scheme_id: schemeId,
     title_id: required(formData, 'title_id', 'Title'),
     label,
     product_rate: rate,
     can_recruit: formData.get('can_recruit') === 'on',
-    group_sales_threshold: num(formData, 'group_sales_threshold'),
+    group_sales_threshold: groupGate,
+    personal_sales_threshold: streakAmount,
+    consecutive_months: streakMonths,
   }
 
   if (id) {

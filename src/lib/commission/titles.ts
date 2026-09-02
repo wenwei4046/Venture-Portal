@@ -73,3 +73,29 @@ export function promotesTo(
   const cur = titlePosition(ranks, currentTitleId)
   return cur === null || hit > cur ? paidTitleId : null
 }
+
+/** A rung that may carry an earned (personal-sales streak) gate. */
+export interface EarnedRung extends LadderRung {
+  personalSalesThreshold: number | null
+}
+
+/**
+ * The rung an EARNED title stands on: the highest streak-gated rung at or
+ * below the title's own rung. A streak is a test of persistence, and passing
+ * it makes somebody a Senior Revenue Specialist for good (user 2026-09-03) —
+ * the title raised at apply is the record, and every later month climbs from
+ * that rung, not from the 5% they were placed at. A Team Assistant's title
+ * sits above rs_6, so their earned rung is still rs_6: 7% was a monthly
+ * target, 6% is what they keep.
+ */
+export function earnedFloor<R extends EarnedRung>(ranks: readonly R[], titleId: string | null): R | undefined {
+  const pos = titlePosition(ranks, titleId)
+  if (pos === null) return undefined
+  let best: R | undefined
+  for (const r of ranks) {
+    if (r.personalSalesThreshold === null) continue
+    if (r.sortOrder > pos) continue
+    if (!best || r.sortOrder > best.sortOrder) best = r
+  }
+  return best
+}

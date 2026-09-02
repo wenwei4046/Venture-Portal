@@ -181,14 +181,35 @@ export interface Rank {
    */
   canRecruit: boolean
   /**
-   * GROUP sales needed to hold this rank — the person's own commissionable
-   * revenue plus their whole downline's. Only the 300k gate to Team Assistant
-   * is live; the richer promotion criteria (consecutive months, KPI per head,
-   * margin tier) are RECORDED in comm_promotion_rules but not yet enforced,
-   * at the user's request. `null` = a rank that cannot be climbed to by volume.
+   * MONTHLY gate into this rung: GROUP sales this month — the person's own
+   * commissionable revenue plus their whole downline's. Paid this rung in a
+   * month that clears it, back to the floor in one that does not (the 300k
+   * gate to Team Assistant). `null` = no monthly gate.
    */
   groupSalesThreshold: number | null
+  /**
+   * EARNED gate into this rung (user 2026-09-03, spec Q11): own commissionable,
+   * deposit-cleared revenue at or above this in `consecutiveMonths` months in
+   * a row, this one included — 100k × 2 → Senior Revenue Specialist. Passing
+   * it raises the title for good, and from then on the engine climbs from
+   * this rung rather than from the rung they were placed at. A rung carries
+   * at most one gate; the richer criteria (KPI per head, margin tier) stay
+   * RECORDED in comm_promotion_rules, not enforced.
+   */
+  personalSalesThreshold: number | null
+  consecutiveMonths: number | null
   sortOrder: number
+}
+
+/**
+ * One earlier month's own commissionable revenue per salesperson — the
+ * earlier runs' `product_revenue`, which is what a streak gate looks back at.
+ * Absent month = no run was made for it, and a streak cannot cross it.
+ */
+export interface PriorMonth {
+  /** YYYY-MM-01 */
+  periodMonth: string
+  personalRevenue: Record<string, number>
 }
 
 /**
@@ -267,6 +288,12 @@ export interface EngineInput {
   openBillTags: OpenBillTag[]
   marginBands: MarginBand[]
   hierarchy: HierarchyNode[]
+  /**
+   * The months before this one, most recent first, as far back as the
+   * longest streak gate on the ladder needs. Empty when nothing was run
+   * before — the first month a sub-department runs, no streak can pass.
+   */
+  priorMonths: PriorMonth[]
 }
 
 // ─── Results ────────────────────────────────────────────────────────────────

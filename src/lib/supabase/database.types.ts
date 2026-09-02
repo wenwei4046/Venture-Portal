@@ -1667,10 +1667,12 @@ export type Database = {
       comm_ranks: {
         Row: {
           can_recruit: boolean
+          consecutive_months: number | null
           created_at: string
           group_sales_threshold: number | null
           id: string
           label: string
+          personal_sales_threshold: number | null
           product_rate: number
           rank_key: string
           scheme_id: string
@@ -1679,10 +1681,12 @@ export type Database = {
         }
         Insert: {
           can_recruit?: boolean
+          consecutive_months?: number | null
           created_at?: string
           group_sales_threshold?: number | null
           id?: string
           label: string
+          personal_sales_threshold?: number | null
           product_rate: number
           rank_key: string
           scheme_id: string
@@ -1691,10 +1695,12 @@ export type Database = {
         }
         Update: {
           can_recruit?: boolean
+          consecutive_months?: number | null
           created_at?: string
           group_sales_threshold?: number | null
           id?: string
           label?: string
+          personal_sales_threshold?: number | null
           product_rate?: number
           rank_key?: string
           scheme_id?: string

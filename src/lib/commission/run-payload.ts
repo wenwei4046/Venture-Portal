@@ -43,6 +43,7 @@ import type {
   OpenBillRank,
   OpenBillRule,
   OpenBillTag,
+  PriorMonth,
   Rank,
   RateMode,
   SalesOrder,
@@ -82,7 +83,19 @@ export interface RankRow {
   product_rate: Num
   can_recruit: boolean
   group_sales_threshold: Num
+  personal_sales_threshold: Num
+  consecutive_months: number | null
   sort_order: number
+}
+
+/**
+ * One earlier month's run, as far as a streak gate needs it: whose own
+ * revenue was what. Only months that were actually run are passed — a month
+ * with no run is unknown, not zero, and a streak cannot cross it.
+ */
+export interface PriorMonthRow {
+  period_month: string
+  comm_statements: Array<{ staff_id: string; product_revenue: Num }> | null
 }
 
 export interface ItemGroupRow {
@@ -167,6 +180,8 @@ export interface RunSourceRows {
   orders: SalesOrderRow[]
   /** order_no of every order an applied run has already paid for. */
   releasedOrderNos: string[]
+  /** The months before this one that have a run, any order. */
+  priorMonths: PriorMonthRow[]
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -210,8 +225,20 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
     productRate: num(r.product_rate),
     canRecruit: r.can_recruit,
     groupSalesThreshold: numOrNull(r.group_sales_threshold),
+    personalSalesThreshold: numOrNull(r.personal_sales_threshold),
+    consecutiveMonths: r.consecutive_months ?? null,
     sortOrder: r.sort_order,
   }))
+
+  // Most recent first, so a streak walks back month by month.
+  const priorMonths: PriorMonth[] = [...rows.priorMonths]
+    .sort((a, b) => (a.period_month < b.period_month ? 1 : -1))
+    .map(p => ({
+      periodMonth: p.period_month,
+      personalRevenue: Object.fromEntries(
+        (p.comm_statements ?? []).map(s => [s.staff_id, num(s.product_revenue)]),
+      ),
+    }))
 
   const itemGroups: ItemGroupRule[] = rows.itemGroups.map(g => ({
     group: g.item_group,
@@ -319,6 +346,7 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
     openBillTags,
     marginBands,
     hierarchy,
+    priorMonths,
   }
 }
 
