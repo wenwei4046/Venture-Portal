@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import type { InfotechStaffRow } from '@/lib/import/infotech-staff'
+import { bankNameFromCode } from '@/lib/banks'
 
 /**
  * InfoTech department code → portal department name.
@@ -17,17 +18,6 @@ const DEPT_CODE_MAP: Record<string, string> = {
   'H-HR': 'HR',
   'H-IT': 'IT',
   'H-MK': 'Marketing',
-}
-
-/** InfoTech's internal bank codes observed in HVenture payroll data. */
-const BANK_CODES: Record<string, string> = {
-  '7725': 'AmBank',
-  '7747': 'Hong Leong Bank',
-  '7766': 'Public Bank',
-  '7798': 'Maybank',
-  '7830': 'CIMB',
-  '7832': 'RHB',
-  '7844': 'Alliance Bank',
 }
 
 const DIRECTOR_DEPT_CODE = 'H-DRT'
@@ -133,7 +123,7 @@ export async function previewInfotechStaffImport(
     if (current) {
       // Existing staff — diff the master fields against the file and sync.
       const incomingNric = row.nric ? row.nric.replace(/[-\s]/g, '') : null
-      const incomingBank = row.bankCode ? BANK_CODES[row.bankCode] ?? row.bankCode : null
+      const incomingBank = bankNameFromCode(row.bankCode)
       const diffs: Array<{ field: string; from: string; to: string }> = []
       const compare = (field: string, from: unknown, to: unknown) => {
         const f = from == null || from === '' ? null : String(from)
@@ -225,9 +215,7 @@ export async function applyInfotechStaffImport(
     }
 
     const nric = src.nric ? src.nric.replace(/[-\s]/g, '') : null
-    const bankName = src.bankCode
-      ? BANK_CODES[src.bankCode] ?? src.bankCode
-      : null
+    const bankName = bankNameFromCode(src.bankCode)
 
     const { error } = await supabase.from('hr_staff_costs').insert({
       employee_name: src.employeeName,
@@ -270,9 +258,7 @@ export async function applyInfotechStaffImport(
     }
 
     const nric = src.nric ? src.nric.replace(/[-\s]/g, '') : null
-    const bankName = src.bankCode
-      ? BANK_CODES[src.bankCode] ?? src.bankCode
-      : null
+    const bankName = bankNameFromCode(src.bankCode)
 
     const { error } = await supabase
       .from('hr_staff_costs')

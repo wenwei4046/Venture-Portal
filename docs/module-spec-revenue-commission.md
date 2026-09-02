@@ -559,6 +559,14 @@ precedent), `hr_employment_type` already has `commission_eligible`
 (migration 120), and the statutory base is `prorated basic + statutory
 allowance` — with both at 0, every statutory lookup returns 0 by itself.
 
+The Add Staff form (People → People Management → Add person) is where that is
+filed: picking any `payroll_source = 'commission'` department shows a **Full
+commission basis** tick, on by default, which locks basic / statutory
+allowance / non-statutory allowance at 0.00 and saves the person as
+`commission_eligible`. Untick it for the odd Revenue hire who does draw a
+basic. The tick does not touch `tax_mode` — Withholding Tax stays the
+per-person tick on the sub-department's Staff Hierarchy page (§5).
+
 > ⚠️ **Remittance is not built.** PCB is filed to LHDN through the statutory
 > export; WHT goes to LHDN on a different form. The statutory route needs a WHT
 > section before the first Revenue payroll is actually paid out (§11 Q4).

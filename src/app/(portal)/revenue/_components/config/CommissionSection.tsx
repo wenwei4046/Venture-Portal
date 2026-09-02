@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { formatMoney } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
 import { titleCanRecruit } from '@/lib/commission/titles'
 import {
@@ -20,6 +19,7 @@ import {
 } from '../../config-actions'
 import { setPositionFromForm, updateStaffTax } from '../../hierarchy-actions'
 import NewSubDepartmentForm from './NewSubDepartmentForm'
+import PromotionCriteria from './PromotionCriteria'
 import {
   ActionButton,
   ActionForm,
@@ -34,6 +34,12 @@ import {
   toPct,
 } from '@/components/RowForm'
 import type { CommissionSettingsData } from './types'
+
+/**
+ * The brand picker's "+ Add brand" chip. Lowercase on purpose: saved codes are
+ * uppercased, so no brand can ever collide with it.
+ */
+const NEW_BRAND = '+new'
 
 /**
  * One sub-department's Rules page: every rule on one screen (user 2026-08-31:
@@ -54,11 +60,27 @@ export default function CommissionSection({
   subDept: { name: string; slug: string }
 }) {
   const [showNewSub, setShowNewSub] = useState(false)
-  const [brandId, setBrandId] = useState<string>('')
+  // Which brand section VII shows, by CODE — the one key a brand has before it
+  // exists. Codes are unique within a scheme and this page is one scheme.
+  // NEW_BRAND is the "+ Add brand" chip: no brand selected, an empty form.
+  const [brandCode, setBrandCode] = useState<string>('')
 
   const scheme = data.scheme
   const brands = data.brands
-  const activeBrand = brands.find(b => b.id === brandId) ?? brands[0] ?? null
+  const addingBrand = brandCode === NEW_BRAND
+  const activeBrand = addingBrand
+    ? null
+    : (brands.find(b => b.code === brandCode) ?? brands[0] ?? null)
+
+  /**
+   * Save, then follow the brand just saved: a new one turns up in the picker
+   * under the code it was given, and a recoded one keeps its place instead of
+   * snapping back to the first chip.
+   */
+  async function saveBrand(fd: FormData) {
+    await upsertBrand(fd)
+    setBrandCode(String(fd.get('code') ?? '').trim().toUpperCase())
+  }
 
   return (
     <div className="space-y-12">
@@ -499,7 +521,7 @@ export default function CommissionSection({
                 <button
                   key={b.id}
                   type="button"
-                  onClick={() => setBrandId(b.id)}
+                  onClick={() => setBrandCode(b.code)}
                   className={
                     b.id === activeBrand?.id
                       ? 'px-3 py-1 rounded-md bg-accent text-white font-serif italic text-sm'
@@ -510,9 +532,24 @@ export default function CommissionSection({
                   {b.item_code_prefixes.length === 0 ? ' ·  no prefixes' : ''}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => setBrandCode(NEW_BRAND)}
+                className={
+                  addingBrand
+                    ? 'px-3 py-1 rounded-md bg-accent text-white font-serif italic text-sm'
+                    : 'px-3 py-1 rounded-md bg-surface border border-dashed border-hairline text-graphite font-serif italic text-sm hover:bg-surface-2 hover:text-ink'
+                }
+              >
+                + Add brand
+              </button>
             </div>
 
-            <ActionForm action={upsertBrand} className="mb-4">
+            {/* Keyed on the brand so switching chips re-seeds the uncontrolled
+                fields — without it the inputs keep the previous brand's text
+                while the hidden id moves on, and Save writes one brand's code
+                onto another. */}
+            <ActionForm key={activeBrand?.id ?? NEW_BRAND} action={saveBrand} className="mb-4">
               {({ pending }) => (
                 <div className="border border-hairline rounded-md bg-surface p-4 flex flex-wrap items-end gap-4">
                   <Hidden name="scheme_id" value={scheme.id} />
@@ -622,52 +659,19 @@ export default function CommissionSection({
                   </tbody>
                 </table>
               </div>
-            ) : null}
+            ) : (
+              <Hint>
+                Add the brand first — its margin ladder is keyed in here once it exists.
+              </Hint>
+            )}
           </section>
 
           {/* ── VIII. Promotion criteria ────────────────────────────────── */}
-          <section>
-            <SectionHead title="VIII. Promotion criteria" count="RECORDED · NOT ENFORCED" />
-            <Hint>
-              Written down for reference while the rules settle. Nothing reads these yet — the only
-              gate the engine applies is the group-sales target on the ladder above. Rows sharing an
-              <em> Alt</em> group must all hold; different groups are alternatives.
-            </Hint>
-            <div className="border border-hairline rounded-md bg-surface overflow-x-auto table-scroll">
-              <table className="ledger-table">
-                <thead>
-                  <tr>
-                    <th>From → To</th>
-                    <th className="w-16">Alt</th>
-                    <th>Criterion</th>
-                    <th className="right">Threshold</th>
-                    <th className="w-24">Enforced</th>
-                    <th>Note</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.promotionRules.map(r => (
-                    <tr key={r.id}>
-                      <td className="font-mono text-xs">{r.from_rank_key} → {r.to_rank_key}</td>
-                      <td className="font-mono text-xs">{r.alternative_group}</td>
-                      <td>{CRITERION_LABEL[r.criterion]}</td>
-                      <td className="num">
-                        {r.threshold_amount !== null ? formatMoney(r.threshold_amount) : null}
-                        {r.threshold_qty !== null ? `${r.threshold_qty} per head` : null}
-                        {r.margin_band_key ?? null}
-                        {r.consecutive_months ? ` × ${r.consecutive_months} months` : ''}
-                      </td>
-                      <td className="font-serif italic text-xs text-muted">{r.is_enforced ? 'yes' : 'no'}</td>
-                      <td className="font-serif italic text-xs text-muted">{r.note}</td>
-                    </tr>
-                  ))}
-                  {data.promotionRules.length === 0 ? (
-                    <tr><td colSpan={6} className="text-muted font-serif italic">None recorded.</td></tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-          </section>
+          <PromotionCriteria
+            ranks={data.ranks}
+            rules={data.promotionRules}
+            bands={data.marginBands}
+          />
 
           {/* ── IX. Salespeople ─────────────────────────────────────────── */}
           <section>
@@ -752,13 +756,6 @@ export default function CommissionSection({
       )}
     </div>
   )
-}
-
-const CRITERION_LABEL: Record<string, string> = {
-  personal_sales: 'Personal sales',
-  group_sales: 'Group sales',
-  kpi_items_per_pax: 'KPI items per head',
-  margin_band: 'Margin band',
 }
 
 /**

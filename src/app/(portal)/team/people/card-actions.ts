@@ -6,6 +6,7 @@ import { requirePermission } from '@/lib/auth'
 import { canAccessAuditLog, canManagePermissions } from '@/lib/roles'
 import { navLabelByPath } from '@/components/layout/nav-config'
 import { describeActivity, type ActivityRow } from '@/lib/activity'
+import type { TitleRow } from '@/lib/staff-form'
 import { listSubDepartments } from '../../revenue/_lib/sub-departments'
 import { resolvePersonPermissions } from '../_lib/person-permissions'
 import type { PersonPermissionRow } from '../_components/PersonPermissions'
@@ -21,6 +22,8 @@ export interface CardActivityLine {
 
 export interface PersonCardData {
   staff: StaffRow
+  /** For the edit form's title dropdown — every title, active or not. */
+  titles: TitleRow[]
   code: string | null
   title: string | null
   department: string | null
@@ -51,13 +54,16 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
   const viewer = await requirePermission('team')
   const supabase = await createClient()
 
-  const { data: staff } = await supabase
-    .from('hr_staff_costs')
-    .select(
-      '*, departments(name), titles(id, name), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active, last_seen_at)',
-    )
-    .eq('id', id)
-    .maybeSingle()
+  const [{ data: staff }, { data: titles }] = await Promise.all([
+    supabase
+      .from('hr_staff_costs')
+      .select(
+        '*, departments(name), titles(id, name), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active, last_seen_at)',
+      )
+      .eq('id', id)
+      .maybeSingle(),
+    supabase.from('titles').select('id, name, department_id, is_active').order('name'),
+  ])
 
   if (!staff) throw new Error('That person is no longer on the roster.')
 
@@ -113,7 +119,9 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
       id: row.id,
       employee_name: row.employee_name,
       designation: row.designation ?? null,
+      department_id: row.department_id,
       department_name: deptName ?? '—',
+      title_id: row.title_id ?? null,
       basic_salary: Number(row.basic_salary ?? 0),
       allowances: Number(row.allowances ?? 0),
       non_statutory_allowance: Number(row.non_statutory_allowance ?? 0),
@@ -136,6 +144,7 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
       emergency_contact_phone: row.emergency_contact_phone ?? null,
       emergency_contact_relationship: row.emergency_contact_relationship ?? null,
     },
+    titles: (titles ?? []) as TitleRow[],
     code: row.employee_code ?? null,
     title: titleName,
     department: deptName,

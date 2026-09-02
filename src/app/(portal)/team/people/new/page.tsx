@@ -1,19 +1,29 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import AddStaffForm from '../_components/AddStaffForm'
+import type { TitleOption } from '@/lib/staff-form'
+import AddStaffForm, { type AddStaffDepartment } from '../_components/AddStaffForm'
 
 export default async function NewStaffPage() {
   await requirePermission('team')
   const supabase = await createClient()
 
   // is_internal=false excludes the hidden 'Venture Office' pseudo-department —
-  // staff can't be assigned to it.
-  const { data: departments } = await supabase
-    .from('departments')
-    .select('id, name')
-    .eq('is_internal', false)
-    .order('name')
+  // staff can't be assigned to it. payroll_source says which department the
+  // commission engine pays, and so which one offers "Full commission".
+  // Titles are rows since 2026-09-01; only the active ones are on offer.
+  const [{ data: departments }, { data: titles }] = await Promise.all([
+    supabase
+      .from('departments')
+      .select('id, name, payroll_source')
+      .eq('is_internal', false)
+      .order('name'),
+    supabase
+      .from('titles')
+      .select('id, name, department_id')
+      .eq('is_active', true)
+      .order('name'),
+  ])
 
   return (
     <div>
@@ -33,7 +43,10 @@ export default async function NewStaffPage() {
         </div>
       </div>
 
-      <AddStaffForm departments={departments ?? []} />
+      <AddStaffForm
+        departments={(departments ?? []) as AddStaffDepartment[]}
+        titles={(titles ?? []) as TitleOption[]}
+      />
     </div>
   )
 }
