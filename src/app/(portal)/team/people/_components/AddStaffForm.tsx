@@ -195,7 +195,7 @@ export default function AddStaffForm({ departments, titles }: Props) {
           />
           <span>
             <span className="block text-sm font-sans font-medium text-ink">
-              Full commission basis
+              Fully commission based
             </span>
             <span className="block font-serif italic text-graphite text-xs mt-0.5">
               {department.name} staff carry no basic salary and no statutory allowance — 100% of
