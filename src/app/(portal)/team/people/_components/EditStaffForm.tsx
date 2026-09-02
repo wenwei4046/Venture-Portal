@@ -1,14 +1,18 @@
 'use client'
 
-import { useState, useTransition, useRef, useEffect } from 'react'
+import { useMemo, useState, useTransition, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { updateStaff } from '../actions'
+import { titlesForDepartment, type TitleRow } from '@/lib/staff-form'
 
 export interface StaffRow {
   id: string
   employee_name: string
   designation: string | null
+  department_id: string
   department_name: string
+  /** Authoritative since 2026-09-01; `designation` is the text it mirrors. */
+  title_id: string | null
   basic_salary: number
   allowances: number
   non_statutory_allowance: number | null
@@ -34,6 +38,8 @@ export interface StaffRow {
 
 interface Props {
   staff: StaffRow
+  /** Every title, active or not — see `titleChoices` for which are offered. */
+  titles: TitleRow[]
   /** Rendered inside the person card, which supplies its own panel and
    *  padding — so the form drops the card chrome it wears on its own page. */
   embedded?: boolean
@@ -45,12 +51,22 @@ interface Props {
   onCancel?: () => void
 }
 
-export default function EditStaffForm({ staff, embedded, onSaved, onCancel }: Props) {
+export default function EditStaffForm({ staff, titles, embedded, onSaved, onCancel }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
+
+  // The department's active titles, plus the one they already hold if it has
+  // since been deactivated — so a plain re-save does not silently drop it.
+  const titleChoices = useMemo(
+    () =>
+      titlesForDepartment(titles, staff.department_id).filter(
+        t => t.is_active || t.id === staff.title_id,
+      ),
+    [titles, staff.department_id, staff.title_id],
+  )
 
   useEffect(() => {
     if (error && formRef.current) {
@@ -104,14 +120,24 @@ export default function EditStaffForm({ staff, embedded, onSaved, onCancel }: Pr
         </div>
         <div>
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Designation <span className="text-xs text-muted ml-1 font-normal">(optional)</span>
+            Designation{' '}
+            <span className="text-xs text-muted ml-1 font-normal">
+              (a title from Role &amp; Permission)
+            </span>
           </label>
-          <input
-            name="designation"
-            defaultValue={staff.designation ?? ''}
-            placeholder="e.g. Marketing Executive"
+          <select
+            name="title_id"
+            defaultValue={staff.title_id ?? ''}
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
-          />
+          >
+            <option value="">— None</option>
+            {titleChoices.map(t => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+                {t.is_active ? '' : ' (inactive)'}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import type { TitleRow } from '@/lib/staff-form'
 import EditStaffForm from '../../_components/EditStaffForm'
 
 interface PageProps {
@@ -13,11 +14,10 @@ export default async function EditStaffPage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()
 
-  const { data: staff } = await supabase
-    .from('hr_staff_costs')
-    .select('*, departments(name)')
-    .eq('id', id)
-    .maybeSingle()
+  const [{ data: staff }, { data: titles }] = await Promise.all([
+    supabase.from('hr_staff_costs').select('*, departments(name)').eq('id', id).maybeSingle(),
+    supabase.from('titles').select('id, name, department_id, is_active').order('name'),
+  ])
 
   if (!staff) notFound()
 
@@ -46,11 +46,14 @@ export default async function EditStaffPage({ params }: PageProps) {
       </div>
 
       <EditStaffForm
+        titles={(titles ?? []) as TitleRow[]}
         staff={{
           id: staff.id,
           employee_name: staff.employee_name,
           designation: staff.designation ?? null,
+          department_id: staff.department_id,
           department_name: deptName,
+          title_id: staff.title_id ?? null,
           basic_salary: Number(staff.basic_salary),
           allowances: Number(staff.allowances),
           non_statutory_allowance: staff.non_statutory_allowance == null ? null : Number(staff.non_statutory_allowance),
