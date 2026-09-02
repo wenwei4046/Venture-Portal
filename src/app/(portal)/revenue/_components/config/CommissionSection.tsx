@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { formatMoney } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
 import {
   deleteKpiItem,
@@ -19,6 +18,7 @@ import {
 } from '../../config-actions'
 import { setPositionFromForm, updateStaffTax } from '../../hierarchy-actions'
 import NewSubDepartmentForm from './NewSubDepartmentForm'
+import PromotionCriteria from './PromotionCriteria'
 import {
   ActionButton,
   ActionForm,
@@ -645,48 +645,11 @@ export default function CommissionSection({
           </section>
 
           {/* ── VIII. Promotion criteria ────────────────────────────────── */}
-          <section>
-            <SectionHead title="VIII. Promotion criteria" count="RECORDED · NOT ENFORCED" />
-            <Hint>
-              Written down for reference while the rules settle. Nothing reads these yet — the only
-              gate the engine applies is the group-sales target on the ladder above. Rows sharing an
-              <em> Alt</em> group must all hold; different groups are alternatives.
-            </Hint>
-            <div className="border border-hairline rounded-md bg-surface overflow-x-auto table-scroll">
-              <table className="ledger-table">
-                <thead>
-                  <tr>
-                    <th>From → To</th>
-                    <th className="w-16">Alt</th>
-                    <th>Criterion</th>
-                    <th className="right">Threshold</th>
-                    <th className="w-24">Enforced</th>
-                    <th>Note</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.promotionRules.map(r => (
-                    <tr key={r.id}>
-                      <td className="font-mono text-xs">{r.from_rank_key} → {r.to_rank_key}</td>
-                      <td className="font-mono text-xs">{r.alternative_group}</td>
-                      <td>{CRITERION_LABEL[r.criterion]}</td>
-                      <td className="num">
-                        {r.threshold_amount !== null ? formatMoney(r.threshold_amount) : null}
-                        {r.threshold_qty !== null ? `${r.threshold_qty} per head` : null}
-                        {r.margin_band_key ?? null}
-                        {r.consecutive_months ? ` × ${r.consecutive_months} months` : ''}
-                      </td>
-                      <td className="font-serif italic text-xs text-muted">{r.is_enforced ? 'yes' : 'no'}</td>
-                      <td className="font-serif italic text-xs text-muted">{r.note}</td>
-                    </tr>
-                  ))}
-                  {data.promotionRules.length === 0 ? (
-                    <tr><td colSpan={6} className="text-muted font-serif italic">None recorded.</td></tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-          </section>
+          <PromotionCriteria
+            ranks={data.ranks}
+            rules={data.promotionRules}
+            bands={data.marginBands}
+          />
 
           {/* ── IX. Salespeople ─────────────────────────────────────────── */}
           <section>
@@ -765,13 +728,6 @@ export default function CommissionSection({
       )}
     </div>
   )
-}
-
-const CRITERION_LABEL: Record<string, string> = {
-  personal_sales: 'Personal sales',
-  group_sales: 'Group sales',
-  kpi_items_per_pax: 'KPI items per head',
-  margin_band: 'Margin band',
 }
 
 /** Upline + rank + rate mode, saved together as one position. */
