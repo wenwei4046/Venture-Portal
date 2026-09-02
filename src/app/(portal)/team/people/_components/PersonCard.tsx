@@ -230,6 +230,7 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
             editing ? (
               <EditStaffForm
                 staff={person.staff}
+                titles={person.titles}
                 embedded
                 onSaved={() => {
                   setEditing(false)

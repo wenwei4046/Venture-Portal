@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import { validateStaffForm, designationForTitle } from '@/lib/staff-form'
 
 function trimOrNull(v: FormDataEntryValue | null): string | null {
   if (typeof v !== 'string') return null
@@ -10,29 +11,71 @@ function trimOrNull(v: FormDataEntryValue | null): string | null {
   return t.length > 0 ? t : null
 }
 
+const str = (formData: FormData, key: string): string | null =>
+  typeof formData.get(key) === 'string' ? (formData.get(key) as string) : null
+
+/**
+ * Filing a new person.
+ *
+ * Shape and rules live in lib/staff-form.ts, where they are unit-tested: the
+ * "Full commission" tick (a commission department's staff carry no basic and
+ * no statutory allowance), money that has to be a non-negative number, an
+ * account number kept to its digits.
+ *
+ * A title is a row (2026-09-01), so the chosen one is read back from the
+ * table here — it has to exist, be active and fit the department — and
+ * `designation`, the free-text column the InfoTech import writes and the
+ * payroll export reads, is set to mirror its name.
+ */
 export async function addStaff(formData: FormData) {
   const user = await requirePermission('team')
   const supabase = await createClient()
 
-  const { data: dept } = await supabase
-    .from('departments')
-    .select('id')
-    .eq('name', formData.get('department') as string)
-    .maybeSingle()
+  const form = validateStaffForm({
+    name: str(formData, 'name'),
+    departmentId: str(formData, 'department_id'),
+    titleId: str(formData, 'title_id'),
+    fullCommission: formData.get('full_commission') === 'on',
+    basicSalary: str(formData, 'basic_salary'),
+    allowances: str(formData, 'allowances'),
+    nonStatutoryAllowance: str(formData, 'non_statutory_allowance'),
+    bankName: str(formData, 'bank_name'),
+    bankAccountNo: str(formData, 'bank_account_no'),
+    contactNumber: str(formData, 'contact_number'),
+    email: str(formData, 'email'),
+    address: str(formData, 'address'),
+    emergencyContactName: str(formData, 'emergency_contact_name'),
+    emergencyContactPhone: str(formData, 'emergency_contact_phone'),
+    emergencyContactRelationship: str(formData, 'emergency_contact_relationship'),
+  })
+
+  let designation: string | null = null
+  if (form.titleId) {
+    const { data: title } = await supabase
+      .from('titles')
+      .select('id, name, department_id, is_active')
+      .eq('id', form.titleId)
+      .maybeSingle()
+    designation = designationForTitle(title, form.departmentId)
+  }
 
   const { error } = await supabase.from('hr_staff_costs').insert({
-    employee_name: formData.get('name') as string,
-    designation: trimOrNull(formData.get('designation')),
-    department_id: dept?.id ?? (formData.get('department_id') as string),
-    basic_salary: parseFloat(formData.get('basic_salary') as string) || 0,
-    allowances: parseFloat(formData.get('allowances') as string) || 0,
-    non_statutory_allowance: parseFloat(formData.get('non_statutory_allowance') as string) || 0,
-    contact_number: trimOrNull(formData.get('contact_number')),
-    email: trimOrNull(formData.get('email')),
-    address: trimOrNull(formData.get('address')),
-    emergency_contact_name: trimOrNull(formData.get('emergency_contact_name')),
-    emergency_contact_phone: trimOrNull(formData.get('emergency_contact_phone')),
-    emergency_contact_relationship: trimOrNull(formData.get('emergency_contact_relationship')),
+    employee_name: form.name,
+    department_id: form.departmentId,
+    title_id: form.titleId,
+    designation,
+    employment_type: form.employmentType,
+    basic_salary: form.basicSalary,
+    allowances: form.allowances,
+    non_statutory_allowance: form.nonStatutoryAllowance,
+    bank_name: form.bankName,
+    bank_account_no: form.bankAccountNo,
+    contact_number: form.contactNumber,
+    email: form.email,
+    address: form.address,
+    emergency_contact_name: form.emergencyContactName,
+    emergency_contact_phone: form.emergencyContactPhone,
+    emergency_contact_relationship: form.emergencyContactRelationship,
     created_by: user.id,
   })
 
@@ -42,6 +85,7 @@ export async function addStaff(formData: FormData) {
   }
 
   revalidatePath('/hr-costing')
+  revalidatePath('/team', 'layout')
 }
 
 export async function updateStaff(id: string, formData: FormData) {
@@ -55,11 +99,38 @@ export async function updateStaff(id: string, formData: FormData) {
   const bankAccountNo = ((formData.get('bank_account_no') as string) || '').trim() || null
   const nric = ((formData.get('nric') as string) || '').replace(/[-\s]/g, '') || null
 
+  // The title dropdown. Department is fixed on this form, so the row says
+  // which department a title has to fit. An unchanged title is left alone: a
+  // title deactivated while somebody held it is still theirs (deactivating
+  // is what the roles page offers instead of deleting one out from under its
+  // holders), and re-saving their record must not fail on it.
+  const { data: current } = await supabase
+    .from('hr_staff_costs')
+    .select('department_id, title_id')
+    .eq('id', id)
+    .maybeSingle()
+  if (!current) throw new Error('That person is no longer on the roster')
+
+  const titleId = trimOrNull(formData.get('title_id'))
+  let titleChange: { title_id: string | null; designation: string | null } | Record<string, never> = {}
+  if (titleId !== (current.title_id ?? null)) {
+    if (titleId) {
+      const { data: title } = await supabase
+        .from('titles')
+        .select('id, name, department_id, is_active')
+        .eq('id', titleId)
+        .maybeSingle()
+      titleChange = { title_id: titleId, designation: designationForTitle(title, current.department_id) }
+    } else {
+      titleChange = { title_id: null, designation: null }
+    }
+  }
+
   const { error } = await supabase
     .from('hr_staff_costs')
     .update({
       employee_name: formData.get('name') as string,
-      designation: trimOrNull(formData.get('designation')),
+      ...titleChange,
       basic_salary: parseFloat(formData.get('basic_salary') as string) || 0,
       allowances: parseFloat(formData.get('allowances') as string) || 0,
       non_statutory_allowance: parseFloat(formData.get('non_statutory_allowance') as string) || 0,
