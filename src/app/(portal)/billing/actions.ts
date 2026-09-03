@@ -1585,7 +1585,9 @@ interface OwnShareRpcRow {
   eis_amount: number | string
 }
 
-const OWN_SHARE_ORDER: PayrollSegment[] = ['hr', 'finance', 'director_office', 'director', 'it']
+// HR removed 2026-09-03 — its payroll is pool-borne like Marketing's (see
+// OWN_SHARE_SEGMENTS in lib/staff-allocation.ts).
+const OWN_SHARE_ORDER: PayrollSegment[] = ['finance', 'director_office', 'director', 'it']
 
 function groupOwnShareAllocation(rows: OwnShareRpcRow[]): DeptComponentGroup[] {
   const groups: DeptComponentGroup[] = []

@@ -335,6 +335,22 @@ file's verbatim statutory with recomputed JADUAL values — **31 of the 38 live
 rows move** if anyone runs a bulk `UPDATE hr_monthly_payroll SET x = x`. Do not
 do that without accounting for it.
 
+## POLICY 2026-09-03 — HR payroll is POOL-BORNE (like Marketing)
+
+User: "hr payroll 会用自己的pool,和marketing 一样,所以不用bill back,也不会
+bill to venture". HR's Aug allocation being empty is DELIBERATE, not a miss.
+- OWN_SHARE_SEGMENTS no longer contains 'hr' → the own-share → Venture Office
+  invoice excludes HR entirely (Aug preview drops from 17,822.11 to 1,657.46:
+  Finance 835.60 + Director Office 821.86; IT own-share 0 this month).
+- HR STAYS in PAYROLL_DEPT_TO_SEGMENT so any future subsidiary allocation
+  still bills out instead of being silently dropped.
+- Funding unchanged: Stage-E already draws each dept's payroll from its own
+  pool — HR's pool simply bears the cost with no recovery, like Marketing.
+- OPEN ITEM the user hasn't answered yet: Aug STAFF accrual JVs are missing
+  entirely (run was HR-direct-submitted 09-02; the accrual hook only fires on
+  the Principal-approval path). Offered: backfill Aug (all depts incl. IT) +
+  hook accrual onto the direct-submit path. Waiting for go-ahead.
+
 ## SESSION 2026-09-03 (later) — IT segment RENAMED to 'it' + CONTS repayment fix
 
 1. **Segment renamed infotech → it** (user: "segment 不是infotech,而是真的叫

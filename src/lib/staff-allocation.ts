@@ -152,8 +152,13 @@ export function buildAllocationInvoiceLines(
 export type PayrollSegment = 'hr' | 'finance' | 'director_office' | 'director' | 'it'
 
 /** The staff-attribution segments eligible for own-share → Venture (Office)
- *  inter-billing (excludes marketing). */
-export const OWN_SHARE_SEGMENTS: readonly PayrollSegment[] = ['hr', 'finance', 'director_office', 'director', 'it']
+ *  inter-billing. Excludes marketing AND — since 2026-09-03 (user: "hr
+ *  payroll 会用自己的pool,和marketing 一样,所以不用bill back,也不会bill to
+ *  venture") — HR: both are direct cost centres whose pool bears their own
+ *  payroll. HR stays in the consolidated-billing map so that IF its staff
+ *  ever get subsidiary allocations again they bill out rather than being
+ *  silently dropped. */
+export const OWN_SHARE_SEGMENTS: readonly PayrollSegment[] = ['finance', 'director_office', 'director', 'it']
 
 export interface DeptComponentGroup {
   /** Display label for the group header, e.g. "HR", "Finance", "Director Office". */
