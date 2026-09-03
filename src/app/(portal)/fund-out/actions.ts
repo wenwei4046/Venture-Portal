@@ -473,6 +473,41 @@ export async function voidRepayment(formData: FormData): Promise<{ error: string
   return undefined
 }
 
+// ─── Amend a recorded repayment's AMOUNT (2026-09-03) ────────────────────────
+// User: "不能直接点开receipt 的单去edit?" — in-place fix for a mis-keyed
+// amount, without voiding the whole thing. One atomic RPC adjusts the
+// repayments row, its GL entry (audit note stamped), the bank cache delta,
+// venture_pool counter + loan status for principal. Ambiguous cases (no or
+// several matching JEs) error out and the void + re-record path applies.
+export async function amendRepayment(
+  formData: FormData,
+): Promise<{ error?: string; old?: number; newAmount?: number }> {
+  await requirePermission('treasury')
+  const supabase = await createClient()
+
+  const repaymentId = ((formData.get('repayment_id') as string) ?? '').trim()
+  const newAmount = parseFloat((formData.get('new_amount') as string) ?? '')
+  const reason = ((formData.get('reason') as string) ?? '').trim()
+  if (!repaymentId) return { error: 'Repayment id is required' }
+  if (!Number.isFinite(newAmount) || newAmount <= 0) return { error: '金额必须大于 0' }
+  if (!reason) return { error: '写一句原因(会记进 GL 的审计注记)' }
+
+  const { data, error } = await supabase.rpc('amend_loan_repayment' as never, {
+    p_repayment_id: repaymentId,
+    p_new_amount: newAmount,
+    p_reason: reason,
+  } as never)
+  if (error) return { error: error.message }
+
+  const res = (data ?? {}) as { old?: number; new?: number }
+  revalidatePath('/receipts')
+  revalidatePath('/fund-out')
+  revalidatePath('/repayment-schedule')
+  revalidatePath('/reports')
+  revalidatePath('/dashboard')
+  return { old: Number(res.old ?? 0), newAmount: Number(res.new ?? newAmount) }
+}
+
 // ─── Amend an active loan (Principal — self-service, direct apply) ────────────
 // Principal is the top approval authority, so edits apply immediately via the
 // amend_loan SECURITY DEFINER RPC (audited by loans.updated_at). Only the

@@ -1,0 +1,134 @@
+'use client'
+
+// In-place amount fix for a received loan repayment row on the /receipts
+// ledger (user 2026-09-03: "不能直接点开receipt 的单去edit?"). The RPC
+// adjusts the repayment, its GL entry, the bank cache and (for principal)
+// venture_pool + loan status atomically; ambiguous records error out and
+// the loan page's 撤销 + re-record path applies instead.
+
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { amendRepayment } from '../../fund-out/actions'
+
+export default function AmendRepaymentButton({
+  repaymentId,
+  currentAmount,
+  label,
+}: {
+  repaymentId: string
+  currentAmount: number
+  label: string
+}) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [amount, setAmount] = useState(currentAmount.toFixed(2))
+  const [reason, setReason] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [done, setDone] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  function submit() {
+    setError(null)
+    const n = parseFloat(amount)
+    if (!Number.isFinite(n) || n <= 0) return setError('金额必须大于 0')
+    if (Math.abs(n - currentAmount) < 0.005) return setError('金额没有改变')
+    if (!reason.trim()) return setError('写一句原因(会记进 GL 的审计注记)')
+    const fd = new FormData()
+    fd.set('repayment_id', repaymentId)
+    fd.set('new_amount', amount)
+    fd.set('reason', reason.trim())
+    startTransition(async () => {
+      const res = await amendRepayment(fd)
+      if (res.error) {
+        setError(res.error)
+        return
+      }
+      setDone(`改好了 — ${res.old?.toFixed(2)} → ${res.newAmount?.toFixed(2)},GL/银行已同步。`)
+      router.refresh()
+    })
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setOpen(true)
+          setDone(null)
+          setError(null)
+          setAmount(currentAmount.toFixed(2))
+        }}
+        className="ml-2 text-xs text-muted hover:text-accent font-serif italic"
+        title="金额录错用这个:直接改这笔还款的金额,GL/银行/池自动同步并留注记"
+      >
+        改金额
+      </button>
+
+      {open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/45 p-4" onClick={() => !isPending && setOpen(false)}>
+          <div className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-hairline">
+              <div className="font-serif italic text-accent text-sm">Amend repayment</div>
+              <div className="font-serif text-lg text-ink">改这笔还款的金额</div>
+              <p className="font-serif italic text-muted text-xs mt-1">
+                {label} · 现在 RM {currentAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}。
+                改完 GL 分录、银行余额(和本金的池记录)自动跟着调,全部留注记。
+                整笔录错要重来的话,去贷款页用「撤销」再重录。
+              </p>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              <div>
+                <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+                  正确金额 <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink font-mono tabular focus:outline-none focus:border-accent-border"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+                  原因 <span className="text-danger">*</span>
+                </label>
+                <input
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="e.g. 利息录错"
+                  className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
+                />
+              </div>
+              {error ? (
+                <div className="bg-danger/10 border border-danger/30 text-danger rounded-md px-3 py-2 text-sm font-sans">{error}</div>
+              ) : null}
+              {done ? (
+                <div className="bg-surface border border-hairline rounded-md px-3 py-2 text-sm font-sans text-ledger">{done}</div>
+              ) : null}
+            </div>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-hairline bg-surface rounded-b-lg">
+              <button
+                onClick={() => !isPending && setOpen(false)}
+                disabled={isPending}
+                className="text-sm font-sans text-muted hover:text-ink disabled:opacity-50"
+              >
+                {done ? 'Close' : 'Cancel'}
+              </button>
+              {!done ? (
+                <button
+                  onClick={submit}
+                  disabled={isPending}
+                  className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50"
+                >
+                  {isPending ? '改着…' : '确认改'}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
+  )
+}

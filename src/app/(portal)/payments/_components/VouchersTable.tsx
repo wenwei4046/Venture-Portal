@@ -4,6 +4,7 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
 import SortableTable from '@/components/SortableTable'
+import AmendRepaymentButton from './AmendRepaymentButton'
 
 /**
  * Row shape consumed by VouchersTable. The parent server page is
@@ -129,12 +130,24 @@ export default function VouchersTable({ rows }: { rows: VoucherRow[] }) {
           sortable: false,
           align: 'right',
           render: (v) => (
-            <Link
-              href={v.href ?? `/payments/${v.id}`}
-              className="text-sm text-accent hover:text-accent-hover font-serif italic"
-            >
-              View
-            </Link>
+            <span className="whitespace-nowrap">
+              <Link
+                href={v.href ?? `/payments/${v.id}`}
+                className="text-sm text-accent hover:text-accent-hover font-serif italic"
+              >
+                View
+              </Link>
+              {/* Synthetic loan-repayment rows (id 'rpy-<repayment uuid>') get
+                  an in-place amount fix (user 2026-09-03: "不能直接点开
+                  receipt 的单去edit?"). */}
+              {v.id.startsWith('rpy-') ? (
+                <AmendRepaymentButton
+                  repaymentId={v.id.slice(4)}
+                  currentAmount={v.amount}
+                  label={v.catLabel}
+                />
+              ) : null}
+            </span>
           ),
         },
       ]}
