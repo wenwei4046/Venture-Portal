@@ -1396,9 +1396,9 @@ const PAYROLL_DEPT_TO_SEGMENT: Record<string, PayrollSegment> = {
   HR: 'hr',
   Finance: 'finance',
   'Director Office': 'director_office',
-  IT: 'infotech',
+  IT: 'it',
 }
-const PAYROLL_DEPT_ORDER: PayrollSegment[] = ['hr', 'finance', 'director_office', 'infotech']
+const PAYROLL_DEPT_ORDER: PayrollSegment[] = ['hr', 'finance', 'director_office', 'it']
 
 export interface ConsolidatedCompanyPreview {
   companyId: string
@@ -1585,7 +1585,7 @@ interface OwnShareRpcRow {
   eis_amount: number | string
 }
 
-const OWN_SHARE_ORDER: PayrollSegment[] = ['hr', 'finance', 'director_office', 'director', 'infotech']
+const OWN_SHARE_ORDER: PayrollSegment[] = ['hr', 'finance', 'director_office', 'director', 'it']
 
 function groupOwnShareAllocation(rows: OwnShareRpcRow[]): DeptComponentGroup[] {
   const groups: DeptComponentGroup[] = []

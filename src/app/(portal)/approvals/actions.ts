@@ -22,8 +22,8 @@ const DEPT_POOL_GL: Record<string, string> = {
   HR: '1050',
   'Director Office': '1060',
   Director: '1070',
-  // IT provisioned 2026-09-03 via provision_full_department (segment
-  // 'infotech') — the RPC opened its pool equity account at 1100.
+  // IT provisioned 2026-09-03 via provision_full_department (segment 'it',
+  // renamed from the slug 'infotech') — pool equity account 1100.
   IT: '1100',
 }
 

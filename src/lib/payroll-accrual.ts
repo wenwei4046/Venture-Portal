@@ -106,7 +106,7 @@ const SEGMENT_BY_DEPT: Record<string, string> = {
   Finance: 'finance',
   Marketing: 'marketing',
   'Director Office': 'director_office',
-  IT: 'infotech',
+  IT: 'it',
 }
 
 const SEGMENT_LABEL: Record<string, string> = {
@@ -115,7 +115,7 @@ const SEGMENT_LABEL: Record<string, string> = {
   marketing: 'Marketing',
   director_office: 'Director Office',
   director: 'Director',
-  infotech: 'IT',
+  it: 'IT',
 }
 
 export interface AccrualPostResult {

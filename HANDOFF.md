@@ -335,6 +335,28 @@ file's verbatim statutory with recomputed JADUAL values — **31 of the 38 live
 rows move** if anyone runs a bulk `UPDATE hr_monthly_payroll SET x = x`. Do not
 do that without accounting for it.
 
+## SESSION 2026-09-03 (later) — IT segment RENAMED to 'it' + CONTS repayment fix
+
+1. **Segment renamed infotech → it** (user: "segment 不是infotech,而是真的叫
+   IT"; mig 20260903020000 APPLIED): ALTER TYPE gl_segment RENAME VALUE +
+   billing_mode 'infotech_attribution'→'it_attribution' + departments row.
+   RENAME VALUE rewrites stored rows in place, so the two issued Aug
+   consolidated invoices' 'infotech' lines followed automatically. TS wiring
+   files updated to 'it'; types regenerated. The provision RPC's 3-char slug
+   guard was why 'infotech' existed — future 2-char segment names need this
+   manual-rename route. NOTE: 'infotech' strings elsewhere in src are the HR
+   InfoTech FILE-IMPORT parsers (other session's work) — unrelated, untouched.
+2. **CONTS 1-Sep loan repayment corrected** (user keyed interest 4,360,
+   actual 3,600): repayments row → 3,600, JE-202609-0004 both legs + total →
+   3,600 with audit note, HL bank bumped −760. Principal 90,000 untouched;
+   interest never hits venture_pool so nothing else moved. Loan already
+   fully_repaid (status unchanged — total was over-recorded, not under).
+3. **Re-discovered**: void for RECEIVED loan repayments ALREADY EXISTS
+   (2026-08-20, void_loan_repayment RPC — mirror JE + is_reversed, bank
+   bump-down, venture_pool VOID counter for principal, repayments row delete,
+   fully_repaid un-flip). Button lives on the LOAN DETAIL page
+   (/fund-out/[id] repayments list). Told user: 以后自己 void + 重录即可.
+
 ## SESSION 2026-09-03 — IT department wired in (user: "接上")
 
 The deferred IT-payroll traps are CLOSED. IT had 1 staff on Aug'26 payroll

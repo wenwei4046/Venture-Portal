@@ -147,12 +147,13 @@ export function buildAllocationInvoiceLines(
  *  split payroll across subsidiaries + an HV own-share). Marketing is a direct
  *  cost centre — deliberately NOT here, so it's excluded from own-share
  *  inter-billing (user 2026-07). IT joined 2026-09-03 (user "接上") as
- *  segment 'infotech' — provisioned via the dept registry, pool 1100. */
-export type PayrollSegment = 'hr' | 'finance' | 'director_office' | 'director' | 'infotech'
+ *  segment 'it' (renamed from the provisioning slug 'infotech' same day,
+ *  user: "segment 不是infotech, 而是真的叫IT") — pool 1100. */
+export type PayrollSegment = 'hr' | 'finance' | 'director_office' | 'director' | 'it'
 
 /** The staff-attribution segments eligible for own-share → Venture (Office)
  *  inter-billing (excludes marketing). */
-export const OWN_SHARE_SEGMENTS: readonly PayrollSegment[] = ['hr', 'finance', 'director_office', 'director', 'infotech']
+export const OWN_SHARE_SEGMENTS: readonly PayrollSegment[] = ['hr', 'finance', 'director_office', 'director', 'it']
 
 export interface DeptComponentGroup {
   /** Display label for the group header, e.g. "HR", "Finance", "Director Office". */
@@ -184,7 +185,7 @@ export const PAYROLL_SEGMENT_LABEL: Record<PayrollSegment, string> = {
   finance: 'Finance',
   director_office: 'Director Office',
   director: 'Director',
-  infotech: 'IT',
+  it: 'IT',
 }
 
 /**
