@@ -346,10 +346,17 @@ bill to venture". HR's Aug allocation being empty is DELIBERATE, not a miss.
   still bills out instead of being silently dropped.
 - Funding unchanged: Stage-E already draws each dept's payroll from its own
   pool — HR's pool simply bears the cost with no recovery, like Marketing.
-- OPEN ITEM the user hasn't answered yet: Aug STAFF accrual JVs are missing
-  entirely (run was HR-direct-submitted 09-02; the accrual hook only fires on
-  the Principal-approval path). Offered: backfill Aug (all depts incl. IT) +
-  hook accrual onto the direct-submit path. Waiting for go-ahead.
+- Aug STAFF accruals: RESOLVED (user "要补记账"). Backfilled via
+  post_journal_entry SQL exactly matching buildAccrualLines —
+  JE-202608-0580..0584 (director_office 6,466.25 / finance 24,747.35 / hr
+  16,164.65 / it 4,841.53 / marketing 54,740.63; Σ 106,960.41 = employer
+  cost). And the CAUSE is fixed: submitToFinance (HR direct-submit,
+  hr-costing/payroll/actions.ts) now calls postPayrollAccrualJVs itself —
+  the Principal-approval hook never fires on that path since mig 278.
+  Bonus decode: the RM64,976.20 funding request = DIRECTOR payroll (run_id
+  NULL branch); RM102,118.88 = staff run. Both status 'submitted' = waiting
+  for FINANCE to generate PVs at /payments/payroll-requests (Stage E), THEN
+  Principal approves the PVs.
 
 ## SESSION 2026-09-03 (later) — IT segment RENAMED to 'it' + CONTS repayment fix
 

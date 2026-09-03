@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import {
@@ -9,6 +10,7 @@ import {
   type DerivedCommissionRow,
 } from '@/lib/commission/derived-commission'
 import { assertPeriodOpen } from '@/lib/period-lock'
+import { postPayrollAccrualJVs } from '@/lib/payroll-accrual'
 
 /**
  * HR submits the month's payroll straight to Finance — NO Principal approval.
@@ -30,6 +32,20 @@ export async function submitToFinance(period: string): Promise<void> {
 
   if (error) throw new Error(`Submit failed: ${error.message}`)
   if (!data) throw new Error('Submit failed: no run id returned')
+
+  // Post the per-segment staff accrual JVs HERE (2026-09-03): since mig 278
+  // the run lands directly in 'approved', so the Principal-approval page —
+  // which used to carry this call — never fires for the direct-submit path.
+  // August's staff accruals were missed entirely that way and had to be
+  // backfilled by hand (JE-202608-0580..0584). Idempotent per (period,
+  // segment); a genuine amount conflict with an existing JV fails LOUD, same
+  // as on the approval path — reverse the stale JV, then resubmit.
+  await postPayrollAccrualJVs(supabase as unknown as SupabaseClient, {
+    periodMonth: period,
+    kind: 'staff',
+    runId: data as string,
+    userId: user.id,
+  })
 
   revalidatePath('/hr-costing/payroll')
   revalidatePath('/billing')
