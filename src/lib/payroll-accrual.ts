@@ -98,11 +98,15 @@ export function sumPayrollRows(rows: PayrollRowLike[]): AccrualSums {
   return acc
 }
 
+// IT wired 2026-09-03 (user "接上"): before this, IT staff rows mapped to no
+// segment and postPayrollAccrualJVs silently DROPPED them — IT salary never
+// even reached the GL accrual.
 const SEGMENT_BY_DEPT: Record<string, string> = {
   HR: 'hr',
   Finance: 'finance',
   Marketing: 'marketing',
   'Director Office': 'director_office',
+  IT: 'infotech',
 }
 
 const SEGMENT_LABEL: Record<string, string> = {
@@ -111,6 +115,7 @@ const SEGMENT_LABEL: Record<string, string> = {
   marketing: 'Marketing',
   director_office: 'Director Office',
   director: 'Director',
+  infotech: 'IT',
 }
 
 export interface AccrualPostResult {

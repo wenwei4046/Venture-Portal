@@ -335,6 +335,40 @@ file's verbatim statutory with recomputed JADUAL values — **31 of the 38 live
 rows move** if anyone runs a bulk `UPDATE hr_monthly_payroll SET x = x`. Do not
 do that without accounting for it.
 
+## SESSION 2026-09-03 — IT department wired in (user: "接上")
+
+The deferred IT-payroll traps are CLOSED. IT had 1 staff on Aug'26 payroll
+(4,841.53 employer cost, allocated 50/50 to 2990 + CAR) and was silently
+dropped everywhere. Timing was perfect: Aug consolidated payroll invoices AND
+Aug staff accrual JVs had not been generated yet, so NO backfill was needed —
+the normal August cycle now includes IT. No earlier months had IT payroll.
+
+1. **Provisioned IT** via provision_full_department('IT', 'infotech') —
+   segment_key 'infotech' ('it' rejected, 3-char minimum), billing_mode
+   'infotech_attribution', pool equity account **1100**. Registry consumers
+   (invoice modes, settle pools, report rails, bridge, daily bank) pick it up
+   automatically.
+2. **TS hardcodes extended** (the payroll-specific maps registry can't reach):
+   staff-allocation.ts PayrollSegment/'OWN_SHARE_SEGMENTS'/PAYROLL_SEGMENT_LABEL
+   += infotech/'IT'; billing/actions.ts PAYROLL_DEPT_TO_SEGMENT (IT→infotech) +
+   PAYROLL_DEPT_ORDER + OWN_SHARE_ORDER; payroll-accrual.ts SEGMENT_BY_DEPT +
+   SEGMENT_LABEL (this was the worst trap — IT salary never even reached the
+   GL accrual); approvals/actions.ts DEPT_POOL_GL IT→'1100'.
+3. **get_payroll_breakdown_by_pool registry-driven** (mig 20260903010000,
+   APPLIED): was WHERE name IN (HR/Finance/Director Office/Marketing); now every
+   non-internal dept with segment_key (except director), pool_key =
+   'dept_pool_'||segment_key; legacy four always listed, new depts appear when
+   they have payroll. get_staff_own_share_allocation needed NO change (no dept
+   filter — the TS OWN_SHARE_SEGMENTS gate is the filter).
+4. database.types.ts regenerated (gl_segment now has 'infotech' + the other
+   session's commission tables). Also: next_account_code gap-fill fix earlier
+   today (mig 20260901010000) — 5999 at range top made revenue "exhausted";
+   user's new account 5000 Design Income created under 5030.
+5. Aug expectations when the user runs the cycle: staff accrual posts an
+   'infotech' JV; consolidated invoices to 2990 (2,420.77) + CAR (2,420.77)
+   carry IT lines; own-share = 0 for Aug (fully allocated); Stage-E funding
+   lists dept_pool_infotech (pool starts 0 → 预支 negative allowed at approval).
+
 ## SESSION 2026-08-29 — reassign-GL day + report ghost fixes + sidebar
 
 (Items 8–10 of the 2026-08-24 section below actually happened TODAY 08-29 —

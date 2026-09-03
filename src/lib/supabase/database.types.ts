@@ -7538,6 +7538,7 @@ export type Database = {
         | "venture_attribution"
         | "payroll_consolidated"
         | "revenue_department_attribution"
+        | "infotech_attribution"
       cash_flow_category: "operating" | "investing" | "financing"
       claim_status: "pending" | "approved" | "rejected" | "paid"
       claim_type: "project" | "benefit"
@@ -7604,6 +7605,7 @@ export type Database = {
         | "unallocated"
         | "director"
         | "revenue_department"
+        | "infotech"
       hr_employment_type: "salaried" | "commission_eligible"
       hr_monthly_payroll_source:
         | "imported"
@@ -7842,6 +7844,7 @@ export const Constants = {
         "venture_attribution",
         "payroll_consolidated",
         "revenue_department_attribution",
+        "infotech_attribution",
       ],
       cash_flow_category: ["operating", "investing", "financing"],
       claim_status: ["pending", "approved", "rejected", "paid"],
@@ -7916,6 +7919,7 @@ export const Constants = {
         "unallocated",
         "director",
         "revenue_department",
+        "infotech",
       ],
       hr_employment_type: ["salaried", "commission_eligible"],
       hr_monthly_payroll_source: [
