@@ -335,6 +335,40 @@ file's verbatim statutory with recomputed JADUAL values — **31 of the 38 live
 rows move** if anyone runs a bulk `UPDATE hr_monthly_payroll SET x = x`. Do not
 do that without accounting for it.
 
+## SESSION 2026-09-04 — 最低还息单 (minimum-pay-interest) for fund in/out
+
+User: "关于fund in 和 fund out 我想要set minimum pay interest" → clarified via
+questions: meaning = **每月至少要还利息** (principal may wait, the month's
+interest must be paid); per-record toggle; shown on repayment-schedule +
+who-hasn't-paid-enough tracking + statement note; interest on the ORIGINAL
+principal (跟现在 flat 一样), compound 单用余额算; NO recording-time warning.
+Commit 232ba87, deployed. Display/tracking only — zero GL impact.
+
+- **DB (mig 20260904010000)**: `loans.min_pay_interest` +
+  `fund_sources.min_pay_interest` (boolean default false) + RPCs
+  `set_loan_min_pay_interest` / `set_fund_source_min_pay_interest`
+  (SECURITY DEFINER, finance/principal gate — mirrors set_*_repayment_start).
+  Smoke-tested live as finance via users-table JWT DO block (NOT `profiles` —
+  the table here is `users`).
+- **lib/treasury-schedule.ts**: `minInterestStatus(due, paidInterest)` →
+  {due, paid, shortfall, met} with half-sen tolerance; 6 new vitest cases.
+- **/repayment-schedule**: new per-side "Minimum interest" tracking section on
+  the scheduled tab (NOT added to hero cash totals). due = flat 原额×月息 /
+  compound 余额×月息; paid = the month's interest-type repayments
+  (含 penalty/netting, same口径 as 已收行); respects 还款起始月
+  (resolveFirstDueYM) so first-month deals aren't chased; settled 单 skipped;
+  month-aware (?month=YYYY-MM works). Unmet rows sort first by shortfall.
+- **Set/unset**: checkbox on NewLoanForm + NewFundSourceForm (creation flags
+  update piggybacks the compound_interest post-create update);
+  MinPayInterestToggle on both [id] detail pages (saves on toggle, 旧单可补设).
+- **Company statement** (/reports/company-statement + xlsx/pdf export): flagged
+  positions carry "Min interest RM X/mo" chip / label bit
+  (PositionInput.minPayInterest → PositionRow.minPayInterest).
+- Gates: tsc ✓ · vitest 865 ✓ · next build ✓ · deploy Ready.
+- NOTE: no 单 is flagged yet — user will tick the ones with this arrangement
+  themselves. Don't chase shortfalls proactively (dont-audit-outstanding-debts
+  still applies; the tracker exists BECAUSE the user asked for it).
+
 ## POLICY 2026-09-03 — HR payroll is POOL-BORNE (like Marketing)
 
 User: "hr payroll 会用自己的pool,和marketing 一样,所以不用bill back,也不会
