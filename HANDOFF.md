@@ -335,6 +335,23 @@ file's verbatim statutory with recomputed JADUAL values — **31 of the 38 live
 rows move** if anyone runs a bulk `UPDATE hr_monthly_payroll SET x = x`. Do not
 do that without accounting for it.
 
+## SESSION 2026-09-04 (night) — Daily Bank row-total bug (client-blind dynamic columns)
+
+User screenshot: HLB Available row TOTAL footed 80,824.49 while the columns
+summed 75,982.96 — IT's (4,841.53) rendered in its cell but was missing from
+the row total. Cause: DailyBankView (client) called lib sumAmounts, whose
+EXTRA_DB_COLUMNS registry is set server-side only (empty in the browser), so
+row totals ignored every dynamic dept column. Fixed (commit cd152c3): view now
+sums over the payload `columns` (same source the cells render from) via local
+sumCols. PDF export route unaffected (server-side, registry set by
+fetchDailyBank in-request). Bottom Total available row was always right
+(server-computed). Same "IT missing from a hardcoded/stale list" disease as
+the submit RPC — when touching daily-bank code, keep client math on the
+payload columns. Also verified during diagnosis: user generated both payroll
+PVs 10:36 today (HV-PV-202609-0332 staff 109,770.21 incl. IT / 0333 director
+64,976.20, both pending Principal, from HLB); requests both pv_generated;
+today's receipts 99,422.12 legit.
+
 ## SESSION 2026-09-04 (evening) — 对数补差 reconcile & top-up feature
 
 User chose "make it a feature" over one-off SQL for the Aug under-billing
