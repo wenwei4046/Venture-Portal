@@ -7,7 +7,6 @@ import { formatMoneyBare } from '@/lib/utils'
 import {
   DB_COLUMNS,
   DB_COLUMN_LABELS,
-  sumAmounts,
   type BankDay,
   type SegAmounts,
 } from '@/lib/daily-bank'
@@ -20,6 +19,13 @@ let COLS: Array<{ key: string; label: string }> = DB_COLUMNS.map(k => ({
   key: k as string,
   label: DB_COLUMN_LABELS[k],
 }))
+
+// Row totals MUST sum over the payload columns, not lib sumAmounts: that
+// helper reads the server module's dynamic-column state, which is EMPTY in
+// the browser — with IT provisioned, the HLB Available row footed 4,841.53
+// high (user report 2026-09-04) while the cells themselves were right.
+const sumCols = (a: SegAmounts): number =>
+  Math.round(COLS.reduce((s, c) => s + (a[c.key] ?? 0), 0) * 100) / 100
 
 const money = (n: number) => formatMoneyBare(Math.abs(n))
 
@@ -262,7 +268,7 @@ function AmountRow({
         </td>
       ))}
       <td className={`text-right px-4 py-2 ${strong ? 'font-semibold' : ''}`}>
-        <Cell n={sumAmounts(amounts)} zeroDash={false} tone={tone} />
+        <Cell n={sumCols(amounts)} zeroDash={false} tone={tone} />
       </td>
     </tr>
   )
@@ -272,7 +278,7 @@ function BankMatrixRows({ b }: { b: BankDay }) {
   return (
     <>
       <AmountRow label={<b>{b.bankName} · Balance B/F</b>} amounts={b.bf} strong />
-      {sumAmounts(b.inToday) !== 0 ? (
+      {sumCols(b.inToday) !== 0 ? (
         <AmountRow label="· Received today" amounts={b.inToday} tone="text-ledger" />
       ) : null}
       {b.pending.map((p, i) => (
@@ -326,7 +332,7 @@ function BanksView({ data }: { data: DailyBankData }) {
           >
             <span className="font-serif text-base text-ink">{b.bankName}</span>
             <span className="font-mono text-sm text-ink">
-              Bank Balance&nbsp;&nbsp;<b>{formatMoneyBare(sumAmounts(b.current))}</b>
+              Bank Balance&nbsp;&nbsp;<b>{formatMoneyBare(sumCols(b.current))}</b>
             </span>
           </div>
           <table className="w-full text-[13px] font-mono tabular">
@@ -344,15 +350,15 @@ function BanksView({ data }: { data: DailyBankData }) {
                 <td className="px-5 py-1.5 font-sans text-ink">Balance B/F</td>
                 <td /><td /><td />
                 <td className="text-right px-5 py-1.5">
-                  <Cell n={sumAmounts(b.bf)} zeroDash={false} />
+                  <Cell n={sumCols(b.bf)} zeroDash={false} />
                 </td>
               </tr>
-              {sumAmounts(b.inToday) !== 0 ? (
+              {sumCols(b.inToday) !== 0 ? (
                 <tr className="border-b border-hairline">
                   <td className="px-5 py-1.5 font-sans text-ledger">Received today</td>
                   <td /><td />
                   <td className="text-right px-3 py-1.5 text-ledger">
-                    {formatMoneyBare(sumAmounts(b.inToday))}
+                    {formatMoneyBare(sumCols(b.inToday))}
                   </td>
                   <td />
                 </tr>
@@ -388,7 +394,7 @@ function BanksView({ data }: { data: DailyBankData }) {
                   Available (after pending)
                 </td>
                 <td className="text-right px-5 py-2 font-semibold">
-                  <Cell n={sumAmounts(b.available)} zeroDash={false} tone="text-ledger" />
+                  <Cell n={sumCols(b.available)} zeroDash={false} tone="text-ledger" />
                 </td>
               </tr>
             </tbody>
