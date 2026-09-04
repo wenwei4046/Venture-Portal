@@ -335,6 +335,42 @@ file's verbatim statutory with recomputed JADUAL values — **31 of the 38 live
 rows move** if anyone runs a bulk `UPDATE hr_monthly_payroll SET x = x`. Do not
 do that without accounting for it.
 
+## SESSION 2026-09-04 (later) — double-accrual postmortem + IT in funding request
+
+HR reopened + re-uploaded Aug payroll (08:13) and re-submitted (08:17): marketing
+54,740.63→56,980.63 (+2,240), director_office 6,466.25→7,036.05 (+569.80),
+finance/hr/it unchanged. The submit hook then DOUBLE-POSTED all five staff
+accruals (JE-202608-0585..0589 on top of backfilled 0580..0584). Commit 1cf6b71,
+mig 20260904020000, deployed. Root causes + fixes:
+
+- **RLS-blind idempotency check (my bug)**: postPayrollAccrualJVs read
+  journal_entries with the CALLER's client; je_select RLS wants treasury scope,
+  so the submitting HR user saw ZERO existing JVs → posted everything again.
+  Fixed: check now calls `get_payroll_accrual_totals(p_period)` (SECURITY
+  DEFINER, roles hr/finance/principal, segment::text). Verified as HR via
+  users-table JWT DO block: sees all 6 rows.
+- **Cleanup**: 0580..0584 reversed via mirror JEs 0590..0594
+  (post_journal_entry + mark_journal_entry_reversed pairs, dated 2026-08-31).
+  Active Aug accruals now exactly: staff 0585..0589 Σ109,770.21 (matches live
+  hr_monthly_payroll employer cost) + director 0564 64,976.20.
+- **IT missing from funding request**: submit_payroll_to_principal hardcoded 4
+  depts; payroll_runs.total_amount (GENERATED) excluded IT, so every staff
+  request was short by IT (Aug: 104,928.68 vs true 109,770.21 — July's
+  102,118.88 was equally short). Fixed: payroll_runs.it_opex_total column,
+  total_amount regenerated to include it, RPC sums IT dept. Live Aug run +
+  its submitted request patched to 109,770.21. BillingView hero pre-generation
+  total now includes it_opex_total (NO IT DeptCostCard — it_attribution rides
+  the registry path, deliberately left out of the legacy tile row).
+- Requests self-manage on reopen/resubmit (old ones auto-cancelled) — only
+  accruals lacked protection. reopen_payroll_run does NOT touch accrual JVs.
+- **防盗墙 pending user decision**: reopen_payroll_run allows role hr OR
+  principal — HR can reopen an APPROVED run alone (only a generated PV blocks
+  it). Proposed 甲: reopen → principal-only + auto-reverse that period's
+  accrual JVs on reopen; 乙: restore principal approval gate on submit (mig 278
+  removed it deliberately). Recommended 甲. Invoice deltas from the Aug
+  correction (DO +569.80 → 2990 +~188 / CAR +~188 / HC +~125, Σ~501) — user
+  will decide separately whether to bill.
+
 ## SESSION 2026-09-04 — 最低还息单 (minimum-pay-interest) for fund in/out
 
 User: "关于fund in 和 fund out 我想要set minimum pay interest" → clarified via
