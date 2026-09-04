@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { loanMonthlyInstallment, sumSchedule, isLoanUnscheduled, isBeforeFirstInstallment, compoundInterestState } from './treasury-schedule'
+import { loanMonthlyInstallment, sumSchedule, isLoanUnscheduled, isBeforeFirstInstallment, compoundInterestState, minInterestStatus } from './treasury-schedule'
 
 describe('isBeforeFirstInstallment', () => {
   // Regression 2026-06-10: The Cont 120k disbursed 10 Jun (1mo tenure) showed
@@ -113,5 +113,39 @@ describe('sumSchedule', () => {
       { principalDue: 1500, interestDue: 450, totalDue: 1950 },
     ])
     expect(t).toEqual({ principal: 9833.33, interest: 2450, total: 12283.33 })
+  })
+})
+
+describe('minInterestStatus (最低还息单)', () => {
+  it('nothing paid → full shortfall, not met', () => {
+    const s = minInterestStatus(2000, 0)
+    expect(s).toEqual({ due: 2000, paid: 0, shortfall: 2000, met: false })
+  })
+
+  it('partial interest paid → remaining shortfall', () => {
+    const s = minInterestStatus(2000, 500)
+    expect(s).toEqual({ due: 2000, paid: 500, shortfall: 1500, met: false })
+  })
+
+  it('paid exactly the minimum → met', () => {
+    const s = minInterestStatus(2000, 2000)
+    expect(s).toEqual({ due: 2000, paid: 2000, shortfall: 0, met: true })
+  })
+
+  it('overpaid → met, shortfall clamps at 0', () => {
+    const s = minInterestStatus(2000, 2600)
+    expect(s).toEqual({ due: 2000, paid: 2600, shortfall: 0, met: true })
+  })
+
+  it('sen rounding: within half a sen counts as met', () => {
+    // due 91.26 vs paid 91.255 → r2 both sides, no phantom 0.005 shortfall
+    const s = minInterestStatus(91.26, 91.255)
+    expect(s.met).toBe(true)
+    expect(s.shortfall).toBe(0)
+  })
+
+  it('zero-rate flagged record → trivially met', () => {
+    const s = minInterestStatus(0, 0)
+    expect(s).toEqual({ due: 0, paid: 0, shortfall: 0, met: true })
   })
 })

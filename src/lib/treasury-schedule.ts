@@ -113,6 +113,28 @@ export function compoundInterestState(i: CompoundInput): CompoundState {
   }
 }
 
+// ─── 最低还息单 (minimum-pay-interest, user 2026-09-04) ─────────────────────
+// Flagged loans / fund sources agree "principal may wait, but each month's
+// interest must be paid". due = that month's interest under the record's own
+// convention (flat: original × rate; compound: balance × rate); paid = the
+// month's interest-type repayments. Display/tracking only — never a GL figure.
+
+export interface MinInterestStatus {
+  due: number
+  paid: number
+  shortfall: number
+  met: boolean
+}
+
+export function minInterestStatus(due: number, paidInterest: number): MinInterestStatus {
+  const d = r2(due)
+  const p = r2(paidInterest)
+  const shortfall = Math.max(0, r2(d - p))
+  // Half-a-sen tolerance so r2 artifacts never show a phantom RM0.00 差额.
+  const met = shortfall <= 0.005
+  return { due: d, paid: p, shortfall: met ? 0 : shortfall, met }
+}
+
 export interface ScheduleTotals {
   principal: number
   interest: number

@@ -332,6 +332,23 @@ export default function NewLoanForm({ companies, baseRate, bsAccounts, banks }: 
         </p>
       </div>
 
+      {/* ───────── 最低还息 · Minimum pay interest (2026-09-04) ───────── */}
+      <div className="mb-6">
+        <label className="flex items-center gap-2">
+          <input
+            id="min_pay_interest"
+            name="min_pay_interest"
+            type="checkbox"
+            className="h-4 w-4 accent-[var(--accent)]"
+          />
+          <span className="text-sm font-sans font-medium text-graphite">最低还息 · Minimum pay interest</span>
+        </label>
+        <p className="font-serif italic text-muted text-xs mt-1.5">
+          勾选后代表约定「本金可以慢慢还，但每月利息一定要还」。Repayment schedule
+          会追踪当月利息收齐了没有，statement 上也会注明。
+        </p>
+      </div>
+
       {/* ───────── Interest preview ───────── */}
       {selectedCompany ? (
         <div className="mb-6 font-serif italic text-graphite text-sm">

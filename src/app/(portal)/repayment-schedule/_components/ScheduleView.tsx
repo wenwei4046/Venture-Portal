@@ -50,6 +50,20 @@ export interface CompoundTotals {
   thisMonthInterest: number
 }
 
+/** 最低还息单 (2026-09-04): flagged loans / fund sources where the deal is
+ *  "principal may wait, but each month's interest must be paid". */
+export interface MinInterestRow {
+  key: string
+  counterparty: string
+  detail: string
+  /** This month's interest under the record's own convention. */
+  due: number
+  /** Interest-type repayments recorded in the month. */
+  paid: number
+  shortfall: number
+  met: boolean
+}
+
 type Mode = 'all' | 'outstanding'
 // 'scheduled' = the cash actually due this month (feeds the hero totals);
 // 'reference' = compounding 挂账 + no-fixed-term items, which are excluded
@@ -63,6 +77,8 @@ function r2(n: number): number {
 export default function ScheduleView({
   monthLabel,
   collectRows,
+  collectMin,
+  repayMin,
   collectNoTerm,
   collectNoTermOutstanding,
   collectNoTermInterest,
@@ -77,6 +93,8 @@ export default function ScheduleView({
 }: {
   monthLabel: string
   collectRows: SchedRow[]
+  collectMin: MinInterestRow[]
+  repayMin: MinInterestRow[]
   collectNoTerm: NoTermRow[]
   collectNoTermOutstanding: number
   collectNoTermInterest: number
@@ -165,6 +183,24 @@ export default function ScheduleView({
             </button>
           </div>
 
+          {/* 最低还息单 — minimum-interest tracking (2026-09-04) */}
+          {collectMin.length > 0 || repayMin.length > 0 ? (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-10">
+              <MinInterestSection
+                title="Minimum interest — to collect"
+                rows={collectMin}
+                paidLabel="Received"
+                monthLabel={monthLabel}
+              />
+              <MinInterestSection
+                title="Minimum interest — to repay"
+                rows={repayMin}
+                paidLabel="Paid"
+                monthLabel={monthLabel}
+              />
+            </div>
+          ) : null}
+
           {/* Side-by-side on wide screens: collect left, repay right */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-10">
             <ScheduleSection title="To collect — scheduled loans" rows={collectVisible} tone="credit" monthLabel={monthLabel} />
@@ -245,6 +281,82 @@ function SourceChip({ source }: { source?: string | null }) {
     >
       SC {source}
     </span>
+  )
+}
+
+/** 最低还息单 — deals where principal may wait but the month's interest must be
+ *  paid. Tracking only: these figures are NOT added to the hero cash totals. */
+function MinInterestSection({
+  title,
+  rows,
+  paidLabel,
+  monthLabel,
+}: {
+  title: string
+  rows: MinInterestRow[]
+  paidLabel: 'Received' | 'Paid'
+  monthLabel: string
+}) {
+  if (rows.length === 0) return null
+  const due = rows.reduce((s, r) => r2(s + r.due), 0)
+  const paid = rows.reduce((s, r) => r2(s + r.paid), 0)
+  const short = rows.reduce((s, r) => r2(s + r.shortfall), 0)
+  return (
+    <section className="mb-12 max-w-4xl">
+      <div className="sect-head">
+        <h2>{title}</h2>
+        <span className="rule" aria-hidden />
+        <span className={`count ${short > 0 ? 'text-danger' : 'text-ledger'}`}>
+          {short > 0 ? `short ${formatMoney(short)}` : 'all met ✓'}
+        </span>
+      </div>
+      <p className="font-serif italic text-muted text-xs mb-3">
+        最低还息单 — 本金可以慢慢还，但当月利息一定要{paidLabel === 'Received' ? '收' : '付'}齐。
+        Not counted in the cash totals above.
+      </p>
+      <table className="ledger-table">
+        <thead>
+          <tr>
+            <th>Counterparty</th>
+            <th className="num">Min interest</th>
+            <th className="num">{paidLabel} · {monthLabel}</th>
+            <th className="num">Short 还差</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key}>
+              <td>
+                <div className="font-serif text-md text-ink">
+                  {r.counterparty}
+                  {r.met ? (
+                    <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-ledger border border-hairline rounded px-1.5 py-0.5">Met ✓</span>
+                  ) : (
+                    <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-danger border border-hairline rounded px-1.5 py-0.5">Short</span>
+                  )}
+                </div>
+                <div className="font-mono text-xs text-muted">{r.detail}</div>
+              </td>
+              <td className="num">{formatMoney(r.due)}</td>
+              <td className="num">{formatMoney(r.paid)}</td>
+              <td className={`num font-medium ${r.met ? 'text-ledger' : 'text-danger'}`}>
+                {r.met ? '—' : formatMoney(r.shortfall)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="border-t-2 border-hairline">
+            <td className="font-serif italic text-ink font-medium">Subtotal</td>
+            <td className="num font-semibold">{formatMoney(due)}</td>
+            <td className="num font-semibold">{formatMoney(paid)}</td>
+            <td className={`num font-semibold ${short > 0 ? 'text-danger' : 'text-ledger'}`}>
+              {short > 0 ? formatMoney(short) : '—'}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </section>
   )
 }
 

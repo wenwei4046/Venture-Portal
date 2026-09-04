@@ -172,17 +172,20 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
     return { error: `Failed to create loan: ${rpcError?.message ?? 'unknown'}` }
   }
 
-  // 利滚利 — compound interest, settable at creation (2026-06-12; was edit-only).
-  // The RPC doesn't take it, so flag the just-created loan. Safe: it's still
-  // pending_approval (no GL/cash yet), and compounding only affects the
-  // schedule/accrual math, not the disbursement.
-  if (formData.get('compound_interest') === 'on') {
+  // 利滚利 / 最低还息 — settable at creation (2026-06-12 / 2026-09-04). The RPC
+  // doesn't take them, so flag the just-created loan. Safe: it's still
+  // pending_approval (no GL/cash yet), and both flags only affect the
+  // schedule/tracking math, not the disbursement.
+  const creationFlags: { compound_interest?: boolean; min_pay_interest?: boolean } = {}
+  if (formData.get('compound_interest') === 'on') creationFlags.compound_interest = true
+  if (formData.get('min_pay_interest') === 'on') creationFlags.min_pay_interest = true
+  if (Object.keys(creationFlags).length > 0) {
     const { error: cErr } = await supabase
       .from('loans')
-      .update({ compound_interest: true })
+      .update(creationFlags)
       .eq('id', loanId as string)
       .eq('status', 'pending_approval')
-    if (cErr) return { error: `Loan created but marking 利滚利 failed: ${cErr.message}` }
+    if (cErr) return { error: `Loan created but marking 利滚利/最低还息 failed: ${cErr.message}` }
   }
 
   revalidatePath('/fund-out')
@@ -442,6 +445,31 @@ export async function setLoanRepaymentStart(
   revalidatePath(`/fund-out/${id}`)
   revalidatePath('/reports/loan-aging')
   revalidatePath('/repayment-schedule')
+  return undefined
+}
+
+// ─── 最低还息单 toggle (user 2026-09-04) ─────────────────────────────────────
+// Flagged = "本金可以慢慢还，但每月利息一定要还". Drives the minimum-interest
+// tracking on /repayment-schedule and the note on the company statement.
+// Display/tracking metadata only — no GL impact.
+export async function setLoanMinPayInterest(
+  id: string,
+  value: boolean
+): Promise<{ error: string } | undefined> {
+  await requirePermission('treasury')
+  const supabase = await createClient()
+
+  if (!id) return { error: 'Loan id is required' }
+
+  const { error } = await supabase.rpc('set_loan_min_pay_interest' as never, {
+    p_loan_id: id,
+    p_value: value,
+  } as never)
+  if (error) return { error: `保存失败: ${error.message}` }
+
+  revalidatePath(`/fund-out/${id}`)
+  revalidatePath('/repayment-schedule')
+  revalidatePath('/reports/company-statement')
   return undefined
 }
 

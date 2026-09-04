@@ -9,6 +9,7 @@ import { cancelLoan } from '../actions'
 import RepaymentForm from '../_components/RepaymentForm'
 import FundingSourceEditor from './_components/FundingSourceEditor'
 import RepaymentStartEditor from './_components/RepaymentStartEditor'
+import MinPayInterestToggle from './_components/MinPayInterestToggle'
 import VoidRepaymentButton from './_components/VoidRepaymentButton'
 import LedgerRow from '@/components/LedgerRow'
 
@@ -319,6 +320,11 @@ export default async function LoanDetailPage({ params }: Props) {
               ? dayjs(`${(loan.disbursement_date as string).slice(0, 7)}-01`).add(1, 'month').format('YYYY-MM')
               : 'the month after disbursement'
           }
+        />
+
+        <MinPayInterestToggle
+          loanId={loan.id}
+          current={(loan as { min_pay_interest?: boolean }).min_pay_interest === true}
         />
       </section>
 

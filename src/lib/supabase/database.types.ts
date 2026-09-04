@@ -3742,6 +3742,7 @@ export type Database = {
           id: string
           lock_in_months: number | null
           maturity_date: string | null
+          min_pay_interest: boolean
           notes: string | null
           penalty_on_early: number | null
           repaid_at: string | null
@@ -3771,6 +3772,7 @@ export type Database = {
           id?: string
           lock_in_months?: number | null
           maturity_date?: string | null
+          min_pay_interest?: boolean
           notes?: string | null
           penalty_on_early?: number | null
           repaid_at?: string | null
@@ -3800,6 +3802,7 @@ export type Database = {
           id?: string
           lock_in_months?: number | null
           maturity_date?: string | null
+          min_pay_interest?: boolean
           notes?: string | null
           penalty_on_early?: number | null
           repaid_at?: string | null
@@ -4820,6 +4823,7 @@ export type Database = {
           disbursement_date: string | null
           effective_rate: number
           id: string
+          min_pay_interest: boolean
           principal: number
           repayment_start_month: string | null
           repayment_terms: string | null
@@ -4840,6 +4844,7 @@ export type Database = {
           disbursement_date?: string | null
           effective_rate: number
           id?: string
+          min_pay_interest?: boolean
           principal: number
           repayment_start_month?: string | null
           repayment_terms?: string | null
@@ -4860,6 +4865,7 @@ export type Database = {
           disbursement_date?: string | null
           effective_rate?: number
           id?: string
+          min_pay_interest?: boolean
           principal?: number
           repayment_start_month?: string | null
           repayment_terms?: string | null
@@ -6858,6 +6864,10 @@ export type Database = {
         Args: { p_loan_id: string; p_payload: Json }
         Returns: undefined
       }
+      amend_loan_repayment: {
+        Args: { p_new_amount: number; p_reason: string; p_repayment_id: string }
+        Returns: Json
+      }
       apply_commission_run: { Args: { p_run_id: string }; Returns: Json }
       apply_pool_adjustment: {
         Args: {
@@ -7421,6 +7431,10 @@ export type Database = {
         Returns: string
       }
       save_director_salary_results: { Args: { p_data: Json }; Returns: Json }
+      set_fund_source_min_pay_interest: {
+        Args: { p_fund_source_id: string; p_value: boolean }
+        Returns: undefined
+      }
       set_fund_source_notes: {
         Args: { p_fund_source_id: string; p_notes: string }
         Returns: undefined
@@ -7431,6 +7445,10 @@ export type Database = {
       }
       set_loan_funding_source: {
         Args: { p_loan_id: string; p_source: string }
+        Returns: undefined
+      }
+      set_loan_min_pay_interest: {
+        Args: { p_loan_id: string; p_value: boolean }
         Returns: undefined
       }
       set_loan_repayment_start: {

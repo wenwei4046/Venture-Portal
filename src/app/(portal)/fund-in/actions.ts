@@ -163,6 +163,8 @@ export async function createFundSource(formData: FormData) {
   const cost_rate = raw.cost_rate_percent / 100
   // 利滚利 — compound interest, settable at creation (2026-06-12; was edit-only).
   const compound = formData.get('compound_interest') === 'on'
+  // 最低还息 — minimum-pay-interest flag, settable at creation (2026-09-04).
+  const minPayInterest = formData.get('min_pay_interest') === 'on'
 
   const basePayload = {
     source_type: raw.source_type,
@@ -170,6 +172,7 @@ export async function createFundSource(formData: FormData) {
     amount: raw.amount,
     cost_rate,
     compound_interest: compound,
+    min_pay_interest: minPayInterest,
     // Blank → null (无固定期限). NaN (blank number) is falsy → null.
     lock_in_months: !isNaN(raw.lock_in_months) && raw.lock_in_months >= 1 ? raw.lock_in_months : null,
     effective_date: raw.effective_date,
@@ -447,6 +450,31 @@ export async function setFundSourceRepaymentStart(
   revalidatePath(`/fund-in/${id}`)
   revalidatePath('/reports/loan-aging')
   revalidatePath('/repayment-schedule')
+  return undefined
+}
+
+// ─── 最低还息单 toggle (user 2026-09-04) ─────────────────────────────────────
+// Flagged = "本金可以慢慢还，但每月利息一定要付". Drives the minimum-interest
+// tracking on /repayment-schedule and the note on the company statement.
+// Display/tracking metadata only — no GL impact.
+export async function setFundSourceMinPayInterest(
+  id: string,
+  value: boolean
+): Promise<{ error: string } | undefined> {
+  await requirePermission('treasury')
+  const supabase = await createClient()
+
+  if (!id) return { error: 'Fund source id is required' }
+
+  const { error } = await supabase.rpc('set_fund_source_min_pay_interest' as never, {
+    p_fund_source_id: id,
+    p_value: value,
+  } as never)
+  if (error) return { error: `保存失败: ${error.message}` }
+
+  revalidatePath(`/fund-in/${id}`)
+  revalidatePath('/repayment-schedule')
+  revalidatePath('/reports/company-statement')
   return undefined
 }
 

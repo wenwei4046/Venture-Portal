@@ -127,6 +127,14 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
                     {item.startYM ? ` · starts ${item.startYM}` : ''}
                   </span>
                   <SourceBadge source={item.source} side={item.side} />
+                  {item.minPayInterest ? (
+                    <span
+                      className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
+                      title="最低还息单 — 本金可以慢慢还，但每月利息一定要还"
+                    >
+                      Min interest RM {formatMoneyBare(item.monthlyInterest)}/mo
+                    </span>
+                  ) : null}
                 </td>
                 <td className="py-1.5 px-3 text-right font-mono tabular text-graphite hidden md:table-cell">
                   {formatMoneyBare(item.principal)}

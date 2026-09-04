@@ -37,6 +37,8 @@ function positionLabel(item: PositionRow): string {
         : `${item.tenureMonths}mo`
   const bits = [`${parseFloat((item.monthlyRate * 100).toFixed(3))}%/mo`, kind]
   if (item.startYM) bits.push(`starts ${item.startYM}`)
+  // 最低还息单 — the agreed monthly-interest floor travels on the export too.
+  if (item.minPayInterest) bits.push(`min interest ${money(item.monthlyInterest)}/mo`)
   // collect: SC = funding source remark; repay: where the money was lent on.
   if (item.source) {
     const src = item.source.length > 24 ? `${item.source.slice(0, 24)}…` : item.source

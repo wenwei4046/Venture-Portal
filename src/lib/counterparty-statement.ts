@@ -57,6 +57,8 @@ export interface PositionInput {
   outstanding: number
   /** Total repaid (all types) per calendar month — compounding roll-forward. */
   paymentsByMonth: Record<string, number>
+  /** 最低还息单 (2026-09-04) — the deal requires each month's interest paid. */
+  minPayInterest?: boolean
   source?: string | null
 }
 
@@ -79,6 +81,8 @@ export interface PositionRow {
   finishYM: string | null
   /** First installment month (agreed start, else start date + 1). */
   startYM: string | null
+  /** 最低还息单 — statement notes "每月最低应还利息 = monthlyInterest". */
+  minPayInterest: boolean
   source?: string | null
 }
 
@@ -97,6 +101,7 @@ export function buildPositionRow(p: PositionInput, currentYM: string): PositionR
     principalOutstanding: r2(p.outstanding),
     monthlyInterest,
     startYM,
+    minPayInterest: p.minPayInterest === true,
     source: p.source ?? null,
   }
 
