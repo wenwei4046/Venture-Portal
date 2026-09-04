@@ -56,10 +56,37 @@ export default function DailyBankView({ data, today }: { data: DailyBankData; to
     const node = captureRef.current
     if (!node) return null
     const { toBlob } = await import('html-to-image')
-    return toBlob(node, {
-      pixelRatio: 2,
-      backgroundColor: getComputedStyle(document.body).backgroundColor || '#faf5ea',
-    })
+    // The matrix lives in an overflow-x-auto wrapper: on a narrow window a
+    // plain capture clips the scrolled-out columns (user 2026-09-04: export
+    // 照片会 hide 掉右边). Expand the node + scroll wrappers to full content
+    // width for the shot, restore afterwards whatever happens.
+    const scrollers = Array.from(node.querySelectorAll<HTMLElement>('.overflow-x-auto'))
+    const fullWidth = Math.max(node.scrollWidth, ...scrollers.map(s => s.scrollWidth))
+    const restore: Array<() => void> = []
+    if (fullWidth > node.clientWidth) {
+      const prevNode = { width: node.style.width, maxWidth: node.style.maxWidth }
+      node.style.width = `${fullWidth}px`
+      node.style.maxWidth = 'none'
+      restore.push(() => {
+        node.style.width = prevNode.width
+        node.style.maxWidth = prevNode.maxWidth
+      })
+      for (const s of scrollers) {
+        const prev = s.style.overflowX
+        s.style.overflowX = 'visible'
+        restore.push(() => {
+          s.style.overflowX = prev
+        })
+      }
+    }
+    try {
+      return await toBlob(node, {
+        pixelRatio: 2,
+        backgroundColor: getComputedStyle(document.body).backgroundColor || '#faf5ea',
+      })
+    } finally {
+      restore.forEach(f => f())
+    }
   }
 
   const downloadPng = async () => {
