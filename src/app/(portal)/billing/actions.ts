@@ -21,6 +21,12 @@ import {
   type DeptComponentGroup,
   type PayrollSegment,
 } from '@/lib/staff-allocation'
+import {
+  computeBillingDeltas,
+  type CompanyBillingDelta,
+  type ShouldBillRow,
+  type BilledRow,
+} from '@/lib/payroll-billing-delta'
 
 // Payer-side inter-billing splits BY NATURE (user 2026-07-24): the paying
 // dept's expense JE debits what the charge actually was — rent share → 9094,
@@ -1560,6 +1566,222 @@ export async function generateConsolidatedPayrollInvoices(
   revalidatePath('/billing')
   revalidatePath('/statements')
   return { generated: generatedCompanies.length, companies: generatedCompanies }
+}
+
+// ─── 对数补差 · Payroll billing reconciliation (user 2026-09-04) ─────────────
+// Born from the Aug'26 case: HR corrected payroll AFTER the consolidated
+// invoices were issued (Director Office +569.80), leaving three subsidiaries
+// under-billed by 497.39 total. This compares live allocation vs what the
+// period's issued/paid consolidated invoices billed, per segment, and tops up
+// the gap with ONE adjustment invoice per company in the SAME consolidated
+// format (per-segment lines → identical issue/settle/P&L routing). Over-billed
+// segments are report-only: consolidated invoices take no credit notes.
+
+const ADJUSTMENT_MARKER = '· adjustment'
+const BILLED_STATUSES = ['issued', 'paid', 'paid_via_netting'] as const
+
+async function loadPayrollBillingDeltas(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  period: string,
+): Promise<CompanyBillingDelta[]> {
+  const [{ data: alloc, error: allocErr }, { data: invs, error: invErr }, { data: cos }] =
+    await Promise.all([
+      supabase.rpc('get_staff_billing_allocation', { p_period_month: period }),
+      supabase
+        .from('invoices')
+        .select('id, company_id')
+        .eq('period_month', period)
+        .eq('billing_mode', 'payroll_consolidated')
+        .eq('billable_to_type', 'subsidiary')
+        .in('status', [...BILLED_STATUSES]),
+      supabase.from('companies').select('id, short_code, name'),
+    ])
+  if (allocErr) throw new Error(`Failed to load payroll allocation: ${allocErr.message}`)
+  if (invErr) throw new Error(`Failed to load consolidated invoices: ${invErr.message}`)
+
+  const should: ShouldBillRow[] = []
+  for (const r of (alloc ?? []) as unknown as AllocationRpcRow[]) {
+    if (!r.company_id) continue // HV own-share — never billed to a subsidiary
+    const seg = PAYROLL_DEPT_TO_SEGMENT[r.department_name]
+    if (!seg) continue
+    should.push({
+      companyId: r.company_id,
+      shortCode: r.company_short_code,
+      name: r.company_name,
+      segment: seg,
+      deptLabel: PAYROLL_SEGMENT_LABEL[seg],
+      amount:
+        Number(r.salary_amount ?? 0) +
+        Number(r.allowance_amount ?? 0) +
+        Number(r.epf_amount ?? 0) +
+        Number(r.socso_amount ?? 0) +
+        Number(r.eis_amount ?? 0),
+    })
+  }
+
+  const invoiceIds = (invs ?? []).map((i) => i.id as string)
+  const companyByInvoice = new Map((invs ?? []).map((i) => [i.id as string, i.company_id as string]))
+  const billed: BilledRow[] = []
+  if (invoiceIds.length > 0) {
+    const { data: lines, error: linesErr } = await supabase
+      .from('invoice_lines')
+      .select('invoice_id, segment, amount')
+      .in('invoice_id', invoiceIds)
+    if (linesErr) throw new Error(`Failed to load invoice lines: ${linesErr.message}`)
+    for (const l of lines ?? []) {
+      const companyId = companyByInvoice.get(l.invoice_id as string)
+      if (!companyId || !l.segment) continue
+      billed.push({ companyId, segment: l.segment as string, amount: Number(l.amount) })
+    }
+  }
+
+  const companyMetaById = new Map(
+    (cos ?? []).map((c) => [
+      c.id as string,
+      { shortCode: ((c.short_code as string | null) ?? (c.name as string)) || '—', name: c.name as string },
+    ]),
+  )
+  return computeBillingDeltas(should, billed, PAYROLL_SEGMENT_LABEL, companyMetaById)
+}
+
+/** Read-only preview: per-company 已开 vs 应开 vs 差额 for the period. */
+export async function fetchPayrollBillingDelta(
+  periodMonth: string,
+): Promise<CompanyBillingDelta[]> {
+  await requirePermission('billing')
+  const supabase = await createClient()
+  const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
+  return loadPayrollBillingDeltas(supabase, period)
+}
+
+/** Create one DRAFT adjustment invoice per under-billed subsidiary (same
+ *  payroll_consolidated format as the originals). Deltas are recomputed
+ *  server-side; the client's preview is display-only. */
+export async function generatePayrollAdjustmentInvoices(
+  periodMonth: string,
+): Promise<{ generated: string[]; overBilled: string[]; missingInvoice: string[] }> {
+  const user = await requirePermission('billing')
+  const supabase = await createClient()
+  const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
+  await assertPeriodOpen(supabase, period)
+
+  const deltas = await loadPayrollBillingDeltas(supabase, period)
+  const eligible = deltas.filter((d) => d.hasIssuedInvoice && d.positiveTotal > 0.005)
+  const overBilled = deltas.filter((d) => d.negatives.length > 0).map((d) => d.shortCode)
+  const missingInvoice = deltas
+    .filter((d) => !d.hasIssuedInvoice && d.positiveTotal > 0.005)
+    .map((d) => d.shortCode)
+  if (eligible.length === 0) {
+    throw new Error('没有需要补开的差额 — nothing under-billed on issued invoices for this period.')
+  }
+
+  // Adjustment lines reuse the category the originals were issued with. Refuse
+  // on ambiguity rather than guessing a P&L account.
+  const { data: origInvs, error: origErr } = await supabase
+    .from('invoices')
+    .select('id')
+    .eq('period_month', period)
+    .eq('billing_mode', 'payroll_consolidated')
+    .eq('billable_to_type', 'subsidiary')
+    .in('status', [...BILLED_STATUSES])
+  if (origErr) throw new Error(`Failed to load original invoices: ${origErr.message}`)
+  const origIds = (origInvs ?? []).map((r) => r.id as string)
+  const { data: catRows, error: catErr } = origIds.length
+    ? await supabase.from('invoice_lines').select('category_code').in('invoice_id', origIds)
+    : { data: [], error: null }
+  if (catErr) throw new Error(`Failed to read original invoice categories: ${catErr.message}`)
+  const categories = [...new Set((catRows ?? []).map((r) => r.category_code as string | null).filter(Boolean))]
+  if (categories.length !== 1) {
+    throw new Error(
+      `原发票的 revenue category 不唯一 (${categories.join(', ') || 'none'}) — 无法自动选账，请找 Finance 手动处理。`,
+    )
+  }
+  const category = categories[0] as string
+
+  const periodShort = periodShortLabel(period)
+  const description = `Payroll cost share — ${periodShort} ${ADJUSTMENT_MARKER}`
+
+  // Idempotent: re-running replaces prior UN-issued adjustment drafts.
+  const { data: priorDrafts } = await supabase
+    .from('invoices')
+    .select('id')
+    .eq('period_month', period)
+    .eq('billing_mode', 'payroll_consolidated')
+    .eq('status', 'draft')
+    .eq('description', description)
+  const priorIds = (priorDrafts ?? []).map((r) => r.id as string)
+  if (priorIds.length > 0) {
+    await supabase.from('invoice_lines').delete().in('invoice_id', priorIds)
+    await supabase.from('invoices').delete().in('id', priorIds).eq('status', 'draft')
+  }
+
+  const invoiceDate = dayjs(period).endOf('month').format('YYYY-MM-DD')
+  const generated: string[] = []
+  for (const d of eligible) {
+    const lines = d.segments
+      .filter((s) => s.delta > 0.005)
+      .map((s) => ({
+        description: `${s.deptLabel} payroll adjustment - ${periodShort}`,
+        amount: Math.round(s.delta * 100) / 100,
+        segment: s.segment as PayrollSegment,
+      }))
+    const total = Math.round(lines.reduce((s, l) => s + l.amount, 0) * 100) / 100
+    if (lines.length === 0 || total <= 0) continue
+
+    const { data: invoiceNo, error: mintErr } = await supabase.rpc('mint_invoice_no', {
+      p_period: period,
+    })
+    if (mintErr || !invoiceNo) {
+      throw new Error(`Failed to mint invoice number: ${mintErr?.message ?? 'unknown'}`)
+    }
+
+    const { data: created, error: invErr } = await supabase
+      .from('invoices')
+      .insert({
+        invoice_no: invoiceNo as string,
+        period_month: period,
+        billing_mode: 'payroll_consolidated',
+        category_code: null, // issue fans out per line, same as the originals
+        base_amount: total,
+        total_amount: total,
+        status: 'draft',
+        invoice_date: invoiceDate,
+        due_date: null,
+        description,
+        created_by: user.id,
+        billable_to_type: 'subsidiary',
+        company_id: d.companyId,
+      })
+      .select('id')
+      .single()
+    if (invErr || !created) {
+      throw new Error(
+        `Failed to create adjustment invoice for ${d.shortCode}: ${invErr?.message ?? 'unknown'}`,
+      )
+    }
+
+    const { error: linesErr } = await supabase.from('invoice_lines').insert(
+      lines.map((l, i) => ({
+        invoice_id: created.id,
+        line_no: i + 1,
+        description: l.description,
+        amount: l.amount,
+        category_code: category,
+        segment: l.segment,
+      })),
+    )
+    if (linesErr) {
+      await supabase.from('invoices').delete().eq('id', created.id).eq('status', 'draft')
+      throw new Error(
+        `Failed to insert lines for ${d.shortCode} (rolled back): ${linesErr.message}`,
+      )
+    }
+    generated.push(`${invoiceNo as string} (${d.shortCode} +${total.toFixed(2)})`)
+  }
+
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+  return { generated, overBilled, missingInvoice }
 }
 
 // ─── Own-share inter-billing to Venture (Office) (2026-07) ───────────────────

@@ -19,6 +19,7 @@ import { fetchPaidByInvoice } from '@/lib/debtor-aging-data'
 import CreateInvoiceButton from './CreateInvoiceButton'
 import CreateMultiLineInvoiceButton from './CreateMultiLineInvoiceButton'
 import GenerateConsolidatedInvoicesButton from './GenerateConsolidatedInvoicesButton'
+import ReconcilePayrollBillingButton from './ReconcilePayrollBillingButton'
 import GenerateOwnShareInvoiceButton from './GenerateOwnShareInvoiceButton'
 import LedgerRow from '@/components/LedgerRow'
 
@@ -478,6 +479,7 @@ export default async function BillingView({ searchParams }: Props) {
                 currentPeriod={period}
                 categories={categoryList}
               />
+              <ReconcilePayrollBillingButton currentPeriod={period} />
               <GenerateOwnShareInvoiceButton
                 currentPeriod={period}
                 categories={categoryList}
