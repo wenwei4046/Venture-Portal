@@ -5569,6 +5569,7 @@ export type Database = {
           finance_opex_total: number
           hr_opex_total: number
           id: string
+          it_opex_total: number
           marketing_opex_total: number
           paid_at: string | null
           period_month: string
@@ -5590,6 +5591,7 @@ export type Database = {
           finance_opex_total?: number
           hr_opex_total?: number
           id?: string
+          it_opex_total?: number
           marketing_opex_total?: number
           paid_at?: string | null
           period_month: string
@@ -5611,6 +5613,7 @@ export type Database = {
           finance_opex_total?: number
           hr_opex_total?: number
           id?: string
+          it_opex_total?: number
           marketing_opex_total?: number
           paid_at?: string | null
           period_month?: string
@@ -7192,6 +7195,13 @@ export type Database = {
           total_basic: number
           total_ctc: number
           total_statutory: number
+        }[]
+      }
+      get_payroll_accrual_totals: {
+        Args: { p_period: string }
+        Returns: {
+          segment: string
+          total_amount: number
         }[]
       }
       get_payroll_breakdown_by_pool: {

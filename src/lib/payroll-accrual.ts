@@ -138,17 +138,19 @@ export async function postPayrollAccrualJVs(
   const monthLabel = dayjs(period).format("MMM[']YY")
 
   // Existing accruals for the month (idempotency + conflict detection).
-  const { data: existing, error: exErr } = await supabase
-    .from('journal_entries')
-    .select('segment, total_amount')
-    .eq('reference_type', 'payroll_accrual')
-    .eq('period_month', period)
-    .eq('is_reversed', false)
+  // 2026-09-04: MUST go through the SECURITY DEFINER RPC. Reading
+  // journal_entries directly returns NOTHING for the submitting HR user
+  // (SELECT RLS wants treasury scope), so the check saw zero existing JVs and
+  // an HR re-submit double-posted every segment (JE-202608-0585..0589
+  // duplicating 0580..0584).
+  const { data: existing, error: exErr } = await supabase.rpc('get_payroll_accrual_totals', {
+    p_period: period,
+  })
   if (exErr) throw new Error(`Failed to check existing accrual JVs: ${exErr.message}`)
-  const existingBySegment = new Map(
-    (existing ?? []).map((e: { segment: string | null; total_amount: number }) => [
-      e.segment as string,
-      Number(e.total_amount),
+  const existingBySegment = new Map<string, number>(
+    ((existing ?? []) as Array<{ segment: string | null; total_amount: number | null }>).map((e) => [
+      e.segment ?? '',
+      Number(e.total_amount ?? 0),
     ]),
   )
 

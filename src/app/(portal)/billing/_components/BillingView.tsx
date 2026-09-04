@@ -318,7 +318,7 @@ export default async function BillingView({ searchParams }: Props) {
   const { data: payrollRun } = await supabase
     .from('payroll_runs')
     .select(
-      'marketing_opex_total, hr_opex_total, finance_opex_total, director_office_total, director_salary_total, approved_at'
+      'marketing_opex_total, hr_opex_total, finance_opex_total, director_office_total, it_opex_total, director_salary_total, approved_at'
     )
     .eq('period_month', period)
     .neq('status', 'rejected')
@@ -328,6 +328,9 @@ export default async function BillingView({ searchParams }: Props) {
   const hrFromPayroll = payrollSubmitted ? Number(payrollRun?.hr_opex_total ?? 0) : 0
   const financeFromPayroll = payrollSubmitted ? Number(payrollRun?.finance_opex_total ?? 0) : 0
   const directorOfficeFromPayroll = payrollSubmitted ? Number(payrollRun?.director_office_total ?? 0) : 0
+  // IT rides the dept-registry billing path (it_attribution) rather than a
+  // legacy DeptCostCard; it still belongs in the pre-generation hero total.
+  const itFromPayroll = payrollSubmitted ? Number(payrollRun?.it_opex_total ?? 0) : 0
 
   // Staff billing allocation (2026-07-03): HR splits each employee's employer
   // cost across subsidiaries by % (/hr-costing/allocation). The RPC returns
@@ -512,6 +515,7 @@ export default async function BillingView({ searchParams }: Props) {
                       hrFromPayroll +
                       financeFromPayroll +
                       directorOfficeFromPayroll +
+                      itFromPayroll +
                       directorFromPayroll,
                   )
                 : formatMoney(0)}
