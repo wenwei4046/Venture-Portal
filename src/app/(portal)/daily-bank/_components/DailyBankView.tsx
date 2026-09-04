@@ -56,32 +56,45 @@ export default function DailyBankView({ data, today }: { data: DailyBankData; to
     const node = captureRef.current
     if (!node) return null
     const { toBlob } = await import('html-to-image')
-    // The matrix lives in an overflow-x-auto wrapper: on a narrow window a
-    // plain capture clips the scrolled-out columns (user 2026-09-04: export
-    // 照片会 hide 掉右边). Expand the node + scroll wrappers to full content
-    // width for the shot, restore afterwards whatever happens.
-    const scrollers = Array.from(node.querySelectorAll<HTMLElement>('.overflow-x-auto'))
-    const fullWidth = Math.max(node.scrollWidth, ...scrollers.map(s => s.scrollWidth))
+    // Scroll containers ruin the shot two ways (user 2026-09-04 ×2): columns
+    // scrolled out of view are clipped, and a container that still scrolls in
+    // the clone paints a scrollbar and eats ~17px off its last row (the
+    // half-cut Total available line). So: make EVERY scrolling descendant
+    // non-scrolling, widen the node to the widest content, measure after the
+    // reflow, pass explicit width/height, and restore whatever happens.
     const restore: Array<() => void> = []
-    if (fullWidth > node.clientWidth) {
-      const prevNode = { width: node.style.width, maxWidth: node.style.maxWidth }
-      node.style.width = `${fullWidth}px`
-      node.style.maxWidth = 'none'
-      restore.push(() => {
-        node.style.width = prevNode.width
-        node.style.maxWidth = prevNode.maxWidth
-      })
-      for (const s of scrollers) {
-        const prev = s.style.overflowX
-        s.style.overflowX = 'visible'
+    const descendants = [node, ...Array.from(node.querySelectorAll<HTMLElement>('*'))]
+    let fullWidth = node.clientWidth
+    for (const el of descendants) {
+      fullWidth = Math.max(fullWidth, el.scrollWidth)
+      const cs = getComputedStyle(el)
+      if (['auto', 'scroll'].includes(cs.overflowX) || ['auto', 'scroll'].includes(cs.overflowY)) {
+        const prev = { overflow: el.style.overflow, overflowX: el.style.overflowX, overflowY: el.style.overflowY }
+        el.style.overflow = 'visible'
+        el.style.overflowX = 'visible'
+        el.style.overflowY = 'visible'
         restore.push(() => {
-          s.style.overflowX = prev
+          el.style.overflow = prev.overflow
+          el.style.overflowX = prev.overflowX
+          el.style.overflowY = prev.overflowY
         })
       }
     }
+    const prevNode = { width: node.style.width, maxWidth: node.style.maxWidth }
+    node.style.width = `${fullWidth}px`
+    node.style.maxWidth = 'none'
+    restore.push(() => {
+      node.style.width = prevNode.width
+      node.style.maxWidth = prevNode.maxWidth
+    })
+    // Reflow with the new styles, then shoot at the true content size.
+    const w = Math.ceil(Math.max(node.scrollWidth, node.offsetWidth))
+    const h = Math.ceil(Math.max(node.scrollHeight, node.offsetHeight))
     try {
       return await toBlob(node, {
         pixelRatio: 2,
+        width: w,
+        height: h,
         backgroundColor: getComputedStyle(document.body).backgroundColor || '#faf5ea',
       })
     } finally {
