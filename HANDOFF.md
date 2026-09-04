@@ -358,10 +358,22 @@ ISSUED/PAID payroll_consolidated subsidiary invoices, per company per segment:
   (2990 +186.50 / CAR +186.50 / HC +124.39 expected; CONTS/HK 对上).
 - Fund-request refresh question answered: reopen auto-cancels the submitted
   request, re-submit files a fresh one from live data (now IT-inclusive) —
-  fully automatic. The accrual side is NOT self-healing when totals changed:
-  submit fails loud mid-way ("reverse the old JV first") and nothing re-posts
-  after Finance reverses — the reopen-auto-reverse piece of 防盗墙 方案甲 fixes
-  that; wall decision still pending the user's talk with Principal.
+  fully automatic.
+- **Reopen auto-reverse SHIPPED** (user "要做", mig 20260904030000): new
+  `reverse_staff_payroll_accruals(period, user)` (SECURITY DEFINER, hr/finance/
+  principal) posts mirror JEs + flags is_reversed pairs for the period's active
+  STAFF accruals (segment <> 'director' — director flow untouched);
+  `reopen_payroll_run` calls it before flipping the run, so reopen → clean
+  slate → re-submit posts fresh accruals. Whole reopen rolls back if the
+  reversal fails (e.g. locked period). Zero TS changes (RPC signature
+  unchanged). Tested against live Aug data in a rolled-back transaction:
+  5 reversed / director untouched / pairs cross-linked, then live state
+  verified intact (5 staff active Σ109,770.21 + director). Reports safe by
+  construction: is_reversed pairs are the same mechanism voidRepayment and
+  today's manual cleanup use — every GL report already drops them.
+  防盗墙 remaining piece = ONLY the principal-only reopen gate (方案甲) or the
+  full submit-approval gate (方案乙) — still pending the user's talk with
+  Principal.
 
 ## SESSION 2026-09-04 (later) — double-accrual postmortem + IT in funding request
 

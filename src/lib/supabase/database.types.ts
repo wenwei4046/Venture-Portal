@@ -7409,6 +7409,10 @@ export type Database = {
         Args: { p_voucher_id: string }
         Returns: undefined
       }
+      reverse_staff_payroll_accruals: {
+        Args: { p_period: string; p_user_id: string }
+        Returns: number
+      }
       reverse_voucher_pool_rows: {
         Args: { p_voucher_no: string }
         Returns: number
