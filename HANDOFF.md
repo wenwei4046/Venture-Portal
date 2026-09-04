@@ -335,6 +335,34 @@ file's verbatim statutory with recomputed JADUAL values — **31 of the 38 live
 rows move** if anyone runs a bulk `UPDATE hr_monthly_payroll SET x = x`. Do not
 do that without accounting for it.
 
+## SESSION 2026-09-04 (evening) — 对数补差 reconcile & top-up feature
+
+User chose "make it a feature" over one-off SQL for the Aug under-billing
+(497.39 from the DO correction). Commit 16cac7c. On /billing, new 对数补差
+button → modal compares live get_staff_billing_allocation vs the period's
+ISSUED/PAID payroll_consolidated subsidiary invoices, per company per segment:
+- Under-billed (has issued invoice + positive delta) → one-click DRAFT
+  adjustment invoice per company, SAME consolidated format (per-segment lines,
+  category auto-reused from the originals — refuses if not exactly one distinct
+  category), description marker '· adjustment', dated period-end. Review+issue
+  via the normal flow. Idempotent (replaces unissued adjustment drafts).
+- Over-billed segments → report-only (consolidated invoices take no CN).
+- Company with NO issued invoice → flagged "整张未开", excluded (use the normal
+  generator).
+- lib/payroll-billing-delta.ts computeBillingDeltas + 6 vitest cases.
+- Deliberately NOT touching the legacy OPEX DeptCostCards: they only count
+  old per-dept billing modes, so they say "no invoice yet" even when
+  consolidated invoices exist — pre-existing display quirk, user knows; offered
+  a fix, not yet requested.
+- Aug top-ups NOT yet created — the user will click the new button themselves
+  (2990 +186.50 / CAR +186.50 / HC +124.39 expected; CONTS/HK 对上).
+- Fund-request refresh question answered: reopen auto-cancels the submitted
+  request, re-submit files a fresh one from live data (now IT-inclusive) —
+  fully automatic. The accrual side is NOT self-healing when totals changed:
+  submit fails loud mid-way ("reverse the old JV first") and nothing re-posts
+  after Finance reverses — the reopen-auto-reverse piece of 防盗墙 方案甲 fixes
+  that; wall decision still pending the user's talk with Principal.
+
 ## SESSION 2026-09-04 (later) — double-accrual postmortem + IT in funding request
 
 HR reopened + re-uploaded Aug payroll (08:13) and re-submitted (08:17): marketing
