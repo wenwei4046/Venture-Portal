@@ -3,20 +3,16 @@ import { createClient } from '@/lib/supabase/server'
 import { revenuePath } from '@/lib/revenue'
 import { ladderBreaks, type Rung } from '@/lib/ladder'
 import { listSubDepartments } from '../../revenue/_lib/sub-departments'
-import TeamOrgChart, { type ChartPerson } from './_components/TeamOrgChart'
-import LevelsBoard, { type BoardTitle } from './_components/LevelsBoard'
+import HierarchyTabs from './_components/HierarchyTabs'
+import type { ChartPerson } from './_components/TeamOrgChart'
+import type { BoardTitle } from './_components/LevelsBoard'
 
 /**
- * Hierarchy: the ladder, and the company org chart drawn under it.
+ * Hierarchy: the company org chart and the ladder it obeys — two tabs, side
+ * by side, on one page. This file loads both; `HierarchyTabs` shows the one
+ * `?tab=` asks for.
  *
- * LEVELS, at the top of the page — the user's placing (2026-09-05; the board
- * lived on the Roles page from 2026-09-03 until then). One scale for the whole
- * company, every title pinned to a rung. It is the rule the chart obeys and
- * the thing a promotion climbs, and it moved here because the chart is where
- * the rule is felt — a refused drop, a red line — so the two are read
- * together.
- *
- * THE CHART — every department on one canvas. Two lines are drawn and only
+ * ORG CHART — every department on one canvas. Two lines are drawn and only
  * one of them is editable here:
  *
  *   reports_to        solid, draggable. Current state, no history. This page
@@ -32,9 +28,12 @@ import LevelsBoard, { type BoardTitle } from './_components/LevelsBoard'
  * the two disagree — the commission upline is not the line manager — that is
  * now visible instead of implicit.
  *
- * Since 2026-09-03 the chart also obeys the ladder: nobody can be dropped
- * under somebody whose title stands lower than theirs. The ladder is a rule
- * about titles — how high, never where — so moving people between departments
+ * LEVELS — the ladder. One scale for the whole company, every title pinned to
+ * a rung; since 2026-09-03 the chart obeys it (nobody can be dropped under
+ * somebody whose title stands lower than theirs) and a promotion climbs it.
+ * It lived on the Roles page until 2026-09-05, when the user moved it here as
+ * the second tab: the rule and the place it is felt, one click apart. The
+ * ladder says how high, never where — moving people between departments
  * stays a gesture on the chart.
  */
 export default async function TeamHierarchyPage() {
@@ -136,46 +135,12 @@ export default async function TeamHierarchyPage() {
   const commissionHref = subDepts[0] ? revenuePath(subDepts[0].slug, 'hierarchy') : null
 
   return (
-    <div>
-      <div className="page-head">
-        <div>
-          <div className="page-eyebrow">
-            <em>I.</em> PEOPLE · HIERARCHY
-          </div>
-          <h1 className="page-title">Hierarchy</h1>
-          <p className="font-serif italic text-graphite text-base mt-3 max-w-2xl">
-            The ladder first: which title stands on which level, one scale for
-            the whole company. Then the chart — drag somebody onto their
-            manager, or draw a line from a manager down to them. Nobody can be
-            put under a title the ladder ranks below theirs. The dashed lines
-            are the Revenue Department&apos;s commission uplines — shown here,
-            changed on their own page.
-          </p>
-        </div>
-      </div>
-
-      <LevelsBoard rungs={rungs} titles={boardTitles} breaks={breaks} />
-
-      <section id="chart" className="mb-12 scroll-mt-6">
-        <div className="sect-head">
-          <h2>Org chart</h2>
-          <span className="rule" aria-hidden />
-          <span className="count">
-            {people.length} {people.length === 1 ? 'PERSON' : 'PEOPLE'}
-          </span>
-        </div>
-
-        {people.length === 0 ? (
-          <div className="py-16 text-center border border-hairline rounded-card bg-surface">
-            <p className="font-serif text-2xl text-ink mb-3">Nobody to chart yet.</p>
-            <p className="font-serif italic text-muted text-sm max-w-md mx-auto">
-              Add people under People → People Management first.
-            </p>
-          </div>
-        ) : (
-          <TeamOrgChart people={people} commissionHref={commissionHref} />
-        )}
-      </section>
-    </div>
+    <HierarchyTabs
+      people={people}
+      commissionHref={commissionHref}
+      rungs={rungs}
+      titles={boardTitles}
+      breaks={breaks}
+    />
   )
 }

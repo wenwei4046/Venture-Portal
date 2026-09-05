@@ -322,7 +322,7 @@ function Chart({
 
       <div className="flex flex-wrap items-center gap-4 mb-3">
         <p className="font-serif italic text-muted text-xs">
-          {layout.roots.length} tree
+          {people.length} people · {layout.roots.length} tree
           {layout.roots.length === 1 ? '' : 's'} · {unplaced} reporting to nobody
           {broken > 0 ? (
             <span className="text-danger">
@@ -391,12 +391,13 @@ function Chart({
               <line x1="0" y1="3" x2="26" y2="3" stroke="var(--danger)" strokeWidth="1.75" />
             </svg>
             Breaks the ladder · {broken}
-            <a
-              href="#levels"
+            <Link
+              href="/team/hierarchy?tab=levels"
+              scroll={false}
               className="ml-1 not-italic font-sans text-[11px] text-accent hover:underline"
             >
-              see Levels ↑
-            </a>
+              see Levels →
+            </Link>
           </span>
         ) : null}
         <span className="inline-flex items-center gap-2 font-serif italic text-xs text-graphite">
@@ -428,7 +429,7 @@ function Chart({
         A greyed card cannot take the person being dragged — it is one of their
         own reports, or the ladder ranks its title below theirs. A red line is
         one the ladder would refuse today: move the line, or change the ladder
-        under Levels above. The dashed line is read-only here: it decides
+        on the Levels tab. The dashed line is read-only here: it decides
         override commission, and a month already run keeps the chart it was run
         against.
       </p>
