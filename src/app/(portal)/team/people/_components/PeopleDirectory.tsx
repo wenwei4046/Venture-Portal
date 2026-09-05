@@ -5,6 +5,7 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import LedgerRow from '@/components/LedgerRow'
+import { compareByLadder } from '@/lib/ladder'
 import PersonCard from './PersonCard'
 
 dayjs.extend(relativeTime)
@@ -14,6 +15,9 @@ export interface PersonRow {
   name: string
   code: string | null
   title: string | null
+  /** Where their title stands on the ladder; null when it is not placed. */
+  levelRank: number | null
+  levelName: string | null
   department: string | null
   /** Employment, from hr_staff_costs.status — not the same fact as the account. */
   active: boolean
@@ -94,7 +98,9 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
     })
   }, [people, query, status])
 
-  // Group by department (A→Z, no-dept last), names A→Z inside each group.
+  // Group by department (A→Z, no-dept last). Inside a group the ladder reads
+  // top down — the most senior title first, the same title together, names
+  // A→Z on a rung — so the roster is the org chart in rows (user, 2026-09-05).
   const groups = useMemo(() => {
     const map = new Map<string, PersonRow[]>()
     for (const p of filtered) {
@@ -111,7 +117,7 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
       })
       .map(([dept, rows]) => ({
         dept,
-        rows: rows.sort((a, b) => a.name.localeCompare(b.name)),
+        rows: rows.sort(compareByLadder),
       }))
   }, [filtered])
 
@@ -306,8 +312,22 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
                               </div>
                             </td>
                             <td className="m-hide" data-label="Title">
-                              <span className="clip text-ink" title={p.title ?? undefined}>
-                                {p.title ?? '—'}
+                              <span className="flex items-baseline gap-2 min-w-0">
+                                <span
+                                  className="clip min-w-0 text-ink"
+                                  title={p.title ?? undefined}
+                                >
+                                  {p.title ?? '—'}
+                                </span>
+                                {/* The rung — the rows are in its order. */}
+                                {p.levelRank !== null ? (
+                                  <span
+                                    className="font-mono text-[10px] text-muted shrink-0"
+                                    title={`Level ${p.levelRank} · ${p.levelName}`}
+                                  >
+                                    L{p.levelRank}
+                                  </span>
+                                ) : null}
                               </span>
                             </td>
                             <td className="m-hide" data-label="Code">
