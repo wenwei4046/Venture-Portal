@@ -124,19 +124,26 @@ export async function loadCommissionSettings(
 export async function loadTeam(schemeId: string): Promise<TeamData> {
   const supabase = await untyped()
 
-  const [{ data: rankRows }, { data: staffRows }, { data: positions }] = await Promise.all([
-    supabase.from('comm_ranks').select('*').eq('scheme_id', schemeId).order('sort_order'),
-    supabase
-      .from('hr_staff_costs')
-      .select('id, employee_name, employee_code, tax_mode, withholding_rate, title_id, titles (name), departments!inner (name, payroll_source)')
-      .eq('status', 'active')
-      .eq('departments.payroll_source', 'commission')
-      .order('employee_name'),
-    supabase
-      .from('comm_hierarchy')
-      .select('id, staff_id, scheme_id, upline_staff_id, rank_id, rate_mode, effective_from, comm_ranks (rank_key, label)')
-      .is('effective_to', null),
-  ])
+  const [{ data: rankRows }, { data: staffRows }, { data: positions }, { data: levelRows }] =
+    await Promise.all([
+      supabase.from('comm_ranks').select('*').eq('scheme_id', schemeId).order('sort_order'),
+      supabase
+        .from('hr_staff_costs')
+        .select('id, employee_name, employee_code, tax_mode, withholding_rate, title_id, titles (name, level_id), departments!inner (name, payroll_source)')
+        .eq('status', 'active')
+        .eq('departments.payroll_source', 'commission')
+        .order('employee_name'),
+      supabase
+        .from('comm_hierarchy')
+        .select('id, staff_id, scheme_id, upline_staff_id, rank_id, rate_mode, effective_from, comm_ranks (rank_key, label)')
+        .is('effective_to', null),
+      // The company ladder: the Team table reads it top down (user, 2026-09-05).
+      supabase.from('title_levels').select('id, rank, name'),
+    ])
+
+  const rungByLevel = new Map(
+    rows<{ id: string; rank: number; name: string }>(levelRows).map(l => [l.id, l]),
+  )
 
   const positionByStaff = new Map(
     rows<{
@@ -158,7 +165,10 @@ export async function loadTeam(schemeId: string): Promise<TeamData> {
     tax_mode: 'pcb' | 'withholding' | 'none' | null
     withholding_rate: number | null
     title_id: string | null
-    titles: { name: string } | { name: string }[] | null
+    titles:
+      | { name: string; level_id: string | null }
+      | { name: string; level_id: string | null }[]
+      | null
   }>(staffRows)
     .filter(s => {
       const pos = positionByStaff.get(s.id)
@@ -167,6 +177,7 @@ export async function loadTeam(schemeId: string): Promise<TeamData> {
     .map(s => {
       const pos = positionByStaff.get(s.id)
       const title = Array.isArray(s.titles) ? (s.titles[0] ?? null) : s.titles
+      const rung = title?.level_id ? (rungByLevel.get(title.level_id) ?? null) : null
       const rank = Array.isArray(pos?.comm_ranks) ? (pos?.comm_ranks[0] ?? null) : (pos?.comm_ranks ?? null)
       return {
         staff_id: s.id,
@@ -174,6 +185,8 @@ export async function loadTeam(schemeId: string): Promise<TeamData> {
         employee_code: s.employee_code,
         title_id: s.title_id ?? null,
         title_name: title?.name ?? null,
+        title_level_rank: rung?.rank ?? null,
+        title_level_name: rung?.name ?? null,
         hierarchy_id: pos?.id ?? null,
         upline_staff_id: pos?.upline_staff_id ?? null,
         rank_id: pos?.rank_id ?? null,
