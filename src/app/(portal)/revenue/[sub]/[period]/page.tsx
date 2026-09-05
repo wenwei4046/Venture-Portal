@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { PRODUCT_LIST_PATH, revenuePath } from '@/lib/revenue'
+import { rankLetters, rankName } from '@/lib/commission/ranks'
 import RunControls from './_components/RunControls'
 import LedgerRow from '@/components/LedgerRow'
 import { requireSubDepartment } from '../../_lib/sub-departments'
@@ -159,6 +160,20 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     : { data: null }
   const depositPct = scheme ? (scheme as { deposit_threshold_pct: number | string | null }).deposit_threshold_pct : null
   const threshold = depositPct === null || depositPct === undefined ? null : Number(depositPct)
+
+  // A statement snapshots the rank KEY; the ladder says what letter that key
+  // wears today (ranks.ts — SS, A, B … from the top). A key the ladder no
+  // longer carries is shown as itself.
+  const { data: rankRows } = subDept.schemeId
+    ? await supabase.from('comm_ranks').select('id, rank_key, product_rate, sort_order').eq('scheme_id', subDept.schemeId)
+    : { data: null }
+  const ladder = ((rankRows ?? []) as Array<{ id: string; rank_key: string; product_rate: number | string; sort_order: number }>)
+  const letters = rankLetters(ladder.map(r => ({ id: r.id, productRate: Number(r.product_rate), sortOrder: r.sort_order })))
+  const rankNameOf = (key: string | null) => {
+    if (!key) return null
+    const r = ladder.find(x => x.rank_key === key)
+    return r ? rankName(letters.get(r.id) ?? '?') : key
+  }
 
   // ── The run ────────────────────────────────────────────────────────────
   // One run per sub-department per month (uq_comm_run_per_sub_dept_period):
@@ -399,7 +414,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                           </Link>
                           {s.qualifies_for_rank_key && s.qualifies_for_rank_key !== s.rank_key ? (
                             <div className="font-mono text-[10.5px] text-accent mt-0.5">
-                              QUALIFIES FOR {s.qualifies_for_rank_key.toUpperCase()}
+                              QUALIFIES FOR {(rankNameOf(s.qualifies_for_rank_key) ?? '').toUpperCase()}
                             </div>
                           ) : null}
                           {s.promotes_to_title_id ? (
@@ -411,8 +426,8 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                           ) : null}
                         </td>
                         <td className="m-hide" data-label="Rank">
-                          <span className="font-mono text-[11px] text-graphite">
-                            {s.rank_key ?? '—'} · {(Number(s.product_rate) * 100).toFixed(0)}%
+                          <span className="font-mono text-[11px] text-graphite" title={s.rank_key ?? undefined}>
+                            {rankNameOf(s.rank_key) ?? '—'} · {(Number(s.product_rate) * 100).toFixed(0)}%
                           </span>
                         </td>
                         <td className="num m-hide" data-label="Own revenue">{formatMoney(Number(s.product_revenue))}</td>

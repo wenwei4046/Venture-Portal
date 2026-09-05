@@ -331,6 +331,14 @@ export function Choice({
 }) {
   return (
     <select
+      // Re-mounted when the server's value changes (2026-09-05). React 19
+      // resets a form after its action, which puts every field back on the
+      // default it MOUNTED with — and while React rewrites an input's
+      // defaultValue / defaultChecked on re-render, it never rewrites a
+      // select's defaultSelected. So a saved change sat on screen as the old
+      // choice until a reload: a rank saved as D showed E. The key makes the
+      // refreshed value the mount value.
+      key={defaultValue ?? ''}
       name={name}
       form={useRowFormId()}
       required={required}

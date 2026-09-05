@@ -237,9 +237,9 @@ export default function LevelsBoard({
       <Hint>
         Every title stands on one level, and the top row is the most senior.
         A person can be promoted to the next level up in their own department,
-        and Hierarchy will not put anybody under somebody the ladder ranks
-        below them. A title not placed yet is outside the rule. Drag a title up
-        or down its column, or use the arrows; click a level&apos;s name to
+        and the chart will not put anybody under somebody the ladder ranks
+        below them. A title not placed yet is outside the rule. Drag a title
+        up or down its column, or use the arrows; click a level&apos;s name to
         rename it.
       </Hint>
 
@@ -251,9 +251,10 @@ export default function LevelsBoard({
           stands.{' '}
           <Link
             href="/team/hierarchy"
+            scroll={false}
             className="not-italic font-sans text-xs text-accent hover:underline"
           >
-            See them on Hierarchy →
+            See them on the chart →
           </Link>
         </p>
       ) : null}

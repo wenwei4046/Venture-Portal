@@ -134,8 +134,8 @@ differently and there is no meaningful department-level view of a calculation:
 | View | Route | What it is |
 |---|---|---|
 | Comm Cal | `/revenue/<sub>` | the months, and this sub-department's run against each. Titled *Commission Calculation* on the page |
-| Staff Hierarchy | `…/hierarchy` | who is under who — the org chart (§10) |
-| Rules | `…/rules` | every rule the engine reads (§9) |
+| Staff Hierarchy | `…/hierarchy` | who is under who — two tabs on the page: the org chart, and the **Team** table (`?tab=team`) where a rank is set (§10) |
+| Rules | `…/rules` | every rule the engine reads — eight tabs, one section each (`?tab=`, §9) |
 
 They are **children of the sub-department in the sidebar**, not a tab rail on
 the page (user, 2026-09-01: "这个其实是进去 subtab 的选择,而不是在这个里面").
@@ -144,6 +144,14 @@ of the navigation lives; the page itself only ever renders the one view it is.
 Fair's own row stays a link — one click still lands on the calculation — and
 the chevron beside it folds the three away. The sidebar label is *Comm Cal*
 because the full name does not fit the 220px rail three levels in.
+
+The tabs *inside* Rules and Staff Hierarchy (2026-09-05) are a different
+thing: sections of one view, not views. Nine tables end to end were a scroll,
+not a page, so Rules became eight tabs on the header's rule and the
+salespeople table went to sit beside the chart it mirrors (user: "我要把下面
+那些分析的 1、2、3、4 全部变成一个 tab tab tab"). `SlidingTabs` on a
+`.page-head.tabbed` header, `?tab=` pushed with the browser's own history so
+a switch costs no round trip — see DESIGN.md.
 
 The slug is derived from the sub-department's **name** (`Fair` → `fair`), which
 is what `uq_sub_department_name` makes unique; `code` is nullable and
@@ -184,6 +192,42 @@ company-wide `title_levels` rungs (Assistant … Head of Department) either —
 those compare titles *across* departments for the People org chart, while the
 commission ladder is the one authority on which Revenue title outranks which,
 because that is what the rate follows.
+
+**A rank is its rate, lettered from the top** (user 2026-09-05):
+
+> Rank 你不用想一个名字 … 它直接变成 Rank A equal to 5% rate 这样。可能从 Rank H
+> 以此类推到 Rank A，最高到 SS，这样反推过去，它就是 equal with 它的 rate。
+
+A rung used to be named after its title with the rate stapled on ("Team
+Leader - 9%"), which read as if the title and the rank were one thing. They
+are not: a Team Leader who misses target is still a Team Leader, paid a rank
+down. So nobody names a rung any more. The ladder is lettered from the **top**
+— **SS** for the highest rate, then **A, B, C …** downward — and the letter
+follows the rate:
+
+| Rank | Rate | Title of the rung |
+|---|---|---|
+| SS | 10% | Senior Team Leader |
+| A | 9% | Team Leader |
+| B | 8% | Senior Team Assistant |
+| C | 7% | Team Assistant |
+| D | 6% | Senior Revenue Specialist |
+| E | 5% | Revenue Specialist |
+
+A rung added above shifts every letter down — that is the point, the letters
+count from the top. `src/lib/commission/ranks.ts` (15 tests) is the one
+place that letters: every page computes from the rates it holds, and
+`upsertRank` re-sequences the whole ladder after every write — `sort_order`
+10/20/30 … by rate from the bottom, `comm_ranks.label` "Rank SS" / "Rank A"
+… from the top — so a rung keyed in at 6.5% lands between 6% and 7%, and the
+engine's "one rung up" always means the next rate up. Two rungs on one rate
+would be two names for one pay: refused in the action and by
+`uq_comm_rank_rate` (migration `20260905010000_rank_letters.sql`, which also
+relettered the live ladder). `rank_key` — what a statement snapshots and a
+promotion rule points at — is minted from the title's initials and the rate
+(`stl_11`) and never carries the letter, so history never moves when the
+letters do. The run dashboard and a statement show the letter their key
+wears *today*.
 
 ### 3.1.1 The title is a ratchet; the rank floats
 
@@ -817,6 +861,13 @@ PCB 0, WHT 200, net 9,800, then back to 0).
 > Principal-only: HR sets the rules, not what a product costs.
 >
 > The layout below is unchanged apart from the picker (see next paragraph).
+>
+> **Tabbed 2026-09-05.** The eight sections are a tab rail on the header's
+> rule — `?tab=scheme|ladder|groups|kpi|thresholds|open-bill|brands|promotion`
+> — one section on screen at a time, the numerals kept on the section heads.
+> *+ Generate new sub-department* moved into the header's action slot and
+> opens its panel above the active tab. Section IX, the salespeople, moved to
+> Staff Hierarchy's **Team** tab (§10) — beside the chart that moves them.
 
 One page holds every rule, threshold and per-person tick, laid out as dense
 tables following `DESIGN.md` v3.0 (`.ledger-table`, `.num`, `.sect-head`).
@@ -842,20 +893,23 @@ Default rate mode                                  ( ) Fixed   (•) Variable
 ```
 
 **II. Title ladder** — `comm_ranks`. The first column is a **dropdown of the
-Revenue Department's titles** (2026-09-03, §3.1), and a blank row at the
-bottom adds a rung — its `rank_key` is minted from the label and it lands at
-the bottom of the ladder. A rung takes at most one gate: a monthly group-sales
+Revenue Department's titles** (2026-09-03, §3.1); the Rank column is a chip
+nobody types in — the letter counted from the top (§3.1, 2026-09-05). A blank
+row at the bottom adds a rung — its `rank_key` is minted from the title's
+initials and the rate, and the whole ladder is re-lettered and re-sequenced by
+rate on every save. A rung takes at most one gate: a monthly group-sales
 target, or an earned personal-sales streak (§3.1.1).
 
 ```
-TITLE                       RANK                        RATE    CAN RECRUIT   GROUP SALES TARGET   PERSONAL SALES STREAK
-[Revenue Specialist      ▾] Revenue Specialist - 5%      5.00%      [ ]              —                  —
-[Senior Revenue Special… ▾] Revenue Specialist - 6%      6.00%      [✓]              —          100,000 × 2 mths
-[Team Assistant          ▾] Team Assistant - 7%          7.00%      [✓]        300,000.00                —
-[Senior Team Assistant   ▾] Team Assistant - 8%          8.00%      [✓]              —                  —
-[Team Leader             ▾] Team Leader - 9%             9.00%      [✓]              —                  —
-[Senior Team Leader      ▾] Senior Team Leader - 10%    10.00%      [✓]              —                  —
-[— pick a title —        ▾] Team Leader - 11%               11      [✓]              —                  —        [ Add ]
+TITLE                       RANK          RATE    CAN RECRUIT   GROUP SALES TARGET   PERSONAL SALES STREAK
+[Revenue Specialist      ▾] RANK E         5.00%      [ ]              —                  —
+[Senior Revenue Special… ▾] RANK D         6.00%      [✓]              —          100,000 × 2 mths
+[Team Assistant          ▾] RANK C         7.00%      [✓]        300,000.00                —
+[Senior Team Assistant   ▾] RANK B         8.00%      [✓]              —                  —
+[Team Leader             ▾] RANK A         9.00%      [✓]              —                  —
+[Senior Team Leader      ▾] RANK SS       10.00%      [✓]              —                  —
+[— pick a title —        ▾] lettered by      11      [✓]              —                  —        [ Add ]
+                            its rate
 ```
 
 **III. Item groups** — `comm_item_groups`, with last month's revenue beside each
@@ -923,29 +977,10 @@ FROM → TO      ALT   CRITERION              THRESHOLD        ENFORCED
 8% → 9%         1    KPI items per head     10                  [ ]
 ```
 
-**IX. Salespeople** — the per-person tick table the whole tab exists for.
-"Manual" is the user's *flexible* (a human sets the rank); "Scheme" is
-*entitled to the target scheme* (the monthly targets set it). **Title** is
-read-only here: it is the ratchet (§3.1.1), raised by an applied run or by a
-placement at a higher rank, lowered only on the People page.
-
-```
-NAME            TITLE                 UPLINE        ATTAINED RANK   RATE MODE            WITHHOLDING   WHT %
-YUNY            Team Leader           —             Team Leader 9%  (•)Manual ( )Scheme     [✓]        2.00
-TAN KAR JIUN    Team Assistant        YUNY          Rev Spec 6%     ( )Manual (•)Scheme     [✓]        2.00
-LUCAS           Senior Rev Specialist YUNY          Rev Spec 6%     ( )Manual (•)Scheme     [ ]          —
-SALLY           Revenue Specialist    TAN KAR JIUN  Rev Spec 5%     ( )Manual (•)Scheme     [✓]        2.00
-```
-
-(TAN KAR JIUN above: title Team Assistant from a month that cleared 300k,
-floor rank still 6% — exactly the July of §3.1.1.)
-
-Rules the table enforces inline: an upline whose **title** may not recruit
-cannot be chosen (the rank only answers for somebody with no title yet);
-changing a rank or upline writes a **new effective-dated `comm_hierarchy`
-row** rather than mutating the old one, so past runs never move; a person who
-qualifies for a higher rank than they hold shows a
-`due promotion → Team Assistant 7%` chip with a one-click promote.
+**IX. Salespeople** — **moved 2026-09-05** to Staff Hierarchy's Team tab; see
+§10. It sat here as the per-person tick table with an upline picker on every
+row, which made two places to move somebody. Now the chart moves people and
+the table sets the rank, and they are two tabs of one page.
 
 ---
 
@@ -961,7 +996,7 @@ that URL is only where Back returns to.
 |---|---|
 | `/revenue` | no page of its own — redirects to the first sub-department. Serves the old `/hr-costing/commission/*` links and the not-set-up-yet case |
 | `/revenue/<sub>` | **Commission Calculation** — months with sales data and this sub-department's run status against each. Sidebar: *Comm Cal* |
-| `…/<sub>/hierarchy` | **Staff Hierarchy** — the org chart (below) |
+| `…/<sub>/hierarchy` | **Staff Hierarchy** — the org chart, and `?tab=team` the Team table (both below) |
 | `…/<sub>/rules` | **Rules** — every rule the engine reads (§9) |
 | `…/<sub>/[period]` | run dashboard: hero total, per-salesperson `.ledger-table` (PR / group / C1 / KPI / Open Bill / Override / Incentive / Total), warnings, penalised bills, orders waiting on a deposit, Compute + Apply + Reopen |
 | `…/<sub>/[period]/statement/[staffId]` | one salesperson's month ringgit by ringgit — the figures, margin brand by brand, and a section per component drilling into `comm_statement_lines` |
@@ -981,6 +1016,28 @@ library: **`@xyflow/react`** — n8n's own canvas is Vue Flow, the sibling port 
 the same project, so this is the closest match to the reference. Every drop
 writes a new effective-dated `comm_hierarchy` row; the cycle trigger rejects an
 illegal drop, and a drop under a `can_recruit = false` rank is refused in the UI.
+
+**Team tab** (2026-09-05, was Rules IX). One row per salesperson: name, the
+title they hold, their rank, rate mode, upline, Withholding Tax. The user's
+line between the two tabs: "Hierarchy table 那边 … 是可以随意调动的; Team
+table 那边 … 只可以换它的 rank 罢了" — so the chart moves people between
+trees freely, and the table changes **nothing but the rank** (with the rate
+mode, which is the rank's own setting). Its Upline column is text, what the
+chart last drew; the row's form carries that upline as a hidden value so a
+rank change never moves anyone. Both tabs read one `loadTeam` — the same
+`comm_hierarchy` rows — so a move on the chart is what the table shows the
+moment it re-renders. Withholding Tax stays editable here because it is a
+payroll fact of the person with no other home in the module. **Title** is
+read-only: the ratchet (§3.1.1), raised by an applied run or by a rank above
+it set here, lowered only on People.
+
+```
+NAME            TITLE                 RANK              RATE MODE        UPLINE                 WITHHOLDING
+YUNY            Team Leader           [Rank A · 9%  ▾]  [Manual       ▾] top of a tree             [✓] 2.00 %
+TAN KAR JIUN    Team Assistant        [Rank D · 6%  ▾]  [Scheme target▾] YUNY  since 2026-09-01     [✓] 2.00 %
+LUCAS           Senior Rev Specialist [Rank D · 6%  ▾]  [Scheme target▾] YUNY  since 2026-09-01     [ ]
+SALLY           Revenue Specialist    [— pick a rank ▾] [scheme default▾] not placed               [✓] 2.00 %
+```
 
 **Payroll grid change** (`PayrollRow.tsx`, built): for staff in a
 `payroll_source = 'commission'` department the Commission cell is **read-only**

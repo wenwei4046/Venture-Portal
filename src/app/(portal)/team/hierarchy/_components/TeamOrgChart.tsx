@@ -392,7 +392,8 @@ function Chart({
             </svg>
             Breaks the ladder · {broken}
             <Link
-              href="/team/roles"
+              href="/team/hierarchy?tab=levels"
+              scroll={false}
               className="ml-1 not-italic font-sans text-[11px] text-accent hover:underline"
             >
               see Levels →
@@ -428,7 +429,7 @@ function Chart({
         A greyed card cannot take the person being dragged — it is one of their
         own reports, or the ladder ranks its title below theirs. A red line is
         one the ladder would refuse today: move the line, or change the ladder
-        under Roles → Levels. The dashed line is read-only here: it decides
+        on the Levels tab. The dashed line is read-only here: it decides
         override commission, and a month already run keeps the chart it was run
         against.
       </p>

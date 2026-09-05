@@ -40,22 +40,32 @@ src/
 │   │   │                              category since 2026-09-01, below
 │   │   │                              Departments): People Management /
 │   │   │                              Hierarchy / Roles / Permissions, four flat
-│   │   │                              entries. No tab rail on the pages — the
-│   │   │                              sidebar is the only way between them.
-│   │   │                              Routes stay under /team/*. Roles =
-│   │   │                              titles + the **ladder** (Levels board,
-│   │   │                              2026-09-03: `title_levels`, one shared
-│   │   │                              scale; promotion climbs it, Hierarchy
-│   │   │                              obeys it — `lib/ladder.ts`).
-│   │   │                              Permissions = the matrix, split off the
-│   │   │                              same day.
+│   │   │                              entries. No tab rail BETWEEN them — the
+│   │   │                              sidebar is the only way from page to
+│   │   │                              page. Routes stay under /team/*. Roles =
+│   │   │                              titles. Hierarchy = two tabs side by
+│   │   │                              side on the header's rule (`?tab=`,
+│   │   │                              2026-09-05): **Org chart**, and
+│   │   │                              **Levels** = the **ladder** (`title_levels`,
+│   │   │                              one shared scale, 2026-09-03; on Roles
+│   │   │                              until 2026-09-05) that the chart obeys,
+│   │   │                              promotion climbs and the roster sorts by
+│   │   │                              — `lib/ladder.ts`. Permissions = the
+│   │   │                              matrix, split off 2026-09-03.
 │   │   ├── director-salary/         (Phase 3)
 │   │   ├── hr-costing/              (Phase 3 — staff directory moved to team/)
 │   │   ├── revenue/                 ← Revenue Department: [sub]/ = one sub-department
 │   │   │                              (Fair, …) with 3 views, reached from the
 │   │   │                              SIDEBAR not a tab rail — page.tsx (Commission
 │   │   │                              Calculation) / hierarchy / rules — plus
-│   │   │                              [sub]/[period]/ runs and products/ (Principal)
+│   │   │                              [sub]/[period]/ runs and products/ (Principal).
+│   │   │                              Inside a view, tabs ARE used for its sections
+│   │   │                              (2026-09-05): rules = 8 tabs (`?tab=`),
+│   │   │                              hierarchy = chart / **Team** table
+│   │   │                              (`?tab=team`, the old Rules IX — the table
+│   │   │                              sets only the rank, the chart moves people).
+│   │   │                              A rank IS its rate, lettered from the top
+│   │   │                              (SS, A, B …) — `lib/commission/ranks.ts`.
 │   │   ├── reports/                 (Phase 3)
 │   │   └── settings/                ← 8 tabs: treasury / overdue / splits / directors / companies / banks / periods / simulator
 │   └── api/erp/v1/                 ← the ONE machine endpoint: the Houzs ERP live
