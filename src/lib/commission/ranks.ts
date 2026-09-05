@@ -65,6 +65,16 @@ export function rankLabel(letter: string, rate: number): string {
   return `${rankName(letter)} · ${ratePct(rate)}`
 }
 
+/**
+ * "Rank B · 8%" from a row that already wears its label — a rank of the
+ * catalogue (`comm_rank_defs`), or a rung, whose label is a trigger-kept copy
+ * of its rank's (2026-09-05). Pages that only display a rank read this
+ * instead of re-lettering the ladder themselves.
+ */
+export function rankLabelOf(row: { label: string; product_rate: number | string }): string {
+  return `${row.label} · ${ratePct(Number(row.product_rate))}`
+}
+
 export interface ResequencedRung {
   id: string
   sortOrder: number

@@ -1,7 +1,7 @@
 'use client'
 
 import { earnedFloor } from '@/lib/commission/titles'
-import { rankLabel, rankLetters } from '@/lib/commission/ranks'
+import { rankLabelOf } from '@/lib/commission/ranks'
 import { compareByLadder } from '@/lib/ladder'
 import { setPositionFromForm, updateStaffTax } from '../../../hierarchy-actions'
 import {
@@ -43,9 +43,6 @@ export default function TeamTable({
   ranks: RankRow[]
   schemeId: string
 }) {
-  const letters = rankLetters(
-    ranks.map(r => ({ id: r.id, productRate: Number(r.product_rate), sortOrder: r.sort_order })),
-  )
   const nameOf = new Map(people.map(p => [p.staff_id, p.employee_name]))
 
   // The ladder, top down — the most senior title first, the same title
@@ -69,9 +66,11 @@ export default function TeamTable({
     personalSalesThreshold: r.personal_sales_threshold,
     productRate: Number(r.product_rate),
   }))
+  // "Rank B · 8%" — the rung's label is a trigger-kept copy of its rank's
+  // (comm_rank_defs, 2026-09-05), so nothing is re-lettered here.
   const labelOf = (id: string) => {
-    const r = rungs.find(x => x.id === id)
-    return r ? rankLabel(letters.get(id) ?? '?', r.productRate) : '—'
+    const r = ranks.find(x => x.id === id)
+    return r ? rankLabelOf(r) : '—'
   }
 
   return (

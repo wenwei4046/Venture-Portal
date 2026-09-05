@@ -5,7 +5,6 @@ import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { PRODUCT_LIST_PATH, revenuePath } from '@/lib/revenue'
-import { rankLetters, rankName } from '@/lib/commission/ranks'
 import RunControls from './_components/RunControls'
 import LedgerRow from '@/components/LedgerRow'
 import { requireSubDepartment } from '../../_lib/sub-departments'
@@ -162,17 +161,16 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   const threshold = depositPct === null || depositPct === undefined ? null : Number(depositPct)
 
   // A statement snapshots the rank KEY; the ladder says what letter that key
-  // wears today (ranks.ts — SS, A, B … from the top). A key the ladder no
-  // longer carries is shown as itself.
+  // wears today — the rung's label, a trigger-kept copy of its rank's
+  // (comm_rank_defs, 2026-09-05; SS, A, B … from the top). A key the ladder
+  // no longer carries is shown as itself.
   const { data: rankRows } = subDept.schemeId
-    ? await supabase.from('comm_ranks').select('id, rank_key, product_rate, sort_order').eq('scheme_id', subDept.schemeId)
+    ? await supabase.from('comm_ranks').select('rank_key, label').eq('scheme_id', subDept.schemeId)
     : { data: null }
-  const ladder = ((rankRows ?? []) as Array<{ id: string; rank_key: string; product_rate: number | string; sort_order: number }>)
-  const letters = rankLetters(ladder.map(r => ({ id: r.id, productRate: Number(r.product_rate), sortOrder: r.sort_order })))
+  const ladder = (rankRows ?? []) as Array<{ rank_key: string; label: string }>
   const rankNameOf = (key: string | null) => {
     if (!key) return null
-    const r = ladder.find(x => x.rank_key === key)
-    return r ? rankName(letters.get(r.id) ?? '?') : key
+    return ladder.find(x => x.rank_key === key)?.label ?? key
   }
 
   // ── The run ────────────────────────────────────────────────────────────

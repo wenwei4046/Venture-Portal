@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { rankLetters } from '@/lib/commission/ranks'
+import { rankLetters, ratePct } from '@/lib/commission/ranks'
 import {
   deleteKpiItem,
   deleteKpiThreshold,
   deleteMarginBand,
+  deleteRankDef,
   updateOpenBillRule,
   updateScheme,
   upsertBrand,
@@ -15,6 +16,7 @@ import {
   upsertKpiThreshold,
   upsertMarginBand,
   upsertRank,
+  upsertRankDef,
 } from '../../config-actions'
 import NewSubDepartmentForm from './NewSubDepartmentForm'
 import PromotionCriteria from './PromotionCriteria'
@@ -41,8 +43,10 @@ import type { CommissionSettingsData, SchemeRow } from './types'
 const NEW_BRAND = '+new'
 
 /**
- * The Rules page's eight tabs — one per section, in ladder order. The key is
- * what `?tab=` carries, so a link can open the page on the ladder.
+ * The Rules page's nine tabs — one per section, in ladder order, the Ranks
+ * catalogue last (section IX, the number the salespeople held before they
+ * moved to Staff Hierarchy). The key is what `?tab=` carries, so a link can
+ * open the page on the ladder.
  */
 export type RulesTab =
   | 'scheme'
@@ -53,6 +57,7 @@ export type RulesTab =
   | 'open-bill'
   | 'brands'
   | 'promotion'
+  | 'ranks'
 
 const RULES_TABS: Array<TabItem & { key: RulesTab }> = [
   { key: 'scheme', label: 'Scheme rules' },
@@ -63,6 +68,7 @@ const RULES_TABS: Array<TabItem & { key: RulesTab }> = [
   { key: 'open-bill', label: 'Open Bill rates' },
   { key: 'brands', label: 'Brands & margin bands' },
   { key: 'promotion', label: 'Promotion criteria' },
+  { key: 'ranks', label: 'Ranks' },
 ]
 
 export function isRulesTab(s: string | null | undefined): s is RulesTab {
@@ -74,9 +80,10 @@ export function isRulesTab(s: string | null | undefined): s is RulesTab {
  *
  * Every rule on one URL, as the user asked on 2026-08-31 ("把规则、setting、
  * threshold 等等全部放在同一个 Tab 里") — and, since 2026-09-05, one SECTION on
- * screen at a time: the eight sections became a tab rail on the header's rule
- * ("我要把下面那些分析的 1、2、3、4 全部变成一个 tab tab tab"). Nine tables end
- * to end were a scroll, not a page. The tab is `?tab=`, pushed with the
+ * screen at a time: the sections became a tab rail on the header's rule
+ * ("我要把下面那些分析的 1、2、3、4 全部变成一个 tab tab tab") — eight, then
+ * nine when the Ranks catalogue got a tab of its own the same evening. Nine
+ * tables end to end were a scroll, not a page. The tab is `?tab=`, pushed with the
  * browser's own history so switching costs nothing and Back steps through
  * them; Next syncs `useSearchParams` from it.
  *
@@ -153,7 +160,9 @@ export default function CommissionSection({
       ) : tab === 'scheme' ? (
         <SchemeRules scheme={scheme} />
       ) : tab === 'ladder' ? (
-        <TitleLadder data={data} scheme={scheme} />
+        <TitleLadder data={data} scheme={scheme} onRanks={() => goTo('ranks')} />
+      ) : tab === 'ranks' ? (
+        <RankCatalogue data={data} scheme={scheme} onLadder={() => goTo('ladder')} />
       ) : tab === 'groups' ? (
         <ItemGroups data={data} scheme={scheme} />
       ) : tab === 'kpi' ? (
@@ -285,40 +294,86 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
 
 // ─── II. Title ladder ────────────────────────────────────────────────────────
 
+/** The catalogue from the top: highest rate first, the way the letters read. */
+function catalogueTopDown(data: CommissionSettingsData) {
+  return [...data.rankDefs].sort((a, b) => Number(b.product_rate) - Number(a.product_rate))
+}
+
+/** The letter each rank of the catalogue wears — counted over the catalogue, not the rungs. */
+function catalogueLetters(data: CommissionSettingsData) {
+  return rankLetters(
+    data.rankDefs.map(d => ({ id: d.id, productRate: Number(d.product_rate), sortOrder: d.sort_order })),
+  )
+}
+
 /**
- * The ladder. A rank is its rate: the Rank column is not typed in, it is the
- * letter each rung wears counted from the top (SS, A, B, C …), and it moves
- * when a rung is added above or a rate is changed (`lib/commission/ranks.ts`).
+ * The ladder: one rung per title. The title is fixed once the rung exists —
+ * only the last row, the one that adds a rung, picks one. The RANK is the
+ * dropdown, from the Rank tab's catalogue, and the rate is the rank's: shown,
+ * never typed (user 2026-09-05: "title 本身不能用 dropdown 选 … rank 那边有
+ * dropdown option … rate 不能直接改，因为 rank 和 rate 是绑定的"). A rank pays
+ * one title, so a rank another rung holds is greyed in the picker with its
+ * holder's name. Letters are counted over the catalogue, so a rank with no
+ * title on it still holds its place (`lib/commission/ranks.ts`).
  */
-function TitleLadder({ data, scheme }: { data: CommissionSettingsData; scheme: SchemeRow }) {
-  const letters = rankLetters(
-    data.ranks.map(r => ({ id: r.id, productRate: Number(r.product_rate), sortOrder: r.sort_order })),
+function TitleLadder({
+  data,
+  scheme,
+  onRanks,
+}: {
+  data: CommissionSettingsData
+  scheme: SchemeRow
+  onRanks: () => void
+}) {
+  const letters = catalogueLetters(data)
+  const catalogue = catalogueTopDown(data)
+  const defById = new Map(data.rankDefs.map(d => [d.id, d]))
+  const titleById = new Map(data.titles.map(t => [t.id, t.name]))
+  const holderByDef = new Map(data.ranks.map(r => [r.rank_def_id, r]))
+
+  // The rank picker for one rung (or, with `self` null, for the row that adds one).
+  const rankOptions = (self: { id: string } | null) =>
+    catalogue.map(d => {
+      const holder = holderByDef.get(d.id)
+      const taken = holder !== undefined && holder.id !== self?.id
+      const name = `Rank ${letters.get(d.id) ?? '?'} · ${ratePct(Number(d.product_rate))}`
+      return (
+        <option key={d.id} value={d.id} disabled={taken}>
+          {taken ? `${name} — ${titleById.get(holder.title_id) ?? 'taken'}` : name}
+        </option>
+      )
+    })
+
+  const RanksTab = (
+    <button type="button" onClick={onRanks} className="not-italic font-sans text-xs text-accent hover:underline">
+      Ranks tab
+    </button>
   )
 
   return (
     <section>
-      <SectionHead title="II. Title ladder" count={`${data.ranks.length} RANKS`} />
+      <SectionHead title="II. Title ladder" count={`${data.ranks.length} RUNGS`} />
       <Hint>
-        Each rung belongs to a <strong>title</strong> from People → Roles, and pays a{' '}
-        <strong>rank</strong>. A rank is its rate: the rungs are lettered from the top —{' '}
-        <em>SS</em> for the highest rate, then <em>A</em>, <em>B</em>, <em>C</em> … — so a Team
-        Leader on Rank A at 9% who misses target is still a Team Leader, paid Rank B at 8%. The
-        rank is what a month pays; the title is what a person keeps — the month somebody is paid
-        a rung above the title they hold, their title is raised to it and <em>never lowered</em>.
-        Whether a title may recruit follows the title. The ladder is climbed{' '}
-        <strong>one rung at a time</strong>, and a rung carries at most one gate: a{' '}
-        <strong>group-sales target</strong> is monthly — a <em>scheme-target</em> salesperson is
-        paid that rung in a month that clears it and drops back in one that does not; a{' '}
-        <strong>personal-sales streak</strong> (so much, so many months running) is earned —
-        passing it raises the title for good and later months climb from there. Leave both blank
-        for a rung nobody can reach on volume alone.
+        One rung per <strong>title</strong> from People → Roles; the title is fixed once the rung
+        exists, only the last row picks one. The <strong>rank</strong> is the dropdown — which
+        rank the title is paid — and the <strong>rate</strong> follows it: a rank is its rate, set
+        on the {RanksTab}, never here. A Team Leader on Rank A at 9% who misses target is still a
+        Team Leader, paid Rank B at 8%: the rank is what a month pays, the title is what a person
+        keeps — the month somebody is paid a rung above the title they hold, their title is raised
+        to it and <em>never lowered</em>. Whether a title may recruit follows the title. The
+        ladder is climbed <strong>one rung at a time</strong>, and a rung carries at most one
+        gate: a <strong>group-sales target</strong> is monthly — a <em>scheme-target</em>{' '}
+        salesperson is paid that rung in a month that clears it and drops back in one that does
+        not; a <strong>personal-sales streak</strong> (so much, so many months running) is earned
+        — passing it raises the title for good and later months climb from there. Leave both
+        blank for a rung nobody can reach on volume alone.
       </Hint>
       <div className="border border-hairline rounded-md bg-surface overflow-x-auto table-scroll">
         <table className="ledger-table">
           <thead>
             <tr>
               <th>Title</th>
-              <th className="w-28">Rank</th>
+              <th className="w-52">Rank</th>
               <th className="right">Rate %</th>
               <th className="w-24">Can recruit</th>
               <th className="right">Group sales target</th>
@@ -327,59 +382,182 @@ function TitleLadder({ data, scheme }: { data: CommissionSettingsData; scheme: S
             </tr>
           </thead>
           <tbody>
-            {data.ranks.map(r => (
-              <RowForm key={r.id} action={upsertRank}>
-                {({ pending }) => (
-                  <tr>
-                    <td>
-                      <Hidden name="id" value={r.id} />
-                      <Hidden name="scheme_id" value={scheme.id} />
-                      <TitleChoice titles={data.titles} current={r.title_id} ariaLabel={`${r.rank_key} title`} />
-                    </td>
-                    <td>
-                      <span className="chip whitespace-nowrap" title={r.rank_key}>
-                        RANK {letters.get(r.id)}
-                      </span>
-                    </td>
-                    <td className="num">
-                      <Field name="product_rate" type="number" step="0.01" width="w-20" defaultValue={toPct(r.product_rate)} ariaLabel={`${r.rank_key} rate`} />
-                    </td>
-                    <td><Tick name="can_recruit" defaultChecked={r.can_recruit} ariaLabel={`${r.rank_key} can recruit`} /></td>
-                    <td className="num">
-                      <Field name="group_sales_threshold" type="number" step="1" width="w-28" defaultValue={r.group_sales_threshold ?? ''} placeholder="—" ariaLabel={`${r.rank_key} group sales target`} />
-                    </td>
-                    <td className="num whitespace-nowrap">
-                      <Field name="personal_sales_threshold" type="number" step="1" width="w-28" defaultValue={r.personal_sales_threshold ?? ''} placeholder="—" ariaLabel={`${r.rank_key} personal sales target`} />
-                      <span className="mx-1 text-xs text-muted">×</span>
-                      <Field name="consecutive_months" type="number" step="1" width="w-14" defaultValue={r.consecutive_months ?? ''} placeholder="—" ariaLabel={`${r.rank_key} months running`} />
-                      <span className="ml-1 text-xs text-muted">mths</span>
-                    </td>
-                    <td><SaveButton pending={pending} /></td>
-                  </tr>
-                )}
-              </RowForm>
-            ))}
+            {data.ranks.map(r => {
+              const rank = defById.get(r.rank_def_id)
+              return (
+                <RowForm key={r.id} action={upsertRank}>
+                  {({ pending }) => (
+                    <tr>
+                      <td>
+                        <Hidden name="id" value={r.id} />
+                        <Hidden name="scheme_id" value={scheme.id} />
+                        <span className="text-ink whitespace-nowrap" title={r.rank_key}>
+                          {titleById.get(r.title_id) ?? <span className="text-muted">(inactive title)</span>}
+                        </span>
+                      </td>
+                      <td>
+                        <Choice name="rank_def_id" defaultValue={r.rank_def_id} required ariaLabel={`${r.rank_key} rank`} width="w-48">
+                          {rankOptions(r)}
+                        </Choice>
+                      </td>
+                      <td className="num">
+                        <span className="font-mono text-sm text-num-ink" title="Set on the Ranks tab">
+                          {ratePct(Number(rank?.product_rate ?? r.product_rate))}
+                        </span>
+                      </td>
+                      <td><Tick name="can_recruit" defaultChecked={r.can_recruit} ariaLabel={`${r.rank_key} can recruit`} /></td>
+                      <td className="num">
+                        <Field name="group_sales_threshold" type="number" step="1" width="w-28" defaultValue={r.group_sales_threshold ?? ''} placeholder="—" ariaLabel={`${r.rank_key} group sales target`} />
+                      </td>
+                      <td className="num whitespace-nowrap">
+                        <Field name="personal_sales_threshold" type="number" step="1" width="w-28" defaultValue={r.personal_sales_threshold ?? ''} placeholder="—" ariaLabel={`${r.rank_key} personal sales target`} />
+                        <span className="mx-1 text-xs text-muted">×</span>
+                        <Field name="consecutive_months" type="number" step="1" width="w-14" defaultValue={r.consecutive_months ?? ''} placeholder="—" ariaLabel={`${r.rank_key} months running`} />
+                        <span className="ml-1 text-xs text-muted">mths</span>
+                      </td>
+                      <td><SaveButton pending={pending} /></td>
+                    </tr>
+                  )}
+                </RowForm>
+              )
+            })}
             <RowForm action={upsertRank}>
               {({ pending }) => (
                 <tr className="bg-surface-2/40">
                   <td>
                     <Hidden name="scheme_id" value={scheme.id} />
-                    <TitleChoice titles={data.titles} current={null} ariaLabel="new rank title" required />
+                    <TitleChoice titles={data.titles} current={null} ariaLabel="new rung title" required />
                   </td>
-                  <td className="font-serif italic text-xs text-muted whitespace-nowrap">lettered by its rate</td>
+                  <td>
+                    <Choice name="rank_def_id" defaultValue="" required ariaLabel="new rung rank" width="w-48">
+                      <option value="">— pick a rank —</option>
+                      {rankOptions(null)}
+                    </Choice>
+                  </td>
+                  <td className="num">
+                    <span className="font-serif italic text-xs text-muted whitespace-nowrap">follows the rank</span>
+                  </td>
+                  <td><Tick name="can_recruit" defaultChecked ariaLabel="new rung can recruit" /></td>
+                  <td className="num">
+                    <Field name="group_sales_threshold" type="number" step="1" width="w-28" placeholder="—" ariaLabel="new rung group sales target" />
+                  </td>
+                  <td className="num whitespace-nowrap">
+                    <Field name="personal_sales_threshold" type="number" step="1" width="w-28" placeholder="—" ariaLabel="new rung personal sales target" />
+                    <span className="mx-1 text-xs text-muted">×</span>
+                    <Field name="consecutive_months" type="number" step="1" width="w-14" placeholder="—" ariaLabel="new rung months running" />
+                    <span className="ml-1 text-xs text-muted">mths</span>
+                  </td>
+                  <td><SaveButton pending={pending} label="Add" /></td>
+                </tr>
+              )}
+            </RowForm>
+          </tbody>
+        </table>
+      </div>
+      {catalogue.length === 0 ? (
+        <p className="mt-3 font-serif italic text-sm text-alert">
+          No ranks yet — add them on the {RanksTab} first; a rung needs one to pay.
+        </p>
+      ) : null}
+    </section>
+  )
+}
+
+// ─── IX. Ranks ───────────────────────────────────────────────────────────────
+
+/**
+ * The catalogue: a rank is its rate, and this is the only place a rate is
+ * typed (user 2026-09-05: "rank A 等于多少 rate、rank B 等于多少 rate … 除非我在
+ * rank 的那个 tab 里去调"). The letter is not typed either — it is the rank's
+ * place counted from the top, SS for the highest rate, then A, B, C … — so a
+ * rank keyed in above the others moves every letter down, and a rank nobody
+ * has put a title on yet still holds its place in the count. Section IX: the
+ * number the salespeople held before they moved to Staff Hierarchy.
+ */
+function RankCatalogue({
+  data,
+  scheme,
+  onLadder,
+}: {
+  data: CommissionSettingsData
+  scheme: SchemeRow
+  onLadder: () => void
+}) {
+  const letters = catalogueLetters(data)
+  const catalogue = catalogueTopDown(data)
+  const titleById = new Map(data.titles.map(t => [t.id, t.name]))
+  const holderByDef = new Map(data.ranks.map(r => [r.rank_def_id, r]))
+
+  return (
+    <section>
+      <SectionHead title="IX. Ranks" count={`${catalogue.length} RANKS`} />
+      <Hint>
+        A rank is its rate. Set the rate here and the ladder reads it — the{' '}
+        <button type="button" onClick={onLadder} className="not-italic font-sans text-xs text-accent hover:underline">
+          Title ladder
+        </button>{' '}
+        picks a rank for each title and never types a rate. The letter is the rank&apos;s place
+        counted from the top: <em>SS</em> for the highest rate, then <em>A</em>, <em>B</em>,{' '}
+        <em>C</em> … — add a rank above the others and every letter moves down; a rank with no
+        title on it still holds its place. Changing a rate changes what every month from now pays
+        on that rank; a month already computed keeps the rate it was computed with.
+      </Hint>
+      <div className="border border-hairline rounded-md bg-surface overflow-x-auto table-scroll">
+        <table className="ledger-table">
+          <thead>
+            <tr>
+              <th className="w-32">Rank</th>
+              <th className="right w-28">Rate %</th>
+              <th>Paid to</th>
+              <th className="w-36"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {catalogue.map(d => {
+              const holder = holderByDef.get(d.id)
+              return (
+                <RowForm key={d.id} action={upsertRankDef}>
+                  {({ pending }) => (
+                    <tr>
+                      <td>
+                        <Hidden name="id" value={d.id} />
+                        <Hidden name="scheme_id" value={scheme.id} />
+                        <span className="chip whitespace-nowrap">RANK {letters.get(d.id) ?? '?'}</span>
+                      </td>
+                      <td className="num">
+                        <Field name="product_rate" type="number" step="0.01" width="w-20" defaultValue={toPct(d.product_rate)} ariaLabel={`${d.label} rate`} />
+                      </td>
+                      <td className="font-serif italic text-sm">
+                        {holder ? (
+                          <span className="text-graphite">{titleById.get(holder.title_id) ?? '(inactive title)'}</span>
+                        ) : (
+                          <span className="text-muted">nobody yet — pick it for a title on the ladder</span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap">
+                        <SaveButton pending={pending} />
+                        {!holder ? (
+                          <span className="ml-3">
+                            <ActionButton run={() => deleteRankDef(d.id)} label="Remove" danger />
+                          </span>
+                        ) : null}
+                      </td>
+                    </tr>
+                  )}
+                </RowForm>
+              )
+            })}
+            <RowForm action={upsertRankDef}>
+              {({ pending }) => (
+                <tr className="bg-surface-2/40">
+                  <td>
+                    <Hidden name="scheme_id" value={scheme.id} />
+                    <span className="font-serif italic text-xs text-muted whitespace-nowrap">lettered by its rate</span>
+                  </td>
                   <td className="num">
                     <Field name="product_rate" type="number" step="0.01" width="w-20" placeholder="11" required ariaLabel="new rank rate" />
                   </td>
-                  <td><Tick name="can_recruit" defaultChecked ariaLabel="new rank can recruit" /></td>
-                  <td className="num">
-                    <Field name="group_sales_threshold" type="number" step="1" width="w-28" placeholder="—" ariaLabel="new rank group sales target" />
-                  </td>
-                  <td className="num whitespace-nowrap">
-                    <Field name="personal_sales_threshold" type="number" step="1" width="w-28" placeholder="—" ariaLabel="new rank personal sales target" />
-                    <span className="mx-1 text-xs text-muted">×</span>
-                    <Field name="consecutive_months" type="number" step="1" width="w-14" placeholder="—" ariaLabel="new rank months running" />
-                    <span className="ml-1 text-xs text-muted">mths</span>
-                  </td>
+                  <td />
                   <td><SaveButton pending={pending} label="Add" /></td>
                 </tr>
               )}

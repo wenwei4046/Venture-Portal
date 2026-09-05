@@ -82,7 +82,8 @@ department's.
 departments (Revenue Department)
   └── comm_sub_departments (Fair, …)
         └── comm_schemes                  ← knobs + per-component switches
-              ├── comm_ranks              the tier ladder
+              ├── comm_rank_defs          the ranks: "Rank A · 9%" (the Rank tab)
+              ├── comm_ranks              the title ladder: one rung per title, pointing at a rank
               ├── comm_item_groups        which ERP groups are commissionable
               ├── comm_kpi_items          product → flat KPI allowance
               ├── comm_kpi_thresholds     qty ladder → uplift
@@ -213,6 +214,26 @@ follows the rate:
 | C | 7% | Team Assistant |
 | D | 6% | Senior Revenue Specialist |
 | E | 5% | Revenue Specialist |
+
+**The rank is a row of its own** (user 2026-09-05 evening, migration
+`20260905060000_rank_catalog`):
+
+> 这个 rank 基本上是可选的，rate 是不能选的，因为 rate 绑定了 rank。你帮我加多一个
+> rank 的 tab，点进去后我可以配置 rank A 等于多少 rate … title 本身不能用 dropdown
+> 选（只有 add new 那边才可以），选好后 title 就是 fixed 的；rank 那边有 dropdown
+> option；rate 不能直接改，除非我在 rank 的那个 tab 里去调。
+
+`comm_rank_defs` is the catalogue — one row per (scheme, rate), the **Ranks**
+tab (section IX). `comm_ranks` stays the ladder: one rung per title, holding
+the gates and `can_recruit`, with `rank_def_id` pointing at the rank it pays.
+The rung's `product_rate` / `label` / `sort_order` are trigger-kept copies of
+the rank's (`comm_ranks_follow_rank_def` on the way in,
+`comm_rank_defs_propagate` pushing a re-rate down), so the engine, the
+statements and the hierarchy read exactly what they read before. Letters are
+counted over the **catalogue**, so a rank nobody has put a title on yet still
+takes its place (add an 11% rank and Senior Team Leader's 10% becomes Rank A).
+A rank pays one title (`uq_comm_rank_def`); a rung written with only a rate —
+old code, a clone — is matched to the rank at that rate or mints one.
 
 A rung added above shifts every letter down — that is the point, the letters
 count from the top. `src/lib/commission/ranks.ts` (15 tests) is the one
@@ -862,12 +883,14 @@ PCB 0, WHT 200, net 9,800, then back to 0).
 >
 > The layout below is unchanged apart from the picker (see next paragraph).
 >
-> **Tabbed 2026-09-05.** The eight sections are a tab rail on the header's
-> rule — `?tab=scheme|ladder|groups|kpi|thresholds|open-bill|brands|promotion`
+> **Tabbed 2026-09-05.** The sections are a tab rail on the header's rule —
+> `?tab=scheme|ladder|groups|kpi|thresholds|open-bill|brands|promotion|ranks`
 > — one section on screen at a time, the numerals kept on the section heads.
 > *+ Generate new sub-department* moved into the header's action slot and
 > opens its panel above the active tab. Section IX, the salespeople, moved to
-> Staff Hierarchy's **Team** tab (§10) — beside the chart that moves them.
+> Staff Hierarchy's **Team** tab (§10) — beside the chart that moves them —
+> and the same evening the number went to the ninth tab, **Ranks** (§3.1):
+> the rate catalogue the ladder picks from.
 
 One page holds every rule, threshold and per-person tick, laid out as dense
 tables following `DESIGN.md` v3.0 (`.ledger-table`, `.num`, `.sect-head`).
@@ -892,13 +915,15 @@ Deposit gate                            [✓]        threshold  [ 50 ] % of orde
 Default rate mode                                  ( ) Fixed   (•) Variable
 ```
 
-**II. Title ladder** — `comm_ranks`. The first column is a **dropdown of the
-Revenue Department's titles** (2026-09-03, §3.1); the Rank column is a chip
-nobody types in — the letter counted from the top (§3.1, 2026-09-05). A blank
-row at the bottom adds a rung — its `rank_key` is minted from the title's
-initials and the rate, and the whole ladder is re-lettered and re-sequenced by
-rate on every save. A rung takes at most one gate: a monthly group-sales
-target, or an earned personal-sales streak (§3.1.1).
+**II. Title ladder** — `comm_ranks`. One rung per title. The **title is
+fixed** once the rung exists (2026-09-05 evening: "选好后 title 就是 fixed 的") —
+only the blank row at the bottom, the one that adds a rung, has the title
+dropdown (the Revenue Department's titles, §3.1). The **Rank column is a
+dropdown** of the catalogue (§3.1, "Rank B · 8%"; a rank another title holds is
+greyed with that title's name), and the **rate is read-only** — it follows the
+rank. Adding a rung mints its `rank_key` from the title's initials and the
+rank's rate. A rung takes at most one gate: a monthly group-sales target, or
+an earned personal-sales streak (§3.1.1).
 
 ```
 TITLE                       RANK          RATE    CAN RECRUIT   GROUP SALES TARGET   PERSONAL SALES STREAK
@@ -977,10 +1002,20 @@ FROM → TO      ALT   CRITERION              THRESHOLD        ENFORCED
 8% → 9%         1    KPI items per head     10                  [ ]
 ```
 
-**IX. Salespeople** — **moved 2026-09-05** to Staff Hierarchy's Team tab; see
-§10. It sat here as the per-person tick table with an upline picker on every
-row, which made two places to move somebody. Now the chart moves people and
-the table sets the rank, and they are two tabs of one page.
+**IX. Ranks** — `comm_rank_defs`, the catalogue (2026-09-05 evening, §3.1). One
+row per rank: the letter as a chip (counted from the top, never typed), the
+**rate** — the only place a rate is typed — and the title it is paid to. A
+blank row adds a rank; an unused rank can be removed; a rank a title sits on
+cannot. Re-rating a rank changes what every month from now pays on it; a month
+already computed keeps the rate it snapshotted. Adding a rank above the others
+moves every letter down, and a rank nobody has put a title on yet still holds
+its place.
+
+*(IX was the salespeople until earlier the same day — **moved** to Staff
+Hierarchy's Team tab, see §10. It sat here as the per-person tick table with an
+upline picker on every row, which made two places to move somebody. Now the
+chart moves people and the table sets the rank, and they are two tabs of one
+page.)*
 
 ---
 

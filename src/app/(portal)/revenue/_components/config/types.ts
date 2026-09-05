@@ -31,18 +31,36 @@ export interface SchemeRow {
   default_rate_mode: 'fixed' | 'variable'
 }
 
+/**
+ * A rank of the catalogue — one row of the Rank tab (2026-09-05). A rank is
+ * its rate; the letter is counted from the top of the catalogue by the app
+ * after every write (`resequenceLadder`, lib/commission/ranks.ts). A rung of
+ * the ladder points at one of these and copies its rate, label and order.
+ */
+export interface RankDefRow {
+  id: string
+  scheme_id: string
+  product_rate: number
+  /** "Rank B" — from the top of the catalogue. Rewritten after every write, never typed in. */
+  label: string
+  /** Rate order, 10/20/30 … from the lowest rate up. */
+  sort_order: number
+}
+
 export interface RankRow {
   id: string
-  /** The title (Team → Role & Permission) this rung belongs to. */
+  /** The title (Team → Role & Permission) this rung belongs to. Fixed once the rung exists. */
   title_id: string
+  /** The rank this rung pays — a row of `comm_rank_defs`, picked on the ladder. */
+  rank_def_id: string
   rank_key: string
   /**
-   * "Rank B" — the letter counted from the top of the ladder, maintained by
-   * `upsertRank` after every write (`lib/commission/ranks.ts`). Pages letter
-   * the rows they hold themselves rather than trusting this; it exists so the
-   * engine's warnings and SQL say the same thing the pages do.
+   * "Rank B" — a COPY of the rank's label, kept by the database trigger
+   * `comm_ranks_follow_rank_def` (and rewritten whenever the catalogue is
+   * re-lettered). Since 2026-09-05 pages may read it as it stands.
    */
   label: string
+  /** A COPY of the rank's rate, kept by the same trigger. Set on the Rank tab, never here. */
   product_rate: number
   can_recruit: boolean
   /** MONTHLY gate: group sales this month. Paid this rung, back down next month. */
@@ -176,6 +194,8 @@ export interface ProductRow {
 export interface CommissionSettingsData {
   /** Null while a sub-department exists but has no active scheme. */
   scheme: SchemeRow | null
+  /** The Rank tab: every rank of the scheme, whether or not a title sits on it. */
+  rankDefs: RankDefRow[]
   ranks: RankRow[]
   /** Titles a rung may belong to: every active title of a commission department. */
   titles: TitleRow[]
