@@ -60,7 +60,7 @@ export default function Promotion({
         <div className="font-serif text-sm text-ink mt-1.5">
           {ladder.level === null ? (
             <span className="italic text-muted">
-              {title} is not on the ladder yet — place it under Roles → Levels first.
+              {title} is not on the ladder yet — place it under Hierarchy → Levels first.
             </span>
           ) : next === null ? (
             <span className="italic text-muted">

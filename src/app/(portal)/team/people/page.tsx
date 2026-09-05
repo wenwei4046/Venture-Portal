@@ -16,18 +16,24 @@ export default async function PeopleManagementPage() {
   const user = await requirePermission('team')
   const supabase = await createClient()
 
-  const [{ data: staff }, { data: accounts }] = await Promise.all([
+  const [{ data: staff }, { data: accounts }, { data: levels }] = await Promise.all([
     supabase
       .from('hr_staff_costs')
       // Every status, not just 'active'. Deactivating somebody used to remove
       // them from the only page that lists people, which left no way back
       // except the database — the roster filters by status instead.
       .select(
-        'id, employee_name, employee_code, designation, user_id, status, resignation_date, nric, bank_account_no, hire_date, titles(name), departments(name), users!hr_staff_costs_user_id_fkey(email, is_active, last_seen_at)',
+        'id, employee_name, employee_code, designation, user_id, status, resignation_date, nric, bank_account_no, hire_date, titles(name, level_id), departments(name), users!hr_staff_costs_user_id_fkey(email, is_active, last_seen_at)',
       )
       .order('employee_name'),
     supabase.from('users').select('id, name, email, role, is_active').order('name'),
+    // The ladder: inside each department the roster reads from the top down.
+    supabase.from('title_levels').select('id, rank, name'),
   ])
+
+  const rungs = new Map(
+    ((levels ?? []) as Array<{ id: string; rank: number; name: string }>).map(l => [l.id, l]),
+  )
 
   void supabase.rpc('log_data_access', {
     p_resource_type: 'hr_staff_costs',
@@ -39,6 +45,7 @@ export default async function PeopleManagementPage() {
     /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
     const r = s as any
     const active = r.status !== 'inactive'
+    const rung = r.titles?.level_id ? (rungs.get(r.titles.level_id) ?? null) : null
     return {
       id: r.id,
       name: r.employee_name,
@@ -46,6 +53,8 @@ export default async function PeopleManagementPage() {
       // title_id is authoritative; designation is the free text it was
       // backfilled from and still what the InfoTech import writes.
       title: r.titles?.name ?? r.designation ?? null,
+      levelRank: rung?.rank ?? null,
+      levelName: rung?.name ?? null,
       department: r.departments?.name ?? null,
       active,
       resignedOn: r.resignation_date ?? null,

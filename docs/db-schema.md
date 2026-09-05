@@ -490,7 +490,8 @@ title_levels (
 One scale for the whole company, not one per department: the org chart compares
 ACROSS departments (an IT executive under the Marketing manager), and only a
 shared scale can. Several titles may share a rung within one department; a
-title with `level_id` NULL is outside the rule. Edited on Roles → Levels; RLS
+title with `level_id` NULL is outside the rule. Edited on Hierarchy → Levels
+(the board sat on Roles until 2026-09-05); the roster sorts by it, top down; RLS
 read = signed-in, write = hr scope. `ladder_insert_level(p_rank, p_name)` and
 `ladder_delete_level(p_id)` shift the ranks around a change atomically.
 

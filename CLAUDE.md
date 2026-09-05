@@ -42,12 +42,14 @@ src/
 │   │   │                              entries. No tab rail on the pages — the
 │   │   │                              sidebar is the only way between them.
 │   │   │                              Routes stay under /team/*. Roles =
-│   │   │                              titles + the **ladder** (Levels board,
-│   │   │                              2026-09-03: `title_levels`, one shared
-│   │   │                              scale; promotion climbs it, Hierarchy
-│   │   │                              obeys it — `lib/ladder.ts`).
-│   │   │                              Permissions = the matrix, split off the
-│   │   │                              same day.
+│   │   │                              titles. Hierarchy = the **ladder**
+│   │   │                              (Levels board — `title_levels`, one
+│   │   │                              shared scale, 2026-09-03; moved off
+│   │   │                              Roles onto Hierarchy 2026-09-05) above
+│   │   │                              the org chart that obeys it; promotion
+│   │   │                              climbs it; the roster sorts by it, top
+│   │   │                              down — `lib/ladder.ts`. Permissions =
+│   │   │                              the matrix, split off 2026-09-03.
 │   │   ├── director-salary/         (Phase 3)
 │   │   ├── hr-costing/              (Phase 3 — staff directory moved to team/)
 │   │   ├── revenue/                 ← Revenue Department: [sub]/ = one sub-department
