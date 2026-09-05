@@ -6,6 +6,9 @@ import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
 import LedgerRow from '@/components/LedgerRow'
 import { requireSubDepartment } from '../_lib/sub-departments'
+import { loadErpSyncPanelData } from '../_lib/erp-sync-panel'
+import ErpSyncPanel from '../_components/ErpSyncPanel'
+import { formatAgo } from '@/lib/erp-sync/format'
 
 interface PageProps {
   params: Promise<{ sub: string }>
@@ -37,16 +40,17 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
 
   const thisPeriod = getPeriodMonth()
 
-  const [{ data: batches }, { data: runs }] = await Promise.all([
+  const [{ data: batches }, { data: runs }, sync] = await Promise.all([
     supabase
       .from('sales_import_batches')
-      .select('id, period_month, file_name, order_count, out_of_period_count, cancelled_count, unmatched_agent_count, created_at')
+      .select('id, period_month, file_name, source, last_synced_at, order_count, out_of_period_count, cancelled_count, unmatched_agent_count, created_at')
       .eq('status', 'committed')
       .order('period_month', { ascending: false }),
     supabase
       .from('comm_runs')
       .select('period_month, status, total_commission, staff_count')
       .eq('sub_department_id', subDept.id),
+    loadErpSyncPanelData(supabase),
   ])
 
   const runByPeriod = new Map(
@@ -58,6 +62,8 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
     id: string
     period_month: string
     file_name: string
+    source: string
+    last_synced_at: string | null
     order_count: number
     unmatched_agent_count: number
     created_at: string
@@ -109,7 +115,7 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
                   <th className="right m-hide">Unmatched agents</th>
                   <th className="m-hide">Run</th>
                   <th className="right">Commission</th>
-                  <th className="m-hide">Source file</th>
+                  <th className="m-hide">Source</th>
                   <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
@@ -140,7 +146,13 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
                       <td className="num">
                         {run ? formatMoney(Number(run.total_commission)) : '—'}
                       </td>
-                      <td className="font-mono text-xs text-muted m-hide" data-label="Source file">{b.file_name}</td>
+                      <td className="font-mono text-xs text-muted m-hide" data-label="Source">
+                        {b.source === 'erp_sync' ? (
+                          <span className="text-ledger">ERP live · {formatAgo(b.last_synced_at)}</span>
+                        ) : (
+                          b.file_name
+                        )}
+                      </td>
                     </LedgerRow>
                   )
                 })}
@@ -151,10 +163,11 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
       ) : (
         <div className="py-16 text-center border border-hairline rounded-md bg-surface">
           <p className="font-serif italic text-accent text-sm mb-2">{label(thisPeriod)}</p>
-          <p className="font-serif text-2xl text-ink mb-3">No sales data imported yet.</p>
+          <p className="font-serif text-2xl text-ink mb-3">No sales data yet.</p>
           <p className="font-serif italic text-muted text-sm mb-8 max-w-lg mx-auto">
-            Commission is worked out from the ERP sales-order export — one row per product line,
-            with the salesperson on each order. Import a month to begin.
+            Commission is worked out from the ERP&apos;s sales orders — one row per product line,
+            with the salesperson on each order. They arrive live from the ERP once its feed is
+            switched on; until then, import a month&apos;s export to begin.
           </p>
           <Link
             href={revenuePath(subDept.slug, thisPeriod, 'import')}
@@ -164,6 +177,8 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
           </Link>
         </div>
       )}
+
+      <ErpSyncPanel data={sync} />
     </div>
   )
 }

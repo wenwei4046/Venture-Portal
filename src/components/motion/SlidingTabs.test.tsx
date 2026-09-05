@@ -23,6 +23,39 @@ describe('SlidingTabs', () => {
     expect(onChange).toHaveBeenCalledWith('tiers')
   })
 
+  it('shows a count after the label when the item carries one', () => {
+    render(
+      <SlidingTabs
+        items={[{ key: 'chart', label: 'Hierarchy' }, { key: 'team', label: 'Team', count: 26 }]}
+        active="chart"
+        onTabChange={() => {}}
+      />
+    )
+    expect(screen.getByRole('button', { name: 'Team 26' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Hierarchy' })).toBeDefined()
+  })
+
+  it('control variant sets the labels in the body face, upright, on their own hover surface', () => {
+    render(<SlidingTabs items={tabs} active="treasury" onTabChange={() => {}} variant="control" />)
+    const active = screen.getByRole('button', { name: 'Treasury' })
+    const idle = screen.getByRole('button', { name: 'Overdue' })
+    // The user asked for "正常 formal 的字体" (2026-09-05): no mono, no caps.
+    expect(active.className).toContain('font-sans')
+    expect(active.className).not.toContain('font-mono')
+    expect(active.className).not.toContain('uppercase')
+    expect(active.className).toContain('text-accent')
+    expect(idle.className).toContain('hover:bg-surface-2/70')
+    expect(active.closest('nav')?.getAttribute('data-variant')).toBe('control')
+  })
+
+  it('defaults to the text variant', () => {
+    render(<SlidingTabs items={tabs} active="treasury" onTabChange={() => {}} />)
+    const active = screen.getByRole('button', { name: 'Treasury' })
+    expect(active.className).toContain('font-serif')
+    expect(active.className).not.toContain('hover:bg-surface-2/70')
+    expect(active.closest('nav')?.getAttribute('data-variant')).toBe('text')
+  })
+
   it('renders the indicator bar element', () => {
     const { container } = render(
       <SlidingTabs items={tabs} active="treasury" onTabChange={() => {}} />

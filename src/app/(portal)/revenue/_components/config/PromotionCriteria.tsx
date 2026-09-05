@@ -81,10 +81,12 @@ function StepBlock({
         <h3 className="m-0 text-base font-semibold text-ink">
           {step.fromLabel} <span className="font-normal text-muted">→</span> {step.toLabel}
         </h3>
-        <span className="font-mono text-xs text-muted">
-          {step.fromKey} → {step.toKey}
-          {step.onLadder ? '' : ' · not two adjacent rungs'}
-        </span>
+        {/* The rank keys used to sit here (rs_5 → rs_6); the user had them
+            taken out on 2026-09-05 — the letters say it. Only the anomaly
+            still speaks. */}
+        {step.onLadder ? null : (
+          <span className="font-mono text-[11px] text-muted">not two adjacent rungs</span>
+        )}
         <span className="ml-auto font-mono text-[11px] uppercase tracking-[0.04em] text-muted">
           {stepLogic(step)}
         </span>

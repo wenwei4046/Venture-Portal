@@ -57,6 +57,7 @@ When you're not sure how a pattern looks in code, copy from one of these — the
 | Multi-column hero summary | `src/app/(portal)/payments/page.tsx` |
 | Hero number + side stats | `src/app/(portal)/director-salary/page.tsx` |
 | Section-grouped tables | `src/app/(portal)/statements/page.tsx`, `src/app/(portal)/overdue/page.tsx` |
+| Tab rail on the header's rule (`.page-head.tabbed` + `SlidingTabs`) | `src/app/(portal)/revenue/_components/config/CommissionSection.tsx`, `src/app/(portal)/revenue/[sub]/hierarchy/_components/HierarchyTabs.tsx` |
 | Hero + dept totals + history | `src/app/(portal)/hr-costing/page.tsx` |
 | Pure read-only ledger | `src/app/(portal)/audit-log/page.tsx` |
 | Sidebar (roman numerals + dot markers) | `src/components/layout/Sidebar.tsx` |
@@ -507,6 +508,16 @@ wants to go properly dark.)
 Settings is a single page driven by a tab key in the URL (`?tab=treasury|overdue|splits|directors|companies|banks|periods|simulator`). Each tab renders its own section component. There are 8 tabs total — see `src/app/(portal)/settings/page.tsx` for the canonical mounting.
 
 Forms use serif section headings + italic subheads + sans labels + mono inputs for numbers. The buffer amount field was removed in mig 57 (no longer applicable). The tier system was removed in mig 63 — no Tier Premiums tab exists.
+
+### Tabbed pages — the rail on the header's rule
+
+A page whose body is a tab rail (Revenue › Rules, Revenue › Staff Hierarchy, 2026-09-05) puts the rail **on the header's rule**, not under a second one: `<div className="page-head tabbed">` drops the header's bottom border and its 64px accent segment, and the `SlidingTabs` nav directly beneath supplies the hairline — its accent indicator under the active tab *is* the header's accent segment, moved to where the reader is. Settings predates this and still stacks two rules; leave it until it is next touched.
+
+The tab is `?tab=<key>`, so a link can open the page on a section. Push it with the browser's own history (`window.history.pushState(null, '', '?tab=…')`) — Next syncs `useSearchParams` from it and no server round trip happens; read the active key from `useSearchParams()` and render the one section. A tab may carry a small mono count (`TabItem.count` — "Team 26").
+
+On a tabbed header the rail takes **`variant="control"`**: labels in the body face — Inter 13px medium, upright, sentence case — each on its own `rounded-t-control` hover surface with the indicator under the label, and the header keeps 18px clear above them. With no rule between the intro and the tabs, plain text labels read as one more line of the intro (user 2026-09-05); the hover surface and the indicator are what make them read as things to pick. The first cut set them in mono caps and the user asked for "正常 formal 的字体" the same day — the control voice (mono caps) stays for table heads, chips and eyebrows, not for tab labels. Rails below a bordered header keep the default `text` variant.
+
+Tabs are for the **sections of one view**. Choosing between *views* of a thing (Comm Cal / Staff Hierarchy / Rules of a sub-department, the four People pages) is navigation and lives in the sidebar — see the 2026-09-01 removals in `nav-config.ts`.
 
 ---
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  compareByLadder,
   ladderAllows,
   ladderBreaks,
   ladderRefusal,
@@ -141,5 +142,55 @@ describe('ladderBreaks', () => {
 
   it('is empty when the chart obeys the ladder', () => {
     expect(ladderBreaks(people.filter(p => p.id !== 'tammy'))).toEqual([])
+  })
+})
+
+describe('compareByLadder', () => {
+  const p = (name: string, title: string | null, levelRank: number | null) => ({
+    name,
+    title,
+    levelRank,
+  })
+
+  it('reads a department top down — same title together, names A→Z on a rung', () => {
+    // The Revenue Department roster as the user drew it (2026-09-05): the two
+    // L6 titles stay apart from each other, then L3, then L2.
+    const roster = [
+      p('ETHAN', 'Revenue Specialist', 2),
+      p('ANTHONY', 'Team Leader', 6),
+      p('LUCAS', 'Senior Team Leader', 6),
+      p('ESTHER', 'Revenue Specialist', 2),
+      p('CHEA HUAN', 'Team Leader', 6),
+      p('KAR JUN', 'Senior Revenue Specialist', 3),
+    ]
+    expect([...roster].sort(compareByLadder).map(x => x.name)).toEqual([
+      'LUCAS',
+      'ANTHONY',
+      'CHEA HUAN',
+      'KAR JUN',
+      'ESTHER',
+      'ETHAN',
+    ])
+  })
+
+  it('puts an unplaced title after every placed one, and no title last of all', () => {
+    const roster = [
+      p('NO TITLE', null, null),
+      p('UNPLACED', 'IT DEVELOPER EXECUTIVE', null),
+      p('PLACED', 'ACCOUNTS ASSISTANT', 1),
+    ]
+    expect([...roster].sort(compareByLadder).map(x => x.name)).toEqual([
+      'PLACED',
+      'UNPLACED',
+      'NO TITLE',
+    ])
+  })
+
+  it('is a total order: antisymmetric, and zero only for the same row', () => {
+    const a = p('A', 'X', 2)
+    const b = p('B', 'X', 2)
+    expect(Math.sign(compareByLadder(a, b))).toBe(-Math.sign(compareByLadder(b, a)))
+    expect(compareByLadder(a, { ...a })).toBe(0)
+    expect(compareByLadder(p('Z', null, null), p('A', 'T', null))).toBeGreaterThan(0)
   })
 })

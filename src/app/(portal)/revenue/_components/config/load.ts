@@ -1,7 +1,15 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import type { CommissionSettingsData, ProductRow, SalespersonRow, SchemeRow, TitleRow } from './types'
+import type {
+  CommissionSettingsData,
+  ProductRow,
+  RankRow,
+  SalespersonRow,
+  SchemeRow,
+  TeamData,
+  TitleRow,
+} from './types'
 
 /**
  * Everything the Rules page renders for ONE sub-department, in one round
@@ -58,7 +66,6 @@ export async function loadCommissionSettings(
     brands: [],
     marginBands: [],
     promotionRules: [],
-    salespeople: [],
     subDepartments: rows(subDepartments.data),
     allSchemes: rows(allSchemes.data),
     commissionDepartments: rows(departments.data),
@@ -88,68 +95,6 @@ export async function loadCommissionSettings(
     supabase.from('comm_promotion_rules').select('*').eq('scheme_id', schemeId).order('from_rank_key').order('alternative_group'),
   ])
 
-  // Salespeople: staff in a commission department who either sit in THIS
-  // scheme or sit nowhere yet. `comm_hierarchy` allows one open position per
-  // person across every scheme, so somebody already placed in another
-  // sub-department is not offered here — moving them means ending that
-  // position, not drawing a second one.
-  const { data: staffRows } = await supabase
-    .from('hr_staff_costs')
-    .select('id, employee_name, employee_code, tax_mode, withholding_rate, title_id, titles (name), departments!inner (name, payroll_source)')
-    .eq('status', 'active')
-    .eq('departments.payroll_source', 'commission')
-    .order('employee_name')
-
-  const { data: positions } = await supabase
-    .from('comm_hierarchy')
-    .select('id, staff_id, scheme_id, upline_staff_id, rank_id, rate_mode, comm_ranks (rank_key, label)')
-    .is('effective_to', null)
-
-  const positionByStaff = new Map(
-    rows<{
-      id: string
-      staff_id: string
-      scheme_id: string
-      upline_staff_id: string | null
-      rank_id: string
-      rate_mode: 'fixed' | 'variable' | null
-      comm_ranks: { rank_key: string; label: string } | null
-    }>(positions).map(p => [p.staff_id, p]),
-  )
-
-  const salespeople: SalespersonRow[] = rows<{
-    id: string
-    employee_name: string
-    employee_code: string | null
-    tax_mode: 'pcb' | 'withholding' | 'none' | null
-    withholding_rate: number | null
-    title_id: string | null
-    titles: { name: string } | { name: string }[] | null
-  }>(staffRows)
-    .filter(s => {
-      const pos = positionByStaff.get(s.id)
-      return !pos || pos.scheme_id === schemeId
-    })
-    .map(s => {
-      const pos = positionByStaff.get(s.id)
-      const title = Array.isArray(s.titles) ? (s.titles[0] ?? null) : s.titles
-      return {
-        staff_id: s.id,
-        employee_name: s.employee_name,
-        employee_code: s.employee_code,
-        title_id: s.title_id ?? null,
-        title_name: title?.name ?? null,
-        hierarchy_id: pos?.id ?? null,
-        upline_staff_id: pos?.upline_staff_id ?? null,
-        rank_id: pos?.rank_id ?? null,
-        rank_key: pos?.comm_ranks?.rank_key ?? null,
-        rank_label: pos?.comm_ranks?.label ?? null,
-        rate_mode: pos?.rate_mode ?? null,
-        tax_mode: s.tax_mode ?? 'pcb',
-        withholding_rate: Number(s.withholding_rate ?? 0.02),
-      }
-    })
-
   return {
     ...shell,
     scheme: (scheme.data as SchemeRow | null) ?? null,
@@ -161,8 +106,100 @@ export async function loadCommissionSettings(
     brands: rows(brands.data),
     marginBands: rows(marginBands.data),
     promotionRules: rows(promotionRules.data),
-    salespeople,
   }
+}
+
+/**
+ * Staff Hierarchy's load — the ladder and the people, for BOTH of its tabs.
+ * The org chart and the Team table are two views of one `comm_hierarchy`
+ * read (user 2026-09-05: move somebody on the chart and the table follows),
+ * so they are handed the same rows rather than each reading their own.
+ *
+ * People: staff in a commission department who either sit in THIS scheme or
+ * sit nowhere yet. `comm_hierarchy` allows one open position per person
+ * across every scheme, so somebody already placed in another sub-department
+ * is not offered here — moving them means ending that position, not drawing
+ * a second one.
+ */
+export async function loadTeam(schemeId: string): Promise<TeamData> {
+  const supabase = await untyped()
+
+  const [{ data: rankRows }, { data: staffRows }, { data: positions }, { data: levelRows }] =
+    await Promise.all([
+      supabase.from('comm_ranks').select('*').eq('scheme_id', schemeId).order('sort_order'),
+      supabase
+        .from('hr_staff_costs')
+        .select('id, employee_name, employee_code, tax_mode, withholding_rate, title_id, titles (name, level_id), departments!inner (name, payroll_source)')
+        .eq('status', 'active')
+        .eq('departments.payroll_source', 'commission')
+        .order('employee_name'),
+      supabase
+        .from('comm_hierarchy')
+        .select('id, staff_id, scheme_id, upline_staff_id, rank_id, rate_mode, effective_from, comm_ranks (rank_key, label)')
+        .is('effective_to', null),
+      // The company ladder: the Team table reads it top down (user, 2026-09-05).
+      supabase.from('title_levels').select('id, rank, name'),
+    ])
+
+  const rungByLevel = new Map(
+    rows<{ id: string; rank: number; name: string }>(levelRows).map(l => [l.id, l]),
+  )
+
+  const positionByStaff = new Map(
+    rows<{
+      id: string
+      staff_id: string
+      scheme_id: string
+      upline_staff_id: string | null
+      rank_id: string
+      rate_mode: 'fixed' | 'variable' | null
+      effective_from: string
+      comm_ranks: { rank_key: string; label: string } | { rank_key: string; label: string }[] | null
+    }>(positions).map(p => [p.staff_id, p]),
+  )
+
+  const people: SalespersonRow[] = rows<{
+    id: string
+    employee_name: string
+    employee_code: string | null
+    tax_mode: 'pcb' | 'withholding' | 'none' | null
+    withholding_rate: number | null
+    title_id: string | null
+    titles:
+      | { name: string; level_id: string | null }
+      | { name: string; level_id: string | null }[]
+      | null
+  }>(staffRows)
+    .filter(s => {
+      const pos = positionByStaff.get(s.id)
+      return !pos || pos.scheme_id === schemeId
+    })
+    .map(s => {
+      const pos = positionByStaff.get(s.id)
+      const title = Array.isArray(s.titles) ? (s.titles[0] ?? null) : s.titles
+      const rung = title?.level_id ? (rungByLevel.get(title.level_id) ?? null) : null
+      const rank = Array.isArray(pos?.comm_ranks) ? (pos?.comm_ranks[0] ?? null) : (pos?.comm_ranks ?? null)
+      return {
+        staff_id: s.id,
+        employee_name: s.employee_name,
+        employee_code: s.employee_code,
+        title_id: s.title_id ?? null,
+        title_name: title?.name ?? null,
+        title_level_rank: rung?.rank ?? null,
+        title_level_name: rung?.name ?? null,
+        hierarchy_id: pos?.id ?? null,
+        upline_staff_id: pos?.upline_staff_id ?? null,
+        rank_id: pos?.rank_id ?? null,
+        rank_key: rank?.rank_key ?? null,
+        rank_label: rank?.label ?? null,
+        rate_mode: pos?.rate_mode ?? null,
+        placed_since: pos?.effective_from ?? null,
+        tax_mode: s.tax_mode ?? 'pcb',
+        withholding_rate: Number(s.withholding_rate ?? 0.02),
+      }
+    })
+
+  return { ranks: rows<RankRow>(rankRows), people }
 }
 
 export async function loadProducts(): Promise<ProductRow[]> {

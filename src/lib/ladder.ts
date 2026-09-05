@@ -146,3 +146,28 @@ export function ladderBreaks(
   }
   return out
 }
+
+/** Somebody on the roster, as far as the ladder is concerned. */
+export interface LadderOrderable {
+  name: string
+  title: string | null
+  /** The rung their title stands on; null = unplaced title, or no title. */
+  levelRank: number | null
+}
+
+/**
+ * The roster's order inside a department: the ladder, top down (user,
+ * 2026-09-05). Higher rung first; on one rung the same title keeps together,
+ * A→Z; then names A→Z. Somebody whose title is not on the ladder — or who has
+ * no title — comes after everybody who is: the ladder has nothing to say about
+ * where they stand, so they stand at the end, no title last of all.
+ */
+export function compareByLadder(a: LadderOrderable, b: LadderOrderable): number {
+  if (a.levelRank !== b.levelRank) {
+    if (a.levelRank === null) return 1
+    if (b.levelRank === null) return -1
+    return b.levelRank - a.levelRank
+  }
+  if ((a.title === null) !== (b.title === null)) return a.title === null ? 1 : -1
+  return (a.title ?? '').localeCompare(b.title ?? '') || a.name.localeCompare(b.name)
+}
