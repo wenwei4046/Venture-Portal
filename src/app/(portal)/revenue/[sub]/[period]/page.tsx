@@ -101,7 +101,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
 
   const { data: batch } = await supabase
     .from('sales_import_batches')
-    .select('id, file_name, order_count, out_of_period_count, cancelled_count, unmatched_agent_count, created_at')
+    .select('id, file_name, source, order_count, out_of_period_count, cancelled_count, unmatched_agent_count, created_at')
     .eq('period_month', period)
     .eq('status', 'committed')
     .maybeSingle()
@@ -109,6 +109,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   const batchRow = batch as {
     id: string
     file_name: string
+    source: string
     order_count: number
     out_of_period_count: number
     cancelled_count: number
@@ -120,6 +121,9 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         .from('sales_orders')
         .select('id, order_no, agent_name, agent_key, staff_id, brand_code, order_total, paid_amount, manual_margin_pct, sequence_in_day, hr_staff_costs (employee_name)')
         .eq('batch_id', batchRow.id)
+        // A live month carries its excluded orders (cancelled, held, draft) so
+        // the feed can bring them back; the money below is the live ones'.
+        .eq('cancelled', false)
     : { data: null }
 
   const orders = ((orderRows ?? []) as unknown as Array<{
@@ -241,12 +245,18 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
           >
             ← All months
           </Link>
-          <Link
-            href={revenuePath(subDept.slug, period, 'import')}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
-          >
-            {batchRow ? 'Re-import' : 'Import sales orders'}
-          </Link>
+          {batchRow?.source === 'erp_sync' ? (
+            <span className="font-mono text-[11px] uppercase tracking-[0.02em] text-ledger border border-hairline bg-surface px-3 py-2 rounded-control">
+              Live from ERP
+            </span>
+          ) : (
+            <Link
+              href={revenuePath(subDept.slug, period, 'import')}
+              className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
+            >
+              {batchRow ? 'Re-import' : 'Import sales orders'}
+            </Link>
+          )}
         </div>
       </div>
 
@@ -579,7 +589,10 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
               <Link href={revenuePath(subDept.slug, period, 'open-bill')} className="text-accent hover:underline">
                 Review the Open Bill picks
               </Link>{' '}
-              before computing: they are seeded from the document number, not from a real timestamp.
+              before computing:{' '}
+              {batchRow?.source === 'erp_sync'
+                ? 'the ERP feed suggests them from each order’s real creation time and re-suggests as orders arrive; a pick you make yourself is never touched.'
+                : 'they are seeded from the document number, not from a real timestamp.'}
             </p>
           </section>
         </>
