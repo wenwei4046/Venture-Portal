@@ -1003,10 +1003,11 @@ FROM → TO      ALT   CRITERION              THRESHOLD        ENFORCED
 ```
 
 **IX. Ranks** — `comm_rank_defs`, the catalogue (2026-09-05 evening, §3.1). One
-row per rank: the letter as a chip (counted from the top, never typed), the
-**rate** — the only place a rate is typed — and the title it is paid to. A
-blank row adds a rank; an unused rank can be removed; a rank a title sits on
-cannot. Re-rating a rank changes what every month from now pays on it; a month
+row per rank: the letter as a chip (counted from the top, never typed) and the
+**rate** — the only place a rate is typed. Nothing else: which title a rank is
+paid to is the ladder's business, not this tab's (user 2026-09-06, "这边主要是
+setting for rate"). A blank row adds a rank; an unused rank can be removed; a
+rank a title sits on cannot. Re-rating a rank changes what every month from now pays on it; a month
 already computed keeps the rate it snapshotted. Adding a rank above the others
 moves every letter down, and a rank nobody has put a title on yet still holds
 its place.
