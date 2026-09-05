@@ -1031,7 +1031,7 @@ Q1, Q8 and a separate scope.
 
 | # | Question | Why it matters |
 |---|---|---|
-| **Q1** | **Where does cost come from?** The sales-order export has no cost column, so margin — and therefore the whole penalty/incentive layer — cannot be computed. Either a cost price per Item Code, or a second ERP export carrying cost or margin per line. | blocks the entire margin layer |
+| ~~**Q1**~~ | ~~**Where does cost come from?** The sales-order export has no cost column…~~ **Answered 2026-09-05 by the ERP live feed (§14):** every delivered line carries the ERP's `line_cost_sen`, stamped onto `sales_order_lines.cost_amount`; the Product List is the fallback for a line the ERP sends without one. Only file-imported months still depend on the Product List. | closed for live months |
 | **Q2** | The **staff list** for the ~39 salespeople — names, NRIC, bank accounts, hire dates, sub-department, upline, attained rank, manual/scheme rate mode, and who is withheld. | nothing can run until they exist in `hr_staff_costs` |
 | **Q3** | **Brand mapping** for Zanotti and Ergotex. Akemi is seeded as `AK-` / `AKE` (those codes carry AKEMI product descriptions). The July export's other prefixes are `NTYR- JM- AERO- HOK- DSL- AMN- CH-` — which belong to which brand, and what happens to the ones that belong to none? | an order that resolves to no brand blocks that person's incentive |
 | **Q4** | The **KPI product list**: which of the 26 ACC item codes, at what amount? Sizing check — RM50 on the five commonest pillow codes would have paid **≈ RM63,000** of KPI in July against ≈ RM141,000 of product commission at a flat 5%. | drives `comm_kpi_items` |
@@ -1041,6 +1041,47 @@ Q1, Q8 and a separate scope.
 | **Q9** | Is the deposit threshold really **50%**, and is it the same for every sub-department? | it is a per-scheme setting; 50% is seeded |
 | **Q10** | Should the Revenue Dept manager (`dept_manager` role) see their team's commission? | RLS scope; DENY for now |
 | ~~**Q11**~~ | ~~A 5% Revenue Specialist who sells 300k on their own is paid at 7% and titled Team Assistant, skipping 6%.~~ **Answered 2026-09-03: no skipping.** They stay a Specialist until two months running of 100k make them Senior; only then does the 300k gate apply. Built as the earned streak gate + one-rung-per-month rule (§3.1.1). | closed |
+
+---
+
+## 14. ERP live feed (2026-09-05)
+
+The xlsx import is no longer the only way sales orders arrive. The Houzs ERP
+(`Houzs-Century/Houzs-ERP`, a Cloudflare Worker over Supabase) **pushes every
+changed sales order to the portal seconds after it is saved**, using the same
+outbox + pg_cron + pg_net shape it already runs for its 2990 POS mirror. The
+portal upserts it into the SAME `sales_*` tables, so nothing below the import
+step changed.
+
+```
+scm.mfg_sales_orders (+items, +payments)  ── AFTER trigger ──▶  scm.venture_portal_outbox
+        pg_cron 10 s → net.http_post ──▶  POST /api/erp/v1/sales-orders   (x-sync-secret)
+                                              │  src/lib/erp-sync/contract.ts  (sen→RM, PII off, statuses)
+                                              ▼
+                                   ingest_erp_sales_order(p_order)   [atomic RPC]
+                                              │
+                       sales_import_batches (source = 'erp_sync', ONE per period, stays committed)
+                       sales_orders (upsert by doc no) + sales_order_lines (replaced) + Open Bill suggestions
+                       erp_sync_events (every delivery, its outcome, held payloads)
+```
+
+What the feed changes, and what it does not:
+
+| | |
+|---|---|
+| One committed batch per period | unchanged — a live month has ONE `erp_sync` batch that orders are upserted into; the importer refuses a live month and the feed holds deliveries for a file-imported one |
+| `cancelled` | for a live order means *excluded from commission*; `erp_status` / `erp_on_hold` say why. The ERP's own rule is mirrored: CANCELLED / DRAFT / the hold marker earn nothing, **CLOSED still earns** |
+| cost | now per line from the ERP (Q1 closed) |
+| brand | the ERP's `branding` column first, then the lines, then the Item Code prefixes |
+| salesperson | the ERP's `scm.staff` uuid, matched once on the Comm Cal page and remembered (`comm_agent_aliases.erp_salesperson_id`); the spelling match is the fallback |
+| Open Bill | the ERP has a real creation time, so 1st/2nd/3rd bill of the day is derived from it and re-suggested as orders arrive; human picks are never touched |
+| applied / locked months | the feed never writes into them — the delivery is **held** with its payload, counted on the Comm Cal page, and replayed by a human after `reopen_commission_run`. Cross-period clawback is still §13 |
+| ordering | `snapshotAt` from the ERP; an older snapshot arriving late is ignored |
+| the Comm Cal page | shows the feed: last event N s ago, salespeople to match, held deliveries per month with Replay, the last 15 deliveries |
+
+The contract the ERP team builds against, and the SQL they apply, live in
+`docs/erp-sync/`. The receiver is the portal's only POST route handler — the
+machine-ingest exception in CLAUDE.md.
 
 ---
 

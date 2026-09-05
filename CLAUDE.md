@@ -14,6 +14,7 @@ Environment Variables
 NEXT_PUBLIC_SUPABASE_URL=https://gixpptmfuryskbwkmiwz.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpeHBwdG1mdXJ5c2tid2ttaXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3MzgzOTAsImV4cCI6MjA5MTMxNDM5MH0.7ahinbJZ7VpxeSiOpWznmbTdc_agDQ5kNkaPqPbFe6k>
 SUPABASE_SERVICE_ROLE_KEY=<eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpeHBwdG1mdXJ5c2tid2ttaXd6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTczODM5MCwiZXhwIjoyMDkxMzE0MzkwfQ.evFBJixWz9d3-shRC08X6Rg_3Fviw2AGxvPhIz85pGU>
+ERP_SYNC_SECRET=<≥32 chars; shared with the Houzs ERP database (scm.venture_portal_sync_config vp.secret). Set on Vercel Production — until it is, /api/erp/* answers 503>
 ```
 Repository
 ```
@@ -57,7 +58,11 @@ src/
 │   │   │                              [sub]/[period]/ runs and products/ (Principal)
 │   │   ├── reports/                 (Phase 3)
 │   │   └── settings/                ← 8 tabs: treasury / overdue / splits / directors / companies / banks / periods / simulator
-│   └── (no api/ folder — uses Server Actions, not Route Handlers)
+│   └── api/erp/v1/                 ← the ONE machine endpoint: the Houzs ERP live
+│                                      feed's receiver (sales-orders POST + health
+│                                      GET). The only POST route handler in the app —
+│                                      see the machine-ingest exception under Coding
+│                                      Conventions. Everything else stays Server Actions.
 ├── components/
 │   └── layout/                     ← Sidebar, TopBar
 ├── lib/
@@ -109,6 +114,11 @@ module-spec-revenue-commission.md — Revenue Department commission payroll: the
   touching anything under `comm_*` / `sales_*` or `/revenue`. §3.0 explains the
   routing: every page is scoped to a sub-department (`/revenue/fair/rules`) and
   the sidebar's Revenue children are database rows, not constants.
+erp-sync/contract.md — the Houzs ERP → portal LIVE sales-order feed (2026-09-05):
+  the receiver at `/api/erp/v1/sales-orders`, the delivery shape (the ERP's own
+  rows, verbatim), what each outcome means, and the three SQL files the ERP
+  team applies on their side (`docs/erp-sync/houzs-erp-side/`). Read this before
+  touching `src/lib/erp-sync/`, `src/app/api/erp/` or `ingest_erp_sales_order`.
 DESIGN.md — v3.0 Ledger-Dense design system. **Single source of truth for all UI.** Colors, typography, components, page anatomy, the v3.0 utility classes (`.num`, `.ledger-table`, `.page-head`, etc), and canonical reference pages.
 ALWAYS reference these docs before implementing any feature.
 
@@ -191,6 +201,7 @@ TypeScript strict mode — no `any`
 Server Components by default — Client Components only when needed (forms, interactive widgets)
 Writes — use Server Actions (`'use server'`), NOT API Route Handlers. Every action calls `requireRole(...)` at entry.
 Read-only file downloads (PDF, CSV, ZIP binary streams) — GET Route Handlers (`app/**/route.ts`) are OK because Server Actions can't stream binary responses cleanly. Still call `requireRole(...)` at entry. Never accept write-side params — POST/PUT/DELETE route handlers remain forbidden. Locked by user 2026-04-17 (Spec 5 blocker Q5).
+Machine ingest — the ONE exception to the rule above (2026-09-05, ERP live sync): another SYSTEM pushing data in (the Houzs ERP's database via pg_net) cannot call a Server Action and has no session, so it gets a POST Route Handler under `app/api/<system>/v<n>/`. The exception is narrow and every part of it is required: a static shared secret from env compared in constant time and failing closed when unset (never a session, never a query param); the service-role client used for ONE thing — calling a single ingest RPC that owns every write; the path excluded from `middleware.ts`; every delivery logged (`erp_sync_events`); 2xx for every delivery the portal chose not to apply, because the sender's outbox retries non-2xx forever. Nothing a browser calls may ever be a POST handler.
 Supabase client — server-side (`lib/supabase/server.ts`) uses anon key with RLS via SSR cookies. Service role client (`admin.ts`) is dormant + `'server-only'` guarded; avoid unless you truly need to bypass RLS.
 Aggregate queries — prefer RPC functions (`dashboard_summary`, `get_hr_cost_summary`) over scattered per-field selects. Single round-trip, clearer intent, easier to unit test at SQL level.
 Error handling — Server Actions throw, pages use error boundaries, never return `{ data, error }` to the client

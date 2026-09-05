@@ -115,6 +115,21 @@ export async function commitSalesImport(input: CommitInput): Promise<CommitResul
     )
   }
 
+  // A month the ERP feeds live is not replaced by a file: the import would
+  // supersede the live batch and every later delivery would be held.
+  const { data: liveBatch } = await supabase
+    .from('sales_import_batches')
+    .select('id')
+    .eq('period_month', input.periodMonth)
+    .eq('status', 'committed')
+    .eq('source', 'erp_sync')
+    .maybeSingle()
+  if (liveBatch) {
+    throw new Error(
+      `${input.periodMonth.slice(0, 7)} is fed live from the ERP. A file import would replace what the feed delivered — it is not needed for a live month.`,
+    )
+  }
+
   // ── Resolve agents ─────────────────────────────────────────────────────
   const { data: aliasRows } = await supabase.from('comm_agent_aliases').select('agent_key, staff_id')
   const staffByAgent = new Map(
