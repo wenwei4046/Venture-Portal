@@ -142,7 +142,10 @@ export async function createSubDepartment(formData: FormData) {
 
 /**
  * Copy every rule row from one scheme to another. Brands are copied first
- * because the margin bands hang off them and need the NEW brand ids.
+ * because the margin bands hang off them and need the NEW brand ids; the
+ * ranks (the catalogue) before the rungs, which are copied with only their
+ * rate — the trigger `comm_ranks_follow_rank_def` matches each to the new
+ * scheme's rank at that rate.
  */
 async function cloneSchemeChildren(
   supabase: SupabaseClient,
@@ -150,6 +153,7 @@ async function cloneSchemeChildren(
   toSchemeId: string,
 ) {
   const simple: Array<[table: string, columns: string[]]> = [
+    ['comm_rank_defs', ['product_rate', 'label', 'sort_order']],
     ['comm_ranks', ['title_id', 'rank_key', 'label', 'product_rate', 'can_recruit', 'group_sales_threshold', 'personal_sales_threshold', 'consecutive_months', 'sort_order']],
     ['comm_item_groups', ['item_group', 'commissionable', 'note']],
     ['comm_kpi_items', ['product_code', 'product_name', 'kpi_amount', 'effective_from', 'effective_to']],
@@ -257,24 +261,98 @@ export async function updateScheme(formData: FormData) {
   refresh()
 }
 
+// ─── Ranks ──────────────────────────────────────────────────────────────────
+
+/**
+ * The Rank tab (user 2026-09-05: "rank A 等于多少 rate、rank B 等于多少 rate
+ * … 除非我在 rank 的那个 tab 里去调"). A rank is its rate and is a row of
+ * `comm_rank_defs`; nobody names one. After every write the catalogue is
+ * re-sequenced by rate — `sort_order` 10, 20, 30 … from the bottom, `label`
+ * "Rank SS", "Rank A", "Rank B" … from the top (`lib/commission/ranks.ts`) —
+ * so a rank keyed in at 6.5% lands between 6% and 7% and every letter above
+ * it moves along. Two ranks on one rate would be two names for one pay, so
+ * the second is refused (`uq_comm_rank_def_rate` says the same).
+ *
+ * The rungs of the ladder point at a rank and COPY its rate, label and order
+ * — trigger `comm_ranks_follow_rank_def` on the way in, and
+ * `comm_rank_defs_propagate` pushing a re-rate down — so the engine, the
+ * statements and the hierarchy never notice the split.
+ */
+export async function upsertRankDef(formData: FormData) {
+  await requirePermission('revenue')
+  const supabase = await client()
+
+  const id = text(formData, 'id')
+  const schemeId = required(formData, 'scheme_id', 'Scheme')
+  const rate = pct(formData, 'product_rate')
+  if (rate === null || rate < 0 || rate > 1) {
+    throw new Error('Commission rate must be between 0 and 100%')
+  }
+
+  const catalogue = await loadRankDefs(supabase, schemeId)
+  const clash = catalogue.find(d => d.id !== id && Math.abs(Number(d.product_rate) - rate) < 1e-9)
+  if (clash) {
+    throw new Error(`${clash.label} already pays ${ratePct(rate)} — a rank is its rate, so give this one a different rate`)
+  }
+
+  if (id) {
+    check(
+      (await supabase.from('comm_rank_defs').update({ product_rate: rate }).eq('id', id)).error,
+      'Could not save the rank',
+    )
+  } else {
+    // Appended at the bottom; the re-sequence below puts it where its rate
+    // belongs and letters it.
+    const bottom = catalogue.reduce((max, d) => Math.max(max, d.sort_order), 0) + 10
+    const { error } = await supabase
+      .from('comm_rank_defs')
+      .insert({ scheme_id: schemeId, product_rate: rate, label: rankName('?'), sort_order: bottom })
+    check(error, 'Could not add the rank')
+  }
+
+  await resequenceRanks(supabase, schemeId)
+  refresh()
+}
+
+/** Remove a rank no title sits on. One with a title on it is refused: move the title first. */
+export async function deleteRankDef(id: string) {
+  await requirePermission('revenue')
+  const supabase = await client()
+  if (!id) throw new Error('Which rank?')
+
+  const { data: found } = await supabase
+    .from('comm_rank_defs')
+    .select('id, scheme_id, label')
+    .eq('id', id)
+    .maybeSingle()
+  const rank = found as { id: string; scheme_id: string; label: string } | null
+  if (!rank) throw new Error('That rank is already gone')
+
+  const holder = (await loadLadderRows(supabase, rank.scheme_id)).find(r => r.rank_def_id === id)
+  if (holder) {
+    throw new Error(`${rank.label} is ${holder.title_name ?? 'a title'}'s — move that title to another rank on the ladder first`)
+  }
+
+  check((await supabase.from('comm_rank_defs').delete().eq('id', id)).error, 'Could not remove the rank')
+  await resequenceRanks(supabase, rank.scheme_id)
+  refresh()
+}
+
 // ─── Title ladder ────────────────────────────────────────────────────────────
 
 /**
- * One rung: its title (a Team → Roles row), rate, whether it may recruit,
- * and the gate that climbs to it.
- *
- * A rank IS its rate (user 2026-09-05, `lib/commission/ranks.ts`): nobody
- * names a rung any more. After every write the whole ladder is re-sequenced
- * by rate — `sort_order` 10, 20, 30 … from the bottom, `label` "Rank SS",
- * "Rank A", "Rank B" … from the top — so a rung keyed in at 6.5% lands
- * between 6% and 7% and every letter above it moves along. Two rungs on one
- * rate would be two names for one pay, so the second is refused
- * (`uq_comm_rank_rate` says the same in the database).
+ * One rung of the ladder: a title (a Team → Roles row — fixed once the rung
+ * exists; only the row that adds a rung picks one, user 2026-09-05), the RANK
+ * it pays (picked from the Rank tab's catalogue; the rate follows the rank
+ * and is never keyed in here), whether it may recruit, and the gate that
+ * climbs to it. A rank pays one title, so a rank another rung already holds
+ * is refused (`uq_comm_rank_def` says the same).
  *
  * A NEW rung (no id) gets its identity here: `rank_key` is minted from the
  * title's initials and the rate (`stl_11`) — it is the key positions and
  * statements hang off, so it never changes once written, and it never
- * carries the letter, which does.
+ * carries the letter, which does. Moving the rung to another rank later
+ * keeps the key: it is a name, not a description.
  */
 export async function upsertRank(formData: FormData) {
   await requirePermission('revenue')
@@ -282,11 +360,7 @@ export async function upsertRank(formData: FormData) {
 
   const id = text(formData, 'id')
   const schemeId = required(formData, 'scheme_id', 'Scheme')
-  const titleId = required(formData, 'title_id', 'Title')
-  const rate = pct(formData, 'product_rate')
-  if (rate === null || rate < 0 || rate > 1) {
-    throw new Error('Commission rate must be between 0 and 100%')
-  }
+  const rankDefId = required(formData, 'rank_def_id', 'Rank')
 
   // A rung carries at most one gate: a monthly group-sales target, or a
   // personal-sales streak (so much, so many months running) that is earned
@@ -304,16 +378,25 @@ export async function upsertRank(formData: FormData) {
     throw new Error('Months running must be a whole number of at least 1')
   }
 
+  const rank = (await loadRankDefs(supabase, schemeId)).find(d => d.id === rankDefId)
+  if (!rank) throw new Error('Pick a rank — they are set on the Ranks tab')
+
   const ladder = await loadLadderRows(supabase, schemeId)
-  const clash = ladder.find(r => r.id !== id && Math.abs(Number(r.product_rate) - rate) < 1e-9)
+  const clash = ladder.find(r => r.id !== id && r.rank_def_id === rankDefId)
   if (clash) {
-    throw new Error(`${clash.label} already pays ${ratePct(rate)} — a rank is its rate, so give this rung a different one`)
+    throw new Error(
+      `${rank.label} · ${ratePct(Number(rank.product_rate))} is already ${clash.title_name ?? 'another title'}'s — a rank pays one title`,
+    )
   }
 
   const base = {
     scheme_id: schemeId,
-    title_id: titleId,
-    product_rate: rate,
+    rank_def_id: rankDefId,
+    // Copies the trigger keeps; written here too so the row reads right on
+    // its own.
+    product_rate: Number(rank.product_rate),
+    label: rank.label,
+    sort_order: rank.sort_order,
     can_recruit: formData.get('can_recruit') === 'on',
     group_sales_threshold: groupGate,
     personal_sales_threshold: streakAmount,
@@ -321,64 +404,87 @@ export async function upsertRank(formData: FormData) {
   }
 
   if (id) {
-    check((await supabase.from('comm_ranks').update(base).eq('id', id)).error, 'Could not save the rank')
+    // The title is not in `base`: fixed once the rung exists.
+    check((await supabase.from('comm_ranks').update(base).eq('id', id)).error, 'Could not save the rung')
   } else {
+    const titleId = required(formData, 'title_id', 'Title')
     const { data: title } = await supabase.from('titles').select('name').eq('id', titleId).maybeSingle()
     const titleName = (title as { name: string } | null)?.name
     if (!titleName) throw new Error('Pick a title for the rung')
 
-    // Appended at the bottom; the re-sequence below puts it where its rate
-    // belongs and letters it.
-    const bottom = ladder.reduce((max, r) => Math.max(max, r.sort_order), 0) + 10
     const { error } = await supabase.from('comm_ranks').insert({
       ...base,
-      rank_key: mintRankKey(titleName, rate, new Set(ladder.map(r => r.rank_key))),
-      label: rankName('?'),
-      sort_order: bottom,
+      title_id: titleId,
+      rank_key: mintRankKey(titleName, Number(rank.product_rate), new Set(ladder.map(r => r.rank_key))),
     })
-    check(error, 'Could not add the rank')
+    check(error, 'Could not add the rung')
   }
 
-  await resequence(supabase, schemeId)
   refresh()
 }
 
-interface LadderRow {
+interface RankDefLite {
   id: string
-  rank_key: string
   label: string
   product_rate: number | string
   sort_order: number
 }
 
+async function loadRankDefs(supabase: SupabaseClient, schemeId: string): Promise<RankDefLite[]> {
+  const { data, error } = await supabase
+    .from('comm_rank_defs')
+    .select('id, label, product_rate, sort_order')
+    .eq('scheme_id', schemeId)
+  check(error, 'Could not read the ranks')
+  return (data ?? []) as RankDefLite[]
+}
+
+interface LadderRow {
+  id: string
+  rank_key: string
+  rank_def_id: string
+  title_name: string | null
+}
+
 async function loadLadderRows(supabase: SupabaseClient, schemeId: string): Promise<LadderRow[]> {
   const { data, error } = await supabase
     .from('comm_ranks')
-    .select('id, rank_key, label, product_rate, sort_order')
+    .select('id, rank_key, rank_def_id, titles (name)')
     .eq('scheme_id', schemeId)
   check(error, 'Could not read the ladder')
-  return (data ?? []) as LadderRow[]
+  return ((data ?? []) as Array<{
+    id: string
+    rank_key: string
+    rank_def_id: string
+    titles: { name: string } | { name: string }[] | null
+  }>).map(r => ({
+    id: r.id,
+    rank_key: r.rank_key,
+    rank_def_id: r.rank_def_id,
+    title_name: (Array.isArray(r.titles) ? r.titles[0] : r.titles)?.name ?? null,
+  }))
 }
 
 /**
- * Rewrite `sort_order` and `label` so the ladder's order is its rate order
- * and every rung wears the letter counted from the top. Only rows whose
- * values actually change are written.
+ * Rewrite the catalogue's `sort_order` and `label` so its order is its rate
+ * order and every rank wears the letter counted from the top — a rank nobody
+ * has put a title on yet included. Only rows whose values change are written;
+ * the trigger copies each change down to the rung on that rank.
  */
-async function resequence(supabase: SupabaseClient, schemeId: string): Promise<void> {
-  const ladder = await loadLadderRows(supabase, schemeId)
-  const byId = new Map(ladder.map(r => [r.id, r]))
+async function resequenceRanks(supabase: SupabaseClient, schemeId: string): Promise<void> {
+  const catalogue = await loadRankDefs(supabase, schemeId)
+  const byId = new Map(catalogue.map(d => [d.id, d]))
   const next = resequenceLadder(
-    ladder.map(r => ({ id: r.id, productRate: Number(r.product_rate), sortOrder: r.sort_order })),
+    catalogue.map(d => ({ id: d.id, productRate: Number(d.product_rate), sortOrder: d.sort_order })),
   )
-  const changed = next.filter(r => {
-    const cur = byId.get(r.id)
-    return !cur || cur.sort_order !== r.sortOrder || cur.label !== r.label
+  const changed = next.filter(d => {
+    const cur = byId.get(d.id)
+    return !cur || cur.sort_order !== d.sortOrder || cur.label !== d.label
   })
-  for (const r of changed) {
+  for (const d of changed) {
     check(
-      (await supabase.from('comm_ranks').update({ sort_order: r.sortOrder, label: r.label }).eq('id', r.id)).error,
-      'Could not re-letter the ladder',
+      (await supabase.from('comm_rank_defs').update({ sort_order: d.sortOrder, label: d.label }).eq('id', d.id)).error,
+      'Could not re-letter the ranks',
     )
   }
 }

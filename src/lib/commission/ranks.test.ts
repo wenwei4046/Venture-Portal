@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   mintRankKey,
   rankLabel,
+  rankLabelOf,
   rankLetter,
   rankLetters,
   ratePct,
@@ -26,6 +27,24 @@ describe('rankLetter', () => {
   it('keeps going past Z rather than breaking', () => {
     expect(rankLetter(26)).toBe('Z')
     expect(rankLetter(27)).toBe('AA')
+  })
+})
+
+describe('rankLabelOf', () => {
+  it('reads the label a row already wears — a rank of the catalogue, or a rung — and appends the rate', () => {
+    expect(rankLabelOf({ label: 'Rank B', product_rate: 0.08 })).toBe('Rank B · 8%')
+    // PostgREST hands decimals over as strings.
+    expect(rankLabelOf({ label: 'Rank SS', product_rate: '0.100000' })).toBe('Rank SS · 10%')
+  })
+})
+
+describe('rankLetters over the catalogue', () => {
+  it('lets a rank nobody has put a title on take its letter — the ladder does not get to skip it', () => {
+    // Fair's six, plus an unused 11% rank keyed in on the Ranks tab.
+    const letters = rankLetters([...FAIR, { id: 'unused_11', productRate: 0.11, sortOrder: 70 }])
+    expect(letters.get('unused_11')).toBe('SS')
+    expect(letters.get('stl_10')).toBe('A')
+    expect(letters.get('rs_5')).toBe('F')
   })
 })
 

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import type {
   CommissionSettingsData,
   ProductRow,
+  RankDefRow,
   RankRow,
   SalespersonRow,
   SchemeRow,
@@ -57,6 +58,7 @@ export async function loadCommissionSettings(
 
   const shell = {
     scheme: null,
+    rankDefs: [],
     ranks: [],
     titles: rows<{ id: string; name: string }>(titles.data).map(t => ({ id: t.id, name: t.name })) satisfies TitleRow[],
     itemGroups: [],
@@ -75,6 +77,7 @@ export async function loadCommissionSettings(
 
   const [
     scheme,
+    rankDefs,
     ranks,
     itemGroups,
     kpiItems,
@@ -85,6 +88,7 @@ export async function loadCommissionSettings(
     promotionRules,
   ] = await Promise.all([
     supabase.from('comm_schemes').select('*').eq('id', schemeId).maybeSingle(),
+    supabase.from('comm_rank_defs').select('*').eq('scheme_id', schemeId).order('sort_order'),
     supabase.from('comm_ranks').select('*').eq('scheme_id', schemeId).order('sort_order'),
     supabase.from('comm_item_groups').select('*').eq('scheme_id', schemeId).order('item_group'),
     supabase.from('comm_kpi_items').select('*').eq('scheme_id', schemeId).is('effective_to', null).order('product_code'),
@@ -98,6 +102,7 @@ export async function loadCommissionSettings(
   return {
     ...shell,
     scheme: (scheme.data as SchemeRow | null) ?? null,
+    rankDefs: rows<RankDefRow>(rankDefs.data),
     ranks: rows(ranks.data),
     itemGroups: rows(itemGroups.data),
     kpiItems: rows(kpiItems.data),

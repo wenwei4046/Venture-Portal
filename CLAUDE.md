@@ -60,12 +60,16 @@ src/
 │   │   │                              Calculation) / hierarchy / rules — plus
 │   │   │                              [sub]/[period]/ runs and products/ (Principal).
 │   │   │                              Inside a view, tabs ARE used for its sections
-│   │   │                              (2026-09-05): rules = 8 tabs (`?tab=`),
-│   │   │                              hierarchy = chart / **Team** table
-│   │   │                              (`?tab=team`, the old Rules IX — the table
-│   │   │                              sets only the rank, the chart moves people).
-│   │   │                              A rank IS its rate, lettered from the top
-│   │   │                              (SS, A, B …) — `lib/commission/ranks.ts`.
+│   │   │                              (2026-09-05): rules = 9 tabs (`?tab=`; the
+│   │   │                              ninth, **Ranks**, is the rate catalogue
+│   │   │                              `comm_rank_defs` — a rank IS its rate,
+│   │   │                              lettered from the top SS, A, B …; the
+│   │   │                              Title ladder picks a rank per title and
+│   │   │                              never types a rate — `lib/commission/
+│   │   │                              ranks.ts`), hierarchy = chart / **Team**
+│   │   │                              table (`?tab=team`, the old Rules IX — the
+│   │   │                              table sets only the rank, the chart moves
+│   │   │                              people).
 │   │   ├── reports/                 (Phase 3)
 │   │   └── settings/                ← 8 tabs: treasury / overdue / splits / directors / companies / banks / periods / simulator
 │   └── api/erp/v1/                 ← the ONE machine endpoint: the Houzs ERP live
