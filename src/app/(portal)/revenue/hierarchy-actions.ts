@@ -8,7 +8,8 @@ import { promotesTo, titleCanRecruit, type LadderRung } from '@/lib/commission/t
 
 /**
  * The payroll-purpose org chart: who is under who, at what rank, on which rate
- * mode. Shared by the Staff Hierarchy canvas and the Rules salespeople table.
+ * mode. Shared by Staff Hierarchy's two tabs — the canvas, which moves people
+ * between trees, and the Team table, which sets nothing but the rank.
  *
  * The rule that shapes all of this: **a position is never mutated in place once
  * a month has closed over it.** Moving somebody writes a NEW effective-dated
@@ -282,7 +283,12 @@ export async function setPosition(input: PositionInput): Promise<void> {
   refresh()
 }
 
-/** Form wrapper for the Rules page's people table. */
+/**
+ * Form wrapper for the Team table. The table carries the person's current
+ * upline as a hidden value (2026-09-05: the table changes the rank and nothing
+ * else — trees are rearranged on the chart), so `upline_staff_id` here is
+ * what the chart last drew, not a choice.
+ */
 export async function setPositionFromForm(formData: FormData): Promise<void> {
   const rateMode = ((formData.get('rate_mode') as string) ?? '').trim()
   await setPosition({

@@ -5,6 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { RESERVED_SUB_DEPT_SLUGS, subDeptSlug } from '@/lib/revenue'
+import { mintRankKey, rankName, ratePct, resequenceLadder } from '@/lib/commission/ranks'
 
 /**
  * Revenue → Rules. Every rule, threshold and per-person tick for the Revenue
@@ -259,15 +260,21 @@ export async function updateScheme(formData: FormData) {
 // ─── Title ladder ────────────────────────────────────────────────────────────
 
 /**
- * One rung: its title (a Team → Role & Permission row), label, rate, whether
- * it may recruit, and the group-sales target that climbs to it.
+ * One rung: its title (a Team → Roles row), rate, whether it may recruit,
+ * and the gate that climbs to it.
+ *
+ * A rank IS its rate (user 2026-09-05, `lib/commission/ranks.ts`): nobody
+ * names a rung any more. After every write the whole ladder is re-sequenced
+ * by rate — `sort_order` 10, 20, 30 … from the bottom, `label` "Rank SS",
+ * "Rank A", "Rank B" … from the top — so a rung keyed in at 6.5% lands
+ * between 6% and 7% and every letter above it moves along. Two rungs on one
+ * rate would be two names for one pay, so the second is refused
+ * (`uq_comm_rank_rate` says the same in the database).
  *
  * A NEW rung (no id) gets its identity here: `rank_key` is minted from the
- * label — it is the key positions and statements hang off, so it never
- * changes once written — and it lands at the bottom of the ladder unless a
- * sort order was given. The tick ordering IS the ladder: a title sits where
- * its lowest rung sits (titles.ts), so where a rung goes decides who
- * outranks whom.
+ * title's initials and the rate (`stl_11`) — it is the key positions and
+ * statements hang off, so it never changes once written, and it never
+ * carries the letter, which does.
  */
 export async function upsertRank(formData: FormData) {
   await requirePermission('revenue')
@@ -275,7 +282,7 @@ export async function upsertRank(formData: FormData) {
 
   const id = text(formData, 'id')
   const schemeId = required(formData, 'scheme_id', 'Scheme')
-  const label = required(formData, 'label', 'Label')
+  const titleId = required(formData, 'title_id', 'Title')
   const rate = pct(formData, 'product_rate')
   if (rate === null || rate < 0 || rate > 1) {
     throw new Error('Commission rate must be between 0 and 100%')
@@ -297,10 +304,15 @@ export async function upsertRank(formData: FormData) {
     throw new Error('Months running must be a whole number of at least 1')
   }
 
+  const ladder = await loadLadderRows(supabase, schemeId)
+  const clash = ladder.find(r => r.id !== id && Math.abs(Number(r.product_rate) - rate) < 1e-9)
+  if (clash) {
+    throw new Error(`${clash.label} already pays ${ratePct(rate)} — a rank is its rate, so give this rung a different one`)
+  }
+
   const base = {
     scheme_id: schemeId,
-    title_id: required(formData, 'title_id', 'Title'),
-    label,
+    title_id: titleId,
     product_rate: rate,
     can_recruit: formData.get('can_recruit') === 'on',
     group_sales_threshold: groupGate,
@@ -309,48 +321,66 @@ export async function upsertRank(formData: FormData) {
   }
 
   if (id) {
-    check(
-      (await supabase.from('comm_ranks').update({ ...base, sort_order: num(formData, 'sort_order') ?? 0 }).eq('id', id)).error,
-      'Could not save the rank',
-    )
-    refresh()
-    return
+    check((await supabase.from('comm_ranks').update(base).eq('id', id)).error, 'Could not save the rank')
+  } else {
+    const { data: title } = await supabase.from('titles').select('name').eq('id', titleId).maybeSingle()
+    const titleName = (title as { name: string } | null)?.name
+    if (!titleName) throw new Error('Pick a title for the rung')
+
+    // Appended at the bottom; the re-sequence below puts it where its rate
+    // belongs and letters it.
+    const bottom = ladder.reduce((max, r) => Math.max(max, r.sort_order), 0) + 10
+    const { error } = await supabase.from('comm_ranks').insert({
+      ...base,
+      rank_key: mintRankKey(titleName, rate, new Set(ladder.map(r => r.rank_key))),
+      label: rankName('?'),
+      sort_order: bottom,
+    })
+    check(error, 'Could not add the rank')
   }
 
-  let sortOrder = num(formData, 'sort_order')
-  if (sortOrder === null) {
-    const { data: last } = await supabase
-      .from('comm_ranks')
-      .select('sort_order')
-      .eq('scheme_id', schemeId)
-      .order('sort_order', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    sortOrder = ((last as { sort_order: number } | null)?.sort_order ?? 0) + 10
-  }
-
-  const { error } = await supabase.from('comm_ranks').insert({
-    ...base,
-    rank_key: text(formData, 'rank_key') || rankKeyFrom(label),
-    sort_order: sortOrder,
-  })
-  if (error?.code === '23505') {
-    throw new Error('A rank with that key already exists on this ladder — give it a different label')
-  }
-  check(error, 'Could not add the rank')
-
+  await resequence(supabase, schemeId)
   refresh()
 }
 
-/** "Team Leader - 11%" → "team_leader_11". Stable, readable, unique per label. */
-function rankKeyFrom(label: string): string {
-  const key = label
-    .toLowerCase()
-    .replace(/%/g, '')
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-  if (!key) throw new Error('Give the rank a label the key can be made from')
-  return key
+interface LadderRow {
+  id: string
+  rank_key: string
+  label: string
+  product_rate: number | string
+  sort_order: number
+}
+
+async function loadLadderRows(supabase: SupabaseClient, schemeId: string): Promise<LadderRow[]> {
+  const { data, error } = await supabase
+    .from('comm_ranks')
+    .select('id, rank_key, label, product_rate, sort_order')
+    .eq('scheme_id', schemeId)
+  check(error, 'Could not read the ladder')
+  return (data ?? []) as LadderRow[]
+}
+
+/**
+ * Rewrite `sort_order` and `label` so the ladder's order is its rate order
+ * and every rung wears the letter counted from the top. Only rows whose
+ * values actually change are written.
+ */
+async function resequence(supabase: SupabaseClient, schemeId: string): Promise<void> {
+  const ladder = await loadLadderRows(supabase, schemeId)
+  const byId = new Map(ladder.map(r => [r.id, r]))
+  const next = resequenceLadder(
+    ladder.map(r => ({ id: r.id, productRate: Number(r.product_rate), sortOrder: r.sort_order })),
+  )
+  const changed = next.filter(r => {
+    const cur = byId.get(r.id)
+    return !cur || cur.sort_order !== r.sortOrder || cur.label !== r.label
+  })
+  for (const r of changed) {
+    check(
+      (await supabase.from('comm_ranks').update({ sort_order: r.sortOrder, label: r.label }).eq('id', r.id)).error,
+      'Could not re-letter the ladder',
+    )
+  }
 }
 
 // ─── Item groups ────────────────────────────────────────────────────────────

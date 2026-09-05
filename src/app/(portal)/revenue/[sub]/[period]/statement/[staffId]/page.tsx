@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
+import { rankLetters, rankName } from '@/lib/commission/ranks'
 import LedgerRow from '@/components/LedgerRow'
 import { requireSubDepartment } from '../../../../_lib/sub-departments'
 
@@ -155,6 +156,19 @@ export default async function CommissionStatementPage({ params }: PageProps) {
       .eq('statement_id', s.id)
       .order('brand_code'),
   ])
+  // The statement snapshots the rank KEY; the ladder says what letter it
+  // wears today (ranks.ts). A key the ladder no longer carries shows as itself.
+  const { data: rankRows } = subDept.schemeId
+    ? await supabase.from('comm_ranks').select('id, rank_key, product_rate, sort_order').eq('scheme_id', subDept.schemeId)
+    : { data: null }
+  const ladder = ((rankRows ?? []) as Array<{ id: string; rank_key: string; product_rate: number | string; sort_order: number }>)
+  const letters = rankLetters(ladder.map(r => ({ id: r.id, productRate: Number(r.product_rate), sortOrder: r.sort_order })))
+  const rankNameOf = (key: string | null) => {
+    if (!key) return null
+    const r = ladder.find(x => x.rank_key === key)
+    return r ? rankName(letters.get(r.id) ?? '?') : key
+  }
+
   const lines = (lineData ?? []) as unknown as LineRow[]
   const brands = (brandData ?? []) as unknown as Array<{
     brand_code: string
@@ -200,7 +214,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
           <h1 className="page-title">{me?.employee_name ?? staffId}</h1>
           <p className="font-serif italic text-graphite text-base mt-3">
             {oneOf(s.rank_title)?.name ? `${oneOf(s.rank_title)!.name} · ` : ''}
-            {s.rank_key ?? 'no rank'} at {pct(s.product_rate, 0)}
+            {rankNameOf(s.rank_key) ?? 'no rank'} at {pct(s.product_rate, 0)}
             {s.rate_mode === 'fixed' ? ' · Manual rate' : ' · Scheme rate'}
             {s.upline_staff_id
               ? ` · under ${staff.get(s.upline_staff_id)?.employee_name ?? 'an upline'}`
@@ -227,7 +241,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
           </div>
           {s.qualifies_for_rank_key && s.qualifies_for_rank_key !== s.rank_key ? (
             <p className="font-serif italic text-accent text-sm mt-3">
-              Group sales clear <strong>{s.qualifies_for_rank_key}</strong>
+              Group sales clear <strong>{rankNameOf(s.qualifies_for_rank_key)}</strong>
               {s.rate_mode === 'fixed'
                 ? ' — a promotion to consider, not applied, because their rate is set manually.'
                 : ' — already applied this month.'}

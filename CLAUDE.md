@@ -56,7 +56,14 @@ src/
 │   │   │                              (Fair, …) with 3 views, reached from the
 │   │   │                              SIDEBAR not a tab rail — page.tsx (Commission
 │   │   │                              Calculation) / hierarchy / rules — plus
-│   │   │                              [sub]/[period]/ runs and products/ (Principal)
+│   │   │                              [sub]/[period]/ runs and products/ (Principal).
+│   │   │                              Inside a view, tabs ARE used for its sections
+│   │   │                              (2026-09-05): rules = 8 tabs (`?tab=`),
+│   │   │                              hierarchy = chart / **Team** table
+│   │   │                              (`?tab=team`, the old Rules IX — the table
+│   │   │                              sets only the rank, the chart moves people).
+│   │   │                              A rank IS its rate, lettered from the top
+│   │   │                              (SS, A, B …) — `lib/commission/ranks.ts`.
 │   │   ├── reports/                 (Phase 3)
 │   │   └── settings/                ← 8 tabs: treasury / overdue / splits / directors / companies / banks / periods / simulator
 │   └── (no api/ folder — uses Server Actions, not Route Handlers)

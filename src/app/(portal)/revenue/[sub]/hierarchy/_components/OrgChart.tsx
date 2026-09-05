@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Background,
@@ -9,7 +9,7 @@ import {
   Position,
   ReactFlow,
   ReactFlowProvider,
-  useReactFlow,
+  useNodesState,
   type Connection,
   type Edge,
   type Node,
@@ -32,6 +32,7 @@ export interface OrgRank {
   rankKey: string
   /** The title this rung belongs to — a title sits where its lowest rung sits. */
   titleId: string
+  /** "Rank B · 8%" — lettered from the top of the ladder (ranks.ts). */
   label: string
   productRate: number
   canRecruit: boolean
@@ -46,6 +47,7 @@ export interface OrgPerson {
   titleName: string | null
   uplineStaffId: string | null
   rankId: string | null
+  /** "Rank B" — the card shows the rate beside it. */
   rankLabel: string | null
   productRate: number | null
   /** Decided by the title they hold, not the rank of the month. */
@@ -59,6 +61,8 @@ interface CardData extends Record<string, unknown> {
   invalidTarget: boolean
   selected: boolean
 }
+
+type CardNode = Node<CardData>
 
 /**
  * The org chart canvas.
@@ -92,7 +96,6 @@ function Chart({
   schemeId: string
 }) {
   const router = useRouter()
-  const { getIntersectingNodes } = useReactFlow()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
@@ -117,20 +120,54 @@ function Chart({
     return out
   }, [dragging, graph, people])
 
-  const nodes: Node<CardData>[] = useMemo(
-    () =>
+  /**
+   * The cards, laid out. `initialWidth` / `initialHeight` are what the card
+   * renders at, so the geometry below never sees a zero-sized rect before the
+   * canvas has measured a node.
+   */
+  const laidOut = useCallback(
+    (): CardNode[] =>
       people.map(p => {
         const pos = layout.positions.get(p.staffId)!
         return {
           id: p.staffId,
           type: 'person',
           position: { x: pos.x, y: pos.y },
-          data: { person: p, invalidTarget: forbidden.has(p.staffId), selected: selected === p.staffId },
+          initialWidth: NODE_WIDTH,
+          initialHeight: NODE_HEIGHT,
+          data: { person: p, invalidTarget: false, selected: false },
           draggable: true,
         }
       }),
-    [people, layout, forbidden, selected],
+    [people, layout],
   )
+
+  // Controlled nodes, so the canvas can move a card while it is dragged
+  // (React Flow only updates positions through onNodesChange) and can keep
+  // the size it measured on each node. Without both, a drag did not move the
+  // card and every drop landed on a zero-sized rect that "overlapped"
+  // everyone — the first unplaced person on the roster got the position.
+  const [nodes, setNodes, onNodesChange] = useNodesState<CardNode>(laidOut())
+
+  /** Fresh people or a fresh layout: re-lay the cards, keeping what was measured. */
+  useEffect(() => {
+    setNodes(prev => {
+      const measured = new Map(prev.map(n => [n.id, n.measured]))
+      return laidOut().map(n => ({ ...n, measured: measured.get(n.id) }))
+    })
+  }, [laidOut, setNodes])
+
+  /** Greying and selection are card data; the cards themselves stay put. */
+  useEffect(() => {
+    setNodes(prev =>
+      prev.map(n => {
+        const invalidTarget = forbidden.has(n.id)
+        const isSelected = selected === n.id
+        if (n.data.invalidTarget === invalidTarget && n.data.selected === isSelected) return n
+        return { ...n, data: { ...n.data, invalidTarget, selected: isSelected } }
+      }),
+    )
+  }, [forbidden, selected, setNodes])
 
   const edges: Edge[] = useMemo(
     () =>
@@ -169,7 +206,7 @@ function Chart({
         }
       }
       if (!child.rankId) {
-        setError(`${child.name} has no rank yet — give them a rank on the Rules tab first.`)
+        setError(`${child.name} has no rank yet — give them one on the Team tab first.`)
         return
       }
 
@@ -197,15 +234,49 @@ function Chart({
     [byId, graph, router, schemeId],
   )
 
-  const onNodeDragStop: OnNodeDrag<Node<CardData>> = useCallback(
+  /**
+   * Where a dropped card landed: the other card it overlaps most, judged on
+   * the chart's own geometry (every card but the dragged one still sits where
+   * the layout put it). Nothing here asks the canvas what it measured.
+   */
+  const dropTarget = useCallback(
+    (dragged: CardNode): string | null => {
+      const w = dragged.measured?.width ?? NODE_WIDTH
+      const h = dragged.measured?.height ?? NODE_HEIGHT
+      let best: { id: string; area: number } | null = null
+      for (const other of nodes) {
+        if (other.id === dragged.id || forbidden.has(other.id)) continue
+        const ow = other.measured?.width ?? NODE_WIDTH
+        const oh = other.measured?.height ?? NODE_HEIGHT
+        const dx = Math.min(dragged.position.x + w, other.position.x + ow) - Math.max(dragged.position.x, other.position.x)
+        const dy = Math.min(dragged.position.y + h, other.position.y + oh) - Math.max(dragged.position.y, other.position.y)
+        const area = dx > 0 && dy > 0 ? dx * dy : 0
+        if (area > 0 && (!best || area > best.area)) best = { id: other.id, area }
+      }
+      return best?.id ?? null
+    },
+    [nodes, forbidden],
+  )
+
+  /** Put every card back where the layout has it — the drop was not a move. */
+  const snapBack = useCallback(() => {
+    setNodes(prev => {
+      const home = new Map(laidOut().map(n => [n.id, n.position]))
+      return prev.map(n => {
+        const p = home.get(n.id)
+        return p && (p.x !== n.position.x || p.y !== n.position.y) ? { ...n, position: p } : n
+      })
+    })
+  }, [laidOut, setNodes])
+
+  const onNodeDragStop: OnNodeDrag<CardNode> = useCallback(
     (_event, node) => {
       setDragging(null)
-      const hits = getIntersectingNodes(node).filter(n => !forbidden.has(n.id))
-      const target = hits[0]
-      if (target) move(node.id, target.id)
-      else router.refresh() // snap the card back to its laid-out place
+      const target = dropTarget(node)
+      if (target) move(node.id, target)
+      snapBack()
     },
-    [forbidden, getIntersectingNodes, move, router],
+    [dropTarget, move, snapBack],
   )
 
   const onConnect = useCallback(
@@ -265,6 +336,7 @@ function Chart({
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
+          onNodesChange={onNodesChange}
           onNodeDragStart={(_e, node) => {
             setNote(null)
             setDragging(node.id)
@@ -297,16 +369,17 @@ function Chart({
 
       <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
         A greyed card cannot take the person being dragged — either it is one of their own
-        downlines, or the title they hold is not allowed to recruit. Rates shown are the rank&apos;s;
-        a salesperson on <em>scheme target</em> may be paid a higher one in a month their group
-        sales clear it. The small caps under a name is the title they hold — it only ever goes up,
-        and the rank beneath it may sit lower in a month below target.
+        downlines, or the title they hold is not allowed to recruit. A rank is its rate, lettered
+        from the top of the ladder (SS, A, B …); a salesperson on <em>scheme target</em> may be
+        paid a rank higher in a month their group sales clear it. The small caps under a name is
+        the title they hold — it only ever goes up, and the rank beneath it may sit lower in a
+        month below target. Ranks are set on the Team tab; this chart only moves people.
       </p>
     </div>
   )
 }
 
-function PersonCard({ data }: NodeProps<Node<CardData>>) {
+function PersonCard({ data }: NodeProps<CardNode>) {
   const { person, invalidTarget, selected } = data
 
   return (
