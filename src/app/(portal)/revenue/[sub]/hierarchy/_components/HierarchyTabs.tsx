@@ -74,7 +74,7 @@ export default function HierarchyTabs({
         </div>
       </div>
 
-      <SlidingTabs items={tabs} active={tab} onTabChange={goTo} />
+      <SlidingTabs items={tabs} active={tab} onTabChange={goTo} variant="control" />
 
       {tab === 'team' ? (
         <TeamTable people={team.people} ranks={team.ranks} schemeId={schemeId} />

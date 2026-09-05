@@ -82,7 +82,7 @@ export default function HierarchyTabs({
         </div>
       </div>
 
-      <SlidingTabs items={tabs} active={tab} onTabChange={goTo} />
+      <SlidingTabs items={tabs} active={tab} onTabChange={goTo} variant="control" />
 
       {tab === 'levels' ? (
         <LevelsBoard rungs={rungs} titles={titles} breaks={breaks} />

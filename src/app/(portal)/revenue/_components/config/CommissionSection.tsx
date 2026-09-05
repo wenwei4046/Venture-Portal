@@ -132,7 +132,7 @@ export default function CommissionSection({
         </button>
       </div>
 
-      {scheme ? <SlidingTabs items={RULES_TABS} active={tab} onTabChange={goTo} /> : null}
+      {scheme ? <SlidingTabs items={RULES_TABS} active={tab} onTabChange={goTo} variant="control" /> : null}
 
       {showNewSub ? (
         <section className="mb-12">

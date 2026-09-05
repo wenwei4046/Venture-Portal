@@ -35,6 +35,21 @@ describe('SlidingTabs', () => {
     expect(screen.getByRole('button', { name: 'Hierarchy' })).toBeDefined()
   })
 
+  it('control variant sets the labels in mono caps on their own hover surface', () => {
+    render(<SlidingTabs items={tabs} active="treasury" onTabChange={() => {}} variant="control" />)
+    const active = screen.getByRole('button', { name: 'Treasury' })
+    const idle = screen.getByRole('button', { name: 'Overdue' })
+    expect(active.className).toContain('uppercase')
+    expect(active.className).toContain('text-accent')
+    expect(idle.className).toContain('hover:bg-surface-2/70')
+    expect(active.closest('nav')?.getAttribute('data-variant')).toBe('control')
+  })
+
+  it('defaults to the text variant', () => {
+    render(<SlidingTabs items={tabs} active="treasury" onTabChange={() => {}} />)
+    expect(screen.getByRole('button', { name: 'Treasury' }).className).not.toContain('uppercase')
+  })
+
   it('renders the indicator bar element', () => {
     const { container } = render(
       <SlidingTabs items={tabs} active="treasury" onTabChange={() => {}} />

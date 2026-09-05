@@ -823,14 +823,16 @@ tr:hover .icon-btn { opacity: 1; }
   height: 2px;
   background: rgb(var(--accent));
 }
-/* A page whose body is a tab rail (Revenue › Rules, Staff Hierarchy,
-   2026-09-05): the rail sits ON the header's rule rather than under a second
-   one. The header gives up its border and its 64px accent segment — the
-   SlidingTabs indicator under the active tab is that segment, moved to where
-   the reader's eye already is. */
+/* A page whose body is a tab rail (Revenue › Rules, Staff Hierarchy, People ›
+   Hierarchy, 2026-09-05): the rail sits ON the header's rule rather than under
+   a second one. The header gives up its border and its 64px accent segment —
+   the SlidingTabs indicator under the active tab is that segment, moved to
+   where the reader's eye already is. 18px of air above the rail, and the rail
+   in its `control` variant (mono caps): the intro and the tabs are two
+   things, and at 4px they read as one paragraph. */
 .page-head.tabbed {
   border-bottom: 0;
-  padding-bottom: 4px;
+  padding-bottom: 18px;
   margin-bottom: 0;
 }
 .page-head.tabbed::after {
