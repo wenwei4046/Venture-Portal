@@ -289,7 +289,9 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     //
     // Roles and Permissions were one page ("Role & Permission") until
     // 2026-09-03, when the user asked for them apart: Roles is what a title IS
-    // (its department, its level on the ladder), Permissions is what it may DO.
+    // (its department), Permissions is what it may DO. The ladder (Levels)
+    // sat on Roles for two days and moved to Hierarchy on 2026-09-05, above
+    // the chart that obeys it.
     { href: '/team/people', label: 'People Management', section: 'People', visible: isHRorPrincipal },
     { href: '/team/hierarchy', label: 'Hierarchy', section: 'People', visible: isHRorPrincipal },
     { href: '/team/roles', label: 'Roles', section: 'People', visible: isHRorPrincipal },
