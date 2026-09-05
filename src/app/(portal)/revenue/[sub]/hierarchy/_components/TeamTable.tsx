@@ -124,7 +124,7 @@ export default function TeamTable({
                         <span className="ml-2 font-mono text-xs text-muted">{p.employee_code}</span>
                       ) : null}
                     </td>
-                    <td className="font-serif italic text-sm text-graphite whitespace-nowrap">
+                    <td className="font-serif italic text-sm text-graphite">
                       {p.title_name ?? <span className="text-muted">— none yet —</span>}
                       {/* The rung — the rows are in its order. */}
                       {p.title_level_rank !== null ? (
