@@ -1,7 +1,14 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { formatMoneyBare } from '@/lib/utils'
+import {
+  columnTotals,
+  formatAmount,
+  groupByDepartment,
+  neighbourId,
+} from '@/lib/payroll-grid'
 import { deletePayrollRows } from '../actions'
 import PayrollRow from './PayrollRow'
 
@@ -49,12 +56,74 @@ interface Props {
   period: string
 }
 
+/** Column order, left to right — the <colgroup> that fixes the widths. */
+const COLUMNS = [
+  'chk',
+  'name',
+  'gross',
+  'net',
+  'act',
+  'basic',
+  'stat',
+  'ns',
+  'ot',
+  'comm',
+  'unpaid',
+  'ded',
+  'skbbk',
+  'epf',
+  'socso',
+  'eis',
+] as const
+
+const TOTAL_KEYS = [
+  'gross',
+  'net',
+  'basic_salary',
+  'statutory_allowance',
+  'non_statutory_allowance',
+  'ot_amount',
+  'commission_amount',
+  'unpaid_leave_days',
+  'deduction_amount',
+  'skbbk_amount',
+  'epf_er',
+  'socso_er',
+  'eis_er',
+] as const
+
+/**
+ * The payroll grid — redesigned 2026-09-05 ("C · Window", chosen out of
+ * three mockups). One line per person inside a well; ✓ · Name · Gross · Net
+ * frozen on the left with the eleven working columns scrolling under them;
+ * rows grouped by department under a band that carries the subtotal; the
+ * nine editable figures typed straight into the row, or into the person's
+ * paycheck window (▾ or the name) which is a second view of the same
+ * figures. The old table sat bare on the page with four-line names, ~130px
+ * a row, and pushed Gross and Net off the right edge.
+ */
 export default function PayrollGrid({ rows, period }: Props) {
   const router = useRouter()
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [folded, setFolded] = useState<Set<string>>(new Set())
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [isPending, startTransition] = useTransition()
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  const groups = useMemo(() => groupByDepartment(rows), [rows])
+  // Display order — what ‹ › in the paycheck window step through.
+  const order = useMemo(() => groups.flatMap(g => g.rows.map(r => r.id)), [groups])
+  const totals = useMemo(() => columnTotals(rows, TOTAL_KEYS), [rows])
+
+  // The frozen edge casts a shadow only once something has scrolled under it.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const onScroll = () => el.classList.toggle('scrolled', el.scrollLeft > 0)
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [])
 
   // Only draft rows can be selected (and thus deleted). Non-draft rows
   // live in an approved/submitted/paid payroll_run and must stay.
@@ -85,6 +154,15 @@ export default function PayrollGrid({ rows, period }: Props) {
     }
   }
 
+  function toggleFold(dept: string) {
+    setFolded(prev => {
+      const next = new Set(prev)
+      if (next.has(dept)) next.delete(dept)
+      else next.add(dept)
+      return next
+    })
+  }
+
   function handleDelete() {
     if (selected.size === 0) return
     const count = selected.size
@@ -112,17 +190,18 @@ export default function PayrollGrid({ rows, period }: Props) {
 
   return (
     <div className="mb-12">
-      <div className="flex items-center justify-between mb-3 gap-4 min-h-[1.75rem]">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-3 min-h-[1.75rem]">
         {someSelected ? (
           <span className="font-serif italic text-graphite text-xs">
             {selected.size} selected
           </span>
         ) : (
           <p className="font-serif italic text-graphite text-xs">
-            All values in RM. Click the row arrow for pro-rata + EE breakdown.
+            All values in RM · edit in the row, or open a name for the paycheck ·
+            Name and the payout stay put, the working scrolls.
           </p>
         )}
-        {someSelected && (
+        {someSelected ? (
           <div className="flex items-center gap-3">
             {deleteError && (
               <span className="font-serif italic text-danger text-xs">{deleteError}</span>
@@ -142,59 +221,167 @@ export default function PayrollGrid({ rows, period }: Props) {
               Clear
             </button>
           </div>
+        ) : (
+          <span className="pg-legend">
+            <span>
+              <i className="in" aria-hidden />
+              editable
+            </span>
+            <span>
+              <i className="ro" aria-hidden />
+              computed
+            </span>
+            <span>
+              <i className="dv" aria-hidden />
+              from commission run
+            </span>
+          </span>
         )}
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-              <th className="py-4 pl-2 pr-2 w-8">
-                <input
-                  type="checkbox"
-                  aria-label="Select all draft rows"
-                  checked={allSelectableChecked}
-                  disabled={selectableIds.length === 0 || isPending}
-                  onChange={toggleAll}
-                  className="w-4 h-4 accent-accent cursor-pointer disabled:cursor-not-allowed disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:outline-none"
-                />
-              </th>
-              <th className="text-left py-4 pr-4 font-medium">Name</th>
-              <th className="text-left py-4 pr-4 font-medium">Dept</th>
-              <th className="text-right py-4 pr-4 font-medium">Basic</th>
-              <th className="text-right py-4 pr-4 font-medium">Stat.</th>
-              <th className="text-right py-4 pr-4 font-medium">Non-Stat.</th>
-              <th className="text-right py-4 pr-4 font-medium">OT</th>
-              <th className="text-right py-4 pr-4 font-medium">Comm.</th>
-              <th className="text-right py-4 pr-4 font-medium">Unpaid</th>
-              <th className="text-right py-4 pr-4 font-medium">Deduct</th>
-              <th className="text-right py-4 pr-4 font-medium" title="Net-only employee deduction — gross and statutory are unaffected">SKBBK</th>
-              <th className="text-right py-4 pr-4 font-medium">EPF&nbsp;ER</th>
-              <th className="text-right py-4 pr-4 font-medium">SOCSO&nbsp;ER</th>
-              <th className="text-right py-4 pr-4 font-medium">EIS&nbsp;ER</th>
-              <th className="text-right py-4 pr-4 font-medium">Gross</th>
-              <th className="text-right py-4 pr-4 font-medium">Net</th>
-              <th className="text-right py-4 pr-2 font-medium w-14"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(r => (
-              <PayrollRow
-                key={r.id}
-                row={r}
-                period={period}
-                expanded={expandedId === r.id}
-                onToggleExpand={() => setExpandedId(expandedId === r.id ? null : r.id)}
-                selected={selected.has(r.id)}
-                onToggleSelect={() => toggleRow(r.id)}
-                selectDisabled={isPending}
-              />
-            ))}
-          </tbody>
-        </table>
+
+      <div className="pg-well">
+        <div ref={scrollRef} className="pg-scroll table-scroll">
+          <table className="ledger-table payroll-grid">
+            {/* Fixed layout reads its column widths from the first row — the
+                group header with its colspans — so the widths live on the
+                <col>s (globals.css → col.col-*), not on the <th>s. */}
+            <colgroup>
+              {COLUMNS.map(c => (
+                <col key={c} className={`col-${c}`} />
+              ))}
+            </colgroup>
+            <thead>
+              <tr className="pg-grp">
+                <th className="pg-st l0" colSpan={2} />
+                <th className="pg-st l2" colSpan={3}>
+                  Payout
+                </th>
+                <th className="g1" colSpan={5}>
+                  Earnings
+                </th>
+                <th className="g1" colSpan={3}>
+                  Deductions
+                </th>
+                <th className="g1" colSpan={3}>
+                  Employer
+                </th>
+              </tr>
+              <tr className="pg-cols">
+                <th className="pg-st l0 col-chk">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all draft rows"
+                    checked={allSelectableChecked}
+                    disabled={selectableIds.length === 0 || isPending}
+                    onChange={toggleAll}
+                    className="w-3.5 h-3.5 accent-accent cursor-pointer disabled:cursor-not-allowed disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:outline-none"
+                  />
+                </th>
+                <th className="pg-st l1 col-name">Name</th>
+                <th className="num pg-st l2 col-gross">Gross</th>
+                <th className="num pg-st l3 col-net">Net</th>
+                <th className="pg-st l4 col-act" />
+                <th className="num g1 col-basic">Basic</th>
+                <th className="num col-stat">Stat.</th>
+                <th className="num col-ns">Non-stat.</th>
+                <th className="num col-ot">OT</th>
+                <th className="num col-comm">Comm.</th>
+                <th className="num g1 col-unpaid">
+                  Unpaid <i>days</i>
+                </th>
+                <th className="num col-ded">Deduct</th>
+                <th
+                  className="num col-skbbk"
+                  title="Net-only employee deduction — gross and statutory are unaffected"
+                >
+                  SKBBK
+                </th>
+                <th className="num g1 col-epf">EPF ER</th>
+                <th className="num col-socso">SOCSO ER</th>
+                <th className="num col-eis">EIS ER</th>
+              </tr>
+            </thead>
+            <tbody>
+              {groups.map(g => {
+                const isFolded = folded.has(g.dept)
+                const commissionDept = g.rows.some(r => r.commission_is_derived)
+                return (
+                  <Fragment key={g.dept}>
+                    <tr className="pg-band">
+                      <td className="pg-st l0 group-cell" colSpan={2}>
+                        <button
+                          type="button"
+                          className="group-btn"
+                          aria-expanded={!isFolded}
+                          onClick={() => toggleFold(g.dept)}
+                        >
+                          <span className="chev" aria-hidden>
+                            ▾
+                          </span>
+                          {g.dept}
+                          {commissionDept && <span className="tag">commission</span>}
+                          <span className="count">{g.rows.length}</span>
+                        </button>
+                      </td>
+                      <td className="pg-st l2 sub">{formatMoneyBare(g.gross)}</td>
+                      <td className="pg-st l3 sub">{formatMoneyBare(g.net)}</td>
+                      <td className="pg-st l4" />
+                      <td colSpan={11} />
+                    </tr>
+                    {g.rows.map((r, i) => (
+                      <PayrollRow
+                        key={r.id}
+                        row={r}
+                        period={period}
+                        index={order.indexOf(r.id)}
+                        count={order.length}
+                        alt={i % 2 === 1}
+                        hidden={isFolded}
+                        open={openId === r.id}
+                        onOpen={() => setOpenId(r.id)}
+                        onClose={() => setOpenId(null)}
+                        onStep={dir => {
+                          const next = neighbourId(order, r.id, dir)
+                          if (next) setOpenId(next)
+                        }}
+                        selected={selected.has(r.id)}
+                        onToggleSelect={() => toggleRow(r.id)}
+                        selectDisabled={isPending}
+                      />
+                    ))}
+                  </Fragment>
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td className="pg-st l0" colSpan={2} style={{ paddingLeft: 12 }}>
+                  Total · {rows.length} staff
+                </td>
+                <td className="num pg-st l2">{formatMoneyBare(totals.gross)}</td>
+                <td className="num pg-st l3">{formatMoneyBare(totals.net)}</td>
+                <td className="pg-st l4" />
+                <td className="num g1">{formatMoneyBare(totals.basic_salary)}</td>
+                <td className="num sub">{formatMoneyBare(totals.statutory_allowance)}</td>
+                <td className="num sub">{formatMoneyBare(totals.non_statutory_allowance)}</td>
+                <td className="num sub">{formatMoneyBare(totals.ot_amount)}</td>
+                <td className="num sub">{formatMoneyBare(totals.commission_amount)}</td>
+                <td className="num g1 sub">{formatAmount(totals.unpaid_leave_days, 1)}</td>
+                <td className="num sub">{formatMoneyBare(totals.deduction_amount)}</td>
+                <td className="num sub">{formatMoneyBare(totals.skbbk_amount)}</td>
+                <td className="num g1 sub">{formatMoneyBare(totals.epf_er)}</td>
+                <td className="num sub">{formatMoneyBare(totals.socso_er)}</td>
+                <td className="num sub">{formatMoneyBare(totals.eis_er)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       </div>
+
       <p className="font-serif italic text-muted text-xs mt-4">
-        Edit values inline, click Save on the row. Statutory re-computes automatically.
-        Tick draft rows and <em>Delete</em> to drop staff who shouldn&apos;t be on this month&apos;s payroll.
+        Edit values in the row and click Save, or open a name for the paycheck — same
+        figures either way. Statutory re-computes automatically. Tick draft rows and{' '}
+        <em>Delete</em> to drop staff who shouldn&apos;t be on this month&apos;s payroll.
       </p>
     </div>
   )

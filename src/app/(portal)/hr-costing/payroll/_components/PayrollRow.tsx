@@ -1,57 +1,100 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { formatMoney, formatMoneyBare } from '@/lib/utils'
+import { cn, formatMoneyBare } from '@/lib/utils'
+import {
+  dirtyFields,
+  editFromRow,
+  formatAmount,
+  PAYROLL_FIELD_LABELS,
+  type PayrollEdit,
+  type PayrollEditField,
+} from '@/lib/payroll-grid'
 import { updatePayrollRow } from '../actions'
 import { usePayrollDraft } from './PayrollDraftContext'
+import AmountInput from './AmountInput'
+import PaycheckWindow from './PaycheckWindow'
 import type { PayrollRowData } from './PayrollGrid'
 
 interface Props {
   row: PayrollRowData
   period: string
-  expanded: boolean
-  onToggleExpand: () => void
+  /** Position in the grid's display order — the paycheck window's "n / N". */
+  index: number
+  count: number
+  /** Zebra, counted inside the department so a band never breaks the stripe. */
+  alt: boolean
+  /** Department folded away. Hidden, not unmounted, so unsaved edits survive. */
+  hidden: boolean
+  /** This row's paycheck window is up. */
+  open: boolean
+  onOpen: () => void
+  onClose: () => void
+  onStep: (dir: -1 | 1) => void
   selected: boolean
   onToggleSelect: () => void
   selectDisabled: boolean
 }
 
+/**
+ * One person, one line. The row owns the working copy of the nine editable
+ * figures; the paycheck window renders from — and writes to — that same
+ * state, so it is a second view of the row rather than a copy of it.
+ */
 export default function PayrollRow({
   row,
   period,
-  expanded,
-  onToggleExpand,
+  index,
+  count,
+  alt,
+  hidden,
+  open,
+  onOpen,
+  onClose,
+  onStep,
   selected,
   onToggleSelect,
   selectDisabled,
 }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [edit, setEdit] = useState({
-    basic_salary: row.basic_salary,
-    statutory_allowance: row.statutory_allowance,
-    non_statutory_allowance: row.non_statutory_allowance,
-    ot_hours: row.ot_hours,
-    ot_amount: row.ot_amount,
-    commission_amount: row.commission_amount,
-    unpaid_leave_days: row.unpaid_leave_days,
-    deduction_amount: row.deduction_amount,
-    skbbk_amount: row.skbbk_amount,
-  })
+  const [edit, setEdit] = useState<PayrollEdit>(() => editFromRow(row))
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const trRef = useRef<HTMLTableRowElement>(null)
+  const chevRef = useRef<HTMLButtonElement>(null)
+  const wasOpen = useRef(false)
 
-  const dirty =
-    edit.basic_salary !== row.basic_salary ||
-    edit.statutory_allowance !== row.statutory_allowance ||
-    edit.non_statutory_allowance !== row.non_statutory_allowance ||
-    edit.ot_hours !== row.ot_hours ||
-    edit.ot_amount !== row.ot_amount ||
-    (!row.commission_is_derived && edit.commission_amount !== row.commission_amount) ||
-    edit.unpaid_leave_days !== row.unpaid_leave_days ||
-    edit.deduction_amount !== row.deduction_amount ||
-    edit.skbbk_amount !== row.skbbk_amount
+  const locked = row.status !== 'draft'
+  const dirtyList = dirtyFields(edit, row, { commissionDerived: row.commission_is_derived })
+  const dirty = dirtyList.length > 0
+
+  // Report pending edits to the page-level draft context — powers the
+  // header Save button and blocks Submit to Finance while unsaved.
+  const { setRowEdit } = usePayrollDraft()
+  useEffect(() => {
+    setRowEdit(row.id, dirty && !locked ? edit : null)
+  }, [row.id, dirty, locked, edit, setRowEdit])
+  useEffect(() => () => setRowEdit(row.id, null), [row.id, setRowEdit])
+
+  // Opening scrolls the row into view (‹ › in the window can land anywhere
+  // in the list); closing hands focus back to the chevron that opened it.
+  useEffect(() => {
+    if (open) {
+      trRef.current?.scrollIntoView({ block: 'nearest' })
+      wasOpen.current = true
+    } else if (wasOpen.current) {
+      wasOpen.current = false
+      chevRef.current?.focus({ preventScroll: true })
+    }
+  }, [open])
+
+  function setField(field: PayrollEditField, value: number) {
+    setError(null)
+    setSaved(false)
+    setEdit(prev => ({ ...prev, [field]: value }))
+  }
 
   function handleSave() {
     setError(null)
@@ -68,166 +111,136 @@ export default function PayrollRow({
     })
   }
 
-  const locked = row.status !== 'draft'
+  // An editable figure — a field on a draft row, a bare figure once the
+  // month has been submitted.
+  const cell = (field: PayrollEditField, decimals = 2) =>
+    locked ? (
+      <span className={cn('num', row[field] === 0 && 'zero')}>
+        {formatAmount(row[field], decimals)}
+      </span>
+    ) : (
+      <AmountInput
+        value={edit[field]}
+        onChange={v => setField(field, v)}
+        decimals={decimals}
+        disabled={isPending}
+        dirty={dirtyList.includes(field)}
+        aria-label={`${PAYROLL_FIELD_LABELS[field]} — ${row.staff_name}`}
+      />
+    )
 
-  // Report pending edits to the page-level draft context — powers the
-  // header Save button and blocks Submit to Finance while unsaved.
-  const { setRowEdit } = usePayrollDraft()
-  useEffect(() => {
-    setRowEdit(row.id, dirty && !locked ? edit : null)
-  }, [row.id, dirty, locked, edit, setRowEdit])
-  useEffect(() => () => setRowEdit(row.id, null), [row.id, setRowEdit])
-
-  // Narrow editable cell — minimal chrome
-  const cell = (
-    name: keyof typeof edit,
-    value: number,
-    step = '0.01',
-  ) => (
-    <input
-      type="number"
-      step={step}
-      min="0"
-      value={value}
-      disabled={locked || isPending}
-      onChange={e => setEdit({ ...edit, [name]: parseFloat(e.target.value) || 0 })}
-      className="w-24 text-right font-mono tabular text-sm bg-transparent border-b border-transparent focus:border-accent-border focus:outline-none px-1 py-1 disabled:text-muted disabled:cursor-not-allowed"
-    />
+  const num = (value: number, extra?: string) => (
+    <td className={cn('num', value === 0 && 'zero', extra)}>{formatMoneyBare(value)}</td>
   )
 
   return (
     <>
-      <tr className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors">
-        <td className="py-5 pl-2 pr-2 w-8">
+      <tr
+        ref={trRef}
+        hidden={hidden}
+        className={cn('pg-row', alt && 'alt', open && 'open', dirty && !locked && 'dirty')}
+      >
+        <td className="pg-st l0 pg-chk">
           <input
             type="checkbox"
             aria-label={`Select ${row.staff_name}`}
             checked={selected}
             disabled={locked || selectDisabled}
             onChange={onToggleSelect}
-            className="w-4 h-4 accent-accent cursor-pointer disabled:cursor-not-allowed disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:outline-none"
+            className="w-3.5 h-3.5 accent-accent cursor-pointer disabled:cursor-not-allowed disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:outline-none"
             title={locked ? `Cannot delete — status is ${row.status}` : undefined}
           />
         </td>
-        <td className="py-5 pr-4 font-serif text-md text-ink">{row.staff_name}</td>
-        <td className="py-5 pr-4 font-serif italic text-graphite text-sm">{row.dept_name}</td>
-        <td className="py-5 pr-4 text-right">{cell('basic_salary', edit.basic_salary)}</td>
-        <td className="py-5 pr-4 text-right">{cell('statutory_allowance', edit.statutory_allowance)}</td>
-        <td className="py-5 pr-4 text-right">{cell('non_statutory_allowance', edit.non_statutory_allowance)}</td>
-        <td className="py-5 pr-4 text-right">{cell('ot_amount', edit.ot_amount)}</td>
-        <td className="py-5 pr-4 text-right">
-          {row.commission_is_derived ? (
-            <div className="flex flex-col items-end">
-              <span className="font-mono tabular text-sm text-graphite px-1 py-1">
+        <td className="pg-st l1 pg-name">
+          <button
+            type="button"
+            className="pg-name-btn"
+            onClick={open ? onClose : onOpen}
+            title={`${row.staff_name} — open paycheck`}
+          >
+            {row.staff_name}
+          </button>
+        </td>
+        {num(row.gross, 'pg-st l2 pg-gross')}
+        {num(row.net, 'pg-st l3 pg-net')}
+        <td className="pg-st l4 pg-act">
+          {dirty && !locked && (
+            <button
+              type="button"
+              className="pg-save"
+              onClick={handleSave}
+              disabled={isPending}
+            >
+              {isPending ? '…' : 'Save'}
+            </button>
+          )}
+          {saved && <span className="text-xs font-serif italic text-ledger mr-1">✓</span>}
+          {error && (
+            <span className="text-xs font-serif italic text-danger mr-1" title={error}>
+              !
+            </span>
+          )}
+          <button
+            ref={chevRef}
+            type="button"
+            className="icon-btn chev"
+            aria-expanded={open}
+            aria-label={open ? 'Close paycheck' : 'Open paycheck'}
+            onClick={open ? onClose : onOpen}
+          >
+            ▾
+          </button>
+        </td>
+
+        <td className="pg-ed g1">{cell('basic_salary')}</td>
+        <td className="pg-ed">{cell('statutory_allowance')}</td>
+        <td className="pg-ed">{cell('non_statutory_allowance')}</td>
+        <td className="pg-ed">{cell('ot_amount')}</td>
+        {row.commission_is_derived ? (
+          <td className={cn('num derived', row.commission_amount === 0 && 'zero')}>
+            {row.commission_statement_href ? (
+              <a
+                href={row.commission_statement_href}
+                title="This figure comes from the commission run — open the statement behind it"
+              >
+                {formatMoneyBare(row.commission_amount)}
+              </a>
+            ) : (
+              <span title="Compute the commission run for this month to fill this in">
                 {formatMoneyBare(row.commission_amount)}
               </span>
-              {row.commission_statement_href ? (
-                <a
-                  href={row.commission_statement_href}
-                  className="font-mono text-[9.5px] uppercase tracking-wide text-accent hover:underline"
-                  title="This figure comes from the commission run — open the statement behind it"
-                >
-                  from commission run
-                </a>
-              ) : (
-                <span
-                  className="font-mono text-[9.5px] uppercase tracking-wide text-muted"
-                  title="Compute the commission run for this month to fill this in"
-                >
-                  awaiting the run
-                </span>
-              )}
-            </div>
-          ) : (
-            cell('commission_amount', edit.commission_amount)
-          )}
-        </td>
-        <td className="py-5 pr-4 text-right">{cell('unpaid_leave_days', edit.unpaid_leave_days, '0.5')}</td>
-        <td className="py-5 pr-4 text-right">{cell('deduction_amount', edit.deduction_amount)}</td>
-        <td className="py-5 pr-4 text-right">{cell('skbbk_amount', edit.skbbk_amount)}</td>
-        <td className="py-5 pr-4 text-right font-mono tabular text-graphite">{formatMoneyBare(row.epf_er)}</td>
-        <td className="py-5 pr-4 text-right font-mono tabular text-graphite">{formatMoneyBare(row.socso_er)}</td>
-        <td className="py-5 pr-4 text-right font-mono tabular text-graphite">{formatMoneyBare(row.eis_er)}</td>
-        <td className="py-5 pr-4 text-right font-mono tabular font-medium text-ink">{formatMoneyBare(row.gross)}</td>
-        <td className="py-5 pr-4 text-right font-mono tabular font-semibold text-ink">{formatMoneyBare(row.net)}</td>
-        <td className="py-5 pr-2 text-right">
-          <div className="flex items-center gap-2 justify-end">
-            {dirty && !locked && (
-              <button
-                onClick={handleSave}
-                disabled={isPending}
-                className="text-xs font-sans text-accent hover:text-accent-hover disabled:opacity-50"
-              >
-                {isPending ? '...' : 'Save'}
-              </button>
             )}
-            {saved && <span className="text-xs font-serif italic text-ledger">✓</span>}
-            {error && <span className="text-xs font-serif italic text-danger" title={error}>!</span>}
-            <a
-              href={`/hr-costing/payroll/${period}/${row.staff_id}/payslip`}
-              className="text-xs font-sans text-muted hover:text-accent"
-              title="Open payslip"
-            >
-              Payslip
-            </a>
-            <button
-              onClick={onToggleExpand}
-              className="text-xs text-muted hover:text-accent"
-              aria-label="Toggle details"
-            >
-              {expanded ? '▴' : '▾'}
-            </button>
-          </div>
-        </td>
-      </tr>
-      {expanded && (
-        <tr className="border-b border-hairline bg-surface-2/30">
-          <td colSpan={17} className="py-4 px-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-8 gap-y-3 text-sm">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted font-sans">Pro-rata</div>
-                <div className="font-mono tabular text-ink mt-1">
-                  {row.prorata_days_worked} / {row.prorata_days_in_month} days
-                </div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted font-sans">EPF ER / EE</div>
-                <div className="font-mono tabular text-ink mt-1">
-                  {formatMoney(row.epf_er)} / {formatMoney(row.epf_ee)}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted font-sans">SOCSO ER / EE</div>
-                <div className="font-mono tabular text-ink mt-1">
-                  {formatMoney(row.socso_er)} / {formatMoney(row.socso_ee)}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted font-sans">EIS ER / EE</div>
-                <div className="font-mono tabular text-ink mt-1">
-                  {formatMoney(row.eis_er)} / {formatMoney(row.eis_ee)}
-                </div>
-              </div>
-              <div>
-                {/* PCB and Withholding Tax are mutually exclusive: whichever
-                    one the staff record selects applies, the other is 0. A
-                    Revenue salesperson pays WHT, so showing only PCB would
-                    report a zero deduction on a row that has one. */}
-                <div className="text-xs uppercase tracking-wide text-muted font-sans">
-                  {row.withholding_tax > 0 ? 'Withholding Tax' : 'PCB'}
-                </div>
-                <div className="font-mono tabular text-ink mt-1">
-                  {formatMoney(row.withholding_tax > 0 ? row.withholding_tax : row.pcb)}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted font-sans">Status</div>
-                <div className="font-serif italic text-ink mt-1 capitalize">{row.status}</div>
-                <div className="font-serif italic text-muted text-xs">Source: {row.source}</div>
-              </div>
-            </div>
           </td>
-        </tr>
+        ) : (
+          <td className="pg-ed">{cell('commission_amount')}</td>
+        )}
+
+        <td className="pg-ed g1">{cell('unpaid_leave_days', 1)}</td>
+        <td className="pg-ed">{cell('deduction_amount')}</td>
+        <td className="pg-ed">{cell('skbbk_amount')}</td>
+
+        {num(row.epf_er, 'g1')}
+        {num(row.socso_er)}
+        {num(row.eis_er)}
+      </tr>
+
+      {open && (
+        <PaycheckWindow
+          row={row}
+          period={period}
+          index={index}
+          count={count}
+          edit={edit}
+          dirtyList={dirtyList}
+          locked={locked}
+          isPending={isPending}
+          saved={saved}
+          error={error}
+          onField={setField}
+          onSave={handleSave}
+          onClose={onClose}
+          onStep={onStep}
+        />
       )}
     </>
   )
