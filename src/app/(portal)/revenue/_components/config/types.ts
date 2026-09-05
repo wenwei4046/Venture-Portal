@@ -135,6 +135,9 @@ export interface SalespersonRow {
   /** The title they HOLD — the ratchet; may sit above the rank they are paid. */
   title_id: string | null
   title_name: string | null
+  /** Where that title stands on the company ladder (`title_levels`); null = not placed. */
+  title_level_rank: number | null
+  title_level_name: string | null
   hierarchy_id: string | null
   upline_staff_id: string | null
   rank_id: string | null

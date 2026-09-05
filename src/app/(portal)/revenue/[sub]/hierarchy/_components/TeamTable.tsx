@@ -2,6 +2,7 @@
 
 import { earnedFloor } from '@/lib/commission/titles'
 import { rankLabel, rankLetters } from '@/lib/commission/ranks'
+import { compareByLadder } from '@/lib/ladder'
 import { setPositionFromForm, updateStaffTax } from '../../../hierarchy-actions'
 import {
   ActionForm,
@@ -47,6 +48,17 @@ export default function TeamTable({
   )
   const nameOf = new Map(people.map(p => [p.staff_id, p.employee_name]))
 
+  // The ladder, top down — the most senior title first, the same title
+  // together, names A→Z on a rung — the order the People roster reads in
+  // (user, 2026-09-05: "从 title level 最高排到 level 最低"). Somebody whose
+  // title is not on the ladder comes after everybody who is.
+  const ordered = [...people].sort((a, b) =>
+    compareByLadder(
+      { name: a.employee_name, title: a.title_name, levelRank: a.title_level_rank },
+      { name: b.employee_name, title: b.title_name, levelRank: b.title_level_rank },
+    ),
+  )
+
   // The shape titles.ts reasons about — the earned floor a title lifts a
   // scheme-target month above the placed rank.
   const rungs = ranks.map(r => ({
@@ -67,7 +79,8 @@ export default function TeamTable({
       <SectionHead title="Team" count={`${people.length} PEOPLE`} />
       <Hint>
         <strong>Title</strong> is what they hold and only ever goes up — an applied run, or a rank
-        above it set here, raises it; nothing here lowers it. <strong>Rank</strong> is the floor a
+        above it set here, raises it; nothing here lowers it. The rows read the ladder top down,
+        the most senior title first. <strong>Rank</strong> is the floor a
         month pays from, lettered from the top of the ladder. <strong>Manual</strong> keeps that
         rank even in a month below target; <strong>Scheme target</strong> recomputes the rate every
         month from group sales and drops back when the target is missed. <strong>Upline</strong> is
@@ -97,7 +110,7 @@ export default function TeamTable({
               </tr>
             </thead>
             <tbody>
-              {people.map(p => {
+              {ordered.map(p => {
                 const placed = p.rank_id ? rungs.find(r => r.id === p.rank_id) : undefined
                 const earned = p.rate_mode === 'fixed' ? undefined : earnedFloor(rungs, p.title_id)
                 const liftedTo =
@@ -113,6 +126,15 @@ export default function TeamTable({
                     </td>
                     <td className="font-serif italic text-sm text-graphite">
                       {p.title_name ?? <span className="text-muted">— none yet —</span>}
+                      {/* The rung — the rows are in its order. */}
+                      {p.title_level_rank !== null ? (
+                        <span
+                          className="ml-2 font-mono not-italic text-[10px] text-muted"
+                          title={`Level ${p.title_level_rank} · ${p.title_level_name}`}
+                        >
+                          L{p.title_level_rank}
+                        </span>
+                      ) : null}
                     </td>
                     <RowForm action={setPositionFromForm}>
                       {({ pending }) => (
