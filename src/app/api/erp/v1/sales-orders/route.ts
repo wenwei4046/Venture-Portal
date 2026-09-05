@@ -32,8 +32,9 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 // erp_sync_events / the RPC postdate database.types.ts — untyped-client convention.
+// adminClient() builds the service-role client on first call, never at import.
 function client(): SupabaseClient {
-  return adminClient as unknown as SupabaseClient
+  return adminClient() as unknown as SupabaseClient
 }
 
 interface IngestResult {
