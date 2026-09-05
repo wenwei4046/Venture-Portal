@@ -70,7 +70,7 @@ export async function inviteUser(formData: FormData): Promise<void> {
     if (person.user_id) throw new Error(`${person.employee_name} already has an account`)
   }
 
-  const { data: created, error: authError } = await adminClient.auth.admin.createUser({
+  const { data: created, error: authError } = await adminClient().auth.admin.createUser({
     email,
     password,
     email_confirm: true,
@@ -126,7 +126,7 @@ export async function inviteUser(formData: FormData): Promise<void> {
   } catch (err) {
     // Roll the credential back so a retry is not blocked by a half-made
     // account, and so nothing can sign in without a portal identity.
-    await adminClient.auth.admin.deleteUser(userId)
+    await adminClient().auth.admin.deleteUser(userId)
     throw err
   }
 
