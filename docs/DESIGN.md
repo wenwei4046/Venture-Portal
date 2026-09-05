@@ -547,6 +547,22 @@ Two mobile rules the fixed layout needs, both already in `globals.css`: a
 split; and it must be a plain percentage — a `calc()` width on a table cell is
 treated as auto and the name collapses to 60px.
 
+### Payroll grid (v3.3, 2026-09-05 — HR → Payroll)
+
+The one table where every row is a form: nine editable figures per person,
+so it can neither fold for a phone nor shed columns, and the four-line names
+and `py-5` rows of the first version put Gross and Net off the right edge of
+a 1440 screen. Chosen as "C · Window" out of three mockups (A every column
+inline, B six figures and a panel, C both) — the artifact is linked from the
+project memory. Everything below lives in `globals.css` under "Payroll grid".
+
+| Class | What it does | Where to use |
+|---|---|---|
+| `.pg-well > .pg-scroll > table.ledger-table.payroll-grid` | Frozen panes: ✓ · Name · Gross · Net · ▾ stay put on the left (`.pg-st.l0`–`.l4`, offsets derived from the `--w-*` column widths so they cannot drift), the eleven working columns scroll under them in three groups (Earnings · Deductions · Employer, each opened by a `.g1` hairline), the two header rows pin to the top and the totals row to the bottom. The well is its own scroll box in both directions, because a sticky edge only holds inside the element that scrolls. `border-collapse: separate` is load-bearing; frozen cells are painted with the row's own `--row-bg`, an opaque pre-mixed zebra, because a translucent tint shows the scrolled cells through | Any grid where a row is a form and the answer columns must stay in view. Below `md` only ✓ · Name stay frozen and the well stops scrolling inside itself |
+| `.pg-in` | The editable figure: `3,000.00` in Chivo Mono like the computed cells beside it, on a `--paper` field one step below the surface so it reads as a recessed box; `.dirty` tints it alert until saved, `.zero` fades a 0.00 to muted so the figures that are actually there stand out. A computed figure stays a bare `.num` with no box — that contrast is how "you can change this one" is told | Figures HR types; never on a computed figure |
+| `.pg-band` (`.group-btn` in `td.group-cell`) | The roster's department band, with the Gross / Net subtotal sitting in the frozen block directly under the two columns it sums | Grouped money grids |
+| `.pg-win` + `.pg-scrim` | One person's paycheck as a floating window over a scrim (`--scrim` at .42): header with n / N, the month and department, ‹ › to step through people and × / Esc to close; a payslip-shaped body (Earnings · Deductions inputs, a Computed column of ER / EE, PCB or WHT, cost to company, net to bank) and a footer with Payslip and Save. It is a second view of the row's figures, never a copy — the inputs write the row's own edit state, so a change in either place shows in both | Opening a row from a dense grid. The first inline version sat in the same paper tones as the table and read as part of it; the scrim is what makes it unmistakably in front |
+
 ### `.page-head` example (mandatory shape)
 
 ```tsx

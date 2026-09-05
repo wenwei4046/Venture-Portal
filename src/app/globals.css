@@ -1177,3 +1177,503 @@ table.ledger-table tr.lt-detail {
     background-attachment: local, local, scroll, scroll;
   }
 }
+
+/* ── Payroll grid (2026-09-05, HR → Payroll) ───────────────────────────────
+   The one table where every row is a form — nine editable figures per
+   person — so it can neither fold for a phone nor shed columns. Picked as
+   "C · Window" out of three mockups (DESIGN.md → Payroll grid):
+
+   · Frozen panes on a .ledger-table. ✓ · Name · Gross · Net · ▾ stay put on
+     the left while the eleven working columns scroll under them; the two
+     header rows pin to the top and the totals row to the bottom. A sticky
+     edge only holds inside the element that scrolls, so the well is its own
+     scroll box in both directions (spreadsheet style) rather than letting
+     the page grow with the rows.
+   · Sticky cells must be opaque — they paint over the cells scrolling
+     beneath — so the zebra tint is pre-mixed into a solid colour and every
+     row carries it as --row-bg for its frozen cells to share.
+   · border-collapse must be separate: collapsed borders and sticky cells
+     shear apart in Chrome. */
+.pg-well {
+  background: rgb(var(--surface));
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 12px;
+  overflow: hidden;
+}
+.pg-scroll {
+  overflow: auto;
+  max-height: calc(100vh - 160px);
+  -webkit-overflow-scrolling: touch;
+}
+table.ledger-table.payroll-grid {
+  --w-chk: 36px;
+  --w-name: 196px;
+  --w-gross: 96px;
+  --w-net: 104px;
+  --w-act: 60px;
+  border: 0;
+  border-radius: 0;
+  /* .ledger-table clips itself for its rounded corners; here the WELL does
+     the clipping, because an overflow other than visible on the table would
+     make the table — not .pg-scroll — the box the frozen cells stick to,
+     and they would scroll away with everything else. */
+  overflow: visible;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  width: 100%;
+  font-size: 13.5px;
+}
+/* Column widths live here, on the <colgroup>, not on the markup. A money
+   column that can reach 1,000.00 needs 84px: eight Chivo Mono characters at
+   13px are 62px, plus the cell and field padding — narrower clips the digits.
+   Under
+   fixed layout the widths are read from the first row, which is the group
+   header with its colspans, so a width on the second header row's <th> is
+   ignored. The frozen offsets below derive from the same --w-* values, so
+   the two cannot drift apart. */
+table.payroll-grid col.col-chk { width: var(--w-chk); }
+table.payroll-grid col.col-name { width: var(--w-name); }
+table.payroll-grid col.col-gross { width: var(--w-gross); }
+table.payroll-grid col.col-net { width: var(--w-net); }
+table.payroll-grid col.col-act { width: var(--w-act); }
+table.payroll-grid col.col-basic { width: 92px; }
+table.payroll-grid col.col-stat { width: 84px; }
+table.payroll-grid col.col-ns { width: 88px; }
+table.payroll-grid col.col-ot { width: 84px; }
+table.payroll-grid col.col-comm { width: 88px; }
+table.payroll-grid col.col-unpaid { width: 84px; }
+table.payroll-grid col.col-ded { width: 84px; }
+table.payroll-grid col.col-skbbk { width: 76px; }
+table.payroll-grid col.col-epf { width: 92px; }
+table.payroll-grid col.col-socso { width: 84px; }
+table.payroll-grid col.col-eis { width: 76px; }
+
+table.payroll-grid thead th {
+  position: sticky;
+  z-index: 2;
+  padding: 0 8px;
+  height: 34px;
+  white-space: nowrap;
+  vertical-align: middle;
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+}
+table.payroll-grid thead tr.pg-grp th {
+  top: 0;
+  height: 26px;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-align: center;
+  color: rgb(var(--muted));
+  border-bottom: 1px solid rgb(var(--hairline) / 0.6);
+}
+table.payroll-grid thead tr.pg-cols th { top: 26px; }
+table.payroll-grid thead th i {
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: 0;
+  color: rgb(var(--muted));
+  font-weight: 500;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 10px;
+}
+table.payroll-grid td {
+  padding: 0 8px;
+  height: 36px;
+  vertical-align: middle;
+  white-space: nowrap;
+  border-bottom: 1px solid rgb(var(--hairline));
+}
+/* Row colour is a variable so the frozen cells can repeat it opaquely. */
+table.payroll-grid tbody tr:nth-child(even) { background: transparent; }
+table.payroll-grid tbody tr.pg-row {
+  --row-bg: rgb(var(--surface));
+  background: var(--row-bg);
+}
+table.payroll-grid tbody tr.pg-row.alt {
+  --row-bg: color-mix(in srgb, rgb(var(--surface-2)) 40%, rgb(var(--surface)));
+}
+table.payroll-grid tbody tr.pg-row:hover,
+table.payroll-grid tbody tr.pg-row.open {
+  --row-bg: rgb(var(--accent-bg));
+  background: var(--row-bg);
+}
+table.payroll-grid tbody tr.pg-row.open td.pg-chk { box-shadow: inset 3px 0 0 rgb(var(--accent)); }
+table.payroll-grid tbody tr.pg-row[hidden] { display: none; }
+
+/* Frozen left block */
+table.payroll-grid .pg-st { position: sticky; z-index: 1; }
+table.payroll-grid thead .pg-st,
+table.payroll-grid tfoot .pg-st { z-index: 3; }
+table.payroll-grid .l0 { left: 0; }
+table.payroll-grid .l1 { left: var(--w-chk); }
+table.payroll-grid .l2 { left: calc(var(--w-chk) + var(--w-name)); }
+table.payroll-grid .l3 { left: calc(var(--w-chk) + var(--w-name) + var(--w-gross)); }
+table.payroll-grid .l4 { left: calc(var(--w-chk) + var(--w-name) + var(--w-gross) + var(--w-net)); }
+table.payroll-grid tbody td.pg-st { background: var(--row-bg); }
+table.payroll-grid th.g1,
+table.payroll-grid td.g1 { border-left: 1px solid rgb(var(--hairline)); }
+table.payroll-grid .l2 { box-shadow: inset 1px 0 0 rgb(var(--hairline)); }
+table.payroll-grid .l4 { box-shadow: inset -1px 0 0 rgb(var(--hairline)); }
+table.payroll-grid tr.pg-band .l4 { box-shadow: none; }
+/* A soft shadow off the frozen edge, only once the working columns have
+   scrolled under it. */
+table.payroll-grid .l4::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -10px;
+  width: 10px;
+  pointer-events: none;
+  background: linear-gradient(to right, rgb(var(--ink) / 0.1), transparent);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.pg-scroll.scrolled table.payroll-grid .l4::after { opacity: 1; }
+
+/* Department band — the roster's .group-btn, with the subtotal sitting
+   right under the Gross / Net columns it belongs to. */
+table.payroll-grid tbody tr.pg-band td {
+  background: rgb(var(--band));
+  border-bottom: 0;
+  height: 32px;
+  padding: 0;
+}
+table.payroll-grid tbody tr.pg-band td.sub {
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgb(var(--band-ink));
+  text-align: right;
+  padding: 0 8px;
+}
+table.payroll-grid tbody tr.pg-band .group-btn .tag {
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 9.5px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: rgb(246 214 150);
+}
+
+/* Cells */
+table.payroll-grid td.pg-name { padding-left: 12px; font-weight: 500; font-size: 13px; }
+.pg-name-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pg-name-btn:hover { color: rgb(var(--accent)); }
+.pg-name-btn:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; border-radius: 3px; }
+table.payroll-grid td.pg-chk,
+table.payroll-grid th.col-chk { padding: 0 0 0 12px; }
+table.payroll-grid td.num.zero { color: rgb(var(--muted)); font-weight: 400; }
+table.payroll-grid td.pg-gross { font-weight: 500; }
+table.payroll-grid td.pg-net { font-weight: 600; font-size: 14px; }
+table.payroll-grid td.derived a {
+  color: rgb(var(--accent));
+  text-decoration: none;
+  border-bottom: 1px dotted rgb(var(--accent));
+  font-weight: 500;
+}
+table.payroll-grid td.pg-ed { padding: 0 4px; }
+table.payroll-grid td.pg-act { padding: 0 6px 0 4px; text-align: right; }
+table.payroll-grid .icon-btn {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  vertical-align: middle;
+  font-size: 12px;
+}
+table.payroll-grid .icon-btn.chev { transition: transform 0.18s ease, color 0.14s, opacity 0.14s; }
+table.payroll-grid tr.pg-row.open .icon-btn.chev { color: rgb(var(--accent)); opacity: 1; transform: rotate(180deg); }
+/* Save takes the chevron's place while the row has unsaved figures. */
+table.payroll-grid tr.pg-row.dirty .icon-btn.chev { display: none; }
+.pg-save {
+  font-family: var(--font-sans), 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid rgb(var(--walnut));
+  background: rgb(var(--walnut));
+  color: rgb(var(--band-ink));
+  cursor: pointer;
+  vertical-align: middle;
+}
+.pg-save:disabled { opacity: 0.5; cursor: wait; }
+.pg-save:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; }
+
+/* The editable figure. Paper sits one step below surface, so inside the well
+   the field reads as a recessed box without a shouting border — that is how
+   "you can change this one" is told apart from a computed figure. */
+.pg-in {
+  width: 100%;
+  height: 24px;
+  padding: 0 5px;
+  text-align: right;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgb(var(--num-ink));
+  background: rgb(var(--paper));
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 6px;
+  outline: none;
+}
+.pg-in.zero { color: rgb(var(--muted)); font-weight: 400; }
+.pg-in:hover { border-color: rgb(var(--accent-border)); }
+.pg-in:focus {
+  border-color: rgb(var(--accent));
+  box-shadow: 0 0 0 2px rgb(var(--accent) / 0.18);
+  background: rgb(var(--surface));
+  color: rgb(var(--num-ink));
+}
+.pg-in.dirty {
+  border-color: rgb(var(--alert) / 0.7);
+  background: rgb(var(--alert-bg));
+  color: rgb(var(--num-ink));
+  font-weight: 500;
+}
+.pg-in:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Totals row, pinned to the bottom of the well */
+table.payroll-grid tfoot td {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: rgb(var(--surface-2));
+  border-top: 2px solid rgb(var(--hairline));
+  border-bottom: 0;
+  height: 38px;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgb(var(--graphite));
+  font-weight: 600;
+}
+table.payroll-grid tfoot td.pg-st { z-index: 3; }
+table.payroll-grid tfoot td.num {
+  font-size: 13.5px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgb(var(--num-ink));
+  font-weight: 600;
+}
+table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphite)); }
+
+/* Caption legend above the well */
+.pg-legend {
+  display: inline-flex;
+  gap: 14px;
+  align-items: center;
+  font-style: normal;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgb(var(--graphite));
+}
+.pg-legend i {
+  display: inline-block;
+  width: 22px;
+  height: 14px;
+  border-radius: 4px;
+  vertical-align: -3px;
+  margin-right: 5px;
+}
+.pg-legend i.in { background: rgb(var(--paper)); border: 1px solid rgb(var(--hairline)); }
+.pg-legend i.ro { border: 1px dashed rgb(var(--hairline)); }
+.pg-legend i.dv { height: 10px; border-radius: 0; border-bottom: 1px dotted rgb(var(--accent)); }
+
+/* Phone: the frozen block is wider than the screen, so only ✓ · Name stay
+   put and the well stops scrolling inside itself. */
+@media (max-width: 767px) {
+  table.payroll-grid .l2,
+  table.payroll-grid .l3,
+  table.payroll-grid .l4 { position: static; box-shadow: none; }
+  table.payroll-grid .l4::after { display: none; }
+  .pg-scroll { max-height: none; }
+  table.payroll-grid thead th { position: static; }
+  table.payroll-grid tfoot td { position: static; }
+}
+
+/* ── Paycheck window ───────────────────────────────────────────────────────
+   One person's paycheck over a scrim. The first inline version sat in the
+   same paper tones as the table and read as part of it (user 2026-09-05);
+   the scrim is what makes it unmistakably in front. It is a second view of
+   the row's figures, never a copy — see PaycheckWindow.tsx. */
+.pg-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgb(var(--scrim) / 0.42);
+  animation: pg-fade 0.16s;
+}
+.pg-win {
+  position: fixed;
+  z-index: 61;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(1040px, calc(100vw - 40px));
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  background: rgb(var(--surface));
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgb(var(--ink) / 0.3), 0 2px 6px rgb(var(--ink) / 0.1);
+  animation: pg-win-in 0.16s ease-out;
+  outline: none;
+}
+.pg-win-h {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 18px 14px 24px;
+  border-bottom: 1px solid rgb(var(--hairline));
+  background: rgb(var(--accent-bg) / 0.45);
+}
+.pg-win-h .page-eyebrow { margin-bottom: 0; }
+.pg-win-h h2 {
+  margin: 6px 0 0;
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: rgb(var(--ink));
+}
+.pg-win-h .nav { margin-left: auto; display: flex; gap: 4px; align-items: center; flex: none; }
+.pg-win-h .nav .icon-btn {
+  border-color: rgb(var(--hairline));
+  background: rgb(var(--surface));
+  font-size: 16px;
+}
+.pg-win-h .nav .icon-btn:disabled { opacity: 0.35; cursor: default; }
+.pg-slip {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 1.25fr;
+  gap: 0 36px;
+  padding: 18px 24px 18px 26px;
+}
+.pg-slip h4 {
+  margin: 0 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgb(var(--hairline));
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgb(var(--graphite));
+  font-weight: 500;
+  display: flex;
+  justify-content: space-between;
+}
+.pg-slip h4 span { letter-spacing: 0.04em; color: rgb(var(--muted)); }
+.pg-slip .f {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 3px 0;
+}
+.pg-slip .f label { font-size: 13px; color: rgb(var(--ink)); }
+.pg-slip .f label small {
+  display: block;
+  font-size: 11px;
+  color: rgb(var(--muted));
+  font-style: italic;
+}
+.pg-slip .f .pg-in { width: 124px; height: 28px; padding: 0 8px; flex: none; }
+.pg-slip .f .pg-in.hrs { width: 64px; }
+.pg-slip .f .pair { display: inline-flex; gap: 6px; flex: none; }
+.pg-slip .f .ro {
+  width: 124px;
+  flex: none;
+  text-align: right;
+  font-size: 13px;
+  padding: 0 8px;
+  line-height: 26px;
+}
+.pg-slip .f .ro.link {
+  color: rgb(var(--accent));
+  border-bottom: 1px dotted rgb(var(--accent));
+  text-decoration: none;
+}
+.pg-slip .f .ro.zero { color: rgb(var(--muted)); font-weight: 400; }
+.pg-slip .kv {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px dotted rgb(var(--hairline) / 0.9);
+  font-size: 12.5px;
+  color: rgb(var(--graphite));
+}
+.pg-slip .kv .num { font-size: 13px; }
+.pg-slip .kv .num.zero { color: rgb(var(--muted)); font-weight: 400; }
+.pg-slip .kv small { color: rgb(var(--muted)); font-style: italic; font-size: 11px; margin-left: 6px; }
+.pg-slip .kv.big { border-bottom: 0; padding-top: 8px; color: rgb(var(--ink)); }
+.pg-slip .kv.big .num { font-size: 15px; font-weight: 600; }
+.pg-slip .foot {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgb(var(--hairline));
+}
+.pg-slip .foot .meta { font-size: 12px; font-style: italic; color: rgb(var(--graphite)); }
+.pg-slip .foot .meta .chip { margin-left: 8px; font-style: normal; }
+.pg-slip .foot .btns { display: flex; gap: 8px; align-items: center; }
+.pg-btn {
+  font-family: var(--font-sans), 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid rgb(var(--hairline));
+  background: rgb(var(--surface));
+  color: rgb(var(--ink));
+  cursor: pointer;
+  text-decoration: none;
+}
+.pg-btn:hover { background: rgb(var(--surface-2)); }
+.pg-btn.pri { background: rgb(var(--walnut)); border-color: rgb(var(--walnut)); color: rgb(var(--band-ink)); }
+.pg-btn.pri:hover { background: rgb(var(--walnut)); opacity: 0.92; }
+.pg-btn.pri:disabled { opacity: 0.45; cursor: not-allowed; }
+.pg-btn:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; }
+@keyframes pg-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pg-win-in {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.985); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pg-win, .pg-scrim { animation: none; }
+  table.payroll-grid .icon-btn.chev { transition: none; }
+}
+@media (max-width: 980px) {
+  .pg-slip { grid-template-columns: 1fr 1fr; }
+  .pg-slip .c3 { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .pg-slip { grid-template-columns: 1fr; padding: 14px 16px; }
+  .pg-win { max-height: calc(100vh - 16px); width: calc(100vw - 16px); border-radius: 12px; }
+}
