@@ -14,12 +14,16 @@ export interface TabItem {
  *            rail that sits below a bordered page header (Settings, Fund In,
  *            Fund Out, Payments).
  * `control`  for a rail ON the header's own rule (`.page-head.tabbed`). With
- *            no rule between the intro and the tabs, body-face labels read as
- *            one more line of the intro (user 2026-09-05: "它好像不是一个选项
- *            … 让它看起来其实是不同的选项"). So the labels drop to the portal's
- *            control voice — small mono caps, the same as a table head or a
- *            chip — each on its own hover surface, and the header keeps 18px
- *            clear above them.
+ *            no rule between the intro and the tabs, the labels have to read
+ *            as things to pick rather than one more line of the intro (user
+ *            2026-09-05: "它好像不是一个选项 … 让它看起来其实是不同的选项") —
+ *            so each sits on its own hover surface, the indicator underlines
+ *            the label, and the header keeps 18px clear above them. The face
+ *            is the body face, Inter at 13px medium, upright and in sentence
+ *            case: the first cut set them in the portal's mono caps and the
+ *            user asked for "正常 formal 的字体" the same evening. What makes
+ *            them options is the surface and the indicator, not a typewriter
+ *            voice.
  */
 export type SlidingTabsVariant = 'text' | 'control'
 
@@ -39,7 +43,8 @@ const NAV: Record<SlidingTabsVariant, string> = {
 
 // Control tabs wear padding for their hover surface; the first one pulls left
 // by that padding (first:-ml-3) so its label lines up with the header text
-// while the rail's rule still starts where the text does.
+// while the rail's rule still starts where the text does. Active and idle
+// share one weight so a tab does not change width when it is picked.
 const TAB: Record<SlidingTabsVariant, { active: string; idle: string }> = {
   text: {
     active: 'font-serif italic text-accent text-base pb-3 -mb-px whitespace-nowrap',
@@ -47,14 +52,15 @@ const TAB: Record<SlidingTabsVariant, { active: string; idle: string }> = {
   },
   control: {
     active:
-      'font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-accent px-3 pt-2 pb-2.5 -mb-px first:-ml-3 rounded-t-control whitespace-nowrap',
-    idle: 'font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-graphite px-3 pt-2 pb-2.5 first:-ml-3 rounded-t-control hover:text-ink hover:bg-surface-2/70 transition-colors whitespace-nowrap',
+      'font-sans text-[13px] font-medium text-accent px-3 pt-2 pb-2.5 -mb-px first:-ml-3 rounded-t-control whitespace-nowrap',
+    idle: 'font-sans text-[13px] font-medium text-graphite px-3 pt-2 pb-2.5 first:-ml-3 rounded-t-control hover:text-ink hover:bg-surface-2/70 transition-colors whitespace-nowrap',
   },
 }
 
+// The count is a number, so it keeps the data face on both variants.
 const COUNT: Record<SlidingTabsVariant, string> = {
   text: 'font-mono not-italic text-[10px] text-muted ml-1.5',
-  control: 'text-[10px] text-muted ml-1.5 tracking-normal',
+  control: 'font-mono text-[10.5px] text-muted ml-1.5',
 }
 
 export function SlidingTabs({ items, active, onTabChange, variant = 'text' }: SlidingTabsProps) {
