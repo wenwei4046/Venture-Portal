@@ -39,17 +39,18 @@ src/
 │   │   │                              category since 2026-09-01, below
 │   │   │                              Departments): People Management /
 │   │   │                              Hierarchy / Roles / Permissions, four flat
-│   │   │                              entries. No tab rail on the pages — the
-│   │   │                              sidebar is the only way between them.
-│   │   │                              Routes stay under /team/*. Roles =
-│   │   │                              titles. Hierarchy = the **ladder**
-│   │   │                              (Levels board — `title_levels`, one
-│   │   │                              shared scale, 2026-09-03; moved off
-│   │   │                              Roles onto Hierarchy 2026-09-05) above
-│   │   │                              the org chart that obeys it; promotion
-│   │   │                              climbs it; the roster sorts by it, top
-│   │   │                              down — `lib/ladder.ts`. Permissions =
-│   │   │                              the matrix, split off 2026-09-03.
+│   │   │                              entries. No tab rail BETWEEN them — the
+│   │   │                              sidebar is the only way from page to
+│   │   │                              page. Routes stay under /team/*. Roles =
+│   │   │                              titles. Hierarchy = two tabs side by
+│   │   │                              side on the header's rule (`?tab=`,
+│   │   │                              2026-09-05): **Org chart**, and
+│   │   │                              **Levels** = the **ladder** (`title_levels`,
+│   │   │                              one shared scale, 2026-09-03; on Roles
+│   │   │                              until 2026-09-05) that the chart obeys,
+│   │   │                              promotion climbs and the roster sorts by
+│   │   │                              — `lib/ladder.ts`. Permissions = the
+│   │   │                              matrix, split off 2026-09-03.
 │   │   ├── director-salary/         (Phase 3)
 │   │   ├── hr-costing/              (Phase 3 — staff directory moved to team/)
 │   │   ├── revenue/                 ← Revenue Department: [sub]/ = one sub-department

@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState, useTransition, type DragEvent } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ErrorNote, Hint, SectionHead } from '@/components/RowForm'
 import type { Rung } from '@/lib/ladder'
@@ -217,7 +218,7 @@ export default function LevelsBoard({
         } PLACED${pending ? ' · SAVING…' : ''}`
 
   return (
-    <section id="levels" className="mb-12 scroll-mt-6" aria-busy={pending}>
+    <section className="mb-12" aria-busy={pending}>
       <SectionHead
         title="Levels"
         count={count}
@@ -236,10 +237,10 @@ export default function LevelsBoard({
       <Hint>
         Every title stands on one level, and the top row is the most senior.
         A person can be promoted to the next level up in their own department,
-        and the chart below will not put anybody under somebody the ladder
-        ranks below them. A title not placed yet is outside the rule. Drag a
-        title up or down its column, or use the arrows; click a level&apos;s
-        name to rename it.
+        and the chart will not put anybody under somebody the ladder ranks
+        below them. A title not placed yet is outside the rule. Drag a title
+        up or down its column, or use the arrows; click a level&apos;s name to
+        rename it.
       </Hint>
 
       <ErrorNote error={error} />
@@ -248,9 +249,13 @@ export default function LevelsBoard({
         <p className="mb-4 font-serif italic text-sm text-alert">
           {breaks} reporting {breaks === 1 ? 'line breaks' : 'lines break'} this ladder as it
           stands.{' '}
-          <a href="#chart" className="not-italic font-sans text-xs text-accent hover:underline">
-            Marked red on the chart below ↓
-          </a>
+          <Link
+            href="/team/hierarchy"
+            scroll={false}
+            className="not-italic font-sans text-xs text-accent hover:underline"
+          >
+            See them on the chart →
+          </Link>
         </p>
       ) : null}
 

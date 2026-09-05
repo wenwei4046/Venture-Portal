@@ -64,7 +64,7 @@ export default async function RolesPage() {
             A title says what somebody is called and which department that role
             belongs under. How high it stands is the ladder, under{' '}
             <Link
-              href="/team/hierarchy#levels"
+              href="/team/hierarchy?tab=levels"
               className="text-accent hover:underline not-italic"
             >
               Hierarchy → Levels
