@@ -485,8 +485,10 @@ function RankCatalogue({
 }) {
   const letters = catalogueLetters(data)
   const catalogue = catalogueTopDown(data)
-  const titleById = new Map(data.titles.map(t => [t.id, t.name]))
-  const holderByDef = new Map(data.ranks.map(r => [r.rank_def_id, r]))
+  // Which ranks a title sits on — only to keep Remove off those rows. Which
+  // title is the ladder's business, not this tab's (user 2026-09-06: "这边主要
+  // 是 setting for rate").
+  const taken = new Set(data.ranks.map(r => r.rank_def_id))
 
   return (
     <section>
@@ -508,45 +510,34 @@ function RankCatalogue({
             <tr>
               <th className="w-32">Rank</th>
               <th className="right w-28">Rate %</th>
-              <th>Paid to</th>
-              <th className="w-36"></th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
-            {catalogue.map(d => {
-              const holder = holderByDef.get(d.id)
-              return (
-                <RowForm key={d.id} action={upsertRankDef}>
-                  {({ pending }) => (
-                    <tr>
-                      <td>
-                        <Hidden name="id" value={d.id} />
-                        <Hidden name="scheme_id" value={scheme.id} />
-                        <span className="chip whitespace-nowrap">RANK {letters.get(d.id) ?? '?'}</span>
-                      </td>
-                      <td className="num">
-                        <Field name="product_rate" type="number" step="0.01" width="w-20" defaultValue={toPct(d.product_rate)} ariaLabel={`${d.label} rate`} />
-                      </td>
-                      <td className="font-serif italic text-sm">
-                        {holder ? (
-                          <span className="text-graphite">{titleById.get(holder.title_id) ?? '(inactive title)'}</span>
-                        ) : (
-                          <span className="text-muted">nobody yet — pick it for a title on the ladder</span>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap">
-                        <SaveButton pending={pending} />
-                        {!holder ? (
-                          <span className="ml-3">
-                            <ActionButton run={() => deleteRankDef(d.id)} label="Remove" danger />
-                          </span>
-                        ) : null}
-                      </td>
-                    </tr>
-                  )}
-                </RowForm>
-              )
-            })}
+            {catalogue.map(d => (
+              <RowForm key={d.id} action={upsertRankDef}>
+                {({ pending }) => (
+                  <tr>
+                    <td>
+                      <Hidden name="id" value={d.id} />
+                      <Hidden name="scheme_id" value={scheme.id} />
+                      <span className="chip whitespace-nowrap">RANK {letters.get(d.id) ?? '?'}</span>
+                    </td>
+                    <td className="num">
+                      <Field name="product_rate" type="number" step="0.01" width="w-20" defaultValue={toPct(d.product_rate)} ariaLabel={`${d.label} rate`} />
+                    </td>
+                    <td className="whitespace-nowrap">
+                      <SaveButton pending={pending} />
+                      {!taken.has(d.id) ? (
+                        <span className="ml-3">
+                          <ActionButton run={() => deleteRankDef(d.id)} label="Remove" danger />
+                        </span>
+                      ) : null}
+                    </td>
+                  </tr>
+                )}
+              </RowForm>
+            ))}
             <RowForm action={upsertRankDef}>
               {({ pending }) => (
                 <tr className="bg-surface-2/40">
@@ -557,7 +548,6 @@ function RankCatalogue({
                   <td className="num">
                     <Field name="product_rate" type="number" step="0.01" width="w-20" placeholder="11" required ariaLabel="new rank rate" />
                   </td>
-                  <td />
                   <td><SaveButton pending={pending} label="Add" /></td>
                 </tr>
               )}
