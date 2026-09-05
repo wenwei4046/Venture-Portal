@@ -23,6 +23,18 @@ describe('SlidingTabs', () => {
     expect(onChange).toHaveBeenCalledWith('tiers')
   })
 
+  it('shows a count after the label when the item carries one', () => {
+    render(
+      <SlidingTabs
+        items={[{ key: 'chart', label: 'Hierarchy' }, { key: 'team', label: 'Team', count: 26 }]}
+        active="chart"
+        onTabChange={() => {}}
+      />
+    )
+    expect(screen.getByRole('button', { name: 'Team 26' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Hierarchy' })).toBeDefined()
+  })
+
   it('renders the indicator bar element', () => {
     const { container } = render(
       <SlidingTabs items={tabs} active="treasury" onTabChange={() => {}} />

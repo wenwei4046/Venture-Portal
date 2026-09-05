@@ -823,6 +823,19 @@ tr:hover .icon-btn { opacity: 1; }
   height: 2px;
   background: rgb(var(--accent));
 }
+/* A page whose body is a tab rail (Revenue › Rules, Staff Hierarchy,
+   2026-09-05): the rail sits ON the header's rule rather than under a second
+   one. The header gives up its border and its 64px accent segment — the
+   SlidingTabs indicator under the active tab is that segment, moved to where
+   the reader's eye already is. */
+.page-head.tabbed {
+  border-bottom: 0;
+  padding-bottom: 4px;
+  margin-bottom: 0;
+}
+.page-head.tabbed::after {
+  display: none;
+}
 .page-eyebrow {
   font-family: var(--font-mono), 'Chivo Mono', Menlo, var(--font-cjk), monospace;
   font-size: 10.5px;

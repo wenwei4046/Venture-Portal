@@ -36,6 +36,12 @@ export interface RankRow {
   /** The title (Team → Role & Permission) this rung belongs to. */
   title_id: string
   rank_key: string
+  /**
+   * "Rank B" — the letter counted from the top of the ladder, maintained by
+   * `upsertRank` after every write (`lib/commission/ranks.ts`). Pages letter
+   * the rows they hold themselves rather than trusting this; it exists so the
+   * engine's warnings and SQL say the same thing the pages do.
+   */
   label: string
   product_rate: number
   can_recruit: boolean
@@ -118,7 +124,10 @@ export interface PromotionRuleRow {
   note: string | null
 }
 
-/** A salesperson's live position, joined for the people table. */
+/**
+ * A salesperson's live position, joined for the Team table and the org chart
+ * (Staff Hierarchy, both tabs — the two read one load so they never disagree).
+ */
 export interface SalespersonRow {
   staff_id: string
   employee_name: string
@@ -132,8 +141,16 @@ export interface SalespersonRow {
   rank_key: string | null
   rank_label: string | null
   rate_mode: 'fixed' | 'variable' | null
+  /** `effective_from` of the open position — when they were last placed or moved. */
+  placed_since: string | null
   tax_mode: 'pcb' | 'withholding' | 'none'
   withholding_rate: number
+}
+
+/** Staff Hierarchy's load: the ladder to pick from, and everyone on it or not yet placed. */
+export interface TeamData {
+  ranks: RankRow[]
+  people: SalespersonRow[]
 }
 
 export interface ProductRow {
@@ -150,6 +167,8 @@ export interface ProductRow {
 /**
  * One sub-department's rules — everything below `scheme` is filtered to it —
  * plus the three unscoped lists the "generate a new sub-department" form needs.
+ * The people are not here: they moved to Staff Hierarchy's Team tab on
+ * 2026-09-05 and load through `loadTeam`.
  */
 export interface CommissionSettingsData {
   /** Null while a sub-department exists but has no active scheme. */
@@ -164,7 +183,6 @@ export interface CommissionSettingsData {
   brands: BrandRow[]
   marginBands: MarginBandRow[]
   promotionRules: PromotionRuleRow[]
-  salespeople: SalespersonRow[]
   /** Every sub-department — the clone picker names its source by them. */
   subDepartments: SubDeptRow[]
   /** Every live scheme, so a new sub-department can follow any of them. */
