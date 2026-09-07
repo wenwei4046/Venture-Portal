@@ -92,3 +92,92 @@ describe('promotesTo — the ratchet', () => {
     expect(promotesTo(SHARED, RS, RS)).toBeNull()
   })
 })
+
+// ─── Title-driven rank assignation (2026-09-07) ──────────────────────────────
+
+import { rankAfterTitleChange, rankForTitle, type AssignableRung } from './titles'
+
+/** The Fair ladder with ids, lowest rate first. */
+const RUNGS: AssignableRung[] = [
+  { id: 'r10', titleId: RS, canRecruit: false, sortOrder: 10 },
+  { id: 'r20', titleId: SRS, canRecruit: true, sortOrder: 20 },
+  { id: 'r30', titleId: TA, canRecruit: true, sortOrder: 30 },
+  { id: 'r40', titleId: STA, canRecruit: true, sortOrder: 40 },
+  { id: 'r50', titleId: TL, canRecruit: true, sortOrder: 50 },
+  { id: 'r60', titleId: STL, canRecruit: true, sortOrder: 60 },
+]
+
+/** One title carrying two rungs — the pre-2026-09-03 shape, with ids. */
+const SHARED_RUNGS: AssignableRung[] = [
+  { id: 's10', titleId: RS, canRecruit: false, sortOrder: 10 },
+  { id: 's20', titleId: RS, canRecruit: true, sortOrder: 20 },
+  { id: 's30', titleId: TA, canRecruit: true, sortOrder: 30 },
+]
+
+describe('rankForTitle', () => {
+  it('is the rung that carries the title', () => {
+    expect(rankForTitle(RUNGS, TL)?.id).toBe('r50')
+  })
+
+  it('is the LOWEST rung when a title carries several', () => {
+    // The title is what somebody keeps, so the rank it guarantees is the
+    // floor, not the best month it could reach.
+    expect(rankForTitle(SHARED_RUNGS, RS)?.id).toBe('s10')
+  })
+
+  it('is undefined for a title the ladder does not carry', () => {
+    expect(rankForTitle(RUNGS, 'title-finance-manager')).toBeUndefined()
+  })
+
+  it('is undefined for somebody with no title', () => {
+    expect(rankForTitle(RUNGS, null)).toBeUndefined()
+  })
+})
+
+describe('rankAfterTitleChange', () => {
+  it('places somebody who has no rank yet at their title floor', () => {
+    expect(rankAfterTitleChange(RUNGS, TA, null)?.id).toBe('r30')
+  })
+
+  it('raises a rank that sits below the new title floor', () => {
+    // Promoted Revenue Specialist → Team Leader: 10 → 50.
+    expect(rankAfterTitleChange(RUNGS, TL, 'r10')?.id).toBe('r50')
+  })
+
+  it('leaves a rank that already sits above the title floor alone', () => {
+    // Placed at Team Leader by hand, then given the Team Assistant title —
+    // the placement was deliberate and the ratchet never claws back.
+    expect(rankAfterTitleChange(RUNGS, TA, 'r50')).toBeNull()
+  })
+
+  it('does nothing when the rank is already the floor', () => {
+    expect(rankAfterTitleChange(RUNGS, TA, 'r30')).toBeNull()
+  })
+
+  it('does nothing for a title the ladder does not carry', () => {
+    expect(rankAfterTitleChange(RUNGS, 'title-finance-manager', 'r10')).toBeNull()
+  })
+
+  it('does nothing for a title cleared to none', () => {
+    expect(rankAfterTitleChange(RUNGS, null, 'r10')).toBeNull()
+  })
+
+  it("leaves alone a current rank this ladder does not carry, rather than guessing it is lower", () => {
+    // Another scheme's rank id. Treating an unknown as "below everything"
+    // would move somebody across schemes on a title edit.
+    expect(rankAfterTitleChange(RUNGS, TL, 'some-other-schemes-rank')).toBeNull()
+  })
+
+  it('never oscillates against the title ratchet', () => {
+    // promotesTo raises the TITLE when a rank stands above it;
+    // rankAfterTitleChange raises the RANK when a title stands above it.
+    // Applying one must not re-trigger the other.
+    const raisedRank = rankAfterTitleChange(RUNGS, TL, 'r10')
+    expect(raisedRank?.id).toBe('r50')
+    // The person now holds TL at r50. The title ratchet asks: does r50's
+    // title stand above TL? No — it IS TL.
+    expect(promotesTo(RUNGS, TL, TL)).toBeNull()
+    // And the rank ratchet, asked again, is now a no-op.
+    expect(rankAfterTitleChange(RUNGS, TL, 'r50')).toBeNull()
+  })
+})

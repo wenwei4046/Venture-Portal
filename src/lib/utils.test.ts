@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatMoney, formatMoneyBare, formatRate, cn, fundingSourceFromTerms, lentToFromNotes } from './utils'
+import { formatMoney, formatMoneyBare, formatRate, cn, fundingSourceFromTerms, getPeriodMonth, lentToFromNotes } from './utils'
 
 describe('fundingSourceFromTerms', () => {
   it('extracts 资金来源: value up to the next · separator', () => {
@@ -121,5 +121,35 @@ describe('cn — class name joiner', () => {
 
   it('returns empty string when all values are falsy', () => {
     expect(cn(null, undefined, false)).toBe('')
+  })
+})
+
+describe('getPeriodMonth', () => {
+  // Regression, 2026-09-07. `lib/hierarchy-writes.ts` had reimplemented this
+  // from raw UTC, and the copy decided whether an effective-dated commission
+  // position could be edited in place. For the first eight hours of every
+  // month the two answers differed, and the wrong one overwrote a position a
+  // run had already been computed against. The fix was to delete the copy —
+  // these pin the behaviour it must keep delegating to.
+  it('takes the month from Malaysian wall-clock time, not the server’s UTC', () => {
+    // 2026-10-01 07:00 MYT is still 2026-09-30 23:00 in UTC.
+    expect(getPeriodMonth(new Date('2026-09-30T23:00:00Z'))).toBe('2026-10-01')
+  })
+
+  it('has not rolled over eight hours earlier', () => {
+    // 2026-09-30 15:59 UTC is 23:59 MYT on the 30th — still September.
+    expect(getPeriodMonth(new Date('2026-09-30T15:59:00Z'))).toBe('2026-09-01')
+    expect(getPeriodMonth(new Date('2026-09-30T16:00:00Z'))).toBe('2026-10-01')
+  })
+
+  it('crosses a year boundary the same way', () => {
+    expect(getPeriodMonth(new Date('2026-12-31T16:00:00Z'))).toBe('2027-01-01')
+    expect(getPeriodMonth(new Date('2026-12-31T15:59:59Z'))).toBe('2026-12-01')
+  })
+
+  it('pads a single-digit month, so the string sorts and compares as a date', () => {
+    // The `effectiveFrom >= from` guard in hierarchy-writes.ts is a STRING
+    // comparison; an unpadded '2026-9-01' would sort after '2026-10-01'.
+    expect(getPeriodMonth(new Date('2026-03-15T04:00:00Z'))).toBe('2026-03-01')
   })
 })

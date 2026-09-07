@@ -213,17 +213,25 @@ function Chart({
       setError(null)
       startTransition(async () => {
         try {
-          await setPosition({
+          const outcome = await setPosition({
             staffId: childId,
             schemeId,
             rankId: child.rankId!,
             uplineStaffId: parentId,
             rateMode: child.rateMode,
           })
+          const moved = parentId
+            ? `${child.name} now reports to ${byId.get(parentId)!.name}.`
+            : `${child.name} is now top of their own tree.`
+          // The reporting-line half of the write. A skip or a failure means the
+          // org chart and this one now draw different managers for the same
+          // person, which is exactly the thing nobody notices until payroll.
           setNote(
-            parentId
-              ? `${child.name} now reports to ${byId.get(parentId)!.name}.`
-              : `${child.name} is now top of their own tree.`,
+            outcome.note
+              ? `${moved} ${outcome.note}`
+              : outcome.mirrored
+                ? `${moved} Their reporting line moved with them.`
+                : moved,
           )
           router.refresh()
         } catch (err) {

@@ -1,44 +1,53 @@
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { canAccessRevenue } from '@/lib/roles'
 import { revenuePath } from '@/lib/revenue'
 import { ladderBreaks, type Rung } from '@/lib/ladder'
+import { ratePct } from '@/lib/commission/ranks'
 import { listSubDepartments } from '../../revenue/_lib/sub-departments'
-import HierarchyTabs from './_components/HierarchyTabs'
+import HierarchyView from './_components/HierarchyView'
 import type { ChartPerson } from './_components/TeamOrgChart'
 import type { BoardTitle } from './_components/LevelsBoard'
+import type { SalesPerson, RankOption } from './_components/HierarchyPanel'
 
 /**
- * Hierarchy: the company org chart and the ladder it obeys — two tabs, side
- * by side, on one page. This file loads both; `HierarchyTabs` shows the one
- * `?tab=` asks for.
+ * Hierarchy: the company org chart, and everything that governs it, on one
+ * screen.
  *
- * ORG CHART — every department on one canvas. Two lines are drawn and only
- * one of them is editable here:
+ * The chart is the page (user, 2026-09-07: "graph UI takes priority"). What
+ * used to be a second tab you left the chart to read is now a panel BESIDE it —
+ * the salespeople's own tree, and the ladder the chart obeys. A rule you have
+ * to navigate away from to check is a rule you check less often than you
+ * should.
  *
- *   reports_to        solid, draggable. Current state, no history. This page
- *                     writes it.
- *   commission upline dashed, read-only. `comm_hierarchy` is what the override
- *                     differential is computed from, it is effective-dated, and
- *                     a month already run keeps the chart it was run against.
- *                     Changing it is the Revenue Department's own hierarchy
- *                     page, which this one links to.
+ * TWO LINES are drawn on the canvas, and since 2026-09-07 both are written:
  *
- * Drawing both was the point (user, 2026-09-01): the Revenue team's structure
- * stops being an island you have to open a different page to see, and where
- * the two disagree — the commission upline is not the line manager — that is
- * now visible instead of implicit.
+ *   reports_to        solid. The company reporting line. Current state, no
+ *                     history.
+ *   commission upline dashed. `comm_hierarchy` — what the override
+ *                     differential is computed from, effective-dated so a
+ *                     month already run keeps the chart it was run against.
  *
- * LEVELS — the ladder. One scale for the whole company, every title pinned to
- * a rung; since 2026-09-03 the chart obeys it (nobody can be dropped under
- * somebody whose title stands lower than theirs) and a promotion climbs it.
- * It lived on the Roles page until 2026-09-05, when the user moved it here as
- * the second tab: the rule and the place it is felt, one click apart. The
- * ladder says how high, never where — moving people between departments
- * stays a gesture on the chart.
+ * They used to be edited on different pages under different permissions, and
+ * drifted apart in silence. Moving somebody on either now moves them on both
+ * where the account is allowed to write both; where it is not, the move still
+ * happens and the page says which half did not. See `lib/hierarchy-mirror.ts`.
+ *
+ * THE LADDER is one scale for the whole company, every title pinned to a rung.
+ * The chart obeys it — nobody can be dropped under somebody whose title stands
+ * lower — and a promotion climbs it. It says how high, never where; moving
+ * people between departments stays a gesture on the chart.
  */
 export default async function TeamHierarchyPage() {
-  await requirePermission('team')
+  const user = await requirePermission('team')
   const supabase = await createClient()
+  // What a month pays somebody is commission data, and this page is gated on
+  // `team`. The two permissions happen to share the `hr` RLS scope, so the
+  // query below WILL return rates to an account with no `revenue` — the
+  // withholding has to happen here, before anything reaches a client
+  // component, not at the control that edits them. A rate that is merely not
+  // editable is still a rate the reader now knows.
+  const seesMoney = canAccessRevenue(user)
 
   const [{ data: staffRows }, { data: positions }, { data: levels }, { data: titles }, subDepts] =
     await Promise.all([
@@ -49,9 +58,12 @@ export default async function TeamHierarchyPage() {
         )
         .eq('status', 'active')
         .order('employee_name'),
+      // The commission side. `comm_*` postdates database.types.ts, and the
+      // embedded rank comes back as an object or a one-element array depending
+      // on how PostgREST resolves the relationship — both shapes are handled.
       supabase
         .from('comm_hierarchy')
-        .select('staff_id, upline_staff_id')
+        .select('staff_id, upline_staff_id, scheme_id, rank_id, comm_ranks (label, product_rate, sort_order)')
         .is('effective_to', null),
       supabase.from('title_levels').select('id, rank, name').order('rank'),
       // Every title, inactive ones too: the board shows those dimmed rather
@@ -63,12 +75,24 @@ export default async function TeamHierarchyPage() {
       listSubDepartments(),
     ])
 
+  interface PositionRow {
+    staff_id: string
+    upline_staff_id: string | null
+    scheme_id: string
+    rank_id: string | null
+    comm_ranks:
+      | { label: string; product_rate: number | string; sort_order: number }
+      | Array<{ label: string; product_rate: number | string; sort_order: number }>
+      | null
+  }
+  const one = <T,>(v: T | T[] | null | undefined): T | null =>
+    !v ? null : Array.isArray(v) ? (v[0] ?? null) : v
+
+  const positionRows = (positions ?? []) as unknown as PositionRow[]
   const commUpline = new Map<string, string | null>(
-    ((positions ?? []) as Array<{ staff_id: string; upline_staff_id: string | null }>).map(p => [
-      p.staff_id,
-      p.upline_staff_id,
-    ]),
+    positionRows.map(p => [p.staff_id, p.upline_staff_id]),
   )
+  const position = new Map(positionRows.map(p => [p.staff_id, p]))
 
   const rungs: Rung[] = ((levels ?? []) as Array<{ id: string; rank: number; name: string }>).map(
     l => ({ id: l.id, rank: l.rank, name: l.name }),
@@ -88,6 +112,7 @@ export default async function TeamHierarchyPage() {
 
   const people: ChartPerson[] = staff.map(s => {
     const rung = s.titles?.level_id ? (rungById.get(s.titles.level_id) ?? null) : null
+    const rank = one(position.get(s.id)?.comm_ranks)
     return {
       id: s.id,
       name: s.employee_name,
@@ -100,8 +125,59 @@ export default async function TeamHierarchyPage() {
       // Only carried when it is a line the reporting tree does not already draw;
       // an identical dashed edge on top of a solid one is noise.
       commUplineId: commUpline.get(s.id) ?? null,
+      rankLabel: seesMoney ? (rank?.label ?? null) : null,
+      rankRate: seesMoney && rank ? Number(rank.product_rate) : null,
     }
   })
+
+  // The panel's own tree: only the people the commission engine knows about,
+  // in their own shape, so the aside is a second hierarchy rather than the same
+  // one filtered.
+  const nameOf = new Map(staff.map(s => [s.id, s.employee_name]))
+  const salespeople: SalesPerson[] = positionRows
+    .filter(p => nameOf.has(p.staff_id))
+    .map(p => {
+      const rank = one(p.comm_ranks)
+      return {
+        staffId: p.staff_id,
+        name: nameOf.get(p.staff_id)!,
+        uplineStaffId: p.upline_staff_id,
+        rankId: p.rank_id,
+        rankLabel: seesMoney ? (rank?.label ?? null) : null,
+        rateLabel: seesMoney && rank ? ratePct(Number(rank.product_rate)) : null,
+        schemeId: p.scheme_id,
+      }
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
+
+  // The rank a table cell may pick from. Scoped per scheme because a rank is a
+  // scheme's row — offering Fair's ladder to somebody placed under another
+  // sub-department's scheme would write a rank its engine cannot read.
+  const schemeIds = [...new Set(positionRows.map(p => p.scheme_id))]
+  let ranksByScheme: Record<string, RankOption[]> = {}
+  if (schemeIds.length > 0 && seesMoney) {
+    const { data: rankRows } = await supabase
+      .from('comm_ranks')
+      .select('id, scheme_id, label, product_rate, sort_order')
+      .in('scheme_id', schemeIds)
+      .order('sort_order')
+    const grouped: Record<string, RankOption[]> = {}
+    for (const r of (rankRows ?? []) as unknown as Array<{
+      id: string
+      scheme_id: string
+      label: string
+      product_rate: number | string
+      sort_order: number
+    }>) {
+      ;(grouped[r.scheme_id] ??= []).push({
+        id: r.id,
+        label: r.label,
+        rateLabel: ratePct(Number(r.product_rate)),
+        sortOrder: r.sort_order,
+      })
+    }
+    ranksByScheme = grouped
+  }
 
   // The board: every title as a chip, with the headcount holding it.
   const headcount = new Map<string, number>()
@@ -125,22 +201,25 @@ export default async function TeamHierarchyPage() {
 
   // Lines the ladder, as it stands now, would refuse. The trigger only checks
   // a line when it is drawn, so a ladder edited after the fact can leave some;
-  // the board says how many and the chart paints them red.
+  // the panel says which, and the chart paints them red.
   const breaks = ladderBreaks(
     people.map(p => ({ id: p.id, reportsTo: p.reportsTo, rank: p.levelRank })),
-  ).length
+  )
 
   // One link is enough while Fair is the only sub-department; when there are
   // more, the first is still the right place to land.
   const commissionHref = subDepts[0] ? revenuePath(subDepts[0].slug, 'hierarchy') : null
 
   return (
-    <HierarchyTabs
+    <HierarchyView
       people={people}
       commissionHref={commissionHref}
       rungs={rungs}
       titles={boardTitles}
       breaks={breaks}
+      salespeople={salespeople}
+      ranksByScheme={ranksByScheme}
+      canSetRank={seesMoney}
     />
   )
 }

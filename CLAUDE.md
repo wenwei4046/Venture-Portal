@@ -43,15 +43,22 @@ src/
 │   │   │                              entries. No tab rail BETWEEN them — the
 │   │   │                              sidebar is the only way from page to
 │   │   │                              page. Routes stay under /team/*. Roles =
-│   │   │                              titles. Hierarchy = two tabs side by
-│   │   │                              side on the header's rule (`?tab=`,
-│   │   │                              2026-09-05): **Org chart**, and
+│   │   │                              titles. Hierarchy = the GRAPH, with a
+│   │   │                              panel beside it (2026-09-07): three views
+│   │   │                              on the header's rule (`?tab=`) — **Org
+│   │   │                              chart** (default), **Table** (the same two
+│   │   │                              facts as editable rows, in ladder order),
 │   │   │                              **Levels** = the **ladder** (`title_levels`,
 │   │   │                              one shared scale, 2026-09-03; on Roles
 │   │   │                              until 2026-09-05) that the chart obeys,
 │   │   │                              promotion climbs and the roster sorts by
-│   │   │                              — `lib/ladder.ts`. Permissions = the
-│   │   │                              matrix, split off 2026-09-03.
+│   │   │                              — `lib/ladder.ts`. A SECOND GRAPH rides
+│   │   │                              the chart view: the commission tree
+│   │   │                              (`comm_hierarchy`), READ beside the staff
+│   │   │                              one and still EDITED on Revenue. Clicking
+│   │   │                              a card in either centres the other.
+│   │   │                              Permissions = the matrix, split off
+│   │   │                              2026-09-03.
 │   │   ├── director-salary/         (Phase 3)
 │   │   ├── hr-costing/              (Phase 3 — staff directory moved to team/)
 │   │   ├── revenue/                 ← Revenue Department: [sub]/ = one sub-department
@@ -59,8 +66,12 @@ src/
 │   │   │                              SIDEBAR not a tab rail — page.tsx (Commission
 │   │   │                              Calculation) / hierarchy / rules — plus
 │   │   │                              [sub]/[period]/ runs and products/ (Principal).
-│   │   │                              Inside a view, tabs ARE used for its sections
-│   │   │                              (2026-09-05): rules = 9 tabs (`?tab=`; the
+│   │   │                              Inside a view, sections get their own nav
+│   │   │                              (2026-09-05): rules = 9 sections (`?tab=`)
+│   │   │                              in a VERTICAL sidebar since 2026-09-07 —
+│   │   │                              nine labels never fitted one rail, so the
+│   │   │                              cure for the page's scroll had become a
+│   │   │                              scroll over the nav itself. The
 │   │   │                              ninth, **Ranks**, is the rate catalogue
 │   │   │                              `comm_rank_defs` — a rank IS its rate,
 │   │   │                              lettered from the top SS, A, B …; the
@@ -70,6 +81,18 @@ src/
 │   │   │                              table (`?tab=team`, the old Rules IX — the
 │   │   │                              table sets only the rank, the chart moves
 │   │   │                              people).
+│   │   │                              **DOUBLE WRITE (2026-09-07):** moving
+│   │   │                              somebody on EITHER org chart writes both
+│   │   │                              `hr_staff_costs.reports_to` and their
+│   │   │                              `comm_hierarchy` position. The two lines
+│   │   │                              used to drift apart in silence. Shared
+│   │   │                              writes live in `lib/hierarchy-writes.ts`
+│   │   │                              ('server-only', NOT 'use server') so
+│   │   │                              neither action calls the other; the
+│   │   │                              decision of whether to mirror is the pure
+│   │   │                              `lib/hierarchy-mirror.ts`. A mirror that
+│   │   │                              is skipped or fails NEVER throws — it
+│   │   │                              returns a note the caller must render.
 │   │   ├── reports/                 (Phase 3)
 │   │   └── settings/                ← 8 tabs: treasury / overdue / splits / directors / companies / banks / periods / simulator
 │   └── api/erp/v1/                 ← the ONE machine endpoint: the Houzs ERP live

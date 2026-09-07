@@ -1,5 +1,7 @@
 'use client'
 
+import { useState } from 'react'
+import type { MirrorOutcome } from '@/lib/hierarchy-mirror'
 import { earnedFloor } from '@/lib/commission/titles'
 import { rankLabelOf } from '@/lib/commission/ranks'
 import { compareByLadder } from '@/lib/ladder'
@@ -33,6 +35,14 @@ import type { RankRow, SalespersonRow } from '../../../_components/config/types'
  *
  * Every save goes through `setPosition`, which writes a new effective-dated
  * position and raises the title if the rank sits above it — never lowers it.
+ *
+ * Because that action also writes the OTHER hierarchy, it can come back with
+ * something it could not do — and it reports that by returning, not by
+ * throwing, so `RowForm`'s error slot never sees it. The banner below is where
+ * such a note lands. It should stay empty from this table: a rank change says
+ * nothing about anybody's upline, so `setPosition` skips the mirror entirely.
+ * If a note ever appears here, that assumption has stopped holding, and this
+ * is how you find out rather than how you don't.
  */
 export default function TeamTable({
   people,
@@ -43,6 +53,7 @@ export default function TeamTable({
   ranks: RankRow[]
   schemeId: string
 }) {
+  const [note, setNote] = useState<string | null>(null)
   const nameOf = new Map(people.map(p => [p.staff_id, p.employee_name]))
 
   // The ladder, top down — the most senior title first, the same title
@@ -86,6 +97,12 @@ export default function TeamTable({
         the chart&apos;s — move people there. Every change writes a new effective-dated position; a
         month already computed keeps the chart it was computed against.
       </Hint>
+
+      {note ? (
+        <div className="bg-accent-bg border border-accent-border text-accent rounded-md p-3 mb-4 text-sm font-sans">
+          {note}
+        </div>
+      ) : null}
 
       {people.length === 0 ? (
         <div className="border border-hairline rounded-md bg-surface p-8 text-center">
@@ -135,7 +152,10 @@ export default function TeamTable({
                         </span>
                       ) : null}
                     </td>
-                    <RowForm action={setPositionFromForm}>
+                    <RowForm
+                      action={setPositionFromForm}
+                      onDone={r => setNote((r as MirrorOutcome | undefined)?.note ?? null)}
+                    >
                       {({ pending }) => (
                         <>
                           <td>

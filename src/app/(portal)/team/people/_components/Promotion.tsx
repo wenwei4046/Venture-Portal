@@ -30,6 +30,10 @@ export default function Promotion({
 }) {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  // What happened to their RANK. A promotion whose rank did not follow leaves
+  // somebody titled one thing and paid from another, and this is the only
+  // place that says so before the next payroll does.
+  const [note, setNote] = useState<string | null>(null)
   const [choice, setChoice] = useState<string>(ladder.next?.titles[0]?.id ?? '')
 
   if (!title) return null
@@ -43,12 +47,32 @@ export default function Promotion({
     setError(null)
     startTransition(async () => {
       try {
-        await promoteStaff(personId, target.id)
-        onDone()
+        const result = await promoteStaff(personId, target.id)
+        // Close the panel only when there is nothing left to read. A note that
+        // disappears with the panel it was written in has not been delivered.
+        if (result.rankNote) setNote(result.rankNote)
+        else onDone()
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not promote them')
       }
     })
+  }
+
+  if (note) {
+    return (
+      <div className="mt-6 pt-4 border-t border-hairline">
+        <div className="bg-accent-bg border border-accent-border text-accent rounded-md p-3 text-sm font-sans">
+          {note}
+        </div>
+        <button
+          type="button"
+          onClick={onDone}
+          className="mt-2 font-serif italic text-xs text-accent hover:underline"
+        >
+          Got it →
+        </button>
+      </div>
+    )
   }
 
   return (
