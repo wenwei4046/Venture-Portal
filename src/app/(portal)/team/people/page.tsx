@@ -1,7 +1,28 @@
 import Link from 'next/link'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import PeopleDirectory, { type PersonRow, type AccountRow } from './_components/PeopleDirectory'
+
+/** Cast once, at the boundary — the revenue side's convention, see
+ *  `revenue/_components/config/load.ts`. */
+function untypedRows<T>(data: unknown): T[] {
+  return (data ?? []) as T[]
+}
+
+/**
+ * One open commission position, with the rank it is placed on. PostgREST
+ * hands an embedded row back as an object or as a one-element array
+ * depending on how it reads the relationship, so both are unwrapped (again,
+ * load.ts does the same).
+ */
+interface OpenPosition {
+  staff_id: string
+  comm_ranks:
+    | { label: string; product_rate: number | string }
+    | { label: string; product_rate: number | string }[]
+    | null
+}
 
 /**
  * People Management — the roster.
@@ -16,7 +37,7 @@ export default async function PeopleManagementPage() {
   const user = await requirePermission('team')
   const supabase = await createClient()
 
-  const [{ data: staff }, { data: accounts }, { data: levels }] = await Promise.all([
+  const [{ data: staff }, { data: accounts }, { data: levels }, positions] = await Promise.all([
     supabase
       .from('hr_staff_costs')
       // Every status, not just 'active'. Deactivating somebody used to remove
@@ -29,11 +50,39 @@ export default async function PeopleManagementPage() {
     supabase.from('users').select('id, name, email, role, is_active').order('name'),
     // The ladder: inside each department the roster reads from the top down.
     supabase.from('title_levels').select('id, rank, name'),
+    // Everybody's OPEN commission position, for the Rank column. The comm_*
+    // tables postdate database.types.ts, so this goes through the untyped
+    // client the revenue side already uses.
+    //
+    // Deliberately not fatal. /team/people is reachable by every title holding
+    // `team`, and the commission tables answer only to `revenue` — a Finance
+    // reader losing the entire roster because RLS refused one embedded select
+    // would be the wrong trade by a mile. The refusal costs the Rank column
+    // and nothing else: every row reads a dash.
+    (supabase as unknown as SupabaseClient)
+      .from('comm_hierarchy')
+      .select('staff_id, comm_ranks (label, product_rate)')
+      .is('effective_to', null)
+      .then(
+        r => r.data,
+        () => null,
+      ),
   ])
 
   const rungs = new Map(
     ((levels ?? []) as Array<{ id: string; rank: number; name: string }>).map(l => [l.id, l]),
   )
+
+  // One open position per person is the rule `comm_hierarchy` already enforces,
+  // so a plain map is enough. `product_rate` comes out of Postgres as numeric-
+  // as-string; Number() it here so nothing downstream has to wonder.
+  const rankByStaff = new Map<string, { label: string; rate: number }>()
+  for (const pos of untypedRows<OpenPosition>(positions)) {
+    const rank = Array.isArray(pos.comm_ranks) ? (pos.comm_ranks[0] ?? null) : pos.comm_ranks
+    if (rank) {
+      rankByStaff.set(pos.staff_id, { label: rank.label, rate: Number(rank.product_rate) })
+    }
+  }
 
   void supabase.rpc('log_data_access', {
     p_resource_type: 'hr_staff_costs',
@@ -46,6 +95,7 @@ export default async function PeopleManagementPage() {
     const r = s as any
     const active = r.status !== 'inactive'
     const rung = r.titles?.level_id ? (rungs.get(r.titles.level_id) ?? null) : null
+    const rank = rankByStaff.get(r.id) ?? null
     return {
       id: r.id,
       name: r.employee_name,
@@ -55,6 +105,8 @@ export default async function PeopleManagementPage() {
       title: r.titles?.name ?? r.designation ?? null,
       levelRank: rung?.rank ?? null,
       levelName: rung?.name ?? null,
+      rankLabel: rank?.label ?? null,
+      rankRate: rank?.rate ?? null,
       department: r.departments?.name ?? null,
       active,
       resignedOn: r.resignation_date ?? null,

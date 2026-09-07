@@ -142,7 +142,16 @@ export function RowForm({
 }: {
   action: (fd: FormData) => Promise<unknown>
   children: (state: { pending: boolean }) => ReactNode
-  onDone?: () => void
+  /**
+   * Called after a successful save, with whatever the action returned.
+   *
+   * The argument matters for actions that report something they could NOT do
+   * without failing — `setPosition` returns a `MirrorOutcome` whose `note`
+   * says the second hierarchy was left disagreeing with the first. That is a
+   * return value, not a throw, so the `catch` below never sees it; before this
+   * argument existed the row showed a clean save and the note was discarded.
+   */
+  onDone?: (result: unknown) => void
   confirm?: string
 }) {
   // useId is stable across server and client; the punctuation React puts in it
@@ -169,8 +178,7 @@ export function RowForm({
                 setError(null)
                 startTransition(async () => {
                   try {
-                    await action(fd)
-                    onDone?.()
+                    onDone?.(await action(fd))
                   } catch (err) {
                     setError(err instanceof Error ? err.message : 'Something went wrong')
                   }

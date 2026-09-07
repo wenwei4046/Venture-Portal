@@ -171,3 +171,50 @@ export function compareByLadder(a: LadderOrderable, b: LadderOrderable): number 
   if ((a.title === null) !== (b.title === null)) return a.title === null ? 1 : -1
   return (a.title ?? '').localeCompare(b.title ?? '') || a.name.localeCompare(b.name)
 }
+
+/** A roster grouping. `rank` is one list; `department` groups first. */
+export type RosterGrouping = 'rank' | 'department'
+
+/** What the roster shows under one heading. */
+export interface RosterGroup<T> {
+  /** Null for the single ungrouped list `rank` produces. */
+  key: string | null
+  rows: T[]
+}
+
+/** The heading a person with no department files under. */
+export const NO_DEPARTMENT = '— No department'
+
+/**
+ * The roster, in the order the user asked for: **rank, then title, then name
+ * ascending** (2026-09-07).
+ *
+ * `compareByLadder` has always been the comparator; what it lacked was reach.
+ * It ran inside a department group, so the ladder order was never visible
+ * across the company — two Heads of Department in different columns, and no
+ * way to see they stand on the same rung. `rank` grouping is the answer: one
+ * list, every department at once, the most senior title first.
+ *
+ * `department` keeps what the page did before — departments A→Z with the
+ * unassigned last, the ladder read top down inside each. It is still the right
+ * view when the question is "who is in Marketing", which is why it stayed.
+ */
+export function orderRoster<T extends LadderOrderable & { department?: string | null }>(
+  people: readonly T[],
+  grouping: RosterGrouping,
+): Array<RosterGroup<T>> {
+  if (grouping === 'rank') {
+    return [{ key: null, rows: [...people].sort(compareByLadder) }]
+  }
+
+  const map = new Map<string, T[]>()
+  for (const p of people) {
+    const dept = p.department ?? NO_DEPARTMENT
+    const list = map.get(dept)
+    if (list) list.push(p)
+    else map.set(dept, [p])
+  }
+  return [...map.entries()]
+    .sort(([a], [b]) => (a === NO_DEPARTMENT ? 1 : b === NO_DEPARTMENT ? -1 : a.localeCompare(b)))
+    .map(([key, rows]) => ({ key, rows: rows.sort(compareByLadder) }))
+}

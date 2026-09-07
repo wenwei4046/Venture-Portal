@@ -99,3 +99,71 @@ export function earnedFloor<R extends EarnedRung>(ranks: readonly R[], titleId: 
   }
   return best
 }
+
+/**
+ * A rung, as the title→rank mapping needs to see it. `id` is what a position
+ * points at; the rest is what decides which rung a title means.
+ */
+export interface AssignableRung extends LadderRung {
+  id: string
+}
+
+/**
+ * The rank a TITLE assigns — its floor rung, the lowest `sort_order` of the
+ * rungs that carry it.
+ *
+ * The user's ruling: "a title assigns the rank automatically". A title may
+ * carry more than one rung (before 2026-09-03 both 5% and 6% were "Revenue
+ * Specialist"), and the floor is the honest reading of the pair — the title is
+ * what somebody keeps, so the rank it guarantees is the lowest one it stands
+ * for, not the highest one they might reach in a good month. Climbing above it
+ * is what the monthly scheme target is for.
+ *
+ * `undefined` when the ladder does not carry the title, which every caller
+ * treats as "this title says nothing about rank" rather than as an error: a
+ * Finance title has no rung on a commission scheme and never will.
+ */
+export function rankForTitle<R extends AssignableRung>(
+  ranks: readonly R[],
+  titleId: string | null,
+): R | undefined {
+  if (!titleId) return undefined
+  let best: R | undefined
+  for (const r of ranks) {
+    if (r.titleId !== titleId) continue
+    if (!best || r.sortOrder < best.sortOrder) best = r
+  }
+  return best
+}
+
+/**
+ * The rank somebody should be moved to when their TITLE changes — or `null`
+ * when nothing should move.
+ *
+ * A RATCHET, the exact mirror of the title ratchet in `hierarchy-actions.ts`:
+ * placing somebody at a rank whose title stands above theirs raises the title;
+ * giving somebody a title whose floor stands above their rank now raises the
+ * rank. Neither ever lowers the other, which is what stops the two from
+ * oscillating — a promotion cannot claw back a rank somebody was deliberately
+ * placed above, and a high placement cannot be undone by re-saving the title
+ * that placement earned them.
+ *
+ * Returns null, not the current rank, when there is nothing to do: the caller
+ * writes only when it gets an id back, so an unchanged rank is not an
+ * effective-dated position row nobody asked for.
+ */
+export function rankAfterTitleChange<R extends AssignableRung>(
+  ranks: readonly R[],
+  titleId: string | null,
+  currentRankId: string | null,
+): R | null {
+  const floor = rankForTitle(ranks, titleId)
+  if (!floor) return null
+  if (!currentRankId) return floor
+  if (currentRankId === floor.id) return null
+  const current = ranks.find(r => r.id === currentRankId)
+  // A rank the ladder does not carry (another scheme's) is not something to
+  // compare against — leave it alone rather than guess it is lower.
+  if (!current) return null
+  return floor.sortOrder > current.sortOrder ? floor : null
+}

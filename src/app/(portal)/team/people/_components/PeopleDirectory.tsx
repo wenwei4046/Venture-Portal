@@ -5,6 +5,7 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import LedgerRow from '@/components/LedgerRow'
+import { ratePct } from '@/lib/commission/ranks'
 import { compareByLadder } from '@/lib/ladder'
 import PersonCard from './PersonCard'
 
@@ -19,6 +20,17 @@ export interface PersonRow {
   levelRank: number | null
   levelName: string | null
   department: string | null
+  /**
+   * The rank of their OPEN commission position — "Rank B", and the rate it
+   * pays. Optional, and it stands for two different absences: most of the
+   * roster is on no commission scheme at all, and a reader without the
+   * `revenue` scope is shown none of the ones who are (page.tsx swallows that
+   * refusal rather than lose the roster over it). Both read as a dash, which
+   * is the honest answer from where that reader is standing.
+   */
+  rankLabel?: string | null
+  /** 0.08 = 8%, the way `comm_ranks.product_rate` stores it. */
+  rankRate?: number | null
   /** Employment, from hr_staff_costs.status — not the same fact as the account. */
   active: boolean
   resignedOn: string | null
@@ -216,7 +228,8 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
         <div className="table-scroll">
           <table className="ledger-table tight">
             <thead>
-              {/* The widths are in globals.css under `.tight` — fixed layout,
+              {/* The widths are in globals.css under `.tight` (all but Rank's,
+                  which has nowhere there to go — see below) — fixed layout,
                   so the columns stay on the same vertical edges from the first
                   row to the last, and below 768px the name gets whatever the
                   two remaining columns do not need. */}
@@ -225,6 +238,16 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
                 {/* Below 768px the name needs the row to itself, so every other
                     column folds into LedgerRow's panel. */}
                 <th className="col-title m-hide">Title</th>
+                {/* The one width not declared in globals.css's `.tight` block,
+                    and it has to live somewhere: the six `col-*` shares
+                    already add to 100%, so a seventh column with no width of
+                    its own is handed 0 under `table-layout: fixed` and its
+                    chip spills into Code. Claiming a share instead makes the
+                    other six scale down around it rather than one collapse.
+                    `md:` because below 768px this column is folded away, and a
+                    width there would be taken off the name — the same trap
+                    the `.tight` phone rules were written for. */}
+                <th className="md:w-[14%] m-hide">Rank</th>
                 <th className="col-code m-hide">Code</th>
                 <th className="col-emp m-hide">Employment</th>
                 <th className="col-seen m-hide whitespace-nowrap">Last seen</th>
@@ -242,7 +265,11 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
                 return (
                   <Fragment key={group.dept}>
                     <tr>
-                      <td className="group-cell" colSpan={6}>
+                      {/* Every visible column — seven since Rank arrived. The
+                          chevron is not one of them: it is `display: none`
+                          above 768px and LedgerRow adds it per row, not
+                          here. */}
+                      <td className="group-cell" colSpan={7}>
                         <button
                           type="button"
                           className="group-btn"
@@ -329,6 +356,20 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
                                   </span>
                                 ) : null}
                               </span>
+                            </td>
+                            <td className="m-hide" data-label="Rank">
+                              {p.rankLabel ? (
+                                <span className="flex items-center gap-2 min-w-0">
+                                  <span className="chip shrink-0">{p.rankLabel}</span>
+                                  {p.rankRate != null ? (
+                                    <span className="font-mono text-[10px] text-muted shrink-0">
+                                      {ratePct(p.rankRate)}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              ) : (
+                                <span className="text-muted">—</span>
+                              )}
                             </td>
                             <td className="m-hide" data-label="Code">
                               <span className="font-mono text-[11px] text-muted">

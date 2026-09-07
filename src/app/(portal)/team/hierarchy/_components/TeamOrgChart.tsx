@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -27,7 +27,11 @@ import {
   type OrgNodeInput,
 } from '@/lib/org-layout'
 import { ladderAllows, ladderRefusal } from '@/lib/ladder'
+import { ratePct } from '@/lib/commission/ranks'
+import type { MirrorOutcome } from '@/lib/hierarchy-mirror'
 import { setReportsTo } from '../actions'
+import MirrorOfferPrompt, { nextOffer, offerKey, type OfferState } from './MirrorOfferPrompt'
+import type { RankOption, SalesPerson } from './HierarchyPanel'
 
 export interface ChartPerson {
   id: string
@@ -42,6 +46,10 @@ export interface ChartPerson {
   reportsTo: string | null
   /** Their Revenue upline, if they have one. Drawn, never written here. */
   commUplineId: string | null
+  /** The rung a month pays them from — "Rank B" — or null off commission. */
+  rankLabel: string | null
+  /** That rung's product rate as a fraction. The card formats it. */
+  rankRate: number | null
 }
 
 interface CardData extends Record<string, unknown> {
@@ -68,10 +76,27 @@ const ALL = '__all__'
  *
  * The ladder is a rule about titles, not a second chart: it says how high,
  * never where. Moving a person between departments is still a drag here.
+ *
+ * Since 2026-09-07 a drag writes BOTH lines. The dashed commission upline used
+ * to be drawn here and changed somewhere else, which let the two drift apart in
+ * silence; `setReportsTo` now moves it too, and the banner says so — including
+ * when it could not, which is the case that matters.
  */
 export default function TeamOrgChart(props: {
   people: ChartPerson[]
   commissionHref: string | null
+  /** Who is lit up. Owned by the page so the panel beside the canvas and the
+   *  canvas itself point at the same person — clicking a name in the list
+   *  scrolls the chart to them, clicking a card highlights the name. */
+  focused: string | null
+  onFocus: (staffId: string | null) => void
+  /** Ranks per scheme, for the enrol offer's picker. `{}` for an account
+   *  without `revenue` — which is the same account the offer is never made
+   *  to, so an empty map here is correct rather than a missing prop. */
+  ranksByScheme: Record<string, RankOption[]>
+  /** The commission positions, carried only so an enrol offer can default its
+   *  scheme picker to the MOVER's own. Nothing here is drawn. */
+  salespeople: SalesPerson[]
 }) {
   return (
     <ReactFlowProvider>
@@ -83,20 +108,48 @@ export default function TeamOrgChart(props: {
 function Chart({
   people,
   commissionHref,
+  focused,
+  onFocus,
+  ranksByScheme,
+  salespeople,
 }: {
   people: ChartPerson[]
   commissionHref: string | null
+  focused: string | null
+  onFocus: (staffId: string | null) => void
+  ranksByScheme: Record<string, RankOption[]>
+  salespeople: SalesPerson[]
 }) {
   const router = useRouter()
-  const { getIntersectingNodes } = useReactFlow()
+  const { getIntersectingNodes, setCenter } = useReactFlow()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
+  /**
+   * The way out attached to a refusal, whichever kind it is.
+   *
+   * This used to keep DETACH offers and drop enrol ones, because the rank
+   * options were built on the page behind a `seesMoney` gate and handed to the
+   * table alone — so on this tab the enrol refusal was a sentence with the
+   * button silently thrown away. The options are threaded here now, and an
+   * offer discarded is a way out the reader never learns exists.
+   */
+  const [offer, setOffer] = useState<OfferState | null>(null)
+  const [warn, setWarn] = useState(false)
   const [dragging, setDragging] = useState<string | null>(null)
-  const [selected, setSelected] = useState<string | null>(null)
   const [focusDept, setFocusDept] = useState<string>(ALL)
+  const selected = focused
 
   const byId = useMemo(() => new Map(people.map(p => [p.id, p])), [people])
+
+  // Which scheme somebody earns under. An enrol offer defaults its picker to
+  // the MOVER's, not to whichever scheme sorts first: an override belongs to
+  // one scheme, so a manager enrolled into a different one is refused by the
+  // very mirror the offer is trying to complete.
+  const schemeOf = useMemo(
+    () => new Map(salespeople.map(s => [s.staffId, s.schemeId])),
+    [salespeople],
+  )
 
   const departments = useMemo(() => {
     const set = new Set<string>()
@@ -169,7 +222,7 @@ function Chart({
           target: p.id,
           type: 'smoothstep',
           style: broken
-            ? { stroke: 'var(--danger)', strokeWidth: 1.75 }
+            ? { stroke: 'rgb(var(--danger))', strokeWidth: 1.75 }
             : { stroke: 'var(--hairline-strong, #b9b0a2)', strokeWidth: 1.5 },
         }
       })
@@ -190,7 +243,7 @@ function Chart({
         type: 'smoothstep',
         animated: false,
         style: {
-          stroke: 'var(--accent)',
+          stroke: 'rgb(var(--accent))',
           strokeWidth: 1.25,
           strokeDasharray: '5 4',
           opacity: 0.65,
@@ -204,7 +257,13 @@ function Chart({
     (childId: string, parentId: string | null) => {
       const child = byId.get(childId)
       if (!child) return
-      if (child.reportsTo === parentId) return
+      // Genuinely nothing to do: the reporting line already points there AND so
+      // does the commission line. When only the first is true the round trip is
+      // the whole point — somebody already reporting to nobody while still
+      // earning under a manager has no other gesture on this page that can
+      // clear that, and the detach offer is raised by the server or not at all.
+      // Returning early there is how that state became unreachable.
+      if (child.reportsTo === parentId && child.commUplineId === parentId) return
 
       if (parentId) {
         const parent = byId.get(parentId)
@@ -225,13 +284,28 @@ function Chart({
       }
 
       setError(null)
+      setOffer(null)
+      setWarn(false)
       startTransition(async () => {
         try {
-          await setReportsTo(childId, parentId)
+          const outcome = await setReportsTo(childId, parentId)
+          // Whatever the server attached — a detach the commission tree did not
+          // follow, or a manager who is not on the ladder. Never taken for them
+          // either way: the two trees hold different people, and acting on an
+          // absence in one is bug B7.
+          setOffer(outcome.offer ? { offer: outcome.offer, moverId: childId } : null)
+          const moved = parentId
+            ? `${child.name} now reports to ${byId.get(parentId)!.name}.`
+            : `${child.name} now reports to nobody.`
+          // The commission half of the write speaks for itself when it has
+          // something to say — a skipped or failed mirror means the two lines
+          // now disagree, and this banner is the only place that is visible.
           setNote(
-            parentId
-              ? `${child.name} now reports to ${byId.get(parentId)!.name}.`
-              : `${child.name} now reports to nobody.`,
+            outcome.note
+              ? `${moved} ${outcome.note}`
+              : outcome.mirrored
+                ? `${moved} Their commission upline moved with them.`
+                : moved,
           )
           router.refresh()
         } catch (err) {
@@ -240,6 +314,28 @@ function Chart({
       })
     },
     [byId, graph, router],
+  )
+
+  /**
+   * What came back from accepting an offer.
+   *
+   * The note is rendered whether or not the write landed: `detachCommissionUpline`
+   * reports on a money write even when it succeeded, and `mirrored` picks the
+   * banner's tone rather than whether it speaks at all.
+   */
+  const acceptOutcome = useCallback(
+    (outcome: MirrorOutcome) => {
+      setError(null)
+      setNote(outcome.note)
+      setWarn(!outcome.mirrored)
+      setOffer(current => {
+        if (!current) return null
+        const next = nextOffer(current.offer, outcome)
+        return next ? { offer: next, moverId: current.moverId } : null
+      })
+      router.refresh()
+    },
+    [router],
   )
 
   const onNodeDragStop: OnNodeDrag<Node<CardData>> = useCallback(
@@ -261,6 +357,23 @@ function Chart({
     [move],
   )
 
+  // Somebody picked in the panel is scrolled to rather than merely tinted:
+  // a tree wider than the viewport can highlight a card the reader cannot
+  // see, which reads as the click having done nothing. Only on a CHANGE of
+  // focus — re-centring on every render would fight the reader's own panning.
+  const centred = useRef<string | null>(null)
+  useEffect(() => {
+    if (focused === centred.current) return
+    centred.current = focused
+    if (!focused) return
+    const pos = layout.positions.get(focused)
+    if (!pos) return
+    void setCenter(pos.x + NODE_WIDTH / 2, pos.y + NODE_HEIGHT / 2, {
+      zoom: 1,
+      duration: 320,
+    })
+  }, [focused, layout, setCenter])
+
   const nodeTypes = useMemo(() => ({ person: PersonCard }), [])
 
   const unplaced = people.filter(p => !p.reportsTo).length
@@ -281,9 +394,34 @@ function Chart({
           {error}
         </div>
       ) : null}
-      {note && !error ? (
-        <div className="bg-surface-2 border border-hairline text-ink rounded-md p-3 mb-4 text-sm font-sans">
-          {note}
+      {/* The note still yields to an error, as it always has — but the OFFER
+          outlives one. A throw here leaves the reporting line already written,
+          so the gesture that raised the offer cannot raise it again: repeating
+          a detach that has already happened is a no-op, and losing the button
+          would be a dead end rather than a fresh start. */}
+      {(note && !error) || offer ? (
+        <div
+          className={`rounded-md p-3 mb-4 text-sm font-sans border ${
+            warn ? 'bg-alert-bg border-alert/40 text-alert' : 'bg-surface-2 border-hairline text-ink'
+          }`}
+        >
+          {error ? null : note}
+          {/* Inside the banner, above the canvas: an affordance that opened
+              between the cards would move the tree under the cursor that just
+              dropped one. */}
+          {offer ? (
+            <MirrorOfferPrompt
+              key={offerKey(offer)}
+              state={offer}
+              ranksByScheme={ranksByScheme}
+              preferredSchemeId={schemeOf.get(offer.moverId) ?? null}
+              onOutcome={acceptOutcome}
+              onError={message => {
+                setError(message)
+                setNote(null)
+              }}
+            />
+          ) : null}
         </div>
       ) : null}
 
@@ -357,10 +495,12 @@ function Chart({
           nodeTypes={nodeTypes}
           onNodeDragStart={(_e, node) => {
             setNote(null)
+            setOffer(null)
+            setWarn(false)
             setDragging(node.id)
           }}
           onNodeDragStop={onNodeDragStop}
-          onNodeClick={(_e, node) => setSelected(s => (s === node.id ? null : node.id))}
+          onNodeClick={(_e, node) => onFocus(focused === node.id ? null : node.id)}
           onConnect={onConnect}
           fitView
           // Before anybody is placed the graph is one very wide row, and a
@@ -373,7 +513,7 @@ function Chart({
           nodesDraggable
           elementsSelectable
         >
-          <Background gap={24} color="var(--hairline, #ddd6c9)" />
+          <Background gap={24} color="rgb(var(--hairline))" />
           <Controls showInteractive={false} />
         </ReactFlow>
       </div>
@@ -388,7 +528,7 @@ function Chart({
         {broken > 0 ? (
           <span className="inline-flex items-center gap-2 font-serif italic text-xs text-danger">
             <svg width="26" height="6" aria-hidden>
-              <line x1="0" y1="3" x2="26" y2="3" stroke="var(--danger)" strokeWidth="1.75" />
+              <line x1="0" y1="3" x2="26" y2="3" stroke="rgb(var(--danger))" strokeWidth="1.75" />
             </svg>
             Breaks the ladder · {broken}
             <Link
@@ -407,7 +547,7 @@ function Chart({
               y1="3"
               x2="26"
               y2="3"
-              stroke="var(--accent)"
+              stroke="rgb(var(--accent))"
               strokeWidth="1.25"
               strokeDasharray="5 4"
               opacity="0.65"
@@ -429,9 +569,10 @@ function Chart({
         A greyed card cannot take the person being dragged — it is one of their
         own reports, or the ladder ranks its title below theirs. A red line is
         one the ladder would refuse today: move the line, or change the ladder
-        on the Levels tab. The dashed line is read-only here: it decides
-        override commission, and a month already run keeps the chart it was run
-        against.
+        from the Rules panel. The dashed line moves with the solid one where
+        this account may write both — it decides override commission, and a
+        month already run keeps the chart it was run against, so the move opens
+        a new position rather than editing the old one.
       </p>
     </div>
   )
@@ -453,7 +594,7 @@ function PersonCard({ data }: NodeProps<Node<CardData>>) {
         dimmed && !invalidTarget ? 'opacity-35' : '',
       ].join(' ')}
     >
-      <Handle type="target" position={Position.Top} className="!bg-[var(--accent)] !w-2 !h-2" />
+      <Handle type="target" position={Position.Top} className="!bg-[rgb(var(--accent))] !w-2 !h-2" />
 
       <div className="font-serif text-sm text-ink leading-tight truncate">{person.name}</div>
       <div className="flex items-baseline justify-between gap-2 mt-0.5">
@@ -471,11 +612,22 @@ function PersonCard({ data }: NodeProps<Node<CardData>>) {
       <div className="font-serif italic text-xs text-graphite truncate mt-1.5">
         {person.title ?? 'no title'}
       </div>
-      <div className="font-mono text-[0.55rem] uppercase tracking-wide text-muted truncate mt-1">
-        {person.department ?? 'no department'}
+      <div className="flex items-baseline justify-between gap-2 mt-1">
+        <span className="font-mono text-[0.55rem] uppercase tracking-wide text-muted truncate">
+          {person.department ?? 'no department'}
+        </span>
+        {person.rankLabel ? (
+          <span
+            className="shrink-0 font-mono text-[0.55rem] text-graphite whitespace-nowrap"
+            title="What a month pays them from"
+          >
+            {person.rankLabel}
+            {person.rankRate !== null ? ` · ${ratePct(person.rankRate)}` : ''}
+          </span>
+        ) : null}
       </div>
 
-      <Handle type="source" position={Position.Bottom} className="!bg-[var(--accent)] !w-2 !h-2" />
+      <Handle type="source" position={Position.Bottom} className="!bg-[rgb(var(--accent))] !w-2 !h-2" />
     </div>
   )
 }

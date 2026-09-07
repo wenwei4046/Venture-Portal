@@ -194,3 +194,80 @@ describe('compareByLadder', () => {
     expect(compareByLadder(p('Z', null, null), p('A', 'T', null))).toBeGreaterThan(0)
   })
 })
+
+// ─── Roster ordering (2026-09-07) ────────────────────────────────────────────
+
+import { NO_DEPARTMENT, orderRoster } from './ladder'
+
+interface Row {
+  name: string
+  title: string | null
+  levelRank: number | null
+  department: string | null
+}
+
+const r = (
+  name: string,
+  title: string | null,
+  levelRank: number | null,
+  department: string | null,
+): Row => ({ name, title, levelRank, department })
+
+const ROSTER: Row[] = [
+  r('Zara', 'EXECUTIVE', 2, 'Marketing'),
+  r('Adam', 'HEAD OF DEPARTMENT', 5, 'Finance'),
+  r('Mila', 'EXECUTIVE', 2, 'Finance'),
+  r('Bea', 'EXECUTIVE', 2, 'Marketing'),
+  r('Cass', 'ASSISTANT', 1, null),
+  r('Dev', 'HEAD OF DEPARTMENT', 5, 'Marketing'),
+]
+
+describe('orderRoster · rank', () => {
+  it('is one list, not one per department', () => {
+    const groups = orderRoster(ROSTER, 'rank')
+    expect(groups).toHaveLength(1)
+    expect(groups[0].key).toBeNull()
+    expect(groups[0].rows).toHaveLength(ROSTER.length)
+  })
+
+  it('reads rank first, then title, then name ascending', () => {
+    // The brief, verbatim: "rank order, title first name later (same title
+    // then by name ascending)". Two Heads of Department from DIFFERENT
+    // departments sort together — the thing department grouping hid.
+    expect(orderRoster(ROSTER, 'rank')[0].rows.map(x => x.name)).toEqual([
+      'Adam',
+      'Dev',
+      'Bea',
+      'Mila',
+      'Zara',
+      'Cass',
+    ])
+  })
+
+  it('does not mutate the array it is given', () => {
+    const input = [...ROSTER]
+    orderRoster(input, 'rank')
+    expect(input.map(x => x.name)).toEqual(ROSTER.map(x => x.name))
+  })
+})
+
+describe('orderRoster · department', () => {
+  it('groups A→Z with the unassigned last', () => {
+    expect(orderRoster(ROSTER, 'department').map(g => g.key)).toEqual([
+      'Finance',
+      'Marketing',
+      NO_DEPARTMENT,
+    ])
+  })
+
+  it('reads the ladder top down inside each group', () => {
+    const groups = orderRoster(ROSTER, 'department')
+    expect(groups[0].rows.map(x => x.name)).toEqual(['Adam', 'Mila'])
+    expect(groups[1].rows.map(x => x.name)).toEqual(['Dev', 'Bea', 'Zara'])
+  })
+
+  it('keeps every person exactly once across the groups', () => {
+    const seen = orderRoster(ROSTER, 'department').flatMap(g => g.rows.map(x => x.name))
+    expect(seen.sort()).toEqual(ROSTER.map(x => x.name).sort())
+  })
+})

@@ -74,3 +74,14 @@ visual-*.png
 
 # Local backup copies (Windows "Name - Copy") must never ship
 src/**/*\ -\ Copy.*
+
+# Cloudflare Workers portability spike — throwaway, lives outside the repo
+# at ../pdf-spike. Ignored so a stray re-scaffold never gets committed.
+/pdf-spike/
+
+# OpenNext build output
+/.open-next/
+
+# Pipeline working notes (coach log, decisions, review, checklists).
+# Scratch for the build process, not part of the product.
+/docs/pipeline/
