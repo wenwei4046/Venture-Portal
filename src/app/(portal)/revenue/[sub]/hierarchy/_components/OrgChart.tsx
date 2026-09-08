@@ -25,6 +25,7 @@ import {
   NODE_WIDTH,
   type OrgNodeInput,
 } from '@/lib/org-layout'
+import { layoutParent, isBorrowed } from '@/lib/commission/chart-shape'
 import { setPosition } from '../../../hierarchy-actions'
 
 export interface OrgRank {
@@ -46,6 +47,14 @@ export interface OrgPerson {
   /** The title they HOLD — the ratchet; may sit above the rank they are paid. */
   titleName: string | null
   uplineStaffId: string | null
+  /**
+   * Their manager on the company chart. Drawn, never written from here.
+   *
+   * Only ever used for somebody holding NO position, and only to borrow a
+   * shape — see `layoutGraph`. A placed person’s upline is their own fact,
+   * including when it is null, and the reporting line never overrides it.
+   */
+  reportsTo: string | null
   rankId: string | null
   /** "Rank B" — the card shows the rate beside it. */
   rankLabel: string | null
@@ -104,12 +113,53 @@ function Chart({
 
   const byId = useMemo(() => new Map(people.map(p => [p.staffId, p])), [people])
 
+  /**
+   * The commission tree, and only that.
+   *
+   * Every RULE reads this one: what a cycle is, who somebody’s downline is,
+   * what a drop would move. Borrowed reporting lines must not reach it — a
+   * manager is not somebody’s commission downline merely because they are
+   * their report, and forbidding that drop would refuse a legal placement.
+   */
   const graph: OrgNodeInput[] = useMemo(
     () => people.map(p => ({ id: p.staffId, parentId: p.uplineStaffId, label: p.name })),
     [people],
   )
 
-  const layout = useMemo(() => layoutTree(graph), [graph])
+  /**
+   * The same people, arranged the way the company is.
+   *
+   * Anybody holding no position has no commission upline to be drawn under,
+   * so this chart used to stand them all at the top level: with most of a
+   * sub-department not yet placed, the page was a row of loose cards while
+   * `/team/hierarchy` drew the same people as a tree. The two disagreed about
+   * the shape of a department that has only one shape.
+   *
+   * So an unplaced person is drawn under the manager they REPORT to, and the
+   * edge is dashed to say the borrowing out loud. Three things this is not:
+   *
+   *   It is not a claim about money. A dashed edge means nobody earns an
+   *   override on that person yet — the card still reads "not placed", and
+   *   the rate column still reads an em dash.
+   *
+   *   It is not applied to a placed person. A position with a null upline is
+   *   somebody deliberately at the top of their tree, which is a fact, not a
+   *   gap to fill in.
+   *
+   *   It is not a write. Placing them stays a deliberate act, because
+   *   `comm_hierarchy.rank_id` is NOT NULL and no rank can be invented for
+   *   somebody whose title carries none.
+   *
+   * `layoutTree` makes a node its own root when its parent is missing or the
+   * chain loops, so a borrowed line that points outside this sub-department
+   * costs the reader nothing.
+   */
+  const layoutGraph: OrgNodeInput[] = useMemo(
+    () => people.map(p => ({ id: p.staffId, parentId: layoutParent(p), label: p.name })),
+    [people],
+  )
+
+  const layout = useMemo(() => layoutTree(layoutGraph), [layoutGraph])
 
   /** Everything the person being dragged may not be dropped on. */
   const forbidden = useMemo(() => {
@@ -169,19 +219,40 @@ function Chart({
     )
   }, [forbidden, selected, setNodes])
 
-  const edges: Edge[] = useMemo(
-    () =>
-      people
-        .filter(p => p.uplineStaffId && byId.has(p.uplineStaffId))
-        .map(p => ({
-          id: `${p.uplineStaffId}->${p.staffId}`,
-          source: p.uplineStaffId!,
-          target: p.staffId,
-          type: 'smoothstep',
-          style: { stroke: 'var(--hairline-strong, #b9b0a2)', strokeWidth: 1.5 },
-        })),
-    [people, byId],
-  )
+  /**
+   * Solid where somebody earns an override, dashed where the shape was
+   * borrowed from the reporting line. The two must never look alike: the
+   * solid one is a money relationship and the dashed one is the absence of
+   * one, so they are told apart before they are read.
+   */
+  const edges: Edge[] = useMemo(() => {
+    const real: Edge[] = people
+      .filter(p => p.uplineStaffId && byId.has(p.uplineStaffId))
+      .map(p => ({
+        id: `${p.uplineStaffId}->${p.staffId}`,
+        source: p.uplineStaffId!,
+        target: p.staffId,
+        type: 'smoothstep',
+        style: { stroke: 'var(--hairline-strong, #b9b0a2)', strokeWidth: 1.5 },
+      }))
+
+    const borrowed: Edge[] = people
+      .filter(p => isBorrowed(p) && byId.has(p.reportsTo!))
+      .map(p => ({
+        id: `reports:${p.reportsTo}->${p.staffId}`,
+        source: p.reportsTo!,
+        target: p.staffId,
+        type: 'smoothstep',
+        style: {
+          stroke: 'rgb(var(--muted))',
+          strokeWidth: 1.25,
+          strokeDasharray: '5 4',
+          opacity: 0.7,
+        },
+      }))
+
+    return [...real, ...borrowed]
+  }, [people, byId])
 
   const move = useCallback(
     (childId: string, parentId: string | null) => {
@@ -297,6 +368,11 @@ function Chart({
     [move],
   )
 
+  const placed = people.filter(p => p.rankId !== null).length
+  // Cards standing where the company puts them rather than where this chart
+  // does. Worth a number: it is the size of the gap between the two pages.
+  const borrowedCount = people.filter(p => isBorrowed(p) && byId.has(p.reportsTo!)).length
+
   const nodeTypes = useMemo(() => ({ person: PersonCard }), [])
 
   return (
@@ -320,9 +396,26 @@ function Chart({
 
       <div className="flex flex-wrap items-center gap-4 mb-3">
         <p className="font-serif italic text-muted text-xs">
-          {people.length} salespeople · {layout.roots.length} tree(s)
+          {people.length} salespeople · {placed} placed · {layout.roots.length} tree(s)
           {pending ? ' · saving…' : ''}
         </p>
+        {borrowedCount > 0 ? (
+          <span className="inline-flex items-center gap-2 font-serif italic text-xs text-graphite">
+            <svg width="26" height="6" aria-hidden>
+              <line
+                x1="0"
+                y1="3"
+                x2="26"
+                y2="3"
+                stroke="rgb(var(--muted))"
+                strokeWidth="1.25"
+                strokeDasharray="5 4"
+                opacity="0.7"
+              />
+            </svg>
+            {borrowedCount} drawn on their reporting line, not placed here yet
+          </span>
+        ) : null}
         {selected ? (
           <button
             type="button"

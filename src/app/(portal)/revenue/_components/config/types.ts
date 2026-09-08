@@ -158,6 +158,14 @@ export interface SalespersonRow {
   title_level_name: string | null
   hierarchy_id: string | null
   upline_staff_id: string | null
+  /**
+   * Who they report to on the company chart — `hr_staff_costs.reports_to`.
+   *
+   * Not a commission fact, and never written from here. It is carried so the
+   * chart can borrow the company’s shape for somebody who has no shape of
+   * their own yet, rather than stranding them at the top level.
+   */
+  reports_to: string | null
   rank_id: string | null
   rank_key: string | null
   rank_label: string | null
