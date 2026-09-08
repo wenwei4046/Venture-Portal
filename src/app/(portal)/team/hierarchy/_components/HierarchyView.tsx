@@ -7,7 +7,7 @@ import type { Rung } from '@/lib/ladder'
 import TeamOrgChart, { ALL_DEPARTMENTS, type ChartPerson } from './TeamOrgChart'
 import LevelsBoard, { type BoardTitle } from './LevelsBoard'
 import type { RankOption, SalesPerson } from './HierarchyPanel'
-import RevenueOrgChart from './RevenueOrgChart'
+import RevenueOrgChart, { type UnplacedPerson } from './RevenueOrgChart'
 import StaffTable from './StaffTable'
 
 export type HierarchyTab = 'chart' | 'table' | 'levels'
@@ -63,6 +63,7 @@ export default function HierarchyView({
   titles,
   breaks,
   salespeople,
+  unplaced,
   ranksByScheme,
   canSetRank,
 }: {
@@ -73,6 +74,10 @@ export default function HierarchyView({
   /** Reporting lines the ladder, as it stands, would refuse. */
   breaks: Array<{ id: string; managerId: string }>
   salespeople: SalesPerson[]
+  /** People in a commission department holding no open position. Drawn on the
+   *  rail beside the placed ones, because in such a department the two charts
+   *  are meant to hold the same people. */
+  unplaced: UnplacedPerson[]
   ranksByScheme: Record<string, RankOption[]>
   canSetRank: boolean
 }) {
@@ -90,6 +95,7 @@ export default function HierarchyView({
   const [focusDept, setFocusDept] = useState<string>(ALL_DEPARTMENTS)
   const scoped = focusDept === ALL_DEPARTMENTS ? null : focusDept
   const railPeople = scoped ? salespeople.filter(s => s.department === scoped) : salespeople
+  const railUnplaced = scoped ? unplaced.filter(u => u.department === scoped) : unplaced
 
   const tabs: TabItem[] = [
     { key: 'chart', label: 'Org chart' },
@@ -198,6 +204,7 @@ export default function HierarchyView({
               </div>
               <RevenueOrgChart
                 salespeople={railPeople}
+                unplaced={railUnplaced}
                 focused={focused}
                 onFocus={setFocused}
                 commissionHref={commissionHref}
