@@ -56,7 +56,6 @@ interface CardData extends Record<string, unknown> {
   person: ChartPerson
   invalidTarget: boolean
   selected: boolean
-  dimmed: boolean
 }
 
 const ALL = '__all__'
@@ -157,17 +156,32 @@ function Chart({
     return [...set].sort((a, b) => a.localeCompare(b))
   }, [people])
 
+  // Focusing a department now REMOVES the rest rather than fading them (user,
+  // 2026-09-08: nobody reports across a department boundary today, so a dimmed
+  // card is a card in the way). Everything the canvas draws is derived from
+  // this list, not from `people`.
+  //
+  // Hiding somebody cannot hide a mistake: `hr_staff_reports_to_no_cycle`
+  // refuses a loop in the database whether or not the chart could see it, and
+  // a line that leaves the department is counted below rather than drawn as a
+  // person who reports to nobody.
+  const visible = useMemo(
+    () => (focusDept === ALL ? people : people.filter(p => p.department === focusDept)),
+    [people, focusDept],
+  )
+  const visibleIds = useMemo(() => new Set(visible.map(p => p.id)), [visible])
+
   // Sorted by department then name, so unattached people cluster with their
   // own department instead of interleaving across the top row. The label is
   // only ever used for ordering — the card draws the real one.
   const graph: OrgNodeInput[] = useMemo(
     () =>
-      people.map(p => ({
+      visible.map(p => ({
         id: p.id,
         parentId: p.reportsTo,
         label: `${p.department ?? 'zzz'} ${p.name}`,
       })),
-    [people],
+    [visible],
   )
 
   const layout = useMemo(() => layoutTree(graph), [graph])
@@ -180,16 +194,16 @@ function Chart({
     out.add(dragging)
     const mover = byId.get(dragging)
     if (mover && mover.levelRank !== null) {
-      for (const p of people) {
+      for (const p of visible) {
         if (!ladderAllows(mover.levelRank, p.levelRank)) out.add(p.id)
       }
     }
     return out
-  }, [dragging, graph, byId, people])
+  }, [dragging, graph, byId, visible])
 
   const nodes: Node<CardData>[] = useMemo(
     () =>
-      people.map(p => {
+      visible.map(p => {
         const pos = layout.positions.get(p.id)!
         return {
           id: p.id,
@@ -199,20 +213,19 @@ function Chart({
             person: p,
             invalidTarget: forbidden.has(p.id),
             selected: selected === p.id,
-            dimmed: focusDept !== ALL && p.department !== focusDept,
           },
           draggable: true,
         }
       }),
-    [people, layout, forbidden, selected, focusDept],
+    [visible, layout, forbidden, selected],
   )
 
   const edges: Edge[] = useMemo(() => {
     // A line the ladder would refuse today — drawn after the ladder changed
     // under it — is painted in the danger colour rather than hidden. The
     // trigger does not go back over old lines, so the chart has to.
-    const reporting: Edge[] = people
-      .filter(p => p.reportsTo && byId.has(p.reportsTo))
+    const reporting: Edge[] = visible
+      .filter(p => p.reportsTo && visibleIds.has(p.reportsTo))
       .map(p => {
         const manager = byId.get(p.reportsTo!)!
         const broken = !ladderAllows(p.levelRank, manager.levelRank)
@@ -229,11 +242,11 @@ function Chart({
 
     // The commission line only when it differs from the reporting line — an
     // identical dashed edge under a solid one says nothing.
-    const commission: Edge[] = people
+    const commission: Edge[] = visible
       .filter(
         p =>
           p.commUplineId &&
-          byId.has(p.commUplineId) &&
+          visibleIds.has(p.commUplineId) &&
           p.commUplineId !== p.reportsTo,
       )
       .map(p => ({
@@ -251,7 +264,7 @@ function Chart({
       }))
 
     return [...reporting, ...commission]
-  }, [people, byId])
+  }, [visible, visibleIds, byId])
 
   const move = useCallback(
     (childId: string, parentId: string | null) => {
@@ -376,16 +389,23 @@ function Chart({
 
   const nodeTypes = useMemo(() => ({ person: PersonCard }), [])
 
-  const unplaced = people.filter(p => !p.reportsTo).length
-  const crossed = people.filter(
-    p => p.commUplineId && p.commUplineId !== p.reportsTo && byId.has(p.commUplineId),
+  // Every count describes the canvas, not the company — a line that says
+  // "9 people" over a chart showing 3 is worse than no line at all.
+  const unplaced = visible.filter(p => !p.reportsTo).length
+  const crossed = visible.filter(
+    p => p.commUplineId && p.commUplineId !== p.reportsTo && visibleIds.has(p.commUplineId),
   ).length
-  const broken = people.filter(
+  const broken = visible.filter(
     p =>
       p.reportsTo &&
       byId.has(p.reportsTo) &&
       !ladderAllows(p.levelRank, byId.get(p.reportsTo)!.levelRank),
   ).length
+  const hidden = people.length - visible.length
+  // Reports to somebody outside the focused department. None today, which is
+  // why filtering is safe at all — but drawn as a root and left uncounted it
+  // would read as "reports to nobody", which is a different fact.
+  const outside = visible.filter(p => p.reportsTo && !visibleIds.has(p.reportsTo)).length
 
   return (
     <div>
@@ -460,8 +480,15 @@ function Chart({
 
       <div className="flex flex-wrap items-center gap-4 mb-3">
         <p className="font-serif italic text-muted text-xs">
-          {people.length} people · {layout.roots.length} tree
+          {visible.length} people · {layout.roots.length} tree
           {layout.roots.length === 1 ? '' : 's'} · {unplaced} reporting to nobody
+          {outside > 0 ? (
+            <span className="text-alert">
+              {' '}
+              · {outside} {outside === 1 ? 'reports' : 'report'} outside {focusDept}
+            </span>
+          ) : null}
+          {hidden > 0 ? ` · ${hidden} in other departments` : ''}
           {broken > 0 ? (
             <span className="text-danger">
               {' '}
@@ -579,7 +606,7 @@ function Chart({
 }
 
 function PersonCard({ data }: NodeProps<Node<CardData>>) {
-  const { person, invalidTarget, selected, dimmed } = data
+  const { person, invalidTarget, selected } = data
 
   return (
     <div
@@ -591,7 +618,6 @@ function PersonCard({ data }: NodeProps<Node<CardData>>) {
           : selected
             ? 'border-accent bg-surface shadow-sm'
             : 'border-hairline bg-surface hover:border-accent-border',
-        dimmed && !invalidTarget ? 'opacity-35' : '',
       ].join(' ')}
     >
       <Handle type="target" position={Position.Top} className="!bg-[rgb(var(--accent))] !w-2 !h-2" />
