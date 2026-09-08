@@ -7,7 +7,6 @@ import type { Rung } from '@/lib/ladder'
 import TeamOrgChart, { ALL_DEPARTMENTS, type ChartPerson } from './TeamOrgChart'
 import LevelsBoard, { type BoardTitle } from './LevelsBoard'
 import type { RankOption, SalesPerson } from './HierarchyPanel'
-import RevenueOrgChart, { type UnplacedPerson } from './RevenueOrgChart'
 import StaffTable from './StaffTable'
 
 export type HierarchyTab = 'chart' | 'table' | 'levels'
@@ -22,36 +21,30 @@ export function hierarchyTab(param: string | null | undefined): HierarchyTab {
  *
  * The chart used to be one of two tabs and shared its width with nothing.
  * Since 2026-09-07 it is the page. The user's phrasing was that the graph takes
- * priority, and priority here means width and position, not a louder heading —
- * everything else moved to the margin rather than in front.
+ * priority, and priority here means width and position, not a louder heading.
  *
- * Three columns on the chart tab, stacked on a phone:
+ * It now has the whole width, which is the second half of one decision. The
+ * canvas used to share the row with the Revenue department's commission tree,
+ * drawn read-only in a 340px rail. That rail is gone (user, 2026-09-08) — not
+ * as clutter, but because the fact it drew was not reliably true: the rank a
+ * position carries is not what a month pays, since somebody who misses their
+ * monthly quota earns at a different rate. A card reading "Rank B · 8%" was
+ * therefore right only in the months quota was hit, and there was no honest
+ * caption to swap in, because the real figure belongs to a RUN and not to a
+ * person. The tree is drawn and edited on `/revenue/[sub]/hierarchy`, where a
+ * period is in scope.
  *
- *   Staff hierarchy      the canvas, `flex-1`. Drag, or draw a line down.
- *   Commission hierarchy the Revenue department's own tree, 380px. The same
- *                        people, a different parent — who earns the override.
- *                        Read-only; it is moved on the Revenue page.
- *   Rules                the ladder, foldable.
+ * Finding somebody replaced it. Clicking a card used to centre that person on
+ * the other chart, which is the only thing the pair of them made easy; the
+ * canvas now carries a name search that does it directly — type "lucas", and
+ * the chart scrolls to Lucas and lights him up, crossing the department filter
+ * to get there if it has to.
  *
- * The second column was a flat list in the panel until the user rejected it:
- * a list can say a hierarchy exists but not what shape it is, and the shape is
- * the question you have when two hierarchies cover the same people. Both
- * charts share one `focused`, so clicking somebody on either lights them up
- * and centres them on the other — which is what makes the pair readable as one
- * fact about a person rather than two drawings.
- *
- * Three views, one rail:
+ * Three views:
  *
  *   Org chart  the canvas. Drag, or draw a line from a manager down.
- *   Table      the same two facts as rows, which is the shape bulk work wants.
- *              Eleven people to rank is eleven drags on a canvas.
- *   Levels     the ladder board, still editable in full. Reading it no longer
- *              needs this tab — the panel carries it — but changing it does.
- *
- * The panel rides the first two and not Levels: the board IS the rules, and
- * showing the rules beside themselves would be a mirror, not a reference. The
- * Revenue chart rides the chart tab alone — the table is for bulk edits, and a
- * second canvas beside it is noise, not context.
+ *   Table      the same facts as rows, which is the shape bulk work wants.
+ *   Levels     the ladder board, still editable in full.
  *
  * The tab is `?tab=`, pushed with the browser's own history so Next syncs
  * `useSearchParams` without a round trip and Back returns to the last view.
@@ -63,9 +56,7 @@ export default function HierarchyView({
   titles,
   breaks,
   salespeople,
-  unplaced,
   ranksByScheme,
-  canSetRank,
 }: {
   people: ChartPerson[]
   commissionHref: string | null
@@ -73,29 +64,21 @@ export default function HierarchyView({
   titles: BoardTitle[]
   /** Reporting lines the ladder, as it stands, would refuse. */
   breaks: Array<{ id: string; managerId: string }>
+  /** Open commission positions. Nothing here is drawn — it is what an enrol
+   *  offer reads to default its scheme picker. */
   salespeople: SalesPerson[]
-  /** People in a commission department holding no open position. Drawn on the
-   *  rail beside the placed ones, because in such a department the two charts
-   *  are meant to hold the same people. */
-  unplaced: UnplacedPerson[]
   ranksByScheme: Record<string, RankOption[]>
-  canSetRank: boolean
 }) {
   const searchParams = useSearchParams()
   const tab = hierarchyTab(searchParams.get('tab'))
-  // Who is lit up, held here because three things now react to it: both
-  // charts and the panel's list of broken lines. Clicking a person on either
-  // chart centres them on the other — the same person, drawn twice.
+  // Who is lit up. Held here rather than in the canvas because it survives a
+  // switch to the table and back, so somebody found by name is still found
+  // after a detour.
   const [focused, setFocused] = useState<string | null>(null)
-  // The department chips live on the canvas but the choice belongs here: they
-  // filter the rail beside it too. It used to sit in the chart alone, so
-  // choosing Finance emptied the canvas of everybody else and left the Revenue
-  // commission tree sitting beside it unchanged — two halves of one view
-  // answering different questions (user, 2026-09-08).
+  // The department chips. Owned here so the choice survives the same detour —
+  // and so the search can widen it when the person somebody typed is standing
+  // outside the department currently in focus.
   const [focusDept, setFocusDept] = useState<string>(ALL_DEPARTMENTS)
-  const scoped = focusDept === ALL_DEPARTMENTS ? null : focusDept
-  const railPeople = scoped ? salespeople.filter(s => s.department === scoped) : salespeople
-  const railUnplaced = scoped ? unplaced.filter(u => u.department === scoped) : unplaced
 
   const tabs: TabItem[] = [
     { key: 'chart', label: 'Org chart' },
@@ -128,13 +111,13 @@ export default function HierarchyView({
             ) : tab === 'table' ? (
               <>
                 The chart as rows, in ladder order. Changing who somebody reports to moves their
-                commission upline with them; the rank is what a month pays from.
+                commission upline with them.
               </>
             ) : (
               <>
                 Drag somebody onto their manager, or draw a line from a manager down to them.
-                Nobody can be put under a title the ladder ranks below theirs. The dashed lines are
-                the commission uplines — and since a move now writes both, they follow.
+                Nobody can be put under a title the ladder ranks below theirs. Search a name to
+                find where somebody sits.
               </>
             )}
           </p>
@@ -153,65 +136,34 @@ export default function HierarchyView({
           </p>
         </div>
       ) : (
-        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch lg:items-start">
-          {/* min-w-0 or the canvas — which is as wide as the tree is — sets the
-              row's width and pushes the panel off the page. */}
-          <div className="min-w-0 flex-1">
-            {tab === 'table' ? (
-              <StaffTable
-                people={people}
-                salespeople={salespeople}
-                ranksByScheme={ranksByScheme}
-                canSetRank={canSetRank}
-              />
-            ) : (
-              <>
-                <div className="sect-head">
-                  <h2>Staff hierarchy</h2>
-                  <span className="rule" aria-hidden />
-                  <span className="count">{people.length} PEOPLE · REPORTS TO</span>
-                </div>
-                <TeamOrgChart
-                  people={people}
-                  commissionHref={commissionHref}
-                  focused={focused}
-                  onFocus={setFocused}
-                  ranksByScheme={ranksByScheme}
-                  salespeople={salespeople}
-                  focusDept={focusDept}
-                  onFocusDept={setFocusDept}
-                />
-              </>
-            )}
-          </div>
-          {tab === 'chart' ? (
-            /* One narrow rail beside the canvas, never a share of it: the user
-               asked for the graph to come first, and first means width. An
-               earlier cut gave this column 380px AND put the ladder in a third
-               column of 320px, which left the staff canvas 360px of a 1150px
-               window — four cards visible out of fifty-one.
-
-               The ladder used to sit under this chart. Removed 2026-09-07 on
-               the user's instruction: the rules already have a home on the
-               Levels tab and on /revenue/[sub]/rules, and restating them
-               beside the chart bought nothing the legend does not. Broken
-               lines still show — red on the canvas, counted in the legend. */
-            <div className="w-full lg:w-[340px] shrink-0 lg:sticky lg:top-4">
+        /* min-w-0 or the canvas — which is as wide as the tree is — sets the
+           width of the row it sits in and pushes past the page. */
+        <div className="min-w-0">
+          {tab === 'table' ? (
+            <StaffTable
+              people={people}
+              salespeople={salespeople}
+              ranksByScheme={ranksByScheme}
+            />
+          ) : (
+            <>
               <div className="sect-head">
-                <h2>Commission hierarchy</h2>
+                <h2>Staff hierarchy</h2>
                 <span className="rule" aria-hidden />
-                <span className="count">{scoped ? scoped.toUpperCase() : 'REVENUE DEPT'}</span>
+                <span className="count">{people.length} PEOPLE · REPORTS TO</span>
               </div>
-              <RevenueOrgChart
-                salespeople={railPeople}
-                unplaced={railUnplaced}
+              <TeamOrgChart
+                people={people}
+                commissionHref={commissionHref}
                 focused={focused}
                 onFocus={setFocused}
-                commissionHref={commissionHref}
-                scope={scoped}
+                ranksByScheme={ranksByScheme}
+                salespeople={salespeople}
+                focusDept={focusDept}
+                onFocusDept={setFocusDept}
               />
-            </div>
-          ) : null}
+            </>
+          )}
         </div>
       )}
     </div>

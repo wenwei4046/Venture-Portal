@@ -182,7 +182,25 @@ async function mirrorToCommission(
   // draws the WHOLE company, so it is the only surface from which somebody
   // could be put under an upline holding a position in a different
   // sub-department — the Revenue chart is scheme-scoped and cannot reach it.
-  // Latent while Fair is the only scheme; a money bug the day there are two.
+  //
+  // This is LIVE, not hypothetical: the Revenue Department runs several
+  // sub-departments, each with its own scheme. Note what it does and does not
+  // stop. The boundary rule refuses a line that leaves a commission
+  // DEPARTMENT, and every sub-department sits inside the same one — so a drag
+  // from one sub-department's tree to another's is not refused. It goes
+  // through: `reports_to` is written, and the commission upline stays where it
+  // was, because moving it would hand the engine a differential belonging to a
+  // scheme it does not read. The two lines then disagree ON PURPOSE, and the
+  // note below is the only thing that says so. Do not turn it into a throw
+  // without deciding what a cross-sub-department reporting line should MEAN.
+  //
+  // It is also recoverable, which is why it stays a note. Detach the person
+  // first and the guard never runs — `reportsToId` is null, so `target` is
+  // null, and the mirror clears the commission upline instead of moving it.
+  // They then stand at the top of their own branch on both charts, which is
+  // a true statement about somebody between two sub-departments. Relink the
+  // reporting line, and place them on the Revenue chart under the scheme
+  // that should now pay them.
   const target = reportsToId ? positions.get(reportsToId) : null
   if (target && target.schemeId !== position.schemeId) {
     return {
@@ -197,52 +215,6 @@ async function mirrorToCommission(
   } catch (e) {
     return mirrorFailed('commission upline', e instanceof Error ? e.message : String(e))
   }
-}
-
-/**
- * Set what a month pays somebody from, without moving them.
- *
- * The Hierarchy table's Rank column. Gated on `revenue`, not on this page's
- * own `team`: a rank is a commission fact, and the fact that both permissions
- * happen to resolve to the same `hr` scope in RLS is a coincidence of the
- * current catalogue, not a licence to let a `team`-only account write the
- * money. The table does not render the control without it, so the redirect
- * `requirePermission` performs is a backstop rather than a path anybody walks.
- *
- * The upline is carried through untouched: `comm_hierarchy` rows are whole, so
- * a rank change that forgot to name the current upline would write NULL and
- * tear the person out of their tree.
- */
-export async function setStaffRank(staffId: string, rankId: string): Promise<void> {
-  const user = await requirePermission('revenue')
-  if (!staffId || !rankId) throw new Error('Which person, and to which rank?')
-
-  const supabase = await createClient()
-  const positions = await loadOpenPositions(supabase)
-  const position = positions.get(staffId)
-  if (!position) {
-    throw new Error(
-      'They hold no commission position yet — place them on the Revenue chart first, where a scheme can be chosen.',
-    )
-  }
-
-  const { data: rank } = await supabase
-    .from('comm_ranks')
-    .select('id, scheme_id')
-    .eq('id', rankId)
-    .maybeSingle()
-  const target = rank as { id: string; scheme_id: string } | null
-  if (!target) throw new Error('That rank no longer exists')
-  // A rank belongs to a scheme and a position points at one. Crossing them
-  // would hand the engine a rate it cannot read for that sub-department.
-  if (target.scheme_id !== position.schemeId) {
-    throw new Error('That rank belongs to another sub-department’s scheme')
-  }
-
-  await movePositionRank(supabase, user.id, position, rankId)
-
-  revalidatePath('/team', 'layout')
-  revalidatePath('/revenue', 'layout')
 }
 
 /* ------------------------------------------------------------------ *

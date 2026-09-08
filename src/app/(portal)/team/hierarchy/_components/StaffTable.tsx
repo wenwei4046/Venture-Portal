@@ -4,11 +4,10 @@ import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { compareByLadder, ladderAllows, ladderRefusal } from '@/lib/ladder'
 import { boundaryRefusal } from '@/lib/hierarchy-boundary'
-import { ratePct } from '@/lib/commission/ranks'
 import { ErrorNote } from '@/components/RowForm'
 import LedgerRow from '@/components/LedgerRow'
 import type { MirrorOutcome } from '@/lib/hierarchy-mirror'
-import { setReportsTo, setStaffRank, undoHierarchyMove, type UndoMoveInput } from '../actions'
+import { setReportsTo, undoHierarchyMove, type UndoMoveInput } from '../actions'
 import type { ChartPerson } from './TeamOrgChart'
 import type { RankOption, SalesPerson } from './HierarchyPanel'
 import MirrorOfferPrompt, { nextOffer, offerKey, type OfferState } from './MirrorOfferPrompt'
@@ -22,19 +21,25 @@ const NONE = '__none__'
  * The chart, as rows.
  *
  * The user asked for the hierarchy to be toggleable between the graph and a
- * staff list with ranking (2026-09-07), and for a change made in either to
- * write both hierarchies. So this is not a read-only mirror of the canvas —
- * it edits the same two facts the canvas does, through the same two actions:
+ * staff list (2026-09-07), and for a change made in either to write both
+ * hierarchies. So this is not a read-only mirror of the canvas — it edits the
+ * same fact the canvas does, through the same action: `setReportsTo`, which
+ * also moves somebody's commission upline with them.
  *
- *   Manager  `setReportsTo` — which also moves their commission upline.
- *   Rank     `setStaffRank` — which is what a month pays from.
+ * It used to edit a second one. A Rank column set what a month pays somebody
+ * from, and it went on 2026-09-08 with the rest of the commission display on
+ * this page — because a rank is NOT what a month pays. Somebody who misses
+ * their monthly quota earns at a different rate from the one their rank
+ * implies, so a row reading "Rank B · 8%" was true only in the months quota
+ * was hit. Ranks are set on `/revenue/[sub]/hierarchy`, where a period is in
+ * scope. The one place a rate still appears here is the enrol offer's picker,
+ * which is a choice being MADE rather than a caption on somebody.
  *
  * Why a table at all, when the graph exists: a canvas answers "what does this
- * tree look like" and is the wrong shape for "set the rank of the eleven
- * people who have none". Dragging is a poor bulk edit. The rows read in ladder
- * order — the most senior title first, the same title together, names A→Z —
- * so the list is the org chart written down rather than a differently-sorted
- * roster.
+ * tree look like" and is the wrong shape for "give the eleven people with no
+ * manager one". Dragging is a poor bulk edit. The rows read in ladder order —
+ * the most senior title first, the same title together, names A→Z — so the
+ * list is the org chart written down rather than a differently-sorted roster.
  *
  * The Manager picker offers only people the ladder would ACCEPT: anybody whose
  * title stands at or above this person's, minus their own descendants. A
@@ -51,13 +56,14 @@ export default function StaffTable({
   people,
   salespeople,
   ranksByScheme,
-  canSetRank,
 }: {
   people: ChartPerson[]
+  /** Open commission positions. Read for ONE thing: the scheme an enrol
+   *  offer defaults its picker to. Nothing here is rendered as a row. */
   salespeople: SalesPerson[]
+  /** Empty for an account with no `revenue` permission, which turns the
+   *  enrol offer's rank picker into a plain refusal rather than a form. */
   ranksByScheme: Record<string, RankOption[]>
-  /** False for an account with no `revenue` permission — the column reads. */
-  canSetRank: boolean
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -261,15 +267,6 @@ export default function StaffTable({
     })
   }
 
-  function changeRank(person: ChartPerson, rankId: string) {
-    const held = position.get(person.id)
-    if (!held || held.rankId === rankId) return
-    const rank = (ranksByScheme[held.schemeId] ?? []).find(r => r.id === rankId)
-    run(person.id, async () => {
-      await setStaffRank(person.id, rankId)
-      return `${person.name} is now paid from ${rank ? `${rank.label} · ${rank.rateLabel}` : 'their new rank'}.`
-    })
-  }
 
   return (
     <div className="mb-12">
@@ -300,7 +297,7 @@ export default function StaffTable({
             <MirrorOfferPrompt
               key={offerKey(offer)}
               state={offer}
-              ranksByScheme={canSetRank ? ranksByScheme : null}
+              ranksByScheme={Object.keys(ranksByScheme).length > 0 ? ranksByScheme : null}
               preferredSchemeId={position.get(offer.moverId)?.schemeId ?? null}
               onOutcome={acceptOutcome}
               onError={message => {
@@ -396,7 +393,6 @@ export default function StaffTable({
                 <th className="m-hide">Title</th>
                 <th className="m-hide">Department</th>
                 <th className="w-56">Reports to</th>
-                <th className="w-48">Rank</th>
                 {/* `.m-hide` on its own only removes a column below 768px — the
                     chevron that brings Title and Department back as a panel comes
                     from LedgerRow, and it needs this cell to sit under. Without
@@ -408,8 +404,6 @@ export default function StaffTable({
               {rows.map(p => {
                 const manager = p.reportsTo ? byId.get(p.reportsTo) : null
                 const broken = manager ? !ladderAllows(p.levelRank, manager.levelRank) : false
-                const held = position.get(p.id)
-                const ranks = held ? (ranksByScheme[held.schemeId] ?? []) : []
                 const mine = descendants.get(p.id) ?? new Set<string>()
                 const saving = pending && busy === p.id
 
@@ -482,37 +476,6 @@ export default function StaffTable({
                         </div>
                       ) : null}
                     </td>
-                    <td data-label="Rank">
-                      {!held ? (
-                        <span className="font-serif italic text-sm text-muted">
-                          not on commission
-                        </span>
-                      ) : !canSetRank || ranks.length === 0 ? (
-                        <span className="font-serif italic text-sm text-graphite">
-                          {p.rankLabel ?? '—'}
-                          {p.rankRate !== null ? (
-                            <span className="ml-1.5 font-mono not-italic text-[10px] text-muted">
-                              {ratePct(p.rankRate)}
-                            </span>
-                          ) : null}
-                        </span>
-                      ) : (
-                        <select
-                          value={held.rankId ?? ''}
-                          disabled={saving}
-                          onChange={e => changeRank(p, e.target.value)}
-                          aria-label={`${p.name} rank`}
-                          className="w-full max-w-44 px-2 py-1 bg-paper border border-hairline rounded-control text-sm text-ink disabled:opacity-50"
-                        >
-                          {held.rankId ? null : <option value="">— pick a rank —</option>}
-                          {ranks.map(r => (
-                            <option key={r.id} value={r.id}>
-                              {r.label} · {r.rateLabel}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </td>
                   </LedgerRow>
                 )
               })}
@@ -526,7 +489,8 @@ export default function StaffTable({
         names A→Z. Changing <em>Reports to</em> moves their commission upline with them where this
         account may write both; where it may not, the row says so. When the new manager holds no
         commission position, the banner offers to put them on the ladder and finish the move in one
-        step — a rank belongs to a scheme, so it asks for both.
+        step — a rank belongs to a scheme, so it asks for both. What a month actually pays somebody
+        is not a column here: it belongs to a run, and it is read on Revenue.
       </p>
     </div>
   )
