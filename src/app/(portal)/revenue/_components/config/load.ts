@@ -134,7 +134,7 @@ export async function loadTeam(schemeId: string): Promise<TeamData> {
       supabase.from('comm_ranks').select('*').eq('scheme_id', schemeId).order('sort_order'),
       supabase
         .from('hr_staff_costs')
-        .select('id, employee_name, employee_code, tax_mode, withholding_rate, title_id, titles (name, level_id), departments!inner (name, payroll_source)')
+        .select('id, employee_name, employee_code, reports_to, tax_mode, withholding_rate, title_id, titles (name, level_id), departments!inner (name, payroll_source)')
         .eq('status', 'active')
         .eq('departments.payroll_source', 'commission')
         .order('employee_name'),
@@ -167,6 +167,7 @@ export async function loadTeam(schemeId: string): Promise<TeamData> {
     id: string
     employee_name: string
     employee_code: string | null
+    reports_to: string | null
     tax_mode: 'pcb' | 'withholding' | 'none' | null
     withholding_rate: number | null
     title_id: string | null
@@ -188,6 +189,7 @@ export async function loadTeam(schemeId: string): Promise<TeamData> {
         staff_id: s.id,
         employee_name: s.employee_name,
         employee_code: s.employee_code,
+        reports_to: s.reports_to ?? null,
         title_id: s.title_id ?? null,
         title_name: title?.name ?? null,
         title_level_rank: rung?.rank ?? null,

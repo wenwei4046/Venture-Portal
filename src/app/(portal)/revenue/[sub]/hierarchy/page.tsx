@@ -59,6 +59,7 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
       code: p.employee_code,
       titleName: p.title_name,
       uplineStaffId: p.upline_staff_id,
+      reportsTo: p.reports_to,
       rankId: p.rank_id,
       rankLabel: rank ? (shortLabel.get(rank.id) ?? null) : null,
       productRate: rank?.productRate ?? null,
