@@ -193,6 +193,14 @@ async function mirrorToCommission(
   // scheme it does not read. The two lines then disagree ON PURPOSE, and the
   // note below is the only thing that says so. Do not turn it into a throw
   // without deciding what a cross-sub-department reporting line should MEAN.
+  //
+  // It is also recoverable, which is why it stays a note. Detach the person
+  // first and the guard never runs — `reportsToId` is null, so `target` is
+  // null, and the mirror clears the commission upline instead of moving it.
+  // They then stand at the top of their own branch on both charts, which is
+  // a true statement about somebody between two sub-departments. Relink the
+  // reporting line, and place them on the Revenue chart under the scheme
+  // that should now pay them.
   const target = reportsToId ? positions.get(reportsToId) : null
   if (target && target.schemeId !== position.schemeId) {
     return {
