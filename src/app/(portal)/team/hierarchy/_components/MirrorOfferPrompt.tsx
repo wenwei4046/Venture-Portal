@@ -99,13 +99,19 @@ export default function MirrorOfferPrompt({
 }: {
   state: OfferState
   /**
-   * The ranks a scheme offers, as the page already built them for the Rank
-   * column: keyed by scheme id, and `{}` for an account with no `revenue`.
+   * The ranks a scheme offers, keyed by scheme id.
    *
-   * `null` means this SURFACE has no rank options to give — the org canvas is
-   * not passed them — and an enrol offer then renders nothing rather than an
-   * empty picker. An empty picker is the worse failure of the two: it looks
-   * like a control that is broken instead of one that is absent.
+   * This is the ONE place a rate still appears on the Hierarchy page. The
+   * rank captions went on 2026-09-08 because a rank is not what a month pays
+   * — but a rank being CHOSEN is different from a rank being reported: this
+   * picker writes the fact rather than describing it, so the rate belongs in
+   * it.
+   *
+   * `null` means this surface has no rank options to give, and an enrol offer
+   * then renders nothing rather than an empty picker. An empty picker is the
+   * worse failure of the two: it looks like a control that is broken instead
+   * of one that is absent. The table passes null for an account with no
+   * `revenue` permission, whose page builds no ranks at all.
    */
   ranksByScheme: Record<string, RankOption[]> | null
   /**
