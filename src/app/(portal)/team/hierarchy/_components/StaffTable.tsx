@@ -8,7 +8,7 @@ import { ratePct } from '@/lib/commission/ranks'
 import { ErrorNote } from '@/components/RowForm'
 import LedgerRow from '@/components/LedgerRow'
 import type { MirrorOutcome } from '@/lib/hierarchy-mirror'
-import { setReportsTo, setStaffRank } from '../actions'
+import { setReportsTo, setStaffRank, undoHierarchyMove, type UndoMoveInput } from '../actions'
 import type { ChartPerson } from './TeamOrgChart'
 import type { RankOption, SalesPerson } from './HierarchyPanel'
 import MirrorOfferPrompt, { nextOffer, offerKey, type OfferState } from './MirrorOfferPrompt'
@@ -69,6 +69,15 @@ export default function StaffTable({
   // money write even when it succeeded.
   const [offer, setOffer] = useState<OfferState | null>(null)
   const [warn, setWarn] = useState(false)
+  /**
+   * The way back from the move just made, or null.
+   *
+   * One move deep and cleared by the next gesture, exactly as on the
+   * chart — the rule and the reasons live in `lib/hierarchy-undo.ts`. The
+   * table has its own copy because the two surfaces do not share state,
+   * not because they disagree about anything.
+   */
+  const [undo, setUndo] = useState<UndoMoveInput | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
 
   const [query, setQuery] = useState('')
@@ -143,6 +152,7 @@ export default function StaffTable({
     setNote(null)
     setOffer(null)
     setWarn(false)
+    setUndo(null)
     setBusy(id)
     startTransition(async () => {
       try {
@@ -182,8 +192,18 @@ export default function StaffTable({
       setError(crossing)
       return
     }
+    const was = { reportsTo: person.reportsTo, commUplineId: person.commUplineId }
     run(person.id, async () => {
       const outcome = await setReportsTo(person.id, managerId)
+      // Whether the mirror ran decides how much an undo may put back. A
+      // commission upline the move never wrote is not this button's to move.
+      setUndo({
+        staffId: person.id,
+        reportsTo: was.reportsTo,
+        commUplineId: was.commUplineId,
+        mirrored: outcome.mirrored,
+        movedTo: managerId,
+      })
       // The refusal may arrive with a way out attached. `offer` is only ever
       // built by a server that checked for `revenue` first, so its presence is
       // the permission gate — but the rank picker under it is NOT, which is why
@@ -218,12 +238,27 @@ export default function StaffTable({
     setError(null)
     setNote(outcome.note)
     setWarn(!outcome.mirrored)
+    // The offer wrote the commission half the move could not, so the
+    // snapshot taken before that move no longer describes what is there.
+    setUndo(null)
     setOffer(current => {
       if (!current) return null
       const next = nextOffer(current.offer, outcome)
       return next ? { offer: next, moverId: current.moverId } : null
     })
     router.refresh()
+  }
+
+  function undoLastMove() {
+    const was = undo
+    if (!was) return
+    run(was.staffId, async () => {
+      const outcome = await undoHierarchyMove(was)
+      // A refusal and a half-undo both warn; only everything going back
+      // reads as the plain confirmation it is.
+      setWarn(!outcome.undone)
+      return outcome.note
+    })
   }
 
   function changeRank(person: ChartPerson, rankId: string) {
@@ -248,6 +283,16 @@ export default function StaffTable({
           }`}
         >
           {note}
+          {undo ? (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={undoLastMove}
+              className="ml-2 underline hover:no-underline disabled:opacity-50 disabled:no-underline"
+            >
+              Undo
+            </button>
+          ) : null}
           {/* Inside the banner on purpose: the prompt answers the sentence
               above it, and anything that opened below the filter bar would
               push every row down under the cursor that just used one. */}

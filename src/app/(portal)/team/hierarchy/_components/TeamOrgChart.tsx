@@ -30,7 +30,7 @@ import { ladderAllows, ladderRefusal } from '@/lib/ladder'
 import { boundaryRefusal } from '@/lib/hierarchy-boundary'
 import { ratePct } from '@/lib/commission/ranks'
 import type { MirrorOutcome } from '@/lib/hierarchy-mirror'
-import { setReportsTo } from '../actions'
+import { setReportsTo, undoHierarchyMove, type UndoMoveInput } from '../actions'
 import MirrorOfferPrompt, { nextOffer, offerKey, type OfferState } from './MirrorOfferPrompt'
 import type { RankOption, SalesPerson } from './HierarchyPanel'
 
@@ -150,6 +150,22 @@ function Chart({
    */
   const [offer, setOffer] = useState<OfferState | null>(null)
   const [warn, setWarn] = useState(false)
+  /**
+   * The way back from the move just made, or null.
+   *
+   * ONE move deep, and it is cleared by the next gesture rather than
+   * stacked. A chart where Undo might mean any of the last five drops is
+   * worse than one where it means exactly the drop you are still looking
+   * at — and a stack over effective-dated commission rows would let
+   * somebody walk backwards across a month boundary, where each step back
+   * writes a THIRD row rather than removing the second.
+   *
+   * Captured from the render the drop was aimed at, because after the
+   * write this page no longer holds a copy of the manager they left. The
+   * server re-reads all of it and refuses if anything moved underneath;
+   * see `lib/hierarchy-undo.ts`.
+   */
+  const [undo, setUndo] = useState<UndoMoveInput | null>(null)
   const [dragging, setDragging] = useState<string | null>(null)
   const selected = focused
 
@@ -328,9 +344,24 @@ function Chart({
       setError(null)
       setOffer(null)
       setWarn(false)
+      setUndo(null)
+      // Both lines as the card the drop was aimed at still has them. `child`
+      // is a snapshot from that render rather than a live view, so it keeps
+      // the pre-move values even after `router.refresh()` replaces `people`.
+      const was = { reportsTo: child.reportsTo, commUplineId: child.commUplineId }
       startTransition(async () => {
         try {
           const outcome = await setReportsTo(childId, parentId)
+          // Whether the mirror ran decides how much of this an undo may put
+          // back — restoring a commission upline the move never wrote would be
+          // a NEW money decision wearing an undo button's clothes.
+          setUndo({
+            staffId: childId,
+            reportsTo: was.reportsTo,
+            commUplineId: was.commUplineId,
+            mirrored: outcome.mirrored,
+            movedTo: parentId,
+          })
           // Whatever the server attached — a detach the commission tree did not
           // follow, or a manager who is not on the ladder. Never taken for them
           // either way: the two trees hold different people, and acting on an
@@ -375,6 +406,11 @@ function Chart({
       setError(null)
       setNote(outcome.note)
       setWarn(!outcome.mirrored)
+      // Accepting an offer writes the commission half the move could not, so
+      // the snapshot taken before that move no longer describes what is there.
+      // Undoing on the strength of it would put the reporting line back and
+      // leave the override pointing at the new manager, reported as a success.
+      setUndo(null)
       setOffer(current => {
         if (!current) return null
         const next = nextOffer(current.offer, outcome)
@@ -460,6 +496,36 @@ function Chart({
           }`}
         >
           {error ? null : note}
+          {undo && !error ? (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                const was = undo
+                // Cleared first: a second click is a second move forward, not a
+                // second undo, and the button is gone before it can be pressed.
+                setUndo(null)
+                setError(null)
+                setOffer(null)
+                startTransition(async () => {
+                  try {
+                    const outcome = await undoHierarchyMove(was)
+                    setNote(outcome.note)
+                    // A refusal and a half-undo both warn. Only everything going
+                    // back reads as the plain confirmation it is.
+                    setWarn(!outcome.undone)
+                    router.refresh()
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : 'Could not put that back')
+                    setNote(null)
+                  }
+                })
+              }}
+              className="ml-2 underline hover:no-underline disabled:opacity-50 disabled:no-underline"
+            >
+              Undo
+            </button>
+          ) : null}
           {/* Inside the banner, above the canvas: an affordance that opened
               between the cards would move the tree under the cursor that just
               dropped one. */}
@@ -558,6 +624,7 @@ function Chart({
             setNote(null)
             setOffer(null)
             setWarn(false)
+            setUndo(null)
             setDragging(node.id)
           }}
           onNodeDragStop={onNodeDragStop}
