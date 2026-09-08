@@ -200,16 +200,41 @@ export async function updateStaff(id: string, formData: FormData) {
   revalidatePath('/revenue', 'layout')
 }
 
-export async function deactivateStaff(id: string) {
+/**
+ * Employment status. Both directions, because one was a trap: every list in
+ * the app reads `status = 'active'`, so a deactivation used to be a door with
+ * no handle on the other side — the row stayed in the database and nothing in
+ * the UI could bring it back.
+ *
+ * Nothing is deleted. `hr_staff_costs` is referenced by payroll, commission
+ * statements and the hierarchy, several of them ON DELETE RESTRICT, so the
+ * row has to survive; the status is what the readers filter on.
+ *
+ * `/revenue` matters as much as `/team` here: the Staff Hierarchy chart reads
+ * active staff only, so a person deactivated without it stays on the chart
+ * until the next hard reload.
+ */
+async function setEmployment(id: string, status: 'active' | 'inactive') {
   await requirePermission('team')
   const supabase = await createClient()
 
-  const { error } = await supabase
-    .from('hr_staff_costs')
-    .update({ status: 'inactive' })
-    .eq('id', id)
+  const { error } = await supabase.from('hr_staff_costs').update({ status }).eq('id', id)
 
-  if (error) throw new Error(`Failed to deactivate: ${error.message}`)
+  if (error) {
+    throw new Error(
+      `Failed to ${status === 'inactive' ? 'deactivate' : 'reactivate'}: ${error.message}`,
+    )
+  }
 
   revalidatePath('/hr-costing', 'layout')
+  revalidatePath('/team', 'layout')
+  revalidatePath('/revenue', 'layout')
+}
+
+export async function deactivateStaff(id: string) {
+  await setEmployment(id, 'inactive')
+}
+
+export async function reactivateStaff(id: string) {
+  await setEmployment(id, 'active')
 }

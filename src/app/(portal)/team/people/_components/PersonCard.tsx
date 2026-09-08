@@ -8,6 +8,7 @@ import relativeTime from 'dayjs/plugin/relativeTime'
 import PersonPermissions from '../../_components/PersonPermissions'
 import EditStaffForm from './EditStaffForm'
 import Promotion from './Promotion'
+import Employment from './Employment'
 import { isFullyCommissionBased } from '@/lib/staff-form'
 import { getPersonCard, type PersonCardData } from '../card-actions'
 
@@ -257,6 +258,15 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
                     }}
                   />
                 ) : null}
+                <Employment
+                  personId={person.staff.id}
+                  personName={person.staff.employee_name}
+                  active={person.active}
+                  onDone={() => {
+                    void load()
+                    router.refresh()
+                  }}
+                />
               </div>
             )
           ) : tab === 'permissions' ? (
