@@ -1,8 +1,15 @@
 // Creates a pending loan for UI criterion B (combined card) verification.
 import { createClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = 'https://gixpptmfuryskbwkmiwz.supabase.co'
-const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpeHBwdG1mdXJ5c2tid2ttaXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3MzgzOTAsImV4cCI6MjA5MTMxNDM5MH0.7ahinbJZ7VpxeSiOpWznmbTdc_agDQ5kNkaPqPbFe6k'
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+if (!SUPABASE_URL || !ANON_KEY) {
+  console.error(
+    '✗ Missing env vars. Expected NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local'
+  )
+  process.exit(1)
+}
 
 const client = createClient(SUPABASE_URL, ANON_KEY, { auth: { persistSession: false } })
 const { error: signInErr } = await client.auth.signInWithPassword({
