@@ -27,9 +27,10 @@ import {
   type OrgNodeInput,
 } from '@/lib/org-layout'
 import { ladderAllows, ladderRefusal } from '@/lib/ladder'
+import { boundaryRefusal } from '@/lib/hierarchy-boundary'
 import { ratePct } from '@/lib/commission/ranks'
 import type { MirrorOutcome } from '@/lib/hierarchy-mirror'
-import { setReportsTo } from '../actions'
+import { setReportsTo, undoHierarchyMove, type UndoMoveInput } from '../actions'
 import MirrorOfferPrompt, { nextOffer, offerKey, type OfferState } from './MirrorOfferPrompt'
 import type { RankOption, SalesPerson } from './HierarchyPanel'
 
@@ -39,6 +40,9 @@ export interface ChartPerson {
   code: string | null
   title: string | null
   department: string | null
+  /** True in a department the commission engine pays. The reporting line may
+   *  not cross that department's edge — `lib/hierarchy-boundary.ts`. */
+  commissionDept: boolean
   /** Where their title stands on the ladder. Null when it is not placed —
    *  the ladder then has nothing to say about them. */
   levelRank: number | null
@@ -56,10 +60,11 @@ interface CardData extends Record<string, unknown> {
   person: ChartPerson
   invalidTarget: boolean
   selected: boolean
-  dimmed: boolean
 }
 
-const ALL = '__all__'
+/** No department chosen — the whole company. Exported because the page owns
+ *  the choice now: the rail beside this canvas has to answer the same filter. */
+export const ALL_DEPARTMENTS = '__all__'
 
 /**
  * The company org canvas.
@@ -97,6 +102,11 @@ export default function TeamOrgChart(props: {
   /** The commission positions, carried only so an enrol offer can default its
    *  scheme picker to the MOVER's own. Nothing here is drawn. */
   salespeople: SalesPerson[]
+  /** The department in focus, or ALL_DEPARTMENTS. Owned by the page: the chips
+   *  filter the rail beside this canvas as well, and two copies of one choice
+   *  is how the two halves of a view drift apart. */
+  focusDept: string
+  onFocusDept: (department: string) => void
 }) {
   return (
     <ReactFlowProvider>
@@ -112,6 +122,8 @@ function Chart({
   onFocus,
   ranksByScheme,
   salespeople,
+  focusDept,
+  onFocusDept,
 }: {
   people: ChartPerson[]
   commissionHref: string | null
@@ -119,6 +131,8 @@ function Chart({
   onFocus: (staffId: string | null) => void
   ranksByScheme: Record<string, RankOption[]>
   salespeople: SalesPerson[]
+  focusDept: string
+  onFocusDept: (department: string) => void
 }) {
   const router = useRouter()
   const { getIntersectingNodes, setCenter } = useReactFlow()
@@ -136,8 +150,23 @@ function Chart({
    */
   const [offer, setOffer] = useState<OfferState | null>(null)
   const [warn, setWarn] = useState(false)
+  /**
+   * The way back from the move just made, or null.
+   *
+   * ONE move deep, and it is cleared by the next gesture rather than
+   * stacked. A chart where Undo might mean any of the last five drops is
+   * worse than one where it means exactly the drop you are still looking
+   * at — and a stack over effective-dated commission rows would let
+   * somebody walk backwards across a month boundary, where each step back
+   * writes a THIRD row rather than removing the second.
+   *
+   * Captured from the render the drop was aimed at, because after the
+   * write this page no longer holds a copy of the manager they left. The
+   * server re-reads all of it and refuses if anything moved underneath;
+   * see `lib/hierarchy-undo.ts`.
+   */
+  const [undo, setUndo] = useState<UndoMoveInput | null>(null)
   const [dragging, setDragging] = useState<string | null>(null)
-  const [focusDept, setFocusDept] = useState<string>(ALL)
   const selected = focused
 
   const byId = useMemo(() => new Map(people.map(p => [p.id, p])), [people])
@@ -157,39 +186,60 @@ function Chart({
     return [...set].sort((a, b) => a.localeCompare(b))
   }, [people])
 
+  // Focusing a department now REMOVES the rest rather than fading them (user,
+  // 2026-09-08: nobody reports across a department boundary today, so a dimmed
+  // card is a card in the way). Everything the canvas draws is derived from
+  // this list, not from `people`.
+  //
+  // Hiding somebody cannot hide a mistake: `hr_staff_reports_to_no_cycle`
+  // refuses a loop in the database whether or not the chart could see it, and
+  // a line that leaves the department is counted below rather than drawn as a
+  // person who reports to nobody.
+  const visible = useMemo(
+    () => (focusDept === ALL_DEPARTMENTS ? people : people.filter(p => p.department === focusDept)),
+    [people, focusDept],
+  )
+  const visibleIds = useMemo(() => new Set(visible.map(p => p.id)), [visible])
+
   // Sorted by department then name, so unattached people cluster with their
   // own department instead of interleaving across the top row. The label is
   // only ever used for ordering — the card draws the real one.
   const graph: OrgNodeInput[] = useMemo(
     () =>
-      people.map(p => ({
+      visible.map(p => ({
         id: p.id,
         parentId: p.reportsTo,
         label: `${p.department ?? 'zzz'} ${p.name}`,
       })),
-    [people],
+    [visible],
   )
 
   const layout = useMemo(() => layoutTree(graph), [graph])
 
   /** Everything the person being dragged may not be dropped on: their own
-   *  reports, and anybody the ladder ranks below them. */
+   *  reports, anybody the ladder ranks below them, and — since 2026-09-08 —
+   *  everybody on the other side of a commission department's edge. The
+   *  boundary is checked here as well as on the server because it is the only
+   *  one of the three with no database trigger behind it: a card that cannot
+   *  be dropped on is a rule explained before it is broken, and the server
+   *  message is what somebody gets when they got past this. */
   const forbidden = useMemo(() => {
     if (!dragging) return new Set<string>()
     const out = descendantsOf(graph, dragging)
     out.add(dragging)
     const mover = byId.get(dragging)
-    if (mover && mover.levelRank !== null) {
-      for (const p of people) {
-        if (!ladderAllows(mover.levelRank, p.levelRank)) out.add(p.id)
+    if (mover) {
+      for (const p of visible) {
+        if (mover.levelRank !== null && !ladderAllows(mover.levelRank, p.levelRank)) out.add(p.id)
+        if (p.commissionDept !== mover.commissionDept) out.add(p.id)
       }
     }
     return out
-  }, [dragging, graph, byId, people])
+  }, [dragging, graph, byId, visible])
 
   const nodes: Node<CardData>[] = useMemo(
     () =>
-      people.map(p => {
+      visible.map(p => {
         const pos = layout.positions.get(p.id)!
         return {
           id: p.id,
@@ -199,20 +249,19 @@ function Chart({
             person: p,
             invalidTarget: forbidden.has(p.id),
             selected: selected === p.id,
-            dimmed: focusDept !== ALL && p.department !== focusDept,
           },
           draggable: true,
         }
       }),
-    [people, layout, forbidden, selected, focusDept],
+    [visible, layout, forbidden, selected],
   )
 
   const edges: Edge[] = useMemo(() => {
     // A line the ladder would refuse today — drawn after the ladder changed
     // under it — is painted in the danger colour rather than hidden. The
     // trigger does not go back over old lines, so the chart has to.
-    const reporting: Edge[] = people
-      .filter(p => p.reportsTo && byId.has(p.reportsTo))
+    const reporting: Edge[] = visible
+      .filter(p => p.reportsTo && visibleIds.has(p.reportsTo))
       .map(p => {
         const manager = byId.get(p.reportsTo!)!
         const broken = !ladderAllows(p.levelRank, manager.levelRank)
@@ -229,11 +278,11 @@ function Chart({
 
     // The commission line only when it differs from the reporting line — an
     // identical dashed edge under a solid one says nothing.
-    const commission: Edge[] = people
+    const commission: Edge[] = visible
       .filter(
         p =>
           p.commUplineId &&
-          byId.has(p.commUplineId) &&
+          visibleIds.has(p.commUplineId) &&
           p.commUplineId !== p.reportsTo,
       )
       .map(p => ({
@@ -251,7 +300,7 @@ function Chart({
       }))
 
     return [...reporting, ...commission]
-  }, [people, byId])
+  }, [visible, visibleIds, byId])
 
   const move = useCallback(
     (childId: string, parentId: string | null) => {
@@ -281,14 +330,38 @@ function Chart({
           )
           return
         }
+        // `forbidden` already refuses this drop, so reaching here means the
+        // gesture arrived by some other route — the table's picker, a keyboard
+        // drop, a page held open across a department change. Said in full
+        // rather than swallowed: the same sentence the server would return.
+        const crossing = boundaryRefusal(child, parent)
+        if (crossing) {
+          setError(crossing)
+          return
+        }
       }
 
       setError(null)
       setOffer(null)
       setWarn(false)
+      setUndo(null)
+      // Both lines as the card the drop was aimed at still has them. `child`
+      // is a snapshot from that render rather than a live view, so it keeps
+      // the pre-move values even after `router.refresh()` replaces `people`.
+      const was = { reportsTo: child.reportsTo, commUplineId: child.commUplineId }
       startTransition(async () => {
         try {
           const outcome = await setReportsTo(childId, parentId)
+          // Whether the mirror ran decides how much of this an undo may put
+          // back — restoring a commission upline the move never wrote would be
+          // a NEW money decision wearing an undo button's clothes.
+          setUndo({
+            staffId: childId,
+            reportsTo: was.reportsTo,
+            commUplineId: was.commUplineId,
+            mirrored: outcome.mirrored,
+            movedTo: parentId,
+          })
           // Whatever the server attached — a detach the commission tree did not
           // follow, or a manager who is not on the ladder. Never taken for them
           // either way: the two trees hold different people, and acting on an
@@ -304,7 +377,12 @@ function Chart({
             outcome.note
               ? `${moved} ${outcome.note}`
               : outcome.mirrored
-                ? `${moved} Their commission upline moved with them.`
+                ? parentId
+                  ? `${moved} Their commission upline moved with them.`
+                  // A detach inside a commission department clears the
+                  // commission upline too, and that is a MONEY change: said in
+                  // full, because "moved with them" would understate it.
+                  : `${moved} Their commission upline was cleared with them, so nobody earns an override on their sales now.`
                 : moved,
           )
           router.refresh()
@@ -328,6 +406,11 @@ function Chart({
       setError(null)
       setNote(outcome.note)
       setWarn(!outcome.mirrored)
+      // Accepting an offer writes the commission half the move could not, so
+      // the snapshot taken before that move no longer describes what is there.
+      // Undoing on the strength of it would put the reporting line back and
+      // leave the override pointing at the new manager, reported as a success.
+      setUndo(null)
       setOffer(current => {
         if (!current) return null
         const next = nextOffer(current.offer, outcome)
@@ -376,16 +459,23 @@ function Chart({
 
   const nodeTypes = useMemo(() => ({ person: PersonCard }), [])
 
-  const unplaced = people.filter(p => !p.reportsTo).length
-  const crossed = people.filter(
-    p => p.commUplineId && p.commUplineId !== p.reportsTo && byId.has(p.commUplineId),
+  // Every count describes the canvas, not the company — a line that says
+  // "9 people" over a chart showing 3 is worse than no line at all.
+  const unplaced = visible.filter(p => !p.reportsTo).length
+  const crossed = visible.filter(
+    p => p.commUplineId && p.commUplineId !== p.reportsTo && visibleIds.has(p.commUplineId),
   ).length
-  const broken = people.filter(
+  const broken = visible.filter(
     p =>
       p.reportsTo &&
       byId.has(p.reportsTo) &&
       !ladderAllows(p.levelRank, byId.get(p.reportsTo)!.levelRank),
   ).length
+  const hidden = people.length - visible.length
+  // Reports to somebody outside the focused department. None today, which is
+  // why filtering is safe at all — but drawn as a root and left uncounted it
+  // would read as "reports to nobody", which is a different fact.
+  const outside = visible.filter(p => p.reportsTo && !visibleIds.has(p.reportsTo)).length
 
   return (
     <div>
@@ -406,6 +496,36 @@ function Chart({
           }`}
         >
           {error ? null : note}
+          {undo && !error ? (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                const was = undo
+                // Cleared first: a second click is a second move forward, not a
+                // second undo, and the button is gone before it can be pressed.
+                setUndo(null)
+                setError(null)
+                setOffer(null)
+                startTransition(async () => {
+                  try {
+                    const outcome = await undoHierarchyMove(was)
+                    setNote(outcome.note)
+                    // A refusal and a half-undo both warn. Only everything going
+                    // back reads as the plain confirmation it is.
+                    setWarn(!outcome.undone)
+                    router.refresh()
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : 'Could not put that back')
+                    setNote(null)
+                  }
+                })
+              }}
+              className="ml-2 underline hover:no-underline disabled:opacity-50 disabled:no-underline"
+            >
+              Undo
+            </button>
+          ) : null}
           {/* Inside the banner, above the canvas: an affordance that opened
               between the cards would move the tree under the cursor that just
               dropped one. */}
@@ -428,10 +548,10 @@ function Chart({
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <button
           type="button"
-          onClick={() => setFocusDept(ALL)}
-          aria-pressed={focusDept === ALL}
+          onClick={() => onFocusDept(ALL_DEPARTMENTS)}
+          aria-pressed={focusDept === ALL_DEPARTMENTS}
           className={`font-serif italic text-sm px-3 py-1.5 rounded-control border transition-colors ${
-            focusDept === ALL
+            focusDept === ALL_DEPARTMENTS
               ? 'bg-accent border-accent text-white'
               : 'bg-surface border-hairline text-graphite hover:bg-surface-2'
           }`}
@@ -444,7 +564,7 @@ function Chart({
             <button
               key={d}
               type="button"
-              onClick={() => setFocusDept(active ? ALL : d)}
+              onClick={() => onFocusDept(active ? ALL_DEPARTMENTS : d)}
               aria-pressed={active}
               className={`font-serif italic text-sm px-3 py-1.5 rounded-control border transition-colors ${
                 active
@@ -460,8 +580,15 @@ function Chart({
 
       <div className="flex flex-wrap items-center gap-4 mb-3">
         <p className="font-serif italic text-muted text-xs">
-          {people.length} people · {layout.roots.length} tree
+          {visible.length} people · {layout.roots.length} tree
           {layout.roots.length === 1 ? '' : 's'} · {unplaced} reporting to nobody
+          {outside > 0 ? (
+            <span className="text-alert">
+              {' '}
+              · {outside} {outside === 1 ? 'reports' : 'report'} outside {focusDept}
+            </span>
+          ) : null}
+          {hidden > 0 ? ` · ${hidden} in other departments` : ''}
           {broken > 0 ? (
             <span className="text-danger">
               {' '}
@@ -497,6 +624,7 @@ function Chart({
             setNote(null)
             setOffer(null)
             setWarn(false)
+            setUndo(null)
             setDragging(node.id)
           }}
           onNodeDragStop={onNodeDragStop}
@@ -579,7 +707,7 @@ function Chart({
 }
 
 function PersonCard({ data }: NodeProps<Node<CardData>>) {
-  const { person, invalidTarget, selected, dimmed } = data
+  const { person, invalidTarget, selected } = data
 
   return (
     <div
@@ -591,7 +719,6 @@ function PersonCard({ data }: NodeProps<Node<CardData>>) {
           : selected
             ? 'border-accent bg-surface shadow-sm'
             : 'border-hairline bg-surface hover:border-accent-border',
-        dimmed && !invalidTarget ? 'opacity-35' : '',
       ].join(' ')}
     >
       <Handle type="target" position={Position.Top} className="!bg-[rgb(var(--accent))] !w-2 !h-2" />

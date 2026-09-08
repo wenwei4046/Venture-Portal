@@ -19,6 +19,8 @@ import {
   writeReportsTo,
   type OpenPosition,
 } from '@/lib/hierarchy-writes'
+import { boundaryRefusal } from '@/lib/hierarchy-boundary'
+import { undoPlan, type PriorLine } from '@/lib/hierarchy-undo'
 import { titleCanRecruit } from '@/lib/commission/titles'
 import { setPosition } from '../../revenue/hierarchy-actions'
 
@@ -49,6 +51,12 @@ import { setPosition } from '../../revenue/hierarchy-actions'
  *
  * The canvas refuses an illegal move before calling this, and the database
  * trigger refuses it again. This layer's job is the round trip and the message.
+ *
+ * With ONE exception, added 2026-09-08: the department boundary
+ * (`lib/hierarchy-boundary.ts`) has no trigger behind it. The canvas hides the
+ * move and this check is the only thing that refuses it, so it runs before the
+ * write rather than after — a reporting line that has already crossed cannot be
+ * un-crossed without knowing what it used to be.
  */
 export async function setReportsTo(
   staffId: string,
@@ -63,10 +71,30 @@ export async function setReportsTo(
 
   const supabase = await createClient()
 
+  // Both people are read from the roster rather than trusted from the client:
+  // the department is what the refusal turns on, and a page held open while
+  // somebody was moved between departments would otherwise decide on a stale
+  // one. The mover is read even for a detach, because a detach still has to
+  // prove the mover exists before `writeReportsTo` reports a row it cannot find
+  // as "could not move them".
+  const roster = await loadStaff(supabase, [staffId, reportsToId])
+  const mover = roster.get(staffId)
+  if (!mover) throw new Error('That person is no longer on the roster')
+  const manager = reportsToId ? (roster.get(reportsToId) ?? null) : null
+  if (reportsToId && !manager) throw new Error('That manager is no longer on the roster')
+
+  const refusal = boundaryRefusal(mover, manager)
+  if (refusal) throw new Error(refusal)
+
   await writeReportsTo(supabase, staffId, reportsToId)
 
   const outcome = await mirrorToCommission(supabase, user.id, staffId, reportsToId, {
     mayWriteRevenue: canAccessRevenue(user),
+    // Inside a commission department the two lines are one graph, so a detach
+    // here clears the commission upline too rather than being reported as a
+    // half-move. The boundary check above is what makes this safe to assume of
+    // the target as well: it cannot be outside.
+    oneGraph: mover.commissionDept,
   })
 
   revalidatePath('/team', 'layout')
@@ -92,7 +120,7 @@ async function mirrorToCommission(
   userId: string,
   staffId: string,
   reportsToId: string | null,
-  opts: { mayWriteRevenue: boolean },
+  opts: { mayWriteRevenue: boolean; oneGraph?: boolean },
 ): Promise<MirrorOutcome> {
   let positions: Map<string, OpenPosition>
   try {
@@ -137,6 +165,7 @@ async function mirrorToCommission(
     targetId: reportsToId,
     onCommission,
     mayWriteOther: opts.mayWriteRevenue,
+    oneGraph: opts.oneGraph,
     otherName: 'commission upline',
     targetName: reportsToId !== null ? named?.name : null,
     currentOtherUpline: reportsToId === null ? named : null,
@@ -239,6 +268,11 @@ interface StaffRow {
   status: string | null
   reports_to: string | null
   title_id: string | null
+  /** PostgREST returns an embed as an object or a one-element array. Both. */
+  departments:
+    | { name: string; payroll_source: string }
+    | Array<{ name: string; payroll_source: string }>
+    | null
 }
 
 /** What the roster knows about somebody these actions have to name or trust. */
@@ -254,6 +288,14 @@ interface StaffFacts {
    * rule `setPosition` and `movePositionUpline` both apply.
    */
   titleId: string | null
+  /** Where they work, for a sentence. Null is a real state, not a read failure. */
+  department: string | null
+  /**
+   * True in a department the commission engine pays. The one fact
+   * `lib/hierarchy-boundary.ts` decides on: inside such a department the
+   * reporting line is also the commission upline, so it may not leave.
+   */
+  commissionDept: boolean
 }
 
 async function loadStaff(
@@ -265,21 +307,26 @@ async function loadStaff(
 
   const { data, error } = await supabase
     .from('hr_staff_costs')
-    .select('id, employee_name, status, reports_to, title_id')
+    .select('id, employee_name, status, reports_to, title_id, departments (name, payroll_source)')
     .in('id', wanted)
   if (error) throw new Error(`Could not read the roster: ${error.message}`)
 
   return new Map(
-    ((data ?? []) as unknown as StaffRow[]).map(r => [
-      r.id,
-      {
-        id: r.id,
-        name: r.employee_name,
-        active: r.status === 'active',
-        reportsTo: r.reports_to,
-        titleId: r.title_id,
-      },
-    ]),
+    ((data ?? []) as unknown as StaffRow[]).map(r => {
+      const dept = Array.isArray(r.departments) ? (r.departments[0] ?? null) : r.departments
+      return [
+        r.id,
+        {
+          id: r.id,
+          name: r.employee_name,
+          active: r.status === 'active',
+          reportsTo: r.reports_to,
+          titleId: r.title_id,
+          department: dept?.name ?? null,
+          commissionDept: dept?.payroll_source === 'commission',
+        },
+      ]
+    }),
   )
 }
 
@@ -450,6 +497,16 @@ export async function enrolAndCompleteMove(
     }
   }
 
+  // The department boundary, checked a second time and not redundantly.
+  // `setReportsTo` stops a crossing line from being DRAWN, so no offer to enrol
+  // across one can be produced any more — but this action is exported, and a
+  // line drawn before the rule existed is still sitting in the roster waiting
+  // to be completed. Enrolling on the strength of one is exactly the bug the
+  // rule was written for: the manager would earn the override, and the Revenue
+  // chart would not show them.
+  const refusal = boundaryRefusal(mover, manager)
+  if (refusal) return { mirrored: false, note: `${refusal} Nothing was changed.` }
+
   const before = await loadOpenPositions(supabase)
 
   const moverPosition = before.get(moverId)
@@ -560,6 +617,7 @@ export async function enrolAndCompleteMove(
   // the next time anything touches their position.
   const outcome = await mirrorToCommission(supabase, user.id, moverId, mover.reportsTo, {
     mayWriteRevenue: true,
+    oneGraph: mover.commissionDept,
   })
 
   revalidatePath('/team', 'layout')
@@ -664,4 +722,182 @@ export async function detachCommissionUpline(staffId: string): Promise<MirrorOut
     mirrored: true,
     note: `${person} no longer earns under ${upline} — their commission upline is clear from this month on. Months already run keep the chart they were run against.`,
   }
+}
+
+/* ------------------------------------------------------------------ *
+ * Putting one move back
+ *
+ * The user asked for this the moment the chart became draggable
+ * (2026-09-07: "i lowkey need an undo button when theres graph ui
+ * involved"), and the reason is the gesture rather than the feature: a drop
+ * onto the wrong card is one pixel away from a drop onto the right one, and
+ * until now the only way back was to remember who the manager used to be.
+ *
+ * It is deliberately NOT a general undo. The rules it obeys are in
+ * `lib/hierarchy-undo.ts`; what matters here is that this action re-reads
+ * everything and refuses rather than forces. The values it is handed came
+ * from a browser and are a claim about the past, never evidence about the
+ * present.
+ * ------------------------------------------------------------------ */
+
+/** What the chart remembered before it moved somebody. Every field is re-checked. */
+export interface UndoMoveInput {
+  staffId: string
+  /** The reporting line to put back. Null = they were at the top. */
+  reportsTo: string | null
+  /** The commission upline to put back. */
+  commUplineId: string | null
+  /** Did that move's mirror write the commission upline? From its outcome. */
+  mirrored: boolean
+  /** What the move set the reporting line TO. The staleness check reads this. */
+  movedTo: string | null
+}
+
+/**
+ * What an undo did.
+ *
+ * Its own type rather than a borrowed `MirrorOutcome`, because the two say
+ * different things with the same word. A mirror's `mirrored: false` can mean
+ * "there was nothing to mirror", which is a success; an undo has to be able to
+ * say "some of that did not go back", which never is. The note is never null —
+ * somebody pressed a button and is owed a sentence about what happened.
+ */
+export interface UndoOutcome {
+  /** True only when everything that move changed has been put back. */
+  undone: boolean
+  note: string
+}
+
+export async function undoHierarchyMove(input: UndoMoveInput): Promise<UndoOutcome> {
+  // The same gate as the move itself. An undo is not a smaller permission than
+  // the thing it reverses — it writes the same column.
+  const user = await requirePermission('team')
+
+  const staffId = input.staffId?.trim() ?? ''
+  if (!staffId) throw new Error('Which person?')
+  if (input.reportsTo === staffId) throw new Error('Somebody cannot report to themselves')
+
+  const supabase = await createClient()
+
+  const roster = await loadStaff(supabase, [staffId, input.reportsTo])
+  const mover = roster.get(staffId)
+  if (!mover) throw new Error('That person is no longer on the roster')
+
+  // The position is read before the plan, not after: whether they still hold
+  // one is one of the facts the plan turns on.
+  let positions: Map<string, OpenPosition>
+  try {
+    positions = await loadOpenPositions(supabase)
+  } catch (e) {
+    return {
+      undone: false,
+      note: `The commission positions could not be read, so it is not safe to put that move back — half of it would go and half would not. ${reasonOf(e)}`,
+    }
+  }
+  const position = positions.get(staffId)
+
+  const prior: PriorLine = {
+    staffId,
+    // Read, not taken from the client. The name goes into a sentence somebody
+    // acts on, and this action is an exported RPC like any other.
+    staffName: mover.name,
+    reportsTo: input.reportsTo,
+    commUplineId: input.commUplineId,
+    mirrored: input.mirrored,
+    movedTo: input.movedTo,
+  }
+
+  const plan = undoPlan(prior, {
+    reportsTo: mover.reportsTo,
+    hasPosition: !!position,
+    commUplineId: position?.uplineStaffId ?? null,
+  })
+
+  if (plan.kind === 'refuse') return { undone: false, note: plan.note }
+
+  // The manager they are going back to has to still exist, and the line has to
+  // still be legal. A department boundary has no trigger behind it, so a
+  // manager moved out of the commission department since the original move
+  // would let the undo draw exactly the line `boundaryRefusal` exists to stop.
+  let manager: StaffFacts | null = null
+  if (plan.reportsTo) {
+    manager = roster.get(plan.reportsTo) ?? null
+    if (!manager) {
+      return {
+        undone: false,
+        note: `${mover.name}'s previous manager is no longer on the roster, so there is nothing to put them back under. Nothing was changed.`,
+      }
+    }
+    const crossing = boundaryRefusal(mover, manager)
+    if (crossing) return { undone: false, note: `${crossing} Nothing was changed.` }
+  }
+
+  try {
+    await writeReportsTo(supabase, staffId, plan.reportsTo)
+  } catch (e) {
+    if (isControlFlow(e)) throw e
+    // Nothing has committed yet, so this is a clean refusal — the ladder
+    // trigger, a cycle, or a row that went away. Returned rather than thrown so
+    // the reason survives Next's production redaction.
+    return {
+      undone: false,
+      note: `${mover.name} could not be put back: ${reasonOf(e)} Nothing was changed.`,
+    }
+  }
+
+  const back = plan.reportsTo
+    ? `${mover.name} reports to ${manager!.name} again.`
+    : `${mover.name} reports to nobody again.`
+
+  if (plan.commission === 'leave') {
+    await revalidateHierarchy()
+    return { undone: true, note: plan.note ? `${back} ${plan.note}` : back }
+  }
+
+  // The commission half. Gated on `revenue` and not on this page's `team` for
+  // the reason every other write to `comm_hierarchy` is: it is money, and the
+  // two permissions sharing an RLS scope is a coincidence of the catalogue
+  // rather than a licence. From here on the reporting line is already
+  // committed, so every failure is REPORTED and none is thrown.
+  if (!canAccessRevenue(user)) {
+    await revalidateHierarchy()
+    return {
+      undone: false,
+      note: `${back} Their commission upline was left where the move put it — that needs Revenue access, so somebody who has it will have to put it back on the Revenue chart.`,
+    }
+  }
+
+  const target = plan.commUplineId ? positions.get(plan.commUplineId) : null
+  if (plan.commUplineId && (!target || target.schemeId !== position!.schemeId)) {
+    await revalidateHierarchy()
+    return {
+      undone: false,
+      note: `${back} Their commission upline was left where the move put it — the manager it would go back to ${target ? 'earns under a different sub-department’s scheme' : 'holds no commission position any more'}.`,
+    }
+  }
+
+  try {
+    await movePositionUpline(supabase, user.id, position!, plan.commUplineId)
+  } catch (e) {
+    if (isControlFlow(e)) throw e
+    await revalidateHierarchy()
+    return {
+      undone: false,
+      note: `${back} Their commission upline could not be put back: ${reasonOf(e)} The two lines disagree until somebody fixes it on the Revenue chart.`,
+    }
+  }
+
+  await revalidateHierarchy()
+  return {
+    undone: true,
+    note: plan.commUplineId
+      ? `${back} Their commission upline went back with them.`
+      : `${back} Their commission upline is clear again, so nobody earns an override on their sales.`,
+  }
+}
+
+/** Both charts draw both lines, so both are stale after either half moves. */
+async function revalidateHierarchy(): Promise<void> {
+  revalidatePath('/team', 'layout')
+  revalidatePath('/revenue', 'layout')
 }

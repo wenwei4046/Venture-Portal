@@ -192,11 +192,34 @@ export async function applyInfotechStaffImport(
 
   const { data: departments } = await supabase
     .from('departments')
-    .select('id, name')
+    .select('id, name, payroll_source')
     .eq('is_internal', false)
   const deptByName = new Map(
     (departments ?? []).map(d => [d.name.toLowerCase(), d.id]),
   )
+  const commissionDepts = new Set(
+    (departments ?? [])
+      .filter(d => (d as { payroll_source?: string }).payroll_source === 'commission')
+      .map(d => d.id),
+  )
+
+  // Everybody's reporting line, read once.
+  //
+  // This import is the only bulk writer of `department_id`, and it does not
+  // touch `reports_to` at all — so it is the one path that can leave a line
+  // crossing a commission department's edge WITHOUT ever drawing a line. The
+  // rule is in `lib/hierarchy-boundary.ts`; the check below refuses the row
+  // rather than clearing somebody's manager on InfoTech's say-so.
+  //
+  // Neither `hr_staff_costs` trigger fires on a department-only UPDATE (both
+  // are `UPDATE OF reports_to, title_id`), so there is no backstop under this.
+  const { data: lines } = await supabase.from('hr_staff_costs').select('id, reports_to')
+  const managerOf = new Map<string, string | null>()
+  const hasReports = new Set<string>()
+  for (const line of (lines ?? []) as Array<{ id: string; reports_to: string | null }>) {
+    managerOf.set(line.id, line.reports_to)
+    if (line.reports_to) hasReports.add(line.reports_to)
+  }
 
   let created = 0
   let updated = 0
@@ -253,6 +276,25 @@ export async function applyInfotechStaffImport(
         rowIndex: pending.rowIndex,
         employee_code: src.employeeCode,
         reason: 'department disappeared between preview and apply',
+      })
+      continue
+    }
+
+    // A department change that crosses the commission edge, for somebody who
+    // is attached to the reporting tree. `changes` carries the department ids
+    // themselves — `compare('department', current.department_id, deptId)` —
+    // so the old side is read straight off the preview.
+    const deptChange = pending.changes.find(c => c.field === 'department')
+    if (
+      deptChange &&
+      commissionDepts.has(deptChange.from) !== commissionDepts.has(deptId) &&
+      (managerOf.get(pending.staffId) || hasReports.has(pending.staffId))
+    ) {
+      failed.push({
+        rowIndex: pending.rowIndex,
+        employee_code: src.employeeCode,
+        reason:
+          'their department change crosses a commission department’s edge while they are still on the reporting tree — inside such a department the reporting line is also the commission upline, so clear their line on Staff Hierarchy first and re-run this row',
       })
       continue
     }

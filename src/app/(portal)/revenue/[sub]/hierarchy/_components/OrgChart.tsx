@@ -230,7 +230,9 @@ function Chart({
             outcome.note
               ? `${moved} ${outcome.note}`
               : outcome.mirrored
-                ? `${moved} Their reporting line moved with them.`
+                ? parentId
+                  ? `${moved} Their reporting line moved with them.`
+                  : `${moved} Their reporting line was cleared with them.`
                 : moved,
           )
           router.refresh()

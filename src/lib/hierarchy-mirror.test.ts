@@ -217,6 +217,65 @@ describe('mirrorDecision — the detach offer', () => {
   })
 })
 
+describe('mirrorDecision — one graph, inside a commission department', () => {
+  // The user's ruling on 2026-09-08: where the commission engine pays, the
+  // reporting line IS the commission upline. `lib/hierarchy-boundary.ts` keeps
+  // it that way by refusing any reporting line that leaves the department, and
+  // `oneGraph` is how a caller says it is looking at that graph.
+
+  it('MIRRORS a detach instead of refusing it', () => {
+    // The refusal above exists because the two charts hold different people.
+    // Here they hold the same ones, so an absence on one is the same fact, not
+    // evidence about a different one. Leaving somebody detached on the org
+    // chart while they still pay override to the manager they just left is the
+    // exact drift the double write exists to kill.
+    expect(mirrorDecision(ctx({ targetId: null, oneGraph: true }))).toEqual({ kind: 'mirror' })
+  })
+
+  it('still skips that detach when the actor may not write the other table', () => {
+    // The exemption is about evidence, not about permission. A `team`-only
+    // account has no more right to clear a commission upline here than
+    // anywhere else, and the skip has to SAY so.
+    const d = mirrorDecision(ctx({ targetId: null, oneGraph: true, mayWriteOther: false }))
+    expect(d.kind).toBe('skip')
+    if (d.kind !== 'skip') throw new Error('unreachable')
+    expect(d.note).toContain('permission')
+    // No offer: the reader could not accept one.
+    expect(d.offer).toBeUndefined()
+  })
+
+  it('is still a no-op for a detach by somebody not on commission', () => {
+    // Membership comes first, exemption or no exemption. There is no position
+    // to clear, so there is nothing to mirror and nothing to say.
+    expect(mirrorDecision(ctx({ staffId: 'dave', targetId: null, oneGraph: true }))).toEqual({
+      kind: 'noop',
+    })
+  })
+
+  it('still refuses a move onto somebody who holds no position, and still offers to enrol them', () => {
+    // One graph does not mean everybody is on the ladder. A manager with no
+    // position has nowhere for the override to land, so the refusal and its
+    // way out are unchanged.
+    const d = mirrorDecision(
+      ctx({ targetId: 'dave', targetName: 'Dave', oneGraph: true }),
+    )
+    expect(d.kind).toBe('skip')
+    if (d.kind !== 'skip') throw new Error('unreachable')
+    expect(d.offer).toEqual({ kind: 'enrol', staffId: 'dave', staffName: 'Dave' })
+  })
+
+  it('leaves an ordinary move between two position-holders exactly as it was', () => {
+    expect(mirrorDecision(ctx({ oneGraph: true }))).toEqual({ kind: 'mirror' })
+  })
+
+  it('changes nothing when it is absent, so every caller outside a commission department is untouched', () => {
+    const withFlag = mirrorDecision(ctx({ targetId: null, oneGraph: false }))
+    const without = mirrorDecision(ctx({ targetId: null }))
+    expect(withFlag).toEqual(without)
+    expect(without.kind).toBe('skip')
+  })
+})
+
 describe('MIRRORED_NOTHING', () => {
   it('reports nothing written and nothing to say', () => {
     expect(MIRRORED_NOTHING).toEqual({ mirrored: false, note: null })

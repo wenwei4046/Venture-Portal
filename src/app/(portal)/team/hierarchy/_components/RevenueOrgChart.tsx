@@ -18,8 +18,40 @@ import '@xyflow/react/dist/style.css'
 import { layoutTree, NODE_HEIGHT, NODE_WIDTH, type OrgNodeInput } from '@/lib/org-layout'
 import type { SalesPerson } from './HierarchyPanel'
 
+/**
+ * Somebody in a commission department who holds NO open position.
+ *
+ * Drawn here rather than left out (2026-09-08). The user's rule is that in such
+ * a department the reporting chart and the commission chart hold the SAME
+ * people; this chart used to hold only position-holders, so anybody not yet on
+ * the ladder simply was not on it — and their absence looked identical to their
+ * not existing. It is a real, fixable state, and it needs a card to sit on.
+ */
+export interface UnplacedPerson {
+  staffId: string
+  name: string
+  department: string | null
+}
+
+/**
+ * One card's worth, whichever list it came from.
+ *
+ * The two inputs are merged before anything is laid out, because the tree, the
+ * edges and the counts all have to see the same set. `placed` is what the card
+ * prints and what the footer counts; everything else is null for somebody with
+ * no position, which is the truth rather than a placeholder.
+ */
+interface Drawn {
+  staffId: string
+  name: string
+  uplineStaffId: string | null
+  rankLabel: string | null
+  rateLabel: string | null
+  placed: boolean
+}
+
 interface CardData extends Record<string, unknown> {
-  person: SalesPerson
+  person: Drawn
   selected: boolean
 }
 
@@ -39,9 +71,15 @@ interface CardData extends Record<string, unknown> {
  */
 export default function RevenueOrgChart(props: {
   salespeople: SalesPerson[]
+  /** People in this department who hold no position yet. Drawn as roots. */
+  unplaced: UnplacedPerson[]
   focused: string | null
   onFocus: (staffId: string | null) => void
   commissionHref: string | null
+  /** The department the list was filtered to, when it was. An empty rail means
+   *  two different things — nobody is enrolled at all, or nobody in THIS
+   *  department is — and only one of them is a thing to go and fix. */
+  scope?: string | null
 }) {
   return (
     <ReactFlowProvider>
@@ -52,16 +90,45 @@ export default function RevenueOrgChart(props: {
 
 function Chart({
   salespeople,
+  unplaced,
   focused,
   onFocus,
   commissionHref,
+  scope,
 }: {
   salespeople: SalesPerson[]
+  unplaced: UnplacedPerson[]
   focused: string | null
   onFocus: (staffId: string | null) => void
   commissionHref: string | null
+  scope?: string | null
 }) {
   const { setCenter } = useReactFlow()
+
+  // One list, sorted once. An unplaced person carries a null upline, so the
+  // walk below makes them a root without needing to know they are different.
+  const drawn: Drawn[] = useMemo(
+    () =>
+      [
+        ...salespeople.map(s => ({
+          staffId: s.staffId,
+          name: s.name,
+          uplineStaffId: s.uplineStaffId,
+          rankLabel: s.rankLabel,
+          rateLabel: s.rateLabel,
+          placed: true,
+        })),
+        ...unplaced.map(u => ({
+          staffId: u.staffId,
+          name: u.name,
+          uplineStaffId: null,
+          rankLabel: null,
+          rateLabel: null,
+          placed: false,
+        })),
+      ].sort((a, b) => a.name.localeCompare(b.name)),
+    [salespeople, unplaced],
+  )
 
   // The tree, resolved to one parent per person before it is drawn.
   //
@@ -74,10 +141,10 @@ function Chart({
   // and a person missing from THIS chart is a commission position nobody is
   // looking at.
   const graph: OrgNodeInput[] = useMemo(() => {
-    const known = new Set(salespeople.map(s => s.staffId))
-    const children = new Map<string, SalesPerson[]>()
-    const roots: SalesPerson[] = []
-    for (const s of salespeople) {
+    const known = new Set(drawn.map(s => s.staffId))
+    const children = new Map<string, Drawn[]>()
+    const roots: Drawn[] = []
+    for (const s of drawn) {
       if (s.uplineStaffId && s.uplineStaffId !== s.staffId && known.has(s.uplineStaffId)) {
         const list = children.get(s.uplineStaffId)
         if (list) list.push(s)
@@ -89,7 +156,7 @@ function Chart({
 
     const parentOf = new Map<string, string | null>()
     const seen = new Set<string>()
-    const walk = (list: SalesPerson[], parent: string | null) => {
+    const walk = (list: Drawn[], parent: string | null) => {
       for (const person of list) {
         if (seen.has(person.staffId)) continue
         seen.add(person.staffId)
@@ -98,20 +165,20 @@ function Chart({
       }
     }
     walk(roots, null)
-    for (const s of salespeople) if (!seen.has(s.staffId)) parentOf.set(s.staffId, null)
+    for (const s of drawn) if (!seen.has(s.staffId)) parentOf.set(s.staffId, null)
 
-    return salespeople.map(s => ({
+    return drawn.map(s => ({
       id: s.staffId,
       parentId: parentOf.get(s.staffId) ?? null,
       label: s.name,
     }))
-  }, [salespeople])
+  }, [drawn])
 
   const layout = useMemo(() => layoutTree(graph), [graph])
 
   const nodes: Node<CardData>[] = useMemo(
     () =>
-      salespeople.map(p => {
+      drawn.map(p => {
         const pos = layout.positions.get(p.staffId)!
         return {
           id: p.staffId,
@@ -121,7 +188,7 @@ function Chart({
           draggable: false,
         }
       }),
-    [salespeople, layout, focused],
+    [drawn, layout, focused],
   )
 
   // Dashed, the same dash the staff canvas draws its commission line in: one
@@ -178,12 +245,14 @@ function Chart({
     </div>
   ) : null
 
-  if (salespeople.length === 0) {
+  if (drawn.length === 0) {
     return (
       <div>
         <div className="py-10 px-4 text-center border border-hairline rounded-card bg-surface">
           <p className="font-serif italic text-muted text-sm">
-            Nobody is on the commission ladder yet.
+            {scope
+              ? `There is nobody in ${scope} to draw.`
+              : 'Nobody is on the commission ladder yet.'}
           </p>
         </div>
         {link}
@@ -196,6 +265,13 @@ function Chart({
       <p className="font-mono text-mono-xs text-muted mb-2">
         {salespeople.length} ON COMMISSION · {layout.roots.length} TREE
         {layout.roots.length === 1 ? '' : 'S'}
+        {/* Said out loud rather than left as a shorter chart. Somebody in a
+            commission department with no position earns nobody an override and
+            gives nobody one, and that is a thing to go and fix — not a person
+            to leave off. */}
+        {unplaced.length > 0 ? (
+          <span className="text-alert"> · {unplaced.length} NOT ON THE LADDER</span>
+        ) : null}
       </p>
 
       <div
@@ -279,7 +355,15 @@ function SalesCard({ data }: NodeProps<Node<CardData>>) {
             {person.rateLabel ? ` · ${person.rateLabel}` : ''}
           </span>
         </div>
-      ) : null}
+      ) : person.placed ? null : (
+        /* No rank chip and no rate, because there is no position — but the
+           card still has to say WHICH of the two silences this is. A blank
+           card reads as "the rate is hidden from this account"; this one says
+           the person is not on the ladder at all. */
+        <div className="mt-1.5">
+          <span className="chip">not on the ladder</span>
+        </div>
+      )}
 
       <Handle
         type="source"

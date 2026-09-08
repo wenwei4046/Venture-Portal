@@ -9,6 +9,7 @@ import HierarchyView from './_components/HierarchyView'
 import type { ChartPerson } from './_components/TeamOrgChart'
 import type { BoardTitle } from './_components/LevelsBoard'
 import type { SalesPerson, RankOption } from './_components/HierarchyPanel'
+import type { UnplacedPerson } from './_components/RevenueOrgChart'
 
 /**
  * Hierarchy: the company org chart, and everything that governs it, on one
@@ -54,7 +55,7 @@ export default async function TeamHierarchyPage() {
       supabase
         .from('hr_staff_costs')
         .select(
-          'id, employee_name, employee_code, reports_to, designation, title_id, titles(name, level_id), departments(name)',
+          'id, employee_name, employee_code, reports_to, designation, title_id, titles(name, level_id), departments(name, payroll_source)',
         )
         .eq('status', 'active')
         .order('employee_name'),
@@ -107,7 +108,7 @@ export default async function TeamHierarchyPage() {
     designation: string | null
     title_id: string | null
     titles: { name: string; level_id: string | null } | null
-    departments: { name: string } | null
+    departments: { name: string; payroll_source: string } | null
   }>
 
   const people: ChartPerson[] = staff.map(s => {
@@ -119,6 +120,9 @@ export default async function TeamHierarchyPage() {
       code: s.employee_code,
       title: s.titles?.name ?? s.designation ?? null,
       department: s.departments?.name ?? null,
+      // The one department fact the chart decides on rather than merely prints:
+      // a reporting line may not cross the edge of a commission department.
+      commissionDept: s.departments?.payroll_source === 'commission',
       levelRank: rung?.rank ?? null,
       levelName: rung?.name ?? null,
       reportsTo: s.reports_to,
@@ -134,6 +138,7 @@ export default async function TeamHierarchyPage() {
   // in their own shape, so the aside is a second hierarchy rather than the same
   // one filtered.
   const nameOf = new Map(staff.map(s => [s.id, s.employee_name]))
+  const deptOf = new Map(staff.map(s => [s.id, s.departments?.name ?? null]))
   const salespeople: SalesPerson[] = positionRows
     .filter(p => nameOf.has(p.staff_id))
     .map(p => {
@@ -141,6 +146,7 @@ export default async function TeamHierarchyPage() {
       return {
         staffId: p.staff_id,
         name: nameOf.get(p.staff_id)!,
+        department: deptOf.get(p.staff_id) ?? null,
         uplineStaffId: p.upline_staff_id,
         rankId: p.rank_id,
         rankLabel: seesMoney ? (rank?.label ?? null) : null,
@@ -148,6 +154,25 @@ export default async function TeamHierarchyPage() {
         schemeId: p.scheme_id,
       }
     })
+    .sort((a, b) => a.name.localeCompare(b.name))
+
+  // People in a commission department holding no open position.
+  //
+  // The user's rule (2026-09-08) is that inside such a department the two
+  // charts hold the SAME people. The rail used to be built from position rows
+  // alone, so anybody not yet on the ladder was simply absent from it — and an
+  // absence there is indistinguishable from not existing, while the Revenue
+  // chart has always drawn them. They are drawn and counted now; enrolling them
+  // stays a deliberate act, because a position needs a rank and `rank_id` is
+  // NOT NULL, so there is no rank to invent for somebody with no title on the
+  // scheme's ladder.
+  const unplaced: UnplacedPerson[] = staff
+    .filter(s => s.departments?.payroll_source === 'commission' && !position.has(s.id))
+    .map(s => ({
+      staffId: s.id,
+      name: s.employee_name,
+      department: s.departments?.name ?? null,
+    }))
     .sort((a, b) => a.name.localeCompare(b.name))
 
   // The rank a table cell may pick from. Scoped per scheme because a rank is a
@@ -218,6 +243,7 @@ export default async function TeamHierarchyPage() {
       titles={boardTitles}
       breaks={breaks}
       salespeople={salespeople}
+      unplaced={unplaced}
       ranksByScheme={ranksByScheme}
       canSetRank={seesMoney}
     />
