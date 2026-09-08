@@ -12,8 +12,8 @@ State: React hooks (no Redux)
 Environment Variables
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://gixpptmfuryskbwkmiwz.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpeHBwdG1mdXJ5c2tid2ttaXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3MzgzOTAsImV4cCI6MjA5MTMxNDM5MH0.7ahinbJZ7VpxeSiOpWznmbTdc_agDQ5kNkaPqPbFe6k>
-SUPABASE_SERVICE_ROLE_KEY=<eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpeHBwdG1mdXJ5c2tid2ttaXd6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTczODM5MCwiZXhwIjoyMDkxMzE0MzkwfQ.evFBJixWz9d3-shRC08X6Rg_3Fviw2AGxvPhIz85pGU>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon / publishable key. Safe to ship to browsers — RLS is what protects the data, not this key. Real value in .env.local and Vercel>
+SUPABASE_SERVICE_ROLE_KEY=<secret key, sb_secret_… . BYPASSES RLS. Never commit it and never paste it into a script — read it from env. Real value in .env.local, in Vercel, and as a Cloudflare Worker secret of the same name>
 ERP_SYNC_SECRET=<≥32 chars; shared with the Houzs ERP database (scm.venture_portal_sync_config vp.secret). Set on Vercel Production — until it is, /api/erp/* answers 503>
 ```
 Repository
@@ -106,7 +106,10 @@ src/
 │   ├── supabase/
 │   │   ├── client.ts               ← Browser client (anon key + RLS)
 │   │   ├── server.ts               ← Server client (anon key + RLS via SSR cookies)
-│   │   ├── admin.ts                ← Service role client (currently unused, 'server-only' guarded)
+│   │   ├── admin.ts                ← Service role client. BYPASSES RLS. 'server-only',
+│   │   │                              built on FIRST USE not at import time. Exactly two
+│   │   │                              callers: the ERP receiver and team/people invites.
+│   │   │                              A third is a decision, not a detail.
 │   │   └── database.types.ts       ← Generated from Supabase
 │   ├── auth.ts                     ← requireAuth / requireRole helpers
 │   ├── roles.ts                    ← canAccess* helpers for sidebar visibility
@@ -250,7 +253,7 @@ Server Components by default — Client Components only when needed (forms, inte
 Writes — use Server Actions (`'use server'`), NOT API Route Handlers. Every action calls `requireRole(...)` at entry.
 Read-only file downloads (PDF, CSV, ZIP binary streams) — GET Route Handlers (`app/**/route.ts`) are OK because Server Actions can't stream binary responses cleanly. Still call `requireRole(...)` at entry. Never accept write-side params — POST/PUT/DELETE route handlers remain forbidden. Locked by user 2026-04-17 (Spec 5 blocker Q5).
 Machine ingest — the ONE exception to the rule above (2026-09-05, ERP live sync): another SYSTEM pushing data in (the Houzs ERP's database via pg_net) cannot call a Server Action and has no session, so it gets a POST Route Handler under `app/api/<system>/v<n>/`. The exception is narrow and every part of it is required: a static shared secret from env compared in constant time and failing closed when unset (never a session, never a query param); the service-role client used for ONE thing — calling a single ingest RPC that owns every write; the path excluded from `middleware.ts`; every delivery logged (`erp_sync_events`); 2xx for every delivery the portal chose not to apply, because the sender's outbox retries non-2xx forever. Nothing a browser calls may ever be a POST handler.
-Supabase client — server-side (`lib/supabase/server.ts`) uses anon key with RLS via SSR cookies. Service role client (`admin.ts`) is dormant + `'server-only'` guarded; avoid unless you truly need to bypass RLS.
+Supabase client — server-side (`lib/supabase/server.ts`) uses the anon key with RLS via SSR cookies. `admin.ts` is the service-role client and BYPASSES RLS entirely. It is `'server-only'` guarded and has exactly two callers: `app/api/erp/v1/sales-orders/route.ts` (which uses it for one thing — calling the ingest RPC) and `team/people/invite-actions.ts`. Reach for it only when a machine path has no session to act under, never to dodge an RLS policy that is merely inconvenient.
 Aggregate queries — prefer RPC functions (`dashboard_summary`, `get_hr_cost_summary`) over scattered per-field selects. Single round-trip, clearer intent, easier to unit test at SQL level.
 Error handling — Server Actions throw, pages use error boundaries, never return `{ data, error }` to the client
 Date handling — store as `date` or `timestamptz` in DB, use `dayjs` for formatting. Compare by day (`dayjs().isAfter(x, 'day')`) to avoid timezone edge cases.
