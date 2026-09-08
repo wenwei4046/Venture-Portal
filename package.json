@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "build:worker": "opennextjs-cloudflare build && node tools/assert-open-next-wasm.mjs",
+    "preview": "npm run build:worker && opennextjs-cloudflare preview",
+    "deploy": "npm run verify:worker && opennextjs-cloudflare deploy",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -14,7 +17,11 @@
     "build:check": "next build",
     "seed:principal": "node --env-file=.env.local scripts/seed-principal.mjs",
     "seed:users": "node --env-file=.env.local scripts/seed-users.mjs",
-    "seed:hr-staff": "node --env-file=.env.local scripts/seed-hr-staff.mjs"
+    "seed:hr-staff": "node --env-file=.env.local scripts/seed-hr-staff.mjs",
+    "assert:wasm": "node tools/assert-open-next-wasm.mjs",
+    "postinstall": "node tools/patch-yoga-wasm.mjs",
+    "smoke:worker": "node tools/smoke-worker-pdf.mjs",
+    "verify:worker": "npm run build:worker && npm run smoke:worker"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",
@@ -36,6 +43,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.6",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^20",
@@ -44,6 +52,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/ui": "^4.1.4",
     "autoprefixer": "^10.0.1",
+    "esbuild": "^0.28.1",
     "eslint": "^9",
     "eslint-config-next": "^15.0.0",
     "happy-dom": "^20.8.9",
@@ -51,6 +60,7 @@
     "supabase": "^2.88.1",
     "tailwindcss": "^3.4.17",
     "typescript": "^5",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.4",
+    "wrangler": "^4.129.0"
   }
 }

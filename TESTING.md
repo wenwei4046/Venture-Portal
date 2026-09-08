@@ -83,3 +83,100 @@ test runner (so you don't forget it) without breaking CI. Examples:
 Build uses placeholder `NEXT_PUBLIC_SUPABASE_URL` and
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` values so compilation works without real
 credentials. Real deploys pick up the values from Vercel project settings.
+
+## PDF geometry tests, and the tool that proves they work
+
+`src/lib/export/pdf.test.ts` renders through the real `PdfDocument` / `PdfTable`
+wrappers and asserts on where text actually landed, not on the bytes. The reason
+is `@react-pdf/layout`: it applies every style through an **optional** call on
+the Yoga node (`yogaNode[method]?.(...)` in `setYogaValue`). A Yoga build missing
+a setter — a version mismatch, a patched WASM loader, a bundler swapping the
+binary — therefore **drops the style in silence** and still emits a perfectly
+valid PDF whose layout has collapsed. `buf.slice(0,4) === '%PDF'` cannot fail for
+any layout reason.
+
+Two fixtures, because they reach different code:
+
+- `buildGeometryFixture()` — tables through `PdfTable`, which lays columns out at
+  fixed widths.
+- `buildFlexFixture()` — the flex row the invoice, credit-note and payment-voucher
+  formatters use (`flex: 1` label, fixed-width right-aligned amount). The flex
+  setters are unreachable from the table fixture, so without this one they are
+  untested no matter what is asserted.
+
+Assertions are derived from the fixtures' own inputs (column x deltas must equal
+the declared widths) except for a handful of **page-frame anchors**, which are
+pinned. Those exist because deltas are blind to a dropped `padding` or `margin`:
+every box shifts by the same amount, so every delta still checks out while the
+document loses its margins. Only a measurement against the page edge catches it.
+
+**Do not trust the coverage — re-measure it:**
+
+```bash
+node tools/yoga-setter-sweep.mjs
+```
+
+That deletes each of the fourteen silently-droppable setters from the Yoga
+prototype in turn, runs the suite against each, and prints which ones the suite
+notices. It restores `node_modules` when it finishes, including on Ctrl-C. Run it
+after changing the fixtures; the coverage table in the header of `pdf.test.ts` is
+its output. As of the last run: 6 caught, 8 unreachable because no style in the
+PDF formatters sets them (that file says which, and why).
+
+One trap worth knowing: pdf2json cannot be handed a pooled `Buffer`. It re-wraps
+any Buffer that views a larger ArrayBuffer from offset 0, discarding
+`byteOffset`, and Node pools every allocation under 4096 bytes — so small PDFs
+get parsed from the wrong offset and fail with "Invalid XRef stream header",
+intermittently. `parsePdf()` copies the exact byte range first. Never work around
+a failure there by padding a fixture past 4096 bytes.
+
+## Cloudflare worker verification
+
+`next build` does not exercise the worker bundle, so the PDF routes can be green
+in CI and return HTTP 500 on Cloudflare: `yoga-layout` compiles its flexbox
+engine from a base64 blob with `WebAssembly.instantiate()`, which workerd
+forbids. The fix is applied by the `postinstall` hook
+(`tools/patch-yoga-wasm.mjs`) — which is why CI must run plain `npm ci` and never
+`npm ci --ignore-scripts`.
+
+```bash
+npm run verify:worker   # build + bundle assertions + render a real PDF in workerd
+```
+
+Three layers, and the third is the one that cannot be faked:
+
+1. `opennextjs-cloudflare build`
+2. `tools/assert-open-next-wasm.mjs` — reads the built bundle and proves the fix
+   is present in the right shape.
+3. `tools/smoke-worker-pdf.mjs` — starts the built worker in workerd, requests a
+   PDF from `/api/wasm-health` (a probe route that stays 404 unless
+   `PDF_WASM_SMOKE=1` is set, so it is inert in production) and checks its
+   geometry.
+
+Layer 2 alone is not enough, and this was demonstrated rather than assumed: a fix
+that is **present but fails to load** passes all four of its checks with exit 0
+and then returns HTTP 500 on every PDF route. Only layer 3 catches that.
+
+Layer 3 has itself been tested the same way. With the sweep harness installed
+(`node tools/yoga-setter-sweep.mjs --keep`), rebuild and run:
+
+```bash
+YOGA_DROP_SETTERS=setPadding node tools/smoke-worker-pdf.mjs
+```
+
+That reproduces a silent layout collapse inside workerd, and the result is worth
+reading closely, because it is the whole argument for how these assertions are
+written:
+
+```
+bytes 10106   pages 2   text items 318          <- HTTP 200, a valid PDF
+header DESC delta=90    (declared 90)           <- column delta: PASSES
+balance col delta=200   (declared 200)          <- column delta: PASSES
+page0 min x/y  -4 / -2.99                       <- the text is off the page
+FAIL  leftmost text sits at x=-4pt, outside [30.5, 33.5]
+```
+
+Every delta-based assertion passed on a document whose content had walked off the
+page, because dropping the padding shifts every column by the same amount. Only
+the page-frame anchors caught it. Restore afterwards with
+`node tools/yoga-setter-sweep.mjs --restore` and rebuild.

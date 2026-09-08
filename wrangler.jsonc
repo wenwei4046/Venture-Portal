@@ -1,0 +1,13 @@
+{
+  "name": "venture-portal",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-03-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "placement": { "mode": "smart" },
+  "limits": { "cpu_ms": 60000 },
+  "define": {
+  "process.env.NODE_ENV": "\"production\"",
+  "import.meta.url": "\"file:///worker/\""
+}
+}

@@ -85,3 +85,12 @@ src/**/*\ -\ Copy.*
 # Pipeline working notes (coach log, decisions, review, checklists).
 # Scratch for the build process, not part of the product.
 /docs/pipeline/
+
+# Wrangler local state — workerd's dev cache and temp builds. Grows to hundreds
+# of MB and is rebuilt from scratch on every `wrangler dev`.
+/.wrangler/
+
+# Bundle-size measurement output:
+#   npx wrangler deploy --dry-run --outdir dist
+# Keep --dry-run. Without it that command publishes.
+/dist/
