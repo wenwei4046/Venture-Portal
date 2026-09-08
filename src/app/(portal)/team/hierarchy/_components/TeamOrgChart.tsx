@@ -28,7 +28,6 @@ import {
 } from '@/lib/org-layout'
 import { ladderAllows, ladderRefusal } from '@/lib/ladder'
 import { boundaryRefusal } from '@/lib/hierarchy-boundary'
-import { ratePct } from '@/lib/commission/ranks'
 import type { MirrorOutcome } from '@/lib/hierarchy-mirror'
 import { setReportsTo, undoHierarchyMove, type UndoMoveInput } from '../actions'
 import MirrorOfferPrompt, { nextOffer, offerKey, type OfferState } from './MirrorOfferPrompt'
@@ -48,12 +47,15 @@ export interface ChartPerson {
   levelRank: number | null
   levelName: string | null
   reportsTo: string | null
-  /** Their Revenue upline, if they have one. Drawn, never written here. */
+  /**
+   * Their Revenue upline, if they have one. CARRIED, NEVER DRAWN.
+   *
+   * The dashed edge this used to paint went away with the rest of the
+   * commission drawing on 2026-09-08. The value stays because an undo has
+   * to be able to put back the line a move changed, and after the write
+   * this page holds no other copy of what it used to be.
+   */
   commUplineId: string | null
-  /** The rung a month pays them from — "Rank B" — or null off commission. */
-  rankLabel: string | null
-  /** That rung's product rate as a fraction. The card formats it. */
-  rankRate: number | null
 }
 
 interface CardData extends Record<string, unknown> {
@@ -167,6 +169,18 @@ function Chart({
    */
   const [undo, setUndo] = useState<UndoMoveInput | null>(null)
   const [dragging, setDragging] = useState<string | null>(null)
+  /**
+   * The name being searched for.
+   *
+   * This replaced the commission rail (user, 2026-09-08). Clicking a card
+   * used to centre that person on the chart beside this one, and finding
+   * where somebody sits was the one thing the pair genuinely made easy —
+   * so it is done directly now, on a tree that is often wider than the
+   * window and where hunting for one card means panning blind.
+   */
+  const [find, setFind] = useState('')
+  /** Bumped by a search so re-picking the SAME person still re-centres. */
+  const [revealAt, setRevealAt] = useState(0)
   const selected = focused
 
   const byId = useMemo(() => new Map(people.map(p => [p.id, p])), [people])
@@ -179,6 +193,21 @@ function Chart({
     () => new Map(salespeople.map(s => [s.staffId, s.schemeId])),
     [salespeople],
   )
+
+  const matches = useMemo(() => {
+    const q = find.trim().toLowerCase()
+    if (!q) return []
+    // Deliberately over `people` and not `visible`: somebody hidden by the
+    // department chips is still ON this chart, and answering “nobody matches”
+    // because a filter is on would be a lie the reader cannot see through.
+    // Name first, then code, so typing a name never surfaces a code match above
+    // an exact one.
+    const byName = people.filter(p => p.name.toLowerCase().includes(q))
+    const byCode = people.filter(
+      p => !p.name.toLowerCase().includes(q) && (p.code ?? '').toLowerCase().includes(q),
+    )
+    return [...byName, ...byCode].slice(0, 8)
+  }, [people, find])
 
   const departments = useMemo(() => {
     const set = new Set<string>()
@@ -275,31 +304,7 @@ function Chart({
             : { stroke: 'var(--hairline-strong, #b9b0a2)', strokeWidth: 1.5 },
         }
       })
-
-    // The commission line only when it differs from the reporting line — an
-    // identical dashed edge under a solid one says nothing.
-    const commission: Edge[] = visible
-      .filter(
-        p =>
-          p.commUplineId &&
-          visibleIds.has(p.commUplineId) &&
-          p.commUplineId !== p.reportsTo,
-      )
-      .map(p => ({
-        id: `c:${p.commUplineId}->${p.id}`,
-        source: p.commUplineId!,
-        target: p.id,
-        type: 'smoothstep',
-        animated: false,
-        style: {
-          stroke: 'rgb(var(--accent))',
-          strokeWidth: 1.25,
-          strokeDasharray: '5 4',
-          opacity: 0.65,
-        },
-      }))
-
-    return [...reporting, ...commission]
+    return reporting
   }, [visible, visibleIds, byId])
 
   const move = useCallback(
@@ -455,16 +460,38 @@ function Chart({
       zoom: 1,
       duration: 320,
     })
-  }, [focused, layout, setCenter])
+  }, [focused, layout, setCenter, revealAt])
+
+  /**
+   * Show me where this person is.
+   *
+   * Three steps, and the first is the one that makes the search honest: a
+   * card the department chips have filtered out cannot be scrolled to, so
+   * the filter is widened rather than the search failing on somebody who is
+   * plainly there. Then the card is lit, and the effect above scrolls to it.
+   */
+  const reveal = useCallback(
+    (id: string) => {
+      const person = byId.get(id)
+      if (!person) return
+      if (focusDept !== ALL_DEPARTMENTS && person.department !== focusDept) {
+        onFocusDept(ALL_DEPARTMENTS)
+      }
+      // Cleared so somebody ALREADY selected is centred again rather than
+      // silently ignored — searching a name twice has to move the canvas twice.
+      centred.current = null
+      onFocus(id)
+      setRevealAt(n => n + 1)
+      setFind('')
+    },
+    [byId, focusDept, onFocusDept, onFocus],
+  )
 
   const nodeTypes = useMemo(() => ({ person: PersonCard }), [])
 
   // Every count describes the canvas, not the company — a line that says
   // "9 people" over a chart showing 3 is worse than no line at all.
   const unplaced = visible.filter(p => !p.reportsTo).length
-  const crossed = visible.filter(
-    p => p.commUplineId && p.commUplineId !== p.reportsTo && visibleIds.has(p.commUplineId),
-  ).length
   const broken = visible.filter(
     p =>
       p.reportsTo &&
@@ -544,6 +571,47 @@ function Chart({
           ) : null}
         </div>
       ) : null}
+
+      <div className="relative w-full sm:w-80 mb-3">
+        <input
+          type="search"
+          value={find}
+          onChange={e => setFind(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && matches[0]) {
+              e.preventDefault()
+              reveal(matches[0].id)
+            }
+            if (e.key === 'Escape') setFind('')
+          }}
+          placeholder="Find somebody by name…"
+          aria-label="Find somebody on the chart by name"
+          className="w-full px-3 py-2 bg-paper border border-hairline rounded-control text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border font-sans"
+        />
+        {find.trim() ? (
+          <div className="absolute z-30 mt-1 w-full max-h-64 overflow-y-auto border border-hairline rounded-control bg-surface shadow-md">
+            {matches.length === 0 ? (
+              <p className="px-3 py-2 font-serif italic text-xs text-muted">
+                Nobody on the chart matches that.
+              </p>
+            ) : (
+              matches.map(m => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => reveal(m.id)}
+                  className="w-full text-left px-3 py-2 hover:bg-surface-2 border-b border-hairline last:border-b-0"
+                >
+                  <span className="block font-serif text-sm text-ink truncate">{m.name}</span>
+                  <span className="block font-mono text-[0.58rem] uppercase tracking-wide text-muted truncate">
+                    {m.title ?? 'no title'} · {m.department ?? 'no department'}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        ) : null}
+      </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <button
@@ -668,39 +736,26 @@ function Chart({
             </Link>
           </span>
         ) : null}
-        <span className="inline-flex items-center gap-2 font-serif italic text-xs text-graphite">
-          <svg width="26" height="6" aria-hidden>
-            <line
-              x1="0"
-              y1="3"
-              x2="26"
-              y2="3"
-              stroke="rgb(var(--accent))"
-              strokeWidth="1.25"
-              strokeDasharray="5 4"
-              opacity="0.65"
-            />
-          </svg>
-          Commission upline{crossed > 0 ? ` · ${crossed} differ` : ''}
-          {commissionHref ? (
-            <Link
-              href={commissionHref}
-              className="ml-1 not-italic font-sans text-[11px] text-accent hover:underline"
-            >
-              change on Revenue →
-            </Link>
-          ) : null}
-        </span>
+        {/* The commission tree is not drawn here any more, but a move still
+            writes it — so the page keeps the one way to go and look at it. */}
+        {commissionHref ? (
+          <Link
+            href={commissionHref}
+            className="font-sans text-[11px] text-accent hover:underline"
+          >
+            Commission hierarchy on Revenue →
+          </Link>
+        ) : null}
       </div>
 
       <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
         A greyed card cannot take the person being dragged — it is one of their
-        own reports, or the ladder ranks its title below theirs. A red line is
-        one the ladder would refuse today: move the line, or change the ladder
-        from the Rules panel. The dashed line moves with the solid one where
-        this account may write both — it decides override commission, and a
-        month already run keeps the chart it was run against, so the move opens
-        a new position rather than editing the old one.
+        own reports, the ladder ranks its title below theirs, or they stand on
+        the other side of a commission department&rsquo;s edge. A red line is one
+        the ladder would refuse today: move the line, or change the ladder from
+        the Levels tab. Moving somebody still moves their commission upline with
+        them where this account may write both — that line is not drawn here any
+        more, and the banner says so whenever it could not follow.
       </p>
     </div>
   )
@@ -743,15 +798,6 @@ function PersonCard({ data }: NodeProps<Node<CardData>>) {
         <span className="font-mono text-[0.55rem] uppercase tracking-wide text-muted truncate">
           {person.department ?? 'no department'}
         </span>
-        {person.rankLabel ? (
-          <span
-            className="shrink-0 font-mono text-[0.55rem] text-graphite whitespace-nowrap"
-            title="What a month pays them from"
-          >
-            {person.rankLabel}
-            {person.rankRate !== null ? ` · ${ratePct(person.rankRate)}` : ''}
-          </span>
-        ) : null}
       </div>
 
       <Handle type="source" position={Position.Bottom} className="!bg-[rgb(var(--accent))] !w-2 !h-2" />

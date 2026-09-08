@@ -9,30 +9,34 @@ import HierarchyView from './_components/HierarchyView'
 import type { ChartPerson } from './_components/TeamOrgChart'
 import type { BoardTitle } from './_components/LevelsBoard'
 import type { SalesPerson, RankOption } from './_components/HierarchyPanel'
-import type { UnplacedPerson } from './_components/RevenueOrgChart'
 
 /**
  * Hierarchy: the company org chart, and everything that governs it, on one
  * screen.
  *
- * The chart is the page (user, 2026-09-07: "graph UI takes priority"). What
- * used to be a second tab you left the chart to read is now a panel BESIDE it —
- * the salespeople's own tree, and the ladder the chart obeys. A rule you have
- * to navigate away from to check is a rule you check less often than you
- * should.
+ * The chart is the page (user, 2026-09-07: "graph UI takes priority").
  *
- * TWO LINES are drawn on the canvas, and since 2026-09-07 both are written:
+ * ONE LINE is drawn on the canvas: `hr_staff_costs.reports_to`, who somebody
+ * reports to. Current state, no history.
  *
- *   reports_to        solid. The company reporting line. Current state, no
- *                     history.
- *   commission upline dashed. `comm_hierarchy` — what the override
- *                     differential is computed from, effective-dated so a
- *                     month already run keeps the chart it was run against.
+ * The commission tree used to be drawn beside it, and is not any more (user,
+ * 2026-09-08). It was removed for a reason worth keeping written down, because
+ * the obvious reading is that it was clutter and it was not: the rank a
+ * position carries is NOT what a month pays. A salesperson who misses their
+ * monthly quota earns at a different rate from the one their rank implies, so
+ * a chart captioning somebody "Rank B · 8%" states as a fact about them
+ * something that is only true in the months they hit quota. There is no
+ * caption this page could have written instead — the real figure is a
+ * property of a RUN, not of a person — so the honest move was to stop
+ * answering the question here. The commission tree is drawn and edited on
+ * `/revenue/[sub]/hierarchy`, where a period is in scope and the number means
+ * something.
  *
- * They used to be edited on different pages under different permissions, and
- * drifted apart in silence. Moving somebody on either now moves them on both
- * where the account is allowed to write both; where it is not, the move still
- * happens and the page says which half did not. See `lib/hierarchy-mirror.ts`.
+ * The DOUBLE WRITE is untouched by that. Moving somebody here still moves
+ * their commission upline with them, and still says so when it cannot — see
+ * `lib/hierarchy-mirror.ts`. What went away is the drawing, not the write:
+ * the two lines drifting apart in silence was the original bug and it stays
+ * fixed.
  *
  * THE LADDER is one scale for the whole company, every title pinned to a rung.
  * The chart obeys it — nobody can be dropped under somebody whose title stands
@@ -42,12 +46,13 @@ import type { UnplacedPerson } from './_components/RevenueOrgChart'
 export default async function TeamHierarchyPage() {
   const user = await requirePermission('team')
   const supabase = await createClient()
-  // What a month pays somebody is commission data, and this page is gated on
-  // `team`. The two permissions happen to share the `hr` RLS scope, so the
-  // query below WILL return rates to an account with no `revenue` — the
-  // withholding has to happen here, before anything reaches a client
-  // component, not at the control that edits them. A rate that is merely not
-  // editable is still a rate the reader now knows.
+  // Rates no longer reach a card on this page, but they still reach the enrol
+  // offer's rank picker — that one is a CHOICE being made rather than a figure
+  // captioning somebody, which is the whole distinction the rank display was
+  // removed over. This page is gated on `team` and the two permissions share
+  // the `hr` RLS scope, so the query below would happily return rates to an
+  // account with no `revenue`: the withholding has to happen here, before
+  // anything reaches a client component.
   const seesMoney = canAccessRevenue(user)
 
   const [{ data: staffRows }, { data: positions }, { data: levels }, { data: titles }, subDepts] =
@@ -59,12 +64,12 @@ export default async function TeamHierarchyPage() {
         )
         .eq('status', 'active')
         .order('employee_name'),
-      // The commission side. `comm_*` postdates database.types.ts, and the
-      // embedded rank comes back as an object or a one-element array depending
-      // on how PostgREST resolves the relationship — both shapes are handled.
+      // The commission side. Read for two things only, neither of them drawn:
+      // the upline an undo has to be able to put back, and the scheme an enrol
+      // offer defaults its picker to.
       supabase
         .from('comm_hierarchy')
-        .select('staff_id, upline_staff_id, scheme_id, rank_id, comm_ranks (label, product_rate, sort_order)')
+        .select('staff_id, upline_staff_id, scheme_id')
         .is('effective_to', null),
       supabase.from('title_levels').select('id, rank, name').order('rank'),
       // Every title, inactive ones too: the board shows those dimmed rather
@@ -80,20 +85,12 @@ export default async function TeamHierarchyPage() {
     staff_id: string
     upline_staff_id: string | null
     scheme_id: string
-    rank_id: string | null
-    comm_ranks:
-      | { label: string; product_rate: number | string; sort_order: number }
-      | Array<{ label: string; product_rate: number | string; sort_order: number }>
-      | null
   }
-  const one = <T,>(v: T | T[] | null | undefined): T | null =>
-    !v ? null : Array.isArray(v) ? (v[0] ?? null) : v
 
   const positionRows = (positions ?? []) as unknown as PositionRow[]
   const commUpline = new Map<string, string | null>(
     positionRows.map(p => [p.staff_id, p.upline_staff_id]),
   )
-  const position = new Map(positionRows.map(p => [p.staff_id, p]))
 
   const rungs: Rung[] = ((levels ?? []) as Array<{ id: string; rank: number; name: string }>).map(
     l => ({ id: l.id, rank: l.rank, name: l.name }),
@@ -113,7 +110,6 @@ export default async function TeamHierarchyPage() {
 
   const people: ChartPerson[] = staff.map(s => {
     const rung = s.titles?.level_id ? (rungById.get(s.titles.level_id) ?? null) : null
-    const rank = one(position.get(s.id)?.comm_ranks)
     return {
       id: s.id,
       name: s.employee_name,
@@ -126,57 +122,24 @@ export default async function TeamHierarchyPage() {
       levelRank: rung?.rank ?? null,
       levelName: rung?.name ?? null,
       reportsTo: s.reports_to,
-      // Only carried when it is a line the reporting tree does not already draw;
-      // an identical dashed edge on top of a solid one is noise.
+      // Carried, never drawn. An undo has to be able to put back the line the
+      // move changed, and after the write this page holds no other copy of it.
       commUplineId: commUpline.get(s.id) ?? null,
-      rankLabel: seesMoney ? (rank?.label ?? null) : null,
-      rankRate: seesMoney && rank ? Number(rank.product_rate) : null,
     }
   })
 
-  // The panel's own tree: only the people the commission engine knows about,
-  // in their own shape, so the aside is a second hierarchy rather than the same
-  // one filtered.
-  const nameOf = new Map(staff.map(s => [s.id, s.employee_name]))
-  const deptOf = new Map(staff.map(s => [s.id, s.departments?.name ?? null]))
-  const salespeople: SalesPerson[] = positionRows
-    .filter(p => nameOf.has(p.staff_id))
-    .map(p => {
-      const rank = one(p.comm_ranks)
-      return {
-        staffId: p.staff_id,
-        name: nameOf.get(p.staff_id)!,
-        department: deptOf.get(p.staff_id) ?? null,
-        uplineStaffId: p.upline_staff_id,
-        rankId: p.rank_id,
-        rankLabel: seesMoney ? (rank?.label ?? null) : null,
-        rateLabel: seesMoney && rank ? ratePct(Number(rank.product_rate)) : null,
-        schemeId: p.scheme_id,
-      }
-    })
-    .sort((a, b) => a.name.localeCompare(b.name))
+  // Who the commission engine holds an open position for, and under which
+  // scheme. Two fields, because an enrol offer needs to default its scheme
+  // picker to the MOVER's — an override belongs to one scheme, so a manager
+  // enrolled into a different one is refused by the very mirror the offer is
+  // trying to complete.
+  const salespeople: SalesPerson[] = positionRows.map(p => ({
+    staffId: p.staff_id,
+    schemeId: p.scheme_id,
+  }))
 
-  // People in a commission department holding no open position.
-  //
-  // The user's rule (2026-09-08) is that inside such a department the two
-  // charts hold the SAME people. The rail used to be built from position rows
-  // alone, so anybody not yet on the ladder was simply absent from it — and an
-  // absence there is indistinguishable from not existing, while the Revenue
-  // chart has always drawn them. They are drawn and counted now; enrolling them
-  // stays a deliberate act, because a position needs a rank and `rank_id` is
-  // NOT NULL, so there is no rank to invent for somebody with no title on the
-  // scheme's ladder.
-  const unplaced: UnplacedPerson[] = staff
-    .filter(s => s.departments?.payroll_source === 'commission' && !position.has(s.id))
-    .map(s => ({
-      staffId: s.id,
-      name: s.employee_name,
-      department: s.departments?.name ?? null,
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name))
-
-  // The rank a table cell may pick from. Scoped per scheme because a rank is a
-  // scheme's row — offering Fair's ladder to somebody placed under another
+  // The ranks an enrol offer may pick from, scoped per scheme because a rank is
+  // a scheme's row — offering Fair's ladder to somebody placed under another
   // sub-department's scheme would write a rank its engine cannot read.
   const schemeIds = [...new Set(positionRows.map(p => p.scheme_id))]
   let ranksByScheme: Record<string, RankOption[]> = {}
@@ -231,8 +194,11 @@ export default async function TeamHierarchyPage() {
     people.map(p => ({ id: p.id, reportsTo: p.reportsTo, rank: p.levelRank })),
   )
 
-  // One link is enough while Fair is the only sub-department; when there are
-  // more, the first is still the right place to land.
+  // Where the legend's one link goes. There are several sub-departments, so
+  // the first alphabetically is an arbitrary choice among them — the same
+  // arbitrary choice `/revenue` itself makes when it redirects, which is why
+  // it is the least surprising one available. A link that knew whose tree the
+  // reader wanted would have to be per-card, and this one sits in the legend.
   const commissionHref = subDepts[0] ? revenuePath(subDepts[0].slug, 'hierarchy') : null
 
   return (
@@ -243,9 +209,7 @@ export default async function TeamHierarchyPage() {
       titles={boardTitles}
       breaks={breaks}
       salespeople={salespeople}
-      unplaced={unplaced}
       ranksByScheme={ranksByScheme}
-      canSetRank={seesMoney}
     />
   )
 }
