@@ -197,7 +197,10 @@ export default function StaffTable({
       return outcome.note
         ? `${moved} ${outcome.note}`
         : outcome.mirrored
-          ? `${moved} Their commission upline moved with them.`
+          ? manager
+            ? `${moved} Their commission upline moved with them.`
+            // See TeamOrgChart: a cleared upline is a money change, not a move.
+            : `${moved} Their commission upline was cleared with them, so nobody earns an override on their sales now.`
           : moved
     })
   }

@@ -32,6 +32,12 @@
  *            at all, so there is no second line to move. Inventing one would
  *            mean inventing a rank.
  *
+ * Since 2026-09-08 one department reads differently. Where the commission
+ * engine pays — `departments.payroll_source = 'commission'`, today only Revenue
+ * — the two lines are ONE graph and `lib/hierarchy-boundary.ts` keeps them
+ * that way by refusing any reporting line that leaves. Callers say so with
+ * `oneGraph`, and it changes the detach branch alone; see the comment there.
+ *
  * A skip may also carry an OFFER (2026-09-07). Saying what did not happen was
  * already an improvement on silence, but it left the reader holding a sentence
  * and no way to act on it: they were told the new manager earns no override,
@@ -84,6 +90,23 @@ export interface MirrorContext {
   onCommission: ReadonlySet<string>
   /** Does the actor hold the permission that guards the OTHER table? */
   mayWriteOther: boolean
+  /**
+   * True when this move happens INSIDE a commission department.
+   *
+   * The user's ruling on 2026-09-08: in a department the commission engine
+   * pays, the reporting line and the commission upline are ONE graph, drawn
+   * twice. `lib/hierarchy-boundary.ts` is what keeps it one — a reporting line
+   * may not leave such a department — and this flag is what the decision below
+   * needs to know that it is looking at that graph.
+   *
+   * It changes exactly one branch: the DETACH. That branch refuses to copy a
+   * null across on the argument that an absence on one chart is not evidence
+   * about the other. That argument is sound wherever the two charts hold
+   * different people, and false here, where they hold the same ones. Optional
+   * and defaulting to false, so every caller outside a commission department
+   * keeps the behaviour it has always had.
+   */
+  oneGraph?: boolean
   /** How to name the other side in a skip note — "commission upline" / "reporting line". */
   otherName: string
   /**
@@ -170,7 +193,17 @@ export function mirrorDecision(ctx: MirrorContext): MirrorDecision {
   // The argument above is that an absence on one chart is not evidence about
   // the other; a button the reader chooses to press IS evidence, and it is the
   // only kind there is. So the way out is offered and never taken for them.
-  if (ctx.targetId === null) {
+  //
+  // `oneGraph` exempts a commission department from all of it, and the exemption
+  // is the argument's own logic rather than an exception to it. The reasoning
+  // above turns on the two charts holding DIFFERENT people; inside a commission
+  // department they hold the same ones, so an absence on one is not merely
+  // evidence about the other, it is the same fact. Detaching somebody there and
+  // leaving them paying override to the manager they just left is the drift
+  // this whole feature exists to kill. So the detach falls through to the
+  // permission check and then mirrors — and because it is a money write, the
+  // caller says out loud that nobody earns on their sales any more.
+  if (ctx.targetId === null && !ctx.oneGraph) {
     const current = ctx.currentOtherUpline
     if (ctx.mayWriteOther && current) {
       return {

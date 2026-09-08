@@ -186,53 +186,62 @@ export async function setPosition(input: PositionInput): Promise<MirrorOutcome> 
     throw new Error('That rank belongs to another sub-department’s scheme')
   }
 
+  // Both people — or just the mover, on a detach — read once. Two separate
+  // questions need this, and one of them is asked even when there is no upline
+  // to check against:
+  //
+  //   the boundary  does this placement cross a commission department's edge?
+  //                 This canvas cannot OFFER an outsider (it loads one
+  //                 commission department), so anything arriving across the
+  //                 edge came by another route — a direct call, or a row
+  //                 written before the rule existed.
+  //   one graph     is the MOVER inside such a department? If so the two
+  //                 hierarchies are one graph here, and a detach clears their
+  //                 reporting line along with their upline rather than being
+  //                 reported as a half-move.
+  const { data: staffData } = await supabase
+    .from('hr_staff_costs')
+    .select('id, employee_name, title_id, departments (name, payroll_source)')
+    .in('id', input.uplineStaffId ? [input.staffId, input.uplineStaffId] : [input.staffId])
+
+  const staffRows = (staffData ?? []) as unknown as Array<{
+    id: string
+    employee_name: string
+    title_id: string | null
+    departments: DeptEmbed
+  }>
+  const asBoundary = (id: string): BoundaryPerson | null => {
+    const row = staffRows.find(s => s.id === id)
+    if (!row) return null
+    const dept = one(row.departments)
+    return {
+      name: row.employee_name,
+      department: dept?.name ?? null,
+      commissionDept: dept?.payroll_source === 'commission',
+    }
+  }
+  const moverFacts = asBoundary(input.staffId)
+  const oneGraph = moverFacts?.commissionDept ?? false
+
   if (input.uplineStaffId) {
-    const [{ data: uplineRow }, { data: uplineStaff }] = await Promise.all([
-      supabase
-        .from('comm_hierarchy')
-        .select('id, upline_staff_id, comm_ranks (label, can_recruit)')
-        .eq('staff_id', input.uplineStaffId)
-        .is('effective_to', null)
-        .maybeSingle(),
-      // BOTH people, where this used to read only the upline's title. The
-      // department boundary (2026-09-08) is a question about the pair, and this
-      // canvas is not the place it can be answered from the client: it loads
-      // one commission department and cannot even OFFER an outsider, so
-      // anything that reaches here across the edge arrived by another route.
-      supabase
-        .from('hr_staff_costs')
-        .select('id, employee_name, title_id, departments (name, payroll_source)')
-        .in('id', [input.staffId, input.uplineStaffId]),
-    ])
+    const { data: uplineRow } = await supabase
+      .from('comm_hierarchy')
+      .select('id, upline_staff_id, comm_ranks (label, can_recruit)')
+      .eq('staff_id', input.uplineStaffId)
+      .is('effective_to', null)
+      .maybeSingle()
 
     if (!uplineRow) {
       throw new Error('That upline has no active position — place them first')
     }
 
-    const staffRows = (uplineStaff ?? []) as unknown as Array<{
-      id: string
-      employee_name: string
-      title_id: string | null
-      departments: DeptEmbed
-    }>
-    const asBoundary = (id: string): BoundaryPerson | null => {
-      const row = staffRows.find(s => s.id === id)
-      if (!row) return null
-      const dept = one(row.departments)
-      return {
-        name: row.employee_name,
-        department: dept?.name ?? null,
-        commissionDept: dept?.payroll_source === 'commission',
-      }
-    }
-    const mover = asBoundary(input.staffId)
     const upline = asBoundary(input.uplineStaffId)
     // Refused before the position is written, not after: this action mirrors
     // into `reports_to`, so a crossing placement would draw the crossing line
     // as well — and the override would be paid to somebody the Revenue chart
     // does not draw at all.
-    if (mover && upline) {
-      const crossing = boundaryRefusal(mover, upline)
+    if (moverFacts && upline) {
+      const crossing = boundaryRefusal(moverFacts, upline)
       if (crossing) throw new Error(crossing)
     }
 
@@ -286,7 +295,7 @@ export async function setPosition(input: PositionInput): Promise<MirrorOutcome> 
     const { error } = await supabase.from('comm_hierarchy').insert(row)
     if (error) throw new Error(`Could not place them: ${error.message}`)
     // A first placement IS a statement about their upline, so it mirrors.
-    return finish(supabase, user, ladder, input, true)
+    return finish(supabase, user, ladder, input, true, oneGraph)
   }
 
   const cur = current as unknown as {
@@ -323,7 +332,7 @@ export async function setPosition(input: PositionInput): Promise<MirrorOutcome> 
       })
       .eq('id', cur.id)
     if (error) throw new Error(`Could not update the position: ${error.message}`)
-    return finish(supabase, user, ladder, input, uplineChanged)
+    return finish(supabase, user, ladder, input, uplineChanged, oneGraph)
   }
 
   const { error: closeError } = await supabase
@@ -339,7 +348,7 @@ export async function setPosition(input: PositionInput): Promise<MirrorOutcome> 
     throw new Error(`Could not record the new position: ${error.message}`)
   }
 
-  return finish(supabase, user, ladder, input, uplineChanged)
+  return finish(supabase, user, ladder, input, uplineChanged, oneGraph)
 }
 
 
@@ -363,9 +372,10 @@ async function finish(
   ladder: LadderRow[],
   input: PositionInput,
   uplineChanged: boolean,
+  oneGraph: boolean,
 ): Promise<MirrorOutcome> {
   try {
-    const outcome = await mirrorToReportsTo(supabase, user, input, uplineChanged)
+    const outcome = await mirrorToReportsTo(supabase, user, input, uplineChanged, oneGraph)
     const gap = await titleGap(supabase, ladder, input.staffId, input.rankId)
     if (!gap) return outcome
     return { ...outcome, note: outcome.note ? `${outcome.note} ${gap}` : gap }
@@ -395,6 +405,7 @@ async function mirrorToReportsTo(
   user: PermissionHolder,
   input: PositionInput,
   uplineChanged: boolean,
+  oneGraph: boolean,
 ): Promise<MirrorOutcome> {
   if (!uplineChanged) return MIRRORED_NOTHING
 
@@ -420,6 +431,9 @@ async function mirrorToReportsTo(
     // either way. Everybody else is judged by what the table says.
     onCommission: new Set([...positions.keys(), input.staffId]),
     mayWriteOther: canAccessTeam(user),
+    // Inside a commission department the two lines are one graph, so clearing
+    // an upline here clears the reporting line with it.
+    oneGraph,
     otherName: 'reporting line',
   })
 

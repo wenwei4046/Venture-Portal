@@ -346,7 +346,12 @@ function Chart({
             outcome.note
               ? `${moved} ${outcome.note}`
               : outcome.mirrored
-                ? `${moved} Their commission upline moved with them.`
+                ? parentId
+                  ? `${moved} Their commission upline moved with them.`
+                  // A detach inside a commission department clears the
+                  // commission upline too, and that is a MONEY change: said in
+                  // full, because "moved with them" would understate it.
+                  : `${moved} Their commission upline was cleared with them, so nobody earns an override on their sales now.`
                 : moved,
           )
           router.refresh()

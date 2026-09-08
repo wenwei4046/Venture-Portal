@@ -89,6 +89,11 @@ export async function setReportsTo(
 
   const outcome = await mirrorToCommission(supabase, user.id, staffId, reportsToId, {
     mayWriteRevenue: canAccessRevenue(user),
+    // Inside a commission department the two lines are one graph, so a detach
+    // here clears the commission upline too rather than being reported as a
+    // half-move. The boundary check above is what makes this safe to assume of
+    // the target as well: it cannot be outside.
+    oneGraph: mover.commissionDept,
   })
 
   revalidatePath('/team', 'layout')
@@ -114,7 +119,7 @@ async function mirrorToCommission(
   userId: string,
   staffId: string,
   reportsToId: string | null,
-  opts: { mayWriteRevenue: boolean },
+  opts: { mayWriteRevenue: boolean; oneGraph?: boolean },
 ): Promise<MirrorOutcome> {
   let positions: Map<string, OpenPosition>
   try {
@@ -159,6 +164,7 @@ async function mirrorToCommission(
     targetId: reportsToId,
     onCommission,
     mayWriteOther: opts.mayWriteRevenue,
+    oneGraph: opts.oneGraph,
     otherName: 'commission upline',
     targetName: reportsToId !== null ? named?.name : null,
     currentOtherUpline: reportsToId === null ? named : null,
@@ -610,6 +616,7 @@ export async function enrolAndCompleteMove(
   // the next time anything touches their position.
   const outcome = await mirrorToCommission(supabase, user.id, moverId, mover.reportsTo, {
     mayWriteRevenue: true,
+    oneGraph: mover.commissionDept,
   })
 
   revalidatePath('/team', 'layout')
