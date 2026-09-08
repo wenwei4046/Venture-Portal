@@ -35,3 +35,42 @@ jobs:
           # in Vercel project settings for actual deployments.
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+
+  worker:
+    name: Cloudflare worker build + PDF smoke
+    runs-on: ubuntu-latest
+
+    # WHY THIS JOB IS SEPARATE FROM `test`
+    # -----------------------------------
+    # The `test` job above runs `next build`, which does NOT exercise the worker
+    # bundle at all. yoga-layout compiles its flexbox engine from a base64 blob
+    # with WebAssembly.instantiate(), which workerd forbids — so every PDF export
+    # route can be perfectly green here and return HTTP 500 once deployed to
+    # Cloudflare. Only `opennextjs-cloudflare build` produces the artifact where
+    # that difference shows up, and only running it proves anything.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # NOTE: plain `npm ci`, deliberately. The yoga WASM fix is applied by the
+      # `postinstall` hook (tools/patch-yoga-wasm.mjs), so `--ignore-scripts`
+      # would silently skip the very thing this job exists to verify.
+      - name: Install dependencies
+        run: npm ci
+
+      # Builds the worker, then asserts the bundle carries the statically imported
+      # WASM module, then starts the built worker in workerd and asks it for a real
+      # PDF whose geometry is checked. The last step is the one that cannot be
+      # faked: a fix that is present but fails to load passes the static checks and
+      # only fails here.
+      - name: Verify worker bundle and render a PDF in workerd
+        run: npm run verify:worker
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}

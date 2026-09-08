@@ -127,6 +127,17 @@ scripts/
 ├── check-loans.mjs                 ← DB inspection helper
 ├── check-dashboard.mjs             ← dashboard_summary() RPC smoke test
 └── migrate-emails.mjs              ← @houzs.my → @venture.my domain migration
+tools/
+├── patch-yoga-wasm.mjs          ← postinstall. Replaces yoga-layout's runtime
+│                                  WebAssembly.instantiate() with a statically
+│                                  imported .wasm module, which is the only form
+│                                  workerd accepts. CI must run plain `npm ci`.
+├── assert-open-next-wasm.mjs    ← reads the built worker bundle, proves the fix
+│                                  is present and in the right shape
+├── smoke-worker-pdf.mjs         ← starts the built worker in workerd, asks for a
+│                                  real PDF, checks where the text landed
+└── yoga-setter-sweep.mjs        ← measures what src/lib/export/pdf.test.ts
+                                   actually catches (see TESTING.md)
 docs/
 ├── DESIGN.md                       ← Design system v3.0 (Ledger-Dense / single source of truth for ALL UI)
 ├── db-schema.md                    ← Database schema reference (32 tables)
@@ -247,7 +258,7 @@ Money — `decimal(15,2)` in DB. Display with `formatMoney()` from `lib/utils.ts
 Naming — DB: snake_case, TypeScript: camelCase, Components: PascalCase
 Files — one component per file, co-locate related files (`_components/` subfolders per route)
 Testing
-Framework: Vitest + happy-dom + @testing-library/react (bootstrapped Phase 1.5 Step 1). Run `npm test` (watch) or `npm run test:ci` (single run). CI runs tests + `next build` on every push (`.github/workflows/test.yml`).
+Framework: Vitest + happy-dom + @testing-library/react (bootstrapped Phase 1.5 Step 1). Run `npm test` (watch) or `npm run test:ci` (single run). CI runs two jobs on every push (`.github/workflows/test.yml`): `test` (tests + `next build`) and `worker` (`npm run verify:worker` — builds the Cloudflare worker and renders a real PDF inside workerd). See `TESTING.md`.
 Layers: unit (pure helpers in `src/lib/*.test.ts`), integration (Supabase RPC — deferred until billing math in Phase 2 Step 5 needs it), RLS audit (manual via `/qa`), E2E (Playwright MCP during per-step verification, not in CI).
 Convention: every bug fix ships with a regression test. Extract pure logic from Server Actions into `src/lib/*.ts` helpers and test the helper (Server Actions themselves pull in next/cache + next/navigation + Supabase SSR cookies, mocking is more trouble than it's worth).
 Placeholder pattern: when a fix is planned but not yet implemented, drop a `describe.todo('...')` stub at the expected test file location so it stays indexed without breaking CI.
