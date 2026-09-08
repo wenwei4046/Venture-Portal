@@ -58,7 +58,9 @@ interface CardData extends Record<string, unknown> {
   selected: boolean
 }
 
-const ALL = '__all__'
+/** No department chosen — the whole company. Exported because the page owns
+ *  the choice now: the rail beside this canvas has to answer the same filter. */
+export const ALL_DEPARTMENTS = '__all__'
 
 /**
  * The company org canvas.
@@ -96,6 +98,11 @@ export default function TeamOrgChart(props: {
   /** The commission positions, carried only so an enrol offer can default its
    *  scheme picker to the MOVER's own. Nothing here is drawn. */
   salespeople: SalesPerson[]
+  /** The department in focus, or ALL_DEPARTMENTS. Owned by the page: the chips
+   *  filter the rail beside this canvas as well, and two copies of one choice
+   *  is how the two halves of a view drift apart. */
+  focusDept: string
+  onFocusDept: (department: string) => void
 }) {
   return (
     <ReactFlowProvider>
@@ -111,6 +118,8 @@ function Chart({
   onFocus,
   ranksByScheme,
   salespeople,
+  focusDept,
+  onFocusDept,
 }: {
   people: ChartPerson[]
   commissionHref: string | null
@@ -118,6 +127,8 @@ function Chart({
   onFocus: (staffId: string | null) => void
   ranksByScheme: Record<string, RankOption[]>
   salespeople: SalesPerson[]
+  focusDept: string
+  onFocusDept: (department: string) => void
 }) {
   const router = useRouter()
   const { getIntersectingNodes, setCenter } = useReactFlow()
@@ -136,7 +147,6 @@ function Chart({
   const [offer, setOffer] = useState<OfferState | null>(null)
   const [warn, setWarn] = useState(false)
   const [dragging, setDragging] = useState<string | null>(null)
-  const [focusDept, setFocusDept] = useState<string>(ALL)
   const selected = focused
 
   const byId = useMemo(() => new Map(people.map(p => [p.id, p])), [people])
@@ -166,7 +176,7 @@ function Chart({
   // a line that leaves the department is counted below rather than drawn as a
   // person who reports to nobody.
   const visible = useMemo(
-    () => (focusDept === ALL ? people : people.filter(p => p.department === focusDept)),
+    () => (focusDept === ALL_DEPARTMENTS ? people : people.filter(p => p.department === focusDept)),
     [people, focusDept],
   )
   const visibleIds = useMemo(() => new Set(visible.map(p => p.id)), [visible])
@@ -448,10 +458,10 @@ function Chart({
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <button
           type="button"
-          onClick={() => setFocusDept(ALL)}
-          aria-pressed={focusDept === ALL}
+          onClick={() => onFocusDept(ALL_DEPARTMENTS)}
+          aria-pressed={focusDept === ALL_DEPARTMENTS}
           className={`font-serif italic text-sm px-3 py-1.5 rounded-control border transition-colors ${
-            focusDept === ALL
+            focusDept === ALL_DEPARTMENTS
               ? 'bg-accent border-accent text-white'
               : 'bg-surface border-hairline text-graphite hover:bg-surface-2'
           }`}
@@ -464,7 +474,7 @@ function Chart({
             <button
               key={d}
               type="button"
-              onClick={() => setFocusDept(active ? ALL : d)}
+              onClick={() => onFocusDept(active ? ALL_DEPARTMENTS : d)}
               aria-pressed={active}
               className={`font-serif italic text-sm px-3 py-1.5 rounded-control border transition-colors ${
                 active

@@ -134,6 +134,7 @@ export default async function TeamHierarchyPage() {
   // in their own shape, so the aside is a second hierarchy rather than the same
   // one filtered.
   const nameOf = new Map(staff.map(s => [s.id, s.employee_name]))
+  const deptOf = new Map(staff.map(s => [s.id, s.departments?.name ?? null]))
   const salespeople: SalesPerson[] = positionRows
     .filter(p => nameOf.has(p.staff_id))
     .map(p => {
@@ -141,6 +142,7 @@ export default async function TeamHierarchyPage() {
       return {
         staffId: p.staff_id,
         name: nameOf.get(p.staff_id)!,
+        department: deptOf.get(p.staff_id) ?? null,
         uplineStaffId: p.upline_staff_id,
         rankId: p.rank_id,
         rankLabel: seesMoney ? (rank?.label ?? null) : null,

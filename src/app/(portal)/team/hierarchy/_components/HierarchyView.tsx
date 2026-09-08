@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { SlidingTabs, type TabItem } from '@/components/motion/SlidingTabs'
 import type { Rung } from '@/lib/ladder'
-import TeamOrgChart, { type ChartPerson } from './TeamOrgChart'
+import TeamOrgChart, { ALL_DEPARTMENTS, type ChartPerson } from './TeamOrgChart'
 import LevelsBoard, { type BoardTitle } from './LevelsBoard'
 import type { RankOption, SalesPerson } from './HierarchyPanel'
 import RevenueOrgChart from './RevenueOrgChart'
@@ -82,6 +82,14 @@ export default function HierarchyView({
   // charts and the panel's list of broken lines. Clicking a person on either
   // chart centres them on the other — the same person, drawn twice.
   const [focused, setFocused] = useState<string | null>(null)
+  // The department chips live on the canvas but the choice belongs here: they
+  // filter the rail beside it too. It used to sit in the chart alone, so
+  // choosing Finance emptied the canvas of everybody else and left the Revenue
+  // commission tree sitting beside it unchanged — two halves of one view
+  // answering different questions (user, 2026-09-08).
+  const [focusDept, setFocusDept] = useState<string>(ALL_DEPARTMENTS)
+  const scoped = focusDept === ALL_DEPARTMENTS ? null : focusDept
+  const railPeople = scoped ? salespeople.filter(s => s.department === scoped) : salespeople
 
   const tabs: TabItem[] = [
     { key: 'chart', label: 'Org chart' },
@@ -164,6 +172,8 @@ export default function HierarchyView({
                   onFocus={setFocused}
                   ranksByScheme={ranksByScheme}
                   salespeople={salespeople}
+                  focusDept={focusDept}
+                  onFocusDept={setFocusDept}
                 />
               </>
             )}
@@ -184,13 +194,14 @@ export default function HierarchyView({
               <div className="sect-head">
                 <h2>Commission hierarchy</h2>
                 <span className="rule" aria-hidden />
-                <span className="count">REVENUE DEPT</span>
+                <span className="count">{scoped ? scoped.toUpperCase() : 'REVENUE DEPT'}</span>
               </div>
               <RevenueOrgChart
-                salespeople={salespeople}
+                salespeople={railPeople}
                 focused={focused}
                 onFocus={setFocused}
                 commissionHref={commissionHref}
+                scope={scoped}
               />
             </div>
           ) : null}

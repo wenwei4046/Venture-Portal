@@ -20,6 +20,11 @@ export interface SalesPerson {
   /** "8%" — already formatted; the panel does no arithmetic. */
   rateLabel: string | null
   schemeId: string
+  /** Their department on the staff record, so the rail can answer the same
+   *  department chips the canvas does. Commission is a Revenue Department
+   *  concept today, which is exactly why the rail has to say so out loud when
+   *  another department is in focus rather than sit there unchanged. */
+  department: string | null
 }
 
 /** A rank a table cell may pick, inside one scheme. */

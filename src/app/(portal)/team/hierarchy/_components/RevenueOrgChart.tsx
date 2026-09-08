@@ -42,6 +42,10 @@ export default function RevenueOrgChart(props: {
   focused: string | null
   onFocus: (staffId: string | null) => void
   commissionHref: string | null
+  /** The department the list was filtered to, when it was. An empty rail means
+   *  two different things — nobody is enrolled at all, or nobody in THIS
+   *  department is — and only one of them is a thing to go and fix. */
+  scope?: string | null
 }) {
   return (
     <ReactFlowProvider>
@@ -55,11 +59,13 @@ function Chart({
   focused,
   onFocus,
   commissionHref,
+  scope,
 }: {
   salespeople: SalesPerson[]
   focused: string | null
   onFocus: (staffId: string | null) => void
   commissionHref: string | null
+  scope?: string | null
 }) {
   const { setCenter } = useReactFlow()
 
@@ -183,7 +189,9 @@ function Chart({
       <div>
         <div className="py-10 px-4 text-center border border-hairline rounded-card bg-surface">
           <p className="font-serif italic text-muted text-sm">
-            Nobody is on the commission ladder yet.
+            {scope
+              ? `Nobody in ${scope} is on the commission ladder.`
+              : 'Nobody is on the commission ladder yet.'}
           </p>
         </div>
         {link}
