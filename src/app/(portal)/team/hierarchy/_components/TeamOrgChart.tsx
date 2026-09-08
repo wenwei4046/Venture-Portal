@@ -27,6 +27,7 @@ import {
   type OrgNodeInput,
 } from '@/lib/org-layout'
 import { ladderAllows, ladderRefusal } from '@/lib/ladder'
+import { boundaryRefusal } from '@/lib/hierarchy-boundary'
 import { ratePct } from '@/lib/commission/ranks'
 import type { MirrorOutcome } from '@/lib/hierarchy-mirror'
 import { setReportsTo } from '../actions'
@@ -39,6 +40,9 @@ export interface ChartPerson {
   code: string | null
   title: string | null
   department: string | null
+  /** True in a department the commission engine pays. The reporting line may
+   *  not cross that department's edge — `lib/hierarchy-boundary.ts`. */
+  commissionDept: boolean
   /** Where their title stands on the ladder. Null when it is not placed —
    *  the ladder then has nothing to say about them. */
   levelRank: number | null
@@ -197,15 +201,21 @@ function Chart({
   const layout = useMemo(() => layoutTree(graph), [graph])
 
   /** Everything the person being dragged may not be dropped on: their own
-   *  reports, and anybody the ladder ranks below them. */
+   *  reports, anybody the ladder ranks below them, and — since 2026-09-08 —
+   *  everybody on the other side of a commission department's edge. The
+   *  boundary is checked here as well as on the server because it is the only
+   *  one of the three with no database trigger behind it: a card that cannot
+   *  be dropped on is a rule explained before it is broken, and the server
+   *  message is what somebody gets when they got past this. */
   const forbidden = useMemo(() => {
     if (!dragging) return new Set<string>()
     const out = descendantsOf(graph, dragging)
     out.add(dragging)
     const mover = byId.get(dragging)
-    if (mover && mover.levelRank !== null) {
+    if (mover) {
       for (const p of visible) {
-        if (!ladderAllows(mover.levelRank, p.levelRank)) out.add(p.id)
+        if (mover.levelRank !== null && !ladderAllows(mover.levelRank, p.levelRank)) out.add(p.id)
+        if (p.commissionDept !== mover.commissionDept) out.add(p.id)
       }
     }
     return out
@@ -302,6 +312,15 @@ function Chart({
               { name: parent.name, title: parent.title, level: parent.levelName },
             ),
           )
+          return
+        }
+        // `forbidden` already refuses this drop, so reaching here means the
+        // gesture arrived by some other route — the table's picker, a keyboard
+        // drop, a page held open across a department change. Said in full
+        // rather than swallowed: the same sentence the server would return.
+        const crossing = boundaryRefusal(child, parent)
+        if (crossing) {
+          setError(crossing)
           return
         }
       }

@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { compareByLadder, ladderAllows, ladderRefusal } from '@/lib/ladder'
+import { boundaryRefusal } from '@/lib/hierarchy-boundary'
 import { ratePct } from '@/lib/commission/ranks'
 import { ErrorNote } from '@/components/RowForm'
 import LedgerRow from '@/components/LedgerRow'
@@ -170,6 +171,15 @@ export default function StaffTable({
           { name: manager.name, title: manager.title, level: manager.levelName },
         ),
       )
+      return
+    }
+    // The manager they already have stays in the list even when a rule now
+    // refuses them — a controlled <select> whose value matches no option lies
+    // about who somebody reports to. So a crossing line CAN be re-picked here,
+    // and this is where it is caught rather than sent to the server.
+    const crossing = manager ? boundaryRefusal(person, manager) : null
+    if (crossing) {
+      setError(crossing)
       return
     }
     run(person.id, async () => {
@@ -401,7 +411,14 @@ export default function StaffTable({
                               // renders the first one, so filtering them out made
                               // every broken row claim to report to nobody —
                               // directly under a warning saying the opposite.
-                              (m.id === p.reportsTo || ladderAllows(p.levelRank, m.levelRank)),
+                              (m.id === p.reportsTo ||
+                                // Two rules, one exemption. The second is the
+                                // department boundary: a commission
+                                // department's reporting line is also its
+                                // commission upline, so it may not leave —
+                                // `lib/hierarchy-boundary.ts`.
+                                (ladderAllows(p.levelRank, m.levelRank) &&
+                                  m.commissionDept === p.commissionDept)),
                           )
                           .sort((a, b) => a.name.localeCompare(b.name))
                           .map(m => (

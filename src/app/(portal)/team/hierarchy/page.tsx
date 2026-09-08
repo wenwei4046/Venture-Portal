@@ -54,7 +54,7 @@ export default async function TeamHierarchyPage() {
       supabase
         .from('hr_staff_costs')
         .select(
-          'id, employee_name, employee_code, reports_to, designation, title_id, titles(name, level_id), departments(name)',
+          'id, employee_name, employee_code, reports_to, designation, title_id, titles(name, level_id), departments(name, payroll_source)',
         )
         .eq('status', 'active')
         .order('employee_name'),
@@ -107,7 +107,7 @@ export default async function TeamHierarchyPage() {
     designation: string | null
     title_id: string | null
     titles: { name: string; level_id: string | null } | null
-    departments: { name: string } | null
+    departments: { name: string; payroll_source: string } | null
   }>
 
   const people: ChartPerson[] = staff.map(s => {
@@ -119,6 +119,9 @@ export default async function TeamHierarchyPage() {
       code: s.employee_code,
       title: s.titles?.name ?? s.designation ?? null,
       department: s.departments?.name ?? null,
+      // The one department fact the chart decides on rather than merely prints:
+      // a reporting line may not cross the edge of a commission department.
+      commissionDept: s.departments?.payroll_source === 'commission',
       levelRank: rung?.rank ?? null,
       levelName: rung?.name ?? null,
       reportsTo: s.reports_to,

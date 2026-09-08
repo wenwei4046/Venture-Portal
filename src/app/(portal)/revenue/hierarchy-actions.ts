@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { promotesTo, titleCanRecruit, type LadderRung } from '@/lib/commission/titles'
 import { canAccessTeam } from '@/lib/roles'
+import { boundaryRefusal, type BoundaryPerson } from '@/lib/hierarchy-boundary'
 import type { PermissionHolder } from '@/lib/permissions'
 import {
   mirrorDecision,
@@ -55,6 +56,12 @@ interface LadderRow {
   sort_order: number
   titles: { name: string } | { name: string }[] | null
 }
+
+/** A `departments` embed, in either shape PostgREST returns it in. */
+type DeptEmbed =
+  | { name: string; payroll_source: string }
+  | Array<{ name: string; payroll_source: string }>
+  | null
 
 function one<T>(v: T | T[] | null | undefined): T | null {
   if (!v) return null
@@ -187,14 +194,50 @@ export async function setPosition(input: PositionInput): Promise<MirrorOutcome> 
         .eq('staff_id', input.uplineStaffId)
         .is('effective_to', null)
         .maybeSingle(),
-      supabase.from('hr_staff_costs').select('title_id').eq('id', input.uplineStaffId).maybeSingle(),
+      // BOTH people, where this used to read only the upline's title. The
+      // department boundary (2026-09-08) is a question about the pair, and this
+      // canvas is not the place it can be answered from the client: it loads
+      // one commission department and cannot even OFFER an outsider, so
+      // anything that reaches here across the edge arrived by another route.
+      supabase
+        .from('hr_staff_costs')
+        .select('id, employee_name, title_id, departments (name, payroll_source)')
+        .in('id', [input.staffId, input.uplineStaffId]),
     ])
 
     if (!uplineRow) {
       throw new Error('That upline has no active position — place them first')
     }
+
+    const staffRows = (uplineStaff ?? []) as unknown as Array<{
+      id: string
+      employee_name: string
+      title_id: string | null
+      departments: DeptEmbed
+    }>
+    const asBoundary = (id: string): BoundaryPerson | null => {
+      const row = staffRows.find(s => s.id === id)
+      if (!row) return null
+      const dept = one(row.departments)
+      return {
+        name: row.employee_name,
+        department: dept?.name ?? null,
+        commissionDept: dept?.payroll_source === 'commission',
+      }
+    }
+    const mover = asBoundary(input.staffId)
+    const upline = asBoundary(input.uplineStaffId)
+    // Refused before the position is written, not after: this action mirrors
+    // into `reports_to`, so a crossing placement would draw the crossing line
+    // as well — and the override would be paid to somebody the Revenue chart
+    // does not draw at all.
+    if (mover && upline) {
+      const crossing = boundaryRefusal(mover, upline)
+      if (crossing) throw new Error(crossing)
+    }
+
     const rank = one((uplineRow as unknown as { comm_ranks: { label: string; can_recruit: boolean } | { label: string; can_recruit: boolean }[] | null }).comm_ranks)
-    const uplineTitle = ((uplineStaff as { title_id: string | null } | null)?.title_id ?? null)
+    const uplineTitle = staffRows.find(s => s.id === input.uplineStaffId)?.title_id ?? null
     const byTitle = titleCanRecruit(rungs(ladder), uplineTitle)
     const allowed = byTitle ?? rank?.can_recruit ?? true
     if (!allowed) {

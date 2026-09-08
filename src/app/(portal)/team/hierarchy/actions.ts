@@ -19,6 +19,7 @@ import {
   writeReportsTo,
   type OpenPosition,
 } from '@/lib/hierarchy-writes'
+import { boundaryRefusal } from '@/lib/hierarchy-boundary'
 import { titleCanRecruit } from '@/lib/commission/titles'
 import { setPosition } from '../../revenue/hierarchy-actions'
 
@@ -49,6 +50,12 @@ import { setPosition } from '../../revenue/hierarchy-actions'
  *
  * The canvas refuses an illegal move before calling this, and the database
  * trigger refuses it again. This layer's job is the round trip and the message.
+ *
+ * With ONE exception, added 2026-09-08: the department boundary
+ * (`lib/hierarchy-boundary.ts`) has no trigger behind it. The canvas hides the
+ * move and this check is the only thing that refuses it, so it runs before the
+ * write rather than after — a reporting line that has already crossed cannot be
+ * un-crossed without knowing what it used to be.
  */
 export async function setReportsTo(
   staffId: string,
@@ -62,6 +69,21 @@ export async function setReportsTo(
   }
 
   const supabase = await createClient()
+
+  // Both people are read from the roster rather than trusted from the client:
+  // the department is what the refusal turns on, and a page held open while
+  // somebody was moved between departments would otherwise decide on a stale
+  // one. The mover is read even for a detach, because a detach still has to
+  // prove the mover exists before `writeReportsTo` reports a row it cannot find
+  // as "could not move them".
+  const roster = await loadStaff(supabase, [staffId, reportsToId])
+  const mover = roster.get(staffId)
+  if (!mover) throw new Error('That person is no longer on the roster')
+  const manager = reportsToId ? (roster.get(reportsToId) ?? null) : null
+  if (reportsToId && !manager) throw new Error('That manager is no longer on the roster')
+
+  const refusal = boundaryRefusal(mover, manager)
+  if (refusal) throw new Error(refusal)
 
   await writeReportsTo(supabase, staffId, reportsToId)
 
@@ -239,6 +261,11 @@ interface StaffRow {
   status: string | null
   reports_to: string | null
   title_id: string | null
+  /** PostgREST returns an embed as an object or a one-element array. Both. */
+  departments:
+    | { name: string; payroll_source: string }
+    | Array<{ name: string; payroll_source: string }>
+    | null
 }
 
 /** What the roster knows about somebody these actions have to name or trust. */
@@ -254,6 +281,14 @@ interface StaffFacts {
    * rule `setPosition` and `movePositionUpline` both apply.
    */
   titleId: string | null
+  /** Where they work, for a sentence. Null is a real state, not a read failure. */
+  department: string | null
+  /**
+   * True in a department the commission engine pays. The one fact
+   * `lib/hierarchy-boundary.ts` decides on: inside such a department the
+   * reporting line is also the commission upline, so it may not leave.
+   */
+  commissionDept: boolean
 }
 
 async function loadStaff(
@@ -265,21 +300,26 @@ async function loadStaff(
 
   const { data, error } = await supabase
     .from('hr_staff_costs')
-    .select('id, employee_name, status, reports_to, title_id')
+    .select('id, employee_name, status, reports_to, title_id, departments (name, payroll_source)')
     .in('id', wanted)
   if (error) throw new Error(`Could not read the roster: ${error.message}`)
 
   return new Map(
-    ((data ?? []) as unknown as StaffRow[]).map(r => [
-      r.id,
-      {
-        id: r.id,
-        name: r.employee_name,
-        active: r.status === 'active',
-        reportsTo: r.reports_to,
-        titleId: r.title_id,
-      },
-    ]),
+    ((data ?? []) as unknown as StaffRow[]).map(r => {
+      const dept = Array.isArray(r.departments) ? (r.departments[0] ?? null) : r.departments
+      return [
+        r.id,
+        {
+          id: r.id,
+          name: r.employee_name,
+          active: r.status === 'active',
+          reportsTo: r.reports_to,
+          titleId: r.title_id,
+          department: dept?.name ?? null,
+          commissionDept: dept?.payroll_source === 'commission',
+        },
+      ]
+    }),
   )
 }
 
@@ -449,6 +489,16 @@ export async function enrolAndCompleteMove(
       note: `${mover.name} no longer reports to ${manager.name} — the reporting line changed since this was offered, so nothing was changed. Move them again if you still meant it.`,
     }
   }
+
+  // The department boundary, checked a second time and not redundantly.
+  // `setReportsTo` stops a crossing line from being DRAWN, so no offer to enrol
+  // across one can be produced any more — but this action is exported, and a
+  // line drawn before the rule existed is still sitting in the roster waiting
+  // to be completed. Enrolling on the strength of one is exactly the bug the
+  // rule was written for: the manager would earn the override, and the Revenue
+  // chart would not show them.
+  const refusal = boundaryRefusal(mover, manager)
+  if (refusal) return { mirrored: false, note: `${refusal} Nothing was changed.` }
 
   const before = await loadOpenPositions(supabase)
 

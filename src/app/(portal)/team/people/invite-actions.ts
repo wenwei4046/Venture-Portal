@@ -5,6 +5,10 @@ import { adminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { validateInvite } from '@/lib/invite'
+import { boundaryRefusal } from '@/lib/hierarchy-boundary'
+
+/** The two department facts a boundary decision turns on. */
+type DeptFacts = { name: string; payroll_source: string } | null
 
 /**
  * Giving somebody an account.
@@ -60,14 +64,63 @@ export async function inviteUser(formData: FormData): Promise<void> {
     .maybeSingle()
   if (emailTaken) throw new Error('That email already has an account')
 
+  let existingDeptId: string | null = null
   if (staffId) {
     const { data: person } = await supabase
       .from('hr_staff_costs')
-      .select('id, employee_name, user_id')
+      .select('id, employee_name, user_id, department_id')
       .eq('id', staffId)
       .maybeSingle()
     if (!person) throw new Error('That person is no longer on the roster')
     if (person.user_id) throw new Error(`${person.employee_name} already has an account`)
+    existingDeptId = person.department_id
+  }
+
+  // The department boundary — `lib/hierarchy-boundary.ts`. Checked here for two
+  // reasons. This path writes `reports_to` and `department_id` in ONE statement
+  // and has never gone through `setReportsTo`, so it is the other place a
+  // reporting line can be drawn; and it must fail BEFORE the credential exists,
+  // beside the other pre-flight checks, or a refusal costs an auth user that
+  // then has to be deleted again.
+  if (reportsTo) {
+    const { data: managerRow } = await supabase
+      .from('hr_staff_costs')
+      .select('employee_name, departments (name, payroll_source)')
+      .eq('id', reportsTo)
+      .maybeSingle()
+    if (!managerRow) throw new Error('That manager is no longer on the roster')
+
+    // Where the invitee ENDS UP, which is not always where they are now: the
+    // form's department wins when it set one, and an existing person keeps
+    // theirs when it did not.
+    const deptId = departmentId ?? existingDeptId
+    let ownDept: DeptFacts = null
+    if (deptId) {
+      const { data } = await supabase
+        .from('departments')
+        .select('name, payroll_source')
+        .eq('id', deptId)
+        .maybeSingle()
+      ownDept = data as DeptFacts
+    }
+
+    const embed = (managerRow as unknown as { employee_name: string; departments: DeptFacts | DeptFacts[] })
+      .departments
+    const managerDept: DeptFacts = Array.isArray(embed) ? (embed[0] ?? null) : embed
+
+    const crossing = boundaryRefusal(
+      {
+        name,
+        department: ownDept?.name ?? null,
+        commissionDept: ownDept?.payroll_source === 'commission',
+      },
+      {
+        name: (managerRow as { employee_name: string }).employee_name,
+        department: managerDept?.name ?? null,
+        commissionDept: managerDept?.payroll_source === 'commission',
+      },
+    )
+    if (crossing) throw new Error(crossing)
   }
 
   const { data: created, error: authError } = await adminClient().auth.admin.createUser({
