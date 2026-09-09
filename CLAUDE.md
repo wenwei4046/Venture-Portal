@@ -184,6 +184,12 @@ table-level scopes RLS asks about, so a title cannot be granted a page whose
 queries then come back empty.
   App:  `requirePermission('treasury')`, `can(user, 'reports')`, `canAccessX(user)`
   DB:   `(SELECT has_scope(ARRAY['treasury']))`
+        The same wrapping is mandatory for `current_user_role()`,
+        `current_user_segment()` and `current_user_department_id()` inside a
+        policy: `(select current_user_role())`. Bare, Postgres re-runs the
+        `users` lookup for EVERY ROW the policy checks (mig 20260909150000
+        fixed 18 such policies; the `users` table had been scanned 32.6M
+        times). The migration ends with a guard that fails if one comes back.
 A title with NO permissions of its own falls back to the role its holder's
 account was created with — which is why the cutover changed nobody's access.
 `users.role` survives ONLY for that fallback and for the 16 dept_manager
