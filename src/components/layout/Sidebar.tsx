@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import type { NavViewer } from './nav-config'
 import {
   buildNavEntries,
@@ -29,7 +29,6 @@ export default function Sidebar({ viewer, navData }: SidebarProps) {
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
   const basisParam = searchParams.get('basis')
-  const router = useRouter()
 
   const visible = buildNavEntries(navData).filter((entry) => entry.visible(viewer))
 
@@ -72,20 +71,13 @@ export default function Sidebar({ viewer, navData }: SidebarProps) {
     setGroupOpen((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
-  // Eagerly prefetch ALL visible routes on mount for instant navigation
-  useEffect(() => {
-    const prefetch = (entries: NavEntry[]) => {
-      for (const entry of entries) {
-        if (isGroup(entry)) {
-          if (entry.href && entry.href !== pathname) router.prefetch(entry.href)
-          prefetch(entry.children)
-        } else if (entry.href !== pathname) {
-          router.prefetch(entry.href)
-        }
-      }
-    }
-    prefetch(visible)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // No eager prefetch (2026-09-09). This used to `router.prefetch()` every
+  // visible route on mount, and `useRouter().prefetch` defaults to a FULL
+  // prefetch — the server rendered all ~24 pages (auth, permissions and each
+  // page's own queries, journal scans included) within seconds of every hard
+  // load, and any button pressed during that window queued behind them. The
+  // `<Link>`s below keep Next's default prefetch, which for these dynamic
+  // routes fetches only the loading boundary, on hover and in-viewport.
 
   // Auto-open every group on the way to the page being read — both Revenue and
   // the sub-department inside it, so arriving at /revenue/fair/rules from a
