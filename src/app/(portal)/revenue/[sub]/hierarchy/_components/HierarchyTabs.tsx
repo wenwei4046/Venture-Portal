@@ -65,9 +65,9 @@ export default function HierarchyTabs({
               </>
             ) : (
               <>
-                Drag somebody onto a team member to move them, or draw a line from a manager down
-                to them. Every move writes a new dated position — a month already computed keeps
-                the chart it was computed against.
+                Every card names its upline — change it there, or drag the card onto somebody.
+                Cards stay where you put them; Tidy lines them up again. Every move writes a new
+                dated position — a month already computed keeps the chart it was computed against.
               </>
             )}
           </p>
