@@ -1,17 +1,32 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type CSSProperties,
+} from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Background,
-  Controls,
+  BackgroundVariant,
   Handle,
   Position,
   ReactFlow,
   ReactFlowProvider,
+  ViewportPortal,
+  getSmoothStepPath,
   useNodesState,
+  useReactFlow,
+  useViewport,
   type Connection,
   type Edge,
+  type EdgeProps,
   type Node,
   type NodeProps,
   type OnNodeDrag,
@@ -20,13 +35,27 @@ import '@xyflow/react/dist/style.css'
 import {
   descendantsOf,
   layoutTree,
-  wouldCycle,
   NODE_HEIGHT,
   NODE_WIDTH,
   type OrgNodeInput,
 } from '@/lib/org-layout'
 import { layoutParent, isBorrowed } from '@/lib/commission/chart-shape'
+import {
+  forbiddenTargets,
+  moveRefusal,
+  refusalLabel,
+  refusalSentence,
+  shelfIds,
+  type RefusalKind,
+} from '@/lib/commission/chart-moves'
+import {
+  readManualLayout,
+  writeManualLayout,
+  type ManualLayout,
+  type XY,
+} from '@/lib/commission/chart-layout-store'
 import { setPosition } from '../../../hierarchy-actions'
+import MovePopover, { subjectOf, type PopAnchor } from './MovePopover'
 
 export interface OrgRank {
   id: string
@@ -46,6 +75,8 @@ export interface OrgPerson {
   code: string | null
   /** The title they HOLD — the ratchet; may sit above the rank they are paid. */
   titleName: string | null
+  /** Its id, so placing somebody can offer their title's own rung first. */
+  titleId: string | null
   uplineStaffId: string | null
   /**
    * Their manager on the company chart. Drawn, never written from here.
@@ -67,25 +98,69 @@ export interface OrgPerson {
 
 interface CardData extends Record<string, unknown> {
   person: OrgPerson
+  uplineName: string | null
+  borrowName: string | null
+  /** While somebody is dragged: this card may not take them. */
   invalidTarget: boolean
+  /** While somebody is dragged: this card may. */
+  canTake: boolean
   selected: boolean
+  /** The card under the pointer right now, and whether dropping there is refused. */
+  target: boolean
+  bad: boolean
+  /** Just moved — a halo while the tree settles around them. */
+  fresh: boolean
 }
 
-type CardNode = Node<CardData>
+type CardNode = Node<CardData, 'person'>
+type LineEdge = Edge<{ borrow: boolean; fresh: boolean }, 'line'>
+
+/** The card's Upline row asks the chart to open the popover for it. */
+const OpenUpline = createContext<(staffId: string, anchor: PopAnchor) => void>(() => {})
+
+const SHELF_GAP = 96
+const SHELF_ROW = NODE_HEIGHT + 14
+const GLIDE_MS = 500
+/** Overshoots a little on the way in — the card lands, it does not stop. */
+const easeOutBack = (t: number) => 1 + 2.70158 * Math.pow(t - 1, 3) + 1.70158 * Math.pow(t - 1, 2)
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+const storage = () => (typeof window === 'undefined' ? null : window.localStorage)
+/** React Flow hands a drag either a mouse or a touch event; the pointer is in one of two places. */
+const pointerOf = (e: MouseEvent | TouchEvent): { x: number; y: number } => {
+  if ('touches' in e) {
+    const t = e.touches[0] ?? e.changedTouches[0]
+    return { x: t?.clientX ?? 0, y: t?.clientY ?? 0 }
+  }
+  return { x: e.clientX, y: e.clientY }
+}
 
 /**
  * The org chart canvas.
  *
- * Two ways to move somebody, because the brief asked for both: drop their card
- * onto a manager, or draw a line from the manager's bottom handle to their top
- * handle. Both funnel into the same `setPosition`, which is what writes the new
- * dated row.
+ * Three ways to move somebody, and they all funnel into `setPosition`, which
+ * writes the new dated row:
  *
- * Illegal drops are refused HERE, before the round trip, so the refusal is
- * instant and explains itself: a rank that may not recruit cannot take
- * downlines, and nobody may be dropped under their own downline. The database
- * trigger is still the backstop — a cycle would be a silent money bug in the
- * override roll-up, not a crash, so it is guarded twice.
+ *   the Upline row   every card's last line names their upline and is a
+ *                    button — a popover lists the chart by tree, greys anybody
+ *                    who may not take them and says why, and ends in "Top of
+ *                    their own tree" (the detach);
+ *   a drop           drag the card onto somebody; the cards that may take
+ *                    them light up while it is in the air, the one under the
+ *                    pointer says "→ under NAME", and a refused one says why;
+ *   a line           the handles are still there for anybody who liked them.
+ *
+ * A card dropped on nothing STAYS there (user 2026-09-09: the snap-back read
+ * as the chart refusing to be moved) — remembered per browser and scheme, and
+ * forgotten by Tidy or by any move, because a moved tree has a new shape.
+ *
+ * Illegal drops are refused HERE, before the round trip, in the sentence the
+ * server would have used (`chart-moves.ts`). The database trigger is still
+ * the backstop — a cycle would be a silent money bug in the override roll-up.
+ *
+ * The canvas re-declares its palette (`.org-canvas` in globals.css): the old
+ * card sat on a ground of its own colour, ΔL* 0.0, and the user could not
+ * tell the cards from the background.
  */
 export default function OrgChart(props: { people: OrgPerson[]; ranks: OrgRank[]; schemeId: string }) {
   return (
@@ -105,13 +180,22 @@ function Chart({
   schemeId: string
 }) {
   const router = useRouter()
+  const { screenToFlowPosition, fitView, setCenter, zoomIn, zoomOut, getZoom } = useReactFlow()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const [dragging, setDragging] = useState<string | null>(null)
+  const [hover, setHover] = useState<{ id: string; bad: boolean } | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  const [fresh, setFresh] = useState<string | null>(null)
+  const [pop, setPop] = useState<{ moverId: string; anchor: PopAnchor; placeUnder: string | null } | null>(
+    null,
+  )
+  const [find, setFind] = useState('')
+  const [entering, setEntering] = useState(true)
 
   const byId = useMemo(() => new Map(people.map(p => [p.staffId, p])), [people])
+  const subjects = useMemo(() => people.map(subjectOf), [people])
 
   /**
    * The commission tree, and only that.
@@ -127,97 +211,225 @@ function Chart({
   )
 
   /**
-   * The same people, arranged the way the company is.
-   *
-   * Anybody holding no position has no commission upline to be drawn under,
-   * so this chart used to stand them all at the top level: with most of a
-   * sub-department not yet placed, the page was a row of loose cards while
-   * `/team/hierarchy` drew the same people as a tree. The two disagreed about
-   * the shape of a department that has only one shape.
-   *
-   * So an unplaced person is drawn under the manager they REPORT to, and the
-   * edge is dashed to say the borrowing out loud. Three things this is not:
-   *
-   *   It is not a claim about money. A dashed edge means nobody earns an
-   *   override on that person yet — the card still reads "not placed", and
-   *   the rate column still reads an em dash.
-   *
-   *   It is not applied to a placed person. A position with a null upline is
-   *   somebody deliberately at the top of their tree, which is a fact, not a
-   *   gap to fill in.
-   *
-   *   It is not a write. Placing them stays a deliberate act, because
-   *   `comm_hierarchy.rank_id` is NOT NULL and no rank can be invented for
-   *   somebody whose title carries none.
-   *
-   * `layoutTree` makes a node its own root when its parent is missing or the
-   * chain loops, so a borrowed line that points outside this sub-department
-   * costs the reader nothing.
+   * The same people, arranged the way the company is: an unplaced person is
+   * drawn under the manager they REPORT to, dashed (`chart-shape.ts`). Anybody
+   * on no line at all waits on the shelf instead of standing in the leaders'
+   * row — `shelfIds`.
    */
-  const layoutGraph: OrgNodeInput[] = useMemo(
-    () => people.map(p => ({ id: p.staffId, parentId: layoutParent(p), label: p.name })),
+  const shelf = useMemo(
+    () =>
+      shelfIds(
+        people.map(p => ({ staffId: p.staffId, placed: p.rankId !== null, layoutParentId: layoutParent(p) })),
+      ),
     [people],
   )
-
+  const layoutGraph: OrgNodeInput[] = useMemo(
+    () =>
+      people
+        .filter(p => !shelf.has(p.staffId))
+        .map(p => ({ id: p.staffId, parentId: layoutParent(p), label: p.name })),
+    [people, shelf],
+  )
   const layout = useMemo(() => layoutTree(layoutGraph), [layoutGraph])
 
-  /** Everything the person being dragged may not be dropped on. */
-  const forbidden = useMemo(() => {
-    if (!dragging) return new Set<string>()
-    const out = descendantsOf(graph, dragging)
-    out.add(dragging)
-    for (const p of people) if (!p.canRecruit) out.add(p.staffId)
+  /** Where the tidy layout puts everyone — the trees, then the shelf to their right. */
+  const tidy = useMemo(() => {
+    const positions = new Map<string, XY>()
+    for (const [id, p] of layout.positions) positions.set(id, { x: p.x, y: p.y })
+    const shelved = people
+      .filter(p => shelf.has(p.staffId))
+      .sort((a, b) => a.name.localeCompare(b.name))
+    const shelfX = layout.width > 0 ? layout.width + SHELF_GAP : 0
+    shelved.forEach((p, i) => positions.set(p.staffId, { x: shelfX, y: i * SHELF_ROW }))
+    return {
+      positions,
+      shelfX,
+      shelfCount: shelved.length,
+      height: Math.max(layout.height, shelved.length ? shelved.length * SHELF_ROW - 14 : 0),
+    }
+  }, [layout, people, shelf])
+
+  // Where the reader left each card, if anywhere. Read once on the client —
+  // never during the server render — then owned by this ref.
+  const manualRef = useRef<ManualLayout>(new Map())
+  const [manualLoaded, setManualLoaded] = useState(false)
+  useEffect(() => {
+    manualRef.current = readManualLayout(storage(), schemeId)
+    setManualLoaded(true)
+  }, [schemeId])
+
+  const targetsFor = useCallback(() => {
+    const out = new Map<string, XY>()
+    for (const p of people) {
+      out.set(p.staffId, manualRef.current.get(p.staffId) ?? tidy.positions.get(p.staffId) ?? { x: 0, y: 0 })
+    }
     return out
-  }, [dragging, graph, people])
+  }, [people, tidy])
+
+  const [nodes, setNodes, onNodesChange] = useNodesState<CardNode>([])
+  const nodesRef = useRef<CardNode[]>([])
+  useEffect(() => {
+    nodesRef.current = nodes
+  }, [nodes])
 
   /**
-   * The cards, laid out. `initialWidth` / `initialHeight` are what the card
-   * renders at, so the geometry below never sees a zero-sized rect before the
-   * canvas has measured a node.
+   * Glide the cards to new places over half a second, through the node state,
+   * so React Flow redraws the edges every frame and the lines follow the
+   * cards rather than jumping ahead of them.
    */
-  const laidOut = useCallback(
-    (): CardNode[] =>
-      people.map(p => {
-        const pos = layout.positions.get(p.staffId)!
-        return {
-          id: p.staffId,
-          type: 'person',
-          position: { x: pos.x, y: pos.y },
-          initialWidth: NODE_WIDTH,
-          initialHeight: NODE_HEIGHT,
-          data: { person: p, invalidTarget: false, selected: false },
-          draggable: true,
+  const animRef = useRef<number | null>(null)
+  const glide = useCallback(
+    (targets: Map<string, XY>, onDone?: () => void) => {
+      if (animRef.current) cancelAnimationFrame(animRef.current)
+      if (prefersReducedMotion()) {
+        setNodes(prev =>
+          prev.map(n => {
+            const to = targets.get(n.id)
+            return to ? { ...n, position: to } : n
+          }),
+        )
+        onDone?.()
+        return
+      }
+      const from = new Map<string, XY>()
+      const t0 = performance.now()
+      const step = (now: number) => {
+        const t = Math.min(1, (now - t0) / GLIDE_MS)
+        const k = easeOutBack(t)
+        setNodes(prev =>
+          prev.map(n => {
+            const to = targets.get(n.id)
+            if (!to) return n
+            let f = from.get(n.id)
+            if (!f) {
+              f = { ...n.position }
+              from.set(n.id, f)
+            }
+            return { ...n, position: { x: f.x + (to.x - f.x) * k, y: f.y + (to.y - f.y) * k } }
+          }),
+        )
+        if (t < 1) animRef.current = requestAnimationFrame(step)
+        else {
+          animRef.current = null
+          onDone?.()
         }
-      }),
-    [people, layout],
+      }
+      animRef.current = requestAnimationFrame(step)
+    },
+    [setNodes],
+  )
+  useEffect(
+    () => () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current)
+    },
+    [],
   )
 
-  // Controlled nodes, so the canvas can move a card while it is dragged
-  // (React Flow only updates positions through onNodesChange) and can keep
-  // the size it measured on each node. Without both, a drag did not move the
-  // card and every drop landed on a zero-sized rect that "overlapped"
-  // everyone — the first unplaced person on the roster got the position.
-  const [nodes, setNodes, onNodesChange] = useNodesState<CardNode>(laidOut())
-
-  /** Fresh people or a fresh layout: re-lay the cards, keeping what was measured. */
+  /**
+   * The cards, laid out. Fresh people or a fresh layout: keep each card's
+   * measured size and its current place, then glide it to where it now
+   * belongs — except the very first time, when there is nothing to glide from.
+   */
+  const firstLayout = useRef(true)
   useEffect(() => {
+    if (!manualLoaded) return
+    const targets = targetsFor()
+    const names = new Map(people.map(p => [p.staffId, p.name]))
     setNodes(prev => {
-      const measured = new Map(prev.map(n => [n.id, n.measured]))
-      return laidOut().map(n => ({ ...n, measured: measured.get(n.id) }))
+      const have = new Map(prev.map(n => [n.id, n]))
+      return people.map((p, i) => {
+        const old = have.get(p.staffId)
+        const to = targets.get(p.staffId)!
+        return {
+          id: p.staffId,
+          type: 'person' as const,
+          position: old ? old.position : to,
+          initialWidth: NODE_WIDTH,
+          initialHeight: NODE_HEIGHT,
+          measured: old?.measured,
+          draggable: true,
+          style: { '--i': i } as CSSProperties,
+          data: {
+            person: p,
+            uplineName: p.uplineStaffId ? (names.get(p.uplineStaffId) ?? null) : null,
+            borrowName: isBorrowed(p) && p.reportsTo ? (names.get(p.reportsTo) ?? null) : null,
+            invalidTarget: old?.data.invalidTarget ?? false,
+            canTake: old?.data.canTake ?? false,
+            selected: old?.data.selected ?? false,
+            target: old?.data.target ?? false,
+            bad: old?.data.bad ?? false,
+            fresh: old?.data.fresh ?? false,
+          },
+        }
+      })
     })
-  }, [laidOut, setNodes])
+    if (firstLayout.current) {
+      firstLayout.current = false
+      return
+    }
+    glide(targets)
+  }, [people, tidy, manualLoaded, targetsFor, glide, setNodes])
 
-  /** Greying and selection are card data; the cards themselves stay put. */
+  // The entrance plays once, for the cards that were there when the chart
+  // opened; a card that arrives later should simply be there.
+  useEffect(() => {
+    if (!manualLoaded) return
+    const t = window.setTimeout(() => setEntering(false), 1400)
+    return () => window.clearTimeout(t)
+  }, [manualLoaded])
+
+  /** Everything the person being dragged may not be dropped on, and why. */
+  const forbidden = useMemo(
+    () => (dragging ? forbiddenTargets(graph, subjects, dragging) : new Map<string, RefusalKind>()),
+    [dragging, graph, subjects],
+  )
+
+  /** Greying, selection and the halo are card data; the cards themselves stay put. */
   useEffect(() => {
     setNodes(prev =>
       prev.map(n => {
-        const invalidTarget = forbidden.has(n.id)
+        const invalidTarget = !!dragging && n.id !== dragging && forbidden.has(n.id)
+        const canTake = !!dragging && n.id !== dragging && !forbidden.has(n.id)
         const isSelected = selected === n.id
-        if (n.data.invalidTarget === invalidTarget && n.data.selected === isSelected) return n
-        return { ...n, data: { ...n.data, invalidTarget, selected: isSelected } }
+        const isTarget = hover?.id === n.id
+        const isBad = isTarget && !!hover?.bad
+        const isFresh = fresh === n.id
+        const d = n.data
+        if (
+          d.invalidTarget === invalidTarget &&
+          d.canTake === canTake &&
+          d.selected === isSelected &&
+          d.target === isTarget &&
+          d.bad === isBad &&
+          d.fresh === isFresh
+        ) {
+          return n
+        }
+        return {
+          ...n,
+          data: { ...d, invalidTarget, canTake, selected: isSelected, target: isTarget, bad: isBad, fresh: isFresh },
+        }
       }),
     )
-  }, [forbidden, selected, setNodes])
+  }, [dragging, forbidden, selected, hover, fresh, setNodes])
+
+  // The halo and the drawn-in line are for the move just made, not forever.
+  useEffect(() => {
+    if (!fresh) return
+    const t = window.setTimeout(() => setFresh(null), 1800)
+    return () => window.clearTimeout(t)
+  }, [fresh])
+
+  // Once the tree has re-tidied around the moved card, bring it into view.
+  useEffect(() => {
+    if (!fresh) return
+    const pos = tidy.positions.get(fresh)
+    if (!pos) return
+    const t = window.setTimeout(() => {
+      void setCenter(pos.x + NODE_WIDTH / 2, pos.y + NODE_HEIGHT / 2, { zoom: getZoom(), duration: 400 })
+    }, GLIDE_MS + 40)
+    return () => window.clearTimeout(t)
+  }, [fresh, tidy, setCenter, getZoom])
 
   /**
    * Solid where somebody earns an override, dashed where the shape was
@@ -225,238 +437,512 @@ function Chart({
    * solid one is a money relationship and the dashed one is the absence of
    * one, so they are told apart before they are read.
    */
-  const edges: Edge[] = useMemo(() => {
-    const real: Edge[] = people
-      .filter(p => p.uplineStaffId && byId.has(p.uplineStaffId))
-      .map(p => ({
-        id: `${p.uplineStaffId}->${p.staffId}`,
-        source: p.uplineStaffId!,
-        target: p.staffId,
-        type: 'smoothstep',
-        style: { stroke: 'var(--hairline-strong, #b9b0a2)', strokeWidth: 1.5 },
-      }))
-
-    const borrowed: Edge[] = people
-      .filter(p => isBorrowed(p) && byId.has(p.reportsTo!))
-      .map(p => ({
-        id: `reports:${p.reportsTo}->${p.staffId}`,
-        source: p.reportsTo!,
-        target: p.staffId,
-        type: 'smoothstep',
-        style: {
-          stroke: 'rgb(var(--muted))',
-          strokeWidth: 1.25,
-          strokeDasharray: '5 4',
-          opacity: 0.7,
-        },
-      }))
-
-    return [...real, ...borrowed]
-  }, [people, byId])
+  const edges: LineEdge[] = useMemo(() => {
+    const out: LineEdge[] = []
+    for (const p of people) {
+      if (p.uplineStaffId && byId.has(p.uplineStaffId)) {
+        const isFresh = fresh === p.staffId
+        out.push({
+          id: `${p.uplineStaffId}->${p.staffId}`,
+          source: p.uplineStaffId,
+          target: p.staffId,
+          type: 'line',
+          className: isFresh ? 'fresh' : undefined,
+          data: { borrow: false, fresh: isFresh },
+        })
+      } else if (isBorrowed(p) && p.reportsTo && byId.has(p.reportsTo)) {
+        out.push({
+          id: `reports:${p.reportsTo}->${p.staffId}`,
+          source: p.reportsTo,
+          target: p.staffId,
+          type: 'line',
+          className: 'borrow',
+          data: { borrow: true, fresh: false },
+        })
+      }
+    }
+    return out
+  }, [people, byId, fresh])
 
   const move = useCallback(
-    (childId: string, parentId: string | null) => {
+    (childId: string, parentId: string | null, rankId?: string | null) => {
       const child = byId.get(childId)
       if (!child) return
-      if (child.uplineStaffId === parentId) return
+      const rank = rankId ?? child.rankId
 
       if (parentId) {
         const parent = byId.get(parentId)
         if (!parent) return
-        if (!parent.canRecruit) {
-          setError(
-            `${parent.name} is a ${parent.titleName ?? parent.rankLabel ?? 'rank'} — that ${
-              parent.titleName ? 'title' : 'rank'
-            } cannot hold downlines.`,
-          )
-          return
-        }
-        if (wouldCycle(graph, childId, parentId)) {
-          setError(`That would put ${child.name} under their own downline.`)
+        const kind = moveRefusal(subjectOf(child), subjectOf(parent), descendantsOf(graph, childId))
+        if (kind) {
+          setError(refusalSentence(kind, subjectOf(child), subjectOf(parent)))
           return
         }
       }
-      if (!child.rankId) {
-        setError(`${child.name} has no rank yet — give them one on the Team tab first.`)
+      if (!rank) {
+        setError(`${child.name} has no rank yet — pick one to place them.`)
+        return
+      }
+      if (child.uplineStaffId === parentId && child.rankId === rank) {
+        setError(null)
+        setNote(
+          parentId
+            ? `${child.name} already reports to ${byId.get(parentId)!.name}.`
+            : `${child.name} is already top of their own tree.`,
+        )
         return
       }
 
       setError(null)
+      setPop(null)
+      const wasPlaced = child.rankId !== null
+      const rankLabel = ranks.find(r => r.id === rank)?.label
       startTransition(async () => {
         try {
           const outcome = await setPosition({
             staffId: childId,
             schemeId,
-            rankId: child.rankId!,
+            rankId: rank,
             uplineStaffId: parentId,
             rateMode: child.rateMode,
           })
           const moved = parentId
             ? `${child.name} now reports to ${byId.get(parentId)!.name}.`
             : `${child.name} is now top of their own tree.`
+          const placed = !wasPlaced && rankLabel ? ` Placed as ${rankLabel}.` : ''
           // The reporting-line half of the write. A skip or a failure means the
           // org chart and this one now draw different managers for the same
           // person, which is exactly the thing nobody notices until payroll.
-          setNote(
-            outcome.note
-              ? `${moved} ${outcome.note}`
-              : outcome.mirrored
-                ? parentId
-                  ? `${moved} Their reporting line moved with them.`
-                  : `${moved} Their reporting line was cleared with them.`
-                : moved,
-          )
+          const mirror = outcome.note
+            ? ` ${outcome.note}`
+            : outcome.mirrored
+              ? parentId
+                ? ' Their reporting line moved with them.'
+                : ' Their reporting line was cleared with them.'
+              : ''
+          setNote(`${moved}${placed}${mirror}`)
+          // A moved tree has a new shape; the arrangement described the old one.
+          manualRef.current = new Map()
+          writeManualLayout(storage(), schemeId, manualRef.current)
+          setFresh(childId)
+          setSelected(childId)
           router.refresh()
         } catch (err) {
           setError(err instanceof Error ? err.message : 'Could not move them')
+          // The card was left over the target it was dropped on; put it back.
+          const home = targetsFor().get(childId)
+          if (home) glide(new Map([[childId, home]]))
         }
       })
     },
-    [byId, graph, router, schemeId],
+    [byId, graph, ranks, router, schemeId, targetsFor, glide],
   )
 
   /**
-   * Where a dropped card landed: the other card it overlaps most, judged on
-   * the chart's own geometry (every card but the dragged one still sits where
-   * the layout put it). Nothing here asks the canvas what it measured.
+   * A drop or a drawn line landing on `targetId`. Somebody with no position
+   * yet cannot simply be moved — `comm_hierarchy.rank_id` is NOT NULL — so
+   * the popover opens on the target to ask for the rank, and places them.
    */
-  const dropTarget = useCallback(
-    (dragged: CardNode): string | null => {
-      const w = dragged.measured?.width ?? NODE_WIDTH
-      const h = dragged.measured?.height ?? NODE_HEIGHT
-      let best: { id: string; area: number } | null = null
-      for (const other of nodes) {
-        if (other.id === dragged.id || forbidden.has(other.id)) continue
-        const ow = other.measured?.width ?? NODE_WIDTH
-        const oh = other.measured?.height ?? NODE_HEIGHT
-        const dx = Math.min(dragged.position.x + w, other.position.x + ow) - Math.max(dragged.position.x, other.position.x)
-        const dy = Math.min(dragged.position.y + h, other.position.y + oh) - Math.max(dragged.position.y, other.position.y)
-        const area = dx > 0 && dy > 0 ? dx * dy : 0
-        if (area > 0 && (!best || area > best.area)) best = { id: other.id, area }
+  const anchorOf = useCallback((staffId: string): PopAnchor => {
+    const el = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${staffId}"] .oc-up`)
+    const r = el?.getBoundingClientRect()
+    return r
+      ? { left: r.left, top: r.top, bottom: r.bottom }
+      : { left: window.innerWidth / 2 - 150, top: 160, bottom: 190 }
+  }, [])
+  const place = useCallback(
+    (moverId: string, targetId: string) => {
+      const mover = byId.get(moverId)
+      if (!mover) return
+      if (mover.rankId === null) {
+        setPop({ moverId, placeUnder: targetId, anchor: anchorOf(targetId) })
+        return
       }
-      return best?.id ?? null
+      move(moverId, targetId)
     },
-    [nodes, forbidden],
+    [byId, move, anchorOf],
   )
 
-  /** Put every card back where the layout has it — the drop was not a move. */
-  const snapBack = useCallback(() => {
-    setNodes(prev => {
-      const home = new Map(laidOut().map(n => [n.id, n.position]))
-      return prev.map(n => {
-        const p = home.get(n.id)
-        return p && (p.x !== n.position.x || p.y !== n.position.y) ? { ...n, position: p } : n
-      })
-    })
-  }, [laidOut, setNodes])
+  const dragRef = useRef<{ id: string; from: XY; hover: string | null } | null>(null)
+  const labelRef = useRef<HTMLDivElement>(null)
+
+  const onNodeDragStart: OnNodeDrag<CardNode> = useCallback((_event, node) => {
+    setNote(null)
+    setError(null)
+    setPop(null)
+    if (animRef.current) {
+      cancelAnimationFrame(animRef.current)
+      animRef.current = null
+    }
+    dragRef.current = { id: node.id, from: { ...node.position }, hover: null }
+    setDragging(node.id)
+  }, [])
+
+  /**
+   * Where the pointer is, not where the card overlaps most: the card under
+   * the pointer is the one the reader means, and it is told so on the spot.
+   * Judged on the chart's own geometry — nothing here asks the canvas.
+   */
+  const onNodeDrag: OnNodeDrag<CardNode> = useCallback(
+    (event, node) => {
+      const d = dragRef.current
+      if (!d) return
+      const client = pointerOf(event)
+      const pt = screenToFlowPosition(client)
+      let hit: CardNode | undefined
+      for (const n of nodesRef.current) {
+        if (n.id === node.id) continue
+        const w = n.measured?.width ?? NODE_WIDTH
+        const h = n.measured?.height ?? NODE_HEIGHT
+        if (pt.x >= n.position.x && pt.x <= n.position.x + w && pt.y >= n.position.y && pt.y <= n.position.y + h) {
+          hit = n
+          break
+        }
+      }
+      const id = hit?.id ?? null
+      const kind = id ? forbidden.get(id) : undefined
+      if (id !== d.hover) {
+        d.hover = id
+        setHover(id ? { id, bad: !!kind } : null)
+      }
+      const lbl = labelRef.current
+      if (!lbl) return
+      if (id) {
+        const t = byId.get(id)!
+        lbl.hidden = false
+        lbl.textContent = kind ? `✕ ${t.name} · ${refusalLabel(kind)}` : `→ under ${t.name}`
+        lbl.classList.toggle('bad', !!kind)
+        lbl.style.left = `${client.x + 14}px`
+        lbl.style.top = `${client.y + 16}px`
+      } else {
+        lbl.hidden = true
+      }
+    },
+    [screenToFlowPosition, forbidden, byId],
+  )
 
   const onNodeDragStop: OnNodeDrag<CardNode> = useCallback(
     (_event, node) => {
+      const d = dragRef.current
+      dragRef.current = null
       setDragging(null)
-      const target = dropTarget(node)
-      if (target) move(node.id, target)
-      snapBack()
+      setHover(null)
+      if (labelRef.current) labelRef.current.hidden = true
+      if (!d) return
+      const mover = byId.get(node.id)
+      if (!mover) return
+
+      if (d.hover) {
+        const target = byId.get(d.hover)!
+        const kind = forbidden.get(d.hover)
+        if (kind) {
+          setError(refusalSentence(kind, subjectOf(mover), subjectOf(target)))
+          glide(new Map([[node.id, d.from]]))
+          return
+        }
+        if (mover.rankId === null) glide(new Map([[node.id, d.from]]))
+        place(node.id, d.hover)
+        return
+      }
+
+      // Dropped on nothing: it stays there, and this browser remembers.
+      manualRef.current.set(node.id, { ...node.position })
+      writeManualLayout(storage(), schemeId, manualRef.current)
     },
-    [dropTarget, move, snapBack],
+    [byId, forbidden, glide, place, schemeId],
   )
 
   const onConnect = useCallback(
     (c: Connection) => {
       // A line is drawn from the MANAGER down to the person.
-      if (c.source && c.target) move(c.target, c.source)
+      if (c.source && c.target) place(c.target, c.source)
     },
-    [move],
+    [place],
   )
+
+  /** Line every card up again, and show the whole of it. */
+  const tidyUp = useCallback(() => {
+    manualRef.current = new Map()
+    writeManualLayout(storage(), schemeId, manualRef.current)
+    glide(targetsFor(), () => void fitView({ duration: 450, padding: 0.12, minZoom: 0.55 }))
+  }, [glide, targetsFor, fitView, schemeId])
+
+  const openUpline = useCallback((staffId: string, anchor: PopAnchor) => {
+    setPop(current =>
+      current && current.moverId === staffId && !current.placeUnder
+        ? null
+        : { moverId: staffId, anchor, placeUnder: null },
+    )
+  }, [])
+
+  /** Show me where this person is: lit, and scrolled to. */
+  const reveal = useCallback(
+    (id: string) => {
+      const pos = nodesRef.current.find(n => n.id === id)?.position ?? targetsFor().get(id)
+      setSelected(id)
+      setFind('')
+      if (!pos) return
+      void setCenter(pos.x + NODE_WIDTH / 2, pos.y + NODE_HEIGHT / 2, {
+        zoom: Math.max(getZoom(), 0.9),
+        duration: 400,
+      })
+    },
+    [setCenter, getZoom, targetsFor],
+  )
+
+  const matches = useMemo(() => {
+    const q = find.trim().toLowerCase()
+    if (!q) return []
+    const byName = people.filter(p => p.name.toLowerCase().includes(q))
+    const byCode = people.filter(
+      p => !p.name.toLowerCase().includes(q) && (p.code ?? '').toLowerCase().includes(q),
+    )
+    return [...byName, ...byCode].slice(0, 8)
+  }, [people, find])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !pop && selected) setSelected(null)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [pop, selected])
 
   const placed = people.filter(p => p.rankId !== null).length
   // Cards standing where the company puts them rather than where this chart
   // does. Worth a number: it is the size of the gap between the two pages.
-  const borrowedCount = people.filter(p => isBorrowed(p) && byId.has(p.reportsTo!)).length
+  const borrowedCount = people.filter(p => isBorrowed(p) && p.reportsTo && byId.has(p.reportsTo)).length
 
   const nodeTypes = useMemo(() => ({ person: PersonCard }), [])
+  const edgeTypes = useMemo(() => ({ line: LineEdge }), [])
+
+  const sel = selected ? byId.get(selected) : undefined
+  const selDownlines = selected ? descendantsOf(graph, selected).size : 0
+  const mover = pop ? byId.get(pop.moverId) : undefined
 
   return (
     <div>
       {error ? (
-        <div className="bg-danger-bg border border-danger text-danger rounded-md p-3 mb-4 text-sm font-sans">
+        <div key={error} className="org-slide bg-danger-bg border border-danger/50 text-danger rounded-md p-3 mb-3 text-sm font-sans">
           {error}
         </div>
       ) : null}
       {note && !error ? (
-        <div className="bg-surface-2 border border-hairline text-ink rounded-md p-3 mb-4 text-sm font-sans">
-          {note}
+        <div key={note} className="org-slide flex items-center gap-3 bg-accent-bg border border-accent-border text-ink rounded-md px-3 py-2.5 mb-3 text-sm font-sans">
+          <span className="flex-1">{note}</span>
+          <button type="button" onClick={() => setNote(null)} className="text-graphite hover:text-ink text-base leading-none px-1" aria-label="Dismiss">
+            ×
+          </button>
         </div>
       ) : null}
       {layout.detached.length > 0 ? (
-        <div className="bg-surface-2 border border-hairline text-graphite rounded-md p-3 mb-4 text-sm font-sans">
+        <div className="bg-surface-2 border border-hairline text-graphite rounded-md p-3 mb-3 text-sm font-sans">
           {layout.detached.length} person(s) have an upline that no longer exists and are shown at
           the top level. Place them to fix it.
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-4 mb-3">
-        <p className="font-serif italic text-muted text-xs">
-          {people.length} salespeople · {placed} placed · {layout.roots.length} tree(s)
-          {pending ? ' · saving…' : ''}
-        </p>
-        {borrowedCount > 0 ? (
-          <span className="inline-flex items-center gap-2 font-serif italic text-xs text-graphite">
-            <svg width="26" height="6" aria-hidden>
-              <line
-                x1="0"
-                y1="3"
-                x2="26"
-                y2="3"
-                stroke="rgb(var(--muted))"
-                strokeWidth="1.25"
-                strokeDasharray="5 4"
-                opacity="0.7"
-              />
-            </svg>
-            {borrowedCount} drawn on their reporting line, not placed here yet
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mb-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-serif italic text-muted text-xs">
+          <span>
+            {people.length} salespeople · {placed} placed · {layout.roots.length} tree(s)
+            {pending ? ' · saving…' : ''}
           </span>
-        ) : null}
-        {selected ? (
+          {borrowedCount > 0 ? (
+            <span className="inline-flex items-center gap-2 text-graphite">
+              <svg width="26" height="6" aria-hidden>
+                <line x1="0" y1="3" x2="26" y2="3" stroke="rgb(var(--muted))" strokeWidth="1.25" strokeDasharray="5 4" opacity="0.7" />
+              </svg>
+              {borrowedCount} drawn on their reporting line, not placed here yet
+            </span>
+          ) : null}
+          {tidy.shelfCount > 0 ? <span className="text-graphite">{tidy.shelfCount} on no line at all</span> : null}
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="relative w-56">
+            <input
+              type="search"
+              value={find}
+              onChange={e => setFind(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && matches[0]) {
+                  e.preventDefault()
+                  reveal(matches[0].staffId)
+                }
+                if (e.key === 'Escape') setFind('')
+              }}
+              placeholder="Find somebody by name…"
+              aria-label="Find somebody on the chart by name"
+              className="w-full px-3 py-1.5 bg-surface border border-hairline rounded-control text-[13px] text-ink placeholder:text-muted focus:outline-none focus:border-accent-border font-sans"
+            />
+            {find.trim() ? (
+              <div className="absolute z-30 mt-1 w-full max-h-64 overflow-y-auto border border-hairline rounded-control bg-surface shadow-md">
+                {matches.length === 0 ? (
+                  <p className="px-3 py-2 font-serif italic text-xs text-muted">Nobody on the chart matches that.</p>
+                ) : (
+                  matches.map(m => (
+                    <button
+                      key={m.staffId}
+                      type="button"
+                      onClick={() => reveal(m.staffId)}
+                      className="w-full text-left px-3 py-2 hover:bg-surface-2 border-b border-hairline last:border-b-0"
+                    >
+                      <span className="block font-sans text-sm text-ink truncate">{m.name}</span>
+                      <span className="block font-mono text-[0.58rem] uppercase tracking-wide text-muted truncate">
+                        {m.titleName ?? 'no title'} · {m.rankLabel ?? 'not placed'}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            ) : null}
+          </div>
           <button
             type="button"
-            onClick={() => move(selected, null)}
-            className="text-xs font-sans text-accent hover:underline"
+            onClick={tidyUp}
+            title="Line every card up again"
+            className="border border-hairline bg-surface rounded-control px-3 py-1.5 text-[12.5px] font-medium font-sans text-graphite hover:text-ink hover:border-muted"
           >
-            Detach {byId.get(selected)?.name} to the top level
+            Tidy
           </button>
-        ) : (
-          <span className="font-serif italic text-muted text-xs">
-            Click a card to select it, then detach it to the top if it should report to nobody.
-          </span>
-        )}
+          <div className="org-zoom">
+            <button type="button" onClick={() => void zoomOut({ duration: 250 })} aria-label="Zoom out">
+              −
+            </button>
+            <button
+              type="button"
+              className="lv"
+              title="Fit the whole chart"
+              onClick={() => void fitView({ duration: 450, padding: 0.12, minZoom: 0.55 })}
+            >
+              <ZoomReadout />
+            </button>
+            <button type="button" onClick={() => void zoomIn({ duration: 250 })} aria-label="Zoom in">
+              +
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div
-        className="border border-hairline rounded-md bg-surface"
-        style={{ height: Math.min(760, Math.max(420, layout.height + NODE_HEIGHT * 2)) }}
-      >
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          onNodesChange={onNodesChange}
-          onNodeDragStart={(_e, node) => {
-            setNote(null)
-            setDragging(node.id)
-          }}
-          onNodeDragStop={onNodeDragStop}
-          onNodeClick={(_e, node) => setSelected(s => (s === node.id ? null : node.id))}
-          onConnect={onConnect}
-          fitView
-          proOptions={{ hideAttribution: false }}
-          nodesConnectable
-          nodesDraggable
-          elementsSelectable
+      {sel ? (
+        <div key={sel.staffId} className="org-slide flex flex-wrap items-center gap-3 bg-surface border border-hairline border-l-[3px] border-l-accent rounded-md px-3 py-2 mb-3 text-[13px] font-sans">
+          <b className="font-semibold text-ink">{sel.name}</b>
+          <span className="font-mono text-[10.5px] uppercase tracking-wide text-graphite">
+            {sel.titleName ?? 'no title'} · {sel.rankLabel ?? 'not placed'}
+            {sel.productRate !== null ? ` · ${Math.round(sel.productRate * 100)}%` : ''}
+            {sel.placedSince ? ` · placed since ${sel.placedSince}` : ''}
+            {` · ${selDownlines} downline${selDownlines === 1 ? '' : 's'}`}
+          </span>
+          <span className="flex-1" />
+          <button
+            type="button"
+            data-org-open
+            onClick={e => {
+              const r = e.currentTarget.getBoundingClientRect()
+              openUpline(sel.staffId, { left: r.left, top: r.top, bottom: r.bottom })
+            }}
+            className="inline-flex items-center gap-2 border border-hairline bg-surface rounded-control px-2.5 py-1 text-[12.5px] font-medium text-ink hover:bg-surface-2"
+          >
+            <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-muted">Upline</span>
+            {sel.uplineStaffId && byId.has(sel.uplineStaffId) ? (
+              byId.get(sel.uplineStaffId)!.name
+            ) : (
+              <i className="font-normal text-graphite">{sel.rankId ? 'top of own tree' : 'nobody yet'}</i>
+            )}
+            <Chevron />
+          </button>
+          <button
+            type="button"
+            disabled={pending || sel.rankId === null || sel.uplineStaffId === null}
+            onClick={() => move(sel.staffId, null)}
+            className="border border-hairline bg-surface rounded-control px-2.5 py-1 text-[12.5px] font-medium text-graphite hover:text-ink disabled:opacity-40"
+          >
+            Detach to top
+          </button>
+          <button
+            type="button"
+            onClick={() => reveal(sel.staffId)}
+            className="border border-hairline bg-surface rounded-control px-2.5 py-1 text-[12.5px] font-medium text-graphite hover:text-ink"
+          >
+            Centre
+          </button>
+          <button type="button" onClick={() => setSelected(null)} className="text-[12.5px] font-medium text-accent px-1.5 hover:underline">
+            Done
+          </button>
+        </div>
+      ) : null}
+
+      <OpenUpline.Provider value={openUpline}>
+        <div
+          className={`org-canvas${entering ? ' enter' : ''}`}
+          style={{ height: Math.min(760, Math.max(460, tidy.height + NODE_HEIGHT * 2)) }}
         >
-          <Background gap={24} color="var(--hairline, #ddd6c9)" />
-          <Controls showInteractive={false} />
-        </ReactFlow>
-      </div>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            onNodesChange={onNodesChange}
+            onNodeDragStart={onNodeDragStart}
+            onNodeDrag={onNodeDrag}
+            onNodeDragStop={onNodeDragStop}
+            onNodeClick={(_e, node) => setSelected(s => (s === node.id ? null : node.id))}
+            onPaneClick={() => setSelected(null)}
+            onConnect={onConnect}
+            fitView
+            // Twenty-eight cards fit a 1,200px column only at ~55%, which is
+            // too small to read; open at a size the names read at and let the
+            // reader pan. The Fit button goes further down when asked.
+            fitViewOptions={{ padding: 0.12, minZoom: 0.7 }}
+            minZoom={0.25}
+            maxZoom={1.6}
+            proOptions={{ hideAttribution: false }}
+            nodesConnectable
+            nodesDraggable
+            elementsSelectable
+          >
+            <Background variant={BackgroundVariant.Lines} gap={48} color="rgb(var(--cv-grid) / 0.55)" />
+            {tidy.shelfCount > 0 ? (
+              <ViewportPortal>
+                {layout.width > 0 ? (
+                  <div
+                    className="org-shelf-rule"
+                    style={{
+                      position: 'absolute',
+                      left: tidy.shelfX - 48,
+                      top: -8,
+                      height: Math.max(tidy.height, NODE_HEIGHT) + 16,
+                    }}
+                  />
+                ) : null}
+                <div className="org-shelf-lbl" style={{ position: 'absolute', left: tidy.shelfX, top: -22 }}>
+                  Not placed here yet · {tidy.shelfCount}
+                </div>
+              </ViewportPortal>
+            ) : null}
+          </ReactFlow>
+        </div>
+      </OpenUpline.Provider>
+      <div ref={labelRef} className="org-droplbl" hidden />
+
+      {pop && mover ? (
+        <MovePopover
+          key={`${pop.moverId}:${pop.placeUnder ?? ''}`}
+          mover={mover}
+          people={people}
+          ranks={ranks}
+          graph={graph}
+          layoutGraph={layoutGraph}
+          anchor={pop.anchor}
+          placeUnder={pop.placeUnder}
+          onPick={(upline, rankId) => {
+            const id = pop.moverId
+            setPop(null)
+            move(id, upline, rankId)
+          }}
+          onClose={() => setPop(null)}
+        />
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3">
         <span className="font-mono text-[0.6rem] uppercase tracking-wide text-muted">Ladder</span>
@@ -468,71 +954,115 @@ function Chart({
             ) : null}
           </span>
         ))}
+        <span className="font-serif italic text-xs text-muted">
+          Ranks are set on the Team tab; this chart only moves people.
+        </span>
       </div>
-
-      <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
-        A greyed card cannot take the person being dragged — either it is one of their own
-        downlines, or the title they hold is not allowed to recruit. A rank is its rate, lettered
-        from the top of the ladder (SS, A, B …); a salesperson on <em>scheme target</em> may be
-        paid a rank higher in a month their group sales clear it. The small caps under a name is
-        the title they hold — it only ever goes up, and the rank beneath it may sit lower in a
-        month below target. Ranks are set on the Team tab; this chart only moves people.
-      </p>
     </div>
   )
 }
 
+function ZoomReadout() {
+  const { zoom } = useViewport()
+  return <>{Math.round(zoom * 100)}%</>
+}
+
+function Chevron() {
+  return (
+    <svg className="chev w-[9px] h-[9px] text-accent" viewBox="0 0 10 10" aria-hidden>
+      <path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+/** "B · 8%" — the rank letter and its rate, the way the chip reads it. */
+function chipLabel(person: OrgPerson): string {
+  const label = (person.rankLabel ?? '').replace(/^rank\s+/i, '')
+  if (person.productRate === null || label.includes('%')) return label
+  return `${label} · ${Math.round(person.productRate * 100)}%`
+}
+
 function PersonCard({ data }: NodeProps<CardNode>) {
-  const { person, invalidTarget, selected } = data
+  const { person, uplineName, borrowName, invalidTarget, canTake, selected, target, bad, fresh } = data
+  const open = useContext(OpenUpline)
+  const cls = [
+    'org-card',
+    person.rankId === null ? 'unplaced' : '',
+    selected ? 'sel' : '',
+    invalidTarget ? 'forbid' : '',
+    canTake ? 'can' : '',
+    target ? 'target' : '',
+    bad ? 'bad' : '',
+    fresh ? 'fresh' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
-    <div
-      style={{ width: NODE_WIDTH, minHeight: NODE_HEIGHT }}
-      className={[
-        'rounded-md border px-3 py-2 transition-colors',
-        invalidTarget
-          ? 'border-hairline bg-surface-2/50 opacity-40'
-          : selected
-            ? 'border-accent bg-surface shadow-sm'
-            : 'border-hairline bg-surface hover:border-accent-border',
-      ].join(' ')}
-    >
-      <Handle type="target" position={Position.Top} className="!bg-[var(--accent)] !w-2 !h-2" />
+    <div className={cls} style={{ width: NODE_WIDTH, minHeight: NODE_HEIGHT }}>
+      <Handle type="target" position={Position.Top} />
 
-      <div className="font-serif text-sm text-ink leading-tight truncate">{person.name}</div>
-      <div className="font-mono text-[0.6rem] text-muted mt-0.5">
-        {person.code ?? '—'}
-        {person.titleName ? <span className="ml-1.5 uppercase tracking-wide">{person.titleName}</span> : null}
+      <div className="oc-top">
+        <div className="oc-nm" title={person.name}>
+          {person.name}
+        </div>
+        {person.rankLabel ? (
+          <span className="oc-rank">{chipLabel(person)}</span>
+        ) : (
+          <span className="oc-rank none">not placed</span>
+        )}
+      </div>
+      <div className="oc-tt">
+        {person.titleName ?? person.code ?? 'no title'}
+        {!person.canRecruit ? <span className="nd">· no downlines</span> : null}
+        {person.rateMode === 'fixed' ? <span className="nd">· manual</span> : null}
       </div>
 
-      <div className="flex items-baseline justify-between mt-1.5">
-        <span className="font-serif italic text-xs text-graphite truncate">
-          {person.rankLabel ?? 'not placed'}
-        </span>
-        <span className="num text-xs text-num-ink">
-          {person.productRate === null ? '—' : `${(person.productRate * 100).toFixed(0)}%`}
-        </span>
-      </div>
-
-      <div className="flex items-center gap-1.5 mt-1.5">
-        <span
-          className={[
-            'font-mono text-[0.55rem] uppercase tracking-wide px-1.5 py-0.5 rounded',
-            person.rateMode === 'fixed'
-              ? 'bg-surface-2 text-graphite'
-              : 'bg-accent/10 text-accent',
-          ].join(' ')}
-        >
-          {person.rateMode === 'fixed' ? 'manual' : 'scheme'}
-        </span>
-        {!person.canRecruit ? (
-          <span className="font-mono text-[0.55rem] uppercase tracking-wide px-1.5 py-0.5 rounded bg-surface-2 text-muted">
-            no downlines
+      <button
+        type="button"
+        className="oc-up nodrag nopan"
+        data-org-open
+        aria-label={`Change upline of ${person.name}`}
+        onClick={e => {
+          const r = e.currentTarget.getBoundingClientRect()
+          open(person.staffId, { left: r.left, top: r.top, bottom: r.bottom })
+        }}
+      >
+        <span className="k">Upline</span>
+        {uplineName ? (
+          <span className="v">{uplineName}</span>
+        ) : borrowName ? (
+          <span className="v borrow" title="Drawn on their reporting line — not placed here yet">
+            {borrowName}
+            <svg width="22" height="6" aria-hidden>
+              <line x1="0" y1="3" x2="22" y2="3" stroke="currentColor" strokeWidth="1.25" strokeDasharray="5 4" />
+            </svg>
           </span>
-        ) : null}
-      </div>
+        ) : (
+          <span className="v top">{person.rankId !== null ? 'top of own tree' : 'nobody yet'}</span>
+        )}
+        <Chevron />
+      </button>
 
-      <Handle type="source" position={Position.Bottom} className="!bg-[var(--accent)] !w-2 !h-2" />
+      <Handle type="source" position={Position.Bottom} />
     </div>
   )
+}
+
+/**
+ * One line, as React Flow would draw it — but the path is ours so it can
+ * carry `pathLength="1"`, which is what lets the just-made line draw itself
+ * (the dash animation in `.react-flow__edge.fresh`) whatever its length.
+ */
+function LineEdge({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }: EdgeProps<LineEdge>) {
+  const [path] = getSmoothStepPath({
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    sourcePosition,
+    targetPosition,
+    borderRadius: 6,
+  })
+  return <path d={path} className="react-flow__edge-path" pathLength={data?.fresh ? 1 : undefined} />
 }

@@ -574,6 +574,31 @@ project memory. Everything below lives in `globals.css` under "Payroll grid".
 | `.pg-band` (`.group-btn` in `td.group-cell`) | The roster's department band, with the Gross / Net subtotal sitting in the frozen block directly under the two columns it sums | Grouped money grids |
 | `.pg-win` + `.pg-scrim` | One person's paycheck as a floating window over a scrim (`--scrim` at .42): header with n / N, the month and department, ‹ › to step through people and × / Esc to close; a payslip-shaped body (Earnings · Deductions inputs, a Computed column of ER / EE, PCB or WHT, cost to company, net to bank) and a footer with Payslip and Save. It is a second view of the row's figures, never a copy — the inputs write the row's own edit state, so a change in either place shows in both | Opening a row from a dense grid. The first inline version sat in the same paper tones as the table and read as part of it; the scrim is what makes it unmistakably in front |
 
+### Org chart canvas (v3.4, 2026-09-09 — Revenue › Staff Hierarchy)
+
+The one surface in the portal that is not paper. Measured before the change:
+the card was `--surface` on a canvas that was also `--surface` (ΔL* 0.0), the
+dot grid was drawn in the card border's own `--hairline`, and the edges used a
+token that does not exist and fell back to `#b9b0a2` — so border, dots and
+lines sat in one band of grey and the user could not tell the cards from the
+background ("颜色太靠近、融入背景了，所以没有层次感"). Chosen as "A · Chart,
+with a Move control" in the Slate tone out of two mockups (B was a team board);
+the artifact is linked from the project memory. Everything below lives in
+`globals.css` under "Org chart canvas".
+
+| Class | What it does | Where to use |
+|---|---|---|
+| `.org-canvas` | Re-declares the palette for its subtree the way `.hero-walnut` does, as `--cv-*` tokens: a cool **Slate** ground `220 227 234` on the accent's own hue, grid `196 208 220`, pure white cards, cool ink `31 41 51`, slate lines `91 111 132`. Card against ground is ΔL* 10.1 — a separate surface on the Walnut scale (~4 invisible, ~6 noticeable, ~8–10 a surface). A surface may be any hue; this one takes the signal's so a selected or targeted card is one family with the ground. Dark mode keeps the elevation ladder (page darkest, card lightest): the ground there is a step *below* the page. The dots are gone; `<Background variant="lines" gap={48}>` in `--cv-grid` at 55% says "this pans" without competing with the borders | Any canvas of cards on which things are dragged. Never for a table |
+| `.org-card` | 220 × 92: name + rank chip (`B · 8%`), the title in small mono caps with `· no downlines` / `· manual` only when true, and the last row **`Upline · NAME ▾`** — a real button that opens the Move popover. No shadow at rest (DESIGN rule); the one moment a card casts one is while it is being dragged (`.react-flow__node.dragging .org-card`: scale 1.04, −1.5°, shadow). States: `.sel` accent ring, `.can` dashed accent (may take the dragged person), `.forbid` 30% (may not), `.target` accent fill + glow + scale (the card under the pointer), `.target.bad` the same in danger, `.fresh` a fading halo after a move, `.unplaced` dashed border | Cards on the canvas; the same tokens should be reused when People › Hierarchy adopts the look |
+| `.org-pop` | The Move popover: everyone on the chart grouped by tree, the current upline marked, anybody who may not take the mover greyed with the reason (`their downline` / `no downlines` / `not placed`), a name filter, and "Top of their own tree" (the detach) as the last row. An unplaced person gets a rank select first, so placing them is one gesture. Portalled, anchored to the button that opened it, flips above when there is no room below | Choosing one person out of a tree |
+| Motion | Cards rise in one after another when the chart opens (`.org-canvas.enter`, `--i` per card); a re-layout glides through the node state over 500 ms with an overshoot so the edges follow the cards; the line a move just made draws itself (`pathLength="1"` + `.react-flow__edge.fresh`); Fit / Centre / ± animate; the note and selection bar slide in (`.org-slide`). All off under `prefers-reduced-motion` | — |
+
+Two rules the canvas keeps that the rest of the page does not: a card dropped
+on empty ground **stays there** (remembered per browser and scheme in
+`localStorage`; Tidy or any move clears it, because a moved tree has a new
+shape), and the ground is the only non-paper surface — everything around it
+(toolbar, note, selection bar, popover) is still in the portal's own tokens.
+
 ### `.page-head` example (mandatory shape)
 
 ```tsx
@@ -1038,6 +1063,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-09-09 v3.4** — Org chart canvas (Revenue › Staff Hierarchy). The canvas re-declares its palette as `--cv-*` tokens: a cool Slate ground on the accent's hue, white cards, cool ink (card vs ground ΔL* 10.1, from 0.0). Every card's last row is `Upline · NAME ▾`, a button into the Move popover; cards dropped on empty ground stay put; motion on entrance, re-layout, the fresh line and the halo. See "Org chart canvas (v3.4)".
 - **2026-04-25 v3.0** — Ledger-Dense / Finance-readability pass. Imported the design exported from claude.ai/design (`design-import/venture/`). Deepened the warm-paper palette (paper #F5EFE4 → #F3ECDD, hairline #DFD4BE → #C6B99E, ink #1A1613 → #1C160F, graphite #6B5F52 → #5A4E40, muted #9E8F7F → #85775F) and introduced a dedicated `--num-ink` (#1A130B) for monetary digits. Added v3.0 utility class layer in `globals.css`: `.num`, `.num-hero`, `.ledger-table`, `.page-head`, `.page-eyebrow`, `.page-title`, `.sect-head`, `.chip`. Sidebar rebuilt with editorial roman numerals + dot/bar markers. TopBar greet enlarged with role badge + ledger green dot. 17 high-traffic pages migrated as reference implementations (Dashboard, Fund IN/OUT, Payments, Statements, Approvals, Overdue, Reconciliation, HR Costing, Director Salary, Settings, Reports, Audit Log, Claims, Dept Pool, Director Pool, Invoice Pool, BillingView). Backend untouched (zero changes to Server Actions / RPCs / Supabase / lib).
 - **2026-04-10 v2.0** — Major pivot to Anthropic-flavored warm cream + Instrument Serif + rust accent direction, per design-consultation session. Replaces institutional slate direction from v1.0.
 - **2026-04-09 v1.0** — Initial version from /autoplan Phase 2 design review. Proposed slate-cool direction with TBD brand color (navy vs teal).
