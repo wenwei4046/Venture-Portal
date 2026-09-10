@@ -2116,3 +2116,255 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   .org-pop { animation: none; }
   .org-card, .org-card .oc-up { transition: none; }
 }
+
+/* ── Payment board (v3.5, 2026-09-10 — HR › Payment) ──────────────────────
+   Proposal B: one card per department, a window for the people, four
+   statutory bodies. The page has THREE surfaces on purpose (user 2026-09-10:
+   "颜色要有层次感, 不要全部一样颜色, can try white"): the cycle strip is the
+   page's one dark object (.hero-walnut, the same object Dashboard and Fund
+   OUT carry), department cards are pure white on the Plaster ground, and the
+   statutory section sits in a Chrome-tinted well. Every colour below is a
+   token; the three tones the user compared differ only in these variables:
+     walnut (default) — dark strip · white cards · chrome well
+     paper            — light strip · white cards · no well
+     white            — the board itself is a white panel, cards Plaster-tinted */
+.pay-board {
+  --pay-card: 255 255 255;
+  --pay-well: var(--chrome);
+  --pay-well-a: 1;
+  --pay-bar: var(--surface-2);
+}
+[data-theme="dark"] .pay-board {
+  --pay-card: var(--surface);
+  --pay-well: 30 26 23;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pay-board {
+    --pay-card: var(--surface);
+    --pay-well: 30 26 23;
+  }
+}
+.pay-board[data-tone="paper"] { --pay-well-a: 0; }
+.pay-board[data-tone="white"] {
+  --pay-card: var(--paper);
+  --pay-well: var(--accent-bg);
+  background: rgb(255 255 255);
+  border-radius: 16px;
+  padding: 22px 26px 30px;
+}
+[data-theme="dark"] .pay-board[data-tone="white"] { background: rgb(var(--surface)); --pay-card: var(--paper); }
+
+/* Cycle strip — four cells that read the run state; the "detect". */
+.pay-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  margin-bottom: 26px;
+  background: rgb(var(--pay-card));
+  border: 1px solid rgb(var(--hairline));
+}
+.pay-strip.hero-walnut { border-color: transparent; }
+.pay-cell {
+  position: relative;
+  border-radius: 10px;
+  padding: 13px 15px 12px;
+  background: rgb(var(--surface-2) / 0.45);
+  border: 1px solid rgb(var(--hairline) / 0.7);
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pay-strip.hero-walnut .pay-cell { background: rgb(var(--surface) / 0.6); border-color: rgb(var(--hairline) / 0.55); }
+.pay-cell.now { border-color: rgb(var(--accent)); box-shadow: inset 3px 0 0 rgb(var(--accent)); }
+.pay-strip.hero-walnut .pay-cell.now { background: rgb(var(--surface-2) / 0.85); }
+.pay-cell .t {
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgb(var(--graphite));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pay-cell .t i { font-style: normal; font-weight: 700; color: rgb(var(--accent)); font-family: var(--font-sans), 'Inter', sans-serif; font-size: 12px; letter-spacing: 0; }
+.pay-cell .st { font-size: 13px; font-weight: 500; line-height: 1.3; }
+.pay-cell .st.done { color: rgb(var(--ledger)); }
+.pay-cell .st.now { color: rgb(var(--accent)); }
+.pay-cell .st.wait { color: rgb(var(--muted)); }
+.pay-cell .amt {
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 21px;
+  font-weight: 500;
+  color: rgb(var(--num-ink));
+  letter-spacing: -0.01em;
+  margin-top: 2px;
+}
+.pay-cell .amt small { font-size: 12px; color: rgb(var(--graphite)); margin-right: 4px; font-weight: 400; }
+.pay-cell.wait .amt { color: rgb(var(--graphite)); }
+.pay-cell .sub { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; color: rgb(var(--graphite)); line-height: 1.45; }
+/* The plain sentence under the figure — who, where, when. */
+.pay-cell .say { font-size: 12.5px; color: rgb(var(--ink)); line-height: 1.4; margin-top: auto; padding-top: 7px; border-top: 1px solid rgb(var(--hairline) / 0.6); }
+.pay-cell .say b { font-weight: 600; }
+
+/* Blockers — the page names the fix, not the problem. */
+.pay-block {
+  border: 1px solid rgb(var(--alert) / 0.5);
+  background: rgb(var(--alert-bg));
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 18px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.pay-block b { color: rgb(var(--alert)); font-weight: 600; }
+.pay-block .who { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11.5px; color: rgb(var(--graphite)); }
+
+/* Control bar under a section head. */
+.pay-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  padding: 10px 14px;
+  background: rgb(var(--pay-bar));
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+.pay-bar .f { display: inline-flex; align-items: center; gap: 8px; }
+.pay-bar .l { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.1em; color: rgb(var(--graphite)); }
+.pay-bar .spacer { flex: 1; }
+.pay-bar .hint { flex-basis: 100%; font-size: 12.5px; font-style: italic; color: rgb(var(--muted)); }
+.pay-seg { display: inline-flex; border: 1px solid rgb(var(--hairline)); border-radius: 6px; overflow: hidden; background: rgb(var(--paper)); }
+.pay-seg button { border: 0; background: transparent; padding: 5px 11px; font-size: 12.5px; font-weight: 500; color: rgb(var(--graphite)); cursor: pointer; }
+.pay-seg button + button { border-left: 1px solid rgb(var(--hairline)); }
+.pay-seg button[aria-pressed="true"] { background: rgb(var(--accent-bg)); color: rgb(var(--accent)); font-weight: 600; }
+.pay-seg button:disabled { opacity: 0.5; cursor: not-allowed; }
+.pay-date {
+  background: rgb(var(--paper));
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 12px;
+  color: rgb(var(--ink));
+}
+.pay-date:focus { outline: none; border-color: rgb(var(--accent-border)); }
+.pay-date:disabled { opacity: 0.55; }
+
+/* Cards. */
+.pay-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.pay-cards.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.pay-card {
+  background: rgb(var(--pay-card));
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 12px;
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 190px;
+  position: relative;
+}
+.pay-card.now { border-color: rgb(var(--accent-border)); }
+.pay-card.warn { border-color: rgb(var(--alert) / 0.55); }
+.pay-card .hd { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.pay-card .nm { font-size: 12.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: rgb(var(--ink)); }
+.pay-card .cnt { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; color: rgb(var(--graphite)); white-space: nowrap; }
+.pay-card .big {
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 22px;
+  font-weight: 500;
+  color: rgb(var(--num-ink));
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+.pay-card .big small { font-size: 12px; color: rgb(var(--graphite)); margin-right: 4px; font-weight: 400; }
+.pay-card .sub { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; color: rgb(var(--graphite)); line-height: 1.5; }
+.pay-card .st { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 22px; }
+.pay-card .st .pv { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; color: rgb(var(--graphite)); }
+.pay-card .ft { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 10px; border-top: 1px solid rgb(var(--hairline)); }
+.pay-card .open { background: none; border: 0; padding: 0; color: rgb(var(--accent)); font-size: 12.5px; cursor: pointer; font-family: inherit; }
+.pay-card .open:hover { text-decoration: underline; }
+.pay-card .foot { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; color: rgb(var(--muted)); line-height: 1.4; }
+.pay-delta { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; color: rgb(var(--graphite)); white-space: nowrap; }
+.pay-delta.notable { color: rgb(var(--alert)); font-weight: 500; }
+
+/* The statutory well. */
+.pay-well { background: rgb(var(--pay-well) / var(--pay-well-a)); border-radius: 16px; padding: 18px; }
+.pay-board[data-tone="paper"] .pay-well { padding: 0; }
+.pay-due { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; color: rgb(var(--graphite)); }
+.pay-due.soon { color: rgb(var(--alert)); font-weight: 500; }
+.pay-due.late { color: rgb(var(--danger)); font-weight: 500; }
+
+/* Confirm bar — names the amount, the account, the date and the people. */
+.pay-confirm {
+  border: 1px solid rgb(var(--accent-border));
+  background: rgb(var(--accent-bg));
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.pay-confirm b { font-weight: 600; }
+
+/* Window — the department's people, or a body's breakdown. */
+.pay-scrim { position: fixed; inset: 0; background: rgb(var(--scrim) / 0.45); z-index: 40; }
+.pay-win {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: min(780px, calc(100vw - 24px));
+  background: rgb(var(--pay-card));
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(26, 22, 19, 0.15);
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.pay-win .wh { padding: 14px 20px 12px; background: rgb(var(--chrome)); border-bottom: 1px solid rgb(var(--hairline)); display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.pay-win .wh h3 { margin: 4px 0 0; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; color: rgb(var(--ink)); }
+.pay-win .wh h3 span { font-weight: 400; font-size: 14px; color: rgb(var(--graphite)); }
+.pay-win .x { border: 1px solid rgb(var(--hairline)); background: rgb(var(--surface)); border-radius: 6px; width: 30px; height: 30px; cursor: pointer; font-size: 15px; line-height: 1; flex: none; color: rgb(var(--ink)); }
+.pay-win .wb { padding: 14px 20px; overflow: auto; flex: 1; display: flex; flex-direction: column; gap: 14px; }
+.pay-win .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.pay-win .tile { background: rgb(var(--surface-2) / 0.5); border: 1px solid rgb(var(--hairline)); border-radius: 8px; padding: 8px 10px; }
+.pay-win .tile .l { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: rgb(var(--graphite)); }
+.pay-win .tile .v { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 500; color: rgb(var(--num-ink)); margin-top: 2px; }
+.pay-win .tile .v.txt { font-size: 12.5px; font-family: var(--font-sans), 'Inter', sans-serif; }
+.pay-win .wctl { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.pay-win .wf { padding: 12px 20px; border-top: 1px solid rgb(var(--hairline)); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; background: rgb(var(--surface-2) / 0.4); }
+.pay-win table.ledger-table { border-radius: 8px; font-size: 12.5px; }
+.pay-win table.ledger-table th { padding: 9px 10px; }
+.pay-win table.ledger-table td { padding: 7px 10px; vertical-align: middle; }
+.pay-win .who { min-width: 190px; }
+.pay-win .who .nm { font-weight: 500; }
+.pay-win .who .cd { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; color: rgb(var(--muted)); margin-left: 8px; }
+.pay-win .bank { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11.5px; color: rgb(var(--graphite)); white-space: nowrap; }
+.pay-win .bank.bad { color: rgb(var(--alert)); }
+.pay-win .pv { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11.5px; white-space: nowrap; }
+.pay-win .pv.none, .pay-win .pv.line { color: rgb(var(--muted)); }
+.pay-win .err { font-size: 12.5px; font-style: italic; color: rgb(var(--danger)); }
+
+@media (max-width: 1100px) {
+  .pay-cards, .pay-cards.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pay-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .pay-cards, .pay-cards.four, .pay-strip, .pay-win .tiles { grid-template-columns: 1fr; }
+  .pay-board[data-tone="white"] { padding: 14px 14px 22px; }
+  .pay-win { top: 0; right: 0; bottom: 0; width: 100vw; border-radius: 0; }
+}

@@ -61,6 +61,21 @@ src/
 │   │   │                              2026-09-03.
 │   │   ├── director-salary/         (Phase 3)
 │   │   ├── hr-costing/              (Phase 3 — staff directory moved to team/)
+│   │   │                              payment/ = the month's payment board
+│   │   │                              (2026-09-10, proposal B): ONE read,
+│   │   │                              `payment_cycle(period)`, and every
+│   │   │                              judgement in `lib/payment-cycle.ts`.
+│   │   │                              Salary PVs are compiled per DEPARTMENT
+│   │   │                              (one voucher, the people as
+│   │   │                              `payroll_voucher_lines`) or per
+│   │   │                              employee — `create_payroll_disbursement_
+│   │   │                              vouchers(period, scope, date,
+│   │   │                              granularity, department_id)`; the
+│   │   │                              dedupe reads the lines. Directors stay
+│   │   │                              one batch. Statutory = 4 bodies on the
+│   │   │                              page, still 5 PVs (PERKESO holds SOCSO +
+│   │   │                              EIS) with a due date per body's
+│   │   │                              weekend rule.
 │   │   ├── revenue/                 ← Revenue Department: [sub]/ = one sub-department
 │   │   │                              (Fair, …) with 3 views, reached from the
 │   │   │                              SIDEBAR not a tab rail — page.tsx (Commission

@@ -40,15 +40,24 @@ export async function GET(
     )
   }
 
+  // ?department=<uuid> cuts the file for one department (2026-09-10, the
+  // Payment board's per-department window). Unset = every staff row.
+  const department = url.searchParams.get('department')
+  if (department && !/^[0-9a-f-]{36}$/i.test(department)) {
+    return NextResponse.json({ error: 'invalid department' }, { status: 400 })
+  }
+
   const supabase = await createClient()
 
-  const { data: rows, error } = await supabase
+  let query = supabase
     .from('hr_monthly_payroll')
     .select(`
       net, status,
-      hr_staff_costs (employee_name, employee_code, bank_name, bank_account_no)
+      hr_staff_costs!inner (employee_name, employee_code, bank_name, bank_account_no, department_id)
     `)
     .eq('period_month', period)
+  if (department) query = query.eq('hr_staff_costs.department_id', department)
+  const { data: rows, error } = await query
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -83,7 +92,7 @@ export async function GET(
 
   const result = generateAllianceBankCsv(payees, paymentDate)
 
-  const filename = `alliance-bank-payroll-${period.slice(0, 7)}.csv`
+  const filename = `alliance-bank-payroll-${period.slice(0, 7)}${department ? '-dept' : ''}.csv`
 
   const headers = new Headers({
     'Content-Type': 'text/csv; charset=utf-8',

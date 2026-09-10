@@ -60,6 +60,7 @@ When you're not sure how a pattern looks in code, copy from one of these — the
 | Tab rail on the header's rule (`.page-head.tabbed` + `SlidingTabs`) | `src/app/(portal)/revenue/_components/config/CommissionSection.tsx`, `src/app/(portal)/revenue/[sub]/hierarchy/_components/HierarchyTabs.tsx` |
 | Hero + dept totals + history | `src/app/(portal)/hr-costing/page.tsx` |
 | Pure read-only ledger | `src/app/(portal)/audit-log/page.tsx` |
+| Cycle strip + department cards + a window (three surfaces on one page) | `src/app/(portal)/hr-costing/payment/page.tsx`, `_components/PaymentBoard.tsx` |
 | Sidebar (roman numerals + dot markers) | `src/components/layout/Sidebar.tsx` |
 | TopBar (greet + role badge) | `src/components/layout/TopBar.tsx` |
 | Mobile nav (bottom tabs + sheet) | `src/components/layout/BottomTabBar.tsx`, `MoreSheet.tsx` |
@@ -68,7 +69,7 @@ When you're not sure how a pattern looks in code, copy from one of these — the
 
 ### Pages still on the legacy v2.0 chrome (clean up when you touch them)
 
-`(portal)/fund-out/[id]`, `/fund-in/[id]`, `/fund-in/new`, `/fund-out/new`, `/payments/[id]`, `/payments/new`, `/payments/dept-requests`, `/payments/payroll-requests`, `/statements/[id]`, `/statements/[id]/print`, `/approvals/[id]`, `/approvals/payroll-run/[id]`, `/approvals/payroll-run/[id]/director-report`, `/billing/contracts/new`, `/billing/contracts/[id]/edit`, `/billing/requests`, `/dept-pool/[slug]`, `/dept-pool/marketing`, `/dept-pool/submissions`, `/dept-pool/contracts/new`, `/director-salary/[directorId]`, `/director-salary/[directorId]/print`, `/hr-costing/staff/*`, `/hr-costing/payroll/*`, `/hr-costing/payment`, `/reports/pnl`, `/reports/fund-summary`, `/reports/base-rate`, `/reports/claims`, `/opex`, `/operating-fund`, plus the HR + Dept Manager branches inside `/dashboard`. Each one inherited the deeper palette automatically but still needs `page-head` / `.num` / `.ledger-table` swap when it next gets edited.
+`(portal)/fund-out/[id]`, `/fund-in/[id]`, `/fund-in/new`, `/fund-out/new`, `/payments/[id]`, `/payments/new`, `/payments/dept-requests`, `/payments/payroll-requests`, `/statements/[id]`, `/statements/[id]/print`, `/approvals/[id]`, `/approvals/payroll-run/[id]`, `/approvals/payroll-run/[id]/director-report`, `/billing/contracts/new`, `/billing/contracts/[id]/edit`, `/billing/requests`, `/dept-pool/[slug]`, `/dept-pool/marketing`, `/dept-pool/submissions`, `/dept-pool/contracts/new`, `/director-salary/[directorId]`, `/director-salary/[directorId]/print`, `/hr-costing/staff/*`, `/hr-costing/payroll/*`, `/reports/pnl`, `/reports/fund-summary`, `/reports/base-rate`, `/reports/claims`, `/opex`, `/operating-fund`, plus the HR + Dept Manager branches inside `/dashboard`. Each one inherited the deeper palette automatically but still needs `page-head` / `.num` / `.ledger-table` swap when it next gets edited.
 
 ### What to do for "add a new feature" or "amend a page"
 
@@ -598,6 +599,35 @@ on empty ground **stays there** (remembered per browser and scheme in
 `localStorage`; Tidy or any move clears it, because a moved tree has a new
 shape), and the ground is the only non-paper surface — everything around it
 (toolbar, note, selection bar, popover) is still in the portal's own tokens.
+
+### Payment board (v3.5, 2026-09-10 — HR › Payment)
+
+The first page with **three surfaces by design**. The old page was one tone
+from top to bottom — two hero figures, a summary table and a bordered box of
+actions, all `--surface` on `--paper` — and the user asked for depth ("颜色要
+有层次感, 不要全部一样颜色, can try white"). Chosen as "B · Department board +
+window" out of two mockups (A was one long ledger); the research that shaped
+the details (Deel's cycle list, BambooHR's explained figures, Rippling's
+compare-to-last-run, BrioHR's statutory rows) is linked from the project
+memory. Everything below lives in `globals.css` under "Payment board" and is
+driven by four tokens on `.pay-board` (`--pay-card`, `--pay-well`,
+`--pay-well-a`, `--pay-bar`), so the three tones the user compared differ
+only in variables: `data-tone="walnut"` (default), `"paper"`, `"white"`.
+
+| Class | What it does | Where to use |
+|---|---|---|
+| `.pay-strip` | The cycle strip: four `.pay-cell`s (submitted → funded → salary PVs → statutory), each with the state **in words** (`.st.done / .now / .wait`), the figure (`.amt`, mono 21px), a mono sub-line, and `.say` — one plain sentence that names the account and the day ("RM 127,192.61 leaves Alliance ···3210 on 5 Sep", "Pool after salaries RM 31,389.17 · short RM 16,164.63"). With `.hero-walnut` it is the page's one dark object, the same object Dashboard and Fund OUT carry; the current cell takes an accent inset bar | The top of any page whose month walks a fixed sequence. It IS the detection — nothing to click |
+| `.pay-card` | A department (or a statutory body): uppercase name + count, the net in mono 22px, a two-line mono sub, a `.st` row (state chip · PV numbers · `.pay-delta` vs last month), an optional `.foot` audit line ("Generated 5 Sep 10:12 · Approved 5 Sep 11:03"), and `.ft` with the window link on the left and the one action on the right. `.now` = the reader should act here; `.warn` = someone in it has unusable bank details. Pure white on the Plaster ground (`--pay-card`) — the ΔL* that gives the page its second surface | Cards in `.pay-cards` (3-up) or `.pay-cards.four` |
+| `.pay-well` | The Chrome-tinted rounded panel the statutory cards sit in — the third surface, so "paying people" and "paying the government" read as two zones | Around a group of cards that is a different job from the group above |
+| `.pay-bar` / `.pay-seg` / `.pay-date` | The control bar under a section head: the **PV per Department / Employee** switch, the staff and director dates, the bank-file link, the one primary button, and a `.hint` sentence that says what the switch does | Above a card grid |
+| `.pay-confirm` | The confirm bar a Generate opens: names the count, the department, the amount, the account and the date before the irreversible act (ADP's "$__ impounded from your account?") | In place of a modal, inside the card or the window |
+| `.pay-block` | The blocker banner: "Payment blocked for 4 staff: fix their bank details" with the names as links to their People page. Names the fix, not the problem; blocks only those people | Above the board |
+| `.pay-win` | The window a card opens (the Paycheck Window shape): Chrome header band, three `.tile`s, the controls, a `.ledger-table` of people or PVs, a footer. Escape closes (capture phase), focus lands on ×, scrim behind | One department's people; one body's PVs + by-department breakdown |
+| `.pay-delta` / `.pay-due` | Mono figures with a direction glyph: `.notable` (≥20% and ≥RM 50) turns amber, never red — changed is not wrong; `.pay-due.soon` (≤7 days) amber, `.late` danger | Beside a net; on a statutory card |
+
+Two rules the board keeps: **status is words, not chips alone** — every
+cell and card carries a sentence a reader can act on; and **the confirm
+names the money** — no Generate fires from a bare button.
 
 ### `.page-head` example (mandatory shape)
 
