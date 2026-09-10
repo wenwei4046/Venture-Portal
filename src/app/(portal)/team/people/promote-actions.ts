@@ -4,8 +4,6 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { ladderAllows, ladderRefusal, nextRung, type LadderTitle, type Rung } from '@/lib/ladder'
-import { canAccessRevenue } from '@/lib/roles'
-import { syncRankToTitle } from '@/lib/hierarchy-writes'
 
 /**
  * Promotion: one rung up the ladder, in the person's own department.
@@ -24,8 +22,8 @@ import { syncRankToTitle } from '@/lib/hierarchy-writes'
 export async function promoteStaff(
   staffId: string,
   toTitleId: string,
-): Promise<{ title: string; level: string; rankRaised: boolean; rankNote: string | null }> {
-  const user = await requirePermission('team')
+): Promise<{ title: string; level: string }> {
+  await requirePermission('team')
   if (!staffId || !toTitleId) throw new Error('Which person, and to which title?')
 
   const supabase = await createClient()
@@ -97,31 +95,12 @@ export async function promoteStaff(
   }
 
   // The rank climbs with the title (user, 2026-09-07). A ratchet, so somebody
-  // already placed above the new title's floor keeps the higher rank — the
-  // promotion raises what they are called, and only raises what they are paid
-  // from when the title now guarantees more than the placement did.
-  //
-  // Both ways this can fail to happen are REPORTED rather than swallowed. A
-  // promotion whose rank silently stayed put leaves somebody titled Team
-  // Leader and paid a Revenue Specialist rate, indefinitely, with a green tick
-  // on screen — and `rankRaised: false` cannot be told apart from "the ratchet
-  // had nothing to do". The note is the only thing that can.
-  let rankRaised = false
-  let rankNote: string | null = null
-  if (canAccessRevenue(user)) {
-    try {
-      rankRaised = (await syncRankToTitle(supabase, user.id, staffId, target.id)) !== null
-    } catch (e) {
-      rankNote = `Promoted, but the rank could not follow the title: ${
-        e instanceof Error ? e.message : 'the database refused it'
-      }`
-    }
-  } else {
-    rankNote =
-      'Promoted. The rank was left as it was — raising it needs a permission this account does not have.'
-  }
+  // already placed above the new title's floor keeps the higher rank. Since
+  // 2026-09-10 the database does it in the same statement as the title write
+  // (`hr_staff_costs_one_line_sync`), so a promotion whose rank did not follow
+  // is not a state that can exist any more.
 
   revalidatePath('/team', 'layout')
   revalidatePath('/revenue', 'layout')
-  return { title: target.name, level: next.rung.name, rankRaised, rankNote }
+  return { title: target.name, level: next.rung.name }
 }

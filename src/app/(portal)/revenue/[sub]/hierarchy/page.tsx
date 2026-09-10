@@ -18,10 +18,10 @@ interface PageProps {
  * Both are one `loadTeam` read, so a move on the chart is what the table
  * shows and a rank set on the table is what the chart draws.
  *
- * Deliberately separate from `hr_staff_costs.department_id` and from any
- * app-role hierarchy — this exists only to answer "who is under who, at what
- * rank, in which month", and it is what the override differential is computed
- * from.
+ * ONE LINE (user, 2026-09-10): the tree is `hr_staff_costs.reports_to` — the
+ * same line People draws — and the commission position follows it in the
+ * database. What this page adds to that line is the money: the rank each
+ * person is paid from, and whether their title may hold downlines.
  */
 export default async function StaffHierarchyPage({ params }: PageProps) {
   await requirePermission('revenue')
@@ -59,14 +59,16 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
       code: p.employee_code,
       titleName: p.title_name,
       titleId: p.title_id,
-      uplineStaffId: p.upline_staff_id,
+      levelRank: p.title_level_rank,
+      levelName: p.title_level_name,
       reportsTo: p.reports_to,
       rankId: p.rank_id,
       rankLabel: rank ? (shortLabel.get(rank.id) ?? null) : null,
       productRate: rank?.productRate ?? null,
-      // Who may hold downlines follows the TITLE they hold (user 2026-09-03);
-      // only somebody with no title yet is judged by the rank they sit at.
-      canRecruit: titleCanRecruit(ranks, p.title_id) ?? rank?.canRecruit ?? false,
+      // Who may hold downlines follows the TITLE they hold (user 2026-09-03):
+      // a Team Assistant back on 5% for a month keeps their team. A title the
+      // ladder does not carry cannot lead anyone here.
+      canRecruit: titleCanRecruit(ranks, p.title_id) ?? false,
       rateMode: p.rate_mode,
       placedSince: p.placed_since,
     }

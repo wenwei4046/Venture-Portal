@@ -512,11 +512,40 @@ the only use of `lib/supabase/admin.ts`), then `public.users`, then the
 fails. Phone lives on the person (`contact_number`), not on the account, so
 there is one source of truth for it.
 
-`reports_to` is the org chart: current state, no history, every department. It is
-NOT `comm_hierarchy`, which is effective-dated because it drives override
-commission — the Team canvas draws that line but never writes it. Guarded by
-`hr_staff_costs_reports_to_not_self` (CHECK) and the
+`reports_to` is the org chart: current state, no history, every department.
+Guarded by `hr_staff_costs_reports_to_not_self` (CHECK) and the
 `hr_staff_reports_to_no_cycle` trigger.
+
+**One line (2026-09-10, migration `20260910120000`).** Inside a commission
+department (`departments.payroll_source = 'commission'`) `reports_to` is also
+who earns the override on the person's sales, so `comm_hierarchy` — the
+effective-dated position the engine reads — is DERIVED from it by trigger and
+never written as an upline by the app:
+
+- `hr_staff_costs_one_line_sync` (AFTER INSERT OR UPDATE OF reports_to,
+  title_id, department_id, status) calls `comm_sync_position(staff_id,
+  actor)`: upline = `reports_to`; scheme = the department's live scheme
+  (`comm_scheme_for_department`, oldest active sub-department — a person →
+  sub-department column is owed the day a department has two); rank = the
+  title's floor rung (`comm_floor_rank`) when a position is first opened,
+  raised to a new title's floor when that stands higher, never lowered. A
+  position that started this period (`comm_period_start()`, Malaysian time)
+  is edited in place; an older one is closed at the end of last month and
+  reopened. Leaving the commission department closes the position; going
+  inactive leaves it alone (the month they left in is payroll's call). A title
+  with no rung = "no rank yet" = no position. Security definer; not callable
+  by clients.
+- `hr_staff_costs_commission_line` (BEFORE INSERT OR UPDATE OF reports_to,
+  title_id, department_id) refuses, with a sentence: a line across the
+  department's edge in either direction, or a department change that would
+  leave reports on the other side (`23BND`); inside the department a manager
+  whose title may not hold downlines (`comm_title_can_recruit` — SRS and
+  above on Fair), or a title change to one that may not while somebody
+  reports to them (`23REC`). The app says the same sentences first
+  (`lib/hierarchy-boundary.ts`).
+
+The only `comm_hierarchy` write left in the app is the rank (Team tab,
+`movePositionRank`).
 
 Job titles as controlled rows, replacing the free-text `hr_staff_costs.designation`
 (20 hand-typed spellings, backfilled into 20 titles). RLS: read = any signed-in

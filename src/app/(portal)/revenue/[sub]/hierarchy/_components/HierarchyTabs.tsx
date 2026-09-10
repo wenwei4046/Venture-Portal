@@ -11,12 +11,14 @@ export type HierarchyTab = 'chart' | 'team'
 /**
  * Staff Hierarchy's two tabs, on the header's rule: the chart, and the Team
  * table that was Rules IX until 2026-09-05 (user: "移去 staff hierarchy 那边
- * … 这个写 team"). They are two views of one position row, and the split of
- * what each may change is the point of putting them side by side:
+ * … 这个写 team"). They are two views of one line, and the split of what
+ * each may change is the point of putting them side by side:
  *
- *   chart  moves people between trees freely — drag, or draw a line;
+ *   chart  moves people between trees freely — drag, or draw a line. The
+ *          line is `reports_to`, the same one People draws (2026-09-10), and
+ *          the commission position follows it in the database;
  *   table  changes nothing but the RANK (and the rate mode that rides with
- *          it); the upline column is what the chart drew, read-only.
+ *          it); the upline column is who they report to, read-only.
  *
  * The tab is `?tab=team`, pushed with the browser's own history so Next
  * syncs `useSearchParams` without a round trip.
@@ -60,14 +62,15 @@ export default function HierarchyTabs({
             {tab === 'team' ? (
               <>
                 Everyone on {subDept.name}: the title they hold, the rank they are paid from, and
-                who they report to. Only the <em>rank</em> is set here — where somebody sits in a
-                tree is moved on the chart, and this table follows it.
+                who they report to. Only the <em>rank</em> is set here — a title gives its rank
+                on its own, and who somebody reports to is moved on the chart.
               </>
             ) : (
               <>
-                Every card names its upline — change it there, or drag the card onto somebody.
-                Cards stay where you put them; Tidy lines them up again. Every move writes a new
-                dated position — a month already computed keeps the chart it was computed against.
+                Every card names who they report to — the same line People draws. Change it
+                there, or drag the card onto somebody; the rank they are paid from follows their
+                title and is set on the Team tab. Cards stay where you put them; Tidy lines them up
+                again. A month already computed keeps the chart it was computed against.
               </>
             )}
           </p>
@@ -92,8 +95,8 @@ function NobodyYet() {
     <div className="py-16 text-center border border-hairline rounded-card bg-surface">
       <p className="font-serif text-2xl text-ink mb-3">Nobody to chart yet.</p>
       <p className="font-serif italic text-muted text-sm max-w-md mx-auto">
-        Add salespeople under People Management with a commission department, then give them a
-        rank on the Team tab.
+        Add salespeople under People Management with a commission department and a ladder title;
+        they appear here with the rank their title gives.
       </p>
     </div>
   )
