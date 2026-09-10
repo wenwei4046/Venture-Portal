@@ -1,6 +1,140 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-08-31 · Revenue commission module, incl. the run)
+# HOUZS Venture Portal — Session Handoff (checkpoint 2026-09-11 · RowForm fix shipped, IR ruleset next)
 
-## ═══ CHECKPOINT 2026-08-08 — read this first ═══
+## ═══ CHECKPOINT 2026-09-11 — read this first (handed to Codex) ═══
+
+**Where things stand.** `main` = `9453824`, clean, in sync with origin. No
+worktree or branch is open for the work below. Merged on 2026-09-10/11, all
+LIVE on Vercel production (`venture-portal-chi.vercel.app`) and every migration
+applied to the live database:
+
+- **PR #78 `05feb90`** — the fix this session shipped (see "What #78 fixed").
+- **PR #77** ONE LINE (`20260910120000_one_line_commission_positions.sql`),
+  **PR #80** memberships per sub-department
+  (`20260910160000_memberships_per_sub_department.sql`) and **PR #79** HR
+  Payment board (`20260910151626_payment_pv_by_department.sql`) — a PARALLEL
+  session's work. Read CLAUDE.md's "ONE LINE" block and the memberships
+  migration before touching hierarchy or ranks: who somebody REPORTS TO
+  (`hr_staff_costs.reports_to`) now derives their `comm_hierarchy` position by
+  trigger, and a person holds one position/title/rank PER sub-department.
+
+**What #78 fixed (2026-09-10).** Two things the user hit on **IR**, the second
+sub-department, in the HR view:
+
+1. Every table built on `src/components/RowForm.tsx` had been a silent no-op
+   since `46b6cf0` (2026-09-07): the submit handler read
+   `onDone?.(await action(fd))`, no row passes `onDone`, so the optional call
+   short-circuited and the action was never called — "Saving…" flickered, no
+   POST, no error, nothing written. Ranks, Title ladder, item groups, KPI,
+   thresholds, Open Bill, brands & bands, Team rank, Titles, product list: 20
+   rows, none saved. Fix = two statements; `RowForm.test.tsx` pins it.
+   **Rule: never put an awaited call inside an optional-chained call's
+   arguments.**
+2. "Start blank" for a new sub-department now writes every scheme switch OFF
+   (`src/lib/commission/scheme-defaults.ts`); the `comm_schemes` column
+   defaults are TRUE and made a blank IR look like a copy of Fair. IR's own
+   scheme (`caeaf2eb-3931-40be-b3bd-b033814f8046`) was switched off by hand
+   on the live DB. Fair's scheme is `ab55f0b5-084e-4e31-968f-311fb9e1558b`.
+
+Rank names are NOT editable by design (user 2026-09-05): the letter is the
+rank's place counted from the top by rate — SS, A, B … (`lib/commission/
+ranks.ts`). The user asked why; the answer is "that is the design", not a bug.
+
+**IR data as of 2026-09-11 00:00 MYT.** Sub-department `IR`, scheme "IR
+scheme", switches all off, ranks B 3% / A 3.5% / SS 4% (the user keyed them in
+after the fix), rungs / people: check before assuming.
+
+### NEXT: the IR ruleset (Investment Renovation) — not started
+
+The user pasted the company's IR commission annexure and answered two
+questions; the verbatim document is `docs/revenue-ir-annexure.md`. **IR is a
+different programme from Fair** ("The two programmes should not be
+cross-applied"). What it is, against what the engine does today
+(`src/lib/commission/engine.ts`, passes A–F, built for Fair):
+
+| Title | Rate | Holds / climbs by | Portal today |
+|---|---|---|---|
+| Revenue Specialist | 3% | personal KPI 100k; may not recruit | fits (`can_recruit` off) |
+| Team Assistant | 3.5% | personal 200k × 2 consecutive months; 0.5% override over its direct RS | fits (EARNED gate: `personal_sales_threshold` + `consecutive_months`) |
+| Team Leader | 4% | group 800k | fits (MONTHLY gate: `group_sales_threshold`) |
+| Senior Team Leader | 4% | each group 1M, up to 3 groups; a 4th only when all 3 hit 1M | half — see below |
+
+Group sales = own + entire downline (annexure's "200k personal + 800k group =
+1M"; `computeGroupRevenue` already does this).
+
+**Two conflicts with the current model:**
+
+1. **TL and STL are both 4%**, but a rank IS its rate (`uq_comm_rank_def_rate`)
+   — a second 4% is refused. This is why the user tried to key the STL rank as
+   "6000 + 2000". Proposed: **rank = rate + incentive package**; the rate may
+   repeat when the package differs. TL = 4%; STL = 4% + RM6,000 per qualifying
+   group + RM2,000 subsidy per qualifying group. Ranks tab gets two more
+   columns (fixed/group incentive RM, subsidy cap RM); letters: package ranks
+   above plain-rate ranks, then by rate.
+2. **Override is direct-line only** (annexure §7: "immediate higher position
+   … not unlimited commission from every employee underneath"). The engine
+   rolls the rate differential up the whole upline chain (`computeOverrides`,
+   Fair's rule). IR needs a scheme switch: override = one level.
+
+**New components (no data or rule in the portal today):**
+
+- Direct-line cap: max 3 direct lines for TA/TL/STL; STL may open a 4th only
+  when all 3 groups hit 1M. Enforce at chart-move time
+  (`lib/commission/chart-moves.ts`, `lib/hierarchy-boundary.ts`, and the
+  `hr_staff_costs_commission_line` trigger since #77).
+- STL **group incentive**: RM6,000 for every group that reaches 1M (§5).
+- **Car/property subsidy**: cap = RM2,000 × qualifying groups this month
+  (2k / 4k / 6k, §6); non-cash; follows the hire-purchase instalment;
+  **registered ONCE with the document, then paid every month without a fresh
+  claim; NO statutory deductions** (user's answers). Belongs in Claims, not
+  the engine: `claims` needs a `staff_id` (today only `claimant_name` text), a
+  category, and the cap read from that month's engine result.
+- §10 **Tier KPI**: Appointment % / Closing % / Revenue target — all three
+  compulsory; pays Personal Owned Achievement RM800 / 2,000 / 4,500 to the
+  person and Direct Line RM300 / 500 / 800 to the direct upline. Appointment
+  and closing COUNTS do not exist anywhere in the portal (the ERP feed is
+  sales orders only, `src/lib/erp-sync/`).
+- §9 **Introduction & closing**: the introducer earns a "closing percentage";
+  a sales order carries one salesperson today — needs an introducer field and
+  the split.
+- **House assignment**: RM10/month per house assigned to a Revenue Specialist,
+  for the agreement's duration — needs an assignments list (person, house,
+  from/to).
+- §11 advertisement control is policy; nothing to compute.
+
+**Fair-only components to keep OFF for IR:** KPI item allowance, Open Bill
+bonus, margin penalty, margin incentive. Deposit gate: undecided.
+
+**Answers already given by the user (2026-09-11):** subsidy = register the
+instalment once, no statutory; and, asked "6,000 取代 % 还是加在 % 上", the user
+typed **取代** — which contradicts §5 ("separate from the basic 4%
+commission") and §12 (STL at 4%). Treat as UNRESOLVED.
+
+**Open questions to put to the user before modelling (in order):**
+
+1. STL: 4% + RM6,000/group (annexure) or "6+2" replacing the 4% (user's word)?
+2. Are 800k / 1M judged per calendar month (like Fair's gates) or cumulative?
+   Is the RM6,000 paid every month a group qualifies?
+3. Which group does the STL's own personal sales count into?
+4. Where do appointment / closing numbers come from, who keys them, and is a
+   person's tier fixed or judged monthly?
+5. The introducer's closing percentage and how it splits with the closer.
+6. House assignment: really RM10 per month per house?
+
+**Plan once answered (three batches):** write the IR ruleset into
+`docs/module-spec-revenue-commission.md` beside Fair's; (1) rank package +
+same-rate ranks + one-level override switch + direct-line cap + group
+incentive, engine + statements + Ranks tab; (2) subsidy through Claims with the
+cap; (3) tier KPI + introducer + house assignment, each needing a data source
+first. Every batch: migration, pure helper + tests under `src/lib/commission/`,
+E2E on localhost against the live DB, `npm run test:ci` (1,093 green today).
+
+**Conventions that bit this session:** in a worktree the Bash harness refuses
+`git -C`, `$(...)`, runtime variables and `(portal)` paths inside compound
+commands — one plain command per call, python heredocs for edits. Playwright:
+log in, then open a NEW tab for the walk (the login tab goes input-dead).
+Vercel runtime logs show nothing when the browser never sends the request.
+
+## ═══ CHECKPOINT 2026-08-08 (older — the 2026-09-11 block above supersedes it) ═══
 
 **Where things stand** (everything below is DEPLOYED, tests 520 passing, all
 migrations applied live + archived; detailed sections follow this block):
