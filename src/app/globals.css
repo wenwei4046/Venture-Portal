@@ -2093,3 +2093,305 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   .org-pop { animation: none; }
   .org-card, .org-card .oc-up { transition: none; }
 }
+
+/* ── Payment board (v3.6, 2026-09-11 — HR › Payment) ──────────────────────
+   The month laid out the way the researched HRMS lay it out (Payroll UI
+   Field Guide, 2026-09-10 — 14 products):
+     · BambooHR's pay-date rail across the head (.pay-rail);
+     · BambooHR's white review panel (selected mockup B): dated header,
+       net-pay hero, explained checklist and footer step trail (.pay-status);
+     · Personio's Due dates and Pay variances beside it (.pay-side);
+     · PayrollPanda's contributions band over the departments (.pay-band);
+     · Deel's cycle list for the departments: a sentence over a four-segment
+       bar, the pay date under it, an action-named button (.pay-row);
+     · Swingvy's two-button statutory rows with ADP's "Due in 5 days (15/09)"
+       pill (.pay-row.stat, .pay-pill).
+   Surfaces: the review, lists and side cards are white on the Plaster
+   ground; the net-pay hero is warm grey and the statutory rows sit in
+   the Chrome well so paying people and paying the government read as two
+   jobs. The accent stays Harbour blue and only ever means "you are here". */
+.pay-board { --pay-card: 255 255 255; --pay-well: var(--chrome); }
+[data-theme="dark"] .pay-board { --pay-card: var(--surface); --pay-well: 30 26 23; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pay-board { --pay-card: var(--surface); --pay-well: 30 26 23; }
+}
+.pay-panel { background: rgb(var(--pay-card)); border: 1px solid rgb(var(--hairline)); border-radius: 16px; }
+
+/* The month rail — one chip per month, how far its cycle got under the name. */
+.pay-rail { display: flex; gap: 6px; flex-wrap: wrap; }
+.pay-rail a {
+  display: flex; flex-direction: column; align-items: center;
+  min-width: 60px; padding: 6px 8px 5px;
+  border: 1px solid rgb(var(--hairline)); border-radius: 8px;
+  background: rgb(var(--surface)); color: rgb(var(--graphite));
+  text-decoration: none; line-height: 1.1; transition: border-color 120ms;
+}
+.pay-rail a:hover { border-color: rgb(var(--accent-border)); text-decoration: none; }
+.pay-rail a b { font-size: 12.5px; font-weight: 600; color: rgb(var(--ink)); }
+.pay-rail a i { font-style: normal; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; margin-top: 3px; color: rgb(var(--muted)); }
+.pay-rail a.closed i { color: rgb(var(--ledger)); }
+.pay-rail a.funded i { color: rgb(var(--accent)); }
+.pay-rail a.submitted i, .pay-rail a.drafts i { color: rgb(var(--alert)); }
+.pay-rail a.none { border-style: dashed; }
+.pay-rail a.none b { color: rgb(var(--muted)); font-weight: 500; }
+.pay-rail a.cur { border-color: rgb(var(--accent)); box-shadow: inset 0 0 0 1px rgb(var(--accent)); background: rgb(var(--accent-bg)); }
+
+/* Overview: the status card and the side cards. */
+.pay-over { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; margin-bottom: 28px; }
+.pay-status { min-width: 0; display: flex; flex-direction: column; overflow: hidden; align-self: start; }
+.pay-status .top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 20px; padding: 20px; }
+.pay-status .review-heading { min-width: 0; }
+.pay-status .eyebrow { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: rgb(var(--graphite)); }
+.pay-status .review-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 16px; margin-top: 8px; }
+.pay-status .review-title h2 { margin: 0; font-size: 1.5rem; font-weight: 600; line-height: 1.25; letter-spacing: -0.015em; color: rgb(var(--ink)); }
+.pay-status .word { font-size: 0.875rem; font-weight: 600; line-height: 1.5; color: rgb(var(--accent)); }
+.pay-status .word.alert { color: rgb(var(--alert)); }
+.pay-status .word.danger { color: rgb(var(--danger)); }
+.pay-status .word.ledger { color: rgb(var(--ledger)); }
+.pay-status .word.muted { color: rgb(var(--graphite)); }
+.pay-status .review-dates { display: flex; flex-wrap: wrap; gap: 14px 24px; margin: 0; }
+.pay-status .review-dates dt { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 0.75rem; letter-spacing: 0.07em; text-transform: uppercase; color: rgb(var(--graphite)); }
+.pay-status .review-dates dd { margin: 5px 0 0; font-size: 0.875rem; font-weight: 500; color: rgb(var(--ink)); }
+.pay-status .review-dates .alert { color: rgb(var(--alert)); }
+.pay-status .review-dates .danger { color: rgb(var(--danger)); }
+.pay-status .review-dates .accent { color: rgb(var(--accent)); }
+.pay-status .detail { margin: 0; padding: 0 20px 16px; font-size: 0.875rem; color: rgb(var(--graphite)); line-height: 1.5; }
+
+/* The segmented bar — Deel's, under a sentence. */
+.pay-bar4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.pay-bar4 .seg { height: 7px; border-radius: 4px; background: rgb(var(--surface-2)); }
+.pay-bar4 .seg.done { background: rgb(var(--ledger) / 0.55); }
+.pay-bar4 .seg.now { background: rgb(var(--accent)); }
+.pay-bar4 .seg.late { background: rgb(var(--danger)); }
+
+/* BambooHR's explained figures: one hero, then a list of amount + sentence. */
+.pay-status .facts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); border-top: 1px solid rgb(var(--hairline)); }
+.pay-status .facts.empty { grid-template-columns: 1fr; }
+.pay-status .hero { min-width: 0; padding: 32px 20px; background: rgb(var(--surface-2)); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.pay-status .hero .amt { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 6px; max-width: 100%; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-variant-numeric: tabular-nums; font-size: clamp(1.5rem, 2.6vw, 2.125rem); font-weight: 500; color: rgb(var(--num-ink)); letter-spacing: -0.02em; line-height: 1.2; overflow-wrap: anywhere; }
+.pay-status .hero .amt small { font-size: 0.875rem; color: rgb(var(--graphite)); font-weight: 400; }
+.pay-status .hero .lab { font-size: 0.875rem; line-height: 1.5; color: rgb(var(--graphite)); margin-top: 8px; }
+.pay-status .hero .say { font-size: 0.75rem; color: rgb(var(--graphite)); margin-top: 16px; line-height: 1.5; }
+.pay-status .hero .pay-delta { font-size: inherit; white-space: normal; }
+.pay-status .list { display: flex; flex-direction: column; min-width: 0; }
+.pay-status .list .f { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 4px 12px; align-items: start; padding: 14px 20px; border-bottom: 1px solid rgb(var(--hairline)); }
+.pay-status .list .f:last-child { border-bottom: 0; }
+.pay-status .fact-mark { grid-row: span 2; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 1px solid currentColor; border-radius: 50%; font-size: 0.75rem; }
+.pay-status .fact-mark.done { color: rgb(var(--ledger)); background: rgb(var(--ledger-bg)); }
+.pay-status .fact-mark.pending { color: rgb(var(--accent)); background: rgb(var(--accent-bg)); }
+.pay-status .list .f .v { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 1rem; font-weight: 500; color: rgb(var(--num-ink)); overflow-wrap: anywhere; }
+.pay-status .list .f .s { grid-column: 2; font-size: 0.875rem; color: rgb(var(--graphite)); line-height: 1.45; overflow-wrap: anywhere; }
+.pay-status .list .f .s b { color: rgb(var(--ink)); font-weight: 600; }
+.pay-status .list .f .s .ok { color: rgb(var(--ledger)); font-weight: 600; }
+.pay-status .list .f .s .short { color: rgb(var(--alert)); font-weight: 600; }
+.pay-status .act { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding: 14px 20px; background: rgb(var(--surface)); border-top: 1px solid rgb(var(--hairline)); }
+.pay-trail { display: flex; flex-wrap: wrap; gap: 10px 14px; list-style: none; margin: 0; padding: 0; }
+.pay-trail li { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 0.75rem; line-height: 1.5; text-transform: uppercase; color: rgb(var(--graphite)); }
+.pay-trail .done > span:first-child { color: rgb(var(--ledger)); }
+.pay-trail .now { color: rgb(var(--accent)); font-weight: 600; }
+.pay-trail .late { color: rgb(var(--danger)); font-weight: 600; }
+.pay-trail .wait { color: rgb(var(--muted)); }
+.pay-status .review-confirm { padding: 0 20px 16px; background: rgb(var(--surface)); }
+
+/* The one button on a dark card: ink on paper, which inside .hero-walnut is
+   cream on walnut and on a light surface is Deel's black pill. */
+.pay-cta {
+  background: rgb(var(--ink)); color: rgb(var(--paper));
+  border: 0; border-radius: 99px; padding: 9px 18px;
+  font-size: 13.5px; font-weight: 600; font-family: inherit; cursor: pointer;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+}
+.pay-cta:hover { opacity: 0.9; text-decoration: none; }
+.pay-cta:disabled { opacity: 0.45; cursor: not-allowed; }
+.pay-status .pay-cta { background: rgb(var(--accent)); color: rgb(var(--paper)); border-radius: 8px; font-size: 0.875rem; line-height: 1.5; white-space: normal; }
+.pay-status .pay-cta:hover { background: rgb(var(--accent-hover)); opacity: 1; }
+.pay-status .pay-cta:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 3px; }
+
+/* Side cards: Due dates, Pay variances. */
+.pay-side { display: flex; flex-direction: column; gap: 14px; }
+.pay-side .pay-panel { padding: 14px 16px; }
+.pay-side h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: rgb(var(--ink)); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.pay-side h3 .chip { font-weight: 500; }
+.pay-ms { display: flex; flex-direction: column; gap: 7px; }
+.pay-ms .m { display: flex; align-items: center; gap: 10px; }
+.pay-ms .dc { width: 42px; flex: none; border: 1px solid rgb(var(--hairline)); border-radius: 7px; padding: 3px 0 2px; text-align: center; line-height: 1; background: rgb(var(--surface)); }
+.pay-ms .dc b { display: block; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 14px; font-weight: 500; color: rgb(var(--num-ink)); }
+.pay-ms .dc i { display: block; font-style: normal; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; color: rgb(var(--graphite)); margin-top: 2px; }
+.pay-ms .m .t { font-size: 12.5px; color: rgb(var(--ink)); flex: 1; min-width: 0; }
+.pay-ms .m .k { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; color: rgb(var(--muted)); white-space: nowrap; }
+.pay-ms .m.done .dc { border-color: rgb(var(--ledger) / 0.45); background: rgb(var(--ledger-bg)); }
+.pay-ms .m.done .dc b { color: rgb(var(--ledger)); }
+.pay-ms .m.done .k { color: rgb(var(--ledger)); }
+.pay-ms .m.next .dc { border-color: rgb(var(--accent)); background: rgb(var(--accent-bg)); }
+.pay-ms .m.next .dc b { color: rgb(var(--accent)); }
+.pay-ms .m.next .t { font-weight: 600; }
+.pay-ms .m.next .k { color: rgb(var(--accent)); }
+.pay-ms .m.late .dc { border-color: rgb(var(--danger) / 0.45); background: rgb(var(--danger-bg)); }
+.pay-ms .m.late .dc b { color: rgb(var(--danger)); }
+.pay-ms .m.late .k { color: rgb(var(--danger)); }
+.pay-ms .m.none { opacity: 0.55; }
+.pay-var { display: flex; flex-direction: column; }
+.pay-var .r { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: baseline; padding: 5px 0; border-top: 1px solid rgb(var(--hairline) / 0.6); font-size: 12.5px; }
+.pay-var .r:first-child { border-top: 0; padding-top: 0; }
+.pay-var .r button { background: none; border: 0; padding: 0; font: inherit; color: rgb(var(--ink)); cursor: pointer; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pay-var .r button:hover { color: rgb(var(--accent)); }
+.pay-var .r button small { color: rgb(var(--muted)); font-size: 10.5px; margin-left: 6px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; }
+.pay-var .pv2 { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 11px; color: rgb(var(--graphite)); white-space: nowrap; }
+.pay-var .pc { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 11px; min-width: 58px; text-align: right; color: rgb(var(--graphite)); }
+.pay-var .pc.up::before { content: '↗ '; }
+.pay-var .pc.down::before { content: '↘ '; }
+.pay-var .pc.notable { color: rgb(var(--alert)); font-weight: 600; }
+.pay-var .foot { font-size: 11.5px; color: rgb(var(--muted)); margin-top: 8px; line-height: 1.4; }
+
+/* Blockers name the fix; warnings can be waved through. */
+.pay-block, .pay-warn { border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; font-size: 13px; line-height: 1.45; }
+.pay-block { border: 1px solid rgb(var(--danger) / 0.45); background: rgb(var(--danger-bg)); }
+.pay-block b { color: rgb(var(--danger)); font-weight: 600; }
+.pay-warn { border: 1px solid rgb(var(--alert) / 0.5); background: rgb(var(--alert-bg)); }
+.pay-warn b { color: rgb(var(--alert)); font-weight: 600; }
+.pay-block .who, .pay-warn .who { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11.5px; color: rgb(var(--graphite)); }
+
+/* PayrollPanda's band: GROSS | employee heads | NET | employer heads | COST. */
+.pay-band { display: flex; flex-wrap: wrap; align-items: stretch; background: rgb(var(--pay-card)); border: 1px solid rgb(var(--hairline)); border-radius: 12px; margin-bottom: 10px; overflow: hidden; }
+.pay-band .g { padding: 10px 16px; display: flex; flex-direction: column; justify-content: center; gap: 4px; border-right: 1px solid rgb(var(--hairline)); }
+.pay-band .g:last-child { border-right: 0; }
+.pay-band .g.tot { min-width: 148px; }
+.pay-band .g.grp { flex: 1; min-width: 230px; }
+.pay-band .l { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: rgb(var(--graphite)); }
+.pay-band .grp.ee .l { color: rgb(var(--accent)); }
+.pay-band .grp.er .l { color: rgb(var(--walnut)); }
+.pay-band .v { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 500; color: rgb(var(--num-ink)); letter-spacing: -0.01em; }
+.pay-band .kv { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.pay-band .kv span { display: flex; flex-direction: column; }
+.pay-band .kv span i { font-style: normal; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 9.5px; color: rgb(var(--muted)); letter-spacing: 0.06em; text-transform: uppercase; }
+.pay-band .kv span b { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 12.5px; font-weight: 500; color: rgb(var(--num-ink)); }
+
+/* Deel's list: a header of filter chips and controls, then one row per department. */
+.pay-list { background: rgb(var(--pay-card)); border: 1px solid rgb(var(--hairline)); border-radius: 16px; overflow: hidden; }
+.pay-list .lh { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 18px; border-bottom: 1px solid rgb(var(--hairline)); background: rgb(var(--surface-2) / 0.35); }
+.pay-list .lh .spacer { flex: 1; }
+.pay-list .lh .f { display: inline-flex; align-items: center; gap: 8px; }
+.pay-list .lh .l { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.1em; color: rgb(var(--graphite)); }
+.pay-list .lt { padding: 8px 18px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(var(--muted)); border-bottom: 1px solid rgb(var(--hairline)); display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.pay-list .empty { padding: 22px 18px; font-size: 13px; color: rgb(var(--muted)); font-style: italic; }
+.pay-filt { display: flex; gap: 6px; flex-wrap: wrap; }
+.pay-filt button { border: 1px solid rgb(var(--hairline)); background: rgb(var(--surface)); border-radius: 99px; padding: 4px 10px; font-size: 12px; color: rgb(var(--graphite)); cursor: pointer; font-family: inherit; display: inline-flex; gap: 6px; align-items: center; }
+.pay-filt button b { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; background: rgb(var(--surface-2)); border-radius: 99px; padding: 0 6px; color: rgb(var(--ink)); font-weight: 500; }
+.pay-filt button[aria-pressed="true"] { background: rgb(var(--ink)); color: rgb(var(--paper)); border-color: rgb(var(--ink)); }
+.pay-filt button[aria-pressed="true"] b { background: rgb(var(--paper) / 0.2); color: rgb(var(--paper)); }
+.pay-seg { display: inline-flex; border: 1px solid rgb(var(--hairline)); border-radius: 6px; overflow: hidden; background: rgb(var(--paper)); }
+.pay-seg button { border: 0; background: transparent; padding: 5px 11px; font-size: 12.5px; font-weight: 500; color: rgb(var(--graphite)); cursor: pointer; font-family: inherit; }
+.pay-seg button + button { border-left: 1px solid rgb(var(--hairline)); }
+.pay-seg button[aria-pressed="true"] { background: rgb(var(--accent-bg)); color: rgb(var(--accent)); font-weight: 600; }
+.pay-seg button:disabled { opacity: 0.5; cursor: not-allowed; }
+.pay-date { background: rgb(var(--paper)); border: 1px solid rgb(var(--hairline)); border-radius: 6px; padding: 5px 8px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 12px; color: rgb(var(--ink)); }
+.pay-date:focus { outline: none; border-color: rgb(var(--accent-border)); }
+.pay-date:disabled { opacity: 0.55; }
+
+.pay-row { display: grid; grid-template-columns: minmax(170px, 1.1fr) minmax(240px, 2fr) 150px minmax(190px, auto); gap: 12px 20px; align-items: center; padding: 13px 18px; border-bottom: 1px solid rgb(var(--hairline)); }
+.pay-row:last-child { border-bottom: 0; }
+.pay-row .who .nm { font-size: 14px; font-weight: 600; color: rgb(var(--ink)); }
+.pay-row .who .sub { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; color: rgb(var(--graphite)); margin-top: 3px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.pay-row .tl .s { font-size: 12.5px; line-height: 1.3; margin-bottom: 6px; color: rgb(var(--graphite)); }
+.pay-row .tl .s.accent { color: rgb(var(--accent)); font-weight: 500; }
+.pay-row .tl .s.alert { color: rgb(var(--alert)); font-weight: 500; }
+.pay-row .tl .s.ledger { color: rgb(var(--ledger)); font-weight: 500; }
+.pay-row .tl .s.danger { color: rgb(var(--danger)); font-weight: 500; }
+.pay-row .tl .cap { display: flex; justify-content: space-between; gap: 10px; margin-top: 5px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; color: rgb(var(--muted)); }
+.pay-row .amt { text-align: right; }
+.pay-row .amt .v { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 500; color: rgb(var(--num-ink)); }
+.pay-row .amt .p { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 10.5px; color: rgb(var(--muted)); margin-top: 3px; white-space: nowrap; }
+.pay-row .act { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.pay-row .act .row2 { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.pay-row .act .people { background: none; border: 0; padding: 0; font-size: 12px; color: rgb(var(--accent)); cursor: pointer; font-family: inherit; }
+.pay-row .act .people:hover { text-decoration: underline; }
+.pay-row .schemes { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; color: rgb(var(--graphite)); }
+.pay-row .schemes a { color: rgb(var(--accent)); }
+.pay-row.stat { grid-template-columns: minmax(150px, 1fr) minmax(230px, 1.6fr) 170px minmax(230px, auto); }
+.pay-row.stat .amt .p { white-space: normal; }
+.pay-row.stat .tl .s .pay-pill { display: inline-flex; margin-bottom: 5px; }
+.pay-row.stat .tl .s .txt { display: block; }
+.pay-row .confirm-wrap { grid-column: 1 / -1; }
+
+.pay-btn { border-radius: 99px; padding: 7px 14px; font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; border: 1px solid transparent; line-height: 1.2; }
+.pay-btn.pri { background: rgb(var(--accent)); color: rgb(255 255 255); }
+.pay-btn.pri:hover { background: rgb(var(--accent-hover)); text-decoration: none; }
+.pay-btn.sec { background: rgb(var(--surface)); border-color: rgb(var(--hairline)); color: rgb(var(--ink)); }
+.pay-btn.sec:hover { background: rgb(var(--surface-2)); text-decoration: none; }
+.pay-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ADP's due pill. */
+.pay-pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 99px; padding: 2px 9px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; font-weight: 500; border: 1px solid rgb(var(--hairline)); background: rgb(var(--surface-2)); color: rgb(var(--graphite)); white-space: nowrap; }
+.pay-pill .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.pay-pill.accent { color: rgb(var(--accent)); background: rgb(var(--accent-bg)); border-color: rgb(var(--accent-border)); }
+.pay-pill.alert { color: rgb(var(--alert)); background: rgb(var(--alert-bg)); border-color: rgb(var(--alert) / 0.4); }
+.pay-pill.danger { color: rgb(var(--danger)); background: rgb(var(--danger-bg)); border-color: rgb(var(--danger) / 0.4); }
+.pay-pill.ledger { color: rgb(var(--ledger)); background: rgb(var(--ledger-bg)); border-color: rgb(var(--ledger) / 0.4); }
+
+/* The statutory well. */
+.pay-well { background: rgb(var(--pay-well)); border-radius: 16px; padding: 14px; }
+.pay-delta { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; color: rgb(var(--graphite)); white-space: nowrap; }
+.pay-delta.notable { color: rgb(var(--alert)); font-weight: 500; }
+
+/* Confirm — names the count, the money, the account and the day, as a question. */
+.pay-confirm { border: 1px solid rgb(var(--accent-border)); background: rgb(var(--accent-bg)); border-radius: 10px; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 13px; line-height: 1.4; }
+.pay-confirm b { font-weight: 600; }
+.hero-walnut .pay-confirm { background: rgb(var(--surface)); border-color: rgb(var(--hairline)); }
+.pay-err { font-size: 12.5px; font-style: italic; color: rgb(var(--danger)); }
+
+/* Window — the department's people, or a body's breakdown. */
+.pay-scrim { position: fixed; inset: 0; background: rgb(var(--scrim) / 0.45); z-index: 40; }
+.pay-win {
+  position: fixed; top: 12px; right: 12px; bottom: 12px;
+  width: min(780px, calc(100vw - 24px));
+  background: rgb(var(--pay-card)); border: 1px solid rgb(var(--hairline)); border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(26, 22, 19, 0.15); z-index: 41;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.pay-win .wh { padding: 14px 20px 12px; background: rgb(var(--chrome)); border-bottom: 1px solid rgb(var(--hairline)); display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.pay-win .wh h3 { margin: 4px 0 0; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; color: rgb(var(--ink)); }
+.pay-win .wh h3 span { font-weight: 400; font-size: 14px; color: rgb(var(--graphite)); }
+.pay-win .x { border: 1px solid rgb(var(--hairline)); background: rgb(var(--surface)); border-radius: 6px; width: 30px; height: 30px; cursor: pointer; font-size: 15px; line-height: 1; flex: none; color: rgb(var(--ink)); }
+.pay-win .wb { padding: 14px 20px; overflow: auto; flex: 1; display: flex; flex-direction: column; gap: 14px; }
+.pay-win .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.pay-win .tile { background: rgb(var(--surface-2) / 0.5); border: 1px solid rgb(var(--hairline)); border-radius: 8px; padding: 8px 10px; }
+.pay-win .tile .l { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: rgb(var(--graphite)); }
+.pay-win .tile .v { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 500; color: rgb(var(--num-ink)); margin-top: 2px; }
+.pay-win .tile .v.txt { font-size: 12.5px; font-family: var(--font-sans), 'Inter', sans-serif; }
+.pay-win .wctl { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.pay-win .wf { padding: 12px 20px; border-top: 1px solid rgb(var(--hairline)); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; background: rgb(var(--surface-2) / 0.4); }
+.pay-win table.ledger-table { border-radius: 8px; font-size: 12.5px; }
+.pay-win table.ledger-table th { padding: 9px 10px; }
+.pay-win table.ledger-table td { padding: 7px 10px; vertical-align: middle; }
+.pay-win .who { min-width: 190px; }
+.pay-win .who .nm { font-weight: 500; }
+.pay-win .who .cd { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; color: rgb(var(--muted)); margin-left: 8px; }
+.pay-win .bank { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11.5px; color: rgb(var(--graphite)); white-space: nowrap; }
+.pay-win .bank.bad { color: rgb(var(--danger)); }
+.pay-win .pv { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11.5px; white-space: nowrap; }
+.pay-win .pv.none, .pay-win .pv.line { color: rgb(var(--muted)); }
+.pay-win .err { font-size: 12.5px; font-style: italic; color: rgb(var(--danger)); }
+.pay-win tr.moved td { background: rgb(var(--alert-bg) / 0.45); }
+
+@media (max-width: 1100px) {
+  .pay-over { grid-template-columns: 1fr; }
+  .pay-side { flex-direction: row; }
+  .pay-side .pay-panel { flex: 1; min-width: 0; }
+}
+@media (max-width: 860px) {
+  .pay-row, .pay-row.stat { grid-template-columns: minmax(0, 1fr) auto; }
+  .pay-row .tl { grid-column: 1 / -1; }
+  .pay-row .act { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; align-items: center; }
+  .pay-status .facts { grid-template-columns: 1fr; }
+  .pay-side { flex-direction: column; }
+}
+@media (max-width: 640px) {
+  .pay-row, .pay-row.stat { grid-template-columns: 1fr; }
+  .pay-row .amt { text-align: left; }
+  .pay-status .top { flex-direction: column; }
+  .pay-status .top { align-items: stretch; padding: 16px; }
+  .pay-status .review-dates { gap: 14px 20px; }
+  .pay-status .act { padding: 14px 16px; }
+  .pay-win { top: 0; right: 0; bottom: 0; width: 100vw; border-radius: 0; }
+  .pay-win .tiles { grid-template-columns: 1fr; }
+}

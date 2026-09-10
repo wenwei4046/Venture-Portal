@@ -112,6 +112,26 @@ export default async function PaymentDetailPage({ params }: Props) {
   )
   const categoryLabel = categoryLabels.length > 0 ? categoryLabels.join(' + ') : null
 
+  // Mig 20260910150000: a payroll disbursement voucher knows who it pays —
+  // one line for a per-person PV, N lines for a department PV.
+  // database.types.ts not regenerated for the new table (same escape hatch as
+  // the payroll RPCs).
+  const { data: payrollLines } =
+    voucher.reference_type === 'payroll_disbursement'
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
+          .from('payroll_voucher_lines')
+          .select('employee_name, employee_code, department_name, net')
+          .eq('voucher_id', id)
+          .order('employee_name')
+      : { data: null }
+  const peopleOnVoucher = ((payrollLines ?? []) as unknown) as Array<{
+    employee_name: string
+    employee_code: string | null
+    department_name: string | null
+    net: string | number
+  }>
+
   // Reassign-GL data (user 2026-08-24: "gl account 放错,我希望approve 了我还
   // 能改"): offer the voucher's actually-POSTED non-bank GL accounts as the
   // from-side, and every active non-bank account as the to-side. 3030 is
@@ -288,6 +308,50 @@ export default async function PaymentDetailPage({ params }: Props) {
                   <td className="num font-semibold">{formatMoney(sourceRows.reduce((s, r) => s + Number(r.amount), 0))}</td>
                 </tr>
               </tfoot>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
+      {/* ── People on a payroll voucher (mig 20260910150000) ── */}
+      {peopleOnVoucher.length > 0 ? (
+        <section className="mb-12">
+          <div className="sect-head">
+            <h2>People on this voucher</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">
+              {peopleOnVoucher.length} {peopleOnVoucher.length === 1 ? 'PERSON' : 'PEOPLE'} · NET
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="ledger-table">
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Department</th>
+                  <th className="num">Net</th>
+                </tr>
+              </thead>
+              <tbody>
+                {peopleOnVoucher.map((p, i) => (
+                  <tr key={i}>
+                    <td>
+                      <span className="font-serif text-md text-ink">{p.employee_name}</span>
+                      {p.employee_code ? <span className="font-mono text-[11px] text-muted ml-2">{p.employee_code}</span> : null}
+                    </td>
+                    <td className="font-serif text-sm text-graphite">{p.department_name ?? '—'}</td>
+                    <td className="num">{formatMoney(Number(p.net))}</td>
+                  </tr>
+                ))}
+              </tbody>
+              {peopleOnVoucher.length > 1 ? (
+                <tfoot>
+                  <tr className="border-t-2 border-hairline">
+                    <td className="font-serif italic text-ink font-medium" colSpan={2}>Total</td>
+                    <td className="num font-semibold">{formatMoney(peopleOnVoucher.reduce((s, p) => s + Number(p.net), 0))}</td>
+                  </tr>
+                </tfoot>
+              ) : null}
             </table>
           </div>
         </section>

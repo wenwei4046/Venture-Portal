@@ -4,26 +4,35 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 
-interface DisbursementResult {
+export interface DisbursementResult {
   group_id: string
   scope: string
+  granularity: 'employee' | 'department'
+  /** Vouchers raised. */
   count: number
+  /** People covered by those vouchers. */
+  people: number
   total: number
 }
 
 export type PayrollScope = 'staff' | 'directors'
+export type PayrollGranularity = 'employee' | 'department'
 export type StatutoryScheme = 'KWSP' | 'SOCSO' | 'EIS' | 'PCB' | 'SKBBK'
 
 /**
- * Mig 20260721000000 — HR runs the payroll payments. Staff and directors are
- * generated as SEPARATE batches (they may be paid on different days), each
- * with HR's chosen payment date stamped on every voucher (drives the GL date
- * at approval).
+ * Mig 20260910150000 — HR compiles the salary PVs. `granularity` decides the
+ * shape: 'employee' is one voucher per person (every month so far),
+ * 'department' is ONE voucher per department with the people as lines.
+ * `departmentId` pays one department on its own (staff only — directors are
+ * always one batch). Each call is its own approval group with its own payment
+ * date, which drives the GL date at approval.
  */
 export async function createPayrollDisbursement(
   period: string,
   scope: PayrollScope,
   paymentDate: string,
+  granularity: PayrollGranularity = 'employee',
+  departmentId: string | null = null,
 ): Promise<DisbursementResult> {
   await requirePermission('hr_costing')
   const supabase = await createClient()
@@ -31,13 +40,25 @@ export async function createPayrollDisbursement(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) {
     throw new Error('Pick the payment date (the day the bank file goes out)')
   }
+  if (granularity !== 'employee' && granularity !== 'department') {
+    throw new Error('Choose one PV per department or one per employee')
+  }
+  if (departmentId && !/^[0-9a-f-]{36}$/i.test(departmentId)) {
+    throw new Error('Invalid department')
+  }
 
   // database.types.ts not regenerated for the new signature (same escape
   // hatch as before).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase.rpc as any)(
     'create_payroll_disbursement_vouchers',
-    { p_period: period, p_scope: scope, p_payment_date: paymentDate },
+    {
+      p_period: period,
+      p_scope: scope,
+      p_payment_date: paymentDate,
+      p_granularity: granularity,
+      p_department_id: departmentId,
+    },
   )
 
   if (error) throw new Error(error.message)
@@ -88,9 +109,8 @@ export async function generateStatutoryScheme(
  * Director-only statutory top-up (mig 20260731050000). For a period whose
  * scheme voucher was generated BEFORE the director InfoTech actuals existed
  * (Jun 2026: the five staff-only vouchers), this raises a second voucher
- * carrying just the director share — amounts from director_monthly_payroll,
- * the same source the payroll funding request summed ("request fund" 算法,
- * user 2026-07-31). The RPC refuses when the share is already carried.
+ * carrying just the director share. The RPC refuses when the share is
+ * already carried.
  */
 export async function generateStatutoryDirectorTopup(
   period: string,
