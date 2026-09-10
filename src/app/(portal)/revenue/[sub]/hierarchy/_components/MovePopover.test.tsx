@@ -27,14 +27,20 @@ const person = (over: Partial<OrgPerson> & { staffId: string; name: string }): O
   ...over,
 })
 
+const unplaced = { rankId: null, rankLabel: null, productRate: null, rateMode: null, placedSince: null } as const
+
 const people: OrgPerson[] = [
   person({ staffId: 'anthony', name: 'ANTHONY' }),
   person({ staffId: 'cheahuan', name: 'CHEA HUAN' }),
   person({ staffId: 'howard', name: 'HOWARD', titleName: 'Senior Revenue Specialist', titleId: 't-srs', uplineStaffId: 'cheahuan', reportsTo: 'cheahuan', rankId: 'r-b', rankLabel: 'Rank B', productRate: 0.08 }),
   person({ staffId: 'zack', name: 'ZACK', titleName: 'Revenue Specialist', titleId: 't-rs', uplineStaffId: 'howard', reportsTo: 'howard', rankId: 'r-c', rankLabel: 'Rank C', productRate: 0.06, canRecruit: false }),
   person({ staffId: 'luis', name: 'LUIS TEO', titleName: 'Senior Revenue Specialist', titleId: 't-srs', uplineStaffId: 'anthony', reportsTo: 'anthony', rankId: 'r-b', rankLabel: 'Rank B', productRate: 0.08 }),
-  person({ staffId: 'yuny', name: 'YUNY', titleName: 'Team Assistant', titleId: 't-ta', uplineStaffId: null, reportsTo: 'anthony', rankId: null, rankLabel: null, productRate: null, canRecruit: false, rateMode: null, placedSince: null }),
-  person({ staffId: 'mei', name: 'MEI TING', titleName: 'Revenue Specialist', titleId: 't-rs', rankId: null, rankLabel: null, productRate: null, canRecruit: false, rateMode: null, placedSince: null }),
+  person({ staffId: 'yuny', name: 'YUNY', titleName: 'Team Assistant', titleId: 't-ta', reportsTo: 'anthony', canRecruit: false, ...unplaced }),
+  person({ staffId: 'mei', name: 'MEI TING', titleName: 'Revenue Specialist', titleId: 't-rs', canRecruit: false, ...unplaced }),
+  // A leader with no position yet, and a report of theirs with none either —
+  // the shape of a chart still being built, drawn on the reporting line.
+  person({ staffId: 'lawrence', name: 'LAWRENCE', ...unplaced }),
+  person({ staffId: 'kj', name: 'KAR JUN', titleName: 'Senior Revenue Specialist', titleId: 't-srs', reportsTo: 'lawrence', ...unplaced }),
 ]
 const graph: OrgNodeInput[] = people.map(p => ({ id: p.staffId, parentId: p.uplineStaffId, label: p.name }))
 // As the chart builds it: anybody on no line at all (MEI TING) is on the shelf,
@@ -68,6 +74,7 @@ describe('MovePopover', () => {
     setup(people[2]) // HOWARD, under CHEA HUAN, with ZACK below him
     expect(screen.getByText('ANTHONY’s tree')).toBeInTheDocument()
     expect(screen.getByText('CHEA HUAN’s tree')).toBeInTheDocument()
+    expect(screen.getByText('LAWRENCE’s tree')).toBeInTheDocument()
     expect(screen.getByText('Not placed')).toBeInTheDocument()
 
     const cheahuan = screen.getByRole('option', { name: /CHEA HUAN/ })
@@ -76,7 +83,9 @@ describe('MovePopover', () => {
 
     expect(screen.getByRole('option', { name: /^HOWARD/ })).toHaveTextContent('that is them')
     expect(screen.getByRole('option', { name: /ZACK/ })).toHaveTextContent('their downline')
-    expect(screen.getByRole('option', { name: /YUNY/ })).toHaveTextContent('not placed')
+    // Unplaced AND a title that may not recruit: the title is the reason,
+    // because placing them would change nothing.
+    expect(screen.getByRole('option', { name: /YUNY/ })).toHaveTextContent('no downlines')
     expect(screen.getByRole('option', { name: /ANTHONY/ })).toBeEnabled()
   })
 
@@ -121,6 +130,70 @@ describe('MovePopover', () => {
     const { props } = setup(people[2])
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(props.onClose).toHaveBeenCalled()
+  })
+})
+
+describe('MovePopover — an upline who holds no position yet', () => {
+  it('is not greyed: the row says they are placed first', () => {
+    setup(people[6]) // MEI TING, unplaced
+    const lawrence = screen.getByRole('option', { name: /LAWRENCE/ })
+    expect(lawrence).toBeEnabled()
+    expect(lawrence).toHaveTextContent('placed first')
+    expect(screen.getByRole('option', { name: /KAR JUN/ })).toBeEnabled()
+  })
+
+  it('picking them shows the plan — them on the ladder at their title’s rank, then the mover — and one button does both', () => {
+    const { props } = setup(people[6])
+    fireEvent.click(screen.getByRole('option', { name: /LAWRENCE/ }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Place MEI TING' })
+    expect(dialog.textContent).toContain(
+      'LAWRENCE holds no position yet, so they go on the ladder first, at the top of their own tree.',
+    )
+    expect(screen.queryByLabelText('Filter by name')).toBeNull()
+
+    const theirs = screen.getByLabelText('Rank to place LAWRENCE at') as HTMLSelectElement
+    expect(theirs.value).toBe('r-a')
+    const mine = screen.getByLabelText('Rank to place them at') as HTMLSelectElement
+    expect(mine.value).toBe('r-c')
+
+    fireEvent.change(theirs, { target: { value: 'r-b' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Place both' }))
+    expect(props.onPick).toHaveBeenCalledWith('lawrence', 'r-c', [
+      { staffId: 'lawrence', uplineStaffId: null, rankId: 'r-b' },
+    ])
+  })
+
+  it('follows the reporting line up: KAR JUN places LAWRENCE first, then KAR JUN, then the mover — whose rank is kept', () => {
+    const { props } = setup(people[4]) // LUIS TEO, placed at Rank B
+    fireEvent.click(screen.getByRole('option', { name: /KAR JUN/ }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Move LUIS TEO' })
+    expect(dialog.textContent).toContain('LAWRENCE and KAR JUN hold no position yet')
+    expect(dialog.textContent).toContain('B · kept')
+    expect(screen.queryByLabelText('Rank to place them at')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Place all 3' }))
+    expect(props.onPick).toHaveBeenCalledWith('kj', 'r-b', [
+      { staffId: 'lawrence', uplineStaffId: null, rankId: 'r-a' },
+      { staffId: 'kj', uplineStaffId: 'lawrence', rankId: 'r-b' },
+    ])
+  })
+
+  it('Back returns to the list with nothing picked', () => {
+    const { props } = setup(people[6])
+    fireEvent.click(screen.getByRole('option', { name: /LAWRENCE/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(screen.getByLabelText('Filter by name')).toBeInTheDocument()
+    expect(props.onPick).not.toHaveBeenCalled()
+  })
+
+  it('a drop on them opens straight on the plan, and Cancel closes', () => {
+    const { props } = setup(people[2], { placeUnder: 'lawrence' }) // HOWARD dropped on LAWRENCE
+    expect(screen.getByRole('button', { name: 'Place both' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(props.onClose).toHaveBeenCalled()
+    expect(props.onPick).not.toHaveBeenCalled()
   })
 })
 

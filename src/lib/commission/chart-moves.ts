@@ -9,11 +9,12 @@ import { descendantsOf, type OrgNodeInput } from '@/lib/org-layout'
  * row it lists — greyed, and with the reason beside the name. One place, so
  * a drop and a pick can never disagree about who may sit under whom.
  *
- * The server still checks all of it (`setPosition`); this is the sentence
- * the reader gets instantly, in the words the server would have used.
+ * The server still checks all of it (`setPosition`, `enrolAndPlace`); this is
+ * the sentence the reader gets instantly, in the words the server would have
+ * used.
  */
 
-/** The four facts a refusal needs about somebody on the chart. */
+/** The facts a refusal needs about somebody on the chart. */
 export interface MoveSubject {
   staffId: string
   name: string
@@ -23,9 +24,130 @@ export interface MoveSubject {
   placed: boolean
   /** Decided by the title they hold, not the rank of the month. */
   canRecruit: boolean
+  /**
+   * `hr_staff_costs.reports_to` — the line an unplaced person is drawn on
+   * (`chart-shape.ts`), and the line they are put on the ladder along when
+   * somebody is placed under them (`enrolPlan`). Read for the unplaced only:
+   * a placed person's upline is their own fact, null included.
+   */
+  reportsTo: string | null
 }
 
 export type RefusalKind = 'self' | 'downline' | 'not-placed' | 'no-downlines'
+
+/** One person a move puts on the ladder on its way, and where they land. */
+export interface EnrolStep {
+  staffId: string
+  /**
+   * The step before them — or, for the first, the placed manager the line
+   * hangs from. Null when the line reaches nobody: top of their own tree.
+   */
+  uplineStaffId: string | null
+}
+
+/** A step with the rank the reader chose for it — what the server is sent. */
+export interface EnrolChoice extends EnrolStep {
+  rankId: string
+}
+
+export interface EnrolPlan {
+  /**
+   * Top-down: the target's unplaced ancestors on the reporting line, then the
+   * target. Empty when the target already holds a position.
+   */
+  steps: EnrolStep[]
+  /** Why no plan can be built, when it cannot. The steps are then empty. */
+  blocked: string | null
+}
+
+/**
+ * What placing somebody under `targetId` has to put on the ladder first.
+ *
+ * Until 2026-09-10 an upline with no position was simply refused — "place
+ * them first" — and on a chart where twenty-five of twenty-eight people were
+ * not placed yet, that was most of the chart (user: "why i cant park yau wei
+ * under chea huan tree?"). The refusal was correct about the database:
+ * `comm_hierarchy.upline_staff_id` must point at an open position, so an
+ * unplaced upline cannot take anyone. It was wrong about the gesture, which
+ * is not "move under an unplaced person" but "put this person on that tree" —
+ * and the tree already has a shape, because the chart draws it from the
+ * reporting line.
+ *
+ * So the plan follows that line. The target goes on the ladder; if the
+ * manager they report to is not on it either, that manager goes first, and so
+ * on up until a placed person is met (they become the first step's upline) or
+ * the line ends (the first step tops their own tree). Inside a commission
+ * department the reporting line IS the commission upline (user 2026-09-08,
+ * `hierarchy-boundary.ts`), so this is not guessing at who earns override —
+ * it is the one shape both charts already agree on. Placing the target at the
+ * top of their own tree instead would be worse than a guess: `setPosition`
+ * mirrors a first placement into `reports_to`, and a null upline would CLEAR
+ * the reporting line the target already has.
+ *
+ * Everybody on the line is about to hold somebody — the target holds the
+ * mover, each ancestor holds the one below, the placed manager holds the top
+ * — so each of them must have a title that may recruit. The target's own is
+ * left to `moveRefusal`, where the caption belongs to them; an ancestor's
+ * blocks the plan with their name in the sentence.
+ *
+ * A line that leaves the chart (a manager in another sub-department, or one
+ * no longer active) is blocked rather than cut: cutting it would make a top
+ * of somebody who has a manager, and the mirror would then erase that manager.
+ */
+export function enrolPlan(people: readonly MoveSubject[], targetId: string): EnrolPlan {
+  const byId = new Map(people.map(p => [p.staffId, p]))
+  const target = byId.get(targetId)
+  if (!target || target.placed) return { steps: [], blocked: null }
+
+  // Bottom-up, the target first.
+  const line: MoveSubject[] = []
+  const seen = new Set<string>()
+  let cursor: MoveSubject = target
+  let anchor: MoveSubject | null = null
+  for (;;) {
+    if (seen.has(cursor.staffId)) {
+      return { steps: [], blocked: `${target.name}’s reporting line loops back on itself` }
+    }
+    seen.add(cursor.staffId)
+    line.push(cursor)
+    if (!cursor.reportsTo) break
+    const up = byId.get(cursor.reportsTo)
+    if (!up) {
+      return { steps: [], blocked: `${cursor.name} reports to somebody who is not on this chart` }
+    }
+    if (up.placed) {
+      anchor = up
+      break
+    }
+    cursor = up
+  }
+
+  for (const holder of anchor ? [...line.slice(1), anchor] : line.slice(1)) {
+    if (!holder.canRecruit) {
+      return {
+        steps: [],
+        blocked: `${target.name} reports up to ${holder.name}, whose title cannot hold downlines`,
+      }
+    }
+  }
+
+  line.reverse()
+  return {
+    steps: line.map((p, i) => ({
+      staffId: p.staffId,
+      uplineStaffId: i === 0 ? (anchor?.staffId ?? null) : line[i - 1].staffId,
+    })),
+    blocked: null,
+  }
+}
+
+/** Do two plans place the same people under the same uplines, in the same order? */
+export function sameSteps(a: readonly EnrolStep[], b: readonly EnrolStep[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every((s, i) => s.staffId === b[i].staffId && s.uplineStaffId === b[i].uplineStaffId)
+  )
+}
 
 /**
  * Why `target` may not become `mover`'s upline — or null when they may.
@@ -33,17 +155,27 @@ export type RefusalKind = 'self' | 'downline' | 'not-placed' | 'no-downlines'
  * `downlines` is the mover's commission descendants, computed once by the
  * caller (`forbiddenTargets` does), because a popover asks this for every
  * person on the chart and walking the tree per row is what made the old
- * canvas hit-test slow enough to notice.
+ * canvas hit-test slow enough to notice. `plan` is what placing under the
+ * target would put on the ladder first (`enrolPlan`): a target with no
+ * position is no longer refused for that alone, only when the plan for them
+ * cannot be built — or when it would close a loop, which the commission
+ * graph cannot see because the line is borrowed.
  */
 export function moveRefusal(
   mover: MoveSubject,
   target: MoveSubject,
   downlines: ReadonlySet<string>,
+  plan: EnrolPlan,
 ): RefusalKind | null {
   if (target.staffId === mover.staffId) return 'self'
   if (downlines.has(target.staffId)) return 'downline'
-  if (!target.placed) return 'not-placed'
+  // The line the target would be placed along runs through the mover, or
+  // hangs from somebody below them: placing it closes the same loop.
+  if (plan.steps.some(s => s.staffId === mover.staffId)) return 'downline'
+  const anchor = plan.steps[0]?.uplineStaffId ?? null
+  if (anchor && (anchor === mover.staffId || downlines.has(anchor))) return 'downline'
   if (!target.canRecruit) return 'no-downlines'
+  if (plan.blocked) return 'not-placed'
   return null
 }
 
@@ -61,15 +193,26 @@ export function refusalLabel(kind: RefusalKind): string {
   }
 }
 
-/** The sentence a refused drop shows — the one the server would have sent. */
-export function refusalSentence(kind: RefusalKind, mover: MoveSubject, target: MoveSubject): string {
+/**
+ * The sentence a refused drop shows — the one the server would have sent.
+ * `blocked` is the plan's own reason, when there is one; without it the
+ * old sentence stands.
+ */
+export function refusalSentence(
+  kind: RefusalKind,
+  mover: MoveSubject,
+  target: MoveSubject,
+  blocked: string | null = null,
+): string {
   switch (kind) {
     case 'self':
       return `${mover.name} cannot be their own upline.`
     case 'downline':
       return `That would put ${mover.name} under their own downline.`
     case 'not-placed':
-      return `${target.name} holds no position yet — place them first.`
+      return blocked
+        ? `${target.name} holds no position yet and cannot be placed from here — ${blocked}. Place them first.`
+        : `${target.name} holds no position yet — place them first.`
     case 'no-downlines':
       return `${target.name} is a ${target.titleName ?? target.rankLabel ?? 'rank'} — that ${
         target.titleName ? 'title' : 'rank'
@@ -92,7 +235,7 @@ export function forbiddenTargets(
   if (!mover) return out
   const downlines = descendantsOf(graph, moverId)
   for (const p of people) {
-    const kind = moveRefusal(mover, p, downlines)
+    const kind = moveRefusal(mover, p, downlines, enrolPlan(people, p.staffId))
     if (kind) out.set(p.staffId, kind)
   }
   return out
