@@ -60,7 +60,7 @@ When you're not sure how a pattern looks in code, copy from one of these — the
 | Tab rail on the header's rule (`.page-head.tabbed` + `SlidingTabs`) | `src/app/(portal)/revenue/_components/config/CommissionSection.tsx`, `src/app/(portal)/revenue/[sub]/hierarchy/_components/HierarchyTabs.tsx` |
 | Hero + dept totals + history | `src/app/(portal)/hr-costing/page.tsx` |
 | Pure read-only ledger | `src/app/(portal)/audit-log/page.tsx` |
-| Cycle strip + department cards + a window (three surfaces on one page) | `src/app/(portal)/hr-costing/payment/page.tsx`, `_components/PaymentBoard.tsx` |
+| Status card + month rail + a Deel-style row list + a window (the researched HRMS layout) | `src/app/(portal)/hr-costing/payment/page.tsx`, `_components/Overview.tsx`, `_components/DeptRows.tsx` |
 | Sidebar (roman numerals + dot markers) | `src/components/layout/Sidebar.tsx` |
 | TopBar (greet + role badge) | `src/components/layout/TopBar.tsx` |
 | Mobile nav (bottom tabs + sheet) | `src/components/layout/BottomTabBar.tsx`, `MoreSheet.tsx` |
@@ -600,34 +600,40 @@ on empty ground **stays there** (remembered per browser and scheme in
 shape), and the ground is the only non-paper surface — everything around it
 (toolbar, note, selection bar, popover) is still in the portal's own tokens.
 
-### Payment board (v3.5, 2026-09-10 — HR › Payment)
+### Payment board (v3.6, 2026-09-11 — HR › Payment)
 
-The first page with **three surfaces by design**. The old page was one tone
-from top to bottom — two hero figures, a summary table and a bordered box of
-actions, all `--surface` on `--paper` — and the user asked for depth ("颜色要
-有层次感, 不要全部一样颜色, can try white"). Chosen as "B · Department board +
-window" out of two mockups (A was one long ledger); the research that shaped
-the details (Deel's cycle list, BambooHR's explained figures, Rippling's
-compare-to-last-run, BrioHR's statutory rows) is linked from the project
-memory. Everything below lives in `globals.css` under "Payment board" and is
-driven by four tokens on `.pay-board` (`--pay-card`, `--pay-well`,
-`--pay-well-a`, `--pay-bar`), so the three tones the user compared differ
-only in variables: `data-tone="walnut"` (default), `"paper"`, `"white"`.
+The page whose layout was taken from the products themselves. The first
+rebuild (v3.5, 2026-09-10: a four-cell strip, department cards, four
+statutory cards) kept the facts right but the user said it did not look
+like the HRMS researched the same day (the *Payroll UI Field Guide*, 14
+products, in the project memory). v3.6 keeps the backend and every
+judgement in `lib/payment-cycle.ts` and re-lays the page after six of them:
 
-| Class | What it does | Where to use |
+| Borrowed from | Class | What it does |
 |---|---|---|
-| `.pay-strip` | The cycle strip: four `.pay-cell`s (submitted → funded → salary PVs → statutory), each with the state **in words** (`.st.done / .now / .wait`), the figure (`.amt`, mono 21px), a mono sub-line, and `.say` — one plain sentence that names the account and the day ("RM 127,192.61 leaves Alliance ···3210 on 5 Sep", "Pool after salaries RM 31,389.17 · short RM 16,164.63"). With `.hero-walnut` it is the page's one dark object, the same object Dashboard and Fund OUT carry; the current cell takes an accent inset bar | The top of any page whose month walks a fixed sequence. It IS the detection — nothing to click |
-| `.pay-card` | A department (or a statutory body): uppercase name + count, the net in mono 22px, a two-line mono sub, a `.st` row (state chip · PV numbers · `.pay-delta` vs last month), an optional `.foot` audit line ("Generated 5 Sep 10:12 · Approved 5 Sep 11:03"), and `.ft` with the window link on the left and the one action on the right. `.now` = the reader should act here; `.warn` = someone in it has unusable bank details. Pure white on the Plaster ground (`--pay-card`) — the ΔL* that gives the page its second surface | Cards in `.pay-cards` (3-up) or `.pay-cards.four` |
-| `.pay-well` | The Chrome-tinted rounded panel the statutory cards sit in — the third surface, so "paying people" and "paying the government" read as two zones | Around a group of cards that is a different job from the group above |
-| `.pay-bar` / `.pay-seg` / `.pay-date` | The control bar under a section head: the **PV per Department / Employee** switch, the staff and director dates, the bank-file link, the one primary button, and a `.hint` sentence that says what the switch does | Above a card grid |
-| `.pay-confirm` | The confirm bar a Generate opens: names the count, the department, the amount, the account and the date before the irreversible act (ADP's "$__ impounded from your account?") | In place of a modal, inside the card or the window |
-| `.pay-block` | The blocker banner: "Payment blocked for 4 staff: fix their bank details" with the names as links to their People page. Names the fix, not the problem; blocks only those people | Above the board |
-| `.pay-win` | The window a card opens (the Paycheck Window shape): Chrome header band, three `.tile`s, the controls, a `.ledger-table` of people or PVs, a footer. Escape closes (capture phase), focus lands on ×, scrim behind | One department's people; one body's PVs + by-department breakdown |
-| `.pay-delta` / `.pay-due` | Mono figures with a direction glyph: `.notable` (≥20% and ≥RM 50) turns amber, never red — changed is not wrong; `.pay-due.soon` (≤7 days) amber, `.late` danger | Beside a net; on a statutory card |
+| BambooHR's pay-date rail | `.pay-rail` | One chip per month in the page head — the name and how far the cycle got (`no run / drafts / submitted / funded / closed ✓`), the month on screen ringed in accent. Replaces the ← August → arrows. Fed by three plain selects (`payroll_runs`, `payroll_payment_requests`, statutory `payment_vouchers`) through `monthRail()` |
+| Personio's Overview | `.pay-status` (on `.hero-walnut`) | The page's one dark object. A big **status word** (`Ready to generate`, `Awaiting Principal`, `Salaries paid`, `Month closed` — `cycleHeadline()`), a **countdown** on the right to whatever is due next (pay date, then statutory due; negative = overdue in danger), one sentence of why, Deel's four-segment bar (`.pay-bar4`: submitted → funded → salary PVs → statutory, with a label + note under each segment, `.pay-seglbl`), then BambooHR's explained figures and the one action |
+| BambooHR's Review hero | `.pay-status .facts` | Left, the net as the hero figure; right, four amounts each with a sentence that names the account and the day: funded by Finance (PV numbers, what the HR pool holds now), staff (*leaves Alliance ···3210 on 5 Sep*), directors, statutory (*due 15 Sep · pool after salaries covers it / short RM x*) |
+| Personio's Due dates + Pay variances | `.pay-side`, `.pay-ms`, `.pay-var` | Beside the card: the month's dated milestones as date chips (`milestones()` — submitted, funded, the two pay dates, the statutory bodies grouped by due date; done / next / late), and the biggest net moves vs last month (`payVariances()`: `9,414.31 → 2,859.49 ↘ −70%`, 20%+ in amber; a name opens its department's window) |
+| PayrollPanda's header band | `.pay-band` | Over the department list: GROSS \| employee contributions (EPF · SOCSO · EIS · PCB · SKBBK, label in accent) \| NET \| employer contributions (label in Walnut) \| COST · CTC — `contributionTotals()`. Two families take a *surface* colour each, never a status colour |
+| Deel's payroll-cycles list | `.pay-list`, `.pay-row`, `.pay-filt` | One row per department: name + headcount + gross + Δ vs last month; **a sentence over a four-segment bar** (funded · generated · approved · paid — `deptTimeline()`), the audit line (*Generated 9 Sep 17:46 · Approved 9 Sep 21:49*) and the pay date under it; the net with *Previous was …* beneath; a button **named for the next step** (`Generate 1 PV`, `Approvals →`, `View PV`) and a `N people ›` link to the window. Filter chips with counts (`All · To generate · With Principal · Paid · Blocked`) over the list; the PV-per switch, the two dates, the Alliance file and the Generate-all button in the list header |
+| Swingvy's statutory rows + ADP's pill | `.pay-row.stat`, `.pay-pill` | In the Chrome well, one row per body: covers + portal under the name; ADP's pill (`Due in 4 days (15/09)`, `Overdue 3 days`, `Paid 14 Aug` — `duePill()`) over a sentence that says where the PV is; the total; **two buttons** — `By department` (the human-readable breakdown for i-Akaun / ASSIST / e-PCB) and `Generate PV` / `View PV` (the machine side). PERKESO lists its SOCSO and EIS PVs as two lines |
+| ADP's "$__ impounded?" | `.pay-confirm` | Every Generate opens a question that names the money, the account, the day, the people and the PV count: *RM 47,553.80 to KWSP · PERKESO · LHDN · SKBBK from Alliance Bank ···3210 · 5 PVs — generate?* → **Yes, generate** |
+| Gusto's banner · Personio's two gates | `.pay-block`, `.pay-warn` | Blockers name the fix (*Payment blocked for 4 staff — fix their bank details*, names linked to People) and stop only those people; warnings (*4 people moved 20% or more vs July*) can be waved through |
+| — | `.pay-cta`, `.pay-btn` | `.pay-cta` is ink on paper — cream on the walnut card, Deel's black pill anywhere light. `.pay-btn.pri` is the accent pill, `.sec` the bordered one; both round, both label the act |
+| — | `.pay-win` | Unchanged from v3.5 (the Paycheck Window shape); rows that moved 20%+ are tinted `tr.moved` |
 
-Two rules the board keeps: **status is words, not chips alone** — every
-cell and card carries a sentence a reader can act on; and **the confirm
-names the money** — no Generate fires from a bare button.
+Surfaces: the status card is dark (`.hero-walnut`, the object Dashboard and
+Fund OUT carry — dark limited by area), every list and side card is white
+on the Plaster ground, and the statutory rows sit in the Chrome well so
+paying people and paying the government read as two jobs. The three
+`data-tone` variants of v3.5 are gone; there is one design.
+
+Three rules the board keeps: **status is a word and a sentence, not a
+chip** (Personio / Deel); **every button is named for what it does**
+(no `Confirm`, no `View`); and **the confirm names the money** before the
+irreversible act. The old v3.5 card grid is gone; `payment-cycle.ts` grew
+the helpers above (38 unit tests).
 
 ### `.page-head` example (mandatory shape)
 

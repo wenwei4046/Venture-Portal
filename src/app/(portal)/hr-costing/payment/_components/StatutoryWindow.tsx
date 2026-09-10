@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { formatMoneyBare } from '@/lib/utils'
-import { BODIES, daysUntil, shortDate, type BodyKey, type DeptGroup, type Scheme, type StatutoryRow } from '@/lib/payment-cycle'
+import { BODIES, duePill, shortDate, type BodyKey, type DeptGroup, type Scheme, type StatutoryRow } from '@/lib/payment-cycle'
 import PayWindow from './PayWindow'
 
 interface Props {
@@ -20,15 +20,6 @@ interface Props {
   busy: string | null
   error: string | null
   onClose: () => void
-}
-
-export function dueLabel(due: string, today: string, stage: string, paidDate?: string | null) {
-  if (stage === 'paid') return { cls: '', text: `Paid ${shortDate(paidDate ?? due)}` }
-  const n = daysUntil(due, new Date(today + 'T00:00:00Z'))
-  if (n < 0) return { cls: 'late', text: `Overdue ${-n} day${n === -1 ? '' : 's'} · was due ${shortDate(due)}` }
-  if (n === 0) return { cls: 'soon', text: `Due today · ${shortDate(due)}` }
-  if (n <= 7) return { cls: 'soon', text: `Due ${shortDate(due)} · in ${n} day${n === 1 ? '' : 's'}` }
-  return { cls: '', text: `Due ${shortDate(due)} · in ${n} days` }
 }
 
 function chip(stage: StatutoryRow['stage']) {
@@ -49,7 +40,8 @@ export default function StatutoryWindow({ body, rows, groups, periodLabel, today
   const dirs = rows.reduce((s, r) => s + r.directors, 0)
   const total = rows.reduce((s, r) => s + r.total, 0)
   const first = rows[0]
-  const due = dueLabel(first.due, today, rows.every((r) => r.stage === 'paid') ? 'paid' : 'open', first.pv?.payment_date)
+  const allPaid = rows.every((r) => r.stage === 'paid')
+  const due = duePill(first.due, today, allPaid ? (first.pv?.payment_date ?? first.due) : null)
 
   return (
     <PayWindow
@@ -78,8 +70,13 @@ export default function StatutoryWindow({ body, rows, groups, periodLabel, today
           </div>
         </div>
         <div className="tile">
-          <div className="l">Due</div>
-          <div className={`v txt pay-due ${due.cls}`}>{due.text}</div>
+          <div className="l">Due · {shortDate(first.due)}</div>
+          <div className="v txt">
+            <span className={`pay-pill ${due.tone}`}>
+              <span className="dot" />
+              {due.text}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -140,7 +137,7 @@ export default function StatutoryWindow({ body, rows, groups, periodLabel, today
                       r.total > 0 ? (
                         <button
                           type="button"
-                          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-xs px-3 py-1.5 rounded-md disabled:opacity-50"
+                          className="pay-btn pri"
                           onClick={() => onGenerate(r.scheme)}
                           disabled={busy != null}
                         >
@@ -152,7 +149,7 @@ export default function StatutoryWindow({ body, rows, groups, periodLabel, today
                     ) : pending ? (
                       <button
                         type="button"
-                        className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-xs px-3 py-1.5 rounded-md disabled:opacity-50"
+                        className="pay-btn sec"
                         onClick={() => onSaveDate(r.pv!.id, date, `date:${r.scheme}`)}
                         disabled={busy != null || !/^\d{4}-\d{2}-\d{2}$/.test(date) || date === r.pv.payment_date}
                       >
@@ -163,7 +160,7 @@ export default function StatutoryWindow({ body, rows, groups, periodLabel, today
                       <div className="mt-1.5">
                         <button
                           type="button"
-                          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-xs px-3 py-1.5 rounded-md disabled:opacity-50"
+                          className="pay-btn pri"
                           onClick={() => onTopup(r.scheme)}
                           disabled={busy != null}
                         >

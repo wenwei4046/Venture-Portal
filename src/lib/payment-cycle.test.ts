@@ -1,19 +1,29 @@
 import { describe, it, expect } from 'vitest'
 import {
   bankIssue,
+  contributionTotals,
+  cycleHeadline,
   cyclePhase,
   cycleTotals,
   daysUntil,
+  ddmm,
   delta,
+  deptTimeline,
+  directorsFunded,
+  duePill,
   groupDepartments,
   isNotableMove,
+  milestones,
+  monthRail,
   normaliseCycle,
+  payVariances,
   shortDate,
   statutoryDue,
   statutoryRows,
   varianceLabel,
   type CyclePerson,
   type CycleVoucher,
+  type HeadlineInput,
   type PaymentCycle,
 } from './payment-cycle'
 
@@ -280,5 +290,247 @@ describe('dates', () => {
     expect(shortDate(null)).toBe('')
     expect(daysUntil('2026-09-15', new Date(Date.UTC(2026, 8, 10)))).toBe(5)
     expect(daysUntil('2026-09-15', new Date(Date.UTC(2026, 8, 20)))).toBe(-5)
+    expect(ddmm('2026-09-15')).toBe('15/09')
+  })
+})
+
+// ── The re-skin (2026-09-11): the helpers behind the researched HRMS patterns ──
+
+describe('contributionTotals (the PayrollPanda band)', () => {
+  it('splits gross into the employee heads, net and the employer heads', () => {
+    const t = contributionTotals([
+      person({ name: 'A', gross: 1119, net: 1000, epf_ee: 90, socso_ee: 3, eis_ee: 1, pcb: 20, skbbk: 5, epf_er: 100, socso_er: 10, eis_er: 1 }),
+      person({ name: 'B', gross: 2188, net: 2000, epf_ee: 180, socso_ee: 6, eis_ee: 2, pcb: 0, skbbk: 0, epf_er: 200, socso_er: 20, eis_er: 2 }),
+    ])
+    expect(t.gross).toBe(3307)
+    expect(t.net).toBe(3000)
+    expect(t.employee).toEqual({ epf: 270, socso: 9, eis: 3, pcb: 20, skbbk: 5, other: 0, total: 307 })
+    expect(t.employer).toEqual({ epf: 300, socso: 30, eis: 3, total: 333 })
+    expect(t.cost).toBe(3640)
+  })
+
+  it('puts a deduction the five heads do not explain under "other"', () => {
+    const t = contributionTotals([person({ name: 'A', gross: 4000, net: 3200, epf_ee: 440, socso_ee: 20, eis_ee: 8, pcb: 12, skbbk: 20 })])
+    expect(t.employee.other).toBe(300)
+    expect(t.employee.total).toBe(800)
+  })
+})
+
+describe('deptTimeline (a Deel cycle row)', () => {
+  const people = [person({ name: 'A' }), person({ name: 'B' })]
+  const g = () => groupDepartments(people)[0]
+
+  it('waits for funding, then is ready with the planned pay date', () => {
+    const t1 = deptTimeline(g(), false, '2026-09-05', '2026-09-03')
+    expect(t1.sentence).toBe('Waiting for Finance to fund')
+    expect(t1.segments).toEqual(['now', 'wait', 'wait', 'wait'])
+    const t2 = deptTimeline(g(), true, '2026-09-05', '2026-09-03')
+    expect(t2.sentence).toBe('Ready to generate · pay date 5 Sep')
+    expect(t2.tone).toBe('accent')
+    expect(t2.segments).toEqual(['done', 'now', 'wait', 'wait'])
+    expect(t2.caption).toBe('Pay date · 5 Sep')
+  })
+
+  it('turns danger when the pay date has passed', () => {
+    const t = deptTimeline(g(), true, '2026-09-05', '2026-09-08')
+    expect(t.tone).toBe('danger')
+    expect(t.segments[1]).toBe('late')
+    expect(t.sentence).toContain('has passed')
+  })
+
+  it('reads a pending department voucher, then a paid one, with the audit line', () => {
+    const v = voucher({ id: '1', granularity: 'department', created_at: '2026-09-05T02:12:00Z' })
+    const pending = groupDepartments(people.map((p) => ({ ...p, voucher: v })))[0]
+    const t = deptTimeline(pending, true, '2026-09-05', '2026-09-05')
+    expect(t.sentence).toBe('Awaiting Principal since 5 Sep 10:12')
+    expect(t.tone).toBe('alert')
+    expect(t.segments).toEqual(['done', 'done', 'now', 'wait'])
+    expect(t.audit).toBe('Generated 5 Sep 10:12')
+    const paidV = { ...v, status: 'paid' as const, approved_at: '2026-09-05T03:03:00Z' }
+    const paid = groupDepartments(people.map((p) => ({ ...p, voucher: paidV })))[0]
+    const t2 = deptTimeline(paid, true, '2026-09-05', '2026-09-20')
+    expect(t2.sentence).toBe('Paid 5 Sep · HV-PV-1')
+    expect(t2.tone).toBe('ledger')
+    expect(t2.segments).toEqual(['done', 'done', 'done', 'done'])
+    expect(t2.audit).toBe('Generated 5 Sep 10:12 · Approved 5 Sep 11:03')
+  })
+
+  it('counts a half-generated department', () => {
+    const half = groupDepartments([people[0], { ...people[1], voucher: voucher({ id: '2', status: 'paid' }) }])[0]
+    const t = deptTimeline(half, true, '2026-09-05', '2026-09-05')
+    expect(t.sentence).toBe('1 of 2 generated · 1 to go')
+    expect(t.segments).toEqual(['done', 'now', 'wait', 'wait'])
+  })
+
+  it('says so when nobody is payable', () => {
+    const t = deptTimeline(groupDepartments([person({ name: 'Z', net: 0 })])[0], true, '2026-09-05', '2026-09-05')
+    expect(t.sentence).toBe('Nobody to pay this month')
+    expect(t.tone).toBe('muted')
+  })
+})
+
+describe('duePill (ADP vocabulary)', () => {
+  it('counts down, then up, and names the paid day', () => {
+    expect(duePill('2026-09-15', '2026-09-01')).toEqual({ text: 'Due in 14 days (15/09)', tone: 'accent' })
+    expect(duePill('2026-09-15', '2026-09-12')).toEqual({ text: 'Due in 3 days (15/09)', tone: 'alert' })
+    expect(duePill('2026-09-15', '2026-09-14')).toEqual({ text: 'Due in 1 day (15/09)', tone: 'alert' })
+    expect(duePill('2026-09-15', '2026-09-15')).toEqual({ text: 'Due today (15/09)', tone: 'alert' })
+    expect(duePill('2026-09-15', '2026-09-18')).toEqual({ text: 'Overdue 3 days (15/09)', tone: 'danger' })
+    expect(duePill('2026-09-15', '2026-09-18', '2026-09-14')).toEqual({ text: 'Paid 14 Sep', tone: 'ledger' })
+  })
+})
+
+function headlineInput(c: PaymentCycle, today = '2026-09-03'): HeadlineInput {
+  const groups = groupDepartments(c.people)
+  const rows = statutoryRows(c, groups)
+  const phase = cyclePhase(c)
+  return { cycle: c, groups, rows, phase, staffFunded: phase === 'funded', directorsFunded: directorsFunded(c), today, plannedStaffDate: '2026-09-05', plannedDirectorDate: '2026-09-02' }
+}
+
+describe('cycleHeadline (Personio status word + countdown)', () => {
+  const funded = () => cycle({ run: { id: 'run', status: 'paid', total_amount: 109770.21, submitted_at: '2026-09-01T01:00:00Z', approved_at: '2026-09-01T01:00:00Z' } })
+
+  it('says there is no payroll, then that drafts are not submitted', () => {
+    const none = cycleHeadline(headlineInput(cycle({ run: null })))
+    expect(none.word).toBe('No payroll')
+    expect(none.action.kind).toBe('payroll')
+    const drafts = cycleHeadline(headlineInput(cycle({ run: null, people: [person({ name: 'A' })] })))
+    expect(drafts.word).toBe('Not submitted')
+    expect(drafts.segments.map((s) => s.state)).toEqual(['now', 'wait', 'wait', 'wait'])
+  })
+
+  it('walks the funding request', () => {
+    const c = cycle({ people: [person({ name: 'A' })], funding: { staff: { id: 'f', status: 'submitted', amount: 5000, requested_at: '2026-09-02T00:00:00Z', pv_id: null, pv_no: null, pv_status: null, pv_date: null }, directors: null } })
+    const h = cycleHeadline(headlineInput(c))
+    expect(h.word).toBe('With Finance')
+    expect(h.detail).toContain('filed 2 Sep')
+    expect(h.action.kind).toBe('funding')
+    expect(h.segments[1].note).toBe('with Finance')
+  })
+
+  it('is ready to generate once funded, and counts down to the pay date', () => {
+    const c = funded()
+    c.people = [person({ name: 'A' }), person({ name: 'B', dept_id: 'd-fin', dept_name: 'Finance' })]
+    const h = cycleHeadline(headlineInput(c))
+    expect(h.word).toBe('Ready to generate')
+    expect(h.tone).toBe('accent')
+    expect(h.due).toEqual({ label: 'Pay date', date: '2026-09-05', days: 2 })
+    expect(h.segments.map((s) => s.state)).toEqual(['done', 'done', 'now', 'wait'])
+    expect(h.action.kind).toBe('generate-salary')
+    const late = cycleHeadline(headlineInput(c, '2026-09-08'))
+    expect(late.word).toBe('Pay date passed')
+    expect(late.tone).toBe('danger')
+    expect(late.due.days).toBe(-3)
+  })
+
+  it('waits on Principal with a link to the group', () => {
+    const c = funded()
+    c.people = [person({ name: 'A', voucher: voucher({ id: '1', group_id: 'grp-9' }) })]
+    const h = cycleHeadline(headlineInput(c))
+    expect(h.word).toBe('Awaiting Principal')
+    expect(h.detail).toBe('1 of 1 salary PVs with Principal since 5 Sep 10:12 · 0 paid.')
+    expect(h.action).toEqual({ kind: 'approvals', label: 'Open Approvals →', href: '/approvals?group_id=grp-9' })
+  })
+
+  it('moves on to statutory once the salaries are paid, then closes the month', () => {
+    const c = funded()
+    c.people = [person({ name: 'A', voucher: voucher({ id: '1', status: 'paid' }) })]
+    const h = cycleHeadline(headlineInput(c, '2026-09-10'))
+    expect(h.word).toBe('Salaries paid')
+    expect(h.due).toEqual({ label: 'Statutory due', date: '2026-09-15', days: 5 })
+    expect(h.action.kind).toBe('generate-statutory')
+    expect(h.action.label).toBe('Generate statutory · 5 PVs')
+    expect(h.segments.map((s) => s.state)).toEqual(['done', 'done', 'done', 'now'])
+    c.statutory_vouchers = ['KWSP', 'PERKESO (SOCSO)', 'PERKESO (EIS)', 'LHDN', 'SKBBK'].map((payee, i) => ({
+      id: `s${i}`, no: `HV-PV-${i}`, payee, status: 'paid' as const, amount: 1, payment_date: '2026-09-14', description: `${payee} — Aug 2026 payroll (staff + directors)`, created_at: null, approved_at: null,
+    }))
+    const closed = cycleHeadline(headlineInput(c, '2026-09-20'))
+    expect(closed.word).toBe('Month closed')
+    expect(closed.tone).toBe('ledger')
+    expect(closed.action.kind).toBe('none')
+    expect(closed.segments.every((s) => s.state === 'done')).toBe(true)
+  })
+})
+
+describe('milestones (Personio due dates)', () => {
+  it('lists the dated steps in order and marks the next one', () => {
+    const c = cycle({ run: { id: 'run', status: 'paid', total_amount: 1, submitted_at: '2026-09-01T01:00:00Z', approved_at: null } })
+    c.people = [person({ name: 'A' }), person({ name: 'D', scope: 'directors', dept_id: null, dept_name: 'Directors' })]
+    const ms = milestones(headlineInput(c, '2026-09-03'))
+    expect(ms.map((m) => [m.key, m.state])).toEqual([
+      ['submitted', 'done'],
+      ['funded-staff', 'done'],
+      ['funded-dirs', 'done'],
+      ['pay-staff', 'next'],
+      ['pay-dirs', 'late'],
+      ['stat-2026-09-15', 'upcoming'],
+    ])
+    expect(ms[3].date).toBe('2026-09-05')
+    expect(ms[5].label).toBe('KWSP · PERKESO · LHDN · SKBBK')
+  })
+
+  it('splits the statutory chips when KWSP rolls the other way', () => {
+    const c = cycle({ period: '2026-07-01', run: { id: 'run', status: 'paid', total_amount: 1, submitted_at: '2026-08-01T01:00:00Z', approved_at: null } })
+    c.people = [person({ name: 'A', voucher: voucher({ id: '1', status: 'paid', payment_date: '2026-08-05' }) })]
+    const ms = milestones(headlineInput(c, '2026-08-10'))
+    const stat = ms.filter((m) => m.key.startsWith('stat-'))
+    expect(stat.map((m) => [m.date, m.label])).toEqual([
+      ['2026-08-14', 'PERKESO · LHDN · SKBBK'],
+      ['2026-08-17', 'KWSP'],
+    ])
+    expect(stat[0].state).toBe('next')
+  })
+})
+
+describe('payVariances', () => {
+  it('ranks the biggest moves and counts who changed, who is new', () => {
+    const v = payVariances([
+      person({ name: 'A', net: 3500, prev_net: 3500 }),
+      person({ name: 'B', net: 4200, prev_net: 3500 }),
+      person({ name: 'C', net: 3000, prev_net: 3100 }),
+      person({ name: 'N', net: 2000, prev_net: null }),
+      person({ name: 'Z', net: 0, prev_net: 100 }),
+    ])
+    expect(v.top.map((x) => x.name)).toEqual(['B', 'C'])
+    expect(v.top[0].d.abs).toBe(700)
+    expect(v.changed).toBe(2)
+    expect(v.compared).toBe(3)
+    expect(v.joiners).toBe(1)
+    expect(v.notable).toBe(1)
+  })
+})
+
+describe('monthRail (BambooHR pay-date rail)', () => {
+  it('walks the months around the one on screen with how far each got', () => {
+    const rail = monthRail(
+      '2026-08-01',
+      [
+        { id: 'r5', period_month: '2026-05-01', status: 'paid' },
+        { id: 'r6', period_month: '2026-06-01', status: 'approved' },
+        { id: 'r7', period_month: '2026-07-01', status: 'approved' },
+        { id: 'r8', period_month: '2026-08-01', status: 'draft' },
+      ],
+      [
+        ...Array.from({ length: 5 }, () => ({ reference_id: 'r5', status: 'paid' })),
+        { reference_id: 'r6', status: 'paid' },
+      ],
+      [{ payroll_run_id: 'r6', status: 'completed' }],
+      3,
+      1,
+    )
+    expect(rail.map((m) => [m.mon, m.state, m.current])).toEqual([
+      ['May', 'closed', false],
+      ['Jun', 'funded', false],
+      ['Jul', 'submitted', false],
+      ['Aug', 'drafts', true],
+      ['Sep', 'none', false],
+    ])
+    expect(rail[0].period).toBe('2026-05-01')
+    expect(rail[0].year).toBe(2026)
+  })
+
+  it('crosses the year boundary', () => {
+    const rail = monthRail('2027-01-01', [], [], [], 2, 1)
+    expect(rail.map((m) => `${m.mon} ${m.year}`)).toEqual(['Nov 2026', 'Dec 2026', 'Jan 2027', 'Feb 2027'])
   })
 })

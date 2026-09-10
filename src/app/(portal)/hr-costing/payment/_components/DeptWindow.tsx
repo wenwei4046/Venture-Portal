@@ -106,7 +106,7 @@ export default function DeptWindow({
           {g.scope === 'staff' && g.dept_id ? (
             <Link
               href={`/hr-costing/payroll/${period}/bank-transfer?format=alliance&department=${g.dept_id}`}
-              className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-xs px-3 py-1.5 rounded-md transition-colors"
+              className="pay-btn sec"
             >
               Alliance file · {g.name} only
             </Link>
@@ -163,7 +163,7 @@ export default function DeptWindow({
           {remaining > 0 ? (
             <button
               type="button"
-              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md disabled:opacity-50 transition-colors"
+              className="pay-btn pri"
               onClick={onAskGenerate}
               disabled={!canGenerate || busy != null || confirming}
               title={!funded ? 'Funding is not complete yet' : undefined}
@@ -177,7 +177,7 @@ export default function DeptWindow({
           ) : pendingVouchers.length > 0 ? (
             <button
               type="button"
-              className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md disabled:opacity-50 transition-colors"
+              className="pay-btn sec"
               onClick={onSaveDates}
               disabled={busy != null || !dateChanged || !/^\d{4}-\d{2}-\d{2}$/.test(date)}
             >
@@ -208,7 +208,7 @@ export default function DeptWindow({
           </span>
           <button
             type="button"
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-xs px-3.5 py-1.5 rounded-md disabled:opacity-50"
+            className="pay-btn pri"
             onClick={onConfirmGenerate}
             disabled={busy != null}
           >
@@ -241,7 +241,7 @@ export default function DeptWindow({
               const v = p.voucher
               const line = g.deptVoucher && v?.granularity === 'department'
               return (
-                <tr key={p.row_id}>
+                <tr key={p.row_id} className={isNotableMove(pd) ? 'moved' : undefined} title={isNotableMove(pd) ? `Moved 20% or more vs ${prevMonthName}` : undefined}>
                   <td className="who">
                     <span className="nm">{p.name}</span>
                     {p.code ? <span className="cd">{p.code}</span> : null}

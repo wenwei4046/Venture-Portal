@@ -1,41 +1,46 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { formatMoneyBare } from '@/lib/utils'
 import {
-  BODIES,
   bankIssue,
-  delta,
   isNotableMove,
-  shortDate,
-  shortDateTime,
-  varianceLabel,
   type BodyKey,
+  type ContributionTotals,
   type CycleTotals,
   type DeptGroup,
   type Granularity,
+  type Headline,
+  type Milestone,
   type Phase,
   type Scheme,
+  type Scope,
   type StatutoryRow,
+  type VarianceSummary,
 } from '@/lib/payment-cycle'
-import {
-  createPayrollDisbursement,
-  generateStatutoryDirectorTopup,
-  generateStatutoryScheme,
-  setPayrollPvDate,
-} from '../actions'
+import { createPayrollDisbursement, generateStatutoryDirectorTopup, generateStatutoryScheme, setPayrollPvDate } from '../actions'
+import ContribBand from './ContribBand'
+import DeptRows from './DeptRows'
 import DeptWindow from './DeptWindow'
-import StatutoryWindow, { dueLabel } from './StatutoryWindow'
+import Overview, { type Facts } from './Overview'
+import StatutoryRows from './StatutoryRows'
+import StatutoryWindow from './StatutoryWindow'
 
 export interface BoardProps {
   period: string
   periodLabel: string
+  periodRange: string
   prevMonthName: string
   groups: DeptGroup[]
   rows: StatutoryRow[]
   totals: CycleTotals
+  band: ContributionTotals
+  headline: Headline
+  milestones: Milestone[]
+  variances: VarianceSummary
+  facts: Facts
   phase: Phase
   staffFunded: boolean
   directorsFunded: boolean
@@ -43,38 +48,38 @@ export interface BoardProps {
   /** ISO date, computed on the server so the due-day maths cannot drift at hydration. */
   today: string
   defaultDate: string
+  fundingSlot: ReactNode
 }
 
 type Win = { kind: 'dept'; key: string } | { kind: 'body'; key: BodyKey } | null
-type Confirm = { kind: 'all-salary' } | { kind: 'dept'; key: string } | null
-
-function stageChip(g: DeptGroup) {
-  if (g.stage === 'paid') return <span className="chip ledger"><span className="dot" />paid · {shortDate(g.vouchers[0]?.payment_date)}</span>
-  if (g.stage === 'approved') return <span className="chip ledger"><span className="dot" />approved</span>
-  if (g.stage === 'pending') return <span className="chip alert"><span className="dot" />{g.pending} awaiting Principal</span>
-  if (g.stage === 'partial') return <span className="chip alert"><span className="dot" />{g.generated} of {g.headcount} generated</span>
-  return <span className="chip">not generated</span>
-}
+type Confirm = { kind: 'all-salary'; at: 'over' | 'list' } | { kind: 'all-stat'; at: 'over' | 'list' } | { kind: 'dept'; key: string } | null
 
 /**
- * Proposal B (user 2026-09-10): one card per department, a window for the
- * people, four statutory bodies. Every judgement about the data is made in
- * lib/payment-cycle.ts; this component only holds the UI state (which window
- * is open, the granularity switch, the dates) and calls the actions.
+ * The state of the page — which window is open, the PV-per switch, the
+ * dates, what is being confirmed — and the calls to the actions. Every
+ * judgement about the data is made in lib/payment-cycle.ts; the layout is
+ * the researched one (see Overview, DeptRows, StatutoryRows).
  */
 export default function PaymentBoard({
   period,
   periodLabel,
+  periodRange,
   prevMonthName,
   groups,
   rows,
   totals,
+  band,
+  headline,
+  milestones,
+  variances,
+  facts,
   phase,
   staffFunded,
   directorsFunded,
   payoutBank,
   today,
   defaultDate,
+  fundingSlot,
 }: BoardProps) {
   const router = useRouter()
   const [, startTransition] = useTransition()
@@ -159,14 +164,13 @@ export default function PaymentBoard({
     }
   }
 
-  async function generateAllStatutory() {
+  async function generateSchemes(schemes: Scheme[]) {
     const failures: string[] = []
-    for (const r of rows) {
-      if (r.pv != null || r.total <= 0) continue
+    for (const scheme of schemes) {
       try {
-        await generateStatutoryScheme(period, r.scheme, dates.stat[r.scheme] || undefined)
+        await generateStatutoryScheme(period, scheme, dates.stat[scheme] || undefined)
       } catch (e) {
-        failures.push(`${r.payee}: ${e instanceof Error ? e.message : 'failed'}`)
+        failures.push(`${scheme}: ${e instanceof Error ? e.message : 'failed'}`)
       }
     }
     if (failures.length) throw new Error(failures.join(' · '))
@@ -174,28 +178,73 @@ export default function PaymentBoard({
 
   const salaryTodo = groups.filter((g) => g.headcount > 0 && remainingOf(g) > 0)
   const salaryTodoFunded = salaryTodo.filter(fundedFor)
-  const allSalaryDone = groups.length > 0 && groups.every((g) => g.stage === 'paid' || g.headcount === 0)
-  const allSalaryLabel = (() => {
-    const staffN = salaryTodoFunded.filter((g) => g.scope === 'staff').length
-    const dirN = salaryTodoFunded.filter((g) => g.scope === 'directors').length
-    const people = salaryTodoFunded.reduce((s, g) => s + remainingOf(g), 0)
-    if (gran === 'department') {
-      const n = staffN + dirN
-      return `Generate ${n} ${n === 1 ? 'PV' : 'PVs'} · ${people} people`
-    }
-    return `Generate ${people} PVs`
-  })()
+  const salaryDone = groups.length > 0 && groups.every((g) => g.stage === 'paid' || g.headcount === 0)
+  const allPeople = salaryTodoFunded.reduce((s, g) => s + remainingOf(g), 0)
+  const allPvCount = gran === 'department' ? salaryTodoFunded.length : allPeople
+  const allSalaryLabel = gran === 'department' ? `Generate ${allPvCount} ${allPvCount === 1 ? 'PV' : 'PVs'} · ${allPeople} people` : `Generate ${allPeople} PVs`
+  const allOwed = salaryTodoFunded.reduce((s, g) => s + g.people.filter((p) => p.net > 0 && !p.voucher).reduce((t, p) => t + p.net, 0), 0)
   const pendingStat = rows.filter((r) => r.pv == null && r.total > 0)
   const blockers = groups.flatMap((g) => (g.stage === 'paid' ? [] : g.people.filter((p) => p.net > 0 && bankIssue(p) != null)))
-  const totalDelta = delta(totals.net, totals.prevNet)
+  const notable = salaryDone ? [] : variances.top.filter((v) => isNotableMove(v.d))
   const openGroup = win?.kind === 'dept' ? groups.find((g) => g.key === win.key) ?? null : null
   const openBody = win?.kind === 'body' ? win.key : null
+  const bankName = payoutBank ? `${payoutBank.name} ···${payoutBank.last4}` : 'the Alliance payroll account'
+  const ddmm = (d: string) => (d ? `${d.slice(8, 10)}/${d.slice(5, 7)}` : '—')
+  const canGenerateAll = salaryTodoFunded.length > 0
+  const allTitle = salaryTodoFunded.length === 0 && salaryTodo.length > 0 ? 'Funding is not complete yet' : undefined
+
+  const confirmAllSalary = (
+    <div className="pay-confirm">
+      <span>
+        <b>RM {formatMoneyBare(allOwed)}</b> leaves {bankName} — staff on <b>{ddmm(dates.staff)}</b>
+        {salaryTodoFunded.some((g) => g.scope === 'directors') ? (
+          <>
+            , directors on <b>{ddmm(dates.directors)}</b>
+          </>
+        ) : null}{' '}
+        · {allPeople} people · <b>{allPvCount} {allPvCount === 1 ? 'PV' : 'PVs'}</b> — generate?
+      </span>
+      <button type="button" className="pay-btn pri" onClick={() => run('gen:all', generateAllSalary)} disabled={busy != null}>
+        {busy === 'gen:all' ? 'Generating…' : 'Yes, generate'}
+      </button>
+      <button type="button" className="text-xs font-sans text-muted hover:text-ink" onClick={() => setConfirm(null)} disabled={busy != null}>
+        Cancel
+      </button>
+    </div>
+  )
+  const confirmAllStat = (
+    <div className="pay-confirm">
+      <span>
+        <b>RM {formatMoneyBare(pendingStat.reduce((s, r) => s + r.total, 0))}</b> to {Array.from(new Set(pendingStat.map((r) => r.body))).join(' · ')} from {bankName}
+        {dates.stat.KWSP ? (
+          <>
+            {' '}
+            on <b>{ddmm(dates.stat.KWSP)}</b>
+          </>
+        ) : (
+          <> · date to be set</>
+        )}{' '}
+        · <b>{pendingStat.length} {pendingStat.length === 1 ? 'PV' : 'PVs'}</b> — generate?
+      </span>
+      <button type="button" className="pay-btn pri" onClick={() => run('stat:all', () => generateSchemes(pendingStat.map((r) => r.scheme)))} disabled={busy != null}>
+        {busy === 'stat:all' ? 'Generating…' : 'Yes, generate'}
+      </button>
+      <button type="button" className="text-xs font-sans text-muted hover:text-ink" onClick={() => setConfirm(null)} disabled={busy != null}>
+        Cancel
+      </button>
+    </div>
+  )
+
+  const overviewAction = () => {
+    if (headline.action.kind === 'generate-salary') setConfirm({ kind: 'all-salary', at: 'over' })
+    else if (headline.action.kind === 'generate-statutory') setConfirm({ kind: 'all-stat', at: 'over' })
+  }
 
   return (
     <div>
       {blockers.length > 0 ? (
         <div className="pay-block">
-          <b>Payment blocked for {blockers.length} staff:</b> fix their bank details before the Alliance file goes out — the file skips them, the rest of the department still pays.{' '}
+          <b>Payment blocked for {blockers.length} staff — fix their bank details.</b> The Alliance file skips them; the rest of their department still pays.{' '}
           <span className="who">
             {blockers.map((p, i) => (
               <span key={p.row_id}>
@@ -212,312 +261,119 @@ export default function PaymentBoard({
           </span>
         </div>
       ) : null}
-
-      {/* ── Salary PVs ─────────────────────────────────────────────────── */}
-      <section className="mb-10">
-        <div className="sect-head">
-          <h2>Salary PVs</h2>
-          <span className="rule" aria-hidden />
-          <span className="count">
-            {groups.length} GROUPS · {totals.staffCount} STAFF + {totals.directorCount} DIRECTORS · NET RM {formatMoneyBare(totals.net)}
-            {totalDelta ? ` · ${varianceLabel(totalDelta, prevMonthName)}` : ''}
+      {notable.length > 0 ? (
+        <div className="pay-warn">
+          <b>
+            {variances.notable} {variances.notable === 1 ? 'person' : 'people'} moved 20% or more vs {prevMonthName}
+          </b>{' '}
+          — worth a look before generating; nothing is blocked.{' '}
+          <span className="who">
+            {notable.map((v, i) => (
+              <span key={v.row_id}>
+                {i > 0 ? ' · ' : ''}
+                <button type="button" className="text-accent hover:underline" onClick={() => setWin({ kind: 'dept', key: v.key })}>
+                  {v.name}
+                </button>{' '}
+                {v.d.dir === 'up' ? '▲' : '▼'} {v.d.pct == null ? formatMoneyBare(Math.abs(v.d.abs)) : `${Math.abs(v.d.pct).toFixed(0)}%`}
+              </span>
+            ))}
+            {variances.notable > notable.length ? ` · and ${variances.notable - notable.length} more` : ''}
           </span>
         </div>
+      ) : null}
 
-        <div className="pay-bar">
-          <div className="f">
-            <span className="l">PV per</span>
-            <div className="pay-seg" role="group" aria-label="PV granularity">
-              <button type="button" aria-pressed={gran === 'department'} onClick={() => setGran('department')} disabled={busy != null}>
-                Department
-              </button>
-              <button type="button" aria-pressed={gran === 'employee'} onClick={() => setGran('employee')} disabled={busy != null}>
-                Employee
-              </button>
+      <Overview
+        periodRange={periodRange}
+        prevMonthName={prevMonthName}
+        headline={headline}
+        milestones={milestones}
+        variances={variances}
+        totals={totals}
+        facts={facts}
+        bankLabel={bankName}
+        actionLabel={headline.action.kind === 'generate-salary' ? allSalaryLabel : headline.action.label}
+        actionDisabled={busy != null || (headline.action.kind === 'generate-salary' ? !canGenerateAll : !staffFunded) || confirm?.kind === 'all-salary' || confirm?.kind === 'all-stat'}
+        actionTitle={headline.action.kind === 'generate-salary' ? allTitle : undefined}
+        onAction={overviewAction}
+        fundingSlot={fundingSlot}
+        confirm={confirm?.kind === 'all-salary' && confirm.at === 'over' ? confirmAllSalary : confirm?.kind === 'all-stat' && confirm.at === 'over' ? confirmAllStat : null}
+        onOpenGroup={(key) => setWin({ kind: 'dept', key })}
+      />
+
+      {error && !win ? <div className="pay-err mb-4">{error}</div> : null}
+
+      {phase !== 'no-payroll' && phase !== 'drafts-pending' ? (
+        <>
+          {/* ── Salary PVs ─────────────────────────────────────────────── */}
+          <section className="mb-10">
+            <div className="sect-head">
+              <h2>Salary PVs</h2>
+              <span className="rule" aria-hidden />
+              <span className="count">
+                {groups.length} GROUPS · {totals.staffCount} STAFF + {totals.directorCount} DIRECTORS · NET RM {formatMoneyBare(totals.net)}
+              </span>
             </div>
-          </div>
-          <label className="f">
-            <span className="l">Staff date</span>
-            <input type="date" className="pay-date" value={dates.staff} onChange={(e) => setDates((d) => ({ ...d, staff: e.target.value }))} disabled={busy != null} />
-          </label>
-          <label className="f">
-            <span className="l">Directors date</span>
-            <input type="date" className="pay-date" value={dates.directors} onChange={(e) => setDates((d) => ({ ...d, directors: e.target.value }))} disabled={busy != null} />
-          </label>
-          <span className="spacer" />
-          <Link
-            href={`/hr-costing/payroll/${period}/bank-transfer?format=alliance`}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-xs px-3 py-1.5 rounded-md transition-colors"
-          >
-            Alliance file · all staff
-          </Link>
-          {!allSalaryDone ? (
-            <button
-              type="button"
-              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md disabled:opacity-50 transition-colors"
-              onClick={() => setConfirm({ kind: 'all-salary' })}
-              disabled={busy != null || salaryTodoFunded.length === 0 || confirm?.kind === 'all-salary'}
-              title={salaryTodoFunded.length === 0 && salaryTodo.length > 0 ? 'Funding is not complete yet' : undefined}
-            >
-              {allSalaryLabel}
-            </button>
-          ) : null}
-          <span className="hint">
-            {gran === 'department'
-              ? 'One PV per department with the people as lines; directors are one batch of their own. '
-              : 'One PV per person, grouped by department. '}
-            Staff and directors keep separate dates and separate Principal approvals. Any department can go alone from its card.
-            {!staffFunded && salaryTodo.some((g) => g.scope === 'staff') ? ' Staff PVs wait for Finance to complete the funding.' : ''}
-            {!directorsFunded && salaryTodo.some((g) => g.scope === 'directors') ? ' Directors wait for their own funding request.' : ''}
-          </span>
-        </div>
+            <ContribBand band={band} />
+            <DeptRows
+              period={period}
+              groups={groups}
+              prevMonthName={prevMonthName}
+              today={today}
+              gran={gran}
+              onGran={setGran}
+              dates={{ staff: dates.staff, directors: dates.directors }}
+              onDate={(scope: Scope, v) => setDates((d) => (scope === 'directors' ? { ...d, directors: v } : { ...d, staff: v }))}
+              fundedFor={fundedFor}
+              busy={busy}
+              confirmKey={confirm?.kind === 'all-salary' && confirm.at === 'list' ? 'all' : confirm?.kind === 'dept' ? confirm.key : null}
+              allLabel={allSalaryLabel}
+              canGenerateAll={canGenerateAll}
+              allTitle={allTitle}
+              onAskAll={() => setConfirm({ kind: 'all-salary', at: 'list' })}
+              onAskGroup={(g) => setConfirm({ kind: 'dept', key: g.key })}
+              onConfirmGroup={(g) => run(`gen:${g.key}`, () => generateGroup(g))}
+              onCancel={() => setConfirm(null)}
+              onOpen={(key) => setWin({ kind: 'dept', key })}
+              confirmAll={confirmAllSalary}
+              payoutBank={payoutBank}
+              hint={
+                (gran === 'department' ? 'One PV per department with the people as lines; directors are one batch of their own. ' : 'One PV per person, grouped by department. ') +
+                'Staff and directors keep separate dates and separate Principal approvals. Any department can go alone from its row. Deductions = gross − net: the employee side of EPF, SOCSO, EIS, PCB and SKBBK.'
+              }
+            />
+          </section>
 
-        {confirm?.kind === 'all-salary' ? (
-          <div className="pay-confirm mb-3">
-            <span>
-              Generate <b>{allSalaryLabel.replace('Generate ', '')}</b> ·{' '}
-              <b>RM {formatMoneyBare(salaryTodoFunded.reduce((s, g) => s + g.people.filter((p) => p.net > 0 && !p.voucher).reduce((t, p) => t + p.net, 0), 0))}</b>
-              {payoutBank ? ` from ${payoutBank.name} ···${payoutBank.last4}` : ''} · staff on <b>{shortDate(dates.staff)}</b>
-              {salaryTodoFunded.some((g) => g.scope === 'directors') ? (
-                <>
-                  , directors on <b>{shortDate(dates.directors)}</b>
-                </>
-              ) : null}
-              . Principal approves each batch; approval is the payment.
-            </span>
-            <button
-              type="button"
-              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-xs px-3.5 py-1.5 rounded-md disabled:opacity-50"
-              onClick={() => run('gen:all', generateAllSalary)}
-              disabled={busy != null}
-            >
-              {busy === 'gen:all' ? 'Generating…' : 'Confirm'}
-            </button>
-            <button type="button" className="text-xs font-sans text-muted hover:text-ink" onClick={() => setConfirm(null)} disabled={busy != null}>
-              Cancel
-            </button>
-          </div>
-        ) : null}
-        {error && !win ? <div className="font-serif italic text-danger text-xs mb-3">{error}</div> : null}
-
-        <div className="pay-cards">
-          {groups.map((g) => {
-            const d = delta(g.net, g.prev_net)
-            const isNow = g.headcount > 0 && remainingOf(g) > 0 && fundedFor(g)
-            const warn = g.blockers > 0 && g.stage !== 'paid'
-            const pvLine =
-              g.mode === 'department' && g.deptVoucher
-                ? g.deptVoucher.no
-                : g.generated > 0
-                  ? `${g.vouchers.length} PV${g.vouchers.length === 1 ? '' : 's'}`
-                  : ''
-            const date = g.scope === 'directors' ? dates.directors : dates.staff
-            const pendingVs = g.vouchers.filter((v) => v.status === 'pending_approval' || v.status === 'draft')
-            const canGenerate = isNow && (g.scope === 'directors' || !!g.dept_id)
-            return (
-              <div key={g.key} className={`pay-card${isNow ? ' now' : ''}${warn ? ' warn' : ''}`}>
-                <div className="hd">
-                  <span className="nm">{g.name}</span>
-                  <span className="cnt">
-                    {g.headcount} {g.scope === 'directors' ? 'directors' : 'staff'}
-                    {g.people.length > g.headcount ? ` · ${g.people.length - g.headcount} unpaid` : ''}
-                  </span>
-                </div>
-                <div className="big">
-                  <small>RM</small>
-                  {formatMoneyBare(g.net)}
-                </div>
-                <div className="sub">
-                  net · gross {formatMoneyBare(g.gross)} · deductions {formatMoneyBare(g.deductions)}
-                  <br />
-                  {g.scope === 'directors' ? 'own batch' : `${g.headcount - g.blockers} of ${g.headcount} with bank on file`} · {shortDate(g.vouchers[0]?.payment_date ?? date)}
-                </div>
-                <div className="st">
-                  {stageChip(g)}
-                  {pvLine ? <span className="pv">{pvLine}</span> : null}
-                  {d ? <span className={`pay-delta ${d.dir}${isNotableMove(d) ? ' notable' : ''}`}>{varianceLabel(d, prevMonthName)}</span> : null}
-                </div>
-                {g.vouchers[0]?.created_at ? (
-                  <div className="foot">
-                    Generated {shortDateTime(g.vouchers[0].created_at)}
-                    {g.vouchers[0].approved_at ? ` · Approved ${shortDateTime(g.vouchers[0].approved_at)}` : ''}
-                  </div>
-                ) : null}
-                {confirm?.kind === 'dept' && confirm.key === g.key ? (
-                  <div className="pay-confirm">
-                    <span>
-                      <b>{g.stage === 'partial' || gran === 'employee' ? `${remainingOf(g)} PVs` : '1 PV'}</b> · {g.name} ·{' '}
-                      <b>RM {formatMoneyBare(g.people.filter((p) => p.net > 0 && !p.voucher).reduce((t, p) => t + p.net, 0))}</b> on <b>{shortDate(date)}</b>
-                    </span>
-                    <button
-                      type="button"
-                      className="bg-accent hover:bg-accent-hover text-white font-serif italic text-xs px-3 py-1.5 rounded-md disabled:opacity-50"
-                      onClick={() => run(`gen:${g.key}`, () => generateGroup(g))}
-                      disabled={busy != null}
-                    >
-                      {busy === `gen:${g.key}` ? 'Generating…' : 'Confirm'}
-                    </button>
-                    <button type="button" className="text-xs font-sans text-muted hover:text-ink" onClick={() => setConfirm(null)} disabled={busy != null}>
-                      Cancel
-                    </button>
-                  </div>
-                ) : null}
-                <div className="ft">
-                  <button type="button" className="open" onClick={() => setWin({ kind: 'dept', key: g.key })}>
-                    Open {g.people.length} {g.people.length === 1 ? 'person' : 'people'} →
-                  </button>
-                  <span>
-                    {remainingOf(g) > 0 && g.headcount > 0 ? (
-                      <button
-                        type="button"
-                        className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-xs px-3 py-1.5 rounded-md disabled:opacity-50 transition-colors"
-                        onClick={() => setConfirm({ kind: 'dept', key: g.key })}
-                        disabled={!canGenerate || busy != null}
-                        title={!fundedFor(g) ? 'Funding is not complete yet' : undefined}
-                      >
-                        {g.stage === 'partial' ? `Generate remaining ${remainingOf(g)}` : 'Generate'}
-                      </button>
-                    ) : pendingVs.length > 0 && pendingVs[0].group_id ? (
-                      <Link href={`/approvals?group_id=${pendingVs[0].group_id}`} className="font-mono text-xs text-accent hover:underline">
-                        Approvals →
-                      </Link>
-                    ) : g.deptVoucher ? (
-                      <Link href={`/payments/${g.deptVoucher.id}`} className="font-mono text-xs text-accent hover:underline">
-                        PV →
-                      </Link>
-                    ) : g.vouchers.length > 0 ? (
-                      <button type="button" className="open" style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }} onClick={() => setWin({ kind: 'dept', key: g.key })}>
-                        {g.vouchers.length} PVs →
-                      </button>
-                    ) : null}
-                  </span>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-        <p className="font-serif italic text-muted text-xs mt-3">
-          Deductions = gross − net (the employee side of EPF, SOCSO, EIS, PCB and SKBBK). A PV turns paid the moment Principal approves it; the Alliance file is what moves the cash.
-        </p>
-      </section>
-
-      {/* ── Statutory PVs ──────────────────────────────────────────────── */}
-      <section className="mb-6">
-        <div className="sect-head">
-          <h2>Statutory PVs</h2>
-          <span className="rule" aria-hidden />
-          <span className="count">
-            4 BODIES · 5 PVS · RM {formatMoneyBare(totals.statutory)} · STAFF {formatMoneyBare(totals.statutoryStaff)} + DIRECTORS {formatMoneyBare(totals.statutoryDirectors)}
-          </span>
-        </div>
-        <div className="pay-well">
-          <div className="pay-bar">
-            <label className="f">
-              <span className="l">Payment date</span>
-              <input
-                type="date"
-                className="pay-date"
-                value={dates.stat.KWSP ?? ''}
-                onChange={(e) => {
-                  const v = e.target.value
-                  setDates((d) => ({ ...d, stat: { KWSP: v, SOCSO: v, EIS: v, PCB: v, SKBBK: v } }))
-                }}
-                disabled={busy != null}
-                aria-label="Payment date for all statutory PVs"
+          {/* ── Statutory PVs ──────────────────────────────────────────── */}
+          <section className="mb-6">
+            <div className="sect-head">
+              <h2>Statutory PVs</h2>
+              <span className="rule" aria-hidden />
+              <span className="count">
+                4 BODIES · 5 PVS · RM {formatMoneyBare(totals.statutory)} · STAFF {formatMoneyBare(totals.statutoryStaff)} + DIRECTORS {formatMoneyBare(totals.statutoryDirectors)}
+              </span>
+            </div>
+            <div className="pay-well">
+              <StatutoryRows
+                rows={rows}
+                today={today}
+                dates={dates.stat}
+                onDateAll={(v) => setDates((d) => ({ ...d, stat: { KWSP: v, SOCSO: v, EIS: v, PCB: v, SKBBK: v } }))}
+                busy={busy}
+                staffFunded={staffFunded}
+                pendingStat={pendingStat.length}
+                onAskAll={() => setConfirm({ kind: 'all-stat', at: 'list' })}
+                confirming={confirm?.kind === 'all-stat' && confirm.at === 'list'}
+                confirmAll={confirmAllStat}
+                onGenerate={(schemes, key) => run(key, () => generateSchemes(schemes))}
+                onOpen={(body) => setWin({ kind: 'body', key: body })}
               />
-              <span className="font-serif italic text-muted text-xs">blank = decide later, editable until approved</span>
-            </label>
-            <span className="spacer" />
-            {pendingStat.length > 0 ? (
-              <button
-                type="button"
-                className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md disabled:opacity-50 transition-colors"
-                onClick={() => run('stat:all', generateAllStatutory)}
-                disabled={busy != null || !staffFunded}
-                title={!staffFunded ? 'Funding is not complete yet' : undefined}
-              >
-                {busy === 'stat:all' ? 'Generating…' : `Generate all 4 bodies (${pendingStat.length} PV${pendingStat.length === 1 ? '' : 's'})`}
-              </button>
-            ) : null}
-            <span className="hint">
-              One PV per body, staff + directors together, paid from the Alliance payroll account. Due the 15th of next month — KWSP rolls a weekend forward, PERKESO and LHDN roll it back. The by-department split is for reconciliation, not a separate PV.
-            </span>
-          </div>
-          {error && !win ? <div className="font-serif italic text-danger text-xs mb-3">{error}</div> : null}
-          <div className="pay-cards four">
-            {BODIES.map((b) => {
-              const brows = rows.filter((r) => r.body === b.key)
-              const total = brows.reduce((s, r) => s + r.total, 0)
-              const staff = brows.reduce((s, r) => s + r.staff, 0)
-              const dirs = brows.reduce((s, r) => s + r.directors, 0)
-              const allPaid = brows.every((r) => r.stage === 'paid')
-              const anyGen = brows.some((r) => r.pv != null)
-              const due = dueLabel(brows[0].due, today, allPaid ? 'paid' : 'open', brows[0].pv?.payment_date)
-              const pvNos = brows.filter((r) => r.pv).map((r) => r.pv!.no ?? 'PV').join(' · ')
-              const todo = brows.filter((r) => r.pv == null && r.total > 0)
-              const isNow = !allPaid && staffFunded
-              return (
-                <div key={b.key} className={`pay-card${isNow && todo.length > 0 ? ' now' : ''}`}>
-                  <div className="hd">
-                    <span className="nm">{b.name}</span>
-                    <span className="cnt">{b.schemes.length === 1 ? '1 PV' : '2 PVs'}</span>
-                  </div>
-                  <div className="big">
-                    <small>RM</small>
-                    {formatMoneyBare(total)}
-                  </div>
-                  <div className="sub">
-                    {b.covers}
-                    <br />
-                    staff {formatMoneyBare(staff)} · directors {formatMoneyBare(dirs)}
-                  </div>
-                  <div className="st">
-                    {allPaid ? (
-                      <span className="chip ledger"><span className="dot" />paid</span>
-                    ) : anyGen ? (
-                      <span className="chip alert"><span className="dot" />awaiting Principal</span>
-                    ) : (
-                      <span className="chip">not generated</span>
-                    )}
-                    {pvNos ? <span className="pv">{pvNos}</span> : null}
-                  </div>
-                  <div className={`pay-due ${due.cls}`}>{due.text}</div>
-                  <div className="foot">Portal · {b.portal}</div>
-                  <div className="ft">
-                    <button type="button" className="open" onClick={() => setWin({ kind: 'body', key: b.key })}>
-                      By department →
-                    </button>
-                    <span>
-                      {todo.length > 0 ? (
-                        <button
-                          type="button"
-                          className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-xs px-3 py-1.5 rounded-md disabled:opacity-50 transition-colors"
-                          onClick={() =>
-                            run(`stat:${b.key}`, async () => {
-                              for (const r of todo) await generateStatutoryScheme(period, r.scheme, dates.stat[r.scheme] || undefined)
-                            })
-                          }
-                          disabled={busy != null || !staffFunded}
-                          title={!staffFunded ? 'Funding is not complete yet' : undefined}
-                        >
-                          {busy === `stat:${b.key}` ? 'Generating…' : todo.length === 1 ? 'Generate PV' : `Generate ${todo.length}`}
-                        </button>
-                      ) : brows.length === 1 && brows[0].pv ? (
-                        <Link href={`/payments/${brows[0].pv.id}`} className="font-mono text-xs text-accent hover:underline">
-                          PV →
-                        </Link>
-                      ) : null}
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-        <p className="font-serif italic text-muted text-xs mt-3">
-          Net {formatMoneyBare(totals.net)} + statutory {formatMoneyBare(totals.statutory)} = CTC {formatMoneyBare(totals.ctc)}, what Finance funded. Once all five are paid the HR pool returns to HR&apos;s own money.
-        </p>
-      </section>
+            </div>
+            <p className="font-serif italic text-muted text-xs mt-3">
+              Net {formatMoneyBare(totals.net)} + statutory {formatMoneyBare(totals.statutory)} = CTC {formatMoneyBare(totals.ctc)}, what Finance funded. Paid to the portals from the Alliance payroll account; once all five are paid the HR pool is HR&apos;s own money again. Public holidays are not in the due-date rule.
+            </p>
+          </section>
+        </>
+      ) : null}
 
       {openGroup ? (
         <DeptWindow

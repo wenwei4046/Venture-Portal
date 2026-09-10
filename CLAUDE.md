@@ -75,7 +75,13 @@ src/
 │   │   │                              one batch. Statutory = 4 bodies on the
 │   │   │                              page, still 5 PVs (PERKESO holds SOCSO +
 │   │   │                              EIS) with a due date per body's
-│   │   │                              weekend rule.
+│   │   │                              weekend rule. UI (2026-09-11) is the
+│   │   │                              researched HRMS layout — BambooHR
+│   │   │                              month rail, Personio status word +
+│   │   │                              countdown + due dates + pay variances,
+│   │   │                              PayrollPanda band, Deel cycle rows,
+│   │   │                              Swingvy statutory rows — DESIGN.md
+│   │   │                              "Payment board (v3.6)".
 │   │   ├── revenue/                 ← Revenue Department: [sub]/ = one sub-department
 │   │   │                              (Fair, …) with 3 views, reached from the
 │   │   │                              SIDEBAR not a tab rail — page.tsx (Commission
