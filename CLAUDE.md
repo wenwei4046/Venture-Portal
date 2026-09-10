@@ -81,18 +81,32 @@ src/
 │   │   │                              table (`?tab=team`, the old Rules IX — the
 │   │   │                              table sets only the rank, the chart moves
 │   │   │                              people).
-│   │   │                              **DOUBLE WRITE (2026-09-07):** moving
-│   │   │                              somebody on EITHER org chart writes both
-│   │   │                              `hr_staff_costs.reports_to` and their
-│   │   │                              `comm_hierarchy` position. The two lines
-│   │   │                              used to drift apart in silence. Shared
-│   │   │                              writes live in `lib/hierarchy-writes.ts`
-│   │   │                              ('server-only', NOT 'use server') so
-│   │   │                              neither action calls the other; the
-│   │   │                              decision of whether to mirror is the pure
-│   │   │                              `lib/hierarchy-mirror.ts`. A mirror that
-│   │   │                              is skipped or fails NEVER throws — it
-│   │   │                              returns a note the caller must render.
+│   │   │                              **ONE LINE (2026-09-10):** inside a
+│   │   │                              commission department who somebody
+│   │   │                              REPORTS TO is who earns the override on
+│   │   │                              their sales — there is no second line.
+│   │   │                              `hr_staff_costs.reports_to` is the fact;
+│   │   │                              the position the engine reads
+│   │   │                              (`comm_hierarchy`) is DERIVED from it by
+│   │   │                              trigger (`hr_staff_costs_one_line_sync`,
+│   │   │                              mig 20260910120000): upline = reports_to,
+│   │   │                              rank = the title's floor rung when first
+│   │   │                              opened, ratcheted up (never down) when
+│   │   │                              the title's floor climbs; the only
+│   │   │                              hierarchy fact a human sets by hand is
+│   │   │                              the rank (Team tab). Both charts move the
+│   │   │                              same column through ONE function,
+│   │   │                              `moveReportingLine` in
+│   │   │                              `lib/hierarchy-writes.ts` ('server-only').
+│   │   │                              Two rules of that line, refused before
+│   │   │                              the write (`lib/hierarchy-boundary.ts`)
+│   │   │                              and again by trigger
+│   │   │                              `hr_staff_costs_commission_line` (23BND /
+│   │   │                              23REC): it may not cross the department's
+│   │   │                              edge, and inside it you may only report
+│   │   │                              to a title that may hold downlines (SRS
+│   │   │                              and above). Never write `comm_hierarchy`
+│   │   │                              rows from the app except the rank.
 │   │   ├── reports/                 (Phase 3)
 │   │   └── settings/                ← 8 tabs: treasury / overdue / splits / directors / companies / banks / periods / simulator
 │   └── api/erp/v1/                 ← the ONE machine endpoint: the Houzs ERP live

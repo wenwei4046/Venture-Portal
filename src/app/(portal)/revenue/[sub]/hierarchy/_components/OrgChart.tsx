@@ -39,15 +39,12 @@ import {
   NODE_WIDTH,
   type OrgNodeInput,
 } from '@/lib/org-layout'
-import { layoutParent, isBorrowed } from '@/lib/commission/chart-shape'
 import {
-  enrolPlan,
   forbiddenTargets,
   moveRefusal,
   refusalLabel,
   refusalSentence,
   shelfIds,
-  type EnrolChoice,
   type RefusalKind,
 } from '@/lib/commission/chart-moves'
 import {
@@ -56,8 +53,7 @@ import {
   type ManualLayout,
   type XY,
 } from '@/lib/commission/chart-layout-store'
-import type { MirrorOutcome } from '@/lib/hierarchy-mirror'
-import { enrolAndPlace, setPosition } from '../../../hierarchy-actions'
+import { moveOnChart } from '../../../hierarchy-actions'
 import MovePopover, { subjectOf, type PopAnchor } from './MovePopover'
 
 export interface OrgRank {
@@ -78,17 +74,16 @@ export interface OrgPerson {
   code: string | null
   /** The title they HOLD — the ratchet; may sit above the rank they are paid. */
   titleName: string | null
-  /** Its id, so placing somebody can offer their title's own rung first. */
   titleId: string | null
-  uplineStaffId: string | null
+  /** Where that title stands on the company ladder; null = not on it. */
+  levelRank: number | null
+  levelName: string | null
   /**
-   * Their manager on the company chart. Drawn, never written from here.
-   *
-   * Only ever used for somebody holding NO position, and only to borrow a
-   * shape — see `layoutGraph`. A placed person’s upline is their own fact,
-   * including when it is null, and the reporting line never overrides it.
+   * Who they report to — THE line. The same column People draws, and what
+   * the commission position's upline is derived from in the database.
    */
   reportsTo: string | null
+  /** The rank their position carries; null = no rank yet (their title has no rung here). */
   rankId: string | null
   /** "Rank B" — the card shows the rate beside it. */
   rankLabel: string | null
@@ -102,7 +97,6 @@ export interface OrgPerson {
 interface CardData extends Record<string, unknown> {
   person: OrgPerson
   uplineName: string | null
-  borrowName: string | null
   /** While somebody is dragged: this card may not take them. */
   invalidTarget: boolean
   /** While somebody is dragged: this card may. */
@@ -116,7 +110,7 @@ interface CardData extends Record<string, unknown> {
 }
 
 type CardNode = Node<CardData, 'person'>
-type LineEdge = Edge<{ borrow: boolean; fresh: boolean }, 'line'>
+type LineEdge = Edge<{ fresh: boolean }, 'line'>
 
 /** The card's Upline row asks the chart to open the popover for it. */
 const OpenUpline = createContext<(staffId: string, anchor: PopAnchor) => void>(() => {})
@@ -141,8 +135,9 @@ const pointerOf = (e: MouseEvent | TouchEvent): { x: number; y: number } => {
 /**
  * The org chart canvas.
  *
- * Three ways to move somebody, and they all funnel into `setPosition`, which
- * writes the new dated row:
+ * Three ways to move somebody, and they all funnel into `moveOnChart`, which
+ * writes who they report to — the one line — and lets the database move the
+ * commission position with it:
  *
  *   the Upline row   every card's last line names their upline and is a
  *                    button — a popover lists the chart by tree, greys anybody
@@ -191,9 +186,7 @@ function Chart({
   const [hover, setHover] = useState<{ id: string; bad: boolean } | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [fresh, setFresh] = useState<string | null>(null)
-  const [pop, setPop] = useState<{ moverId: string; anchor: PopAnchor; placeUnder: string | null } | null>(
-    null,
-  )
+  const [pop, setPop] = useState<{ moverId: string; anchor: PopAnchor } | null>(null)
   const [find, setFind] = useState('')
   const [entering, setEntering] = useState(true)
 
@@ -201,37 +194,28 @@ function Chart({
   const subjects = useMemo(() => people.map(subjectOf), [people])
 
   /**
-   * The commission tree, and only that.
-   *
-   * Every RULE reads this one: what a cycle is, who somebody’s downline is,
-   * what a drop would move. Borrowed reporting lines must not reach it — a
-   * manager is not somebody’s commission downline merely because they are
-   * their report, and forbidding that drop would refuse a legal placement.
+   * The one line: who reports to whom. Every RULE reads this — what a cycle
+   * is, who somebody’s downline is, what a drop would move — and so does the
+   * layout, because since 2026-09-10 there is no second graph to borrow from.
    */
   const graph: OrgNodeInput[] = useMemo(
-    () => people.map(p => ({ id: p.staffId, parentId: p.uplineStaffId, label: p.name })),
+    () => people.map(p => ({ id: p.staffId, parentId: p.reportsTo, label: p.name })),
     [people],
   )
 
   /**
-   * The same people, arranged the way the company is: an unplaced person is
-   * drawn under the manager they REPORT to, dashed (`chart-shape.ts`). Anybody
-   * on no line at all waits on the shelf instead of standing in the leaders'
-   * row — `shelfIds`.
+   * Anybody on no line at all — reporting to nobody, nobody under them, and a
+   * title that cannot lead — waits on the shelf instead of standing in the
+   * leaders' row (`shelfIds`). The trees are drawn without them.
    */
   const shelf = useMemo(
     () =>
-      shelfIds(
-        people.map(p => ({ staffId: p.staffId, placed: p.rankId !== null, layoutParentId: layoutParent(p) })),
-      ),
+      shelfIds(people.map(p => ({ staffId: p.staffId, parentId: p.reportsTo, canRecruit: p.canRecruit }))),
     [people],
   )
   const layoutGraph: OrgNodeInput[] = useMemo(
-    () =>
-      people
-        .filter(p => !shelf.has(p.staffId))
-        .map(p => ({ id: p.staffId, parentId: layoutParent(p), label: p.name })),
-    [people, shelf],
+    () => graph.filter(n => !shelf.has(n.id)),
+    [graph, shelf],
   )
   const layout = useMemo(() => layoutTree(layoutGraph), [layoutGraph])
 
@@ -354,8 +338,7 @@ function Chart({
           style: { '--i': i } as CSSProperties,
           data: {
             person: p,
-            uplineName: p.uplineStaffId ? (names.get(p.uplineStaffId) ?? null) : null,
-            borrowName: isBorrowed(p) && p.reportsTo ? (names.get(p.reportsTo) ?? null) : null,
+            uplineName: p.reportsTo ? (names.get(p.reportsTo) ?? null) : null,
             invalidTarget: old?.data.invalidTarget ?? false,
             canTake: old?.data.canTake ?? false,
             selected: old?.data.selected ?? false,
@@ -434,35 +417,20 @@ function Chart({
     return () => window.clearTimeout(t)
   }, [fresh, tidy, setCenter, getZoom])
 
-  /**
-   * Solid where somebody earns an override, dashed where the shape was
-   * borrowed from the reporting line. The two must never look alike: the
-   * solid one is a money relationship and the dashed one is the absence of
-   * one, so they are told apart before they are read.
-   */
+  /** One kind of line: who reports to whom, which is who earns the override. */
   const edges: LineEdge[] = useMemo(() => {
     const out: LineEdge[] = []
     for (const p of people) {
-      if (p.uplineStaffId && byId.has(p.uplineStaffId)) {
-        const isFresh = fresh === p.staffId
-        out.push({
-          id: `${p.uplineStaffId}->${p.staffId}`,
-          source: p.uplineStaffId,
-          target: p.staffId,
-          type: 'line',
-          className: isFresh ? 'fresh' : undefined,
-          data: { borrow: false, fresh: isFresh },
-        })
-      } else if (isBorrowed(p) && p.reportsTo && byId.has(p.reportsTo)) {
-        out.push({
-          id: `reports:${p.reportsTo}->${p.staffId}`,
-          source: p.reportsTo,
-          target: p.staffId,
-          type: 'line',
-          className: 'borrow',
-          data: { borrow: true, fresh: false },
-        })
-      }
+      if (!p.reportsTo || !byId.has(p.reportsTo)) continue
+      const isFresh = fresh === p.staffId
+      out.push({
+        id: `${p.reportsTo}->${p.staffId}`,
+        source: p.reportsTo,
+        target: p.staffId,
+        type: 'line',
+        className: isFresh ? 'fresh' : undefined,
+        data: { fresh: isFresh },
+      })
     }
     return out
   }, [people, byId, fresh])
@@ -476,43 +444,28 @@ function Chart({
       : { left: window.innerWidth / 2 - 150, top: 160, bottom: 190 }
   }, [])
 
-  const rankLabelOf = useCallback(
-    (rankId: string | null | undefined) => ranks.find(r => r.id === rankId)?.label ?? 'their rank',
-    [ranks],
-  )
-
   /**
-   * The write. `enrol` is the plan the popover confirmed when the upline
-   * holds no position yet — who goes on the ladder first, at what rank —
-   * and it is never inferred here: a move onto an unplaced upline without
-   * one opens the popover to ask, because every step is a position a month
-   * is paid from and nobody should discover one they did not see.
+   * The write: who they report to. One column, and the database moves the
+   * commission position with it. Refused here first, in the sentence the
+   * server would have used (`chart-moves.ts`), so a bad drop costs no round
+   * trip; the server refuses again and returns its reason rather than
+   * throwing, so the sentence survives production.
    */
   const move = useCallback(
-    (childId: string, parentId: string | null, rankId?: string | null, enrol?: EnrolChoice[]) => {
+    (childId: string, parentId: string | null) => {
       const child = byId.get(childId)
       if (!child) return
-      const rank = rankId ?? child.rankId
-      const plan = parentId ? enrolPlan(subjects, parentId) : { steps: [], blocked: null }
 
       if (parentId) {
         const parent = byId.get(parentId)
         if (!parent) return
-        const kind = moveRefusal(subjectOf(child), subjectOf(parent), descendantsOf(graph, childId), plan)
+        const kind = moveRefusal(subjectOf(child), subjectOf(parent), descendantsOf(graph, childId))
         if (kind) {
-          setError(refusalSentence(kind, subjectOf(child), subjectOf(parent), plan.blocked))
+          setError(refusalSentence(kind, subjectOf(child), subjectOf(parent)))
           return
         }
       }
-      if (!rank) {
-        setError(`${child.name} has no rank yet — pick one to place them.`)
-        return
-      }
-      if (plan.steps.length > 0 && !enrol?.length) {
-        setPop({ moverId: childId, placeUnder: parentId, anchor: anchorOf(parentId!) })
-        return
-      }
-      if (!enrol?.length && child.uplineStaffId === parentId && child.rankId === rank) {
+      if (child.reportsTo === parentId) {
         setError(null)
         setNote(
           parentId
@@ -524,58 +477,22 @@ function Chart({
 
       setError(null)
       setPop(null)
-      const wasPlaced = child.rankId !== null
-      const rankLabel = rankLabelOf(rank)
-      const nameOf = (id: string) => byId.get(id)?.name ?? 'somebody'
-      const input = {
-        staffId: childId,
-        schemeId,
-        rankId: rank,
-        uplineStaffId: parentId,
-        rateMode: child.rateMode,
-      }
       startTransition(async () => {
         try {
-          let outcome: MirrorOutcome
-          let first = ''
-          if (enrol?.length) {
-            const res = await enrolAndPlace({ schemeId, enrol, mover: input })
-            const done = res.placed.map(id => {
-              const step = enrol.find(e => e.staffId === id)
-              const where = step?.uplineStaffId ? ` under ${nameOf(step.uplineStaffId)}` : ', top of their own tree'
-              return `${nameOf(id)} placed as ${rankLabelOf(step?.rankId)}${where}`
-            })
-            if (res.failed || !res.outcome) {
-              const who = res.failed ? nameOf(res.failed.staffId) : child.name
-              const why = res.failed?.reason ?? 'the move did not go through'
-              const before = done.length ? `${done.join('; ')} — but ` : ''
-              setError(`${before}${who} could not be placed: ${why}`)
-              // Whatever did land is on the chart now; show it.
-              if (done.length) router.refresh()
-              const home = targetsFor().get(childId)
-              if (home) glide(new Map([[childId, home]]))
-              return
-            }
-            outcome = res.outcome
-            first = done.length ? `${done.join('; ')}. ` : ''
-          } else {
-            outcome = await setPosition(input)
+          const result = await moveOnChart(childId, parentId)
+          if (!result.ok) {
+            setError(result.reason)
+            const home = targetsFor().get(childId)
+            if (home) glide(new Map([[childId, home]]))
+            return
           }
           const moved = parentId
-            ? `${child.name} now reports to ${nameOf(parentId)}.`
+            ? `${child.name} now reports to ${byId.get(parentId)!.name}.`
             : `${child.name} is now top of their own tree.`
-          const placed = !wasPlaced ? ` Placed as ${rankLabel}.` : ''
-          // The reporting-line half of the write. A skip or a failure means the
-          // org chart and this one now draw different managers for the same
-          // person, which is exactly the thing nobody notices until payroll.
-          const mirror = outcome.note
-            ? ` ${outcome.note}`
-            : outcome.mirrored
-              ? parentId
-                ? ' Their reporting line moved with them.'
-                : ' Their reporting line was cleared with them.'
-              : ''
-          setNote(`${first}${moved}${placed}${mirror}`)
+          // The money follows the line in the database; the only thing worth
+          // adding is when there is no money to follow it yet.
+          const rank = child.rankId === null ? ' They have no rank yet — their title has no rung on this ladder.' : ''
+          setNote(`${moved}${rank}`)
           // A moved tree has a new shape; the arrangement described the old one.
           manualRef.current = new Map()
           writeManualLayout(storage(), schemeId, manualRef.current)
@@ -590,38 +507,7 @@ function Chart({
         }
       })
     },
-    [byId, subjects, graph, rankLabelOf, router, schemeId, targetsFor, glide, anchorOf],
-  )
-
-  /**
-   * A drop or a drawn line landing on `targetId`. Two things make the
-   * popover ask before anything is written, and the caller is told when it
-   * did (true) so a dropped card can go home while the question is open:
-   * somebody with no position yet cannot simply be moved —
-   * `comm_hierarchy.rank_id` is NOT NULL — so their rank is asked for; and a
-   * target with no position is put on the ladder first, which the reader
-   * confirms (`enrolPlan`). A refused target is refused here, in the
-   * sentence the popover would have captioned.
-   */
-  const place = useCallback(
-    (moverId: string, targetId: string): boolean => {
-      const mover = byId.get(moverId)
-      const target = byId.get(targetId)
-      if (!mover || !target) return false
-      const plan = enrolPlan(subjects, targetId)
-      const kind = moveRefusal(subjectOf(mover), subjectOf(target), descendantsOf(graph, moverId), plan)
-      if (kind) {
-        setError(refusalSentence(kind, subjectOf(mover), subjectOf(target), plan.blocked))
-        return false
-      }
-      if (mover.rankId === null || plan.steps.length > 0) {
-        setPop({ moverId, placeUnder: targetId, anchor: anchorOf(targetId) })
-        return true
-      }
-      move(moverId, targetId)
-      return false
-    },
-    [byId, subjects, graph, move, anchorOf],
+    [byId, graph, router, schemeId, targetsFor, glide],
   )
 
   const dragRef = useRef<{ id: string; from: XY; hover: string | null } | null>(null)
@@ -671,13 +557,7 @@ function Chart({
       if (id) {
         const t = byId.get(id)!
         lbl.hidden = false
-        // An upline with no position yet is put on the ladder on the way —
-        // said while the card is still in the air, not sprung afterwards.
-        lbl.textContent = kind
-          ? `✕ ${t.name} · ${refusalLabel(kind)}`
-          : t.rankId === null
-            ? `→ under ${t.name} · placed first`
-            : `→ under ${t.name}`
+        lbl.textContent = kind ? `✕ ${t.name} · ${refusalLabel(kind)}` : `→ under ${t.name}`
         lbl.classList.toggle('bad', !!kind)
         lbl.style.left = `${client.x + 14}px`
         lbl.style.top = `${client.y + 16}px`
@@ -703,13 +583,11 @@ function Chart({
         const target = byId.get(d.hover)!
         const kind = forbidden.get(d.hover)
         if (kind) {
-          setError(refusalSentence(kind, subjectOf(mover), subjectOf(target), enrolPlan(subjects, d.hover).blocked))
+          setError(refusalSentence(kind, subjectOf(mover), subjectOf(target)))
           glide(new Map([[node.id, d.from]]))
           return
         }
-        // Asked first — a rank to give, or an upline to put on the ladder:
-        // the card goes home while the popover has the question.
-        if (place(node.id, d.hover)) glide(new Map([[node.id, d.from]]))
+        move(node.id, d.hover)
         return
       }
 
@@ -717,15 +595,15 @@ function Chart({
       manualRef.current.set(node.id, { ...node.position })
       writeManualLayout(storage(), schemeId, manualRef.current)
     },
-    [byId, subjects, forbidden, glide, place, schemeId],
+    [byId, forbidden, glide, move, schemeId],
   )
 
   const onConnect = useCallback(
     (c: Connection) => {
       // A line is drawn from the MANAGER down to the person.
-      if (c.source && c.target) place(c.target, c.source)
+      if (c.source && c.target) move(c.target, c.source)
     },
-    [place],
+    [move],
   )
 
   /** Line every card up again, and show the whole of it. */
@@ -736,11 +614,7 @@ function Chart({
   }, [glide, targetsFor, fitView, schemeId])
 
   const openUpline = useCallback((staffId: string, anchor: PopAnchor) => {
-    setPop(current =>
-      current && current.moverId === staffId && !current.placeUnder
-        ? null
-        : { moverId: staffId, anchor, placeUnder: null },
-    )
+    setPop(current => (current && current.moverId === staffId ? null : { moverId: staffId, anchor }))
   }, [])
 
   /** Show me where this person is: lit, and scrolled to. */
@@ -776,10 +650,9 @@ function Chart({
     return () => document.removeEventListener('keydown', onKey)
   }, [pop, selected])
 
-  const placed = people.filter(p => p.rankId !== null).length
-  // Cards standing where the company puts them rather than where this chart
-  // does. Worth a number: it is the size of the gap between the two pages.
-  const borrowedCount = people.filter(p => isBorrowed(p) && p.reportsTo && byId.has(p.reportsTo)).length
+  // No rung for their title on this ladder: on the tree, but the engine has
+  // nothing to pay them from until they hold a ladder title.
+  const noRank = people.filter(p => p.rankId === null).length
 
   const nodeTypes = useMemo(() => ({ person: PersonCard }), [])
   const edgeTypes = useMemo(() => ({ line: LineEdge }), [])
@@ -813,16 +686,11 @@ function Chart({
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mb-3">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-serif italic text-muted text-xs">
           <span>
-            {people.length} salespeople · {placed} placed · {layout.roots.length} tree(s)
+            {people.length} salespeople · {layout.roots.length} tree(s)
             {pending ? ' · saving…' : ''}
           </span>
-          {borrowedCount > 0 ? (
-            <span className="inline-flex items-center gap-2 text-graphite">
-              <svg width="26" height="6" aria-hidden>
-                <line x1="0" y1="3" x2="26" y2="3" stroke="rgb(var(--muted))" strokeWidth="1.25" strokeDasharray="5 4" opacity="0.7" />
-              </svg>
-              {borrowedCount} drawn on their reporting line, not placed here yet
-            </span>
+          {noRank > 0 ? (
+            <span className="text-graphite">{noRank} with no rank yet — title not on this ladder</span>
           ) : null}
           {tidy.shelfCount > 0 ? <span className="text-graphite">{tidy.shelfCount} on no line at all</span> : null}
         </div>
@@ -857,7 +725,7 @@ function Chart({
                     >
                       <span className="block font-sans text-sm text-ink truncate">{m.name}</span>
                       <span className="block font-mono text-[0.58rem] uppercase tracking-wide text-muted truncate">
-                        {m.titleName ?? 'no title'} · {m.rankLabel ?? 'not placed'}
+                        {m.titleName ?? 'no title'} · {m.rankLabel ?? 'no rank yet'}
                       </span>
                     </button>
                   ))
@@ -896,7 +764,7 @@ function Chart({
         <div key={sel.staffId} className="org-slide flex flex-wrap items-center gap-3 bg-surface border border-hairline border-l-[3px] border-l-accent rounded-md px-3 py-2 mb-3 text-[13px] font-sans">
           <b className="font-semibold text-ink">{sel.name}</b>
           <span className="font-mono text-[10.5px] uppercase tracking-wide text-graphite">
-            {sel.titleName ?? 'no title'} · {sel.rankLabel ?? 'not placed'}
+            {sel.titleName ?? 'no title'} · {sel.rankLabel ?? 'no rank yet'}
             {sel.productRate !== null ? ` · ${Math.round(sel.productRate * 100)}%` : ''}
             {sel.placedSince ? ` · placed since ${sel.placedSince}` : ''}
             {` · ${selDownlines} downline${selDownlines === 1 ? '' : 's'}`}
@@ -912,16 +780,16 @@ function Chart({
             className="inline-flex items-center gap-2 border border-hairline bg-surface rounded-control px-2.5 py-1 text-[12.5px] font-medium text-ink hover:bg-surface-2"
           >
             <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-muted">Upline</span>
-            {sel.uplineStaffId && byId.has(sel.uplineStaffId) ? (
-              byId.get(sel.uplineStaffId)!.name
+            {sel.reportsTo && byId.has(sel.reportsTo) ? (
+              byId.get(sel.reportsTo)!.name
             ) : (
-              <i className="font-normal text-graphite">{sel.rankId ? 'top of own tree' : 'nobody yet'}</i>
+              <i className="font-normal text-graphite">top of own tree</i>
             )}
             <Chevron />
           </button>
           <button
             type="button"
-            disabled={pending || sel.rankId === null || sel.uplineStaffId === null}
+            disabled={pending || sel.reportsTo === null}
             onClick={() => move(sel.staffId, null)}
             className="border border-hairline bg-surface rounded-control px-2.5 py-1 text-[12.5px] font-medium text-graphite hover:text-ink disabled:opacity-40"
           >
@@ -984,7 +852,7 @@ function Chart({
                   />
                 ) : null}
                 <div className="org-shelf-lbl" style={{ position: 'absolute', left: tidy.shelfX, top: -22 }}>
-                  Not placed here yet · {tidy.shelfCount}
+                  On no line · {tidy.shelfCount}
                 </div>
               </ViewportPortal>
             ) : null}
@@ -995,18 +863,15 @@ function Chart({
 
       {pop && mover ? (
         <MovePopover
-          key={`${pop.moverId}:${pop.placeUnder ?? ''}`}
+          key={`pop:${pop.moverId}`}
           mover={mover}
           people={people}
-          ranks={ranks}
-          graph={graph}
-          layoutGraph={layoutGraph}
+          graph={layoutGraph}
           anchor={pop.anchor}
-          placeUnder={pop.placeUnder}
-          onPick={(upline, rankId, enrol) => {
+          onPick={upline => {
             const id = pop.moverId
             setPop(null)
-            move(id, upline, rankId, enrol)
+            move(id, upline)
           }}
           onClose={() => setPop(null)}
         />
@@ -1023,7 +888,8 @@ function Chart({
           </span>
         ))}
         <span className="font-serif italic text-xs text-muted">
-          Ranks are set on the Team tab; this chart only moves people.
+          A title gives its rank; raises are set on the Team tab. This chart moves the reporting
+          line — the same line People draws.
         </span>
       </div>
     </div>
@@ -1051,7 +917,7 @@ function chipLabel(person: OrgPerson): string {
 }
 
 function PersonCard({ data }: NodeProps<CardNode>) {
-  const { person, uplineName, borrowName, invalidTarget, canTake, selected, target, bad, fresh } = data
+  const { person, uplineName, invalidTarget, canTake, selected, target, bad, fresh } = data
   const open = useContext(OpenUpline)
   const cls = [
     'org-card',
@@ -1077,7 +943,7 @@ function PersonCard({ data }: NodeProps<CardNode>) {
         {person.rankLabel ? (
           <span className="oc-rank">{chipLabel(person)}</span>
         ) : (
-          <span className="oc-rank none">not placed</span>
+          <span className="oc-rank none">no rank yet</span>
         )}
       </div>
       <div className="oc-tt">
@@ -1099,15 +965,8 @@ function PersonCard({ data }: NodeProps<CardNode>) {
         <span className="k">Upline</span>
         {uplineName ? (
           <span className="v">{uplineName}</span>
-        ) : borrowName ? (
-          <span className="v borrow" title="Drawn on their reporting line — not placed here yet">
-            {borrowName}
-            <svg width="22" height="6" aria-hidden>
-              <line x1="0" y1="3" x2="22" y2="3" stroke="currentColor" strokeWidth="1.25" strokeDasharray="5 4" />
-            </svg>
-          </span>
         ) : (
-          <span className="v top">{person.rankId !== null ? 'top of own tree' : 'nobody yet'}</span>
+          <span className="v top">top of own tree</span>
         )}
         <Chevron />
       </button>

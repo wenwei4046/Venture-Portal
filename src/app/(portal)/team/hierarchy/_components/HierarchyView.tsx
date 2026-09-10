@@ -6,7 +6,6 @@ import { SlidingTabs, type TabItem } from '@/components/motion/SlidingTabs'
 import type { Rung } from '@/lib/ladder'
 import TeamOrgChart, { ALL_DEPARTMENTS, type ChartPerson } from './TeamOrgChart'
 import LevelsBoard, { type BoardTitle } from './LevelsBoard'
-import type { RankOption, SalesPerson } from './HierarchyPanel'
 import StaffTable from './StaffTable'
 
 export type HierarchyTab = 'chart' | 'table' | 'levels'
@@ -55,8 +54,6 @@ export default function HierarchyView({
   rungs,
   titles,
   breaks,
-  salespeople,
-  ranksByScheme,
 }: {
   people: ChartPerson[]
   commissionHref: string | null
@@ -64,10 +61,6 @@ export default function HierarchyView({
   titles: BoardTitle[]
   /** Reporting lines the ladder, as it stands, would refuse. */
   breaks: Array<{ id: string; managerId: string }>
-  /** Open commission positions. Nothing here is drawn — it is what an enrol
-   *  offer reads to default its scheme picker. */
-  salespeople: SalesPerson[]
-  ranksByScheme: Record<string, RankOption[]>
 }) {
   const searchParams = useSearchParams()
   const tab = hierarchyTab(searchParams.get('tab'))
@@ -110,14 +103,14 @@ export default function HierarchyView({
               </>
             ) : tab === 'table' ? (
               <>
-                The chart as rows, in ladder order. Changing who somebody reports to moves their
-                commission upline with them.
+                The chart as rows, in ladder order. Who somebody reports to is the one line —
+                inside Revenue it is also who earns the override on their sales.
               </>
             ) : (
               <>
                 Drag somebody onto their manager, or draw a line from a manager down to them.
-                Nobody can be put under a title the ladder ranks below theirs. Search a name to
-                find where somebody sits.
+                Nobody can be put under a title the ladder ranks below theirs, and inside Revenue
+                only under a title that may lead. Search a name to find where somebody sits.
               </>
             )}
           </p>
@@ -140,11 +133,7 @@ export default function HierarchyView({
            width of the row it sits in and pushes past the page. */
         <div className="min-w-0">
           {tab === 'table' ? (
-            <StaffTable
-              people={people}
-              salespeople={salespeople}
-              ranksByScheme={ranksByScheme}
-            />
+            <StaffTable people={people} />
           ) : (
             <>
               <div className="sect-head">
@@ -157,8 +146,6 @@ export default function HierarchyView({
                 commissionHref={commissionHref}
                 focused={focused}
                 onFocus={setFocused}
-                ranksByScheme={ranksByScheme}
-                salespeople={salespeople}
                 focusDept={focusDept}
                 onFocusDept={setFocusDept}
               />

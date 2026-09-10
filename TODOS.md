@@ -14,6 +14,17 @@ complete. QA audit on 2026-04-11. See `.gstack/qa-reports/qa-report-phase3-2026-
 
 ---
 
+## Owed — one line (2026-09-10)
+
+- **Person → sub-department column.** `comm_sync_position` picks a
+  department's OLDEST active sub-department (`comm_scheme_for_department`).
+  Revenue has one (Fair), so this is exact today; the day a second
+  sub-department exists, which scheme a person earns under needs a column on
+  `hr_staff_costs` (or a mapping table) and the function reads it instead.
+- **Positions of inactive staff.** Deactivation leaves the open position as
+  it is (payroll decides the leaving month). One inactive test row ("testing")
+  still holds a position; harmless, nobody points at it.
+
 ## ✅ Completed (Phase 2)
 
 - **M2: cancelLoan orphan fix** — shipped in Phase 2 Step 2 via

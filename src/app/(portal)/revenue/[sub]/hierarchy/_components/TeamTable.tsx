@@ -1,11 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import type { MirrorOutcome } from '@/lib/hierarchy-mirror'
 import { earnedFloor } from '@/lib/commission/titles'
 import { rankLabelOf } from '@/lib/commission/ranks'
 import { compareByLadder } from '@/lib/ladder'
-import { setPositionFromForm, updateStaffTax } from '../../../hierarchy-actions'
+import { setStaffRank, updateStaffTax, type RankOutcome } from '../../../hierarchy-actions'
 import {
   ActionForm,
   Choice,
@@ -27,22 +26,17 @@ import type { RankRow, SalespersonRow } from '../../../_components/config/types'
  * it beside the chart on 2026-09-05 and drew the line: "在 team 那边是不能换
  * 任何东西的，只可以换它的 rank 罢了" — the chart is where somebody moves
  * between trees, and the table shows what the chart drew. So the Upline
- * column is text, and the row's form carries the current upline as a hidden
- * value so a rank change never moves anyone. The rate mode saves with the
- * rank because it is the rank's own setting (Manual holds it; Scheme target
- * recomputes from it). Withholding Tax stays editable here because it is a
- * payroll fact of the person with no other home in the module.
+ * column is text: since 2026-09-10 it is who they REPORT to, the one line
+ * both charts draw, and the commission position follows it in the database.
+ * The rate mode saves with the rank because it is the rank's own setting
+ * (Manual holds it; Scheme target recomputes from it). Withholding Tax stays
+ * editable here because it is a payroll fact of the person with no other
+ * home in the module.
  *
- * Every save goes through `setPosition`, which writes a new effective-dated
- * position and raises the title if the rank sits above it — never lowers it.
- *
- * Because that action also writes the OTHER hierarchy, it can come back with
- * something it could not do — and it reports that by returning, not by
- * throwing, so `RowForm`'s error slot never sees it. The banner below is where
- * such a note lands. It should stay empty from this table: a rank change says
- * nothing about anybody's upline, so `setPosition` skips the mirror entirely.
- * If a note ever appears here, that assumption has stopped holding, and this
- * is how you find out rather than how you don't.
+ * Every save goes through `setStaffRank`, which writes a new effective-dated
+ * position. It comes back with a note — the rank now sits above the title,
+ * or why it could not be set — by returning, not throwing, so `RowForm`'s
+ * error slot never sees it. The banner below is where such a note lands.
  */
 export default function TeamTable({
   people,
@@ -53,7 +47,7 @@ export default function TeamTable({
   ranks: RankRow[]
   schemeId: string
 }) {
-  const [note, setNote] = useState<string | null>(null)
+  const [note, setNote] = useState<RankOutcome | null>(null)
   const nameOf = new Map(people.map(p => [p.staff_id, p.employee_name]))
 
   // The ladder, top down — the most senior title first, the same title
@@ -88,19 +82,24 @@ export default function TeamTable({
     <section>
       <SectionHead title="Team" count={`${people.length} PEOPLE`} />
       <Hint>
-        <strong>Title</strong> is what they hold and only ever goes up — an applied run, or a rank
-        above it set here, raises it; nothing here lowers it. The rows read the ladder top down,
-        the most senior title first. <strong>Rank</strong> is the floor a
-        month pays from, lettered from the top of the ladder. <strong>Manual</strong> keeps that
-        rank even in a month below target; <strong>Scheme target</strong> recomputes the rate every
-        month from group sales and drops back when the target is missed. <strong>Upline</strong> is
-        the chart&apos;s — move people there. Every change writes a new effective-dated position; a
-        month already computed keeps the chart it was computed against.
+        <strong>Title</strong> is what they hold and only ever goes up — an applied run raises it;
+        nothing here lowers it. The rows read the ladder top down, the most senior title first.{' '}
+        <strong>Rank</strong> is the floor a month pays from, lettered from the top of the ladder;
+        a title gives its rank automatically, and only a raise is set here. <strong>Manual</strong>{' '}
+        keeps that rank even in a month below target; <strong>Scheme target</strong> recomputes the
+        rate every month from group sales and drops back when the target is missed.{' '}
+        <strong>Upline</strong> is who they report to — the one line both charts draw; move people
+        on the chart or on People. Every change writes a new effective-dated position; a month
+        already computed keeps the chart it was computed against.
       </Hint>
 
-      {note ? (
-        <div className="bg-accent-bg border border-accent-border text-accent rounded-md p-3 mb-4 text-sm font-sans">
-          {note}
+      {note?.note ? (
+        <div
+          className={`rounded-md p-3 mb-4 text-sm font-sans border ${
+            note.ok ? 'bg-accent-bg border-accent-border text-accent' : 'bg-danger-bg border-danger/50 text-danger'
+          }`}
+        >
+          {note.note}
         </div>
       ) : null}
 
@@ -153,16 +152,14 @@ export default function TeamTable({
                       ) : null}
                     </td>
                     <RowForm
-                      action={setPositionFromForm}
-                      onDone={r => setNote((r as MirrorOutcome | undefined)?.note ?? null)}
+                      action={setStaffRank}
+                      onDone={r => setNote((r as RankOutcome | undefined) ?? null)}
                     >
                       {({ pending }) => (
                         <>
                           <td>
                             <Hidden name="staff_id" value={p.staff_id} />
                             <Hidden name="scheme_id" value={schemeId} />
-                            {/* The chart's answer, carried along unchanged. */}
-                            <Hidden name="upline_staff_id" value={p.upline_staff_id ?? ''} />
                             <Choice
                               name="rank_id"
                               defaultValue={p.rank_id ?? ''}
@@ -170,7 +167,7 @@ export default function TeamTable({
                               ariaLabel={`${p.employee_name} rank`}
                               width="w-40"
                             >
-                              {p.rank_id ? null : <option value="">— pick a rank —</option>}
+                              {p.rank_id ? null : <option value="">— no rank yet —</option>}
                               {ranks.map(r => (
                                 <option key={r.id} value={r.id}>{labelOf(r.id)}</option>
                               ))}
@@ -198,10 +195,8 @@ export default function TeamTable({
                       )}
                     </RowForm>
                     <td className="font-serif italic text-sm whitespace-nowrap">
-                      {!p.rank_id ? (
-                        <span className="text-muted">not placed</span>
-                      ) : p.upline_staff_id ? (
-                        <span className="text-graphite">{nameOf.get(p.upline_staff_id) ?? 'an upline no longer here'}</span>
+                      {p.reports_to ? (
+                        <span className="text-graphite">{nameOf.get(p.reports_to) ?? 'somebody not on this chart'}</span>
                       ) : (
                         <span className="text-muted">top of a tree</span>
                       )}

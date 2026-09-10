@@ -1,19 +1,29 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { rankAfterTitleChange, titleCanRecruit, type LadderRung } from '@/lib/commission/titles'
 import { getPeriodMonth } from '@/lib/utils'
+import { lineRefusal, type LineManager } from '@/lib/hierarchy-boundary'
 
 /**
- * The two low-level hierarchy writes, in one place so that both Server Actions
- * can perform each other's half without calling each other.
+ * The hierarchy writes, in one place so that every Server Action moves the
+ * same line the same way.
  *
- * That last clause is the whole point. The user's "double write" ruling means
- * moving somebody on the org chart must also move their commission upline, and
- * vice versa. The obvious implementation — `setReportsTo` calls `setPosition`,
- * `setPosition` calls `setReportsTo` — is a mutual recursion waiting for the
- * day somebody removes a guard clause. Instead both actions call the plain
- * functions below, which know nothing about mirroring and cannot trigger one.
- * The recursion is impossible structurally rather than prevented by a flag.
+ * ONE LINE (user, 2026-09-10): inside a commission department the reporting
+ * line IS the commission upline. `hr_staff_costs.reports_to` is the fact; the
+ * position the engine reads (`comm_hierarchy`) is derived from it by the
+ * database — trigger `hr_staff_costs_one_line_sync`, migration
+ * 20260910120000 — with the rank the title guarantees, ratcheted up and never
+ * down. So there are exactly two writes left here:
+ *
+ *   moveReportingLine   who somebody reports to. The position follows in the
+ *                       same transaction; nothing here writes it. Both charts
+ *                       call this, each behind its own gate.
+ *   movePositionRank    the one fact a human still sets by hand: the rank a
+ *                       month pays from. Effective-dated like every position
+ *                       write before it.
+ *
+ * The mirror that used to live here — write one table, then try the other,
+ * then say what could not be done — is gone with the reason for it. Two
+ * tables that cannot disagree need no note saying they might.
  *
  * NOT a `'use server'` module: nothing here may become a callable endpoint.
  * Every function takes an already-authorised client and trusts the caller to
@@ -23,7 +33,7 @@ import { getPeriodMonth } from '@/lib/utils'
  * `comm_*` postdates database.types.ts — untyped-client convention.
  */
 
-/** A person's open commission position, as the mirror needs to see it. */
+/** A person's open commission position, as a rank edit needs to see it. */
 export interface OpenPosition {
   id: string
   staffId: string
@@ -48,9 +58,7 @@ interface OpenRow {
  * Everybody who holds an open commission position, keyed by staff id.
  *
  * Unscoped by scheme on purpose: `one_position_at_a_time` is an EXCLUDE over
- * `staff_id` alone, so a person has at most one of these company-wide, and the
- * question the mirror asks — "is this person on commission at all" — is a
- * company-wide question.
+ * `staff_id` alone, so a person has at most one of these company-wide.
  */
 export async function loadOpenPositions(
   supabase: SupabaseClient,
@@ -80,15 +88,9 @@ export async function loadOpenPositions(
 
 /**
  * YYYY-MM-01 of today in MALAYSIAN wall-clock time — commission settles per
- * calendar month, and the business's calendar is UTC+8.
- *
- * Delegates to `getPeriodMonth` rather than deriving the month from raw UTC.
- * The difference is not cosmetic: the server runs in UTC, so for the first
- * eight hours of the 1st it is still the previous month there. A move made at
- * 07:00 on 1 October would compute `from = '2026-09-01'`, decide September's
- * position "started this month", and EDIT SEPTEMBER IN PLACE — overwriting the
- * chart a September run was computed against, which is the one invariant every
- * comment in this file swears to.
+ * calendar month, and the business's calendar is UTC+8. The database twin is
+ * `comm_period_start()`; the two must agree, or a rank set at 07:00 on the
+ * 1st would open a row for one month while the trigger edits the other.
  */
 export function currentPeriodStart(): string {
   return getPeriodMonth()
@@ -107,9 +109,7 @@ export function dayBefore(iso: string): string {
  * A statement that matched no rows answers exactly as one that matched:
  * `{ error: null }`. So an RLS policy filtering the row away, a row deleted
  * between the read and the write, or a stale id are all indistinguishable from
- * success. Everything this module writes is one half of a pair, and a half that
- * reports a success it did not achieve is the precise failure the double write
- * exists to prevent — so no bare `.update()` survives in this file.
+ * success unless the returned rows are counted.
  */
 async function updateChecked(
   supabase: SupabaseClient,
@@ -128,20 +128,21 @@ async function updateChecked(
 /**
  * What a database error may be told to the person at the screen.
  *
- * These messages travel further than a thrown error does: the mirror turns them
- * into a `MirrorOutcome.note`, which is a RETURN VALUE, so Next's production
- * redaction of Server Action errors never sees it. Constraint names, column
- * names and RLS-shaped text would be rendered verbatim to whoever made the
- * move. Known codes get a sentence written here; anything else gets a shrug,
- * and the detail stays in the server log where it belongs.
+ * These messages travel as RETURN VALUES, which Next's production redaction
+ * of Server Action errors never sees, so raw constraint names, column names
+ * and RLS-shaped text would be rendered verbatim to whoever made the move.
+ * Known codes get a sentence written here; the triggers that refuse a line
+ * write theirs for a reader (23LAD the ladder, 23BND the department edge,
+ * 23REC a title that cannot hold downlines) and those pass through; anything
+ * else gets a shrug, and the detail stays in the server log.
  */
-function safeReason(error: { code?: string; message: string }): string {
+export function safeReason(error: { code?: string; message: string }): string {
   switch (error.code) {
     case '23514':
       return 'that would put them under their own report'
     case '23LAD':
-      // The ladder trigger's own message is written for a reader — it names
-      // both people and both titles and nothing else.
+    case '23BND':
+    case '23REC':
       return error.message
     case '23P01':
       return 'they already hold a position covering that period'
@@ -155,43 +156,159 @@ function safeReason(error: { code?: string; message: string }): string {
   }
 }
 
+/** Somebody on the roster, as the two ends of a line need them. */
+export interface LineFacts extends LineManager {
+  id: string
+  active: boolean
+  /** Their CURRENT reporting line, read here rather than taken from the client. */
+  reportsTo: string | null
+  titleId: string | null
+}
+
+interface StaffRow {
+  id: string
+  employee_name: string
+  status: string | null
+  reports_to: string | null
+  title_id: string | null
+  department_id: string | null
+  titles: { name: string } | { name: string }[] | null
+  departments:
+    | { name: string; payroll_source: string }
+    | Array<{ name: string; payroll_source: string }>
+    | null
+}
+
+function one<T>(v: T | T[] | null | undefined): T | null {
+  if (!v) return null
+  return Array.isArray(v) ? (v[0] ?? null) : v
+}
+
 /**
- * `hr_staff_costs.reports_to`, written and CHECKED.
- *
- * The check is not defensive noise. PostgREST answers an UPDATE that matched
- * no rows exactly as it answers one that matched — `{ error: null }` — so an
- * RLS policy quietly filtering the row away is indistinguishable from a
- * successful write unless the returned rows are counted. A mirror that reports
- * success it did not achieve is worse than one that refuses.
+ * The roster facts a line's two ends need, read fresh. `canRecruit` is asked
+ * the way the trigger asks it — does any rung of the title, on the ladders of
+ * the person's own department, allow downlines — so the sentence the page
+ * shows before the round trip is the sentence the database would have sent.
  */
-export async function writeReportsTo(
+export async function loadLineFacts(
   supabase: SupabaseClient,
-  staffId: string,
-  reportsToId: string | null,
-): Promise<void> {
-  await updateChecked(
-    supabase,
-    'hr_staff_costs',
-    staffId,
-    { reports_to: reportsToId },
-    'Could not move them',
+  ids: Array<string | null>,
+): Promise<Map<string, LineFacts>> {
+  const wanted = [...new Set(ids.filter((id): id is string => !!id))]
+  if (wanted.length === 0) return new Map()
+
+  const { data, error } = await supabase
+    .from('hr_staff_costs')
+    .select(
+      'id, employee_name, status, reports_to, title_id, department_id, titles (name), departments (name, payroll_source)',
+    )
+    .in('id', wanted)
+  if (error) throw new Error(`Could not read the roster: ${safeReason(error)}`)
+  const rows = (data ?? []) as unknown as StaffRow[]
+
+  // Who may recruit, per (department, title). Read only for the departments
+  // in play — a handful of rows.
+  const deptIds = [...new Set(rows.map(r => r.department_id).filter((d): d is string => !!d))]
+  const recruit = new Map<string, boolean>()
+  if (deptIds.length > 0) {
+    const { data: rungs } = await supabase
+      .from('comm_ranks')
+      .select('title_id, can_recruit, comm_schemes!inner (comm_sub_departments!inner (department_id))')
+      .in('comm_schemes.comm_sub_departments.department_id', deptIds)
+    for (const r of (rungs ?? []) as unknown as Array<{
+      title_id: string
+      can_recruit: boolean
+      comm_schemes: { comm_sub_departments: { department_id: string } | { department_id: string }[] } | null
+    }>) {
+      const sub = one(r.comm_schemes?.comm_sub_departments)
+      if (!sub) continue
+      const key = `${sub.department_id}:${r.title_id}`
+      recruit.set(key, (recruit.get(key) ?? false) || r.can_recruit)
+    }
+  }
+
+  return new Map(
+    rows.map(r => {
+      const dept = one(r.departments)
+      const key = r.department_id && r.title_id ? `${r.department_id}:${r.title_id}` : null
+      return [
+        r.id,
+        {
+          id: r.id,
+          name: r.employee_name,
+          active: r.status === 'active',
+          reportsTo: r.reports_to,
+          titleId: r.title_id,
+          title: one(r.titles)?.name ?? null,
+          department: dept?.name ?? null,
+          commissionDept: dept?.payroll_source === 'commission',
+          canRecruit: key ? (recruit.get(key) ?? null) : null,
+        },
+      ]
+    }),
   )
 }
 
-interface RecruitRow {
-  title_id: string
-  can_recruit: boolean
-  sort_order: number
+/**
+ * What a move came back with. Returned, never thrown, because Next redacts
+ * the message of an error thrown out of a Server Action in production and
+ * the reason is the whole point of a refusal.
+ */
+export type LineResult =
+  | { ok: true; mover: LineFacts; manager: LineFacts | null }
+  | { ok: false; reason: string }
+
+/**
+ * Move somebody's reporting line — the one line both charts draw.
+ *
+ * Refused, with the sentence, when the manager is not on the active roster,
+ * when the line would cross a commission department's edge, or when the
+ * manager's title may not hold downlines (`lib/hierarchy-boundary.ts`). The
+ * database refuses the same lines again, plus a loop and a title the ladder
+ * ranks below theirs; those come back through `safeReason` in the trigger's
+ * own words.
+ *
+ * The commission position follows inside the same statement — the trigger
+ * runs before this returns — so a caller that re-reads the chart afterwards
+ * sees both lines already agreeing.
+ */
+export async function moveReportingLine(
+  supabase: SupabaseClient,
+  staffId: string,
+  reportsToId: string | null,
+): Promise<LineResult> {
+  if (!staffId) return { ok: false, reason: 'Which person?' }
+  if (reportsToId === staffId) return { ok: false, reason: 'Somebody cannot report to themselves.' }
+
+  const facts = await loadLineFacts(supabase, [staffId, reportsToId])
+  const mover = facts.get(staffId)
+  if (!mover?.active) return { ok: false, reason: 'That person is not on the active roster.' }
+  const manager = reportsToId ? (facts.get(reportsToId) ?? null) : null
+  if (reportsToId && !manager?.active) {
+    return { ok: false, reason: 'That manager is not on the active roster.' }
+  }
+
+  const refusal = lineRefusal(mover, manager)
+  if (refusal) return { ok: false, reason: refusal }
+
+  if (mover.reportsTo === reportsToId) return { ok: true, mover, manager }
+
+  const { data, error } = await supabase
+    .from('hr_staff_costs')
+    .update({ reports_to: reportsToId })
+    .eq('id', staffId)
+    .select('id')
+  if (error) return { ok: false, reason: safeReason(error) }
+  if (!data || data.length === 0) {
+    return { ok: false, reason: 'the row is gone, or is not visible to this account' }
+  }
+
+  return { ok: true, mover: { ...mover, reportsTo: reportsToId }, manager }
 }
 
 /**
  * Close the open position and open its replacement — or edit it in place when
  * no month has closed over it yet.
- *
- * Written once and called by both movers. The two gestures that reach it (a
- * chart drag moves an upline, a title change raises a rank) differ only in
- * which field they carry; the discipline below is identical, and it is the part
- * that must not drift:
  *
  *   started this month   edit in place. Nothing has been computed from it, and
  *                        closing a row the day before its own start would
@@ -201,17 +318,15 @@ interface RecruitRow {
  *                        what `one_position_at_a_time` (an EXCLUDE over
  *                        `staff_id` + daterange) demands.
  *
- * Every step is checked, including the roll-back. The comment that used to sit
- * on the roll-back said a person with no open position is paid nothing next
- * month — and then discarded the result that would have told us whether the
- * roll-back worked. If the restore itself fails the caller is told exactly
- * that, because the person is now in the state the comment was afraid of.
+ * Every step is checked, including the roll-back: if the restore itself fails
+ * the caller is told exactly that, because the person then holds NO open
+ * position and would be paid nothing next month.
  */
 async function writeEffectiveDated(
   supabase: SupabaseClient,
   userId: string,
   position: OpenPosition,
-  next: { uplineStaffId: string | null; rankId: string },
+  next: { rankId: string; rateMode: 'fixed' | 'variable' | null },
 ): Promise<void> {
   const from = currentPeriodStart()
 
@@ -220,7 +335,7 @@ async function writeEffectiveDated(
       supabase,
       'comm_hierarchy',
       position.id,
-      { upline_staff_id: next.uplineStaffId, rank_id: next.rankId },
+      { rank_id: next.rankId, rate_mode: next.rateMode },
       'Could not update their position',
     )
     return
@@ -237,9 +352,9 @@ async function writeEffectiveDated(
   const { error } = await supabase.from('comm_hierarchy').insert({
     scheme_id: position.schemeId,
     staff_id: position.staffId,
-    upline_staff_id: next.uplineStaffId,
+    upline_staff_id: position.uplineStaffId,
     rank_id: next.rankId,
-    rate_mode: position.rateMode,
+    rate_mode: next.rateMode,
     effective_from: from,
     created_by: userId,
   })
@@ -247,145 +362,27 @@ async function writeEffectiveDated(
 
   const reason = safeReason(error)
   try {
-    await updateChecked(
-      supabase,
-      'comm_hierarchy',
-      position.id,
-      { effective_to: null },
-      'restore',
-    )
+    await updateChecked(supabase, 'comm_hierarchy', position.id, { effective_to: null }, 'restore')
   } catch {
     throw new Error(
-      `Could not record the new position (${reason}), and their old one could not be reopened — they now hold NO open position and would be paid nothing next month. Place them on the Revenue chart.`,
+      `Could not record the new position (${reason}), and their old one could not be reopened — they now hold NO open position and would be paid nothing next month. Set their rank again on the Team tab.`,
     )
   }
   throw new Error(`Could not record the new position: ${reason}`)
 }
 
 /**
- * Move somebody's commission upline, keeping the rank and rate mode they hold.
- *
- * Throws rather than returning a flag. The caller has already committed the
- * other half of the write and turns this into a note the user reads; see
- * `mirrorFailed`.
- */
-export async function movePositionUpline(
-  supabase: SupabaseClient,
-  userId: string,
-  position: OpenPosition,
-  uplineStaffId: string | null,
-): Promise<void> {
-  if (uplineStaffId === position.staffId) {
-    throw new Error('somebody cannot be their own upline')
-  }
-  if (position.uplineStaffId === uplineStaffId) return
-
-  if (uplineStaffId) {
-    // Who may hold downlines follows the TITLE, not the month's rank (user
-    // 2026-09-03) — the same rule `setPosition` applies, asked the same way,
-    // so a move refused there is refused here for the same stated reason.
-    const [{ data: ladder }, { data: uplineStaff }] = await Promise.all([
-      supabase.from('comm_ranks').select('title_id, can_recruit, sort_order').eq('scheme_id', position.schemeId),
-      supabase.from('hr_staff_costs').select('title_id, employee_name').eq('id', uplineStaffId).maybeSingle(),
-    ])
-
-    const rungs: LadderRung[] = ((ladder ?? []) as unknown as RecruitRow[]).map(r => ({
-      titleId: r.title_id,
-      canRecruit: r.can_recruit,
-      sortOrder: r.sort_order,
-    }))
-    const upline = uplineStaff as { title_id: string | null; employee_name: string } | null
-    // `null` means the ladder does not carry their title — outside the rule,
-    // not refused by it, exactly as `setPosition` treats somebody untitled.
-    if (titleCanRecruit(rungs, upline?.title_id ?? null) === false) {
-      throw new Error(
-        `${upline?.employee_name ?? 'that manager'}'s title is not allowed to hold downlines`,
-      )
-    }
-  }
-
-  await writeEffectiveDated(supabase, userId, position, {
-    uplineStaffId,
-    rankId: position.rankId,
-  })
-}
-
-/**
- * Move somebody's commission RANK, keeping the upline they already have.
- *
- * Split from `movePositionUpline` because the two are asked for by different
- * gestures and neither should carry the other's argument along as a null that
- * means "leave it alone". The write itself is shared.
+ * Set somebody's commission RANK (and the rate mode that rides with it),
+ * keeping the upline the reporting line gives them. The one hierarchy fact a
+ * human still enters by hand.
  */
 export async function movePositionRank(
   supabase: SupabaseClient,
   userId: string,
   position: OpenPosition,
   rankId: string,
+  rateMode: 'fixed' | 'variable' | null,
 ): Promise<void> {
-  if (position.rankId === rankId) return
-
-  await writeEffectiveDated(supabase, userId, position, {
-    uplineStaffId: position.uplineStaffId,
-    rankId,
-  })
-}
-
-interface AssignableRow {
-  id: string
-  title_id: string
-  can_recruit: boolean
-  sort_order: number
-}
-
-/** The scheme's rungs in the shape `rankAfterTitleChange` reasons about. */
-export async function loadAssignableRungs(
-  supabase: SupabaseClient,
-  schemeId: string,
-): Promise<Array<{ id: string; titleId: string; canRecruit: boolean; sortOrder: number }>> {
-  const { data, error } = await supabase
-    .from('comm_ranks')
-    .select('id, title_id, can_recruit, sort_order')
-    .eq('scheme_id', schemeId)
-  if (error) throw new Error(`Could not read the ladder: ${safeReason(error)}`)
-  return ((data ?? []) as unknown as AssignableRow[]).map(r => ({
-    id: r.id,
-    titleId: r.title_id,
-    canRecruit: r.can_recruit,
-    sortOrder: r.sort_order,
-  }))
-}
-
-/**
- * The rank a TITLE assigns, written.
- *
- * "A title assigns the rank automatically" (user). The mapping is
- * `rankAfterTitleChange` — a ratchet, so this only ever raises somebody, never
- * claws back a rank they were deliberately placed above.
- *
- * Silent no-ops, all of them legitimate and none worth a message:
- *   - the person holds no open commission position (they are not on commission);
- *   - the scheme's ladder does not carry their new title (a Finance title never
- *     will);
- *   - their rank already sits at or above the title's floor.
- *
- * Returns the rank it moved them to, or null when it moved nothing, so the
- * caller can say "…and their rank moved up with it" only when it did.
- */
-export async function syncRankToTitle(
-  supabase: SupabaseClient,
-  userId: string,
-  staffId: string,
-  titleId: string | null,
-): Promise<string | null> {
-  const positions = await loadOpenPositions(supabase)
-  const position = positions.get(staffId)
-  if (!position) return null
-
-  const rungs = await loadAssignableRungs(supabase, position.schemeId)
-  const target = rankAfterTitleChange(rungs, titleId, position.rankId)
-  if (!target) return null
-
-  await movePositionRank(supabase, userId, position, target.id)
-  return target.id
+  if (position.rankId === rankId && position.rateMode === rateMode) return
+  await writeEffectiveDated(supabase, userId, position, { rankId, rateMode })
 }
