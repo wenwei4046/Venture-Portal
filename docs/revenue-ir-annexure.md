@@ -346,6 +346,8 @@ pending-attribution note. Sections 1–12 remain the original annexure.
 
 Still awaiting rules/data: the IR deposit gate, Appointment/Closing data and percentage denominators,
 the introducer split, and confirmation/data for house assignments. These
-clarifications record requirements. The local package and opening-month
-expansion implementation has been validated; see `HANDOFF.md` for checks
-and remaining work. No IR migration or payout has been applied live.
+clarifications record requirements. The package and opening-month expansion
+implementation is tracked in [PR #82](https://github.com/wenwei4046/Venture-Portal/pull/82);
+its checks and deployment links record the release outcome. See `HANDOFF.md`
+for preflight validation, the rollback-only production rehearsal and remaining
+work. Releasing the implementation does not compute or apply an IR payout.

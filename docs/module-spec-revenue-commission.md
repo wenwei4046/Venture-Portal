@@ -10,7 +10,7 @@ Related: `module-spec-phase3.md` (HR Costing), `db-schema.md`, `DESIGN.md`.
 
 Programme scope: the original percentage ladder, unlimited group/override
 roll-up and one-rung progression below describe **Fair**. IR's confirmed
-exceptions and current local implementation boundary are in **§15**; do not
+exceptions and current implementation boundary are in **§15**; do not
 cross-apply the two programmes.
 
 ---
@@ -1235,14 +1235,16 @@ machine-ingest exception in CLAUDE.md.
 IR is a separate programme from Fair. The source annexure is
 `revenue-ir-annexure.md`; its original wording is preserved there. Explicit
 management answers below take precedence over conflicting annexure text.
-Implementation is local on `codex/ir-ruleset-checkpoint`. The expanded payouts
-and opening-month gate passed 1,132 tests, 120 disposable-database checks and
-the production build. See
-`HANDOFF.md` for the migration list, current validation and remaining work.
-The changes are uncommitted and have not been deployed; none of the IR
-migrations have been applied live. The fourth-line payout and subsequent
-expansion rules are now confirmed below. Recurring subsidy Claims are a
-later batch.
+The implementation is tracked in [PR #82](https://github.com/wenwei4046/Venture-Portal/pull/82),
+including its release checks and deployment links. After integrating
+`origin/main` at `177f0a0`, 1,147 tests passed; 120 disposable-database checks
+cover the six migrations and expanded payouts. The implementation build
+passed before release, and all six migrations passed a rollback-only
+production rehearsal with the 60 payroll rows unchanged. These preflight
+results do not themselves establish a completed deployment. See `HANDOFF.md`
+for the migration list and remaining work. The fourth-line payout and
+subsequent expansion rules are confirmed below. Recurring subsidy Claims
+are a later batch.
 
 ### 15.1 Confirmed decisions
 
@@ -1378,8 +1380,8 @@ later batch.
 - **Order isolation prerequisite:** scope batches and carry-forward orders
   by sub-department before accepting IR's separate sales feed, including
   committed-batch uniqueness and the Fair ERP ingest path (`TODOS.md`,
-  "Orders per sub-department"). This work is part of the local batch; verify
-  its migration and app loading together before an IR run can be applied.
+  "Orders per sub-department"). This work is included in PR #82; its migration
+  and matching app must be active together before an IR run can be applied.
 - **Delivery batches:** (1) order isolation, rank packages, two-layer
   overrides, recruitment limits, group incentives and statement breakdown;
   (2) recurring subsidy registration through Claims; (3) tier KPI,

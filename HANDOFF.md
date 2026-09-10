@@ -1,12 +1,14 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-09-11 · IR opening-month expansion validated locally)
+# HOUZS Venture Portal — Session Handoff (checkpoint 2026-09-11 · IR release PR #82)
 
 ## ═══ CHECKPOINT 2026-09-11 — read this first (handed to Codex) ═══
 
 **Baseline before this continuation.** The IR branch starts at `0085c8b`
-(the checkpoint commit after `9453824`). Work is local and uncommitted on
-`codex/ir-ruleset-checkpoint`; the progressive expansion and opening-month
-gate are implemented and have passed the checks below.
-Do not describe it as deployed or its migrations as applied live. The following earlier PRs were
+(the checkpoint commit after `9453824`). The implementation is committed on
+`codex/ir-ruleset-checkpoint`, with `origin/main` at `177f0a0` merged without
+conflicts. **Release tracking: [PR #82](https://github.com/wenwei4046/Venture-Portal/pull/82).**
+Its checks and deployment links are the source for the running release;
+the preflight evidence below does not itself establish deployment success.
+The following earlier PRs were
 merged on 2026-09-10/11 and were already LIVE on Vercel production
 (`venture-portal-chi.vercel.app`), with their migrations applied:
 
@@ -46,11 +48,12 @@ IR's new package ranks must sit above percentage ranks even at zero percent.
 scheme", switches all off, ranks B 3% / A 3.5% / SS 4% (the user keyed them in
 after the fix), rungs / people: check before assuming.
 
-### ACTIVE: IR (Investment Renovation) — progressive expansion, not deployed
+### ACTIVE: IR (Investment Renovation) — progressive expansion, release PR #82
 
-**Latest validation, including progressive expansion:** `npm run test:ci` **1,132 passing**
-(89 passing files, 3 pre-existing skipped files); `npm run build` passed with
-existing repository lint warnings. `scripts/test-commission-order-isolation.mjs`
+**Release preflight validation:** after integrating `origin/main` at `177f0a0`,
+`npm run test:ci` passed **1,147 tests**. The earlier implementation build passed
+with existing repository lint warnings; PR #82 checks track the release build.
+`scripts/test-commission-order-isolation.mjs`
 executed all six new migrations in disposable PostgreSQL/PGlite and passed
 **120 checks**, covering programme ownership, atomic imports, Fair ERP routing,
 cash/subsidy separation, shared payroll apply/reopen, direct limits, failed-move
@@ -60,10 +63,14 @@ opening the ninth line, unused offers expiring across months, renewed offers,
 opened lines surviving weak months, reopening withdrawing unused permission,
 stale direct-ID rejection, and failed/ignored inserts not consuming a slot.
 The scoped UI capacity RPC and mutation permissions are checked. The fixture uses
-synthetic HR/auth tables; concurrent sessions and live browser E2E have NOT
-been validated. Production was read only to verify the existing IR catalogue,
-empty ladder and shared title IDs. No migration was applied live, no payroll
-was written and no deployment or push was made.
+synthetic HR/auth tables; concurrent sessions and live browser E2E were not
+part of these preflight checks. A rollback-only rehearsal on the production
+database executed all six migrations successfully. The 60 payroll rows had
+the same hash before and after rehearsal. That transaction was rolled back;
+it is evidence of compatibility, not a completed production migration.
+The release procedure applies and records the six migrations atomically,
+then merges PR #82 for Vercel deployment. Verify the PR's deployment result
+before reporting the running application version.
 
 New migrations, in order:
 `20260911010000_commission_rank_packages.sql`,
@@ -90,8 +97,8 @@ from current-month eligibility and keep immutable qualification evidence;
 historical evidence is not an unused permanent right to expand. A weak line
 blocks expansion for that month but does not cancel other qualifying packages.
 The earlier fourth-line policy block is removed. The sixth migration and app
-changes are locally validated; deployment/live E2E remain before calling this
-shipped. Recurring Claims subsidy payments themselves remain batch 2.
+changes are included in PR #82 and covered by the release preflight above.
+Recurring Claims subsidy payments themselves remain batch 2.
 
 **Read `docs/module-spec-revenue-commission.md` §15 before continuing.** The
 original annexure remains in `docs/revenue-ir-annexure.md` §§1–12; the appended
@@ -149,15 +156,15 @@ three-child requirement.
 The fourth and later lines use the same monthly package and repeated-own
 formula; qualification of individual packages remains independent of expansion.
 
-**Implemented locally:** package-aware rank catalogue/order,
+**Implemented in PR #82:** package-aware rank catalogue/order,
 Ranks tab fields, configurable two-layer target/override calculations,
 group incentives and statement breakdowns, sub-department order isolation,
 and direct-line-limit enforcement. `src/lib/commission/ir-groups.ts` supplies
 the independently tested group calculations; `ir-engine.test.ts` exercises
 their engine integration, package fallback and Fair compatibility. Migration
-and app integration are prepared and locally validated. Live validation and
-deployment remain before describing this batch as shipped. Nothing here asserts a live IR migration
-or payout. Payroll must still sum every applied sub-department's commission;
+and app integration are covered by the checks above; the PR records deployment
+status. Deployment does not compute or apply an IR payout. Payroll must still
+sum every applied sub-department's commission;
 subsidy caps never enter `total_commission`.
 
 **Hierarchy reminder:** ONE LINE governs only the HOME sub-department (Fair).
