@@ -20,12 +20,13 @@ export type PayrollGranularity = 'employee' | 'department'
 export type StatutoryScheme = 'KWSP' | 'SOCSO' | 'EIS' | 'PCB' | 'SKBBK'
 
 /**
- * Mig 20260910150000 — HR compiles the salary PVs. `granularity` decides the
+ * Mig 20260911101500 — HR compiles the salary PVs. `granularity` decides the
  * shape: 'employee' is one voucher per person (every month so far),
  * 'department' is ONE voucher per department with the people as lines.
- * `departmentId` pays one department on its own (staff only — directors are
- * always one batch). Each call is its own approval group with its own payment
- * date, which drives the GL date at approval.
+ * `departmentId` pays one department on its own (staff only). `payrollRowIds`
+ * selects exactly those people; null includes everyone still without a PV.
+ * Each call is its own approval group with its own payment date, which drives
+ * the GL date at approval. The database rejects stale selections atomically.
  */
 export async function createPayrollDisbursement(
   period: string,
@@ -33,6 +34,7 @@ export async function createPayrollDisbursement(
   paymentDate: string,
   granularity: PayrollGranularity = 'employee',
   departmentId: string | null = null,
+  payrollRowIds: string[] | null = null,
 ): Promise<DisbursementResult> {
   await requirePermission('hr_costing')
   const supabase = await createClient()
@@ -46,11 +48,17 @@ export async function createPayrollDisbursement(
   if (departmentId && !/^[0-9a-f-]{36}$/i.test(departmentId)) {
     throw new Error('Invalid department')
   }
+  if (payrollRowIds !== null) {
+    if (!Array.isArray(payrollRowIds) || payrollRowIds.length === 0) {
+      throw new Error('Select at least one employee to generate a payment voucher')
+    }
+    if (payrollRowIds.some(id => typeof id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))
+      || new Set(payrollRowIds.map(id => id.toLowerCase())).size !== payrollRowIds.length) {
+      throw new Error('Invalid employee selection. Select each employee once')
+    }
+  }
 
-  // database.types.ts not regenerated for the new signature (same escape
-  // hatch as before).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.rpc as any)(
+  const { data, error } = await supabase.rpc(
     'create_payroll_disbursement_vouchers',
     {
       p_period: period,
@@ -58,6 +66,7 @@ export async function createPayrollDisbursement(
       p_payment_date: paymentDate,
       p_granularity: granularity,
       p_department_id: departmentId,
+      p_payroll_row_ids: payrollRowIds,
     },
   )
 

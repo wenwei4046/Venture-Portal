@@ -7024,7 +7024,14 @@ export type Database = {
         Returns: string
       }
       create_payroll_disbursement_vouchers: {
-        Args: { p_payment_date: string; p_period: string; p_scope: string }
+        Args: {
+          p_payment_date: string
+          p_period: string
+          p_scope: string
+          p_granularity?: string
+          p_department_id?: string | null
+          p_payroll_row_ids?: string[] | null
+        }
         Returns: Json
       }
       create_payroll_statutory_director_topup: {

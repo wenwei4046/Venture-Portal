@@ -90,6 +90,7 @@ export default function DeptRows({
   })
   const hasDirectors = groups.some((g) => g.scope === 'directors')
   const allDone = groups.length > 0 && groups.every((g) => g.stage === 'paid' || g.headcount === 0)
+  const hasRemaining = counts.todo > 0
   const FILTERS: Array<[Filter, string]> = [
     ['all', 'All'],
     ['todo', 'To generate'],
@@ -111,27 +112,29 @@ export default function DeptRows({
             ))}
           </div>
           <span className="spacer" />
+          {hasRemaining ? <>
           <div className="f">
-            <span className="l">PV per</span>
+            <span className="l">New PVs per</span>
             <div className="pay-seg" role="group" aria-label="PV granularity">
-              <button type="button" aria-pressed={gran === 'department'} onClick={() => onGran('department')} disabled={busy != null}>
+              <button type="button" aria-pressed={gran === 'department'} onClick={() => onGran('department')} disabled={busy != null || confirmKey != null}>
                 Department
               </button>
-              <button type="button" aria-pressed={gran === 'employee'} onClick={() => onGran('employee')} disabled={busy != null}>
+              <button type="button" aria-pressed={gran === 'employee'} onClick={() => onGran('employee')} disabled={busy != null || confirmKey != null}>
                 Employee
               </button>
             </div>
           </div>
           <label className="f">
-            <span className="l">Staff date</span>
-            <input type="date" className="pay-date" value={dates.staff} onChange={(e) => onDate('staff', e.target.value)} disabled={busy != null} />
+            <span className="l">Staff pay date</span>
+            <input type="date" className="pay-date" value={dates.staff} onChange={(e) => onDate('staff', e.target.value)} disabled={busy != null || confirmKey != null} />
           </label>
           {hasDirectors ? (
             <label className="f">
-              <span className="l">Directors</span>
-              <input type="date" className="pay-date" value={dates.directors} onChange={(e) => onDate('directors', e.target.value)} disabled={busy != null} />
+              <span className="l">Director pay date</span>
+              <input type="date" className="pay-date" value={dates.directors} onChange={(e) => onDate('directors', e.target.value)} disabled={busy != null || confirmKey != null} />
             </label>
           ) : null}
+          </> : null}
           <Link href={`/hr-costing/payroll/${period}/bank-transfer?format=alliance`} className="pay-btn sec">
             Alliance file
           </Link>
@@ -161,7 +164,7 @@ export default function DeptRows({
           const pendingVs = g.vouchers.filter((v) => v.status === 'pending_approval' || v.status === 'draft')
           const who = g.scope === 'directors' ? 'directors' : 'staff'
           const unpaid = g.people.length - g.headcount
-          const label = g.stage === 'partial' ? `Generate remaining ${remaining}` : gran === 'department' || g.scope === 'directors' ? 'Generate 1 PV' : `Generate ${g.headcount} PVs`
+          const label = gran === 'department' ? 'Generate 1 PV' : `Generate ${remaining} PVs`
           const confirming = confirmKey === g.key
           const owed = g.people.filter((p) => p.net > 0 && !p.voucher).reduce((s, p) => s + p.net, 0)
           return (
@@ -219,7 +222,7 @@ export default function DeptRows({
                   ) : null}
                 </div>
                 <button type="button" className="people" onClick={() => onOpen(g.key)}>
-                  {g.people.length} {g.people.length === 1 ? 'person' : 'people'} ›
+                  {remaining > 0 ? 'Select people' : `${g.people.length} ${g.people.length === 1 ? 'person' : 'people'}`} ›
                 </button>
               </div>
               {confirming ? (
@@ -227,7 +230,7 @@ export default function DeptRows({
                   <div className="pay-confirm">
                     <span>
                       <b>RM {formatMoneyBare(owed)}</b> leaves {payoutBank ? `${payoutBank.name} ···${payoutBank.last4}` : 'the Alliance payroll account'} on <b>{date.slice(8, 10)}/{date.slice(5, 7)}</b> for {g.name} ·{' '}
-                      {remaining} {who} · <b>{g.stage === 'partial' || (gran === 'employee' && g.scope !== 'directors') ? `${remaining} PVs` : '1 PV'}</b> — generate?
+                      {remaining} {who} · <b>{gran === 'employee' ? `${remaining} PVs` : '1 PV'}</b> — generate?
                     </span>
                     <button type="button" className="pay-btn pri" onClick={() => onConfirmGroup(g)} disabled={busy != null}>
                       {busy === `gen:${g.key}` ? 'Generating…' : 'Yes, generate'}

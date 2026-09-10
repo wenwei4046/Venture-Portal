@@ -2373,6 +2373,21 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 .pay-win .err { font-size: 12.5px; font-style: italic; color: rgb(var(--danger)); }
 .pay-win tr.moved td { background: rgb(var(--alert-bg) / 0.45); }
 
+/* Salary batches: the selection is visible before the confirmation, while
+   existing PVs stay read-only. The status pill must never collapse vertically. */
+.pay-win:has(.pay-people-table) { width: min(1040px, calc(100vw - 24px)); }
+.pay-selection { padding: 12px 14px; background: rgb(var(--accent-bg)); border: 1px solid rgb(var(--accent-border)); border-radius: 8px; }
+.pay-selection p { margin: 10px 0 4px; font-size: 14px; color: rgb(var(--ink)); }
+.pay-selection > span { font-size: 12px; line-height: 1.5; color: rgb(var(--graphite)); }
+.pay-selection .pay-seg { flex-wrap: wrap; }
+.pay-selected-names { display: block; margin-top: 6px; font-size: 12px; line-height: 1.5; }
+.pay-win .pay-people-table .pick { width: 36px; min-width: 36px; text-align: center; }
+.pay-win .pay-people-table input[type="checkbox"] { width: 16px; height: 16px; accent-color: rgb(var(--accent)); vertical-align: middle; cursor: pointer; }
+.pay-win .pay-people-table input[type="checkbox"]:disabled { cursor: not-allowed; }
+.pay-win .pay-people-table .state-cell { min-width: 150px; white-space: nowrap; }
+.pay-win .pay-state { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; line-height: 1.4; flex-shrink: 0; }
+.pay-win .pay-state .dot { flex-shrink: 0; margin: 0; }
+
 @media (max-width: 1100px) {
   .pay-over { grid-template-columns: 1fr; }
   .pay-side { flex-direction: row; }
@@ -2393,5 +2408,6 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   .pay-status .review-dates { gap: 14px 20px; }
   .pay-status .act { padding: 14px 16px; }
   .pay-win { top: 0; right: 0; bottom: 0; width: 100vw; border-radius: 0; }
+  .pay-win:has(.pay-people-table) { width: 100vw; }
   .pay-win .tiles { grid-template-columns: 1fr; }
 }

@@ -621,7 +621,7 @@ judgement in `lib/payment-cycle.ts` and re-lays the page after six of them:
 | ADP's "$__ impounded?" | `.pay-confirm` | Every Generate opens a question that names the money, the account, the day, the people and the PV count: *RM 47,553.80 to KWSP · PERKESO · LHDN · SKBBK from Alliance Bank ···3210 · 5 PVs — generate?* → **Yes, generate** |
 | Gusto's banner · Personio's two gates | `.pay-block`, `.pay-warn` | Blockers name the fix (*Payment blocked for 4 staff — fix their bank details*, names linked to People) and stop only those people; warnings (*4 people moved 20% or more vs July*) can be waved through |
 | — | `.pay-cta`, `.pay-btn` | `.pay-cta` is ink on paper — cream on the walnut card, Deel's black pill anywhere light. `.pay-btn.pri` is the accent pill, `.sec` the bordered one; both round, both label the act |
-| — | `.pay-win` | Unchanged from v3.5 (the Paycheck Window shape); rows that moved 20%+ are tinted `tr.moved` |
+| — | `.pay-win`, `.pay-selection` | Department window: choose the whole department (all remaining people after a partial batch) or tick individual employees. Selected count, net amount and PV count update together; PV format is independently one grouped voucher or one per employee. Existing PVs and zero-net rows cannot be selected. Confirmation names the chosen people, amount, date and account; later batches include only the remaining people. The salary window widens to fit its table; `.pay-state` keeps status and date on one line. Rows that moved 20%+ are tinted `tr.moved` |
 
 Surfaces: mockup B replaces the dark status card with a white review panel
 and a warm grey net-pay block; every list and side card is white

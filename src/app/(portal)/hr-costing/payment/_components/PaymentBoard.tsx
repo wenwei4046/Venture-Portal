@@ -4,6 +4,7 @@ import { useState, useTransition, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { formatMoneyBare } from '@/lib/utils'
+import { payrollSelection } from '@/lib/payroll-selection'
 import {
   bankIssue,
   isNotableMove,
@@ -52,7 +53,7 @@ export interface BoardProps {
 }
 
 type Win = { kind: 'dept'; key: string } | { kind: 'body'; key: BodyKey } | null
-type Confirm = { kind: 'all-salary'; at: 'over' | 'list' } | { kind: 'all-stat'; at: 'over' | 'list' } | { kind: 'dept'; key: string } | null
+type Confirm = { kind: 'all-salary'; at: 'over' | 'list' } | { kind: 'all-stat'; at: 'over' | 'list' } | { kind: 'dept'; key: string; rowIds: string[]; granularity: Granularity; date: string } | null
 
 /**
  * The state of the page — which window is open, the PV-per switch, the
@@ -90,9 +91,17 @@ export default function PaymentBoard({
     stat: {},
   })
   const [win, setWin] = useState<Win>(null)
+  const [selections, setSelections] = useState<Record<string, string[] | null>>({})
   const [confirm, setConfirm] = useState<Confirm>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  function openWindow(next: NonNullable<Win>) {
+    if (busy != null) return
+    setConfirm(null)
+    setError(null)
+    setWin(next)
+  }
 
   function run(key: string, fn: () => Promise<unknown>) {
     setError(null)
@@ -113,11 +122,26 @@ export default function PaymentBoard({
   const fundedFor = (g: DeptGroup) => (g.scope === 'directors' ? directorsFunded : staffFunded)
   const remainingOf = (g: DeptGroup) => g.headcount - g.generated
 
-  function generateGroup(g: DeptGroup) {
+  function generateGroup(g: DeptGroup, selection?: Extract<Confirm, { kind: 'dept' }>) {
     if (g.scope === 'staff' && !g.dept_id) throw new Error(`${g.name} has no department — assign one on the People page first`)
-    const granularity: Granularity = g.stage === 'partial' ? 'employee' : gran
-    const date = g.scope === 'directors' ? dates.directors : dates.staff
-    return createPayrollDisbursement(period, g.scope, date, granularity, g.scope === 'staff' ? g.dept_id : null)
+    const granularity = selection?.granularity ?? gran
+    const date = selection?.date ?? (g.scope === 'directors' ? dates.directors : dates.staff)
+    return createPayrollDisbursement(period, g.scope, date, granularity, g.scope === 'staff' ? g.dept_id : null, selection?.rowIds ?? null)
+  }
+
+  function askGroup(g: DeptGroup, selectedIds: string[] | null = null) {
+    const selection = payrollSelection(g.people, selectedIds, gran)
+    if (!selection.count) return
+    setConfirm({ kind: 'dept', key: g.key, rowIds: selection.rowIds, granularity: gran, date: g.scope === 'directors' ? dates.directors : dates.staff })
+  }
+
+  function confirmGroup(g: DeptGroup) {
+    if (confirm?.kind !== 'dept' || confirm.key !== g.key) return
+    const selection = confirm
+    run(`gen:${g.key}`, async () => {
+      await generateGroup(g, selection)
+      setSelections((current) => ({ ...current, [g.key]: null }))
+    })
   }
 
   // Everything still owed this month. Nobody generated yet → ONE call per
@@ -187,6 +211,7 @@ export default function PaymentBoard({
   const blockers = groups.flatMap((g) => (g.stage === 'paid' ? [] : g.people.filter((p) => p.net > 0 && bankIssue(p) != null)))
   const notable = salaryDone ? [] : variances.top.filter((v) => isNotableMove(v.d))
   const openGroup = win?.kind === 'dept' ? groups.find((g) => g.key === win.key) ?? null : null
+  const openGroupConfirm = confirm?.kind === 'dept' && confirm.key === openGroup?.key ? confirm : null
   const openBody = win?.kind === 'body' ? win.key : null
   const bankName = payoutBank ? `${payoutBank.name} ···${payoutBank.last4}` : 'the Alliance payroll account'
   const ddmm = (d: string) => (d ? `${d.slice(8, 10)}/${d.slice(5, 7)}` : '—')
@@ -271,7 +296,7 @@ export default function PaymentBoard({
             {notable.map((v, i) => (
               <span key={v.row_id}>
                 {i > 0 ? ' · ' : ''}
-                <button type="button" className="text-accent hover:underline" onClick={() => setWin({ kind: 'dept', key: v.key })}>
+                <button type="button" className="text-accent hover:underline" onClick={() => openWindow({ kind: 'dept', key: v.key })}>
                   {v.name}
                 </button>{' '}
                 {v.d.dir === 'up' ? '▲' : '▼'} {v.d.pct == null ? formatMoneyBare(Math.abs(v.d.abs)) : `${Math.abs(v.d.pct).toFixed(0)}%`}
@@ -298,7 +323,7 @@ export default function PaymentBoard({
         onAction={overviewAction}
         fundingSlot={fundingSlot}
         confirm={confirm?.kind === 'all-salary' && confirm.at === 'over' ? confirmAllSalary : confirm?.kind === 'all-stat' && confirm.at === 'over' ? confirmAllStat : null}
-        onOpenGroup={(key) => setWin({ kind: 'dept', key })}
+        onOpenGroup={(key) => openWindow({ kind: 'dept', key })}
       />
 
       {error && !win ? <div className="pay-err mb-4">{error}</div> : null}
@@ -326,19 +351,20 @@ export default function PaymentBoard({
               onDate={(scope: Scope, v) => setDates((d) => (scope === 'directors' ? { ...d, directors: v } : { ...d, staff: v }))}
               fundedFor={fundedFor}
               busy={busy}
-              confirmKey={confirm?.kind === 'all-salary' && confirm.at === 'list' ? 'all' : confirm?.kind === 'dept' ? confirm.key : null}
+              confirmKey={win ? null : confirm?.kind === 'all-salary' && confirm.at === 'list' ? 'all' : confirm?.kind === 'dept' ? confirm.key : null}
               allLabel={allSalaryLabel}
               canGenerateAll={canGenerateAll}
               allTitle={allTitle}
               onAskAll={() => setConfirm({ kind: 'all-salary', at: 'list' })}
-              onAskGroup={(g) => setConfirm({ kind: 'dept', key: g.key })}
-              onConfirmGroup={(g) => run(`gen:${g.key}`, () => generateGroup(g))}
+              onAskGroup={(g) => askGroup(g)}
+              onConfirmGroup={confirmGroup}
               onCancel={() => setConfirm(null)}
-              onOpen={(key) => setWin({ kind: 'dept', key })}
+              onOpen={(key) => openWindow({ kind: 'dept', key })}
               confirmAll={confirmAllSalary}
               payoutBank={payoutBank}
               hint={
-                (gran === 'department' ? 'One PV per department with the people as lines; directors are one batch of their own. ' : 'One PV per person, grouped by department. ') +
+                (gran === 'department' ? 'One PV per department with the people as lines. ' : 'One PV per person, grouped by department. ') +
+                'Open a department to select individual people. Existing PVs are kept; generation includes only people without a PV. ' +
                 'Staff and directors keep separate dates and separate Principal approvals. Any department can go alone from its row. Deductions = gross − net: the employee side of EPF, SOCSO, EIS, PCB and SKBBK.'
               }
             />
@@ -366,7 +392,7 @@ export default function PaymentBoard({
                 confirming={confirm?.kind === 'all-stat' && confirm.at === 'list'}
                 confirmAll={confirmAllStat}
                 onGenerate={(schemes, key) => run(key, () => generateSchemes(schemes))}
-                onOpen={(body) => setWin({ kind: 'body', key: body })}
+                onOpen={(body) => openWindow({ kind: 'body', key: body })}
               />
             </div>
             <p className="font-serif italic text-muted text-xs mt-3">
@@ -378,20 +404,23 @@ export default function PaymentBoard({
 
       {openGroup ? (
         <DeptWindow
+          key={openGroup.key}
           group={openGroup}
           period={period}
           periodLabel={periodLabel}
           prevMonthName={prevMonthName}
-          gran={gran}
+          gran={openGroupConfirm?.granularity ?? gran}
           onGran={setGran}
-          date={openGroup.scope === 'directors' ? dates.directors : dates.staff}
+          selectedIds={openGroupConfirm?.rowIds ?? selections[openGroup.key] ?? null}
+          onSelection={(ids) => setSelections((current) => ({ ...current, [openGroup.key]: ids }))}
+          date={openGroupConfirm?.date ?? (openGroup.scope === 'directors' ? dates.directors : dates.staff)}
           onDate={(v) => setDates((d) => (openGroup.scope === 'directors' ? { ...d, directors: v } : { ...d, staff: v }))}
           funded={fundedFor(openGroup)}
           busy={busy}
           error={error}
           confirming={confirm?.kind === 'dept' && confirm.key === openGroup.key}
-          onAskGenerate={() => setConfirm({ kind: 'dept', key: openGroup.key })}
-          onConfirmGenerate={() => run(`gen:${openGroup.key}`, () => generateGroup(openGroup))}
+          onAskGenerate={() => askGroup(openGroup, selections[openGroup.key] ?? null)}
+          onConfirmGenerate={() => confirmGroup(openGroup)}
           onCancel={() => setConfirm(null)}
           onSaveDates={() => run(`date:${openGroup.key}`, () => saveGroupDates(openGroup))}
           payoutBank={payoutBank}
