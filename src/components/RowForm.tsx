@@ -178,7 +178,16 @@ export function RowForm({
                 setError(null)
                 startTransition(async () => {
                   try {
-                    onDone?.(await action(fd))
+                    // Two statements, deliberately (2026-09-10). Written as
+                    // one — `onDone?.(await action(fd))` — the optional call
+                    // short-circuits when there is no onDone, and JavaScript
+                    // then never evaluates its argument: the action was not
+                    // called at all. No row passes an onDone, so for three
+                    // days every Save and Add on every RowForm table flickered
+                    // "Saving…", wrote nothing and reported nothing.
+                    // RowForm.test.tsx pins this.
+                    const result = await action(fd)
+                    onDone?.(result)
                   } catch (err) {
                     setError(err instanceof Error ? err.message : 'Something went wrong')
                   }
