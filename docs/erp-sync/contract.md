@@ -156,6 +156,8 @@ statuses earn. An excluded order stays in the portal with `cancelled = true` and
 `erp_status` / `erp_on_hold` saying why, and comes back the moment the ERP
 releases it. `deleted: true` excludes it as `DELETED`.
 
+**Programme ownership (2026-09-11).** The endpoint resolves Fair on the portal and stamps its sub-department on every batch and delivery. One committed batch exists per sub-department and month. An IR import or applied run cannot replace, block or consume Fair sales. A Fair order released by a later month also protects its original month until that paying run is reopened.
+
 **Ordering** is `snapshotAt`. The drain builds the payload at send time, so a
 retry always carries the newest state; the guard exists for two in-flight
 requests of one document crossing on the wire. Send it.
@@ -264,5 +266,5 @@ A window of 401s between the two only delays deliveries — the outbox retries.
 | pg_net + pg_cron on the Houzs Supabase | **UNKNOWN** — check Extensions before applying 02 |
 | Sub-minute pg_cron (`'10 seconds'`) | **LIKELY** — Supabase's pg_cron ≥ 1.5 supports it, and the 2990 design assumed it; fall back to `* * * * *` if refused |
 | Which companies feed commission | **assumed** Houzs (1) only — `vp.companies` |
-| Sub-department scoping | none in the feed; the portal's runs are per sub-department already |
+| Sub-department scoping | The existing endpoint always targets Fair. Batches, releases, held deliveries and run locks are scoped to Fair; IR uses a separate feed and may reuse document numbers. No ERP payload change is needed. |
 | Salesperson self-service page in the portal | separate feature, not part of this contract |

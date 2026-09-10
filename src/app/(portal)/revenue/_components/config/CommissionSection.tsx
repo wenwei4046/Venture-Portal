@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { rankLetters, ratePct } from '@/lib/commission/ranks'
+import { compareRankPay, rankLetters, rankPayLabelOf, rankPayOf } from '@/lib/commission/ranks'
 import {
   deleteKpiItem,
   deleteKpiThreshold,
@@ -252,6 +252,37 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
                   </td>
                 </tr>
                 <tr>
+                  <td>Group incentive package</td>
+                  <td><Tick name="enable_group_incentive" defaultChecked={scheme.enable_group_incentive ?? false} /></td>
+                  <td className="text-muted font-serif italic text-xs">
+                    monthly fixed pay per qualifying direct group, replacing percentage commission; amounts are set in Ranks
+                  </td>
+                </tr>
+                <tr>
+                  <td>Group sales layers</td>
+                  <td className="text-muted">—</td>
+                  <td className="font-sans text-xs text-graphite">
+                    <Field name="group_sales_depth" type="number" step="1" width="w-20" defaultValue={scheme.group_sales_depth ?? ''} ariaLabel="Group sales layers" />
+                    <span className="ml-2">2 = directs and their directs; blank = all layers</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Override layers</td>
+                  <td className="text-muted">—</td>
+                  <td className="font-sans text-xs text-graphite">
+                    <Field name="override_depth" type="number" step="1" width="w-20" defaultValue={scheme.override_depth ?? ''} ariaLabel="Override layers" />
+                    <span className="ml-2">2 = at most two layers; blank = all layers</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Direct-line limit</td>
+                  <td className="text-muted">—</td>
+                  <td className="font-sans text-xs text-graphite">
+                    <Field name="direct_line_limit" type="number" step="1" width="w-20" defaultValue={scheme.direct_line_limit ?? ''} ariaLabel="Direct-line limit" />
+                    <span className="ml-2">Base 3 for group packages. Full Spec permits a fourth line that month. Each further line requires all existing groups to qualify in its opening month. Opened slots are retained; unused permission expires.</span>
+                  </td>
+                </tr>
+                <tr>
                   <td>Monthly margin incentive</td>
                   <td><Tick name="enable_margin_incentive" defaultChecked={scheme.enable_margin_incentive} /></td>
                   <td className="text-muted font-serif italic text-xs">
@@ -295,15 +326,16 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
 
 // ─── II. Title ladder ────────────────────────────────────────────────────────
 
-/** The catalogue from the top: highest rate first, the way the letters read. */
+/** The catalogue from the top: group packages, then percentage rates. */
 function catalogueTopDown(data: CommissionSettingsData) {
-  return [...data.rankDefs].sort((a, b) => Number(b.product_rate) - Number(a.product_rate))
+  return [...data.rankDefs].sort((a, b) => compareRankPay(rankPayOf(b), rankPayOf(a))
+    || b.sort_order - a.sort_order || b.id.localeCompare(a.id))
 }
 
 /** The letter each rank of the catalogue wears — counted over the catalogue, not the rungs. */
 function catalogueLetters(data: CommissionSettingsData) {
   return rankLetters(
-    data.rankDefs.map(d => ({ id: d.id, productRate: Number(d.product_rate), sortOrder: d.sort_order })),
+    data.rankDefs.map(d => ({ id: d.id, ...rankPayOf(d), sortOrder: d.sort_order })),
   )
 }
 
@@ -337,7 +369,7 @@ function TitleLadder({
     catalogue.map(d => {
       const holder = holderByDef.get(d.id)
       const taken = holder !== undefined && holder.id !== self?.id
-      const name = `Rank ${letters.get(d.id) ?? '?'} · ${ratePct(Number(d.product_rate))}`
+      const name = `Rank ${letters.get(d.id) ?? '?'} · ${rankPayLabelOf(d)}`
       return (
         <option key={d.id} value={d.id} disabled={taken}>
           {taken ? `${name} — ${titleById.get(holder.title_id) ?? 'taken'}` : name}
@@ -357,17 +389,18 @@ function TitleLadder({
       <Hint>
         One rung per <strong>title</strong> from People → Roles; the title is fixed once the rung
         exists, only the last row picks one. The <strong>rank</strong> is the dropdown — which
-        rank the title is paid — and the <strong>rate</strong> follows it: a rank is its rate, set
+        rank the title is paid — and its <strong>pay</strong> follows it: percentage or group package, set
         on the {RanksTab}, never here. A Team Leader on Rank A at 9% who misses target is still a
         Team Leader, paid Rank B at 8%: the rank is what a month pays, the title is what a person
         keeps — the month somebody is paid a rung above the title they hold, their title is raised
         to it and <em>never lowered</em>. Whether a title may recruit follows the title. The
-        ladder is climbed <strong>one rung at a time</strong>, and a rung carries at most one
+        percentage ladder is climbed <strong>one rung at a time</strong>, and a rung carries at most one
         gate: a <strong>group-sales target</strong> is monthly — a <em>scheme-target</em>{' '}
         salesperson is paid that rung in a month that clears it and drops back in one that does
         not; a <strong>personal-sales streak</strong> (so much, so many months running) is earned
         — passing it raises the title for good and later months climb from there. Leave both
-        blank for a rung nobody can reach on volume alone.
+        blank for a percentage rung nobody can reach on volume alone. A group package uses the monthly
+        group-sales target for each eligible direct line, including the leader&apos;s own sales.
       </Hint>
       <div className="border border-hairline rounded-md bg-surface overflow-x-auto table-scroll">
         <table className="ledger-table">
@@ -375,7 +408,7 @@ function TitleLadder({
             <tr>
               <th>Title</th>
               <th className="w-52">Rank</th>
-              <th className="right">Rate %</th>
+              <th className="right">Pay</th>
               <th className="w-24">Can recruit</th>
               <th className="right">Group sales target</th>
               <th className="right">Personal sales streak</th>
@@ -403,7 +436,7 @@ function TitleLadder({
                       </td>
                       <td className="num">
                         <span className="font-mono text-sm text-num-ink" title="Set on the Ranks tab">
-                          {ratePct(Number(rank?.product_rate ?? r.product_rate))}
+                          {rankPayLabelOf(rank ?? r)}
                         </span>
                       </td>
                       <td><Tick name="can_recruit" defaultChecked={r.can_recruit} ariaLabel={`${r.rank_key} can recruit`} /></td>
@@ -467,7 +500,7 @@ function TitleLadder({
 // ─── IX. Ranks ───────────────────────────────────────────────────────────────
 
 /**
- * The catalogue: a rank is its rate, and this is the only place a rate is
+ * The catalogue: a rank is its pay, and this is the only place its amounts are
  * typed (user 2026-09-05: "rank A 等于多少 rate、rank B 等于多少 rate … 除非我在
  * rank 的那个 tab 里去调"). The letter is not typed either — it is the rank's
  * place counted from the top, SS for the highest rate, then A, B, C … — so a
@@ -495,15 +528,16 @@ function RankCatalogue({
     <section>
       <SectionHead title="IX. Ranks" count={`${catalogue.length} RANKS`} />
       <Hint>
-        A rank is its rate. Set the rate here and the ladder reads it — the{' '}
+        Set each rank&apos;s percentage or group package here. The{' '}
         <button type="button" onClick={onLadder} className="not-italic font-sans text-xs text-accent hover:underline">
           Title ladder
         </button>{' '}
-        picks a rank for each title and never types a rate. The letter is the rank&apos;s place
-        counted from the top: <em>SS</em> for the highest rate, then <em>A</em>, <em>B</em>,{' '}
-        <em>C</em> … — add a rank above the others and every letter moves down; a rank with no
-        title on it still holds its place. Changing a rate changes what every month from now pays
-        on that rank; a month already computed keeps the rate it was computed with.
+        picks a rank for each title. A positive group incentive replaces percentage commission
+        for a qualifying month, so its rate must be 0%. The subsidy cap is separate from cash pay.
+        Leave both amounts at 0 for a percentage rank. Packages sit above percentage ranks, ordered
+        by incentive then subsidy cap; letters count from the top: <em>SS</em>, <em>A</em>,{' '}
+        <em>B</em> … . Changing pay affects future calculations; a month already computed keeps
+        its saved amounts. Set the monthly group target on the title ladder.
       </Hint>
       <div className="border border-hairline rounded-md bg-surface overflow-x-auto table-scroll">
         <table className="ledger-table">
@@ -511,6 +545,8 @@ function RankCatalogue({
             <tr>
               <th className="w-32">Rank</th>
               <th className="right w-28">Rate %</th>
+              <th className="right">Group incentive RM</th>
+              <th className="right">Subsidy cap RM</th>
               <th></th>
             </tr>
           </thead>
@@ -526,6 +562,12 @@ function RankCatalogue({
                     </td>
                     <td className="num">
                       <Field name="product_rate" type="number" step="0.01" width="w-20" defaultValue={toPct(d.product_rate)} ariaLabel={`${d.label} rate`} />
+                    </td>
+                    <td className="num">
+                      <Field name="group_incentive_amount" type="number" step="0.01" width="w-32" defaultValue={d.group_incentive_amount ?? 0} ariaLabel={`${d.label} group incentive RM`} />
+                    </td>
+                    <td className="num">
+                      <Field name="group_subsidy_cap" type="number" step="0.01" width="w-32" defaultValue={d.group_subsidy_cap ?? 0} ariaLabel={`${d.label} subsidy cap RM`} />
                     </td>
                     <td className="whitespace-nowrap">
                       <SaveButton pending={pending} />
@@ -544,10 +586,16 @@ function RankCatalogue({
                 <tr className="bg-surface-2/40">
                   <td>
                     <Hidden name="scheme_id" value={scheme.id} />
-                    <span className="font-serif italic text-xs text-muted whitespace-nowrap">lettered by its rate</span>
+                    <span className="font-serif italic text-xs text-muted whitespace-nowrap">lettered by its pay</span>
                   </td>
                   <td className="num">
                     <Field name="product_rate" type="number" step="0.01" width="w-20" placeholder="11" required ariaLabel="new rank rate" />
+                  </td>
+                  <td className="num">
+                    <Field name="group_incentive_amount" type="number" step="0.01" width="w-32" defaultValue={0} ariaLabel="new rank group incentive RM" />
+                  </td>
+                  <td className="num">
+                    <Field name="group_subsidy_cap" type="number" step="0.01" width="w-32" defaultValue={0} ariaLabel="new rank subsidy cap RM" />
                   </td>
                   <td><SaveButton pending={pending} label="Add" /></td>
                 </tr>

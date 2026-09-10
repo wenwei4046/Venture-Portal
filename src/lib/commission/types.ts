@@ -15,6 +15,8 @@
  * See docs/module-spec-revenue-commission.md §4 for the money rules.
  */
 
+import type { IrGroup } from './ir-groups'
+
 // ─── Imported facts ─────────────────────────────────────────────────────────
 
 export interface SalesLine {
@@ -174,6 +176,10 @@ export interface Rank {
   label: string
   /** 0.07 = 7% of commissionable product revenue. */
   productRate: number
+  /** Fixed reward for each qualifying direct-line group; replaces percentage pay. */
+  groupIncentiveAmount?: number
+  /** Non-cash Claims cap per qualifying group, excluded from commission/payroll. */
+  groupSubsidyCap?: number
   /**
    * A Revenue Specialist on 5% may not hold downlines; 6% unlocks it.
    * Read through the TITLE (`titleCanRecruit`), not the month's rank, so a
@@ -240,6 +246,12 @@ export interface HierarchyNode {
 }
 
 export interface CommissionScheme {
+  /** Null/absent keeps Fair's whole-tree group sales. IR counts two generations. */
+  groupSalesDepth?: number | null
+  /** Null/absent keeps Fair's unlimited differential override. */
+  overrideDepth?: number | null
+  /** Enable monthly direct-line packages and their percentage fallback. */
+  enableGroupIncentive?: boolean
   /**
    * How the Open Bill bonus is based (confirmed 2026-08-31):
    *  - 'uplift_on_commission' → orderRevenue × personalRate × billPct.
@@ -305,6 +317,7 @@ export type CommissionComponent =
   | 'open_bill'
   | 'override'
   | 'margin_incentive'
+  | 'group_incentive'
 
 /**
  * One traceable contribution to a statement. The invariant the RPC enforces:
@@ -421,6 +434,14 @@ export interface Statement {
   marginBandKey: string | null
   /** RM1,000 / RM2,500 etc. Paid as its own statement line. */
   marginIncentive: number
+  /** Cash fixed group rewards; included in totalCommission. */
+  groupIncentive?: number
+  /** Non-cash benefit cap, never part of totalCommission. */
+  groupSubsidyCap?: number
+  /** One independent target per direct; own sales may appear in each target. */
+  groupBreakdown?: IrGroup[]
+  /** Three qualifying direct groups, each with three immediate reports. */
+  fullSpec?: boolean
   /** Memo: commission the below-margin penalty removed. Already reflected in
    *  the line amounts, so it is NOT part of totalCommission. */
   marginPenaltyWithheld: number

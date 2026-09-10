@@ -26,11 +26,8 @@ function label(period: string): string {
  * Commission Calculation: the months that have sales data, and what this
  * sub-department has made of each one.
  *
- * The sales import is department-wide — one ERP export per month covers every
- * sub-department — but a RUN is not: `uq_comm_run_per_sub_dept_period` gives
- * each sub-department its own run for the month, computed against its own
- * scheme. So the months come from the batches and the money comes from this
- * sub-department's runs alone.
+ * Batches and runs both belong to this sub-department. Membership in more
+ * than one programme never makes an order pay through several programmes.
  */
 export default async function CommissionCalculationPage({ params }: PageProps) {
   await requirePermission('revenue')
@@ -44,13 +41,14 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
     supabase
       .from('sales_import_batches')
       .select('id, period_month, file_name, source, last_synced_at, order_count, out_of_period_count, cancelled_count, unmatched_agent_count, created_at')
+      .eq('sub_department_id', subDept.id)
       .eq('status', 'committed')
       .order('period_month', { ascending: false }),
     supabase
       .from('comm_runs')
       .select('period_month, status, total_commission, staff_count')
       .eq('sub_department_id', subDept.id),
-    loadErpSyncPanelData(supabase),
+    loadErpSyncPanelData(supabase, subDept.id),
   ])
 
   const runByPeriod = new Map(
@@ -178,7 +176,7 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
         </div>
       )}
 
-      <ErpSyncPanel data={sync} />
+      {sync ? <ErpSyncPanel data={sync} /> : null}
     </div>
   )
 }

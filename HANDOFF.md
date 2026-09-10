@@ -1,11 +1,14 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-09-11 · RowForm fix shipped, IR ruleset next)
+# HOUZS Venture Portal — Session Handoff (checkpoint 2026-09-11 · IR opening-month expansion validated locally)
 
 ## ═══ CHECKPOINT 2026-09-11 — read this first (handed to Codex) ═══
 
-**Where things stand.** `main` = `9453824`, clean, in sync with origin. No
-worktree or branch is open for the work below. Merged on 2026-09-10/11, all
-LIVE on Vercel production (`venture-portal-chi.vercel.app`) and every migration
-applied to the live database:
+**Baseline before this continuation.** The IR branch starts at `0085c8b`
+(the checkpoint commit after `9453824`). Work is local and uncommitted on
+`codex/ir-ruleset-checkpoint`; the progressive expansion and opening-month
+gate are implemented and have passed the checks below.
+Do not describe it as deployed or its migrations as applied live. The following earlier PRs were
+merged on 2026-09-10/11 and were already LIVE on Vercel production
+(`venture-portal-chi.vercel.app`), with their migrations applied:
 
 - **PR #78 `05feb90`** — the fix this session shipped (see "What #78 fixed").
 - **PR #77** ONE LINE (`20260910120000_one_line_commission_positions.sql`),
@@ -35,55 +38,137 @@ sub-department, in the HR view:
    scheme (`caeaf2eb-3931-40be-b3bd-b033814f8046`) was switched off by hand
    on the live DB. Fair's scheme is `ab55f0b5-084e-4e31-968f-311fb9e1558b`.
 
-Rank names are NOT editable by design (user 2026-09-05): the letter is the
-rank's place counted from the top by rate — SS, A, B … (`lib/commission/
-ranks.ts`). The user asked why; the answer is "that is the design", not a bug.
+Rank names are NOT editable by design (user 2026-09-05): SS, A, B… count
+from the top (`lib/commission/ranks.ts`). Fair orders by percentage rate;
+IR's new package ranks must sit above percentage ranks even at zero percent.
 
 **IR data as of 2026-09-11 00:00 MYT.** Sub-department `IR`, scheme "IR
 scheme", switches all off, ranks B 3% / A 3.5% / SS 4% (the user keyed them in
 after the fix), rungs / people: check before assuming.
 
-### NEXT: the IR ruleset (Investment Renovation) — not started
+### ACTIVE: IR (Investment Renovation) — progressive expansion, not deployed
 
-The user pasted the company's IR commission annexure and answered two
-questions; the verbatim document is `docs/revenue-ir-annexure.md`. **IR is a
-different programme from Fair** ("The two programmes should not be
-cross-applied"). What it is, against what the engine does today
-(`src/lib/commission/engine.ts`, passes A–F, built for Fair):
+**Latest validation, including progressive expansion:** `npm run test:ci` **1,132 passing**
+(89 passing files, 3 pre-existing skipped files); `npm run build` passed with
+existing repository lint warnings. `scripts/test-commission-order-isolation.mjs`
+executed all six new migrations in disposable PostgreSQL/PGlite and passed
+**120 checks**, covering programme ownership, atomic imports, Fair ERP routing,
+cash/subsidy separation, shared payroll apply/reopen, direct limits, failed-move
+rollback, retained SDL evidence and the initial IR rule seed. Expansion cases
+include fourth/fifth payouts, all-current-groups qualification, eight groups
+opening the ninth line, unused offers expiring across months, renewed offers,
+opened lines surviving weak months, reopening withdrawing unused permission,
+stale direct-ID rejection, and failed/ignored inserts not consuming a slot.
+The scoped UI capacity RPC and mutation permissions are checked. The fixture uses
+synthetic HR/auth tables; concurrent sessions and live browser E2E have NOT
+been validated. Production was read only to verify the existing IR catalogue,
+empty ladder and shared title IDs. No migration was applied live, no payroll
+was written and no deployment or push was made.
 
-| Title | Rate | Holds / climbs by | Portal today |
-|---|---|---|---|
-| Revenue Specialist | 3% | personal KPI 100k; may not recruit | fits (`can_recruit` off) |
-| Team Assistant | 3.5% | personal 200k × 2 consecutive months; 0.5% override over its direct RS | fits (EARNED gate: `personal_sales_threshold` + `consecutive_months`) |
-| Team Leader | 4% | group 800k | fits (MONTHLY gate: `group_sales_threshold`) |
-| Senior Team Leader | 4% | each group 1M, up to 3 groups; a 4th only when all 3 hit 1M | half — see below |
+New migrations, in order:
+`20260911010000_commission_rank_packages.sql`,
+`20260911020000_commission_order_sub_departments.sql`,
+`20260911030000_ir_group_incentives.sql`,
+`20260911040000_commission_direct_line_limits.sql`,
+`20260911050000_configure_ir_rules.sql`,
+`20260911060000_progressive_ir_direct_lines.sql`.
+The rule seed fills the verified empty IR ladder with RS 3%, TA 3.5% (200k × 2),
+TL 4% (800k), and STL's 6k/group + 2k cap (1M/group); it refuses to overwrite
+a ladder/catalogue changed since the checkpoint. It preserves the existing
+deposit setting and does not invent IR item classifications or an API.
 
-Group sales = own + entire downline (annexure's "200k personal + 800k group =
-1M"; `computeGroupRevenue` already does this).
+**Latest confirmed expansion rule — qualify in the actual opening month:** the fourth and every later direct group
+reuse the leader's own sales and earn the same RM6,000 cash plus RM2,000
+subsidy cap when independently reaching RM1M. After initial Full Spec earns
+SDL eligibility, **all existing lines must reach RM1M in the calendar month
+when the next line actually opens**: four of four to open five, five of five
+to open six, and so on. A prior qualifying month cannot bank an unused place
+for a later weak month. Additional expansion does not require each new line
+to have three children. Already opened lines and slots remain available in
+later weak months. Persist the highest already opened capacity separately
+from current-month eligibility and keep immutable qualification evidence;
+historical evidence is not an unused permanent right to expand. A weak line
+blocks expansion for that month but does not cancel other qualifying packages.
+The earlier fourth-line policy block is removed. The sixth migration and app
+changes are locally validated; deployment/live E2E remain before calling this
+shipped. Recurring Claims subsidy payments themselves remain batch 2.
 
-**Two conflicts with the current model:**
+**Read `docs/module-spec-revenue-commission.md` §15 before continuing.** The
+original annexure remains in `docs/revenue-ir-annexure.md` §§1–12; the appended
+management clarifications supersede its conflicting wording. The user has
+resolved the questions that blocked the first calculation batch. IR remains
+a separate programme from Fair.
 
-1. **TL and STL are both 4%**, but a rank IS its rate (`uq_comm_rank_def_rate`)
-   — a second 4% is refused. This is why the user tried to key the STL rank as
-   "6000 + 2000". Proposed: **rank = rate + incentive package**; the rate may
-   repeat when the package differs. TL = 4%; STL = 4% + RM6,000 per qualifying
-   group + RM2,000 subsidy per qualifying group. Ranks tab gets two more
-   columns (fixed/group incentive RM, subsidy cap RM); letters: package ranks
-   above plain-rate ranks, then by rate.
-2. **Override is direct-line only** (annexure §7: "immediate higher position
-   … not unlimited commission from every employee underneath"). The engine
-   rolls the rate differential up the whole upline chain (`computeOverrides`,
-   Fair's rule). IR needs a scheme switch: override = one level.
+| Title | Monthly payout / qualification |
+|---|---|
+| Revenue Specialist | **3%**, reconfirmed (not 3.3%); personal KPI 100k; cannot recruit |
+| Team Assistant | **3.5%**; personal 200k in each of two consecutive months |
+| Team Leader | **4%**; monthly group target 800k |
+| Senior Team Leader | **RM6,000 per qualifying RM1M direct group**, plus separate **RM2,000 subsidy cap/group**; replaces both personal percentage commission and percentage override in qualifying months |
+| SDL | Higher level earned by **Full Spec**. Each additional line requires all existing lines to qualify in its actual opening month; already opened lines remain available in later weak months. |
 
-**New components (no data or rule in the portal today):**
+**Sales depth and repeated own sales — explicitly confirmed.** Ordinary
+targets include own + direct personal sales + those directs' immediate
+children's personal sales, stopping after two generations. Each STL package
+group is **leader own + that direct own + that direct's immediate children
+own**. The leader's own amount intentionally repeats in EVERY group target.
+Own 200k + A 800k and the same own 200k + B 800k produces two qualifying
+groups: **RM12,000 incentive + RM4,000 separate subsidy cap**. Actual sales
+are still RM1.8M; do not sum overlapping targets into actual or personal
+revenue. No deeper generations contribute, and one group's surplus cannot
+fill another group's shortfall.
 
-- Direct-line cap: max 3 direct lines for TA/TL/STL; STL may open a 4th only
-  when all 3 groups hit 1M. Enforce at chart-move time
-  (`lib/commission/chart-moves.ts`, `lib/hierarchy-boundary.ts`, and the
-  `hr_staff_costs_commission_line` trigger since #77).
-- STL **group incentive**: RM6,000 for every group that reaches 1M (§5).
+**Monthly packages and fallback.** Judge TL's 800k and each group's 1M afresh
+every calendar month. Pay one RM6,000 package and RM2,000 cap per qualifying
+group every qualifying month, even at RM1.5M / RM2M or above. A group needs
+no TL title or three-child structure to earn this first incentive; a TA with
+one qualifying line can reach STL without first spending a month at TL.
+If **zero groups qualify next month**, pay the **TL 4% percentage structure**
+again, even with a retained STL title/rank. Percentage overrides return in
+that fallback month; subsidy does not. This fallback was explicitly confirmed.
+
+**Overrides are TWO layers, compressed differential.** TL 4% → TA 3.5% →
+RS 3% on an RS sale pays RS 3%, TA 0.5%, TL 0.5%. Equal-rate layers pay zero
+but still consume a layer. Stop after two reporting links. The earlier
+one-level interpretation of annexure §7 is superseded; Fair keeps its
+unlimited differential chain.
+
+**Full Spec is separate from first package eligibility.** Before earning
+SDL expansion, TA/TL/STL may hold at most three directs. Full Spec requires **three directs × three
+immediate children each**, and all three groups independently reaching 1M.
+It earns SDL eligibility for the fourth direct. The latest clarification
+narrows the earlier permanent-entitlement wording: **already opened lines
+are retained**, but an unused qualification cannot fund an opening in a
+later weak month. With four existing lines, all four must qualify in the
+actual month the fifth opens; repeat for five of five, six of six, and later
+expansion. One qualifying new line alone is insufficient if any existing
+line misses RM1M. Persist opened capacity (`opened_direct_line_limit`) and
+current-month effective eligibility separately, with historical award
+evidence retained. These later expansions do not repeat the initial
+three-child requirement.
+The fourth and later lines use the same monthly package and repeated-own
+formula; qualification of individual packages remains independent of expansion.
+
+**Implemented locally:** package-aware rank catalogue/order,
+Ranks tab fields, configurable two-layer target/override calculations,
+group incentives and statement breakdowns, sub-department order isolation,
+and direct-line-limit enforcement. `src/lib/commission/ir-groups.ts` supplies
+the independently tested group calculations; `ir-engine.test.ts` exercises
+their engine integration, package fallback and Fair compatibility. Migration
+and app integration are prepared and locally validated. Live validation and
+deployment remain before describing this batch as shipped. Nothing here asserts a live IR migration
+or payout. Payroll must still sum every applied sub-department's commission;
+subsidy caps never enter `total_commission`.
+
+**Hierarchy reminder:** ONE LINE governs only the HOME sub-department (Fair).
+IR writes its own membership title/upline/rank through `moveMembership` /
+`openMembership`; enforce recruitment limits in that server and DB path too,
+not just the chart or `hr_staff_costs.reports_to`.
+
+**Later components:**
+
 - **Car/property subsidy**: cap = RM2,000 × qualifying groups this month
-  (2k / 4k / 6k, §6); non-cash; follows the hire-purchase instalment;
+  (2k / 4k / 6k / 8k and onward); non-cash; follows the hire-purchase instalment;
   **registered ONCE with the document, then paid every month without a fresh
   claim; NO statutory deductions** (user's answers). Belongs in Claims, not
   the engine: `claims` needs a `staff_id` (today only `claimant_name` text), a
@@ -104,29 +189,21 @@ Group sales = own + entire downline (annexure's "200k personal + 800k group =
 **Fair-only components to keep OFF for IR:** KPI item allowance, Open Bill
 bonus, margin penalty, margin incentive. Deposit gate: undecided.
 
-**Answers already given by the user (2026-09-11):** subsidy = register the
-instalment once, no statutory; and, asked "6,000 取代 % 还是加在 % 上", the user
-typed **取代** — which contradicts §5 ("separate from the basic 4%
-commission") and §12 (STL at 4%). Treat as UNRESOLVED.
+**Remaining questions:**
 
-**Open questions to put to the user before modelling (in order):**
-
-1. STL: 4% + RM6,000/group (annexure) or "6+2" replacing the 4% (user's word)?
-2. Are 800k / 1M judged per calendar month (like Fair's gates) or cumulative?
-   Is the RM6,000 paid every month a group qualifies?
-3. Which group does the STL's own personal sales count into?
-4. Where do appointment / closing numbers come from, who keys them, and is a
+1. Where do appointment / closing numbers come from, who keys them, and is a
    person's tier fixed or judged monthly?
-5. The introducer's closing percentage and how it splits with the closer.
-6. House assignment: really RM10 per month per house?
+2. The introducer's closing percentage and how it splits with the closer.
+3. House assignment: really RM10 per month per house, and its data source?
+4. IR's deposit gate remains undecided; do not copy Fair's 50% silently.
 
-**Plan once answered (three batches):** write the IR ruleset into
-`docs/module-spec-revenue-commission.md` beside Fair's; (1) rank package +
-same-rate ranks + one-level override switch + direct-line cap + group
-incentive, engine + statements + Ranks tab; (2) subsidy through Claims with the
+**Delivery batches:** (1) order isolation + rank packages + two-layer
+target/override settings + direct-line cap + group incentive,
+engine + statements + Ranks tab; (2) subsidy through Claims with the
 cap; (3) tier KPI + introducer + house assignment, each needing a data source
 first. Every batch: migration, pure helper + tests under `src/lib/commission/`,
-E2E on localhost against the live DB, `npm run test:ci` (1,093 green today).
+E2E on localhost against the live DB, `npm run test:ci` (1,093 was the
+pre-IR baseline; report the actual new result after validation).
 
 **Conventions that bit this session:** in a worktree the Bash harness refuses
 `git -C`, `$(...)`, runtime variables and `(portal)` paths inside compound

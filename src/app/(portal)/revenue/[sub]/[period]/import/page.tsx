@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requirePermission } from '@/lib/auth'
+import { createClient } from '@/lib/supabase/server'
 import { revenuePath } from '@/lib/revenue'
 import { loadAgentMatchingData } from '../../../import-actions'
 import SalesImportWizard from './_components/SalesImportWizard'
@@ -18,13 +19,7 @@ function label(period: string): string {
   })
 }
 
-/**
- * The import is DEPARTMENT-wide: one ERP export per month covers every
- * sub-department, and `sales_import_batches` is keyed by period alone. The
- * slug in the URL is only where you came from and where Back returns to —
- * which sub-department a sale pays is settled later, by whose hierarchy the
- * salesperson sits in when a run reads it.
- */
+/** The selected sub-department owns every order imported by this wizard. */
 export default async function SalesImportPage({ params }: PageProps) {
   await requirePermission('revenue')
   const { sub, period } = await params
@@ -32,6 +27,10 @@ export default async function SalesImportPage({ params }: PageProps) {
 
   const subDept = await requireSubDepartment(sub)
   const { staff, aliases } = await loadAgentMatchingData()
+  const supabase = await createClient()
+  const { data: scheme } = subDept.schemeId
+    ? await supabase.from('comm_schemes').select('enable_open_bill').eq('id', subDept.schemeId).single()
+    : { data: null }
 
   return (
     <div>
@@ -42,7 +41,7 @@ export default async function SalesImportPage({ params }: PageProps) {
           </div>
           <h1 className="page-title">Import sales orders</h1>
           <p className="font-serif italic text-graphite text-base mt-3">
-            {label(period)} · the whole department&apos;s export, in one file.
+            {label(period)} · {subDept.name}&apos;s sales orders.
           </p>
         </div>
         <Link
@@ -56,6 +55,8 @@ export default async function SalesImportPage({ params }: PageProps) {
       <SalesImportWizard
         period={period}
         subDeptSlug={subDept.slug}
+        subDepartmentId={subDept.id}
+        enableOpenBill={scheme?.enable_open_bill ?? false}
         staff={staff}
         aliases={aliases}
       />

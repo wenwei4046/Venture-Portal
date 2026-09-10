@@ -439,3 +439,153 @@ describe('toRunPayload', () => {
     expect(payload.p_warnings.some(w => w.includes('MYSTERY'))).toBe(true)
   })
 })
+
+/** IR rows exercise the same database seam as Fair, including DECIMAL strings. */
+function irRows(fullSpec = false): RunSourceRows {
+  const directIds = fullSpec ? ['direct-a', 'direct-b', 'direct-c'] : ['direct-a', 'direct-b']
+  const ranks: RunSourceRows['ranks'] = [
+    { ...RANKS[0], rank_key: 'ir_rs', title_id: 'ir-rs', product_rate: '0.030000', sort_order: 10 },
+    { ...RANKS[1], rank_key: 'ir_tl', title_id: 'ir-tl', product_rate: '0.040000', group_sales_threshold: '800000.00', sort_order: 30 },
+    {
+      ...RANKS[1],
+      rank_key: 'ir_stl',
+      title_id: 'ir-stl',
+      product_rate: '0.000000',
+      group_sales_threshold: '1000000.00',
+      group_incentive_amount: '6000.00',
+      group_subsidy_cap: '2000.00',
+      sort_order: 40,
+    },
+  ]
+  const member = (staffId: string, upline: string | null, rankKey: string, titleId: string): RunSourceRows['hierarchy'][number] => ({
+    staff_id: staffId,
+    upline_staff_id: upline,
+    rate_mode: null,
+    comm_ranks: { rank_key: rankKey },
+    title_id: titleId,
+  })
+  const personalOrder = (staffId: string, amount: string) => order({
+    id: `order-${staffId}`,
+    order_no: `SO-${staffId}`,
+    staff_id: staffId,
+    order_total: amount,
+    paid_amount: amount,
+    sales_order_lines: [{
+      id: `line-${staffId}`,
+      item_group: 'MATTRESS',
+      product_code: 'MAT-01',
+      product_name: 'Project',
+      qty: '1.000',
+      line_amount: amount,
+      brand_code: null,
+      cost_amount: null,
+    }],
+  })
+
+  return baseRows({
+    scheme: {
+      ...SCHEME,
+      enable_kpi: false,
+      enable_open_bill: false,
+      enable_margin_penalty: false,
+      enable_margin_incentive: false,
+      deposit_threshold_pct: null,
+      group_sales_depth: 2,
+      override_depth: 2,
+      enable_group_incentive: true,
+    },
+    ranks,
+    hierarchy: [
+      member('leader', null, 'ir_stl', 'ir-stl'),
+      ...directIds.flatMap(id => [
+        member(id, 'leader', fullSpec ? 'ir_tl' : 'ir_rs', fullSpec ? 'ir-tl' : 'ir-rs'),
+        ...(fullSpec ? ['a', 'b', 'c'].map(child => member(`${id}-${child}`, id, 'ir_rs', 'ir-rs')) : []),
+      ]),
+    ],
+    orders: [personalOrder('leader', '200000.00'), ...directIds.map(id => personalOrder(id, '800000.00'))],
+  })
+}
+
+describe('IR package database mapping', () => {
+  it('maps scheme depth/switch fields and string package amounts without reusing percentage rate', () => {
+    const rows = irRows()
+    rows.ranks[2] = { ...rows.ranks[2], group_incentive_amount: '6000.50', group_subsidy_cap: '2000.25' }
+    const input = toEngineInput(rows)
+
+    expect(input.scheme).toMatchObject({ groupSalesDepth: 2, overrideDepth: 2, enableGroupIncentive: true })
+    expect(input.ranks[2]).toMatchObject({
+      productRate: 0,
+      groupSalesThreshold: 1_000_000,
+      groupIncentiveAmount: 6_000.50,
+      groupSubsidyCap: 2_000.25,
+    })
+
+    const payload = toRunPayload(input, computeCommissionRun(input))
+    expect(payload.p_statements.find(s => s.staff_id === 'leader')).toMatchObject({
+      group_incentive: 12_001,
+      group_subsidy_cap: 4_000.50,
+      total_commission: 12_001,
+    })
+  })
+
+  it('round-trips the independent group evidence and keeps subsidy outside cash line/component totals', () => {
+    const input = toEngineInput(irRows())
+    const result = computeCommissionRun(input)
+    const payload = toRunPayload(input, result)
+    const leader = payload.p_statements.find(s => s.staff_id === 'leader')!
+
+    expect(payload.p_warnings).toEqual([])
+    expect(leader).toMatchObject({
+      product_rate: 0,
+      product_revenue: 200_000,
+      group_revenue: 1_800_000,
+      product_commission: 0,
+      override_commission: 0,
+      group_incentive: 12_000,
+      group_subsidy_cap: 4_000,
+      full_spec: false,
+      total_commission: 12_000,
+    })
+    expect(leader.group_breakdown).toEqual(result.statements.find(s => s.staffId === 'leader')?.groupBreakdown)
+    expect(leader.group_breakdown.map(group => group.targetRevenue)).toEqual([1_000_000, 1_000_000])
+    expect(leader.group_breakdown.map(group => ({
+      direct: group.directStaffId, own: group.leaderPersonalRevenue,
+      directPersonal: group.directPersonalRevenue, second: group.secondLayerRevenue,
+      total: group.totalRevenue, qualifies: group.qualifies,
+    }))).toEqual([
+      { direct: 'direct-a', own: 200_000, directPersonal: 800_000, second: 0, total: 1_000_000, qualifies: true },
+      { direct: 'direct-b', own: 200_000, directPersonal: 800_000, second: 0, total: 1_000_000, qualifies: true },
+    ])
+    expect(leader.lines.map(line => ({ component: line.component, source: line.source_staff_id, amount: line.amount }))).toEqual([
+      { component: 'group_incentive', source: 'direct-a', amount: 6_000 },
+      { component: 'group_incentive', source: 'direct-b', amount: 6_000 },
+    ])
+    for (const s of payload.p_statements) {
+      expect(s.lines.reduce((sum, line) => sum + line.amount, 0)).toBe(s.total_commission)
+      expect(s.product_commission + s.kpi_commission + s.open_bill_bonus + s.override_commission + s.margin_incentive + s.group_incentive).toBe(s.total_commission)
+    }
+    expect(payload.p_statements.reduce((sum, s) => sum + s.total_commission, 0)).toBe(payload.p_total_commission)
+    expect(payload.p_released_orders.reduce((sum, o) => sum + o.product_revenue, 0)).toBe(1_800_000)
+  })
+
+  it('preserves monthly Full Spec and its three-by-three contribution evidence in the RPC payload', () => {
+    const input = toEngineInput(irRows(true))
+    const payload = toRunPayload(input, computeCommissionRun(input))
+    const leader = payload.p_statements.find(s => s.staff_id === 'leader')!
+
+    expect(leader.full_spec).toBe(true)
+    expect(leader.group_incentive).toBe(18_000)
+    expect(leader.group_subsidy_cap).toBe(6_000)
+    expect(leader.group_breakdown.map(group => group.secondLayer.length)).toEqual([3, 3, 3])
+    expect(JSON.parse(JSON.stringify(leader)).group_breakdown).toEqual(leader.group_breakdown)
+  })
+
+  it('uses neutral package defaults for legacy Fair rows and output snapshots', () => {
+    const input = toEngineInput(baseRows({ orders: [order()] }))
+    const payload = toRunPayload(input, computeCommissionRun(input))
+
+    expect(input.scheme).toMatchObject({ groupSalesDepth: null, overrideDepth: null, enableGroupIncentive: false })
+    expect(input.ranks.every(rank => rank.groupIncentiveAmount === 0 && rank.groupSubsidyCap === 0)).toBe(true)
+    expect(payload.p_statements[0]).toMatchObject({ group_incentive: 0, group_subsidy_cap: 0, group_breakdown: [], full_spec: false })
+  })
+})

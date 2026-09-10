@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { PRODUCT_LIST_PATH, revenuePath } from '@/lib/revenue'
+import { ratePct } from '@/lib/commission/ranks'
 import RunControls from './_components/RunControls'
 import LedgerRow from '@/components/LedgerRow'
 import { requireSubDepartment } from '../../_lib/sub-departments'
@@ -75,6 +76,8 @@ interface StatementRow {
   open_bill_bonus: number | string
   override_commission: number | string
   margin_incentive: number | string
+  group_incentive: number | string
+  group_subsidy_cap: number | string
   margin_pct: number | string | null
   margin_penalty_withheld: number | string
   total_commission: number | string
@@ -102,6 +105,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     .from('sales_import_batches')
     .select('id, file_name, source, order_count, out_of_period_count, cancelled_count, unmatched_agent_count, created_at')
     .eq('period_month', period)
+    .eq('sub_department_id', subDept.id)
     .eq('status', 'committed')
     .maybeSingle()
 
@@ -153,7 +157,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   const { data: scheme } = subDept.schemeId
     ? await supabase
         .from('comm_schemes')
-        .select('deposit_threshold_pct')
+        .select('deposit_threshold_pct, enable_open_bill')
         .eq('id', subDept.schemeId)
         .maybeSingle()
     : { data: null }
@@ -187,7 +191,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   const { data: statementData } = run
     ? await supabase
         .from('comm_statements')
-        .select('id, staff_id, rank_key, qualifies_for_rank_key, promotes_to_title_id, promotes_to:titles!comm_statements_promotes_to_title_id_fkey (name), product_rate, product_revenue, group_revenue, deferred_revenue, product_commission, kpi_commission, open_bill_bonus, override_commission, margin_incentive, margin_pct, margin_penalty_withheld, total_commission')
+        .select('id, staff_id, rank_key, qualifies_for_rank_key, promotes_to_title_id, promotes_to:titles!comm_statements_promotes_to_title_id_fkey (name), product_rate, product_revenue, group_revenue, deferred_revenue, product_commission, kpi_commission, open_bill_bonus, override_commission, margin_incentive, group_incentive, group_subsidy_cap, margin_pct, margin_penalty_withheld, total_commission')
         .eq('run_id', run.id)
     : { data: null }
   const statements = ((statementData ?? []) as unknown as StatementRow[]).sort(
@@ -396,6 +400,8 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                       <th className="right m-hide">Open Bill</th>
                       <th className="right m-hide">Override</th>
                       <th className="right m-hide">Incentive</th>
+                      {statements.some(s => Number(s.group_incentive) > 0) ? <th className="right m-hide">Group incentive</th> : null}
+                      {statements.some(s => Number(s.group_subsidy_cap) > 0) ? <th className="right m-hide">Subsidy cap</th> : null}
                       <th className="right">Total</th>
                       <th className="lt-toggle" aria-hidden />
                     </tr>
@@ -425,7 +431,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                         </td>
                         <td className="m-hide" data-label="Rank">
                           <span className="font-mono text-[11px] text-graphite" title={s.rank_key ?? undefined}>
-                            {rankNameOf(s.rank_key) ?? '—'} · {(Number(s.product_rate) * 100).toFixed(0)}%
+                            {rankNameOf(s.rank_key) ?? '—'} · {Number(s.group_incentive) > 0 ? 'Group package' : ratePct(Number(s.product_rate))}
                           </span>
                         </td>
                         <td className="num m-hide" data-label="Own revenue">{formatMoney(Number(s.product_revenue))}</td>
@@ -435,6 +441,8 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                         <td className="num m-hide" data-label="Open Bill">{formatMoney(Number(s.open_bill_bonus))}</td>
                         <td className="num m-hide" data-label="Override">{formatMoney(Number(s.override_commission))}</td>
                         <td className="num m-hide" data-label="Incentive">{formatMoney(Number(s.margin_incentive))}</td>
+                        {statements.some(row => Number(row.group_incentive) > 0) ? <td className="num m-hide" data-label="Group incentive">{formatMoney(Number(s.group_incentive))}</td> : null}
+                        {statements.some(row => Number(row.group_subsidy_cap) > 0) ? <td className="num m-hide" data-label="Subsidy cap (outside payroll)">{formatMoney(Number(s.group_subsidy_cap))}</td> : null}
                         <td className="num font-semibold">{formatMoney(Number(s.total_commission))}</td>
                       </LedgerRow>
                     ))}
@@ -584,13 +592,13 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
               This is raw sales value, not the commission base — transport and disposal come out,
               KPI items move to their own allowance, and the deposit gate holds anything under the
               threshold.{' '}
-              <Link href={revenuePath(subDept.slug, period, 'open-bill')} className="text-accent hover:underline">
+              {(scheme as { enable_open_bill?: boolean } | null)?.enable_open_bill ? <><Link href={revenuePath(subDept.slug, period, 'open-bill')} className="text-accent hover:underline">
                 Review the Open Bill picks
               </Link>{' '}
               before computing:{' '}
               {batchRow?.source === 'erp_sync'
                 ? 'the ERP feed suggests them from each order’s real creation time and re-suggests as orders arrive; a pick you make yourself is never touched.'
-                : 'they are seeded from the document number, not from a real timestamp.'}
+                : 'they are seeded from the document number, not from a real timestamp.'}</> : null}
             </p>
           </section>
         </>

@@ -47,11 +47,18 @@ describe('newSchemeSettings', () => {
     expect(copied).not.toHaveProperty('id')
     expect(copied).not.toHaveProperty('scheme_name')
     expect(Object.keys(copied).sort()).toEqual(
-      [...SCHEME_SWITCHES, 'override_includes_kpi', 'deposit_threshold_pct', 'open_bill_basis', 'default_rate_mode'].sort(),
+      [...SCHEME_SWITCHES, 'override_includes_kpi', 'deposit_threshold_pct', 'open_bill_basis', 'default_rate_mode', 'enable_group_incentive', 'group_sales_depth', 'override_depth', 'direct_line_limit'].sort(),
     )
   })
 
   it('a scheme with any switch on is not blank', () => {
     expect(isBlankScheme({ ...blankSchemeSettings(), enable_kpi: true })).toBe(false)
+    expect(isBlankScheme({ ...blankSchemeSettings(), enable_group_incentive: true })).toBe(false)
+  })
+
+  it('preserves IR depth and recruitment settings when following its scheme', () => {
+    const source = { ...blankSchemeSettings(), enable_group_incentive: true, group_sales_depth: 2, override_depth: 2, direct_line_limit: 3 }
+    expect(copiedSchemeSettings(source)).toEqual(source)
+    expect(blankSchemeSettings()).toMatchObject({ enable_group_incentive: false, group_sales_depth: null, override_depth: null, direct_line_limit: null })
   })
 })

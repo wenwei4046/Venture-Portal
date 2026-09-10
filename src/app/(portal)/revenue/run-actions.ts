@@ -78,7 +78,7 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
   const { data: schemeRows, error: schemeError } = await supabase
     .from('comm_schemes')
     .select(
-      'id, sub_department_id, open_bill_basis, override_includes_kpi, deposit_threshold_pct, default_rate_mode, enable_product_revenue, enable_kpi, enable_open_bill, enable_override, enable_margin_penalty, enable_margin_incentive',
+      'id, sub_department_id, open_bill_basis, override_includes_kpi, deposit_threshold_pct, default_rate_mode, enable_product_revenue, enable_kpi, enable_open_bill, enable_override, enable_margin_penalty, enable_margin_incentive, enable_group_incentive, group_sales_depth, override_depth',
     )
     .eq('is_active', true)
     .is('effective_to', null)
@@ -106,6 +106,7 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
   const { data: batchRow } = await supabase
     .from('sales_import_batches')
     .select('id')
+    .eq('sub_department_id', scheme.sub_department_id)
     .eq('period_month', period)
     .eq('status', 'committed')
     .maybeSingle()
@@ -123,7 +124,7 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
   // that no applied run has paid for yet.
   const [{ data: thisMonth, error: orderError }, { data: releases }] = await Promise.all([
     supabase.from('sales_orders').select(orderSelect).eq('batch_id', batchId).eq('cancelled', false),
-    supabase.from('comm_order_releases').select('order_no'),
+    supabase.from('comm_order_releases').select('order_no').eq('sub_department_id', scheme.sub_department_id),
   ])
   if (orderError) throw new Error(`Could not read the sales orders: ${orderError.message}`)
 
@@ -131,10 +132,11 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
 
   const { data: earlier, error: earlierError } = await supabase
     .from('sales_orders')
-    .select(`${orderSelect}, sales_import_batches!inner (status)`)
+    .select(`${orderSelect}, sales_import_batches!inner (status, sub_department_id)`)
     .lt('period_month', period)
     .eq('cancelled', false)
     .eq('sales_import_batches.status', 'committed')
+    .eq('sales_import_batches.sub_department_id', scheme.sub_department_id)
   if (earlierError) throw new Error(`Could not read carried-forward orders: ${earlierError.message}`)
 
   const releasedSet = new Set(releasedOrderNos)
@@ -153,7 +155,7 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
   ] = await Promise.all([
     supabase
       .from('comm_ranks')
-      .select('rank_key, title_id, titles (name), label, product_rate, can_recruit, group_sales_threshold, personal_sales_threshold, consecutive_months, sort_order')
+      .select('rank_key, title_id, titles (name), label, product_rate, group_incentive_amount, group_subsidy_cap, can_recruit, group_sales_threshold, personal_sales_threshold, consecutive_months, sort_order')
       .eq('scheme_id', scheme.id)
       .order('sort_order'),
     supabase
@@ -352,18 +354,19 @@ export async function setOpenBillRank(orderId: string, rank: 1 | 2 | 3 | null): 
 
   const { data: orderRow } = await supabase
     .from('sales_orders')
-    .select('id, staff_id, event_date, period_month')
+    .select('id, staff_id, event_date, period_month, sales_import_batches!inner (sub_department_id)')
     .eq('id', orderId)
     .maybeSingle()
   const order = orderRow as {
     staff_id: string | null
     event_date: string
     period_month: string
+    sales_import_batches: { sub_department_id: string }
   } | null
   if (!order) throw new Error('Order not found')
   if (!order.staff_id) throw new Error('That order has no matched salesperson yet.')
 
-  await assertRunOpen(supabase, order.period_month)
+  await assertRunOpen(supabase, order.period_month, order.sales_import_batches.sub_department_id)
 
   if (rank === null) {
     const { error } = await supabase.from('sales_order_open_bill_tags').delete().eq('order_id', orderId)
@@ -373,6 +376,7 @@ export async function setOpenBillRank(orderId: string, rank: 1 | 2 | 3 | null): 
     const { error: freeError } = await supabase
       .from('sales_order_open_bill_tags')
       .delete()
+      .eq('sub_department_id', order.sales_import_batches.sub_department_id)
       .eq('staff_id', order.staff_id)
       .eq('event_date', order.event_date)
       .eq('bill_rank', rank)
@@ -411,13 +415,13 @@ export async function setManualMargin(orderId: string, marginPct: number | null)
 
   const { data: orderRow } = await supabase
     .from('sales_orders')
-    .select('period_month')
+    .select('period_month, sales_import_batches!inner (sub_department_id)')
     .eq('id', orderId)
     .maybeSingle()
-  const order = orderRow as { period_month: string } | null
+  const order = orderRow as { period_month: string; sales_import_batches: { sub_department_id: string } } | null
   if (!order) throw new Error('Order not found')
 
-  await assertRunOpen(supabase, order.period_month)
+  await assertRunOpen(supabase, order.period_month, order.sales_import_batches.sub_department_id)
 
   const { error } = await supabase
     .from('sales_orders')
@@ -437,19 +441,15 @@ export async function setManualMargin(orderId: string, marginPct: number | null)
  * statements describing sales that no longer exist. The run has to be reopened
  * first — which puts the money back before the inputs move.
  */
-async function assertRunOpen(supabase: SupabaseClient, periodMonth: string): Promise<void> {
-  // One run per sub-department per month, so a period can carry several rows.
-  // Any settled one is enough to refuse: the order could belong to it.
-  const { data } = await supabase
-    .from('comm_runs')
-    .select('status')
-    .eq('period_month', periodMonth)
-    .in('status', ['applied', 'locked'])
-    .limit(1)
-  const status = ((data ?? []) as Array<{ status: string }>)[0]?.status
-  if (status) {
+async function assertRunOpen(supabase: SupabaseClient, periodMonth: string, subDepartmentId: string): Promise<void> {
+  const { data: locked, error } = await supabase.rpc('commission_order_period_locked', {
+    p_sub_department_id: subDepartmentId,
+    p_period: periodMonth,
+  })
+  if (error) throw new Error(`Could not check the commission run: ${error.message}`)
+  if (locked) {
     throw new Error(
-      `The ${periodMonth.slice(0, 7)} run is already ${status} — reopen it before changing what it was computed from.`,
+      `These ${periodMonth.slice(0, 7)} sales have an applied or locked commission run. Reopen the run that paid them before making changes.`,
     )
   }
 }

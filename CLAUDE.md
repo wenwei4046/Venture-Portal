@@ -94,8 +94,10 @@ src/
 │   │   │                              cure for the page's scroll had become a
 │   │   │                              scroll over the nav itself. The
 │   │   │                              ninth, **Ranks**, is the rate catalogue
-│   │   │                              `comm_rank_defs` — a rank IS its rate,
-│   │   │                              lettered from the top SS, A, B …; the
+│   │   │                              `comm_rank_defs` — a rank is percentage
+│   │   │                              pay OR a fixed group-incentive package,
+│   │   │                              lettered SS, A, B … from the top (packages
+│   │   │                              above percentages); the
 │   │   │                              Title ladder picks a rank per title and
 │   │   │                              never types a rate — `lib/commission/
 │   │   │                              ranks.ts`), hierarchy = chart / **Team**
@@ -149,9 +151,22 @@ src/
 │   │   │                              company title only for the home one;
 │   │   │                              `hr_monthly_payroll.commission_amount`
 │   │   │                              is the SUM of every applied run for the
-│   │   │                              month. Owed: orders per sub-department
-│   │   │                              (`sales_import_batches` has no
-│   │   │                              sub_department_id yet — TODOS).
+│   │   │                              month. Orders are scoped by the batch's
+│   │   │                              sub_department_id, including committed
+│   │   │                              batch uniqueness and carry-forward.
+│   │   │                              The Houzs ERP feed belongs to Fair.
+│   │   │                              IR rules: commission spec §15; two layers,
+│   │   │                              repeated own sales per group, monthly
+│   │   │                              packages and a 4% fallback. SDL retains
+│   │   │                              already opened capacity, separate from
+│   │   │                              company title/permission grants. Initial
+│   │   │                              Full Spec 3×3 enables the fourth line;
+│   │   │                              each further opening requires all
+│   │   │                              existing lines to qualify in its actual
+│   │   │                              opening month (4→5, 5→6, onward). Unused
+│   │   │                              qualification cannot be banked for a weak
+│   │   │                              later month. Later groups use the same
+│   │   │                              repeated-own target and fixed package.
 │   │   ├── reports/                 (Phase 3)
 │   │   └── settings/                ← 8 tabs: treasury / overdue / splits / directors / companies / banks / periods / simulator
 │   └── api/erp/v1/                 ← the ONE machine endpoint: the Houzs ERP live

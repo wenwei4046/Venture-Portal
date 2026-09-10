@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   forbiddenTargets,
+  effectiveDirectLineLimit,
   moveRefusal,
   refusalLabel,
   refusalSentence,
@@ -64,6 +65,49 @@ describe('moveRefusal', () => {
     // ANTHONY (Manager) under HOWARD (Senior Executive).
     expect(moveRefusal(people[0], people[1], none)).toBe('lower-title')
   })
+
+  it('refuses a fourth direct until the server permits opening it this month', () => {
+    const mover = subject({ staffId: 'new', uplineStaffId: null })
+    const target = subject({ staffId: 'leader', directLineCount: 3, directLineLimit: effectiveDirectLineLimit(3, null) })
+    expect(moveRefusal(mover, target, none)).toBe('direct-limit')
+    const expanded = { ...target, directLineLimit: effectiveDirectLineLimit(3, 4) }
+    expect(moveRefusal(mover, expanded, none)).toBeNull()
+    expect(moveRefusal(mover, { ...expanded, directLineCount: 4 }, none)).toBe('direct-limit')
+    expect(refusalSentence('direct-limit', mover, target))
+      .toBe('LEADER has reached the limit of 3 direct lines.')
+  })
+
+  it.each([4, 5, 6])('allows the next direct only within the current server limit of %i', currentLimit => {
+    const mover = subject({ staffId: 'new', uplineStaffId: null })
+    const target = subject({
+      staffId: 'leader',
+      directLineCount: currentLimit - 1,
+      directLineLimit: effectiveDirectLineLimit(3, currentLimit),
+    })
+    expect(target.directLineLimit).toBe(currentLimit)
+    expect(moveRefusal(mover, target, none)).toBeNull()
+    expect(moveRefusal(mover, { ...target, directLineCount: currentLimit }, none)).toBe('direct-limit')
+  })
+
+  it('uses the scheme base when no current server limit was supplied and never lowers a larger base', () => {
+    expect(effectiveDirectLineLimit(3, undefined)).toBe(3)
+    expect(effectiveDirectLineLimit(3, null)).toBe(3)
+    expect(effectiveDirectLineLimit(6, 4)).toBe(6)
+  })
+
+  it('keeps existing direct lines legal when the parent is full', () => {
+    const mover = subject({ staffId: 'existing', uplineStaffId: 'leader' })
+    const target = subject({ staffId: 'leader', directLineCount: 3, directLineLimit: 3 })
+    expect(moveRefusal(mover, target, none)).toBeNull()
+  })
+
+  it('keeps uncapped schemes unlimited with or without a current server limit', () => {
+    for (const currentLimit of [undefined, null, 4, 5, 6]) {
+      expect(effectiveDirectLineLimit(null, currentLimit)).toBeNull()
+      expect(effectiveDirectLineLimit(undefined, currentLimit)).toBeNull()
+      expect(moveRefusal(people[3], { ...people[0], directLineCount: 20, directLineLimit: effectiveDirectLineLimit(null, currentLimit) }, none)).toBeNull()
+    }
+  })
 })
 
 describe('forbiddenTargets', () => {
@@ -85,6 +129,13 @@ describe('forbiddenTargets', () => {
 
   it('is empty for somebody who is not on the chart', () => {
     expect(forbiddenTargets(graph, people, 'ghost').size).toBe(0)
+  })
+
+  it('uses the same capacity refusal for the drag target and picker lists', () => {
+    const capped = people.map(p => p.staffId === 'anthony'
+      ? { ...p, directLineLimit: 3, directLineCount: 3 } : p)
+    expect(forbiddenTargets(graph, capped, 'luis').get('anthony')).toBe('direct-limit')
+    expect(refusalLabel('direct-limit')).toBe('direct lines full')
   })
 })
 

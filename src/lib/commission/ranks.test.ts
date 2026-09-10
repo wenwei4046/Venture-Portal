@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
+  compareRankPay,
   mintRankKey,
   rankLabel,
   rankLabelOf,
   rankLetter,
   rankLetters,
+  rankPayError,
+  rankPayLabel,
+  rankPayOf,
   ratePct,
   resequenceLadder,
 } from './ranks'
@@ -35,6 +39,75 @@ describe('rankLabelOf', () => {
     expect(rankLabelOf({ label: 'Rank B', product_rate: 0.08 })).toBe('Rank B · 8%')
     // PostgREST hands decimals over as strings.
     expect(rankLabelOf({ label: 'Rank SS', product_rate: '0.100000' })).toBe('Rank SS · 10%')
+  })
+
+  it('shows fixed group pay and its separate subsidy cap instead of 0%', () => {
+    expect(rankLabelOf({
+      label: 'Rank SS', product_rate: '0.000000',
+      group_incentive_amount: '6000.00', group_subsidy_cap: '2000.00',
+    })).toBe('Rank SS · RM 6,000.00/group + subsidy up to RM 2,000.00/group')
+    expect(rankPayLabel({ productRate: 0, groupIncentiveAmount: 1250.50 }))
+      .toBe('RM 1,250.50/group')
+  })
+})
+
+describe('group packages', () => {
+  const packageRank = {
+    id: 'stl_package', productRate: 0, groupIncentiveAmount: 6000,
+    groupSubsidyCap: 2000, sortOrder: 0,
+  }
+
+  it('puts a zero-rate package above all percentage ranks in letters and engine order', () => {
+    const ranks = [...FAIR, packageRank]
+    expect(rankLetters(ranks).get('stl_package')).toBe('SS')
+    expect(rankLetters(ranks).get('stl_10')).toBe('A')
+    expect(resequenceLadder(ranks).at(-1))
+      .toEqual({ id: 'stl_package', sortOrder: 70, label: 'Rank SS' })
+    expect(compareRankPay(packageRank, { productRate: 1 })).toBeGreaterThan(0)
+  })
+
+  it('orders package incentive before subsidy and rate, then resolves equal pay consistently', () => {
+    const ranks = [
+      { ...packageRank, id: 'lower', groupIncentiveAmount: 5000, groupSubsidyCap: 5000 },
+      { ...packageRank, id: 'less_subsidy', groupSubsidyCap: 1000 },
+      { ...packageRank, id: 'higher_rate', productRate: 0.01 },
+      { ...packageRank, id: 'z' },
+      { ...packageRank, id: 'a' },
+    ]
+    expect(resequenceLadder(ranks).map(r => r.id))
+      .toEqual(['lower', 'less_subsidy', 'a', 'z', 'higher_rate'])
+    const letters = rankLetters([...ranks].reverse())
+    expect(letters.get('higher_rate')).toBe('SS')
+    expect(letters.get('z')).toBe('A')
+    expect(letters.get('a')).toBe('B')
+  })
+
+  it('normalizes database numeric strings and treats older percentage rows as zero-package pay', () => {
+    expect(rankPayOf({ product_rate: '0.033000' }))
+      .toEqual({ productRate: 0.033, groupIncentiveAmount: 0, groupSubsidyCap: 0 })
+    expect(rankPayOf({ product_rate: '0', group_incentive_amount: '6000.00', group_subsidy_cap: '2000.00' }))
+      .toEqual({ productRate: 0, groupIncentiveAmount: 6000, groupSubsidyCap: 2000 })
+  })
+
+  it('accepts percentage ranks and replacement packages', () => {
+    expect(rankPayError({ productRate: 0.033 })).toBeNull()
+    expect(rankPayError(packageRank)).toBeNull()
+    expect(rankPayError({ productRate: 0, groupIncentiveAmount: 10.12 })).toBeNull()
+  })
+
+  it('refuses additive percentage pay and subsidy without a package', () => {
+    expect(rankPayError({ ...packageRank, productRate: 0.04 })).toMatch(/replaces percentage/)
+    expect(rankPayError({ productRate: 0.04, groupSubsidyCap: 2000 })).toMatch(/needs a group incentive/)
+  })
+
+  it('refuses invalid, negative, non-finite and sub-cent amounts', () => {
+    for (const amount of [-1, NaN, Infinity, 10_000_000_000_000, 0.001]) {
+      expect(rankPayError({ productRate: 0, groupIncentiveAmount: amount })).not.toBeNull()
+      expect(rankPayError({ ...packageRank, groupSubsidyCap: amount })).not.toBeNull()
+    }
+    for (const rate of [-0.01, 1.01, NaN, Infinity]) {
+      expect(rankPayError({ productRate: rate })).toMatch(/between 0 and 100/)
+    }
   })
 })
 

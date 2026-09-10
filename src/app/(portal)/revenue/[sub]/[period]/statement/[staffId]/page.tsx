@@ -5,6 +5,8 @@ import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
+import { ratePct } from '@/lib/commission/ranks'
+import type { IrGroup } from '@/lib/commission/ir-groups'
 import LedgerRow from '@/components/LedgerRow'
 import { requireSubDepartment } from '../../../../_lib/sub-departments'
 
@@ -39,6 +41,7 @@ const COMPONENT_ORDER = [
   'open_bill',
   'override',
   'margin_incentive',
+  'group_incentive',
 ] as const
 
 const COMPONENT_LABEL: Record<string, string> = {
@@ -48,6 +51,7 @@ const COMPONENT_LABEL: Record<string, string> = {
   open_bill: 'Open Bill bonus',
   override: 'Override on the downline',
   margin_incentive: 'Margin incentive',
+  group_incentive: 'Group incentive',
 }
 
 const COMPONENT_NOTE: Record<string, string> = {
@@ -62,6 +66,8 @@ const COMPONENT_NOTE: Record<string, string> = {
     'The differential between this person’s rate and the downline’s, on the downline’s penalty-weighted revenue. Equal rates compress to nothing.',
   margin_incentive:
     'Monthly, and judged brand by brand: every brand sold has to clear the tier. Incentive rungs stack.',
+  group_incentive:
+    'One fixed reward per qualifying direct-line group. Own sales may count in each group, together with that direct and its immediate reports. A group above target still earns one reward.',
 }
 
 interface StatementRow {
@@ -95,6 +101,10 @@ interface StatementRow {
   margin_pct: number | string | null
   margin_band_key: string | null
   margin_incentive: number | string
+  group_incentive: number | string
+  group_subsidy_cap: number | string
+  group_breakdown: IrGroup[]
+  full_spec: boolean
   margin_penalty_withheld: number | string
   total_commission: number | string
 }
@@ -182,6 +192,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
     staffId,
     ...(s.upline_staff_id ? [s.upline_staff_id] : []),
     ...lines.flatMap(l => (l.source_staff_id ? [l.source_staff_id] : [])),
+    ...(s.group_breakdown ?? []).map(g => g.directStaffId),
   ]
   const { data: staffRows } = await supabase
     .from('hr_staff_costs')
@@ -213,7 +224,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
           <h1 className="page-title">{me?.employee_name ?? staffId}</h1>
           <p className="font-serif italic text-graphite text-base mt-3">
             {oneOf(s.rank_title)?.name ? `${oneOf(s.rank_title)!.name} · ` : ''}
-            {rankNameOf(s.rank_key) ?? 'no rank'} at {pct(s.product_rate, 0)}
+            {rankNameOf(s.rank_key) ?? 'no rank'} · {Number(s.group_incentive) > 0 ? 'Group package' : ratePct(Number(s.product_rate))}
             {s.rate_mode === 'fixed' ? ' · Manual rate' : ' · Scheme rate'}
             {s.upline_staff_id
               ? ` · under ${staff.get(s.upline_staff_id)?.employee_name ?? 'an upline'}`
@@ -268,7 +279,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
           <Fig
             label="Group sales"
             value={formatMoney(Number(s.group_revenue))}
-            note="Own plus the whole downline. A sales figure — the margin penalty does not reduce it."
+            note={(s.group_breakdown ?? []).length > 0 ? 'Own plus two downline layers, each person counted once. Individual group targets below may reuse own sales.' : 'Own plus the scheme’s qualifying downline layers. A sales figure — the margin penalty does not reduce it.'}
           />
           <Fig
             label="Held by the deposit gate"
@@ -357,6 +368,41 @@ export default async function CommissionStatementPage({ params }: PageProps) {
         </section>
       ) : null}
 
+      {(s.group_breakdown ?? []).length > 0 ? (
+        <section className="mb-10">
+          <div className="sect-head">
+            <h2>Direct-line group targets</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">{s.group_breakdown.filter(g => g.qualifies).length} QUALIFIED</span>
+          </div>
+          <p className="font-serif italic text-muted text-sm mb-4 max-w-3xl">
+            Your personal sales count in every direct group. Each group includes its direct and that person&apos;s immediate reports; deeper layers are excluded. These overlapping targets are assessed separately and should not be added together as actual revenue.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="ledger-table">
+              <thead><tr>
+                <th>Direct line</th><th className="right m-hide">Your sales</th>
+                <th className="right m-hide">Direct sales</th><th className="right m-hide">Second layer</th>
+                <th className="right">Group target basis</th><th className="m-hide">Result</th>
+                <th className="lt-toggle" aria-hidden />
+              </tr></thead>
+              <tbody>{s.group_breakdown.map(g => (
+                <LedgerRow key={g.directStaffId}>
+                  <td>{staff.get(g.directStaffId)?.employee_name ?? g.directStaffId}</td>
+                  <td className="num m-hide" data-label="Your sales (reused)">{formatMoney(g.leaderPersonalRevenue)}</td>
+                  <td className="num m-hide" data-label="Direct sales">{formatMoney(g.directPersonalRevenue)}</td>
+                  <td className="num m-hide" data-label="Second layer">{formatMoney(g.secondLayerRevenue)}</td>
+                  <td className="num">{formatMoney(g.totalRevenue)}</td>
+                  <td className="m-hide" data-label="Result">{g.qualifies ? 'Qualified' : 'Below target'}{g.targetRevenue ? ` · ${formatMoney(g.targetRevenue)}` : ''}</td>
+                </LedgerRow>
+              ))}</tbody>
+            </table>
+          </div>
+          {s.full_spec ? <p className="font-serif italic text-accent text-sm mt-3">Full Spec achieved: three qualifying groups, each with three immediate reports. {Number(s.group_incentive) > 0 ? 'Applying this package run permits opening a fourth line in this month. Each further line requires all existing groups to qualify in its opening month. Opened slots are retained; unused permission expires.' : 'The current manual percentage rank must be changed to the group package before the SDL qualification can be awarded.'}</p> : null}
+          {Number(s.group_subsidy_cap) > 0 ? <p className="font-serif italic text-graphite text-sm mt-3">Car/property subsidy cap: <strong>{formatMoney(Number(s.group_subsidy_cap))}</strong>. This is a separate non-cash Claims benefit, subject to the registered instalment. It is excluded from the cash commission total.</p> : null}
+        </section>
+      ) : null}
+
       {byComponent.map(group => (
         <section key={group.component} className="mb-10">
           <div className="sect-head">
@@ -419,6 +465,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
               <Sum name="Open Bill bonus" value={Number(s.open_bill_bonus)} />
               <Sum name="Override" value={Number(s.override_commission)} />
               <Sum name="Margin incentive" value={Number(s.margin_incentive)} />
+              {Number(s.group_incentive) > 0 ? <Sum name="Group incentive" value={Number(s.group_incentive)} /> : null}
               <tr>
                 <td>
                   <strong className="font-serif text-ink text-[15px]">
@@ -431,9 +478,8 @@ export default async function CommissionStatementPage({ params }: PageProps) {
           </table>
         </div>
         <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
-          This figure lands in <strong>hr_monthly_payroll.commission_amount</strong> and nothing
-          else. A Revenue salesperson has no basic and no statutory allowance, so it becomes their
-          whole gross; Withholding Tax, where it applies, comes off in payroll.
+          Cash commission is added to this month&apos;s payroll. Withholding Tax, where applicable,
+          is deducted there. Any car/property subsidy is handled separately through Claims.
         </p>
       </section>
     </div>

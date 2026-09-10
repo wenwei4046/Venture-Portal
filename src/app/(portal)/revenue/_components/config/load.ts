@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import { effectiveDirectLineLimit } from '@/lib/commission/chart-moves'
 import type {
   CommissionSettingsData,
   MemberCandidate,
@@ -136,7 +137,7 @@ export async function loadCommissionSettings(
 export async function loadTeam(schemeId: string, opts: { isHome: boolean }): Promise<TeamData> {
   const supabase = await untyped()
 
-  const [{ data: rankRows }, { data: staffRows }, { data: positions }, { data: levelRows }, { data: titleRows }] =
+  const [{ data: rankRows }, { data: staffRows }, { data: positions }, { data: levelRows }, { data: titleRows }, capacity, expansions, currentCapacity] =
     await Promise.all([
       supabase.from('comm_ranks').select('*').eq('scheme_id', schemeId).order('sort_order'),
       supabase
@@ -159,7 +160,19 @@ export async function loadTeam(schemeId: string, opts: { isHome: boolean }): Pro
         .eq('departments.payroll_source', 'commission')
         .eq('is_active', true)
         .order('name'),
+      supabase.from('comm_schemes').select('direct_line_limit').eq('id', schemeId).single(),
+      supabase.from('comm_direct_line_entitlements')
+        .select('staff_id, earned_at, source_period_month').eq('scheme_id', schemeId),
+      supabase.rpc('comm_effective_direct_line_limits', { p_scheme_id: schemeId }),
     ])
+  if (capacity.error || expansions.error || currentCapacity.error) throw new Error('Could not read the commission direct-line limits')
+  const baseLimit = (capacity.data as { direct_line_limit: number | null }).direct_line_limit
+  const expansionByStaff = new Map(rows<{
+    staff_id: string; earned_at: string; source_period_month: string
+  }>(expansions.data).map(e => [e.staff_id, e]))
+  const currentLimitByStaff = new Map(rows<{
+    staff_id: string; direct_line_limit: number | null
+  }>(currentCapacity.data).map(e => [e.staff_id, e.direct_line_limit]))
 
   const rungByLevel = new Map(
     rows<{ id: string; rank: number; name: string }>(levelRows).map(l => [l.id, l]),
@@ -186,6 +199,14 @@ export async function loadTeam(schemeId: string, opts: { isHome: boolean }): Pro
       comm_ranks: { rank_key: string; label: string } | { rank_key: string; label: string }[] | null
     }>(positions).map(p => [p.staff_id, p]),
   )
+  // Include every open membership, including a member now inactive on the
+  // roster. They still occupy a dated slot until their membership is closed.
+  const directCounts = new Map<string, number>()
+  for (const position of positionByStaff.values()) {
+    if (position.upline_staff_id) {
+      directCounts.set(position.upline_staff_id, (directCounts.get(position.upline_staff_id) ?? 0) + 1)
+    }
+  }
 
   const staff = rows<{
     id: string
@@ -229,6 +250,10 @@ export async function loadTeam(schemeId: string, opts: { isHome: boolean }): Pro
         placed_since: pos?.effective_from ?? null,
         tax_mode: s.tax_mode ?? 'pcb',
         withholding_rate: Number(s.withholding_rate ?? 0.02),
+        direct_line_count: directCounts.get(s.id) ?? 0,
+        direct_line_limit: effectiveDirectLineLimit(baseLimit, currentLimitByStaff.get(s.id)),
+        expansion_earned_at: expansionByStaff.get(s.id)?.earned_at ?? null,
+        expansion_source_period: expansionByStaff.get(s.id)?.source_period_month ?? null,
       }
     })
 
