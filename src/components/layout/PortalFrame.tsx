@@ -37,6 +37,7 @@ export default function PortalFrame({
   // reading-width cap so the many month columns can use the full content area.
   const pathname = usePathname()
   const wide = pathname?.startsWith('/reports/monthly-') ?? false
+  const paymentStatement = pathname === '/hr-costing/payment'
 
   // A list's checkbox selection outlives the drill-down into a row's detail
   // page (it lives in lib/selection-store.ts, not in the unmounted list), so
@@ -60,7 +61,7 @@ export default function PortalFrame({
   }, [pathname])
 
   return (
-    <div className="flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible">
+    <div className={`flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible${paymentStatement ? ' payment-statement-shell' : ''}`}>
       <div className="print:hidden contents">
         <Sidebar viewer={user} navData={navData} />
       </div>

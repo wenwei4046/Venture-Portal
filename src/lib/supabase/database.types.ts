@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      payroll_statutory_voucher_lines: {
+        Row: {
+          id: string
+          voucher_id: string
+          scope: string
+          payroll_row_id: string
+          period_month: string
+          scheme: string
+          employee_name: string
+          employee_code: string | null
+          department_id: string | null
+          department_name: string
+          amount: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          voucher_id: string
+          scope: string
+          payroll_row_id: string
+          period_month: string
+          scheme: string
+          employee_name: string
+          employee_code?: string | null
+          department_id?: string | null
+          department_name: string
+          amount: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          voucher_id?: string
+          scope?: string
+          payroll_row_id?: string
+          period_month?: string
+          scheme?: string
+          employee_name?: string
+          employee_code?: string | null
+          department_id?: string | null
+          department_name?: string
+          amount?: number
+          created_at?: string
+        }
+        Relationships: [
+          { foreignKeyName: "payroll_statutory_voucher_lines_voucher_id_fkey"; columns: ["voucher_id"]; isOneToOne: false; referencedRelation: "payment_vouchers"; referencedColumns: ["id"] },
+          { foreignKeyName: "payroll_statutory_voucher_lines_department_id_fkey"; columns: ["department_id"]; isOneToOne: false; referencedRelation: "departments"; referencedColumns: ["id"] },
+        ]
+      }
       access_log: {
         Row: {
           action: string
@@ -6859,6 +6907,20 @@ export type Database = {
       }
     }
     Functions: {
+      create_payroll_statutory_selection: {
+        Args: {
+          p_period: string
+          p_schemes: string[]
+          p_scope: string
+          p_granularity: string
+          p_department_id?: string | null
+          p_payroll_row_ids?: string[] | null
+          p_payment_date?: string | null
+          p_expected_total?: number | null
+          p_expected_count?: number | null
+        }
+        Returns: Json
+      }
       amend_fund_source: {
         Args: { p_fund_source_id: string; p_payload: Json }
         Returns: undefined

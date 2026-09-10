@@ -21,7 +21,8 @@ interface Props {
   periodLabel: string
   prevMonthName: string
   gran: Granularity
-  onGran: (g: Granularity) => void
+  /** Existing PV records only; pending records still allow payment-date edits. */
+  readOnly?: boolean
   /** null selects everyone still without a voucher; [] is an explicit empty selection. */
   selectedIds: string[] | null
   onSelection: (ids: string[] | null) => void
@@ -47,25 +48,26 @@ const BANK_ISSUE_LABEL = {
 } as const
 
 function chip(status: string | undefined, date: string | null | undefined) {
-  if (!status) return <span className="chip pay-state">not generated</span>
-  if (status === 'paid') return <span className="chip ledger pay-state"><span className="dot" />paid · {shortDate(date)}</span>
-  if (status === 'approved') return <span className="chip ledger pay-state"><span className="dot" />approved</span>
-  return <span className="chip alert pay-state"><span className="dot" />awaiting Principal</span>
+  if (!status) return <span className="pay-state whitespace-nowrap">Not generated</span>
+  if (status === 'paid') return <span className="pay-state text-ledger whitespace-nowrap">Paid · {shortDate(date)}</span>
+  if (status === 'approved') return <span className="pay-state text-ledger whitespace-nowrap">Approved</span>
+  return <span className="pay-state text-alert whitespace-nowrap">Awaiting Principal</span>
 }
 
-/**
- * One department's people. The granularity switch lives here as well as on
- * the bar, so a department can be compiled as one PV or one per person
- * without leaving the window. Select all remaining people or a subset;
- * existing vouchers are excluded from every new batch.
- */
+function validPaymentDate(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value)
+    && !Number.isNaN(Date.parse(`${value}T00:00:00Z`))
+    && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value
+}
+
+/** A fixed method: all remaining people in one PV, or selected people in individual PVs. */
 export default function DeptWindow({
   group: g,
   period,
   periodLabel,
   prevMonthName,
   gran,
-  onGran,
+  readOnly = false,
   selectedIds,
   onSelection,
   date,
@@ -83,9 +85,11 @@ export default function DeptWindow({
 }: Props) {
   const d = delta(g.net, g.prev_net)
   const remaining = g.headcount - g.generated
-  const selection = payrollSelection(g.people, selectedIds, gran)
+  const selection = payrollSelection(g.people, gran === 'department' && !confirming ? null : selectedIds, gran)
   const selectedSet = new Set(selection.rowIds)
-  const canGenerate = funded && selection.count > 0 && (g.scope === 'directors' || !!g.dept_id) && /^\d{4}-\d{2}-\d{2}$/.test(date)
+  const showGeneration = !readOnly && remaining > 0
+  const showSelection = showGeneration && gran === 'employee'
+  const canGenerate = showGeneration && funded && selection.count > 0 && (g.scope === 'directors' || !!g.dept_id) && validPaymentDate(date)
   const locked = busy != null || confirming
   const pendingVouchers = g.vouchers.filter((v) => v.status === 'pending_approval' || v.status === 'draft')
   const dateChanged = pendingVouchers.some((v) => v.payment_date !== date)
@@ -94,7 +98,7 @@ export default function DeptWindow({
 
   return (
     <PayWindow
-      eyebrow={`III. SALARY PVS · ${periodLabel.toUpperCase()}`}
+      eyebrow={`SALARY PVS · ${periodLabel.toUpperCase()}`}
       title={
         <>
           {g.name} <span>· {g.headcount} {who}</span>
@@ -106,9 +110,9 @@ export default function DeptWindow({
           <span className="font-serif italic text-muted text-xs">
             {g.stage === 'paid'
               ? `Paid · ${g.vouchers.length} PV${g.vouchers.length === 1 ? '' : 's'}`
-              : remaining > 0
-                ? `${selection.count} selected · RM ${formatMoneyBare(selection.total)} · ${selection.voucherCount} PV${selection.voucherCount === 1 ? '' : 's'}`
-                : `${g.vouchers.length} existing PVs · no people left to generate`}
+                : showGeneration
+                  ? `${selection.count} selected · RM ${formatMoneyBare(selection.total)} · ${selection.voucherCount} PV${selection.voucherCount === 1 ? '' : 's'}`
+                : `${g.vouchers.length} existing PV${g.vouchers.length === 1 ? '' : 's'}${remaining > 0 ? ` · ${remaining} people still to generate` : ' · no people left to generate'}`}
           </span>
           {g.scope === 'staff' && g.dept_id ? (
             <Link
@@ -124,8 +128,8 @@ export default function DeptWindow({
     >
       <div className="tiles">
         <div className="tile">
-          <div className="l">{remaining > 0 ? 'Selected net to pay' : 'Net to pay'}</div>
-          <div className="v" aria-live="polite">{formatMoneyBare(remaining > 0 ? selection.total : g.net)}</div>
+          <div className="l">{showGeneration ? 'Selected net to pay' : 'Net salary'}</div>
+          <div className="v" aria-live="polite">{formatMoneyBare(showGeneration ? selection.total : g.net)}</div>
         </div>
         <div className="tile">
           <div className="l">Gross · deductions</div>
@@ -148,46 +152,24 @@ export default function DeptWindow({
         </div>
       </div>
 
-      {remaining > 0 ? (
+      {showGeneration ? (
         <div className="pay-selection">
-          <div className="pay-seg" role="group" aria-label="People to include">
-            <button type="button" aria-pressed={selectedIds == null} onClick={() => onSelection(null)} disabled={locked}>
-              {g.generated > 0 ? 'All remaining' : 'Whole department'} ({selection.eligible.length})
-            </button>
-            <button type="button" aria-pressed={selectedIds != null} onClick={() => onSelection([])} disabled={locked}>
-              Choose employees
-            </button>
-          </div>
+          <h4>{gran === 'department' ? 'Generate by Department' : 'Manual generate'}</h4>
           <p aria-live="polite">
             <b>{selection.count} of {selection.eligible.length} selected</b> · RM {formatMoneyBare(selection.total)} · {selection.voucherCount} PV{selection.voucherCount === 1 ? '' : 's'}
           </p>
-          <span>Tick the people to include below. Anyone who already has a PV cannot be selected again.</span>
+          <span>{gran === 'department' ? 'All remaining people are included in one grouped PV.' : 'Select employees below. Each selected employee gets one PV.'} Anyone who already has a PV is excluded.</span>
         </div>
       ) : null}
 
-      {remaining > 0 || pendingVouchers.length > 0 ? (
+      {showGeneration || pendingVouchers.length > 0 ? (
         <div className="wctl">
-          {remaining > 0 ? (
-          <div className="f" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <span className="pay-bar-l l" style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgb(var(--graphite))' }}>
-              PV format
-            </span>
-            <div className="pay-seg" role="group" aria-label="PV granularity">
-              <button type="button" aria-pressed={gran === 'department'} onClick={() => onGran('department')} disabled={locked}>
-                One grouped PV
-              </button>
-              <button type="button" aria-pressed={gran === 'employee'} onClick={() => onGran('employee')} disabled={locked}>
-                One PV per employee
-              </button>
-            </div>
-          </div>
-          ) : null}
           <label className="f" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgb(var(--graphite))' }}>Pay date</span>
-            <input type="date" className="pay-date" value={date} onChange={(e) => onDate(e.target.value)} disabled={locked} />
+            <input type="date" className="pay-date" aria-label="Pay date" value={date} onChange={(e) => onDate(e.target.value)} disabled={locked} />
           </label>
           <span style={{ flex: 1 }} />
-          {remaining > 0 ? (
+          {showGeneration ? (
             <button
               type="button"
               className="pay-btn pri"
@@ -195,14 +177,14 @@ export default function DeptWindow({
               disabled={!canGenerate || busy != null || confirming}
               title={!funded ? 'Funding is not complete yet' : selection.count === 0 ? 'Select at least one employee' : undefined}
             >
-              Generate {selection.voucherCount} PV{selection.voucherCount === 1 ? '' : 's'} · {selection.count} people
+              Review PVs
             </button>
           ) : pendingVouchers.length > 0 ? (
             <button
               type="button"
               className="pay-btn sec"
               onClick={onSaveDates}
-              disabled={busy != null || !dateChanged || !/^\d{4}-\d{2}-\d{2}$/.test(date)}
+              disabled={busy != null || !dateChanged || !validPaymentDate(date)}
             >
               {busy === `date:${g.key}` ? 'Saving…' : `Save date on ${pendingVouchers.length} PV${pendingVouchers.length === 1 ? '' : 's'}`}
             </button>
@@ -210,13 +192,13 @@ export default function DeptWindow({
         </div>
       ) : null}
 
-      {g.stage === 'partial' ? (
+      {showGeneration && g.stage === 'partial' ? (
         <p className="font-serif italic text-muted text-xs" style={{ margin: 0 }}>
-          {g.generated} of {g.headcount} already have a voucher. Select any of the remaining {remaining} people for this batch.
+          {g.generated} of {g.headcount} already have a voucher. {gran === 'department' ? `The remaining ${remaining} people are included in this batch.` : `Select any of the remaining ${remaining} people for this batch.`}
         </p>
       ) : null}
 
-      {confirming ? (
+      {showGeneration && confirming ? (
         <div className="pay-confirm">
           <span>
             Generate{' '}
@@ -246,17 +228,17 @@ export default function DeptWindow({
 
       {error ? <div className="err">{error}</div> : null}
 
-      <div className="overflow-x-auto">
-        <table className="ledger-table pay-people-table">
+      <div className="pay-table-wrap">
+        <table className="pay-statement-table pay-people-table" aria-label={`${g.name} employees and PVs`}>
           <thead>
             <tr>
-              {remaining > 0 ? <th className="pick"><input type="checkbox" aria-label="Select all remaining employees" checked={selection.count === selection.eligible.length && selection.count > 0} onChange={(e) => onSelection(e.target.checked ? null : [])} disabled={locked} /></th> : null}
-              <th>Employee</th>
-              <th>Bank</th>
-              <th className="right">Net</th>
-              <th className="right">vs {prevMonthName}</th>
-              <th>PV</th>
-              <th className="state-cell">Status</th>
+              {showSelection ? <th scope="col" className="pick"><input type="checkbox" aria-label="Select all remaining employees" checked={selection.count === selection.eligible.length && selection.count > 0} onChange={(e) => onSelection(e.target.checked ? null : [])} disabled={locked} /></th> : null}
+              <th scope="col">Employee</th>
+              <th scope="col">Bank</th>
+              <th scope="col" className="right">Net · RM</th>
+              <th scope="col" className="right">vs {prevMonthName}</th>
+              <th scope="col">PV</th>
+              <th scope="col" className="state-cell">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -268,7 +250,7 @@ export default function DeptWindow({
               const eligible = p.net > 0 && !v
               return (
                 <tr key={p.row_id} className={isNotableMove(pd) ? 'moved' : undefined} title={isNotableMove(pd) ? `Moved 20% or more vs ${prevMonthName}` : undefined}>
-                  {remaining > 0 ? <td className="pick"><input type="checkbox" aria-label={`Select ${p.name}`} checked={selectedSet.has(p.row_id)} disabled={!eligible || locked} title={!eligible ? 'Already has a PV or no net salary to pay' : undefined} onChange={(e) => onSelection(e.target.checked ? [...selection.rowIds, p.row_id] : selection.rowIds.filter((id) => id !== p.row_id))} /></td> : null}
+                  {showSelection ? <td className="pick"><input type="checkbox" aria-label={`Select ${p.name}`} checked={selectedSet.has(p.row_id)} disabled={!eligible || locked} title={!eligible ? 'Already has a PV or no net salary to pay' : undefined} onChange={(e) => onSelection(e.target.checked ? [...selection.rowIds, p.row_id] : selection.rowIds.filter((id) => id !== p.row_id))} /></td> : null}
                   <td className="who">
                     <span className="nm">{p.name}</span>
                     {p.code ? <span className="cd">{p.code}</span> : null}
@@ -320,14 +302,14 @@ export default function DeptWindow({
                       <span className="pv none">net 0</span>
                     )}
                   </td>
-                  <td className="state-cell">{p.net > 0 ? chip(v?.status, v?.payment_date) : <span className="text-muted text-xs">not paid</span>}</td>
+                  <td className="state-cell">{p.net > 0 ? chip(v?.status, v?.payment_date) : <span className="pay-state text-muted text-xs whitespace-nowrap">No salary due</span>}</td>
                 </tr>
               )
             })}
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-hairline">
-              <td className="font-serif italic text-accent" colSpan={remaining > 0 ? 3 : 2}>
+              <td className="font-serif italic text-accent" colSpan={showSelection ? 3 : 2}>
                 Total · {g.headcount} {who}
               </td>
               <td className="num font-semibold">{formatMoneyBare(g.net)}</td>

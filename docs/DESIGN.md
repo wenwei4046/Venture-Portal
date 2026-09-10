@@ -60,7 +60,7 @@ When you're not sure how a pattern looks in code, copy from one of these — the
 | Tab rail on the header's rule (`.page-head.tabbed` + `SlidingTabs`) | `src/app/(portal)/revenue/_components/config/CommissionSection.tsx`, `src/app/(portal)/revenue/[sub]/hierarchy/_components/HierarchyTabs.tsx` |
 | Hero + dept totals + history | `src/app/(portal)/hr-costing/page.tsx` |
 | Pure read-only ledger | `src/app/(portal)/audit-log/page.tsx` |
-| Status card + month rail + a Deel-style row list + a window (the researched HRMS layout) | `src/app/(portal)/hr-costing/payment/page.tsx`, `_components/Overview.tsx`, `_components/DeptRows.tsx` |
+| Monthly payment statement + Salary / Statutory tabs + department tables | `src/app/(portal)/hr-costing/payment/page.tsx`, `_components/Overview.tsx`, `_components/DeptRows.tsx` |
 | Sidebar (roman numerals + dot markers) | `src/components/layout/Sidebar.tsx` |
 | TopBar (greet + role badge) | `src/components/layout/TopBar.tsx` |
 | Mobile nav (bottom tabs + sheet) | `src/components/layout/BottomTabBar.tsx`, `MoreSheet.tsx` |
@@ -600,40 +600,48 @@ on empty ground **stays there** (remembered per browser and scheme in
 shape), and the ground is the only non-paper surface — everything around it
 (toolbar, note, selection bar, popover) is still in the portal's own tokens.
 
-### Payment board (v3.6, 2026-09-11 — HR › Payment)
+### Payment statement (v3.7, 2026-09-11 — HR › Payment)
 
-The page whose layout was taken from the products themselves. The first
-rebuild (v3.5, 2026-09-10: a four-cell strip, department cards, four
-statutory cards) kept the facts right but the user said it did not look
-like the HRMS researched the same day (the *Payroll UI Field Guide*, 14
-products, in the project memory). v3.6 keeps the backend and every
-judgement in `lib/payment-cycle.ts` and re-lays the page after six of them:
+The approved combination uses concept A's reporting and concept B's table hierarchy.
+The route-scoped `.payment-statement-shell` has a light neutral sidebar and topbar;
+`.payment-statement` uses a serif Payment title, thin rules, square table surfaces,
+shaded headers, right-aligned monetary columns and compact status text. Styles live
+in `payment/payment-statement.css` and `_components/payment-tables.css`.
 
-| Borrowed from | Class | What it does |
-|---|---|---|
-| BambooHR's pay-date rail | `.pay-rail` | One chip per month in the page head — the name and how far the cycle got (`no run / drafts / submitted / funded / closed ✓`), the month on screen ringed in accent. Replaces the ← August → arrows. Fed by three plain selects (`payroll_runs`, `payroll_payment_requests`, statutory `payment_vouchers`) through `monthRail()` |
-| BambooHR's Review Payroll — selected mockup B (2026-09-11) | `.pay-status.pay-panel` | White review panel: month and compact status on the left of the header, three dated facts on the right (next due, pay date, funding). The existing `cycleHeadline()` still chooses the state, next due date and action; overdue stays red, upcoming due stays amber. The footer carries an ordered step trail (submitted → funded → salary PVs → statutory) beside the accent button and its existing confirmation. Due dates and Pay variances remain in the right column |
-| BambooHR's Review hero | `.pay-status .facts` | Net payroll alone, centred on a warm grey block at left, with the staff/director count and previous-month variance. At right, four separated checklist rows: Finance funding, staff, directors, statutory. Each has a completion tick or pending marker, its amount and an explanation naming the account and date. `--pay-card` and `--surface-2` retain the elevation in dark mode; the hero and facts stack on narrow screens |
-| Personio's Due dates + Pay variances | `.pay-side`, `.pay-ms`, `.pay-var` | Beside the card: the month's dated milestones as date chips (`milestones()` — submitted, funded, the two pay dates, the statutory bodies grouped by due date; done / next / late), and the biggest net moves vs last month (`payVariances()`: `9,414.31 → 2,859.49 ↘ −70%`, 20%+ in amber; a name opens its department's window) |
-| PayrollPanda's header band | `.pay-band` | Over the department list: GROSS \| employee contributions (EPF · SOCSO · EIS · PCB · SKBBK, label in accent) \| NET \| employer contributions (label in Walnut) \| COST · CTC — `contributionTotals()`. Two families take a *surface* colour each, never a status colour |
-| Deel's payroll-cycles list | `.pay-list`, `.pay-row`, `.pay-filt` | One row per department: name + headcount + gross + Δ vs last month; **a sentence over a four-segment bar** (funded · generated · approved · paid — `deptTimeline()`), the audit line (*Generated 9 Sep 17:46 · Approved 9 Sep 21:49*) and the pay date under it; the net with *Previous was …* beneath; a button **named for the next step** (`Generate 1 PV`, `Approvals →`, `View PV`) and a `N people ›` link to the window. Filter chips with counts (`All · To generate · With Principal · Paid · Blocked`) over the list; the PV-per switch, the two dates, the Alliance file and the Generate-all button in the list header |
-| Swingvy's statutory rows + ADP's pill | `.pay-row.stat`, `.pay-pill` | In the Chrome well, one row per body: covers + portal under the name; ADP's pill (`Due in 4 days (15/09)`, `Overdue 3 days`, `Paid 14 Aug` — `duePill()`) over a sentence that says where the PV is; the total; **two buttons** — `By department` (the human-readable breakdown for i-Akaun / ASSIST / e-PCB) and `Generate PV` / `View PV` (the machine side). PERKESO lists its SOCSO and EIS PVs as two lines |
-| ADP's "$__ impounded?" | `.pay-confirm` | Every Generate opens a question that names the money, the account, the day, the people and the PV count: *RM 47,553.80 to KWSP · PERKESO · LHDN · SKBBK from Alliance Bank ···3210 · 5 PVs — generate?* → **Yes, generate** |
-| Gusto's banner · Personio's two gates | `.pay-block`, `.pay-warn` | Blockers name the fix (*Payment blocked for 4 staff — fix their bank details*, names linked to People) and stop only those people; warnings (*4 people moved 20% or more vs July*) can be waved through |
-| — | `.pay-cta`, `.pay-btn` | `.pay-cta` is ink on paper — cream on the walnut card, Deel's black pill anywhere light. `.pay-btn.pri` is the accent pill, `.sec` the bordered one; both round, both label the act |
-| — | `.pay-win`, `.pay-selection` | Department window: choose the whole department (all remaining people after a partial batch) or tick individual employees. Selected count, net amount and PV count update together; PV format is independently one grouped voucher or one per employee. Existing PVs and zero-net rows cannot be selected. Confirmation names the chosen people, amount, date and account; later batches include only the remaining people. The salary window widens to fit its table; `.pay-state` keeps status and date on one line. Rows that moved 20%+ are tinted `tr.moved` |
+The shared report remains above two tabs: **Salary** (default) and **Statutory**.
+It contains total payroll cost, actual salary paid, statutory outstanding, payroll
+reconciliation, expandable contribution breakdown, current HR pool/funding gap,
+and payment dates. Paid totals use paid vouchers only; excess paid on one scheme
+cannot offset another scheme's outstanding amount. **Changes from the previous
+month belongs only to Salary**, including the employee variance disclosure.
 
-Surfaces: mockup B replaces the dark status card with a white review panel
-and a warm grey net-pay block; every list and side card is white
-on the Plaster ground, and the statutory rows sit in the Chrome well so
-paying people and paying the government read as two jobs. The three
-`data-tone` variants of v3.5 are gone; there is one design.
+Salary shows department totals, people, net salary, status, PV records and the
+Alliance file. Statutory shows the four institutions, contribution amount, due
+date, status and generation actions. SOCSO and EIS are separate schemes under
+PERKESO. The month rail closes only when every positive statutory contribution
+is covered by a paid voucher and no active unpaid statutory vouchers remain.
 
-Three rules the board keeps: **status is a compact word beside the month,
-with an explanation when action is needed**; **every button is named for what it does**
-(no `Confirm`, no `View`); and **the confirm names the money** before the
-irreversible act. The old v3.5 card grid is gone; `payment-cycle.ts` grew
-the helpers above (38 unit tests).
+Both tables expose exactly two generation entry points:
+
+- **Generate by Department** includes every remaining eligible employee in the
+  chosen department, grouped into one PV per scheme (one salary PV).
+- **Manual generate** opens the department's employee selection and creates one
+  PV per selected employee per scheme. Manual selection starts empty.
+
+There is no independent PV-format toggle. Existing coverage cannot be selected
+again. Review freezes the selected people, count, amount and payment date before
+confirmation; changing the selection requires returning to the form. Statutory
+multi-scheme generation is atomic and rechecks coverage and expected totals.
+Both staff and director statutory contributions use the HR custody pool.
+Stored contribution lines are an immutable audit snapshot shown on the voucher
+and PDF. Their voucher permits date/notes edits only, preserving its financial
+fields and custody sources. HR access to these detail/download routes is limited
+to payroll records; Treasury actions remain permission-gated.
+
+Salary department windows keep status/date text unbroken, support keyboard focus
+and contain horizontal overflow. Tabs support arrow keys and retain selections
+when switching. On narrow screens the report stacks and tables scroll within
+their own containers.
 
 ### `.page-head` example (mandatory shape)
 

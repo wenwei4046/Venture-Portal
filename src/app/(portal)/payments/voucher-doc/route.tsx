@@ -1,18 +1,19 @@
 // Per-voucher PDF export (document layout). Supports:
-//   ?id=<uuid>           — single voucher → 1-page PDF
-//   ?ids=<id1>,<id2>,... — explicit set → multi-page PDF, 1 page per voucher
+//   ?id=<uuid>           — single voucher, with recorded contribution details
+//   ?ids=<id1>,<id2>,... — explicit set, each voucher starts on its own page
 //
 // Mirrors /billing/invoice-doc but for payment vouchers / official receipts.
 
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import { can } from '@/lib/permissions'
 import { exportPdfResponse } from '@/lib/export/response'
 import { formatPoolLabel } from '@/lib/voucher-detail'
-import { VoucherDocPdf, type VoucherDocData } from '../_format/voucher-doc-pdf'
+import { VoucherDocPdf, type StatutoryCoverageData, type VoucherDocData } from '../_format/voucher-doc-pdf'
 import dayjs from 'dayjs'
 
 export async function GET(req: Request) {
-  await requirePermission('treasury')
+  const user = await requirePermission('treasury', 'hr_costing')
   const url = new URL(req.url)
   const id = url.searchParams.get('id')?.trim() || null
   const idsParam = url.searchParams.get('ids')?.trim() || null
@@ -25,7 +26,8 @@ export async function GET(req: Request) {
 
   let q = supabase
     .from('payment_vouchers')
-    .select('id, voucher_no, voucher_type, direction, status, amount, payment_date, created_at, payee_name, payee_company_id, bank_account_id, description, notes, payment_reference, target_pool')
+    .select('id, voucher_no, voucher_type, direction, status, amount, payment_date, created_at, payee_name, payee_company_id, bank_account_id, description, notes, payment_reference, target_pool, reference_type')
+  if (!can(user, 'treasury')) q = q.in('reference_type', ['payroll_disbursement', 'payroll_statutory', 'payroll_payment_request'])
   if (id) {
     q = q.eq('id', id)
   } else {
@@ -43,8 +45,9 @@ export async function GET(req: Request) {
   const voucherIds = vouchers.map((v) => v.id as string)
   const companyIds = Array.from(new Set(vouchers.map((v) => v.payee_company_id).filter(Boolean))) as string[]
   const bankIds = Array.from(new Set(vouchers.map((v) => v.bank_account_id).filter(Boolean))) as string[]
+  const statutoryIds = vouchers.filter((v) => v.reference_type === 'payroll_statutory').map((v) => v.id as string)
 
-  const [{ data: srcs }, { data: companies }, { data: banks }] = await Promise.all([
+  const [{ data: srcs }, { data: companies }, { data: banks }, coverageResult] = await Promise.all([
     supabase
       .from('payment_voucher_sources')
       .select('voucher_id, pool, amount, account_code, chart_of_accounts!pvs_account_code_fk(name)')
@@ -56,7 +59,25 @@ export async function GET(req: Request) {
     bankIds.length > 0
       ? supabase.from('bank_accounts').select('id, bank_name, account_number').in('id', bankIds)
       : Promise.resolve({ data: [] }),
+    statutoryIds.length > 0
+      ? // This new table is not in the generated Database type yet.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any).from('payroll_statutory_voucher_lines')
+          .select('id, voucher_id, scope, payroll_row_id, employee_name, employee_code, department_name, period_month, scheme, amount')
+          .in('voucher_id', statutoryIds)
+          .order('department_name').order('employee_name').order('scheme')
+      : Promise.resolve({ data: [], error: null }),
   ])
+  if (coverageResult.error) {
+    return Response.json({ error: 'Unable to load recorded statutory contribution details. Please try again.' }, { status: 500 })
+  }
+
+  const coverageByVoucher = new Map<string, StatutoryCoverageData[]>()
+  for (const line of (coverageResult.data ?? []) as Array<Omit<StatutoryCoverageData, 'amount'> & { voucher_id: string; amount: string | number }>) {
+    const coverage = coverageByVoucher.get(line.voucher_id) ?? []
+    coverage.push({ ...line, amount: Number(line.amount) })
+    coverageByVoucher.set(line.voucher_id, coverage)
+  }
 
   const companyMap = new Map((companies ?? []).map((c) => [c.id as string, c]))
   const bankMap = new Map((banks ?? []).map((b) => [b.id as string, b]))
@@ -90,6 +111,7 @@ export async function GET(req: Request) {
       notes: v.notes as string | null,
       payment_reference: v.payment_reference as string | null,
       sources: sourcesByVoucher.get(v.id as string) ?? [],
+      statutory_coverage: coverageByVoucher.get(v.id as string) ?? [],
     }
   })
 

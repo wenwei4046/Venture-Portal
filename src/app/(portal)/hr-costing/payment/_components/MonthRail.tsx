@@ -2,18 +2,14 @@ import Link from 'next/link'
 import type { RailMonth, RailState } from '@/lib/payment-cycle'
 
 const WORD: Record<RailState, string> = {
-  none: 'no run',
-  drafts: 'drafts',
-  submitted: 'submitted',
-  funded: 'funded',
-  closed: 'closed ✓',
+  none: 'No run',
+  drafts: 'Drafts',
+  submitted: 'Submitted',
+  funded: 'Open',
+  closed: 'Closed',
 }
 
-/**
- * BambooHR's pay-date rail: one chip per month, how far its cycle got under
- * the name, the month on screen ringed. Replaces the ← August → arrows —
- * which month is still open is readable without clicking.
- */
+/** Month navigation with the current cycle's status underneath. */
 export default function MonthRail({ months }: { months: RailMonth[] }) {
   const year = months.find((m) => m.current)?.year
   return (

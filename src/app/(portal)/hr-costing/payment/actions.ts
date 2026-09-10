@@ -19,6 +19,38 @@ export type PayrollScope = 'staff' | 'directors'
 export type PayrollGranularity = 'employee' | 'department'
 export type StatutoryScheme = 'KWSP' | 'SOCSO' | 'EIS' | 'PCB' | 'SKBBK'
 
+/** Institution remains the payee; employee selection controls contribution lines. */
+export async function generateStatutorySelection(
+  period: string,
+  schemes: StatutoryScheme[],
+  scope: PayrollScope,
+  granularity: PayrollGranularity,
+  departmentId: string | null,
+  payrollRowIds: string[] | null,
+  paymentDate?: string,
+  expected?: { total: number; voucherCount: number },
+): Promise<DisbursementResult> {
+  await requirePermission('hr_costing')
+  if (!/^\d{4}-\d{2}-01$/.test(period)) throw new Error('Choose a payroll month')
+  if (paymentDate && !/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) throw new Error('Invalid payment date')
+  if (!Array.isArray(schemes) || schemes.length === 0 || schemes.some(s => !['KWSP', 'SOCSO', 'EIS', 'PCB', 'SKBBK'].includes(s)) || new Set(schemes).size !== schemes.length) throw new Error('Choose valid contribution schemes')
+  if (!['staff', 'directors'].includes(scope) || !['employee', 'department'].includes(granularity)) throw new Error('Choose a department or employees')
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (departmentId !== null && !uuid.test(departmentId)) throw new Error('Invalid department')
+  if (payrollRowIds !== null && (!Array.isArray(payrollRowIds) || !payrollRowIds.length || payrollRowIds.some(id => typeof id !== 'string' || !uuid.test(id)) || new Set(payrollRowIds.map(id => id.toLowerCase())).size !== payrollRowIds.length)) throw new Error('Select each employee once')
+  if (granularity === 'employee' && payrollRowIds === null) throw new Error('Select at least one employee')
+  if (expected && (!Number.isFinite(expected.total) || expected.total <= 0 || !Number.isInteger(expected.voucherCount) || expected.voucherCount <= 0)) throw new Error('Refresh the payment preview')
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('create_payroll_statutory_selection', {
+    p_period: period, p_schemes: schemes, p_scope: scope, p_granularity: granularity,
+    p_department_id: departmentId, p_payroll_row_ids: payrollRowIds, p_payment_date: paymentDate || null,
+    p_expected_total: expected?.total ?? null, p_expected_count: expected?.voucherCount ?? null,
+  })
+  if (error) throw new Error(error.message)
+  for (const path of ['/hr-costing/payment', '/payments/payroll-requests', '/payments', '/approvals', '/dashboard']) revalidatePath(path)
+  return data as unknown as DisbursementResult
+}
+
 /**
  * Mig 20260911101500 — HR compiles the salary PVs. `granularity` decides the
  * shape: 'employee' is one voucher per person (every month so far),

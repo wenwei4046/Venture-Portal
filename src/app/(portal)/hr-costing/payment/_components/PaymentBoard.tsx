@@ -1,33 +1,22 @@
 'use client'
 
-import { useState, useTransition, type ReactNode } from 'react'
-import Link from 'next/link'
+import { useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { formatMoneyBare } from '@/lib/utils'
 import { payrollSelection } from '@/lib/payroll-selection'
 import {
-  bankIssue,
-  isNotableMove,
-  type BodyKey,
-  type ContributionTotals,
-  type CycleTotals,
-  type DeptGroup,
-  type Granularity,
-  type Headline,
-  type Milestone,
-  type Phase,
-  type Scheme,
-  type Scope,
-  type StatutoryRow,
-  type VarianceSummary,
+  type BodyKey, type ContributionTotals, type CycleTotals, type DeptGroup,
+  type Granularity, type Headline, type Milestone, type StatutoryCoverage, type Phase,
+  type StatutoryRow, type VarianceSummary,
 } from '@/lib/payment-cycle'
-import { createPayrollDisbursement, generateStatutoryDirectorTopup, generateStatutoryScheme, setPayrollPvDate } from '../actions'
-import ContribBand from './ContribBand'
+import { createPayrollDisbursement, setPayrollPvDate } from '../actions'
 import DeptRows from './DeptRows'
 import DeptWindow from './DeptWindow'
 import Overview, { type Facts } from './Overview'
 import StatutoryRows from './StatutoryRows'
 import StatutoryWindow from './StatutoryWindow'
+import StatutoryGenerator from './StatutoryGenerator'
+import SalaryChanges from './SalaryChanges'
+import './payment-tables.css'
 
 export interface BoardProps {
   period: string
@@ -36,6 +25,7 @@ export interface BoardProps {
   prevMonthName: string
   groups: DeptGroup[]
   rows: StatutoryRow[]
+  statutoryCoverage?: StatutoryCoverage[]
   totals: CycleTotals
   band: ContributionTotals
   headline: Headline
@@ -46,412 +36,158 @@ export interface BoardProps {
   staffFunded: boolean
   directorsFunded: boolean
   payoutBank: { name: string; last4: string } | null
-  /** ISO date, computed on the server so the due-day maths cannot drift at hydration. */
   today: string
   defaultDate: string
   fundingSlot: ReactNode
 }
 
-type Win = { kind: 'dept'; key: string } | { kind: 'body'; key: BodyKey } | null
-type Confirm = { kind: 'all-salary'; at: 'over' | 'list' } | { kind: 'all-stat'; at: 'over' | 'list' } | { kind: 'dept'; key: string; rowIds: string[]; granularity: Granularity; date: string } | null
+type WindowState = { kind: 'dept'; key: string; mode: Granularity | 'view' } | { kind: 'body'; key: BodyKey } | null
+type SalaryReview = { key: string; rowIds: string[]; granularity: Granularity; date: string }
 
-/**
- * The state of the page — which window is open, the PV-per switch, the
- * dates, what is being confirmed — and the calls to the actions. Every
- * judgement about the data is made in lib/payment-cycle.ts; the layout is
- * the researched one (see Overview, DeptRows, StatutoryRows).
- */
-export default function PaymentBoard({
-  period,
-  periodLabel,
-  periodRange,
-  prevMonthName,
-  groups,
-  rows,
-  totals,
-  band,
-  headline,
-  milestones,
-  variances,
-  facts,
-  phase,
-  staffFunded,
-  directorsFunded,
-  payoutBank,
-  today,
-  defaultDate,
-  fundingSlot,
-}: BoardProps) {
+export default function PaymentBoard({ period, periodLabel, periodRange, prevMonthName, groups, rows, statutoryCoverage = [], totals, band, headline, milestones, variances, facts, phase, staffFunded, directorsFunded, payoutBank, today, defaultDate, fundingSlot }: BoardProps) {
   const router = useRouter()
-  const [, startTransition] = useTransition()
-  const [gran, setGran] = useState<Granularity>('department')
-  const [dates, setDates] = useState<{ staff: string; directors: string; stat: Partial<Record<Scheme, string>> }>({
-    staff: defaultDate,
-    directors: defaultDate,
-    stat: {},
-  })
-  const [win, setWin] = useState<Win>(null)
-  const [selections, setSelections] = useState<Record<string, string[] | null>>({})
-  const [confirm, setConfirm] = useState<Confirm>(null)
+  const [tab, setTab] = useState<'salary' | 'statutory'>('salary')
+  const tabs = useRef<Array<HTMLButtonElement | null>>([])
+  const [dates, setDates] = useState({ staff: defaultDate, directors: defaultDate })
+  const [win, setWin] = useState<WindowState>(null)
+  const [selections, setSelections] = useState<Record<string, string[]>>({})
+  const [review, setReview] = useState<SalaryReview | null>(null)
+  const [generator, setGenerator] = useState<{ body: BodyKey; mode: Granularity } | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const submitting = useRef(false)
   const [error, setError] = useState<string | null>(null)
-
-  function openWindow(next: NonNullable<Win>) {
-    if (busy != null) return
-    setConfirm(null)
-    setError(null)
-    setWin(next)
-  }
-
-  function run(key: string, fn: () => Promise<unknown>) {
-    setError(null)
-    setBusy(key)
-    startTransition(async () => {
-      try {
-        await fn()
-        setConfirm(null)
-        router.refresh()
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Action failed')
-      } finally {
-        setBusy(null)
-      }
-    })
-  }
-
-  const fundedFor = (g: DeptGroup) => (g.scope === 'directors' ? directorsFunded : staffFunded)
-  const remainingOf = (g: DeptGroup) => g.headcount - g.generated
-
-  function generateGroup(g: DeptGroup, selection?: Extract<Confirm, { kind: 'dept' }>) {
-    if (g.scope === 'staff' && !g.dept_id) throw new Error(`${g.name} has no department — assign one on the People page first`)
-    const granularity = selection?.granularity ?? gran
-    const date = selection?.date ?? (g.scope === 'directors' ? dates.directors : dates.staff)
-    return createPayrollDisbursement(period, g.scope, date, granularity, g.scope === 'staff' ? g.dept_id : null, selection?.rowIds ?? null)
-  }
-
-  function askGroup(g: DeptGroup, selectedIds: string[] | null = null) {
-    const selection = payrollSelection(g.people, selectedIds, gran)
-    if (!selection.count) return
-    setConfirm({ kind: 'dept', key: g.key, rowIds: selection.rowIds, granularity: gran, date: g.scope === 'directors' ? dates.directors : dates.staff })
-  }
-
-  function confirmGroup(g: DeptGroup) {
-    if (confirm?.kind !== 'dept' || confirm.key !== g.key) return
-    const selection = confirm
-    run(`gen:${g.key}`, async () => {
-      await generateGroup(g, selection)
-      setSelections((current) => ({ ...current, [g.key]: null }))
-    })
-  }
-
-  // Everything still owed this month. Nobody generated yet → ONE call per
-  // scope (one approval group for all staff); otherwise the leftover
-  // departments one by one. Sequential on purpose: voucher numbering derives
-  // from a row count.
-  async function generateAllSalary() {
-    const todo = groups.filter((g) => g.headcount > 0 && remainingOf(g) > 0 && fundedFor(g))
-    if (todo.length === 0) return
-    const failures: string[] = []
-    const staffTodo = todo.filter((g) => g.scope === 'staff')
-    const staffUntouched = staffTodo.length > 0 && groups.filter((g) => g.scope === 'staff').every((g) => g.generated === 0)
-    if (staffUntouched) {
-      try {
-        await createPayrollDisbursement(period, 'staff', dates.staff, gran, null)
-      } catch (e) {
-        failures.push(`Staff: ${e instanceof Error ? e.message : 'failed'}`)
-      }
-    } else {
-      for (const g of staffTodo) {
-        try {
-          await generateGroup(g)
-        } catch (e) {
-          failures.push(`${g.name}: ${e instanceof Error ? e.message : 'failed'}`)
-        }
-      }
-    }
-    for (const g of todo.filter((g) => g.scope === 'directors')) {
-      try {
-        await generateGroup(g)
-      } catch (e) {
-        failures.push(`${g.name}: ${e instanceof Error ? e.message : 'failed'}`)
-      }
-    }
-    if (failures.length) throw new Error(failures.join(' · '))
-  }
-
-  async function saveGroupDates(g: DeptGroup) {
-    const date = g.scope === 'directors' ? dates.directors : dates.staff
-    for (const v of g.vouchers) {
-      if ((v.status === 'pending_approval' || v.status === 'draft') && v.payment_date !== date) {
-        await setPayrollPvDate(v.id, date)
-      }
-    }
-  }
-
-  async function generateSchemes(schemes: Scheme[]) {
-    const failures: string[] = []
-    for (const scheme of schemes) {
-      try {
-        await generateStatutoryScheme(period, scheme, dates.stat[scheme] || undefined)
-      } catch (e) {
-        failures.push(`${scheme}: ${e instanceof Error ? e.message : 'failed'}`)
-      }
-    }
-    if (failures.length) throw new Error(failures.join(' · '))
-  }
-
-  const salaryTodo = groups.filter((g) => g.headcount > 0 && remainingOf(g) > 0)
-  const salaryTodoFunded = salaryTodo.filter(fundedFor)
-  const salaryDone = groups.length > 0 && groups.every((g) => g.stage === 'paid' || g.headcount === 0)
-  const allPeople = salaryTodoFunded.reduce((s, g) => s + remainingOf(g), 0)
-  const allPvCount = gran === 'department' ? salaryTodoFunded.length : allPeople
-  const allSalaryLabel = gran === 'department' ? `Generate ${allPvCount} ${allPvCount === 1 ? 'PV' : 'PVs'} · ${allPeople} people` : `Generate ${allPeople} PVs`
-  const allOwed = salaryTodoFunded.reduce((s, g) => s + g.people.filter((p) => p.net > 0 && !p.voucher).reduce((t, p) => t + p.net, 0), 0)
-  const pendingStat = rows.filter((r) => r.pv == null && r.total > 0)
-  const blockers = groups.flatMap((g) => (g.stage === 'paid' ? [] : g.people.filter((p) => p.net > 0 && bankIssue(p) != null)))
-  const notable = salaryDone ? [] : variances.top.filter((v) => isNotableMove(v.d))
-  const openGroup = win?.kind === 'dept' ? groups.find((g) => g.key === win.key) ?? null : null
-  const openGroupConfirm = confirm?.kind === 'dept' && confirm.key === openGroup?.key ? confirm : null
-  const openBody = win?.kind === 'body' ? win.key : null
+  const fundedFor = (g: DeptGroup) => g.scope === 'directors' ? directorsFunded : staffFunded
   const bankName = payoutBank ? `${payoutBank.name} ···${payoutBank.last4}` : 'the Alliance payroll account'
-  const ddmm = (d: string) => (d ? `${d.slice(8, 10)}/${d.slice(5, 7)}` : '—')
-  const canGenerateAll = salaryTodoFunded.length > 0
-  const allTitle = salaryTodoFunded.length === 0 && salaryTodo.length > 0 ? 'Funding is not complete yet' : undefined
 
-  const confirmAllSalary = (
-    <div className="pay-confirm">
-      <span>
-        <b>RM {formatMoneyBare(allOwed)}</b> leaves {bankName} — staff on <b>{ddmm(dates.staff)}</b>
-        {salaryTodoFunded.some((g) => g.scope === 'directors') ? (
-          <>
-            , directors on <b>{ddmm(dates.directors)}</b>
-          </>
-        ) : null}{' '}
-        · {allPeople} people · <b>{allPvCount} {allPvCount === 1 ? 'PV' : 'PVs'}</b> — generate?
-      </span>
-      <button type="button" className="pay-btn pri" onClick={() => run('gen:all', generateAllSalary)} disabled={busy != null}>
-        {busy === 'gen:all' ? 'Generating…' : 'Yes, generate'}
-      </button>
-      <button type="button" className="text-xs font-sans text-muted hover:text-ink" onClick={() => setConfirm(null)} disabled={busy != null}>
-        Cancel
-      </button>
-    </div>
-  )
-  const confirmAllStat = (
-    <div className="pay-confirm">
-      <span>
-        <b>RM {formatMoneyBare(pendingStat.reduce((s, r) => s + r.total, 0))}</b> to {Array.from(new Set(pendingStat.map((r) => r.body))).join(' · ')} from {bankName}
-        {dates.stat.KWSP ? (
-          <>
-            {' '}
-            on <b>{ddmm(dates.stat.KWSP)}</b>
-          </>
-        ) : (
-          <> · date to be set</>
-        )}{' '}
-        · <b>{pendingStat.length} {pendingStat.length === 1 ? 'PV' : 'PVs'}</b> — generate?
-      </span>
-      <button type="button" className="pay-btn pri" onClick={() => run('stat:all', () => generateSchemes(pendingStat.map((r) => r.scheme)))} disabled={busy != null}>
-        {busy === 'stat:all' ? 'Generating…' : 'Yes, generate'}
-      </button>
-      <button type="button" className="text-xs font-sans text-muted hover:text-ink" onClick={() => setConfirm(null)} disabled={busy != null}>
-        Cancel
-      </button>
-    </div>
-  )
-
-  const overviewAction = () => {
-    if (headline.action.kind === 'generate-salary') setConfirm({ kind: 'all-salary', at: 'over' })
-    else if (headline.action.kind === 'generate-statutory') setConfirm({ kind: 'all-stat', at: 'over' })
+  function openSalary(g: DeptGroup, mode: Granularity | 'view') {
+    if (submitting.current) return
+    setReview(null)
+    setError(null)
+    setWin({ kind: 'dept', key: g.key, mode })
   }
 
-  return (
-    <div>
-      {blockers.length > 0 ? (
-        <div className="pay-block">
-          <b>Payment blocked for {blockers.length} staff — fix their bank details.</b> The Alliance file skips them; the rest of their department still pays.{' '}
-          <span className="who">
-            {blockers.map((p, i) => (
-              <span key={p.row_id}>
-                {i > 0 ? ' · ' : ''}
-                {p.staff_id ? (
-                  <Link href={`/team/people/${p.staff_id}`} className="text-accent hover:underline">
-                    {p.name}
-                  </Link>
-                ) : (
-                  p.name
-                )}
-              </span>
-            ))}
-          </span>
-        </div>
-      ) : null}
-      {notable.length > 0 ? (
-        <div className="pay-warn">
-          <b>
-            {variances.notable} {variances.notable === 1 ? 'person' : 'people'} moved 20% or more vs {prevMonthName}
-          </b>{' '}
-          — worth a look before generating; nothing is blocked.{' '}
-          <span className="who">
-            {notable.map((v, i) => (
-              <span key={v.row_id}>
-                {i > 0 ? ' · ' : ''}
-                <button type="button" className="text-accent hover:underline" onClick={() => openWindow({ kind: 'dept', key: v.key })}>
-                  {v.name}
-                </button>{' '}
-                {v.d.dir === 'up' ? '▲' : '▼'} {v.d.pct == null ? formatMoneyBare(Math.abs(v.d.abs)) : `${Math.abs(v.d.pct).toFixed(0)}%`}
-              </span>
-            ))}
-            {variances.notable > notable.length ? ` · and ${variances.notable - notable.length} more` : ''}
-          </span>
-        </div>
-      ) : null}
+  async function run(key: string, action: () => Promise<unknown>) {
+    if (submitting.current) return
+    submitting.current = true
+    setBusy(key)
+    setError(null)
+    try {
+      await action()
+      setReview(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Action failed')
+    } finally {
+      submitting.current = false
+      setBusy(null)
+      router.refresh()
+    }
+  }
 
-      <Overview
-        periodLabel={periodLabel}
-        periodRange={periodRange}
-        prevMonthName={prevMonthName}
-        headline={headline}
-        milestones={milestones}
-        variances={variances}
-        totals={totals}
-        facts={facts}
-        bankLabel={bankName}
-        actionLabel={headline.action.kind === 'generate-salary' ? allSalaryLabel : headline.action.label}
-        actionDisabled={busy != null || (headline.action.kind === 'generate-salary' ? !canGenerateAll : !staffFunded) || confirm?.kind === 'all-salary' || confirm?.kind === 'all-stat'}
-        actionTitle={headline.action.kind === 'generate-salary' ? allTitle : undefined}
-        onAction={overviewAction}
-        fundingSlot={fundingSlot}
-        confirm={confirm?.kind === 'all-salary' && confirm.at === 'over' ? confirmAllSalary : confirm?.kind === 'all-stat' && confirm.at === 'over' ? confirmAllStat : null}
-        onOpenGroup={(key) => openWindow({ kind: 'dept', key })}
-      />
+  function askSalary(g: DeptGroup, granularity: Granularity) {
+    const selection = payrollSelection(g.people, granularity === 'department' ? null : selections[g.key] ?? [], granularity)
+    if (!selection.count) return
+    setReview({ key: g.key, rowIds: selection.rowIds, granularity, date: dates[g.scope] })
+  }
 
-      {error && !win ? <div className="pay-err mb-4">{error}</div> : null}
+  function confirmSalary(g: DeptGroup) {
+    if (!review || review.key !== g.key) return
+    const snapshot = review
+    void run(`gen:${g.key}`, async () => {
+      await createPayrollDisbursement(period, g.scope, snapshot.date, snapshot.granularity, g.scope === 'staff' ? g.dept_id : null, snapshot.rowIds)
+      setSelections(current => ({ ...current, [g.key]: [] }))
+    })
+  }
 
-      {phase !== 'no-payroll' && phase !== 'drafts-pending' ? (
-        <>
-          {/* ── Salary PVs ─────────────────────────────────────────────── */}
-          <section className="mb-10">
-            <div className="sect-head">
-              <h2>Salary PVs</h2>
-              <span className="rule" aria-hidden />
-              <span className="count">
-                {groups.length} GROUPS · {totals.staffCount} STAFF + {totals.directorCount} DIRECTORS · NET RM {formatMoneyBare(totals.net)}
-              </span>
-            </div>
-            <ContribBand band={band} />
-            <DeptRows
-              period={period}
-              groups={groups}
-              prevMonthName={prevMonthName}
-              today={today}
-              gran={gran}
-              onGran={setGran}
-              dates={{ staff: dates.staff, directors: dates.directors }}
-              onDate={(scope: Scope, v) => setDates((d) => (scope === 'directors' ? { ...d, directors: v } : { ...d, staff: v }))}
-              fundedFor={fundedFor}
-              busy={busy}
-              confirmKey={win ? null : confirm?.kind === 'all-salary' && confirm.at === 'list' ? 'all' : confirm?.kind === 'dept' ? confirm.key : null}
-              allLabel={allSalaryLabel}
-              canGenerateAll={canGenerateAll}
-              allTitle={allTitle}
-              onAskAll={() => setConfirm({ kind: 'all-salary', at: 'list' })}
-              onAskGroup={(g) => askGroup(g)}
-              onConfirmGroup={confirmGroup}
-              onCancel={() => setConfirm(null)}
-              onOpen={(key) => openWindow({ kind: 'dept', key })}
-              confirmAll={confirmAllSalary}
-              payoutBank={payoutBank}
-              hint={
-                (gran === 'department' ? 'One PV per department with the people as lines. ' : 'One PV per person, grouped by department. ') +
-                'Open a department to select individual people. Existing PVs are kept; generation includes only people without a PV. ' +
-                'Staff and directors keep separate dates and separate Principal approvals. Any department can go alone from its row. Deductions = gross − net: the employee side of EPF, SOCSO, EIS, PCB and SKBBK.'
-              }
-            />
-          </section>
+  function closeWindow() {
+    if (submitting.current) return
+    setWin(null)
+    setReview(null)
+    setError(null)
+  }
 
-          {/* ── Statutory PVs ──────────────────────────────────────────── */}
-          <section className="mb-6">
-            <div className="sect-head">
-              <h2>Statutory PVs</h2>
-              <span className="rule" aria-hidden />
-              <span className="count">
-                4 BODIES · 5 PVS · RM {formatMoneyBare(totals.statutory)} · STAFF {formatMoneyBare(totals.statutoryStaff)} + DIRECTORS {formatMoneyBare(totals.statutoryDirectors)}
-              </span>
-            </div>
-            <div className="pay-well">
-              <StatutoryRows
-                rows={rows}
-                today={today}
-                dates={dates.stat}
-                onDateAll={(v) => setDates((d) => ({ ...d, stat: { KWSP: v, SOCSO: v, EIS: v, PCB: v, SKBBK: v } }))}
-                busy={busy}
-                staffFunded={staffFunded}
-                pendingStat={pendingStat.length}
-                onAskAll={() => setConfirm({ kind: 'all-stat', at: 'list' })}
-                confirming={confirm?.kind === 'all-stat' && confirm.at === 'list'}
-                confirmAll={confirmAllStat}
-                onGenerate={(schemes, key) => run(key, () => generateSchemes(schemes))}
-                onOpen={(body) => openWindow({ kind: 'body', key: body })}
-              />
-            </div>
-            <p className="font-serif italic text-muted text-xs mt-3">
-              Net {formatMoneyBare(totals.net)} + statutory {formatMoneyBare(totals.statutory)} = CTC {formatMoneyBare(totals.ctc)}, what Finance funded. Paid to the portals from the Alliance payroll account; once all five are paid the HR pool is HR&apos;s own money again. Public holidays are not in the due-date rule.
-            </p>
-          </section>
-        </>
-      ) : null}
+  function openStatutory(body: BodyKey, mode: Granularity) {
+    if (submitting.current) return
+    setWin(null)
+    setError(null)
+    setTab('statutory')
+    setGenerator({ body, mode })
+  }
 
-      {openGroup ? (
-        <DeptWindow
-          key={openGroup.key}
-          group={openGroup}
-          period={period}
-          periodLabel={periodLabel}
-          prevMonthName={prevMonthName}
-          gran={openGroupConfirm?.granularity ?? gran}
-          onGran={setGran}
-          selectedIds={openGroupConfirm?.rowIds ?? selections[openGroup.key] ?? null}
-          onSelection={(ids) => setSelections((current) => ({ ...current, [openGroup.key]: ids }))}
-          date={openGroupConfirm?.date ?? (openGroup.scope === 'directors' ? dates.directors : dates.staff)}
-          onDate={(v) => setDates((d) => (openGroup.scope === 'directors' ? { ...d, directors: v } : { ...d, staff: v }))}
-          funded={fundedFor(openGroup)}
-          busy={busy}
-          error={error}
-          confirming={confirm?.kind === 'dept' && confirm.key === openGroup.key}
-          onAskGenerate={() => askGroup(openGroup, selections[openGroup.key] ?? null)}
-          onConfirmGenerate={() => confirmGroup(openGroup)}
-          onCancel={() => setConfirm(null)}
-          onSaveDates={() => run(`date:${openGroup.key}`, () => saveGroupDates(openGroup))}
-          payoutBank={payoutBank}
-          onClose={() => {
-            setWin(null)
-            setConfirm(null)
-            setError(null)
+  const openGroup = win?.kind === 'dept' ? groups.find(g => g.key === win.key) ?? null : null
+  const openMode = win?.kind === 'dept' ? win.mode : 'view'
+  const openReview = review?.key === openGroup?.key ? review : null
+  const openBody = win?.kind === 'body' ? win.key : null
+  const salaryAction = headline.action.kind === 'generate-salary'
+  const statutoryAction = headline.action.kind === 'generate-statutory'
+
+  return <div>
+    <Overview
+      periodLabel={periodLabel} periodRange={periodRange} prevMonthName={prevMonthName}
+      headline={headline} milestones={milestones} variances={variances} totals={totals}
+      band={band} rows={rows} groups={groups} facts={facts} bankLabel={bankName}
+      actionLabel={salaryAction ? 'Open salary' : statutoryAction ? 'Open statutory' : headline.action.label}
+      actionDisabled={busy != null} onAction={() => {
+        const index = statutoryAction ? 1 : 0
+        setTab(index ? 'statutory' : 'salary')
+        tabs.current[index]?.focus()
+      }}
+      fundingSlot={fundingSlot} confirm={null}
+      onOpenGroup={key => { const g = groups.find(group => group.key === key); if (g) openSalary(g, 'view') }}
+    />
+    {error && !win ? <div className="pay-err" role="alert">{error}</div> : null}
+    {phase !== 'no-payroll' && phase !== 'drafts-pending' ? <>
+      <div className="payment-tabs" role="tablist" aria-label="Payment type">
+        {(['salary', 'statutory'] as const).map((name, index) => <button
+          key={name} ref={node => { tabs.current[index] = node }} type="button" role="tab"
+          id={`payment-${name}-tab`} aria-controls={`payment-${name}-panel`} aria-selected={tab === name}
+          tabIndex={tab === name ? 0 : -1} onClick={() => setTab(name)}
+          onKeyDown={event => {
+            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+            event.preventDefault()
+            const next = event.key === 'Home' ? 0 : event.key === 'End' ? 1 : 1 - index
+            setTab(next ? 'statutory' : 'salary')
+            tabs.current[next]?.focus()
           }}
-        />
-      ) : null}
-
-      {openBody ? (
-        <StatutoryWindow
-          body={openBody}
-          rows={rows.filter((r) => r.body === openBody)}
-          groups={groups}
-          periodLabel={periodLabel}
-          today={today}
-          dates={dates.stat}
-          onDate={(scheme, v) => setDates((d) => ({ ...d, stat: { ...d.stat, [scheme]: v } }))}
-          onGenerate={(scheme) => run(`stat:${scheme}`, () => generateStatutoryScheme(period, scheme, dates.stat[scheme] || undefined))}
-          onTopup={(scheme) => run(`topup:${scheme}`, () => generateStatutoryDirectorTopup(period, scheme, dates.stat[scheme] || undefined))}
-          onSaveDate={(id, date, key) => run(key, () => setPayrollPvDate(id, date))}
-          busy={busy}
-          error={error}
-          onClose={() => {
-            setWin(null)
-            setError(null)
-          }}
-        />
-      ) : null}
-    </div>
-  )
+        >{name === 'salary' ? 'Salary' : 'Statutory'}</button>)}
+      </div>
+      <div id="payment-salary-panel" role="tabpanel" aria-labelledby="payment-salary-tab" hidden={tab !== 'salary'}>
+        <section className="payment-section" aria-label="Salary PVs">
+          <h2>Salary PVs</h2>
+          <DeptRows period={period} groups={groups} prevMonthName={prevMonthName} today={today}
+            dates={dates} fundedFor={fundedFor} busy={busy} payoutBank={payoutBank}
+            onGenerate={openSalary} onOpen={key => { const g = groups.find(group => group.key === key); if (g) openSalary(g, 'view') }} />
+        </section>
+        <SalaryChanges groups={groups} variances={variances} prevMonthName={prevMonthName}
+          onOpen={key => { const g = groups.find(group => group.key === key); if (g) openSalary(g, 'view') }} />
+      </div>
+      <div id="payment-statutory-panel" role="tabpanel" aria-labelledby="payment-statutory-tab" hidden={tab !== 'statutory'}>
+        <section className="payment-section" aria-label="Statutory PVs">
+          <div className="pay-section-toolbar"><h2>Statutory PVs</h2><span className="pay-muted">Contributions &amp; deductions · MYR</span></div>
+          <StatutoryRows rows={rows} today={today} busy={busy} staffFunded={staffFunded}
+            onGenerate={openStatutory} onOpen={body => { setError(null); setWin({ kind: 'body', key: body }) }} />
+          {generator ? <StatutoryGenerator key={`${generator.body}:${generator.mode}`} period={period} body={generator.body}
+            mode={generator.mode} groups={groups} rows={rows} coverage={statutoryCoverage}
+            fundedFor={fundedFor} onClose={() => setGenerator(null)} /> : null}
+        </section>
+      </div>
+    </> : null}
+    {openGroup ? <DeptWindow key={`${openGroup.key}:${openMode}`} group={openGroup} period={period} periodLabel={periodLabel}
+      prevMonthName={prevMonthName} gran={openReview?.granularity ?? (openMode === 'department' ? 'department' : 'employee')}
+      readOnly={openMode === 'view'} selectedIds={openReview?.rowIds ?? (openMode === 'department' ? null : selections[openGroup.key] ?? [])}
+      onSelection={ids => setSelections(current => ({ ...current, [openGroup.key]: ids ?? payrollSelection(openGroup.people, null, 'employee').rowIds }))}
+      date={openReview?.date ?? dates[openGroup.scope]} onDate={date => setDates(current => ({ ...current, [openGroup.scope]: date }))}
+      funded={fundedFor(openGroup)} busy={busy} error={error} confirming={!!openReview}
+      onAskGenerate={() => askSalary(openGroup, openMode === 'department' ? 'department' : 'employee')}
+      onConfirmGenerate={() => confirmSalary(openGroup)} onCancel={() => setReview(null)}
+      onSaveDates={() => { void run(`date:${openGroup.key}`, async () => {
+        for (const voucher of openGroup.vouchers) {
+          if (['pending_approval', 'draft'].includes(voucher.status) && voucher.payment_date !== dates[openGroup.scope])
+            await setPayrollPvDate(voucher.id, dates[openGroup.scope])
+        }
+      }) }} payoutBank={payoutBank} onClose={closeWindow} /> : null}
+    {openBody ? <StatutoryWindow body={openBody} rows={rows.filter(row => row.body === openBody)} groups={groups}
+      periodLabel={periodLabel} today={today} onGenerate={mode => openStatutory(openBody, mode)}
+      onSaveDate={(id, date) => { void run(`date:${id}`, () => setPayrollPvDate(id, date)) }}
+      busy={busy} error={error} onClose={closeWindow} /> : null}
+  </div>
 }

@@ -2,7 +2,7 @@ import React from 'react'
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 import dayjs from 'dayjs'
 
-// Per-voucher document PDF. Each voucher = one A4 portrait page. Mirrors the
+// Per-voucher document PDF. Each voucher starts on an A4 portrait page. Mirrors the
 // invoice document layout (HV letterhead + meta + party + per-source table).
 // Used for single download (?id=) and batch (?ids=) printing of payment
 // vouchers (debit) / official receipts (credit).
@@ -46,6 +46,18 @@ export interface VoucherSourceData {
   amount: number
 }
 
+export interface StatutoryCoverageData {
+  id: string
+  scope: string
+  payroll_row_id: string
+  employee_name: string
+  employee_code: string | null
+  department_name: string
+  period_month: string
+  scheme: string
+  amount: number
+}
+
 export interface VoucherDocData {
   id: string
   voucher_no: string | null
@@ -62,6 +74,8 @@ export interface VoucherDocData {
   notes: string | null
   payment_reference: string | null
   sources: VoucherSourceData[]
+  /** Immutable contribution snapshots for this statutory PV; absent for legacy vouchers. */
+  statutory_coverage?: StatutoryCoverageData[]
 }
 
 function fmtMoney(v: number): string {
@@ -175,11 +189,54 @@ function VoucherPage({ v }: { v: VoucherDocData }) {
   )
 }
 
+function StatutoryCoveragePages({ v }: { v: VoucherDocData }) {
+  const lines = v.statutory_coverage ?? []
+  const people = new Set(lines.map((line) => `${line.scope}:${line.payroll_row_id}`)).size
+  const periods = Array.from(new Set(lines.map((line) => dayjs(line.period_month).format('MMMM YYYY')))).join(' / ')
+  return (
+    <Page size="A4" style={styles.page}>
+      <View fixed>
+        <View style={[styles.letterhead, { marginBottom: 16 }]}>
+          <Text style={styles.brand}>HOUZS Venture Holdings Sdn. Bhd.</Text>
+          <Text style={[styles.primary, { marginTop: 12 }]}>Statutory contribution details</Text>
+          <Text style={styles.sub}>{v.voucher_no ?? v.id.slice(0, 8)} - {v.payee_name} - {periods}</Text>
+          <Text style={[styles.sub, { marginTop: 4 }]}>{people} {people === 1 ? 'person' : 'people'} - recorded when this PV was generated</Text>
+        </View>
+        <View style={[styles.amountRow, { backgroundColor: '#eee', borderTop: '0.5pt solid #aaa', borderBottom: '0.5pt solid #aaa' }]}>
+          <Text style={{ width: '40%', paddingLeft: 4, fontFamily: 'Helvetica-Bold', fontSize: 8 }}>EMPLOYEE</Text>
+          <Text style={{ width: '25%', fontFamily: 'Helvetica-Bold', fontSize: 8 }}>DEPARTMENT</Text>
+          <Text style={{ width: '12%', fontFamily: 'Helvetica-Bold', fontSize: 8 }}>SCHEME</Text>
+          <Text style={{ width: '23%', paddingRight: 4, textAlign: 'right', fontFamily: 'Helvetica-Bold', fontSize: 8 }}>CONTRIBUTION (RM)</Text>
+        </View>
+      </View>
+      {lines.map((line) => (
+        <View key={line.id} wrap={false} style={[styles.amountRow, { borderBottom: '0.5pt solid #ddd' }]}>
+          <View style={{ width: '40%', paddingLeft: 4, paddingRight: 8 }}>
+            <Text style={{ fontSize: 9, lineHeight: 1.3 }}>{line.employee_name}</Text>
+            {line.employee_code ? <Text style={{ fontSize: 8, color: '#777', marginTop: 2 }}>{line.employee_code}</Text> : null}
+          </View>
+          <Text style={{ width: '25%', paddingRight: 8, fontSize: 9, lineHeight: 1.3 }}>{line.department_name}</Text>
+          <Text style={{ width: '12%', fontSize: 9 }}>{line.scheme}</Text>
+          <Text style={{ width: '23%', textAlign: 'right', paddingRight: 4, fontFamily: 'Courier', fontSize: 9 }}>{fmtMoney(line.amount)}</Text>
+        </View>
+      ))}
+      <View wrap={false} style={styles.totalRow}>
+        <Text style={styles.totalLabel}>TOTAL CONTRIBUTION (RM)</Text>
+        <Text style={styles.totalValue}>{fmtMoney(lines.reduce((sum, line) => sum + line.amount, 0))}</Text>
+      </View>
+      <Text style={styles.pageFooter} fixed render={({ pageNumber, totalPages }) => `${v.voucher_no ?? ''} - Statutory contribution details - ${pageNumber} / ${totalPages}`} />
+    </Page>
+  )
+}
+
 export function VoucherDocPdf({ vouchers }: { vouchers: VoucherDocData[] }): React.ReactElement {
   return (
     <Document>
       {vouchers.map((v) => (
-        <VoucherPage key={v.id} v={v} />
+        <React.Fragment key={v.id}>
+          <VoucherPage v={v} />
+          {v.statutory_coverage?.length ? <StatutoryCoveragePages v={v} /> : null}
+        </React.Fragment>
       ))}
     </Document>
   )

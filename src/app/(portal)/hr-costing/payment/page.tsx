@@ -21,15 +21,9 @@ import RequestPayrollPaymentButton, { type RequestState } from '../payroll/_comp
 import MonthRail from './_components/MonthRail'
 import PaymentBoard from './_components/PaymentBoard'
 import type { Facts } from './_components/Overview'
+import './payment-statement.css'
 
-/**
- * HR › Payment — the month laid out the way the researched HRMS lay it out
- * (2026-09-11): a month rail, a status card with the countdown and the one
- * action, due dates and pay variances beside it, one row per department,
- * one row per statutory body. One RPC (payment_cycle) feeds the page plus
- * two plain selects for the rail; every judgement about what they returned
- * is a pure helper in lib/payment-cycle.ts.
- */
+/** HR Payment: a monthly statement above separate Salary and Statutory tabs. */
 export default async function HRPaymentPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
   await requirePermission('hr_costing')
   const supabase = await createClient()
@@ -67,14 +61,15 @@ export default async function HRPaymentPage({ searchParams }: { searchParams: Pr
           runs.map((r) => r.id),
         )
     : { data: [] as Array<{ reference_id: string | null; status: string }> }
+  const cycle = normaliseCycle(cycleRes.data)
   const rail = monthRail(
     period,
     runs,
     (statRes.data ?? []).map((v) => ({ reference_id: String(v.reference_id ?? ''), status: String(v.status) })),
     (fundRes.data ?? []).map((f) => ({ payroll_run_id: String(f.payroll_run_id ?? ''), status: String(f.status) })),
+    4, 1, cycle.statutory_completion,
   )
 
-  const cycle = normaliseCycle(cycleRes.data)
   const groups = groupDepartments(cycle.people)
   const rows = statutoryRows(cycle, groups)
   const totals = cycleTotals(cycle, rows)
@@ -97,14 +92,17 @@ export default async function HRPaymentPage({ searchParams }: { searchParams: Pr
   const periodRange = `1–${dayjs(period).endOf('month').date()} ${dayjs(period).format('MMM YYYY')}`
   const prevMonthName = dayjs(period).subtract(1, 'month').format('MMMM')
 
-  // ── BambooHR's explained figures ─────────────────────────────────────────
+  // Funding and reporting facts use the same payroll rows as the PV tables.
   const run = cycle.run
   const fs = cycle.funding.staff
   const fd = cycle.funding.directors
-  const staffPeople = cycle.people.filter((p) => p.scope === 'staff')
-  const dirPeople = cycle.people.filter((p) => p.scope === 'directors')
-  const staffCtc = run ? run.total_amount : round2(totals.staffNet + staffPeople.reduce((s, p) => s + p.epf_er + p.socso_er + p.eis_er, 0))
-  const dirCtc = fd ? fd.amount : round2(totals.directorNet + dirPeople.reduce((s, p) => s + p.epf_er + p.socso_er + p.eis_er, 0))
+  // A request can be funded by several PVs. The same aggregate RPC covers
+  // partial staff AND director funding; pending vouchers never count as cash.
+  const fundingPaid = await Promise.all([fs, fd].filter((funding) => funding != null).map(async (funding) => {
+    const { data, error } = await supabase.rpc('get_payroll_funding_paid', { p_request_id: funding.id })
+    if (error) throw new Error(error.message)
+    return Number(data ?? 0)
+  }))
   const staffGroups = groups.filter((g) => g.scope === 'staff' && g.headcount > 0)
   const dirGroups = groups.filter((g) => g.scope === 'directors' && g.headcount > 0)
   const staffPaid = staffGroups.length > 0 && staffGroups.every((g) => g.stage === 'paid')
@@ -113,7 +111,8 @@ export default async function HRPaymentPage({ searchParams }: { searchParams: Pr
   const paidNet = groups.reduce((s, g) => s + g.people.filter((p) => p.voucher?.status === 'paid').reduce((t, p) => t + p.net, 0), 0)
   const statDone = rows.length > 0 && rows.every((r) => r.stage === 'paid')
   const facts: Facts = {
-    ctc: round2(staffCtc + dirCtc),
+    ctc: band.cost,
+    fundedAmount: round2(fundingPaid.reduce((sum, amount) => sum + amount, 0)),
     fundedAll: staffFunded && (dirGroups.length === 0 || dirFunded),
     fundedDate: fs?.pv_date ?? fd?.pv_date ?? null,
     fundingPvs: [fs?.pv_no, fd?.pv_no].filter((x): x is string => !!x),
@@ -153,15 +152,13 @@ export default async function HRPaymentPage({ searchParams }: { searchParams: Pr
   }
 
   return (
-    <div className="pay-board">
+    <div className="pay-board payment-statement">
       <div className="page-head">
         <div>
-          <div className="page-eyebrow">
-            <em>I.</em> HR · PAYMENT · {periodLabel.toUpperCase()}
-          </div>
+          <div className="page-eyebrow">Monthly payment statement</div>
           <h1 className="page-title">Payment</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            {periodLabel} · {totals.people > 0 ? `${totals.staffCount} staff + ${totals.directorCount} directors` : 'no payroll yet'} · salary PVs by department or selected employees, four statutory bodies.
+          <p className="payment-period">
+            {periodLabel} · {totals.people > 0 ? `${totals.staffCount} staff + ${totals.directorCount} directors` : 'no payroll yet'}
           </p>
         </div>
         <MonthRail months={rail} />
@@ -175,6 +172,7 @@ export default async function HRPaymentPage({ searchParams }: { searchParams: Pr
         prevMonthName={prevMonthName}
         groups={groups}
         rows={rows}
+        statutoryCoverage={cycle.statutory_coverage}
         totals={totals}
         band={band}
         headline={headline}

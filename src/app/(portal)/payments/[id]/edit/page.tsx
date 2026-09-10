@@ -37,6 +37,13 @@ export default async function EditPaymentPage({ params }: Props) {
     redirect(`/payments/${id}`)
   }
 
+  const { data: statutoryCoverage, error: coverageError } = voucher.reference_type === 'payroll_statutory'
+    ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from('payroll_statutory_voucher_lines').select('id').eq('voucher_id', id).limit(1)
+    : { data: [], error: null }
+  if (coverageError) throw new Error('Unable to verify the recorded statutory contributions. Please refresh and try again.')
+  const statutoryDetailsLocked = (statutoryCoverage?.length ?? 0) > 0
+
   const [
     { data: sources },
     { data: companies },
@@ -89,6 +96,7 @@ export default async function EditPaymentPage({ params }: Props) {
       </div>
 
       <EditPaymentForm
+        statutoryDetailsLocked={statutoryDetailsLocked}
         voucher={{
           id: voucher.id,
           voucher_no: voucher.voucher_no,
