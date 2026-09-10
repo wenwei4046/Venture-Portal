@@ -161,13 +161,14 @@ export default async function HRPaymentPage({ searchParams }: { searchParams: Pr
           </div>
           <h1 className="page-title">Payment</h1>
           <p className="font-serif italic text-graphite text-base mt-3">
-            {periodLabel} · {totals.people > 0 ? `${totals.staffCount} staff + ${totals.directorCount} directors` : 'no payroll yet'} · one PV per department, four statutory bodies.
+            {periodLabel} · {totals.people > 0 ? `${totals.staffCount} staff + ${totals.directorCount} directors` : 'no payroll yet'} · salary PVs by department or selected employees, four statutory bodies.
           </p>
         </div>
         <MonthRail months={rail} />
       </div>
 
       <PaymentBoard
+        key={period}
         period={period}
         periodLabel={periodLabel}
         periodRange={periodRange}

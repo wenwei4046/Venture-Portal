@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { formatMoneyBare } from '@/lib/utils'
+import { payrollSelection } from '@/lib/payroll-selection'
 import {
   bankIssue,
   delta,
@@ -21,6 +22,9 @@ interface Props {
   prevMonthName: string
   gran: Granularity
   onGran: (g: Granularity) => void
+  /** null selects everyone still without a voucher; [] is an explicit empty selection. */
+  selectedIds: string[] | null
+  onSelection: (ids: string[] | null) => void
   date: string
   onDate: (d: string) => void
   /** This scope's funding is complete, so vouchers may be raised. */
@@ -43,18 +47,17 @@ const BANK_ISSUE_LABEL = {
 } as const
 
 function chip(status: string | undefined, date: string | null | undefined) {
-  if (!status) return <span className="chip">not generated</span>
-  if (status === 'paid') return <span className="chip ledger"><span className="dot" />paid · {shortDate(date)}</span>
-  if (status === 'approved') return <span className="chip ledger"><span className="dot" />approved</span>
-  return <span className="chip alert"><span className="dot" />awaiting Principal</span>
+  if (!status) return <span className="chip pay-state">not generated</span>
+  if (status === 'paid') return <span className="chip ledger pay-state"><span className="dot" />paid · {shortDate(date)}</span>
+  if (status === 'approved') return <span className="chip ledger pay-state"><span className="dot" />approved</span>
+  return <span className="chip alert pay-state"><span className="dot" />awaiting Principal</span>
 }
 
 /**
  * One department's people. The granularity switch lives here as well as on
  * the bar, so a department can be compiled as one PV or one per person
- * without leaving the window. A department already half-generated can only
- * take the remainder per employee — one voucher cannot cover people who
- * already have theirs.
+ * without leaving the window. Select all remaining people or a subset;
+ * existing vouchers are excluded from every new batch.
  */
 export default function DeptWindow({
   group: g,
@@ -63,6 +66,8 @@ export default function DeptWindow({
   prevMonthName,
   gran,
   onGran,
+  selectedIds,
+  onSelection,
   date,
   onDate,
   funded,
@@ -78,8 +83,10 @@ export default function DeptWindow({
 }: Props) {
   const d = delta(g.net, g.prev_net)
   const remaining = g.headcount - g.generated
-  const effectiveGran: Granularity = g.stage === 'partial' ? 'employee' : gran
-  const canGenerate = funded && remaining > 0 && g.headcount > 0 && (g.scope === 'directors' || !!g.dept_id)
+  const selection = payrollSelection(g.people, selectedIds, gran)
+  const selectedSet = new Set(selection.rowIds)
+  const canGenerate = funded && selection.count > 0 && (g.scope === 'directors' || !!g.dept_id) && /^\d{4}-\d{2}-\d{2}$/.test(date)
+  const locked = busy != null || confirming
   const pendingVouchers = g.vouchers.filter((v) => v.status === 'pending_approval' || v.status === 'draft')
   const dateChanged = pendingVouchers.some((v) => v.payment_date !== date)
   const generatedBy = g.vouchers[0]
@@ -99,16 +106,17 @@ export default function DeptWindow({
           <span className="font-serif italic text-muted text-xs">
             {g.stage === 'paid'
               ? `Paid · ${g.vouchers.length} PV${g.vouchers.length === 1 ? '' : 's'}`
-              : effectiveGran === 'department'
-                ? `One voucher for ${g.name}, ${g.headcount} lines, one approval.`
-                : `${remaining || g.headcount} vouchers, one approval group.`}
+              : remaining > 0
+                ? `${selection.count} selected · RM ${formatMoneyBare(selection.total)} · ${selection.voucherCount} PV${selection.voucherCount === 1 ? '' : 's'}`
+                : `${g.vouchers.length} existing PVs · no people left to generate`}
           </span>
           {g.scope === 'staff' && g.dept_id ? (
             <Link
               href={`/hr-costing/payroll/${period}/bank-transfer?format=alliance&department=${g.dept_id}`}
               className="pay-btn sec"
+              title="Exports every employee in this department, regardless of the PV selection above"
             >
-              Alliance file · {g.name} only
+              Alliance file · entire department
             </Link>
           ) : null}
         </>
@@ -116,8 +124,8 @@ export default function DeptWindow({
     >
       <div className="tiles">
         <div className="tile">
-          <div className="l">Net to pay</div>
-          <div className="v">{formatMoneyBare(g.net)}</div>
+          <div className="l">{remaining > 0 ? 'Selected net to pay' : 'Net to pay'}</div>
+          <div className="v" aria-live="polite">{formatMoneyBare(remaining > 0 ? selection.total : g.net)}</div>
         </div>
         <div className="tile">
           <div className="l">Gross · deductions</div>
@@ -140,24 +148,43 @@ export default function DeptWindow({
         </div>
       </div>
 
-      {g.stage !== 'paid' && g.stage !== 'approved' ? (
+      {remaining > 0 ? (
+        <div className="pay-selection">
+          <div className="pay-seg" role="group" aria-label="People to include">
+            <button type="button" aria-pressed={selectedIds == null} onClick={() => onSelection(null)} disabled={locked}>
+              {g.generated > 0 ? 'All remaining' : 'Whole department'} ({selection.eligible.length})
+            </button>
+            <button type="button" aria-pressed={selectedIds != null} onClick={() => onSelection([])} disabled={locked}>
+              Choose employees
+            </button>
+          </div>
+          <p aria-live="polite">
+            <b>{selection.count} of {selection.eligible.length} selected</b> · RM {formatMoneyBare(selection.total)} · {selection.voucherCount} PV{selection.voucherCount === 1 ? '' : 's'}
+          </p>
+          <span>Tick the people to include below. Anyone who already has a PV cannot be selected again.</span>
+        </div>
+      ) : null}
+
+      {remaining > 0 || pendingVouchers.length > 0 ? (
         <div className="wctl">
+          {remaining > 0 ? (
           <div className="f" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             <span className="pay-bar-l l" style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgb(var(--graphite))' }}>
-              PV per
+              PV format
             </span>
             <div className="pay-seg" role="group" aria-label="PV granularity">
-              <button type="button" aria-pressed={effectiveGran === 'department'} onClick={() => onGran('department')} disabled={g.stage === 'partial' || busy != null}>
-                Department
+              <button type="button" aria-pressed={gran === 'department'} onClick={() => onGran('department')} disabled={locked}>
+                One grouped PV
               </button>
-              <button type="button" aria-pressed={effectiveGran === 'employee'} onClick={() => onGran('employee')} disabled={busy != null}>
-                Employee
+              <button type="button" aria-pressed={gran === 'employee'} onClick={() => onGran('employee')} disabled={locked}>
+                One PV per employee
               </button>
             </div>
           </div>
+          ) : null}
           <label className="f" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgb(var(--graphite))' }}>Pay date</span>
-            <input type="date" className="pay-date" value={date} onChange={(e) => onDate(e.target.value)} disabled={busy != null} />
+            <input type="date" className="pay-date" value={date} onChange={(e) => onDate(e.target.value)} disabled={locked} />
           </label>
           <span style={{ flex: 1 }} />
           {remaining > 0 ? (
@@ -166,13 +193,9 @@ export default function DeptWindow({
               className="pay-btn pri"
               onClick={onAskGenerate}
               disabled={!canGenerate || busy != null || confirming}
-              title={!funded ? 'Funding is not complete yet' : undefined}
+              title={!funded ? 'Funding is not complete yet' : selection.count === 0 ? 'Select at least one employee' : undefined}
             >
-              {g.stage === 'partial'
-                ? `Generate remaining ${remaining}`
-                : effectiveGran === 'department'
-                  ? 'Generate 1 PV'
-                  : `Generate ${g.headcount} PVs`}
+              Generate {selection.voucherCount} PV{selection.voucherCount === 1 ? '' : 's'} · {selection.count} people
             </button>
           ) : pendingVouchers.length > 0 ? (
             <button
@@ -189,7 +212,7 @@ export default function DeptWindow({
 
       {g.stage === 'partial' ? (
         <p className="font-serif italic text-muted text-xs" style={{ margin: 0 }}>
-          {g.generated} of {g.headcount} already have a voucher, so the rest can only be raised one per person.
+          {g.generated} of {g.headcount} already have a voucher. Select any of the remaining {remaining} people for this batch.
         </p>
       ) : null}
 
@@ -197,22 +220,23 @@ export default function DeptWindow({
         <div className="pay-confirm">
           <span>
             Generate{' '}
-            <b>{effectiveGran === 'department' ? '1 PV' : `${remaining} PVs`}</b> · {g.name} · {remaining} {who} ·{' '}
-            <b>RM {formatMoneyBare(g.stage === 'partial' ? g.people.filter((p) => p.net > 0 && !p.voucher).reduce((s, p) => s + p.net, 0) : g.net)}</b>
+            <b>{selection.voucherCount} PV{selection.voucherCount === 1 ? '' : 's'}</b> · {g.name} · {selection.count} {who} ·{' '}
+            <b>RM {formatMoneyBare(selection.total)}</b>
             {payoutBank ? (
               <>
                 {' '}from {payoutBank.name} ···{payoutBank.last4}
               </>
             ) : null}{' '}
             on <b>{shortDate(date)}</b>. Principal approves; approval is the payment.
+            <span className="pay-selected-names">{selection.selected.map((person) => person.name).join(' · ')}</span>
           </span>
           <button
             type="button"
             className="pay-btn pri"
             onClick={onConfirmGenerate}
-            disabled={busy != null}
+            disabled={busy != null || !canGenerate}
           >
-            {busy === `gen:${g.key}` ? 'Generating…' : 'Confirm'}
+            {busy === `gen:${g.key}` ? 'Generating…' : 'Yes, generate'}
           </button>
           <button type="button" className="text-xs font-sans text-muted hover:text-ink" onClick={onCancel} disabled={busy != null}>
             Cancel
@@ -223,25 +247,28 @@ export default function DeptWindow({
       {error ? <div className="err">{error}</div> : null}
 
       <div className="overflow-x-auto">
-        <table className="ledger-table">
+        <table className="ledger-table pay-people-table">
           <thead>
             <tr>
+              {remaining > 0 ? <th className="pick"><input type="checkbox" aria-label="Select all remaining employees" checked={selection.count === selection.eligible.length && selection.count > 0} onChange={(e) => onSelection(e.target.checked ? null : [])} disabled={locked} /></th> : null}
               <th>Employee</th>
               <th>Bank</th>
               <th className="right">Net</th>
               <th className="right">vs {prevMonthName}</th>
               <th>PV</th>
-              <th>Status</th>
+              <th className="state-cell">Status</th>
             </tr>
           </thead>
           <tbody>
-            {g.people.map((p, i) => {
+            {g.people.map((p) => {
               const issue = bankIssue(p)
               const pd = delta(p.net, p.prev_net)
               const v = p.voucher
-              const line = g.deptVoucher && v?.granularity === 'department'
+              const line = v?.granularity === 'department'
+              const eligible = p.net > 0 && !v
               return (
                 <tr key={p.row_id} className={isNotableMove(pd) ? 'moved' : undefined} title={isNotableMove(pd) ? `Moved 20% or more vs ${prevMonthName}` : undefined}>
+                  {remaining > 0 ? <td className="pick"><input type="checkbox" aria-label={`Select ${p.name}`} checked={selectedSet.has(p.row_id)} disabled={!eligible || locked} title={!eligible ? 'Already has a PV or no net salary to pay' : undefined} onChange={(e) => onSelection(e.target.checked ? [...selection.rowIds, p.row_id] : selection.rowIds.filter((id) => id !== p.row_id))} /></td> : null}
                   <td className="who">
                     <span className="nm">{p.name}</span>
                     {p.code ? <span className="cd">{p.code}</span> : null}
@@ -281,7 +308,7 @@ export default function DeptWindow({
                   <td>
                     {v ? (
                       line ? (
-                        <span className="pv line">line {i + 1} · {v.no}</span>
+                        <Link href={`/payments/${v.id}`} className="pv text-accent hover:underline">{v.no ?? 'PV'} · grouped</Link>
                       ) : (
                         <Link href={`/payments/${v.id}`} className="pv text-accent hover:underline">
                           {v.no ?? 'PV'}
@@ -293,14 +320,14 @@ export default function DeptWindow({
                       <span className="pv none">net 0</span>
                     )}
                   </td>
-                  <td>{p.net > 0 ? chip(v?.status, v?.payment_date) : <span className="text-muted text-xs">not paid</span>}</td>
+                  <td className="state-cell">{p.net > 0 ? chip(v?.status, v?.payment_date) : <span className="text-muted text-xs">not paid</span>}</td>
                 </tr>
               )
             })}
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-hairline">
-              <td className="font-serif italic text-accent" colSpan={2}>
+              <td className="font-serif italic text-accent" colSpan={remaining > 0 ? 3 : 2}>
                 Total · {g.headcount} {who}
               </td>
               <td className="num font-semibold">{formatMoneyBare(g.net)}</td>
