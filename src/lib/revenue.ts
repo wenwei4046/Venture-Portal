@@ -37,3 +37,32 @@ export function revenuePath(slug: string, ...segments: Array<string | number>): 
 
 /** Item code → unit cost + brand. Department-wide, so it sits outside a slug. */
 export const PRODUCT_LIST_PATH = '/revenue/products'
+
+/** What `pickHomeSubDepartments` needs to know about a sub-department. */
+export interface HomeCandidate {
+  id: string
+  departmentId: string
+  /** ISO timestamp — the tie-breaker is age, oldest wins. */
+  createdAt: string
+}
+
+/**
+ * The HOME sub-department of every department: its oldest active one.
+ *
+ * The company chart (`reports_to`, the company title) describes one tree per
+ * department; that tree is the home sub-department's, and the database keeps
+ * that membership in step with the roster. Every other sub-department is its
+ * own world. The same rule as `comm_scheme_for_department` in SQL — ordered
+ * by `created_at`, the first wins — so the two can never disagree about which
+ * chart People is looking at.
+ */
+export function pickHomeSubDepartments(subs: readonly HomeCandidate[]): Set<string> {
+  const oldest = new Map<string, HomeCandidate>()
+  for (const s of subs) {
+    const cur = oldest.get(s.departmentId)
+    if (!cur || s.createdAt < cur.createdAt || (s.createdAt === cur.createdAt && s.id < cur.id)) {
+      oldest.set(s.departmentId, s)
+    }
+  }
+  return new Set([...oldest.values()].map(s => s.id))
+}

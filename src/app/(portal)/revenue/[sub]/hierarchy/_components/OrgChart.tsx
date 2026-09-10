@@ -79,10 +79,11 @@ export interface OrgPerson {
   levelRank: number | null
   levelName: string | null
   /**
-   * Who they report to — THE line. The same column People draws, and what
-   * the commission position's upline is derived from in the database.
+   * Who they earn under HERE — the line this sub-department's chart draws.
+   * On the home sub-department it is `reports_to`, the same column People
+   * draws; elsewhere it is this membership's own upline.
    */
-  reportsTo: string | null
+  uplineStaffId: string | null
   /** The rank their position carries; null = no rank yet (their title has no rung here). */
   rankId: string | null
   /** "Rank B" — the card shows the rate beside it. */
@@ -135,9 +136,10 @@ const pointerOf = (e: MouseEvent | TouchEvent): { x: number; y: number } => {
 /**
  * The org chart canvas.
  *
- * Three ways to move somebody, and they all funnel into `moveOnChart`, which
- * writes who they report to — the one line — and lets the database move the
- * commission position with it:
+ * Three ways to move somebody, and they all funnel into `moveOnChart`: on the
+ * home sub-department that writes who they report to — the company line —
+ * and the database moves the membership with it; elsewhere it writes this
+ * sub-department's membership directly:
  *
  *   the Upline row   every card's last line names their upline and is a
  *                    button — a popover lists the chart by tree, greys anybody
@@ -160,7 +162,7 @@ const pointerOf = (e: MouseEvent | TouchEvent): { x: number; y: number } => {
  * card sat on a ground of its own colour, ΔL* 0.0, and the user could not
  * tell the cards from the background.
  */
-export default function OrgChart(props: { people: OrgPerson[]; ranks: OrgRank[]; schemeId: string }) {
+export default function OrgChart(props: { people: OrgPerson[]; ranks: OrgRank[]; schemeId: string; isHome: boolean }) {
   return (
     <ReactFlowProvider>
       <Chart {...props} />
@@ -172,10 +174,13 @@ function Chart({
   people,
   ranks,
   schemeId,
+  isHome,
 }: {
   people: OrgPerson[]
   ranks: OrgRank[]
   schemeId: string
+  /** The department's home sub-department: this tree is the company reporting line. */
+  isHome: boolean
 }) {
   const router = useRouter()
   const { screenToFlowPosition, fitView, setCenter, zoomIn, zoomOut, getZoom } = useReactFlow()
@@ -199,7 +204,7 @@ function Chart({
    * layout, because since 2026-09-10 there is no second graph to borrow from.
    */
   const graph: OrgNodeInput[] = useMemo(
-    () => people.map(p => ({ id: p.staffId, parentId: p.reportsTo, label: p.name })),
+    () => people.map(p => ({ id: p.staffId, parentId: p.uplineStaffId, label: p.name })),
     [people],
   )
 
@@ -210,7 +215,7 @@ function Chart({
    */
   const shelf = useMemo(
     () =>
-      shelfIds(people.map(p => ({ staffId: p.staffId, parentId: p.reportsTo, canRecruit: p.canRecruit }))),
+      shelfIds(people.map(p => ({ staffId: p.staffId, parentId: p.uplineStaffId, canRecruit: p.canRecruit }))),
     [people],
   )
   const layoutGraph: OrgNodeInput[] = useMemo(
@@ -338,7 +343,7 @@ function Chart({
           style: { '--i': i } as CSSProperties,
           data: {
             person: p,
-            uplineName: p.reportsTo ? (names.get(p.reportsTo) ?? null) : null,
+            uplineName: p.uplineStaffId ? (names.get(p.uplineStaffId) ?? null) : null,
             invalidTarget: old?.data.invalidTarget ?? false,
             canTake: old?.data.canTake ?? false,
             selected: old?.data.selected ?? false,
@@ -421,11 +426,11 @@ function Chart({
   const edges: LineEdge[] = useMemo(() => {
     const out: LineEdge[] = []
     for (const p of people) {
-      if (!p.reportsTo || !byId.has(p.reportsTo)) continue
+      if (!p.uplineStaffId || !byId.has(p.uplineStaffId)) continue
       const isFresh = fresh === p.staffId
       out.push({
-        id: `${p.reportsTo}->${p.staffId}`,
-        source: p.reportsTo,
+        id: `${p.uplineStaffId}->${p.staffId}`,
+        source: p.uplineStaffId,
         target: p.staffId,
         type: 'line',
         className: isFresh ? 'fresh' : undefined,
@@ -434,15 +439,6 @@ function Chart({
     }
     return out
   }, [people, byId, fresh])
-
-  /** Where a popover about `staffId` hangs from: their card's Upline row, or mid-screen. */
-  const anchorOf = useCallback((staffId: string): PopAnchor => {
-    const el = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${staffId}"] .oc-up`)
-    const r = el?.getBoundingClientRect()
-    return r
-      ? { left: r.left, top: r.top, bottom: r.bottom }
-      : { left: window.innerWidth / 2 - 150, top: 160, bottom: 190 }
-  }, [])
 
   /**
    * The write: who they report to. One column, and the database moves the
@@ -465,7 +461,7 @@ function Chart({
           return
         }
       }
-      if (child.reportsTo === parentId) {
+      if (child.uplineStaffId === parentId) {
         setError(null)
         setNote(
           parentId
@@ -479,7 +475,7 @@ function Chart({
       setPop(null)
       startTransition(async () => {
         try {
-          const result = await moveOnChart(childId, parentId)
+          const result = await moveOnChart(schemeId, childId, parentId)
           if (!result.ok) {
             setError(result.reason)
             const home = targetsFor().get(childId)
@@ -489,10 +485,11 @@ function Chart({
           const moved = parentId
             ? `${child.name} now reports to ${byId.get(parentId)!.name}.`
             : `${child.name} is now top of their own tree.`
-          // The money follows the line in the database; the only thing worth
-          // adding is when there is no money to follow it yet.
+          // The money follows the line; the only thing worth adding is when
+          // there is no money to follow it yet.
           const rank = child.rankId === null ? ' They have no rank yet — their title has no rung on this ladder.' : ''
-          setNote(`${moved}${rank}`)
+          const line = isHome ? '' : ' Their reporting line on People is untouched — this is this sub-department’s own tree.'
+          setNote(`${moved}${rank}${line}`)
           // A moved tree has a new shape; the arrangement described the old one.
           manualRef.current = new Map()
           writeManualLayout(storage(), schemeId, manualRef.current)
@@ -507,7 +504,7 @@ function Chart({
         }
       })
     },
-    [byId, graph, router, schemeId, targetsFor, glide],
+    [byId, graph, router, schemeId, isHome, targetsFor, glide],
   )
 
   const dragRef = useRef<{ id: string; from: XY; hover: string | null } | null>(null)
@@ -780,8 +777,8 @@ function Chart({
             className="inline-flex items-center gap-2 border border-hairline bg-surface rounded-control px-2.5 py-1 text-[12.5px] font-medium text-ink hover:bg-surface-2"
           >
             <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-muted">Upline</span>
-            {sel.reportsTo && byId.has(sel.reportsTo) ? (
-              byId.get(sel.reportsTo)!.name
+            {sel.uplineStaffId && byId.has(sel.uplineStaffId) ? (
+              byId.get(sel.uplineStaffId)!.name
             ) : (
               <i className="font-normal text-graphite">top of own tree</i>
             )}
@@ -789,7 +786,7 @@ function Chart({
           </button>
           <button
             type="button"
-            disabled={pending || sel.reportsTo === null}
+            disabled={pending || sel.uplineStaffId === null}
             onClick={() => move(sel.staffId, null)}
             className="border border-hairline bg-surface rounded-control px-2.5 py-1 text-[12.5px] font-medium text-graphite hover:text-ink disabled:opacity-40"
           >
@@ -888,8 +885,9 @@ function Chart({
           </span>
         ))}
         <span className="font-serif italic text-xs text-muted">
-          A title gives its rank; raises are set on the Team tab. This chart moves the reporting
-          line — the same line People draws.
+          {isHome
+            ? 'A title gives its rank; raises are set on the Team tab. This chart moves the reporting line — the same line People draws.'
+            : 'A title gives its rank; titles, raises and who is in this sub-department are set on the Team tab. This tree is this sub-department’s own — People’s chart is untouched.'}
         </span>
       </div>
     </div>

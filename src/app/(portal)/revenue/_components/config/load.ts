@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import type {
   CommissionSettingsData,
+  MemberCandidate,
   ProductRow,
   RankDefRow,
   RankRow,
@@ -116,20 +117,26 @@ export async function loadCommissionSettings(
 
 /**
  * Staff Hierarchy's load — the ladder and the people, for BOTH of its tabs.
- * The org chart and the Team table are two views of one `comm_hierarchy`
- * read (user 2026-09-05: move somebody on the chart and the table follows),
- * so they are handed the same rows rather than each reading their own.
+ * The org chart and the Team table are two views of one read (user
+ * 2026-09-05: move somebody on the chart and the table follows), so they are
+ * handed the same rows rather than each reading their own.
  *
- * People: staff in a commission department who either sit in THIS scheme or
- * sit nowhere yet. `comm_hierarchy` allows one open position per person
- * across every scheme, so somebody already placed in another sub-department
- * is not offered here — moving them means ending that position, not drawing
- * a second one.
+ * MEMBERSHIPS (2026-09-10). A sub-department is a world of its own, so the
+ * people here are its MEMBERS — the open `comm_hierarchy` rows of this scheme
+ * — each with the title, upline and rank held here. Two shapes:
+ *
+ *   home      the department's oldest sub-department. Everybody active in the
+ *             department is on its chart: the database opens their membership
+ *             from `reports_to` and the company title, and somebody whose
+ *             title has no rung yet still stands on the tree with "no rank
+ *             yet". Nobody can be added or removed by hand — it is the roster.
+ *   other     members only, added by hand with a title of their own. Whoever
+ *             is in the department but not a member yet is a `candidate`.
  */
-export async function loadTeam(schemeId: string): Promise<TeamData> {
+export async function loadTeam(schemeId: string, opts: { isHome: boolean }): Promise<TeamData> {
   const supabase = await untyped()
 
-  const [{ data: rankRows }, { data: staffRows }, { data: positions }, { data: levelRows }] =
+  const [{ data: rankRows }, { data: staffRows }, { data: positions }, { data: levelRows }, { data: titleRows }] =
     await Promise.all([
       supabase.from('comm_ranks').select('*').eq('scheme_id', schemeId).order('sort_order'),
       supabase
@@ -140,15 +147,30 @@ export async function loadTeam(schemeId: string): Promise<TeamData> {
         .order('employee_name'),
       supabase
         .from('comm_hierarchy')
-        .select('id, staff_id, scheme_id, upline_staff_id, rank_id, rate_mode, effective_from, comm_ranks (rank_key, label)')
+        .select('id, staff_id, scheme_id, upline_staff_id, rank_id, rate_mode, effective_from, title_id, titles (name, level_id), comm_ranks (rank_key, label)')
+        .eq('scheme_id', schemeId)
         .is('effective_to', null),
       // The company ladder: the Team table reads it top down (user, 2026-09-05).
       supabase.from('title_levels').select('id, rank, name'),
+      // The titles a membership may hold: the commission departments' own.
+      supabase
+        .from('titles')
+        .select('id, name, departments!inner (payroll_source)')
+        .eq('departments.payroll_source', 'commission')
+        .eq('is_active', true)
+        .order('name'),
     ])
 
   const rungByLevel = new Map(
     rows<{ id: string; rank: number; name: string }>(levelRows).map(l => [l.id, l]),
   )
+
+  interface TitleEmbed {
+    name: string
+    level_id: string | null
+  }
+  const oneTitle = (t: TitleEmbed | TitleEmbed[] | null | undefined): TitleEmbed | null =>
+    Array.isArray(t) ? (t[0] ?? null) : (t ?? null)
 
   const positionByStaff = new Map(
     rows<{
@@ -159,11 +181,13 @@ export async function loadTeam(schemeId: string): Promise<TeamData> {
       rank_id: string
       rate_mode: 'fixed' | 'variable' | null
       effective_from: string
+      title_id: string | null
+      titles: TitleEmbed | TitleEmbed[] | null
       comm_ranks: { rank_key: string; label: string } | { rank_key: string; label: string }[] | null
     }>(positions).map(p => [p.staff_id, p]),
   )
 
-  const people: SalespersonRow[] = rows<{
+  const staff = rows<{
     id: string
     employee_name: string
     employee_code: string | null
@@ -171,31 +195,33 @@ export async function loadTeam(schemeId: string): Promise<TeamData> {
     tax_mode: 'pcb' | 'withholding' | 'none' | null
     withholding_rate: number | null
     title_id: string | null
-    titles:
-      | { name: string; level_id: string | null }
-      | { name: string; level_id: string | null }[]
-      | null
+    titles: TitleEmbed | TitleEmbed[] | null
   }>(staffRows)
-    .filter(s => {
-      const pos = positionByStaff.get(s.id)
-      return !pos || pos.scheme_id === schemeId
-    })
+
+  const people: SalespersonRow[] = staff
+    .filter(s => opts.isHome || positionByStaff.has(s.id))
     .map(s => {
       const pos = positionByStaff.get(s.id)
-      const title = Array.isArray(s.titles) ? (s.titles[0] ?? null) : s.titles
+      const companyTitle = oneTitle(s.titles)
+      // The title held HERE. The home membership mirrors the roster, so for
+      // somebody the home chart draws without a membership yet (a title with
+      // no rung) the roster's title is the right one to show.
+      const title = pos ? oneTitle(pos.titles) : opts.isHome ? companyTitle : null
+      const titleId = pos ? (pos.title_id ?? null) : opts.isHome ? (s.title_id ?? null) : null
       const rung = title?.level_id ? (rungByLevel.get(title.level_id) ?? null) : null
       const rank = Array.isArray(pos?.comm_ranks) ? (pos?.comm_ranks[0] ?? null) : (pos?.comm_ranks ?? null)
       return {
         staff_id: s.id,
         employee_name: s.employee_name,
         employee_code: s.employee_code,
-        reports_to: s.reports_to ?? null,
-        title_id: s.title_id ?? null,
+        title_id: titleId,
         title_name: title?.name ?? null,
         title_level_rank: rung?.rank ?? null,
         title_level_name: rung?.name ?? null,
+        company_title_name: companyTitle?.name ?? null,
         hierarchy_id: pos?.id ?? null,
-        upline_staff_id: pos?.upline_staff_id ?? null,
+        upline_staff_id: opts.isHome ? (s.reports_to ?? null) : (pos?.upline_staff_id ?? null),
+        reports_to: s.reports_to ?? null,
         rank_id: pos?.rank_id ?? null,
         rank_key: rank?.rank_key ?? null,
         rank_label: rank?.label ?? null,
@@ -206,7 +232,23 @@ export async function loadTeam(schemeId: string): Promise<TeamData> {
       }
     })
 
-  return { ranks: rows<RankRow>(rankRows), people }
+  const candidates: MemberCandidate[] = opts.isHome
+    ? []
+    : staff
+        .filter(s => !positionByStaff.has(s.id))
+        .map(s => ({
+          staff_id: s.id,
+          employee_name: s.employee_name,
+          employee_code: s.employee_code,
+          company_title_name: oneTitle(s.titles)?.name ?? null,
+        }))
+
+  return {
+    ranks: rows<RankRow>(rankRows),
+    people,
+    titles: rows<{ id: string; name: string }>(titleRows).map(t => ({ id: t.id, name: t.name })),
+    candidates,
+  }
 }
 
 export async function loadProducts(): Promise<ProductRow[]> {

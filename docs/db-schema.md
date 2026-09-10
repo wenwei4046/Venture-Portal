@@ -544,8 +544,36 @@ never written as an upline by the app:
   reports to them (`23REC`). The app says the same sentences first
   (`lib/hierarchy-boundary.ts`).
 
-The only `comm_hierarchy` write left in the app is the rank (Team tab,
-`movePositionRank`).
+The only `comm_hierarchy` write left in the app for the home sub-department is
+the rank (Team tab, `setMembershipRank`).
+
+**Memberships per sub-department (2026-09-10, migration `20260910160000`).**
+A sub-department is a world of its own, so a person holds one `comm_hierarchy`
+row per (scheme, person) — `one_position_per_scheme` replaced
+`one_position_at_a_time` — and every row carries the `title_id` held IN THAT
+SUB-DEPARTMENT:
+
+- `comm_hierarchy_rank_follows_title` (BEFORE INSERT OR UPDATE OF title_id):
+  a membership opened with a title and no rank gets the title's floor rung on
+  that scheme; a title raised to one whose floor stands higher raises the
+  rank; nothing lowers one. A title with no rung on that ladder cannot open a
+  membership (`23RNK`).
+- `comm_sync_position` now derives only the HOME sub-department's membership
+  (`comm_scheme_for_department` = the department's oldest active
+  sub-department), title included; other memberships are the app's
+  (`openMembership` / `closeMembership` / `moveMembership` /
+  `setMembershipTitle` in `lib/hierarchy-writes.ts`). Leaving the commission
+  department closes every membership.
+- `comm_title_can_recruit(department, title)` asks the HOME ladder only;
+  `comm_title_can_recruit_in(scheme, title)` asks one scheme.
+- `apply_commission_run` raises the MEMBERSHIP's title, and the company title
+  as well only when the run is the home sub-department's;
+  `hr_monthly_payroll.commission_amount` = the SUM of every applied run's
+  statement for that person and month (a re-apply replaces its own share).
+  `reopen_commission_run` gives back only its own share rather than zeroing.
+- Still owed: `sales_import_batches` has no `sub_department_id`, so a period
+  has one batch for the whole department — the IR feed needs that column
+  before its orders exist (TODOS).
 
 Job titles as controlled rows, replacing the free-text `hr_staff_costs.designation`
 (20 hand-typed spellings, backfilled into 20 titles). RLS: read = any signed-in

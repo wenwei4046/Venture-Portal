@@ -105,8 +105,32 @@ src/
 │   │   │                              23REC): it may not cross the department's
 │   │   │                              edge, and inside it you may only report
 │   │   │                              to a title that may hold downlines (SRS
-│   │   │                              and above). Never write `comm_hierarchy`
-│   │   │                              rows from the app except the rank.
+│   │   │                              and above).
+│   │   │                              **MEMBERSHIPS (2026-09-10, later):** a
+│   │   │                              sub-department is a world of its own —
+│   │   │                              one `comm_hierarchy` row per (person,
+│   │   │                              scheme) (`one_position_per_scheme`),
+│   │   │                              each with its OWN `title_id`, upline and
+│   │   │                              rank (mig 20260910160000). ONE LINE
+│   │   │                              applies to the HOME sub-department only
+│   │   │                              — the department's oldest
+│   │   │                              (`comm_scheme_for_department`,
+│   │   │                              `pickHomeSubDepartments` in
+│   │   │                              `lib/revenue.ts`); its chart writes
+│   │   │                              `reports_to`. Every other sub-department
+│   │   │                              (IR) edits its memberships directly:
+│   │   │                              `moveMembership` / `openMembership` /
+│   │   │                              `closeMembership` / `setMembershipTitle`
+│   │   │                              in `lib/hierarchy-writes.ts`, the Team
+│   │   │                              tab adds/removes members and sets the
+│   │   │                              title held there. The apply-run ratchet
+│   │   │                              raises the MEMBERSHIP title, and the
+│   │   │                              company title only for the home one;
+│   │   │                              `hr_monthly_payroll.commission_amount`
+│   │   │                              is the SUM of every applied run for the
+│   │   │                              month. Owed: orders per sub-department
+│   │   │                              (`sales_import_batches` has no
+│   │   │                              sub_department_id yet — TODOS).
 │   │   ├── reports/                 (Phase 3)
 │   │   └── settings/                ← 8 tabs: treasury / overdue / splits / directors / companies / banks / periods / simulator
 │   └── api/erp/v1/                 ← the ONE machine endpoint: the Houzs ERP live
