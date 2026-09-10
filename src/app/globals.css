@@ -2098,17 +2098,16 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
    The month laid out the way the researched HRMS lay it out (Payroll UI
    Field Guide, 2026-09-10 — 14 products):
      · BambooHR's pay-date rail across the head (.pay-rail);
-     · Personio's status card — a big word, a countdown, a segmented bar —
-       carrying BambooHR's explained figures and the one action (.pay-status);
+     · BambooHR's white review panel (selected mockup B): dated header,
+       net-pay hero, explained checklist and footer step trail (.pay-status);
      · Personio's Due dates and Pay variances beside it (.pay-side);
      · PayrollPanda's contributions band over the departments (.pay-band);
      · Deel's cycle list for the departments: a sentence over a four-segment
        bar, the pay date under it, an action-named button (.pay-row);
      · Swingvy's two-button statutory rows with ADP's "Due in 5 days (15/09)"
        pill (.pay-row.stat, .pay-pill).
-   Surfaces: the status card is the page's one dark object (.hero-walnut, the
-   object Dashboard and Fund OUT carry — dark limited by area); every list
-   and side card is white on the Plaster ground; the statutory rows sit in
+   Surfaces: the review, lists and side cards are white on the Plaster
+   ground; the net-pay hero is warm grey and the statutory rows sit in
    the Chrome well so paying people and paying the government read as two
    jobs. The accent stays Harbour blue and only ever means "you are here". */
 .pay-board { --pay-card: 255 255 255; --pay-well: var(--chrome); }
@@ -2139,19 +2138,24 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 
 /* Overview: the status card and the side cards. */
 .pay-over { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; margin-bottom: 28px; }
-.pay-status { padding: 20px 22px 18px; display: flex; flex-direction: column; gap: 14px; }
-.pay-status .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
-.pay-status .eyebrow { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: rgb(var(--graphite)); }
-.pay-status .word { font-size: 30px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.05; color: rgb(var(--ink)); margin-top: 5px; }
+.pay-status { min-width: 0; display: flex; flex-direction: column; overflow: hidden; align-self: start; }
+.pay-status .top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 20px; padding: 20px; }
+.pay-status .review-heading { min-width: 0; }
+.pay-status .eyebrow { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: rgb(var(--graphite)); }
+.pay-status .review-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 16px; margin-top: 8px; }
+.pay-status .review-title h2 { margin: 0; font-size: 1.5rem; font-weight: 600; line-height: 1.25; letter-spacing: -0.015em; color: rgb(var(--ink)); }
+.pay-status .word { font-size: 0.875rem; font-weight: 600; line-height: 1.5; color: rgb(var(--accent)); }
 .pay-status .word.alert { color: rgb(var(--alert)); }
 .pay-status .word.danger { color: rgb(var(--danger)); }
 .pay-status .word.ledger { color: rgb(var(--ledger)); }
 .pay-status .word.muted { color: rgb(var(--graphite)); }
-.pay-status .cd { text-align: right; flex: none; }
-.pay-status .cd .n { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 30px; font-weight: 500; letter-spacing: -0.01em; color: rgb(var(--num-ink)); line-height: 1.05; margin-top: 5px; }
-.pay-status .cd .n small { font-family: var(--font-sans), 'Inter', sans-serif; font-size: 13px; font-weight: 500; color: rgb(var(--graphite)); margin-left: 6px; letter-spacing: 0; }
-.pay-status .cd .n.danger { color: rgb(var(--danger)); }
-.pay-status .detail { font-size: 13px; color: rgb(var(--graphite)); line-height: 1.45; max-width: 64ch; }
+.pay-status .review-dates { display: flex; flex-wrap: wrap; gap: 14px 24px; margin: 0; }
+.pay-status .review-dates dt { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 0.75rem; letter-spacing: 0.07em; text-transform: uppercase; color: rgb(var(--graphite)); }
+.pay-status .review-dates dd { margin: 5px 0 0; font-size: 0.875rem; font-weight: 500; color: rgb(var(--ink)); }
+.pay-status .review-dates .alert { color: rgb(var(--alert)); }
+.pay-status .review-dates .danger { color: rgb(var(--danger)); }
+.pay-status .review-dates .accent { color: rgb(var(--accent)); }
+.pay-status .detail { margin: 0; padding: 0 20px 16px; font-size: 0.875rem; color: rgb(var(--graphite)); line-height: 1.5; }
 
 /* The segmented bar — Deel's, under a sentence. */
 .pay-bar4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
@@ -2159,30 +2163,35 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 .pay-bar4 .seg.done { background: rgb(var(--ledger) / 0.55); }
 .pay-bar4 .seg.now { background: rgb(var(--accent)); }
 .pay-bar4 .seg.late { background: rgb(var(--danger)); }
-.hero-walnut .pay-bar4 .seg { background: rgb(var(--surface-2)); }
-.hero-walnut .pay-bar4 .seg.done { background: rgb(var(--ledger) / 0.7); }
-.hero-walnut .pay-bar4 .seg.now { background: rgb(var(--ink)); }
-.pay-seglbl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 6px; }
-.pay-seglbl .l { display: flex; flex-direction: column; gap: 2px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(var(--graphite)); min-width: 0; }
-.pay-seglbl .l span { color: rgb(var(--muted)); text-transform: none; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pay-seglbl .l.now { color: rgb(var(--ink)); font-weight: 600; }
-.pay-seglbl .l.late, .pay-seglbl .l.late span { color: rgb(var(--danger)); }
 
 /* BambooHR's explained figures: one hero, then a list of amount + sentence. */
-.pay-status .facts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr); gap: 14px 24px; padding-top: 14px; border-top: 1px solid rgb(var(--hairline) / 0.7); }
-.pay-status .hero .amt { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 34px; font-weight: 500; color: rgb(var(--num-ink)); letter-spacing: -0.01em; line-height: 1; }
-.pay-status .hero .amt small { font-size: 14px; color: rgb(var(--graphite)); margin-right: 6px; font-weight: 400; }
-.pay-status .hero .lab { font-size: 12.5px; color: rgb(var(--graphite)); margin-top: 6px; }
-.pay-status .hero .say { font-size: 13px; color: rgb(var(--ink)); margin-top: 10px; line-height: 1.45; }
-.pay-status .list { display: flex; flex-direction: column; gap: 9px; }
-.pay-status .list .f { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; align-items: baseline; }
-.pay-status .list .f .v { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 14px; color: rgb(var(--num-ink)); text-align: right; white-space: nowrap; }
-.pay-status .list .f .s { font-size: 12px; color: rgb(var(--graphite)); line-height: 1.4; }
+.pay-status .facts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); border-top: 1px solid rgb(var(--hairline)); }
+.pay-status .facts.empty { grid-template-columns: 1fr; }
+.pay-status .hero { min-width: 0; padding: 32px 20px; background: rgb(var(--surface-2)); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.pay-status .hero .amt { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 6px; max-width: 100%; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-variant-numeric: tabular-nums; font-size: clamp(1.5rem, 2.6vw, 2.125rem); font-weight: 500; color: rgb(var(--num-ink)); letter-spacing: -0.02em; line-height: 1.2; overflow-wrap: anywhere; }
+.pay-status .hero .amt small { font-size: 0.875rem; color: rgb(var(--graphite)); font-weight: 400; }
+.pay-status .hero .lab { font-size: 0.875rem; line-height: 1.5; color: rgb(var(--graphite)); margin-top: 8px; }
+.pay-status .hero .say { font-size: 0.75rem; color: rgb(var(--graphite)); margin-top: 16px; line-height: 1.5; }
+.pay-status .hero .pay-delta { font-size: inherit; white-space: normal; }
+.pay-status .list { display: flex; flex-direction: column; min-width: 0; }
+.pay-status .list .f { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 4px 12px; align-items: start; padding: 14px 20px; border-bottom: 1px solid rgb(var(--hairline)); }
+.pay-status .list .f:last-child { border-bottom: 0; }
+.pay-status .fact-mark { grid-row: span 2; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 1px solid currentColor; border-radius: 50%; font-size: 0.75rem; }
+.pay-status .fact-mark.done { color: rgb(var(--ledger)); background: rgb(var(--ledger-bg)); }
+.pay-status .fact-mark.pending { color: rgb(var(--accent)); background: rgb(var(--accent-bg)); }
+.pay-status .list .f .v { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 1rem; font-weight: 500; color: rgb(var(--num-ink)); overflow-wrap: anywhere; }
+.pay-status .list .f .s { grid-column: 2; font-size: 0.875rem; color: rgb(var(--graphite)); line-height: 1.45; overflow-wrap: anywhere; }
 .pay-status .list .f .s b { color: rgb(var(--ink)); font-weight: 600; }
 .pay-status .list .f .s .ok { color: rgb(var(--ledger)); font-weight: 600; }
 .pay-status .list .f .s .short { color: rgb(var(--alert)); font-weight: 600; }
-.pay-status .act { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid rgb(var(--hairline) / 0.7); }
-.pay-status .act .note { font-size: 12px; color: rgb(var(--muted)); }
+.pay-status .act { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding: 14px 20px; background: rgb(var(--surface)); border-top: 1px solid rgb(var(--hairline)); }
+.pay-trail { display: flex; flex-wrap: wrap; gap: 10px 14px; list-style: none; margin: 0; padding: 0; }
+.pay-trail li { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 0.75rem; line-height: 1.5; text-transform: uppercase; color: rgb(var(--graphite)); }
+.pay-trail .done > span:first-child { color: rgb(var(--ledger)); }
+.pay-trail .now { color: rgb(var(--accent)); font-weight: 600; }
+.pay-trail .late { color: rgb(var(--danger)); font-weight: 600; }
+.pay-trail .wait { color: rgb(var(--muted)); }
+.pay-status .review-confirm { padding: 0 20px 16px; background: rgb(var(--surface)); }
 
 /* The one button on a dark card: ink on paper, which inside .hero-walnut is
    cream on walnut and on a light surface is Deel's black pill. */
@@ -2194,6 +2203,9 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 }
 .pay-cta:hover { opacity: 0.9; text-decoration: none; }
 .pay-cta:disabled { opacity: 0.45; cursor: not-allowed; }
+.pay-status .pay-cta { background: rgb(var(--accent)); color: rgb(var(--paper)); border-radius: 8px; font-size: 0.875rem; line-height: 1.5; white-space: normal; }
+.pay-status .pay-cta:hover { background: rgb(var(--accent-hover)); opacity: 1; }
+.pay-status .pay-cta:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 3px; }
 
 /* Side cards: Due dates, Pay variances. */
 .pay-side { display: flex; flex-direction: column; gap: 14px; }
@@ -2377,8 +2389,9 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   .pay-row, .pay-row.stat { grid-template-columns: 1fr; }
   .pay-row .amt { text-align: left; }
   .pay-status .top { flex-direction: column; }
-  .pay-status .cd { text-align: left; }
-  .pay-seglbl .l span { display: none; }
+  .pay-status .top { align-items: stretch; padding: 16px; }
+  .pay-status .review-dates { gap: 14px 20px; }
+  .pay-status .act { padding: 14px 16px; }
   .pay-win { top: 0; right: 0; bottom: 0; width: 100vw; border-radius: 0; }
   .pay-win .tiles { grid-template-columns: 1fr; }
 }

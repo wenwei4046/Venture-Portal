@@ -612,8 +612,8 @@ judgement in `lib/payment-cycle.ts` and re-lays the page after six of them:
 | Borrowed from | Class | What it does |
 |---|---|---|
 | BambooHR's pay-date rail | `.pay-rail` | One chip per month in the page head — the name and how far the cycle got (`no run / drafts / submitted / funded / closed ✓`), the month on screen ringed in accent. Replaces the ← August → arrows. Fed by three plain selects (`payroll_runs`, `payroll_payment_requests`, statutory `payment_vouchers`) through `monthRail()` |
-| Personio's Overview | `.pay-status` (on `.hero-walnut`) | The page's one dark object. A big **status word** (`Ready to generate`, `Awaiting Principal`, `Salaries paid`, `Month closed` — `cycleHeadline()`), a **countdown** on the right to whatever is due next (pay date, then statutory due; negative = overdue in danger), one sentence of why, Deel's four-segment bar (`.pay-bar4`: submitted → funded → salary PVs → statutory, with a label + note under each segment, `.pay-seglbl`), then BambooHR's explained figures and the one action |
-| BambooHR's Review hero | `.pay-status .facts` | Left, the net as the hero figure; right, four amounts each with a sentence that names the account and the day: funded by Finance (PV numbers, what the HR pool holds now), staff (*leaves Alliance ···3210 on 5 Sep*), directors, statutory (*due 15 Sep · pool after salaries covers it / short RM x*) |
+| BambooHR's Review Payroll — selected mockup B (2026-09-11) | `.pay-status.pay-panel` | White review panel: month and compact status on the left of the header, three dated facts on the right (next due, pay date, funding). The existing `cycleHeadline()` still chooses the state, next due date and action; overdue stays red, upcoming due stays amber. The footer carries an ordered step trail (submitted → funded → salary PVs → statutory) beside the accent button and its existing confirmation. Due dates and Pay variances remain in the right column |
+| BambooHR's Review hero | `.pay-status .facts` | Net payroll alone, centred on a warm grey block at left, with the staff/director count and previous-month variance. At right, four separated checklist rows: Finance funding, staff, directors, statutory. Each has a completion tick or pending marker, its amount and an explanation naming the account and date. `--pay-card` and `--surface-2` retain the elevation in dark mode; the hero and facts stack on narrow screens |
 | Personio's Due dates + Pay variances | `.pay-side`, `.pay-ms`, `.pay-var` | Beside the card: the month's dated milestones as date chips (`milestones()` — submitted, funded, the two pay dates, the statutory bodies grouped by due date; done / next / late), and the biggest net moves vs last month (`payVariances()`: `9,414.31 → 2,859.49 ↘ −70%`, 20%+ in amber; a name opens its department's window) |
 | PayrollPanda's header band | `.pay-band` | Over the department list: GROSS \| employee contributions (EPF · SOCSO · EIS · PCB · SKBBK, label in accent) \| NET \| employer contributions (label in Walnut) \| COST · CTC — `contributionTotals()`. Two families take a *surface* colour each, never a status colour |
 | Deel's payroll-cycles list | `.pay-list`, `.pay-row`, `.pay-filt` | One row per department: name + headcount + gross + Δ vs last month; **a sentence over a four-segment bar** (funded · generated · approved · paid — `deptTimeline()`), the audit line (*Generated 9 Sep 17:46 · Approved 9 Sep 21:49*) and the pay date under it; the net with *Previous was …* beneath; a button **named for the next step** (`Generate 1 PV`, `Approvals →`, `View PV`) and a `N people ›` link to the window. Filter chips with counts (`All · To generate · With Principal · Paid · Blocked`) over the list; the PV-per switch, the two dates, the Alliance file and the Generate-all button in the list header |
@@ -623,14 +623,14 @@ judgement in `lib/payment-cycle.ts` and re-lays the page after six of them:
 | — | `.pay-cta`, `.pay-btn` | `.pay-cta` is ink on paper — cream on the walnut card, Deel's black pill anywhere light. `.pay-btn.pri` is the accent pill, `.sec` the bordered one; both round, both label the act |
 | — | `.pay-win` | Unchanged from v3.5 (the Paycheck Window shape); rows that moved 20%+ are tinted `tr.moved` |
 
-Surfaces: the status card is dark (`.hero-walnut`, the object Dashboard and
-Fund OUT carry — dark limited by area), every list and side card is white
+Surfaces: mockup B replaces the dark status card with a white review panel
+and a warm grey net-pay block; every list and side card is white
 on the Plaster ground, and the statutory rows sit in the Chrome well so
 paying people and paying the government read as two jobs. The three
 `data-tone` variants of v3.5 are gone; there is one design.
 
-Three rules the board keeps: **status is a word and a sentence, not a
-chip** (Personio / Deel); **every button is named for what it does**
+Three rules the board keeps: **status is a compact word beside the month,
+with an explanation when action is needed**; **every button is named for what it does**
 (no `Confirm`, no `View`); and **the confirm names the money** before the
 irreversible act. The old v3.5 card grid is gone; `payment-cycle.ts` grew
 the helpers above (38 unit tests).

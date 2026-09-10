@@ -283,6 +283,7 @@ export default function PaymentBoard({
       ) : null}
 
       <Overview
+        periodLabel={periodLabel}
         periodRange={periodRange}
         prevMonthName={prevMonthName}
         headline={headline}
