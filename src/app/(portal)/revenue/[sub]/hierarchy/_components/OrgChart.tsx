@@ -32,6 +32,7 @@ import {
   type OnNodeDrag,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import { ratePct } from '@/lib/commission/ranks'
 import {
   descendantsOf,
   layoutTree,
@@ -89,10 +90,16 @@ export interface OrgPerson {
   /** "Rank B" — the card shows the rate beside it. */
   rankLabel: string | null
   productRate: number | null
+  rankPayLabel?: string
+  isGroupPackage?: boolean
   /** Decided by the title they hold, not the rank of the month. */
   canRecruit: boolean
   rateMode: 'fixed' | 'variable' | null
   placedSince: string | null
+  directLineCount?: number
+  directLineLimit?: number | null
+  expansionEarnedAt?: string | null
+  expansionSourcePeriod?: string | null
 }
 
 interface CardData extends Record<string, unknown> {
@@ -762,9 +769,11 @@ function Chart({
           <b className="font-semibold text-ink">{sel.name}</b>
           <span className="font-mono text-[10.5px] uppercase tracking-wide text-graphite">
             {sel.titleName ?? 'no title'} · {sel.rankLabel ?? 'no rank yet'}
-            {sel.productRate !== null ? ` · ${Math.round(sel.productRate * 100)}%` : ''}
+            {sel.rankPayLabel ? ` · ${sel.rankPayLabel}` : sel.productRate !== null ? ` · ${ratePct(sel.productRate)}` : ''}
             {sel.placedSince ? ` · placed since ${sel.placedSince}` : ''}
             {` · ${selDownlines} downline${selDownlines === 1 ? '' : 's'}`}
+            {sel.directLineLimit != null ? ` · ${sel.directLineCount ?? 0}/${sel.directLineLimit} direct lines` : ''}
+            {sel.expansionEarnedAt ? ` · SDL expansion earned ${sel.expansionSourcePeriod?.slice(0, 7) ?? ''}` : ''}
           </span>
           <span className="flex-1" />
           <button
@@ -910,8 +919,9 @@ function Chevron() {
 /** "B · 8%" — the rank letter and its rate, the way the chip reads it. */
 function chipLabel(person: OrgPerson): string {
   const label = (person.rankLabel ?? '').replace(/^rank\s+/i, '')
+  if (person.isGroupPackage) return `${label} · group`
   if (person.productRate === null || label.includes('%')) return label
-  return `${label} · ${Math.round(person.productRate * 100)}%`
+  return `${label} · ${ratePct(person.productRate)}`
 }
 
 function PersonCard({ data }: NodeProps<CardNode>) {
@@ -939,7 +949,7 @@ function PersonCard({ data }: NodeProps<CardNode>) {
           {person.name}
         </div>
         {person.rankLabel ? (
-          <span className="oc-rank">{chipLabel(person)}</span>
+          <span className="oc-rank" title={person.rankPayLabel}>{chipLabel(person)}</span>
         ) : (
           <span className="oc-rank none">no rank yet</span>
         )}
@@ -949,6 +959,14 @@ function PersonCard({ data }: NodeProps<CardNode>) {
         {!person.canRecruit ? <span className="nd">· no downlines</span> : null}
         {person.rateMode === 'fixed' ? <span className="nd">· manual</span> : null}
       </div>
+      {person.directLineLimit != null ? (
+        <div className="oc-tt" title={person.expansionEarnedAt
+          ? `SDL first earned in ${person.expansionSourcePeriod?.slice(0, 7) ?? 'an applied month'}. Current limit: ${person.directLineLimit} direct lines. Opening another line requires all existing groups to qualify in its opening month. Opened slots are retained; unused permission expires.`
+          : 'Three qualifying Full Spec groups permit opening a fourth line that month. Each further line requires all existing groups to qualify in its opening month. Opened slots are retained.'}>
+          {person.directLineCount ?? 0}/{person.directLineLimit} directs
+          {person.expansionEarnedAt ? ' · SDL earned' : ''}
+        </div>
+      ) : null}
 
       <button
         type="button"

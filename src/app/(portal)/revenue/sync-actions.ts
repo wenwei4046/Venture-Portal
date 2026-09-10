@@ -25,6 +25,7 @@ async function client(): Promise<SupabaseClient> {
 /** Row form on the Comm Cal page: agent_key + erp_salesperson_id → staff_id. */
 export async function matchErpSalesperson(fd: FormData): Promise<void> {
   await requirePermission('revenue')
+  const subDepartmentId = String(fd.get('sub_department_id') ?? '').trim()
   const agentKey = String(fd.get('agent_key') ?? '').trim()
   const erpSalespersonId = String(fd.get('erp_salesperson_id') ?? '').trim()
   const staffId = String(fd.get('staff_id') ?? '').trim()
@@ -32,6 +33,7 @@ export async function matchErpSalesperson(fd: FormData): Promise<void> {
   if (!agentKey && !erpSalespersonId) throw new Error('Nothing to match on')
 
   const supabase = await client()
+  await assertErpSubDepartment(supabase, subDepartmentId)
   const { error } = await supabase.rpc('match_erp_salesperson', {
     p_agent_key: agentKey,
     p_erp_salesperson_id: erpSalespersonId || null,
@@ -61,16 +63,18 @@ interface HeldEventRow {
  * was applied go through exactly as if the ERP had just sent them. Anything
  * the month still refuses stays held, and says so.
  */
-export async function replayHeldErpEvents(period: string): Promise<ReplayResult> {
+export async function replayHeldErpEvents(period: string, subDepartmentId: string): Promise<ReplayResult> {
   await requirePermission('revenue')
   if (!/^\d{4}-\d{2}-01$/.test(period)) throw new Error('Period must be the first of a month')
 
   const supabase = await client()
+  await assertErpSubDepartment(supabase, subDepartmentId)
   const { data, error } = await supabase
     .from('erp_sync_events')
     .select('id, doc_no, payload, received_at')
     .eq('status', 'held')
     .eq('period_month', period)
+    .eq('sub_department_id', subDepartmentId)
     .is('replayed_at', null)
     .order('received_at', { ascending: true })
   if (error) throw new Error(`Could not read the held events: ${error.message}`)
@@ -108,4 +112,10 @@ export async function replayHeldErpEvents(period: string): Promise<ReplayResult>
 
   revalidatePath('/revenue', 'layout')
   return { replayed: latest.size, applied, stillHeld }
+}
+
+async function assertErpSubDepartment(supabase: SupabaseClient, subDepartmentId: string): Promise<void> {
+  const { data, error } = await supabase.rpc('erp_sync_sub_department')
+  if (error) throw new Error(`Could not identify the ERP programme: ${error.message}`)
+  if (data !== subDepartmentId) throw new Error('The Houzs ERP feed belongs to Fair.')
 }

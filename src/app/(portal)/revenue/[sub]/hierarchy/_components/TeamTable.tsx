@@ -130,6 +130,9 @@ export default function TeamTable({
             People, and a month already computed keeps the chart it was computed against.
           </>
         )}
+        {ranks.some(r => Number(r.group_incentive_amount) > 0) ? (
+          <> Group packages are checked each month, including a manually assigned package rank. If no direct group qualifies, the percentage rank below the package applies for that month.</>
+        ) : null}
       </Hint>
 
       {note?.note ? (
@@ -221,6 +224,11 @@ export default function TeamTable({
                       <span className="text-ink">{p.employee_name}</span>
                       {p.employee_code ? (
                         <span className="ml-2 font-mono text-xs text-muted">{p.employee_code}</span>
+                      ) : null}
+                      {p.direct_line_limit != null ? (
+                        <div className="font-mono text-[10px] text-muted mt-1">
+                          {p.direct_line_count ?? 0}/{p.direct_line_limit} DIRECTS{p.expansion_earned_at ? ' · SDL EARNED' : ''}
+                        </div>
                       ) : null}
                     </td>
                     <RowForm action={setStaffRank} onDone={done}>

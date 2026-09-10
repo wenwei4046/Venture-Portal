@@ -2,8 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
  * What the Comm Cal page shows about the ERP live feed. Read here, rendered
- * by _components/ErpSyncPanel.tsx. Department-wide, like the batches: the feed
- * does not know about sub-departments.
+ * by _components/ErpSyncPanel.tsx. The existing Houzs ERP endpoint owns Fair;
+ * another programme must never display or replay its deliveries.
  */
 
 export interface SyncEventView {
@@ -36,6 +36,7 @@ export interface StaffOptionView {
 }
 
 export interface ErpSyncPanelData {
+  subDepartmentId: string
   lastEventAt: string | null
   events: SyncEventView[]
   held: HeldPeriodView[]
@@ -45,21 +46,27 @@ export interface ErpSyncPanelData {
 
 const RECENT = 15
 
-export async function loadErpSyncPanelData(supabase: SupabaseClient): Promise<ErpSyncPanelData> {
+export async function loadErpSyncPanelData(supabase: SupabaseClient, subDepartmentId: string): Promise<ErpSyncPanelData | null> {
+  const { data: feedSub, error } = await supabase.rpc('erp_sync_sub_department')
+  if (error) throw new Error(`Could not identify the ERP programme: ${error.message}`)
+  if (feedSub !== subDepartmentId) return null
   const [{ data: eventRows }, { data: heldRows }, { data: orderRows }, { data: staffRows }] = await Promise.all([
     supabase
       .from('erp_sync_events')
       .select('id, doc_no, status, message, warnings, received_at, period_month')
+      .eq('sub_department_id', subDepartmentId)
       .order('received_at', { ascending: false })
       .limit(RECENT),
     supabase
       .from('erp_sync_events')
       .select('period_month')
+      .eq('sub_department_id', subDepartmentId)
       .eq('status', 'held')
       .is('replayed_at', null),
     supabase
       .from('sales_orders')
-      .select('agent_key, agent_name, erp_salesperson_id, order_total')
+      .select('agent_key, agent_name, erp_salesperson_id, order_total, sales_import_batches!inner (sub_department_id)')
+      .eq('sales_import_batches.sub_department_id', subDepartmentId)
       .eq('source', 'erp_sync')
       .eq('cancelled', false)
       .is('staff_id', null),
@@ -124,6 +131,7 @@ export async function loadErpSyncPanelData(supabase: SupabaseClient): Promise<Er
   )
 
   return {
+    subDepartmentId,
     lastEventAt: events[0]?.receivedAt ?? null,
     events,
     held,

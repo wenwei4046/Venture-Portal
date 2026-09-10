@@ -42,6 +42,7 @@ import type {
   StatementLine,
 } from './types'
 import { earnedFloor, promotesTo, titleCanRecruit } from './titles'
+import { computeIrGroups, type IrGroupsResult } from './ir-groups'
 
 export * from './types'
 
@@ -372,6 +373,7 @@ export function computeGroupRevenue(
   nodes: Map<string, HierarchyNode>,
   ownRevenue: Map<string, number>,
   warnings: string[],
+  maxDepth: number | null = null,
 ): Map<string, number> {
   const group = new Map<string, number>()
   for (const staffId of nodes.keys()) group.set(staffId, 0)
@@ -386,6 +388,7 @@ export function computeGroupRevenue(
     let depth = 0
 
     while (cursor) {
+      if (maxDepth !== null && depth >= maxDepth) break
       if (seen.has(cursor)) {
         warnings.push(
           `Hierarchy cycle detected at staff ${cursor} — group revenue roll-up stopped for ${staffId}.`,
@@ -535,6 +538,8 @@ export function computeOverrides(
   rateOf: Map<string, number>,
   baseByStaff: Map<string, number>,
   warnings: string[],
+  maxDepth: number | null = null,
+  suppressedUplines: ReadonlySet<string> = new Set(),
 ): OverrideCredit[] {
   const credits: OverrideCredit[] = []
 
@@ -549,6 +554,7 @@ export function computeOverrides(
     let depth = 0
 
     while (cursor) {
+      if (maxDepth !== null && depth >= maxDepth) break
       if (seen.has(cursor)) {
         warnings.push(
           `Hierarchy cycle detected at staff ${cursor} — override roll-up stopped for ${downlineStaffId}.`,
@@ -573,7 +579,7 @@ export function computeOverrides(
 
       const ancestorRate = rateOf.get(ancestor.staffId) ?? 0
       const diff = ancestorRate - paid
-      if (diff > 0) {
+      if (diff > 0 && !suppressedUplines.has(ancestor.staffId)) {
         credits.push({
           uplineStaffId: ancestor.staffId,
           downlineStaffId,
@@ -581,8 +587,10 @@ export function computeOverrides(
           rate: diff,
           amount: round2(base * diff),
         })
-        paid = ancestorRate
       }
+      // A package replaces this leader's percentage payout. It does not pass
+      // the foregone differential to another ancestor above that leader.
+      paid = Math.max(paid, ancestorRate)
 
       cursor = ancestor.uplineStaffId
     }
@@ -764,25 +772,94 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
 
   // ── Pass B: group revenue ──────────────────────────────────────────────
   const ownRevenue = new Map([...drafts.values()].map(d => [d.staffId, d.productRevenue]))
-  const groupRevenue = computeGroupRevenue(nodes, ownRevenue, warnings)
+  const groupRevenue = computeGroupRevenue(nodes, ownRevenue, warnings, scheme.groupSalesDepth ?? null)
 
   // ── Pass C: effective rate ─────────────────────────────────────────────
   const resolved = new Map<string, ResolvedRank>()
   const rateOf = new Map<string, number>()
+  const overrideRateOf = new Map<string, number>()
+  const packageRecipients = new Set<string>()
+  const groupResults = new Map<string, IrGroupsResult>()
+  const packageRanks = ranks.filter(r => (r.groupIncentiveAmount ?? 0) > 0)
+  const percentageRanks = ranks.filter(r => (r.groupIncentiveAmount ?? 0) === 0)
+  if (scheme.enableGroupIncentive && packageRanks.length === 0) {
+    warnings.push('Group incentives are switched on but no package rung is configured. Add its incentive and monthly group target before applying this run.')
+  }
+  if (scheme.enableGroupIncentive && (scheme.groupSalesDepth !== 2 || scheme.overrideDepth !== 2)) {
+    warnings.push('Group packages require two sales layers and two override layers. Correct the scheme before applying this run.')
+  }
+  if (scheme.enableGroupIncentive && packageRanks.length > 1) {
+    warnings.push('Only one group-incentive rung may be active on a scheme ladder. Remove the ambiguous package before applying this run.')
+  }
+  if (!scheme.enableGroupIncentive && nodes.size > 0 &&
+      [...nodes.values()].some(n => packageRanks.some(r => r.rankKey === n.baseRankKey))) {
+    warnings.push('A member holds a group-incentive rank but group incentives are switched off. Enable the scheme component before applying this run.')
+  }
   for (const staffId of staffIds) {
     const node = nodes.get(staffId)
     if (!node) {
       rateOf.set(staffId, 0)
       continue
     }
-    const r = resolveRank(node, ranks, {
+    const figures = {
       periodMonth: input.periodMonth,
       groupRevenue: groupRevenue.get(staffId) ?? 0,
       personalRevenue: ownRevenue.get(staffId) ?? 0,
       priorMonths: input.priorMonths,
-    })
+    }
+    const placedPackage = packageRanks.find(r => r.rankKey === node.baseRankKey)
+    const heldPackage = packageRanks.find(r => r.titleId === node.titleId)
+    const packageFloor = placedPackage ?? heldPackage
+    const fallback = packageFloor
+      ? [...percentageRanks].reverse().find(r => r.sortOrder < packageFloor.sortOrder)
+      : undefined
+    // Holding the STL title/rank cannot lock a package into future months.
+    // A month with no qualifying group pays the configured TL percentage.
+    const percentageNode = packageFloor && fallback
+      ? { ...node, baseRankKey: fallback.rankKey }
+      : node
+    // A package is never an ordinary group-revenue rung, including while
+    // its component is off. Only independent qualifying lines activate it.
+    let r = resolveRank(percentageNode, percentageRanks, figures)
+    let comparisonRate = r.effective?.productRate ?? 0
+
+    if (scheme.enableGroupIncentive && packageRanks.length <= 1) {
+      if (packageFloor && !fallback) {
+        warnings.push(`Staff ${staffId}'s group-incentive rank has no percentage rank below it for a month below target.`)
+      }
+      const mayLead = titleCanRecruit(ranks, node.titleId) ?? rankByKey.get(node.baseRankKey)?.canRecruit ?? false
+      if (mayLead) {
+        for (const candidate of packageRanks) {
+          if (candidate.groupSalesThreshold === null || candidate.groupSalesThreshold <= 0) {
+            warnings.push(`${candidate.label} needs a positive per-group sales target before group incentives can be computed.`)
+            continue
+          }
+          const groups = computeIrGroups({
+            leaderStaffId: staffId,
+            hierarchy: [...nodes.values()],
+            personalRevenue: ownRevenue,
+            groupSalesThreshold: candidate.groupSalesThreshold,
+            incentivePerGroup: candidate.groupIncentiveAmount ?? 0,
+            subsidyPerGroup: candidate.groupSubsidyCap ?? 0,
+          })
+          warnings.push(...groups.warnings)
+          // Keep missed targets visible too, so the fallback is explainable.
+          if (!groupResults.has(staffId) || groups.qualifyingGroupCount > 0) groupResults.set(staffId, groups)
+          if (groups.qualifyingGroupCount === 0) continue
+          const qualifiesFor = candidate
+          if (node.rateMode === 'variable' || placedPackage) {
+            r = { ...r, effective: candidate, qualifiesFor }
+            packageRecipients.add(staffId)
+            comparisonRate = [...percentageRanks].reverse().find(p => p.sortOrder < candidate.sortOrder)?.productRate ?? comparisonRate
+          } else {
+            r = { ...r, qualifiesFor }
+          }
+        }
+      }
+    }
     resolved.set(staffId, r)
-    rateOf.set(staffId, r.effective?.productRate ?? 0)
+    rateOf.set(staffId, packageRecipients.has(staffId) ? 0 : r.effective?.productRate ?? 0)
+    overrideRateOf.set(staffId, comparisonRate)
   }
 
   // ── Pass D: C1 / C2 / C3, each bill scaled by its margin penalty ───────
@@ -954,7 +1031,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       )
     }
 
-    for (const credit of computeOverrides(nodes, rateOf, baseByStaff, warnings)) {
+    for (const credit of computeOverrides(nodes, overrideRateOf, baseByStaff, warnings, scheme.overrideDepth ?? null, packageRecipients)) {
       const draft = drafts.get(credit.uplineStaffId)
       if (!draft || credit.amount === 0) continue
       draft.lines.push({
@@ -965,6 +1042,26 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
         qty: null,
         amount: credit.amount,
         note: `Override on downline ${credit.downlineStaffId} · ${round2(credit.rate * 100)}% differential`,
+      })
+    }
+  }
+
+  // Fixed package: each independent direct-line group earns once, however
+  // far it exceeds target. Subsidy remains a memo for Claims, not a cash line.
+  for (const staffId of packageRecipients) {
+    const draft = drafts.get(staffId)
+    const groups = groupResults.get(staffId)
+    if (!draft || !groups) continue
+    for (const group of groups.groups) {
+      if (!group.qualifies) continue
+      draft.lines.push({
+        component: 'group_incentive',
+        sourceStaffId: group.directStaffId,
+        basisAmount: group.totalRevenue,
+        rate: null,
+        qty: 1,
+        amount: group.incentive,
+        note: `Qualifying direct-line group ${group.directStaffId} · own ${group.leaderPersonalRevenue.toFixed(2)} + direct ${group.directPersonalRevenue.toFixed(2)} + second layer ${group.secondLayerRevenue.toFixed(2)}. Own sales count in each direct group; subsidy is separate.`,
       })
     }
   }
@@ -1034,8 +1131,9 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     const openBillBonus = by('open_bill')
     const overrideCommission = by('override')
     const marginIncentive = by('margin_incentive')
+    const groupIncentive = by('group_incentive')
     const totalCommission = round2(
-      productCommission + kpiCommission + openBillBonus + overrideCommission + marginIncentive,
+      productCommission + kpiCommission + openBillBonus + overrideCommission + marginIncentive + groupIncentive,
     )
 
     const rank = resolved.get(d.staffId)
@@ -1085,6 +1183,10 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       marginByBrand: margin?.brands ?? [],
       marginBandKey: margin?.bandKey ?? null,
       marginIncentive,
+      groupIncentive,
+      groupSubsidyCap: packageRecipients.has(d.staffId) ? groupResults.get(d.staffId)?.subsidyCap ?? 0 : 0,
+      groupBreakdown: groupResults.get(d.staffId)?.groups ?? [],
+      fullSpec: groupResults.get(d.staffId)?.fullSpec ?? false,
       marginPenaltyWithheld: d.marginPenaltyWithheld,
       totalCommission,
       lines: d.lines,

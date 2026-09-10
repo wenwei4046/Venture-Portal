@@ -19,7 +19,11 @@ complete. QA audit on 2026-04-11. See `.gstack/qa-reports/qa-report-phase3-2026-
 - ~~Person → sub-department column~~ — done 2026-09-10 the other way round:
   memberships per sub-department (`comm_hierarchy` one row per scheme, with
   its own title). The oldest sub-department is HOME (`reports_to` drives it).
-- **Orders per sub-department.** `sales_import_batches` has one committed
+- **Orders per sub-department — implemented in [PR #82](https://github.com/wenwei4046/Venture-Portal/pull/82)**
+  (2026-09-11; release checks and deployment links are on the PR). Migration
+  `20260911020000_commission_order_sub_departments.sql` scopes batches,
+  releases, Open Bill tags, ERP events and run/import guards. Original gap:
+  `sales_import_batches` has one committed
   batch per period for the whole department, and `sales_orders` has no
   sub-department. Fair's orders come from the ERP feed; IR's will come from
   another API. Before IR's orders exist: add `sales_import_batches.sub_department_id`
@@ -29,6 +33,21 @@ complete. QA audit on 2026-04-11. See `.gstack/qa-reports/qa-report-phase3-2026-
 - **Positions of inactive staff.** Deactivation leaves the open position as
   it is (payroll decides the leaving month). One inactive test row ("testing")
   still holds a position; harmless, nobody points at it.
+- **IR progressive expansion — implemented in PR #82.** The
+  fourth and later lines use the same repeated-own RM1M target, RM6,000 cash
+  and RM2,000 separate subsidy cap. Initial Full Spec 3×3 enables the
+  fourth line; all existing lines must qualify in the actual month the next
+  line opens (4 of 4 → 5, 5 of 5 → 6, onward). Already opened lines and slots
+  remain available, but unused qualification cannot be banked for a later
+  weak month. Later expansion has no additional three-child requirement.
+  Migration
+  `20260911060000_progressive_ir_direct_lines.sql` records incremental
+  evidence, highest already opened capacity and effective current-period
+  limits. Release preflight passed 1,147 tests and 120 disposable-database
+  checks; all six migrations also passed a rollback-only production rehearsal
+  with 60 payroll rows unchanged. See `HANDOFF.md`, commission spec §15 and
+  PR #82 for release status. Recurring subsidy Claims and the
+  other documented later-batch data sources remain separate follow-up work.
 
 ## ✅ Completed (Phase 2)
 

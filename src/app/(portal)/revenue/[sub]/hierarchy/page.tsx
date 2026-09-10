@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { requirePermission } from '@/lib/auth'
 import { revenuePath } from '@/lib/revenue'
 import { titleCanRecruit } from '@/lib/commission/titles'
-import { rankLabelOf } from '@/lib/commission/ranks'
+import { rankLabelOf, rankPayLabelOf } from '@/lib/commission/ranks'
 import HierarchyTabs from './_components/HierarchyTabs'
 import type { OrgPerson, OrgRank } from './_components/OrgChart'
 import { loadTeam } from '../../_components/config/load'
@@ -41,6 +41,8 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
   // 2026-09-05) — so the chart and the table say "Rank B · 8%", never the
   // title with the rate stapled on.
   const shortLabel = new Map(team.ranks.map(r => [r.id, r.label]))
+  const payLabels = new Map(team.ranks.map(r => [r.id, rankPayLabelOf(r)]))
+  const packageRanks = new Set(team.ranks.filter(r => Number(r.group_incentive_amount ?? 0) > 0).map(r => r.id))
 
   const ranks: OrgRank[] = team.ranks.map(r => ({
     id: r.id,
@@ -67,12 +69,18 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
       rankId: p.rank_id,
       rankLabel: rank ? (shortLabel.get(rank.id) ?? null) : null,
       productRate: rank?.productRate ?? null,
+      rankPayLabel: rank ? payLabels.get(rank.id) : undefined,
+      isGroupPackage: rank ? packageRanks.has(rank.id) : false,
       // Who may hold downlines follows the TITLE held here (user 2026-09-03):
       // a Team Assistant back on 5% for a month keeps their team. A title the
       // ladder does not carry cannot lead anyone here.
       canRecruit: titleCanRecruit(ranks, p.title_id) ?? false,
       rateMode: p.rate_mode,
       placedSince: p.placed_since,
+      directLineCount: p.direct_line_count,
+      directLineLimit: p.direct_line_limit,
+      expansionEarnedAt: p.expansion_earned_at,
+      expansionSourcePeriod: p.expansion_source_period,
     }
   })
 

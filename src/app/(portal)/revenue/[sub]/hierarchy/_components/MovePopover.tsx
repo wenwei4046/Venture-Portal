@@ -38,6 +38,9 @@ export function subjectOf(p: OrgPerson): MoveSubject {
     canRecruit: p.canRecruit,
     levelRank: p.levelRank,
     levelName: p.levelName,
+    uplineStaffId: p.uplineStaffId,
+    directLineCount: p.directLineCount,
+    directLineLimit: p.directLineLimit,
   }
 }
 
@@ -149,6 +152,8 @@ export default function MovePopover({ mover, people, graph, anchor, onPick, onCl
         <span className="tt">
           {p.titleName ?? 'no title'}
           {p.rankLabel ? ` · ${p.rankLabel.replace(/^rank\s+/i, '')}` : ''}
+          {p.directLineLimit != null ? ` · ${p.directLineCount ?? 0}/${p.directLineLimit} directs` : ''}
+          {p.expansionEarnedAt ? ' · SDL earned' : ''}
         </span>
         {current ? (
           <span className="cur">current</span>

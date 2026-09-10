@@ -154,6 +154,8 @@ export function safeReason(error: { code?: string; message: string }): string {
     case '23BND':
     case '23REC':
     case '23RNK':
+    case '23CAP':
+    case '23MEM':
       return error.message
     case '23P01':
       return 'they already hold a position covering that period'
@@ -334,9 +336,8 @@ interface PositionPatch {
  *                        what `one_position_per_scheme` (an EXCLUDE over
  *                        `scheme_id` + `staff_id` + daterange) demands.
  *
- * Every step is checked, including the roll-back: if the restore itself fails
- * the caller is told exactly that, because the person then holds NO open
- * position here and would be paid nothing next month.
+ * The replacement is one database transaction. A capacity refusal must roll
+ * back the close too, even if another move is competing for the same slot.
  */
 async function writeEffectiveDated(
   supabase: SupabaseClient,
@@ -344,7 +345,6 @@ async function writeEffectiveDated(
   position: OpenPosition,
   patch: PositionPatch,
 ): Promise<void> {
-  const from = currentPeriodStart()
   const next = {
     upline_staff_id: 'uplineStaffId' in patch ? (patch.uplineStaffId ?? null) : position.uplineStaffId,
     rank_id: patch.rankId ?? position.rankId,
@@ -352,37 +352,15 @@ async function writeEffectiveDated(
     rate_mode: 'rateMode' in patch ? (patch.rateMode ?? null) : position.rateMode,
   }
 
-  if (position.effectiveFrom >= from) {
-    await updateChecked(supabase, 'comm_hierarchy', position.id, next, 'Could not update their position')
-    return
-  }
-
-  await updateChecked(
-    supabase,
-    'comm_hierarchy',
-    position.id,
-    { effective_to: dayBefore(from) },
-    'Could not close their old position',
-  )
-
-  const { error } = await supabase.from('comm_hierarchy').insert({
-    scheme_id: position.schemeId,
-    staff_id: position.staffId,
-    ...next,
-    effective_from: from,
-    created_by: userId,
+  const { error } = await supabase.rpc('comm_replace_membership_position', {
+    p_position_id: position.id,
+    p_upline_staff_id: next.upline_staff_id,
+    p_rank_id: next.rank_id,
+    p_title_id: next.title_id,
+    p_rate_mode: next.rate_mode,
+    p_actor: userId,
   })
-  if (!error) return
-
-  const reason = safeReason(error)
-  try {
-    await updateChecked(supabase, 'comm_hierarchy', position.id, { effective_to: null }, 'restore')
-  } catch {
-    throw new Error(
-      `Could not record the new position (${reason}), and their old one could not be reopened — they now hold NO open position here and would be paid nothing next month. Set them again on the Team tab.`,
-    )
-  }
-  throw new Error(`Could not record the new position: ${reason}`)
+  if (error) throw new Error(`Could not record the position: ${safeReason(error)}`)
 }
 
 /** The scheme's rungs in the shape titles.ts reasons about. */

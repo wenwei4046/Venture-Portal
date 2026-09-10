@@ -57,6 +57,7 @@ export interface ImportOrderDto {
 }
 
 export interface CommitInput {
+  subDepartmentId: string
   periodMonth: string
   fileName: string
   sheetName: string | null
@@ -103,12 +104,26 @@ export async function commitSalesImport(input: CommitInput): Promise<CommitResul
     throw new Error('Nothing to import for that month')
   }
 
+  const { data: scheme, error: schemeError } = await supabase
+    .from('comm_schemes')
+    .select('id, enable_open_bill')
+    .eq('sub_department_id', input.subDepartmentId)
+    .eq('is_active', true)
+    .is('effective_to', null)
+    .single()
+  if (schemeError || !scheme) throw new Error('Choose a sub-department with an active commission scheme.')
+  if (input.orders.some(o => o.periodMonth !== input.periodMonth)) {
+    throw new Error('Every imported order must belong to the selected month.')
+  }
+
   // A run that has already paid out must not have its source data swapped.
-  const { data: run } = await supabase
+  const { data: run, error: runError } = await supabase
     .from('comm_runs')
     .select('status')
+    .eq('sub_department_id', input.subDepartmentId)
     .eq('period_month', input.periodMonth)
     .maybeSingle()
+  if (runError) throw new Error(`Could not check the commission run: ${runError.message}`)
   if (run && ['applied', 'locked'].includes((run as { status: string }).status)) {
     throw new Error(
       `The ${input.periodMonth.slice(0, 7)} commission run is already ${(run as { status: string }).status} — reopen it before re-importing.`,
@@ -117,13 +132,15 @@ export async function commitSalesImport(input: CommitInput): Promise<CommitResul
 
   // A month the ERP feeds live is not replaced by a file: the import would
   // supersede the live batch and every later delivery would be held.
-  const { data: liveBatch } = await supabase
+  const { data: liveBatch, error: liveError } = await supabase
     .from('sales_import_batches')
     .select('id')
+    .eq('sub_department_id', input.subDepartmentId)
     .eq('period_month', input.periodMonth)
     .eq('status', 'committed')
     .eq('source', 'erp_sync')
     .maybeSingle()
+  if (liveError) throw new Error(`Could not check existing sales: ${liveError.message}`)
   if (liveBatch) {
     throw new Error(
       `${input.periodMonth.slice(0, 7)} is fed live from the ERP. A file import would replace what the feed delivered — it is not needed for a live month.`,
@@ -166,17 +183,11 @@ export async function commitSalesImport(input: CommitInput): Promise<CommitResul
     return prefixes.find(p => code.startsWith(p.prefix))?.code ?? null
   }
 
-  // ── Supersede the month's previous batch ───────────────────────────────
-  const { error: supersedeError } = await supabase
-    .from('sales_import_batches')
-    .update({ status: 'superseded', superseded_at: new Date().toISOString() })
-    .eq('period_month', input.periodMonth)
-    .eq('status', 'committed')
-  if (supersedeError) throw new Error(`Could not retire the previous import: ${supersedeError.message}`)
-
+  // Keep the previous committed batch until all new rows are staged.
   const { data: batch, error: batchError } = await supabase
     .from('sales_import_batches')
     .insert({
+      sub_department_id: input.subDepartmentId,
       period_month: input.periodMonth,
       file_name: input.fileName,
       sheet_name: input.sheetName,
@@ -276,32 +287,6 @@ export async function commitSalesImport(input: CommitInput): Promise<CommitResul
     if (error) throw new Error(`Could not write the order lines: ${error.message}`)
   }
 
-  // ── Open Bill suggestions ──────────────────────────────────────────────
-  // The ERP's Date cells carry no time, so the running document number is the
-  // only usable proxy for which bill was written first that day. These land as
-  // suggestions for a human to review on the Open Bill board, never as final.
-  let openBillsSuggested = 0
-  if (input.suggestOpenBills) {
-    const tags = input.orders
-      .filter(o => o.sequenceInDay >= 1 && o.sequenceInDay <= 3 && staffByAgent.get(o.agentKey))
-      .map(o => ({
-        order_id: insertedIds.get(o.orderNo)!,
-        staff_id: staffByAgent.get(o.agentKey)!,
-        event_date: o.eventDate,
-        bill_rank: o.sequenceInDay,
-        auto_suggested: true,
-        tagged_by: user.id,
-      }))
-      .filter(t => t.order_id)
-
-    for (const part of chunk(tags, 300)) {
-      const { error } = await supabase.from('sales_order_open_bill_tags').insert(part)
-      // A clash only means a human already picked that rank for that day —
-      // their pick wins, so this is not worth failing the whole import over.
-      if (!error) openBillsSuggested += part.length
-    }
-  }
-
   // ── Remember the agent matches ─────────────────────────────────────────
   if (input.saveAliases) {
     const newAliases = Object.entries(input.agentMap)
@@ -317,10 +302,10 @@ export async function commitSalesImport(input: CommitInput): Promise<CommitResul
     }
   }
 
-  const { error: commitError } = await supabase
-    .from('sales_import_batches')
-    .update({ status: 'committed' })
-    .eq('id', batchId)
+  const { data: suggested, error: commitError } = await supabase.rpc('commit_sales_import_batch', {
+    p_batch_id: batchId,
+    p_suggest_open_bills: input.suggestOpenBills && scheme.enable_open_bill,
+  })
   if (commitError) throw new Error(`Import written but could not be committed: ${commitError.message}`)
 
   revalidatePath('/revenue', 'layout')
@@ -332,7 +317,7 @@ export async function commitSalesImport(input: CommitInput): Promise<CommitResul
     unmatchedAgents,
     linesWithoutCost,
     linesWithoutBrand,
-    openBillsSuggested,
+    openBillsSuggested: Number(suggested ?? 0),
   }
 }
 

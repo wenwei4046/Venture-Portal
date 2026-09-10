@@ -263,7 +263,91 @@ arrangements, from time to time depending on business needs.
   (with the document); the subsidy then pays every month without a fresh claim,
   re-submitted only when the instalment changes. **No statutory deductions** on
   it (outside the EPF / SOCSO / PCB base).
-- **"取代" vs "separate":** asked whether RM6,000 replaces the 4% or sits on top
-  of it, the user answered 取代 (replaces) — but §5 above says the group
-  incentive "is separate from the basic 4% commission", and §12 lists STL at
-  4%. **Unresolved; confirm before modelling the STL rank.**
+- **STL payout — resolved on resumption, 2026-09-11:** the user explicitly
+  confirmed: **"取代 4%：只拿 RM6,000／达标组，另计补贴"**. The RM6,000 per
+  qualifying group REPLACES the 4% commission; the RM2,000 subsidy per qualifying
+  group remains separate. This management decision supersedes the additive
+  wording in §§3.4, 5 and 12 above, which is preserved as the original source.
+  Attribution of the STL's own sales among groups is still awaiting an answer.
+- **Qualification period and recurring payment — resolved, 2026-09-11:**
+  the user confirmed **"每月重新计算，每个达标月都发 RM6,000／组"**. TL's
+  RM800,000 group-sales threshold and STL's RM1,000,000 per-group threshold
+  are assessed afresh each calendar month, without carrying sales forward
+  to meet the following month's target. RM6,000 is paid for each qualifying
+  group in every qualifying month, not only on first achievement.
+
+## Further management clarifications — 2026-09-11 continuation
+
+These answers supersede conflicting statements above, including the earlier
+pending-attribution note. Sections 1–12 remain the original annexure.
+
+- **RS remains 3%.** The user reconfirmed 3%, not 3.3%. TA remains 3.5%; TL
+  remains 4%. TA's personal qualification is RM200,000 in each of two
+  consecutive months, and TL's monthly group target is RM800,000.
+- **Two generations only.** Ordinary group targets include a person's own
+  sales, their directs' own sales and those directs' immediate children's own
+  sales. No deeper generation contributes. Percentage overrides use the
+  existing compressed differential calculation, stopped after two actual
+  reporting layers. For TL 4% → TA 3.5% → RS 3%, the RS's sale pays RS 3%,
+  TA 0.5% and TL 0.5%. An equal-rate layer still consumes one of the two
+  layers; it is not skipped to reach a more distant upline.
+- **The leader's personal sales count in every direct group.** Each group is
+  the leader's own sales + that direct's own sales + that direct's immediate
+  children's own sales. The leader's own amount is intentionally repeated
+  for each group's qualification. Thus own RM200,000 plus direct-group A's
+  RM800,000 qualifies A, and the same own RM200,000 plus group B's RM800,000
+  qualifies B. The leader receives RM12,000 group incentive with RM4,000
+  separate subsidy cap. Personal sales themselves are never rewritten or
+  multiplied, and overlapping group figures are not actual total revenue.
+- **One fixed package per qualifying group.** RM1,000,000 qualifies for
+  RM6,000 plus a separate RM2,000 subsidy cap. A group at RM1.5M, RM2M or more
+  still earns one package, not multiples of the target. Groups qualify
+  independently; spare revenue from one does not fill another group's gap.
+- **No TL-title or three-child prerequisite for the group incentive.** A
+  single direct line reaching RM1M under the formula is sufficient. That
+  direct need not be a Team Leader or have three children. A qualifying TA
+  can move directly to the STL package without first spending a month at TL.
+- **Package replaces percentage pay in qualifying months.** When at least
+  one group qualifies, the recipient receives the group incentive instead
+  of personal percentage commission and percentage override. If no group
+  qualifies in the following month, pay the TL 4% percentage structure for
+  that month, even if the person already holds an STL title/rank. Reassess
+  commission and subsidy every calendar month; a retained title does not
+  guarantee the package.
+- **Full Spec and expansion are separate from the first group incentive.**
+  Before earning SDL expansion, TA, TL and STL may hold at most three direct
+  lines. Full Spec requires
+  three directs, each itself holding three immediate directs, with all three
+  groups independently reaching RM1M. Full Spec earns the higher **SDL**
+  level and eligibility for a fourth direct. The latest opening-month
+  clarification narrows the earlier permanent-entitlement wording:
+  **already opened lines remain available** after a weak month, while an
+  unused qualification does not permit an opening in a later weak month.
+  Monthly commission and subsidy still depend on that month's qualifying
+  groups.
+- **Fourth and later groups earn the same package.** The user confirmed that
+  the leader's personal sales also repeat in the fourth and every later
+  group's target. Every independently qualifying RM1M group earns RM6,000
+  cash plus a separate RM2,000 subsidy cap for that month.
+- **All existing lines must qualify in the actual opening month.** After
+  the initial Full Spec stage, all four existing lines must reach RM1M in
+  the calendar month the fifth line actually opens. All five must qualify
+  in the month the sixth opens, and the same rule continues one line at a
+  time. Earlier qualification cannot bank an unused place for a later weak
+  month. Later expansion does not require the newly added line or each
+  existing line to have three children. The new line qualifying alone is
+  insufficient when an older line misses its target. That missed target
+  blocks expansion for the month, but other qualifying lines still earn
+  their individual packages. Already opened lines and slots are retained.
+- **Subsidy remains outside cash commission.** The RM2,000 per qualifying
+  group is a cap for the registered hire-purchase arrangement, not automatic
+  cash salary. Keep its previously confirmed one-time registration and no
+  statutory deductions.
+
+Still awaiting rules/data: the IR deposit gate, Appointment/Closing data and percentage denominators,
+the introducer split, and confirmation/data for house assignments. These
+clarifications record requirements. The package and opening-month expansion
+implementation is tracked in [PR #82](https://github.com/wenwei4046/Venture-Portal/pull/82);
+its checks and deployment links record the release outcome. See `HANDOFF.md`
+for preflight validation, the rollback-only production rehearsal and remaining
+work. Releasing the implementation does not compute or apply an IR payout.

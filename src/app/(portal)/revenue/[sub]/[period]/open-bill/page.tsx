@@ -36,11 +36,16 @@ export default async function OpenBillPage({ params }: PageProps) {
 
   const subDept = await requireSubDepartment(sub)
   const supabase = (await createClient()) as unknown as SupabaseClient
+  const { data: scheme } = subDept.schemeId
+    ? await supabase.from('comm_schemes').select('enable_open_bill').eq('id', subDept.schemeId).single()
+    : { data: null }
+  if (!scheme?.enable_open_bill) notFound()
 
   const { data: batch } = await supabase
     .from('sales_import_batches')
     .select('id')
     .eq('period_month', period)
+    .eq('sub_department_id', subDept.id)
     .eq('status', 'committed')
     .maybeSingle()
   const batchId = (batch as { id: string } | null)?.id ?? null
@@ -64,23 +69,8 @@ export default async function OpenBillPage({ params }: PageProps) {
     hr_staff_costs: { employee_name: string } | null
   }>
 
-  // The batch is the whole department's, but the rates below the title are
-  // THIS scheme's — so the board has to be this sub-department's people, or it
-  // would price another team's bills at rules that never touch them. Since
-  // 2026-09-10 a person may be a member of several sub-departments, so the
-  // question is membership HERE; somebody who is a member nowhere is shown,
-  // because they may join before the run.
-  const { data: positionRows } = await supabase
-    .from('comm_hierarchy')
-    .select('staff_id, scheme_id')
-    .is('effective_to', null)
-  const memberHere = new Set<string>()
-  const memberElsewhere = new Set<string>()
-  for (const p of (positionRows ?? []) as Array<{ staff_id: string; scheme_id: string }>) {
-    if (p.scheme_id === subDept.schemeId) memberHere.add(p.staff_id)
-    else memberElsewhere.add(p.staff_id)
-  }
-  const rawOrders = allOrders.filter(o => memberHere.has(o.staff_id) || !memberElsewhere.has(o.staff_id))
+  // The batch owns these orders even if their salesperson's membership needs repair.
+  const rawOrders = allOrders
 
   const ids = rawOrders.map(o => o.id)
   const { data: tagRows } = ids.length
@@ -124,16 +114,13 @@ export default async function OpenBillPage({ params }: PageProps) {
     rates[r.bill_rank] = Number(r.pct)
   }
 
-  // Locked once THIS sub-department's run has paid the month; another
-  // sub-department applying its own run does not freeze these picks.
-  const { data: runData } = await supabase
-    .from('comm_runs')
-    .select('status')
-    .eq('period_month', period)
-    .eq('sub_department_id', subDept.id)
-    .in('status', ['applied', 'locked'])
-    .limit(1)
-  const readOnly = ((runData ?? []) as Array<{ status: string }>).length > 0
+  // The run that paid carried-forward sales also protects their source month.
+  const { data: locked, error: lockError } = await supabase.rpc('commission_order_period_locked', {
+    p_sub_department_id: subDept.id,
+    p_period: period,
+  })
+  if (lockError) throw new Error(`Could not check the commission run: ${lockError.message}`)
+  const readOnly = Boolean(locked)
 
   return (
     <div>

@@ -19,7 +19,8 @@ import {
 
 interface Props {
   period: string
-  /** Only for the "back to the run" links — the import itself is department-wide. */
+  subDepartmentId: string
+  enableOpenBill: boolean
   subDeptSlug: string
   staff: Array<{ id: string; name: string; code: string | null }>
   aliases: Record<string, string>
@@ -37,14 +38,14 @@ interface Props {
  * cancelled) and what it cannot resolve (unmatched agents), not with what it
  * will keep.
  */
-export default function SalesImportWizard({ period, subDeptSlug, staff, aliases }: Props) {
+export default function SalesImportWizard({ period, subDeptSlug, subDepartmentId, enableOpenBill, staff, aliases }: Props) {
   const router = useRouter()
   const [stage, setStage] = useState<'upload' | 'review' | 'done'>('upload')
   const [fileName, setFileName] = useState('')
   const [parsed, setParsed] = useState<ErpParseResult | null>(null)
   const [agentMap, setAgentMap] = useState<Record<string, string>>({})
   const [saveAliases, setSaveAliases] = useState(true)
-  const [suggestOpenBills, setSuggestOpenBills] = useState(true)
+  const [suggestOpenBills, setSuggestOpenBills] = useState(enableOpenBill)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<CommitResult | null>(null)
   const [pending, startTransition] = useTransition()
@@ -99,6 +100,7 @@ export default function SalesImportWizard({ period, subDeptSlug, staff, aliases 
     startTransition(async () => {
       try {
         const r = await commitSalesImport({
+          subDepartmentId,
           periodMonth: period,
           fileName,
           sheetName: parsed.sheetName || null,
@@ -358,7 +360,7 @@ export default function SalesImportWizard({ period, subDeptSlug, staff, aliases 
             />
             Remember these matches for next month
           </label>
-          <label className="inline-flex items-center gap-2 text-sm font-sans text-graphite">
+          {enableOpenBill ? <label className="inline-flex items-center gap-2 text-sm font-sans text-graphite">
             <input
               type="checkbox"
               checked={suggestOpenBills}
@@ -366,7 +368,7 @@ export default function SalesImportWizard({ period, subDeptSlug, staff, aliases 
               className="h-4 w-4 accent-[var(--accent)]"
             />
             Suggest the 1st/2nd/3rd bill of each day from the document numbers
-          </label>
+          </label> : null}
         </div>
 
         {unmatched.length > 0 ? (

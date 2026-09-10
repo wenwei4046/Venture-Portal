@@ -72,6 +72,9 @@ export interface SchemeRow {
   enable_override: boolean
   enable_margin_penalty: boolean
   enable_margin_incentive: boolean
+  enable_group_incentive?: boolean
+  group_sales_depth?: number | null
+  override_depth?: number | null
 }
 
 export interface RankRow {
@@ -81,6 +84,8 @@ export interface RankRow {
   titles: { name: string } | { name: string }[] | null
   label: string
   product_rate: Num
+  group_incentive_amount?: Num
+  group_subsidy_cap?: Num
   can_recruit: boolean
   group_sales_threshold: Num
   personal_sales_threshold: Num
@@ -227,6 +232,8 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
     titleLabel: one(r.titles)?.name ?? r.label,
     label: r.label,
     productRate: num(r.product_rate),
+    groupIncentiveAmount: num(r.group_incentive_amount),
+    groupSubsidyCap: num(r.group_subsidy_cap),
     canRecruit: r.can_recruit,
     groupSalesThreshold: numOrNull(r.group_sales_threshold),
     personalSalesThreshold: numOrNull(r.personal_sales_threshold),
@@ -338,6 +345,9 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
       enableOverride: rows.scheme.enable_override,
       enableMarginPenalty: rows.scheme.enable_margin_penalty,
       enableMarginIncentive: rows.scheme.enable_margin_incentive,
+      enableGroupIncentive: rows.scheme.enable_group_incentive ?? false,
+      groupSalesDepth: rows.scheme.group_sales_depth ?? null,
+      overrideDepth: rows.scheme.override_depth ?? null,
       itemGroups,
       depositThresholdPct: numOrNull(rows.scheme.deposit_threshold_pct),
       defaultRateMode: rows.scheme.default_rate_mode,
@@ -403,6 +413,10 @@ export interface StatementDto {
   margin_pct: number | null
   margin_band_key: string | null
   margin_incentive: number
+  group_incentive: number
+  group_subsidy_cap: number
+  group_breakdown: NonNullable<Statement['groupBreakdown']>
+  full_spec: boolean
   margin_penalty_withheld: number
   total_commission: number
   lines: StatementLineDto[]
@@ -479,6 +493,10 @@ function toStatementDto(s: Statement): StatementDto {
     margin_pct: s.marginPct,
     margin_band_key: s.marginBandKey,
     margin_incentive: s.marginIncentive,
+    group_incentive: s.groupIncentive ?? 0,
+    group_subsidy_cap: s.groupSubsidyCap ?? 0,
+    group_breakdown: s.groupBreakdown ?? [],
+    full_spec: s.fullSpec ?? false,
     margin_penalty_withheld: s.marginPenaltyWithheld,
     total_commission: s.totalCommission,
     lines: s.lines.map(l => ({

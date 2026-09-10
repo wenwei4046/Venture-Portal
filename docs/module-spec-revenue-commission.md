@@ -8,6 +8,11 @@ run yet** (§12).
 Owner: Principal + HR.
 Related: `module-spec-phase3.md` (HR Costing), `db-schema.md`, `DESIGN.md`.
 
+Programme scope: the original percentage ladder, unlimited group/override
+roll-up and one-rung progression below describe **Fair**. IR's confirmed
+exceptions and current implementation boundary are in **§15**; do not
+cross-apply the two programmes.
+
 ---
 
 ## 1. Problem
@@ -29,7 +34,8 @@ So payroll gains a second **source type**:
 | `commission` | ERP sales export → commission engine | Revenue Department |
 
 Commission settles **month to month on the calendar month** — August = 1 Aug
-through 31 Aug (user, 2026-08-31).
+through 31 Aug (Fair: user, 2026-08-31; IR monthly qualification and recurring
+group incentive: user, 2026-09-11, §15).
 
 ---
 
@@ -175,7 +181,7 @@ that would slug to a reserved static child (`products`) or collide with an
 existing one — a shadowed sub-department would be unreachable rather than
 broken, and only its creator would ever find out.
 
-### 3.1 The tier ladder
+### 3.1 The tier ladder (Fair)
 
 | Tier | Rates | Notes |
 |---|---|---|
@@ -208,7 +214,9 @@ those compare titles *across* departments for the People org chart, while the
 commission ladder is the one authority on which Revenue title outranks which,
 because that is what the rate follows.
 
-**A rank is its rate, lettered from the top** (user 2026-09-05):
+**Fair's percentage ranks are lettered from the top by rate** (user 2026-09-05).
+IR adds a package rank ordered above percentage ranks; see §15.3. The
+following rate-only catalogue history describes Fair:
 
 > Rank 你不用想一个名字 … 它直接变成 Rank A equal to 5% rate 这样。可能从 Rank H
 > 以此类推到 Rank A，最高到 SS，这样反推过去，它就是 equal with 它的 rate。
@@ -340,7 +348,7 @@ may; only somebody with no title yet is judged by the rank they were placed
 at. Enforced in three places with one helper (`src/lib/commission/titles.ts`):
 the engine's warning, `setPosition`'s guard, and the two pages' upline pickers.
 
-### 3.2 Group sales — what the threshold measures
+### 3.2 Group sales — what the threshold measures (Fair)
 
 **Group sales = the person's own commissionable revenue + their entire downline
 subtree's**, for that month. The user's example:
@@ -764,7 +772,7 @@ New tables. `sales_*` = imported facts, `comm_*` = config + results. The dormant
 | `comm_promotion_rules` | the promotion criteria, recorded with `is_enforced = FALSE` |
 | `comm_hierarchy` | effective-dated upline + attained rank + `rate_mode`; one position per person |
 | `comm_agent_aliases` | ERP agent name → `hr_staff_costs` |
-| `sales_import_batches` | one per file; one `committed` batch per period |
+| `sales_import_batches` | one per file; one `committed` batch per sub-department and period |
 | `sales_orders` / `sales_order_lines` | the raw facts, plus `brand_code`, `cost_amount` and `raw` JSONB |
 | `sales_order_open_bill_tags` | the picks, with `auto_suggested` |
 | `comm_runs` | one per sub-department per month |
@@ -1037,10 +1045,11 @@ page.)*
 ## 10. Other UI
 
 Every route below `/revenue/<sub>` is scoped to that sub-department: its runs
-(`uq_comm_run_per_sub_dept_period`), its scheme's rules, its people. The sales
-import is the one exception — one ERP export per month covers the whole
-department, so `sales_import_batches` is keyed by period alone and the slug in
-that URL is only where Back returns to.
+(`uq_comm_run_per_sub_dept_period`), its scheme's rules, its people and its
+sales batches. The IR continuation adds `sales_import_batches.sub_department_id`
+and one committed batch per (sub-department, period). Carry-forward and paid
+order identities use that same boundary. The existing Houzs ERP feed always
+belongs to Fair; an IR file import cannot supersede Fair's batch.
 
 | Route | Purpose |
 |---|---|
@@ -1050,7 +1059,7 @@ that URL is only where Back returns to.
 | `…/<sub>/rules` | **Rules** — every rule the engine reads (§9) |
 | `…/<sub>/[period]` | run dashboard: hero total, per-salesperson `.ledger-table` (PR / group / C1 / KPI / Open Bill / Override / Incentive / Total), warnings, penalised bills, orders waiting on a deposit, Compute + Apply + Reopen |
 | `…/<sub>/[period]/statement/[staffId]` | one salesperson's month ringgit by ringgit — the figures, margin brand by brand, and a section per component drilling into `comm_statement_lines` |
-| `…/<sub>/[period]/import` | ERP import wizard: parse → period + cancelled report → **agent matching** → commit. Department-wide |
+| `…/<sub>/[period]/import` | Sales import wizard: parse → period + cancelled report → **agent matching** → commit, scoped to this sub-department |
 | `…/<sub>/[period]/open-bill` | day-by-day board, pre-filled from `sequence_in_day`, reviewed by a human. Defaults to the salesperson-days still on a suggestion |
 | `/revenue/products` | item code → unit cost + brand — department-wide, Principal only |
 
@@ -1218,3 +1227,164 @@ machine-ingest exception in CLAUDE.md.
 - No commission accrual JV separate from the existing payroll accrual.
 - The Revenue Department's own P&L, billing mode and pool 1090 flows are out of
   scope (step 13).
+
+---
+
+## 15. Investment Renovation (IR) — opening-month expansion gate confirmed, 2026-09-11
+
+IR is a separate programme from Fair. The source annexure is
+`revenue-ir-annexure.md`; its original wording is preserved there. Explicit
+management answers below take precedence over conflicting annexure text.
+The implementation is tracked in [PR #82](https://github.com/wenwei4046/Venture-Portal/pull/82),
+including its release checks and deployment links. After integrating
+`origin/main` at `177f0a0`, 1,147 tests passed; 120 disposable-database checks
+cover the six migrations and expanded payouts. The implementation build
+passed before release, and all six migrations passed a rollback-only
+production rehearsal with the 60 payroll rows unchanged. These preflight
+results do not themselves establish a completed deployment. See `HANDOFF.md`
+for the migration list and remaining work. The fourth-line payout and
+subsequent expansion rules are confirmed below. Recurring subsidy Claims
+are a later batch.
+
+### 15.1 Confirmed decisions
+
+- **Percentage ladder:** RS remains **3%**, confirmed after a question about
+  3.3%; TA is 3.5%, earned by RM200,000 personal sales in each of two
+  consecutive months; TL is 4%, with an RM800,000 monthly group target.
+  RS cannot recruit. TA/TL/STL may hold up to three direct lines before
+  earning SDL expansion entitlement.
+- **STL package replaces percentage pay when a group qualifies.** The user
+  reconfirmed "取代 4%：只拿 RM6,000／达标组，另计补贴". At least one
+  qualifying group switches the month's payout to RM6,000 per qualifying
+  group, with no personal percentage commission or percentage override.
+  The car/property subsidy has a separate RM2,000 cap per qualifying group.
+  A group at RM1.5M, RM2M or more still pays exactly one package.
+- **Monthly qualification and recurring group incentive.** Confirmed by the
+  user on 2026-09-11: "每月重新计算，每个达标月都发 RM6,000／组". Assess
+  TL's RM800,000 group-sales threshold and each STL group's RM1,000,000
+  threshold afresh each calendar month. Do not accumulate sales across
+  months to reach those targets. Pay RM6,000 per qualifying group in every
+  qualifying month; it is not a one-time promotion reward. For example, a
+  group with RM600,000 in August and RM400,000 in September qualifies in
+  neither month; RM1,000,000 in each month qualifies for RM6,000 in each.
+- **Fallback is explicitly TL 4%.** If no direct group qualifies next month,
+  pay the TL 4% percentage structure for that month, even with a persisted
+  STL title or rank. This restores percentage commission and applicable
+  two-layer overrides. A title remains earned; monthly package pay does not.
+- **Ordinary group targets count two generations:** own personal sales +
+  directs' personal sales + their immediate children's personal sales. The
+  third generation and deeper are excluded. This applies to all IR ranks.
+- **Each package group reuses the leader's own sales:** for a leader L and
+  direct D, its qualifying revenue is `personal(L) + personal(D) +
+  sum(personal(C) for C reporting directly to D)`. Personal(L) deliberately
+  appears in every direct group's target. Own RM200,000 plus A's RM800,000
+  and B's RM800,000 gives two qualifying RM1M groups: RM12,000 cash incentive
+  and RM4,000 separate subsidy cap. Actual combined revenue is RM1.8M;
+  never sum the overlapping group targets into personal/actual revenue.
+  Each group must independently meet RM1M; one group's surplus cannot make
+  up another group's shortfall.
+- **The first group incentive needs no TL title or three-child structure.**
+  A direct line reaching the target under that formula is sufficient. The
+  direct need not itself be TL, and can have zero children. A qualifying TA
+  can reach the STL package without first spending a month at TL; Fair's
+  one-rung-per-month restriction does not block this IR package qualification.
+- **Overrides use compressed percentage differences over two actual layers.**
+  TL 4% → TA 3.5% → RS 3% on an RS sale pays RS 3%, TA 0.5%, TL 0.5%.
+  The rate already paid below is the maximum encountered; equal-rate layers
+  pay zero but still consume a layer. Stop after two links, with no payment
+  or target contribution from a third layer. Package recipients receive no
+  percentage override in qualifying months.
+- **Full Spec earns SDL eligibility for the initial expansion.** Full Spec means
+  three direct lines, each holding three immediate directs, and all three
+  groups independently qualifying at RM1M. This earns the higher **SDL**
+  level and eligibility for a fourth direct. Already opened lines remain
+  available after a weak month. The latest clarification limits the earlier
+  permanent-entitlement interpretation: unused qualification does not grant
+  an opening in a later weak month. Full Spec is not required to earn the
+  first STL group package.
+- **The fourth and later groups use the same payout formula.** Every line
+  repeats the leader's own personal sales in its two-layer RM1M target and
+  independently earns RM6,000 cash plus a separate RM2,000 subsidy cap.
+- **Expansion is gated by the actual opening month.** After the initial
+  Full Spec stage, four existing lines must all meet RM1M in the calendar
+  month the fifth line actually opens; five of five must qualify in the
+  month the sixth opens, and so on. An unused qualification from an earlier
+  month cannot be banked for a later weak month. Add one line at each stage,
+  with no upper limit specified. These later stages do not require each
+  line to have three immediate children. A weak line prevents expansion
+  that month, even if the newest line qualifies, but every independently
+  qualifying line still earns its package. Already opened lines and their
+  slots remain available in later weak months; future expansion beyond that
+  opened capacity requires current-month qualification again.
+- **Subsidy registration is once per instalment arrangement.** Register the
+  hire-purchase document once, then pay monthly subject to qualification and
+  the applicable instalment/cap. Re-submit when the instalment changes.
+  It is a non-cash benefit through Claims, with no statutory deductions;
+  do not add it to the engine's cash commission total.
+- **Keep Fair's rules separate.** IR does not use Fair's KPI item allowance,
+  Open Bill bonus, margin penalty or margin incentive. Its deposit gate is
+  still undecided.
+
+### 15.2 Questions still requiring business answers
+
+1. Where do Appointment and Closing figures come from, who maintains them,
+   and is the tier fixed per person or assessed monthly? Percentage
+   denominators must be defined before the tier KPI can be computed.
+2. What is the introducer's closing percentage and how is it split with the
+   closer?
+3. Confirm the house-assignment amount is RM10 per house per month and supply
+   the assignment dates/data source.
+4. Define IR's deposit gate. Until answered, do not silently copy Fair's 50%.
+
+### 15.3 Implementation boundaries identified during resumption
+
+- **Package order and catalogue:** model rate, group-incentive amount and
+  per-group subsidy cap explicitly. Package ranks sort above percentage
+  ranks even with a zero product rate. Letters remain generated SS, A, B…;
+  they are not manually named. Catalogue uniqueness and cloning must use
+  the full package rather than rate alone, so same-rate distinct packages
+  do not collapse. Preserve Fair's existing percentage order and labels.
+- **Pure group helper:** `src/lib/commission/ir-groups.ts` returns a separate
+  breakdown for each direct: leader personal, direct personal, second-layer
+  personal contributions, target result, fixed incentive and subsidy cap.
+  It intentionally reuses leader revenue without mutating personal sales,
+  rejects corrupt hierarchy qualification, and reports monthly Full Spec.
+  The highest already opened SDL capacity must be persisted separately from
+  current-month eligibility so existing slots survive later missed targets.
+  Keep immutable evidence of each qualification; historical evidence does
+  not bank an unused right to open a line in a later weak month. The initial
+  three-by-three Full Spec test remains distinct from later
+  all-existing-lines qualification.
+- **Engine settings:** `groupSalesDepth = 2`, `overrideDepth = 2`, and
+  `enableGroupIncentive = true` select IR's behavior. Absent depth settings
+  preserve Fair's full tree/chain. A package rank supplies its monthly
+  `groupSalesThreshold`, `groupIncentiveAmount`, and `groupSubsidyCap`.
+  Percentage fallback is the TL rung below STL, including for somebody
+  whose stored rank/title has already reached STL. A package without its
+  group target must warn and block applying the run.
+- **Statements/payroll:** emit one `group_incentive` statement line per
+  qualifying group, include it in component totals and `total_commission`,
+  and persist the qualifying-group breakdown. Keep `group_subsidy_cap`
+  outside the cash total; Claims consumes this cap later. Maintain exact
+  rounded line/component/run totals and the existing sum across applied
+  sub-departments in shared payroll.
+- **Hierarchy:** IR is a non-home sub-department and edits its own
+  memberships. Enforce direct-line limits in the membership write/DB path
+  as well as the chart; changing only `reports_to` would miss IR entirely.
+  Start at three places, retain the highest already opened capacity in
+  `opened_direct_line_limit`, and require current-period eligibility before
+  an opening exceeds it. Four is the first expansion, not a permanent
+  maximum. Migration `20260911060000_progressive_ir_direct_lines.sql` records
+  opened capacity, effective current-period limits and immutable
+  qualification evidence.
+- **Order isolation prerequisite:** scope batches and carry-forward orders
+  by sub-department before accepting IR's separate sales feed, including
+  committed-batch uniqueness and the Fair ERP ingest path (`TODOS.md`,
+  "Orders per sub-department"). This work is included in PR #82; its migration
+  and matching app must be active together before an IR run can be applied.
+- **Delivery batches:** (1) order isolation, rank packages, two-layer
+  overrides, recruitment limits, group incentives and statement breakdown;
+  (2) recurring subsidy registration through Claims; (3) tier KPI,
+  introducer split and house assignments after their data sources and rules
+  are defined. Each calculation change needs focused regression coverage
+  plus the repository test/build checks.

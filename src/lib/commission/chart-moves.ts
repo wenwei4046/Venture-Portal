@@ -31,9 +31,31 @@ export interface MoveSubject {
   /** Where their title stands on the company ladder; null = not on it. */
   levelRank: number | null
   levelName: string | null
+  /** Existing parent makes a no-op move legal even when its slots are full. */
+  uplineStaffId?: string | null
+  directLineCount?: number
+  directLineLimit?: number | null
 }
 
-export type RefusalKind = 'self' | 'downline' | 'no-downlines' | 'lower-title'
+/** The server resolves retained opened slots and any offer valid this month. */
+export function effectiveDirectLineLimit(
+  baseLimit: number | null | undefined,
+  currentLimit: number | null | undefined,
+): number | null {
+  if (baseLimit == null) return null
+  return Math.max(baseLimit, currentLimit ?? baseLimit)
+}
+
+export function directLineCapacityRefusal(
+  mover: Pick<MoveSubject, 'uplineStaffId'>,
+  target: Pick<MoveSubject, 'staffId' | 'directLineCount' | 'directLineLimit'>,
+): boolean {
+  return mover.uplineStaffId !== target.staffId
+    && target.directLineLimit != null
+    && (target.directLineCount ?? 0) >= target.directLineLimit
+}
+
+export type RefusalKind = 'self' | 'downline' | 'no-downlines' | 'lower-title' | 'direct-limit'
 
 /**
  * Why `target` may not become `mover`'s upline — or null when they may.
@@ -52,6 +74,7 @@ export function moveRefusal(
   if (downlines.has(target.staffId)) return 'downline'
   if (!target.canRecruit) return 'no-downlines'
   if (!ladderAllows(mover.levelRank, target.levelRank)) return 'lower-title'
+  if (directLineCapacityRefusal(mover, target)) return 'direct-limit'
   return null
 }
 
@@ -66,6 +89,8 @@ export function refusalLabel(kind: RefusalKind): string {
       return 'no downlines'
     case 'lower-title':
       return 'lower title'
+    case 'direct-limit':
+      return 'direct lines full'
   }
 }
 
@@ -85,6 +110,8 @@ export function refusalSentence(kind: RefusalKind, mover: MoveSubject, target: M
         { name: mover.name, title: mover.titleName, level: mover.levelName },
         { name: target.name, title: target.titleName, level: target.levelName },
       )
+    case 'direct-limit':
+      return `${target.name} has reached the limit of ${target.directLineLimit} direct lines.`
   }
 }
 

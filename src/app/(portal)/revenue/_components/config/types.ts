@@ -27,13 +27,17 @@ export interface SchemeRow {
   enable_override: boolean
   enable_margin_penalty: boolean
   enable_margin_incentive: boolean
+  enable_group_incentive?: boolean
+  group_sales_depth?: number | null
+  override_depth?: number | null
+  direct_line_limit?: number | null
   deposit_threshold_pct: number | null
   default_rate_mode: 'fixed' | 'variable'
 }
 
 /**
  * A rank of the catalogue — one row of the Rank tab (2026-09-05). A rank is
- * its rate; the letter is counted from the top of the catalogue by the app
+ * its rate or group package; the letter is counted from the top by the app
  * after every write (`resequenceLadder`, lib/commission/ranks.ts). A rung of
  * the ladder points at one of these and copies its rate, label and order.
  */
@@ -41,9 +45,11 @@ export interface RankDefRow {
   id: string
   scheme_id: string
   product_rate: number
+  group_incentive_amount: number
+  group_subsidy_cap: number
   /** "Rank B" — from the top of the catalogue. Rewritten after every write, never typed in. */
   label: string
-  /** Rate order, 10/20/30 … from the lowest rate up. */
+  /** Pay order, 10/20/30 … from the lowest rate up, then group packages. */
   sort_order: number
 }
 
@@ -62,6 +68,9 @@ export interface RankRow {
   label: string
   /** A COPY of the rank's rate, kept by the same trigger. Set on the Rank tab, never here. */
   product_rate: number
+  /** Fixed pay and separate subsidy cap, copied from the rank catalogue. */
+  group_incentive_amount: number
+  group_subsidy_cap: number
   can_recruit: boolean
   /** MONTHLY gate: group sales this month. Paid this rung, back down next month. */
   group_sales_threshold: number | null
@@ -178,6 +187,11 @@ export interface SalespersonRow {
   placed_since: string | null
   tax_mode: 'pcb' | 'withholding' | 'none'
   withholding_rate: number
+  direct_line_count?: number
+  direct_line_limit?: number | null
+  /** Earned SDL capacity is separate from the held membership/company title. */
+  expansion_earned_at?: string | null
+  expansion_source_period?: string | null
 }
 
 /** Somebody in the department who is not a member of this sub-department yet. */

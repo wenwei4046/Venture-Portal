@@ -5,7 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { RESERVED_SUB_DEPT_SLUGS, subDeptSlug } from '@/lib/revenue'
-import { mintRankKey, rankName, ratePct, resequenceLadder } from '@/lib/commission/ranks'
+import { mintRankKey, rankName, rankLabelOf, rankPayError, rankPayOf, resequenceLadder } from '@/lib/commission/ranks'
 import { newSchemeSettings, type SchemeSettings } from '@/lib/commission/scheme-defaults'
 
 /**
@@ -137,20 +137,41 @@ export async function createSubDepartment(formData: FormData) {
 }
 
 /**
- * Copy every rule row from one scheme to another. Brands are copied first
- * because the margin bands hang off them and need the NEW brand ids; the
- * ranks (the catalogue) before the rungs, which are copied with only their
- * rate — the trigger `comm_ranks_follow_rank_def` matches each to the new
- * scheme's rank at that rate.
+ * Copy every rule row from one scheme to another. Catalogue ids are mapped
+ * explicitly so a zero-rate package can never be mistaken for a plain rank.
+ * Brands are copied before their margin bands for the same reason.
  */
 async function cloneSchemeChildren(
   supabase: SupabaseClient,
   fromSchemeId: string,
   toSchemeId: string,
 ) {
+  const { data: sourceDefs, error: defsError } = await supabase.from('comm_rank_defs')
+    .select('id, product_rate, group_incentive_amount, group_subsidy_cap, label, sort_order')
+    .eq('scheme_id', fromSchemeId)
+  check(defsError, 'Could not read the ranks to clone')
+  const rankDefIds = new Map<string, string>()
+  for (const sourceDef of (sourceDefs ?? []) as Array<Record<string, unknown>>) {
+    const { id: sourceId, ...values } = sourceDef
+    const { data: cloned, error } = await supabase.from('comm_rank_defs')
+      .insert({ ...values, scheme_id: toSchemeId }).select('id').single()
+    check(error, 'Could not clone a rank')
+    rankDefIds.set(String(sourceId), String(cloned!.id))
+  }
+  const { data: sourceRungs, error: rungsError } = await supabase.from('comm_ranks')
+    .select('rank_def_id, title_id, rank_key, label, product_rate, group_incentive_amount, group_subsidy_cap, can_recruit, group_sales_threshold, personal_sales_threshold, consecutive_months, sort_order')
+    .eq('scheme_id', fromSchemeId)
+  check(rungsError, 'Could not read the title ladder to clone')
+  if (sourceRungs?.length) {
+    const rungs = (sourceRungs as unknown as Array<Record<string, unknown>>).map(r => {
+      const rankDefId = rankDefIds.get(String(r.rank_def_id))
+      if (!rankDefId) throw new Error('A ladder rank is missing from the source catalogue')
+      return { ...r, scheme_id: toSchemeId, rank_def_id: rankDefId }
+    })
+    check((await supabase.from('comm_ranks').insert(rungs)).error, 'Could not clone the title ladder')
+  }
+
   const simple: Array<[table: string, columns: string[]]> = [
-    ['comm_rank_defs', ['product_rate', 'label', 'sort_order']],
-    ['comm_ranks', ['title_id', 'rank_key', 'label', 'product_rate', 'can_recruit', 'group_sales_threshold', 'personal_sales_threshold', 'consecutive_months', 'sort_order']],
     ['comm_item_groups', ['item_group', 'commissionable', 'note']],
     ['comm_kpi_items', ['product_code', 'product_name', 'kpi_amount', 'effective_from', 'effective_to']],
     ['comm_kpi_thresholds', ['tier_label', 'min_qty', 'bonus_pct', 'effective_from', 'effective_to']],
@@ -218,6 +239,18 @@ export async function updateScheme(formData: FormData) {
   const id = required(formData, 'scheme_id', 'Scheme')
   const depositOn = formData.get('deposit_gate_on') === 'on'
   const depositPct = pct(formData, 'deposit_threshold_pct')
+  const groupIncentiveOn = formData.get('enable_group_incentive') === 'on'
+  const groupDepth = num(formData, 'group_sales_depth')
+  const overrideDepth = num(formData, 'override_depth')
+  const directLimit = num(formData, 'direct_line_limit')
+  for (const [label, value] of [['Group sales layers', groupDepth], ['Override layers', overrideDepth], ['Direct-line limit', directLimit]] as const) {
+    if (value !== null && (!Number.isInteger(value) || value < 1 || value > 20)) {
+      throw new Error(`${label} must be a whole number from 1 to 20, or blank for unlimited`)
+    }
+  }
+  if (groupIncentiveOn && (groupDepth !== 2 || overrideDepth !== 2 || directLimit !== 3)) {
+    throw new Error('Group packages require 2 sales layers, 2 override layers and a base limit of 3 directs. Full Spec permits opening the fourth line that month. Opening each further line requires all existing groups to qualify in its opening month; opened slots are retained.')
+  }
 
   if (depositOn && depositPct === null) {
     throw new Error('Give the deposit gate a threshold, or switch it off')
@@ -243,6 +276,10 @@ export async function updateScheme(formData: FormData) {
           enable_override: formData.get('enable_override') === 'on',
           enable_margin_penalty: formData.get('enable_margin_penalty') === 'on',
           enable_margin_incentive: formData.get('enable_margin_incentive') === 'on',
+          enable_group_incentive: groupIncentiveOn,
+          group_sales_depth: groupDepth,
+          override_depth: overrideDepth,
+          direct_line_limit: directLimit,
           override_includes_kpi: formData.get('override_includes_kpi') === 'on',
           open_bill_basis: basis || 'uplift_on_commission',
           default_rate_mode: rateMode || 'variable',
@@ -261,13 +298,13 @@ export async function updateScheme(formData: FormData) {
 
 /**
  * The Rank tab (user 2026-09-05: "rank A 等于多少 rate、rank B 等于多少 rate
- * … 除非我在 rank 的那个 tab 里去调"). A rank is its rate and is a row of
+ * … 除非我在 rank 的那个 tab 里去调"). A rank is its pay and is a row of
  * `comm_rank_defs`; nobody names one. After every write the catalogue is
- * re-sequenced by rate — `sort_order` 10, 20, 30 … from the bottom, `label`
+ * re-sequenced by pay — `sort_order` 10, 20, 30 … from the bottom, `label`
  * "Rank SS", "Rank A", "Rank B" … from the top (`lib/commission/ranks.ts`) —
  * so a rank keyed in at 6.5% lands between 6% and 7% and every letter above
- * it moves along. Two ranks on one rate would be two names for one pay, so
- * the second is refused (`uq_comm_rank_def_rate` says the same).
+ * it moves along. Packages sit above percentage ranks. Duplicate complete
+ * pay packages are refused (`uq_comm_rank_def_package` says the same).
  *
  * The rungs of the ladder point at a rank and COPY its rate, label and order
  * — trigger `comm_ranks_follow_rank_def` on the way in, and
@@ -284,16 +321,24 @@ export async function upsertRankDef(formData: FormData) {
   if (rate === null || rate < 0 || rate > 1) {
     throw new Error('Commission rate must be between 0 and 100%')
   }
+  const incentive = num(formData, 'group_incentive_amount') ?? 0
+  const subsidy = num(formData, 'group_subsidy_cap') ?? 0
+  const error = rankPayError({ productRate: rate, groupIncentiveAmount: incentive, groupSubsidyCap: subsidy })
+  if (error) throw new Error(error)
+  const pay = { product_rate: rate, group_incentive_amount: incentive, group_subsidy_cap: subsidy }
 
   const catalogue = await loadRankDefs(supabase, schemeId)
-  const clash = catalogue.find(d => d.id !== id && Math.abs(Number(d.product_rate) - rate) < 1e-9)
+  const clash = catalogue.find(d => d.id !== id
+    && Math.abs(Number(d.product_rate) - rate) < 1e-9
+    && Number(d.group_incentive_amount) === incentive
+    && Number(d.group_subsidy_cap) === subsidy)
   if (clash) {
-    throw new Error(`${clash.label} already pays ${ratePct(rate)} — a rank is its rate, so give this one a different rate`)
+    throw new Error(`${rankLabelOf(clash)} already exists — give this rank different pay`)
   }
 
   if (id) {
     check(
-      (await supabase.from('comm_rank_defs').update({ product_rate: rate }).eq('id', id)).error,
+      (await supabase.from('comm_rank_defs').update(pay).eq('id', id).eq('scheme_id', schemeId)).error,
       'Could not save the rank',
     )
   } else {
@@ -302,7 +347,7 @@ export async function upsertRankDef(formData: FormData) {
     const bottom = catalogue.reduce((max, d) => Math.max(max, d.sort_order), 0) + 10
     const { error } = await supabase
       .from('comm_rank_defs')
-      .insert({ scheme_id: schemeId, product_rate: rate, label: rankName('?'), sort_order: bottom })
+      .insert({ scheme_id: schemeId, ...pay, label: rankName('?'), sort_order: bottom })
     check(error, 'Could not add the rank')
   }
 
@@ -376,12 +421,27 @@ export async function upsertRank(formData: FormData) {
 
   const rank = (await loadRankDefs(supabase, schemeId)).find(d => d.id === rankDefId)
   if (!rank) throw new Error('Pick a rank — they are set on the Ranks tab')
+  if (Number(rank.group_incentive_amount) > 0) {
+    const { data: packages, error: packageReadError } = await supabase.from('comm_ranks')
+      .select('id').eq('scheme_id', schemeId).gt('group_incentive_amount', 0)
+    check(packageReadError, 'Could not read the group package')
+    if ((packages ?? []).some((r: { id: string }) => r.id !== id)) {
+      throw new Error('Only one group-incentive rung can be used on this scheme. Edit the existing package rung instead.')
+    }
+  }
+  if (Number(rank.group_incentive_amount) > 0
+    && (groupGate === null || groupGate <= 0 || streakAmount !== null || streakMonths !== null)) {
+    throw new Error('A group package needs a positive monthly group-sales target and no personal-sales streak')
+  }
 
   const ladder = await loadLadderRows(supabase, schemeId)
+  if (id && !ladder.some(r => r.id === id)) {
+    throw new Error('That rung does not belong to this scheme. Refresh the title ladder before saving.')
+  }
   const clash = ladder.find(r => r.id !== id && r.rank_def_id === rankDefId)
   if (clash) {
     throw new Error(
-      `${rank.label} · ${ratePct(Number(rank.product_rate))} is already ${clash.title_name ?? 'another title'}'s — a rank pays one title`,
+      `${rankLabelOf(rank)} is already ${clash.title_name ?? 'another title'}'s — a rank pays one title`,
     )
   }
 
@@ -391,6 +451,8 @@ export async function upsertRank(formData: FormData) {
     // Copies the trigger keeps; written here too so the row reads right on
     // its own.
     product_rate: Number(rank.product_rate),
+    group_incentive_amount: Number(rank.group_incentive_amount),
+    group_subsidy_cap: Number(rank.group_subsidy_cap),
     label: rank.label,
     sort_order: rank.sort_order,
     can_recruit: formData.get('can_recruit') === 'on',
@@ -401,7 +463,7 @@ export async function upsertRank(formData: FormData) {
 
   if (id) {
     // The title is not in `base`: fixed once the rung exists.
-    check((await supabase.from('comm_ranks').update(base).eq('id', id)).error, 'Could not save the rung')
+    check((await supabase.from('comm_ranks').update(base).eq('id', id).eq('scheme_id', schemeId)).error, 'Could not save the rung')
   } else {
     const titleId = required(formData, 'title_id', 'Title')
     const { data: title } = await supabase.from('titles').select('name').eq('id', titleId).maybeSingle()
@@ -423,13 +485,15 @@ interface RankDefLite {
   id: string
   label: string
   product_rate: number | string
+  group_incentive_amount: number | string
+  group_subsidy_cap: number | string
   sort_order: number
 }
 
 async function loadRankDefs(supabase: SupabaseClient, schemeId: string): Promise<RankDefLite[]> {
   const { data, error } = await supabase
     .from('comm_rank_defs')
-    .select('id, label, product_rate, sort_order')
+    .select('id, label, product_rate, group_incentive_amount, group_subsidy_cap, sort_order')
     .eq('scheme_id', schemeId)
   check(error, 'Could not read the ranks')
   return (data ?? []) as RankDefLite[]
@@ -471,7 +535,7 @@ async function resequenceRanks(supabase: SupabaseClient, schemeId: string): Prom
   const catalogue = await loadRankDefs(supabase, schemeId)
   const byId = new Map(catalogue.map(d => [d.id, d]))
   const next = resequenceLadder(
-    catalogue.map(d => ({ id: d.id, productRate: Number(d.product_rate), sortOrder: d.sort_order })),
+    catalogue.map(d => ({ id: d.id, ...rankPayOf(d), sortOrder: d.sort_order })),
   )
   const changed = next.filter(d => {
     const cur = byId.get(d.id)

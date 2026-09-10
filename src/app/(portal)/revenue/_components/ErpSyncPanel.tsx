@@ -99,6 +99,7 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
                               {u.erpSalespersonId.slice(0, 8)}
                             </span>
                           ) : null}
+                          <Hidden name="sub_department_id" value={data.subDepartmentId} />
                           <Hidden name="agent_key" value={u.agentKey} />
                           <Hidden name="erp_salesperson_id" value={u.erpSalespersonId ?? ''} />
                         </td>
@@ -155,7 +156,7 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
                           label={`Replay ${h.count}`}
                           confirm={`Replay ${h.count} held ${h.count === 1 ? 'delivery' : 'deliveries'} for ${periodLabel(h.period)}?`}
                           run={async () => {
-                            const r = await replayHeldErpEvents(h.period)
+                            const r = await replayHeldErpEvents(h.period, data.subDepartmentId)
                             setReplayNote(
                               `${periodLabel(h.period)}: ${r.applied} applied, ${r.stillHeld} still held, ${r.replayed} replayed.`,
                             )
