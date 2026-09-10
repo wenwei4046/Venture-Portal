@@ -37,9 +37,11 @@ export async function GET(req: Request) {
     cashCodes.length > 0
       ? fetchAllRows((lo, hi) => supabase
           .from('journal_lines')
-          .select('debit, credit, journal_entries!inner(segment)')
+          .select('debit, credit, journal_entries!inner(segment, is_reversed)')
           .in('account_code', cashCodes)
           .in('journal_entries.segment', ['corporate', 'treasury'])
+          // Mirrors the page query (user 2026-09-10) — screen and file agree.
+          .eq('journal_entries.is_reversed', false)
           .order('id', { ascending: true })
           .range(lo, hi)).then((data) => ({ data }))
       : Promise.resolve({ data: [] }),

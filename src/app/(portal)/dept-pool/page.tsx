@@ -329,9 +329,12 @@ export default async function DeptPoolPage({
     if (cashCodes.length > 0) {
       const corpCashRows = await fetchAllRows((lo, hi) => supabase
         .from('journal_lines')
-        .select('debit, credit, journal_entries!inner(segment)')
+        .select('debit, credit, journal_entries!inner(segment, is_reversed)')
         .in('account_code', cashCodes)
         .in('journal_entries.segment', ['corporate', 'treasury'])
+        // Void pairs net to zero in the balance but inflated the Venture row's
+        // gross In/Out (user 2026-09-10).
+        .eq('journal_entries.is_reversed', false)
         .order('id', { ascending: true })
         .range(lo, hi))
       for (const r of corpCashRows ?? []) {

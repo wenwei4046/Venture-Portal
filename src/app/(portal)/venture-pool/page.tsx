@@ -44,9 +44,14 @@ export default async function VenturePoolPage() {
     const base = () => {
       let q = supabase
         .from('journal_lines')
-        .select('id, debit, credit, description, journal_entries!inner(transaction_date, description, reference_type, segment)')
+        .select('id, debit, credit, description, journal_entries!inner(transaction_date, description, reference_type, segment, is_reversed)')
         .in('account_code', cashCodes)
         .in('journal_entries.segment', ['corporate', 'treasury'])
+        // VOID/reversal pairs net to zero, so the BALANCE was always right —
+        // but the gross In/Out, the 12-month trend and the recent-lines list
+        // counted both legs as real flow (user 2026-09-10: Jul + Aug each
+        // inflated ~136k / ~87k). Same exclusion every other report uses.
+        .eq('journal_entries.is_reversed', false)
       if (opts.since) q = q.gte('journal_entries.transaction_date', opts.since)
       if (opts.until) q = q.lt('journal_entries.transaction_date', opts.until)
       return q

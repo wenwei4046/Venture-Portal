@@ -34,9 +34,12 @@ export default async function FundSummaryPage() {
     cashCodes.length > 0
       ? fetchAllRows((lo, hi) => supabase
           .from('journal_lines')
-          .select('debit, credit, journal_entries!inner(segment)')
+          .select('debit, credit, journal_entries!inner(segment, is_reversed)')
           .in('account_code', cashCodes)
           .in('journal_entries.segment', ['corporate', 'treasury'])
+          // Net-only here, so void pairs cancelled out anyway — excluded for
+          // consistency with every other report (user 2026-09-10).
+          .eq('journal_entries.is_reversed', false)
           .order('id', { ascending: true })
           .range(lo, hi)).then((data) => ({ data }))
       : Promise.resolve({ data: [] }),
