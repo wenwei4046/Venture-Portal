@@ -11,7 +11,8 @@ import type { CommissionSettingsData } from './types'
  * differently — Fair (the roadshow team) is the first. A new one either
  * follows an existing ruleset, in which case every rule row is copied and
  * `cloned_from_scheme_id` records where from, or starts blank for a bespoke
- * one.
+ * one — blank meaning every switch off and every table empty (2026-09-10),
+ * not the column defaults.
  *
  * It reads the UNSCOPED lists on `data` on purpose: the whole point of the
  * form is to reach past the sub-department whose page it is sitting on.
@@ -55,7 +56,7 @@ export default function NewSubDepartmentForm({
                 name="clone_from_scheme_id"
                 className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink"
               >
-                <option value="">— start blank —</option>
+                <option value="">— start blank: every rule off —</option>
                 {data.allSchemes.map(s => {
                   const sub = data.subDepartments.find(d => d.id === s.sub_department_id)
                   return (
@@ -69,8 +70,9 @@ export default function NewSubDepartmentForm({
           </div>
           <p className="font-serif italic text-muted text-xs mt-3 mb-4">
             Copying brings across every rank, item group, KPI item, threshold, Open Bill rate, brand
-            and margin band. It does not bring across people — nobody can hold two positions at once.
-            The new sub-department appears in the sidebar under Revenue.
+            and margin band. Starting blank brings nothing: every scheme rule is switched off and
+            every table is empty until you write it. Neither brings across people — nobody can hold
+            two positions at once. The new sub-department appears in the sidebar under Revenue.
           </p>
           <SaveButton pending={pending} label="Create sub-department" />
         </div>

@@ -93,11 +93,17 @@ departments (Revenue Department)
 
 The Rules page gets a **Generate New Sub-Department** action. Creating one
 either **clones** an existing sub-department's scheme (every rule row copied,
-with `cloned_from_scheme_id` recorded) or starts empty for a bespoke ruleset.
-Because each component can be switched off at scheme level
-(`enable_product_revenue` / `enable_kpi` / `enable_open_bill` /
-`enable_override`), a sub-department that only pays a flat percentage reuses the
-same engine instead of getting a bespoke one.
+with `cloned_from_scheme_id` recorded) or starts **blank** for a bespoke ruleset.
+Blank means blank (2026-09-10): the new scheme is written with every component
+switch OFF and no deposit gate — `lib/commission/scheme-defaults.ts` — so
+nothing pays until somebody switches a component on and writes its rules. (The
+`comm_schemes` column defaults are all TRUE, for schemes inserted by scripts;
+before this a blank sub-department opened on a Scheme rules tab with every box
+ticked, as if Fair's had been copied.) Because each component can be switched
+off at scheme level (`enable_product_revenue` / `enable_kpi` /
+`enable_open_bill` / `enable_override` / `enable_margin_penalty` /
+`enable_margin_incentive`), a sub-department that only pays a flat percentage
+reuses the same engine instead of getting a bespoke one.
 
 `comm_hierarchy` enforces **one position per person at a time** across all
 schemes, so nobody can sit in two sub-departments and be paid twice.

@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { RESERVED_SUB_DEPT_SLUGS, subDeptSlug } from '@/lib/revenue'
 import { mintRankKey, rankName, ratePct, resequenceLadder } from '@/lib/commission/ranks'
+import { newSchemeSettings, type SchemeSettings } from '@/lib/commission/scheme-defaults'
 
 /**
  * Revenue → Rules. Every rule, threshold and per-person tick for the Revenue
@@ -66,6 +67,11 @@ function check(error: { message: string } | null, what: string) {
  *
  * Cloning copies every child row of the source scheme and records
  * cloned_from_scheme_id, so it is obvious later where a ruleset came from.
+ *
+ * Blank means blank (2026-09-10): the scheme is written with every component
+ * switch OFF (`lib/commission/scheme-defaults.ts`). Left to the column
+ * defaults it came up with all six on, and the new sub-department opened on a
+ * Scheme rules tab that looked like a copy of Fair's.
  */
 export async function createSubDepartment(formData: FormData) {
   const user = await requirePermission('revenue')
@@ -99,8 +105,11 @@ export async function createSubDepartment(formData: FormData) {
   check(subError, 'Could not create the sub-department')
 
   const source = cloneFrom
-    ? (await supabase.from('comm_schemes').select('*').eq('id', cloneFrom).single()).data
+    ? ((await supabase.from('comm_schemes').select('*').eq('id', cloneFrom).single()).data as SchemeSettings | null)
     : null
+  if (cloneFrom && !source) {
+    throw new Error('The ruleset to follow is gone — pick another, or start blank')
+  }
 
   const { data: scheme, error: schemeError } = await supabase
     .from('comm_schemes')
@@ -110,20 +119,7 @@ export async function createSubDepartment(formData: FormData) {
       cloned_from_scheme_id: cloneFrom,
       effective_from: new Date().toISOString().slice(0, 8) + '01',
       created_by: user.id,
-      ...(source
-        ? {
-            open_bill_basis: source.open_bill_basis,
-            override_includes_kpi: source.override_includes_kpi,
-            enable_product_revenue: source.enable_product_revenue,
-            enable_kpi: source.enable_kpi,
-            enable_open_bill: source.enable_open_bill,
-            enable_override: source.enable_override,
-            enable_margin_penalty: source.enable_margin_penalty,
-            enable_margin_incentive: source.enable_margin_incentive,
-            deposit_threshold_pct: source.deposit_threshold_pct,
-            default_rate_mode: source.default_rate_mode,
-          }
-        : {}),
+      ...newSchemeSettings(source),
     })
     .select('id')
     .single()
