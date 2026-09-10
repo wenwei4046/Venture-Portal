@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
 import { requirePermission } from '@/lib/auth'
+import { can } from '@/lib/permissions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { submitForApproval, approveVoucher, voidVoucher, voidPaidReceipt, reversePaidPayment, returnVoucherToDraft } from '../actions'
@@ -26,15 +27,17 @@ interface Props {
 }
 
 export default async function PaymentDetailPage({ params }: Props) {
-  const user = await requirePermission('treasury')
+  const user = await requirePermission('treasury', 'hr_costing')
+  const canReadTreasury = can(user, 'treasury')
   const { id } = await params
   const supabase = await createClient()
 
-  const { data: voucher, error } = await supabase
+  let voucherQuery = supabase
     .from('payment_vouchers')
     .select('*')
     .eq('id', id)
-    .single()
+  if (!canReadTreasury) voucherQuery = voucherQuery.in('reference_type', ['payroll_disbursement', 'payroll_statutory', 'payroll_payment_request'])
+  const { data: voucher, error } = await voucherQuery.single()
 
   if (error || !voucher) notFound()
 
@@ -64,15 +67,16 @@ export default async function PaymentDetailPage({ params }: Props) {
   }
 
   // Attachments
-  const { data: attachments } = await supabase
+  const { data: attachments } = canReadTreasury ? await supabase
     .from('payment_attachments')
     .select('*')
     .eq('voucher_id', id)
     .order('uploaded_at', { ascending: false })
+    : { data: [] }
 
   // Bank balance for approval check display
   let bankBalance: number | null = null
-  if (bankName && voucher.bank_account_id) {
+  if (canReadTreasury && bankName && voucher.bank_account_id) {
     const { data: bankData } = await supabase
       .from('bank_accounts')
       .select('current_balance')
@@ -81,10 +85,10 @@ export default async function PaymentDetailPage({ params }: Props) {
     if (bankData) bankBalance = Number(bankData.current_balance)
   }
 
-  const isPrincipal = user.role === 'principal'
+  const isPrincipal = canReadTreasury && user.role === 'principal'
   // Unified portal (2026-07-16): Principal gets the Finance-side voucher
   // actions too (copy / mark paid / void).
-  const isFinance = user.role === 'finance' || isPrincipal
+  const isFinance = canReadTreasury && (user.role === 'finance' || isPrincipal)
 
   // Post-mig 238: PVS rows reference chart_of_accounts directly via account_code
   // (the COA `code` IS the GL). Pool + account name both come from the sources
@@ -131,6 +135,34 @@ export default async function PaymentDetailPage({ params }: Props) {
     department_name: string | null
     net: string | number
   }>
+
+  // Read the contribution snapshots written with this PV. Current payroll or
+  // department membership must never change the people an existing PV covers.
+  const { data: statutoryLines, error: statutoryLinesError } =
+    voucher.reference_type === 'payroll_statutory'
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
+          .from('payroll_statutory_voucher_lines')
+          .select('id, scope, payroll_row_id, employee_name, employee_code, department_name, period_month, scheme, amount')
+          .eq('voucher_id', id)
+          .order('department_name')
+          .order('employee_name')
+          .order('scheme')
+      : { data: null, error: null }
+  if (statutoryLinesError) throw new Error('Unable to load the recorded statutory contribution details. Please try again.')
+  const statutoryCoverage = (statutoryLines ?? []) as Array<{
+    id: string
+    scope: string
+    payroll_row_id: string
+    employee_name: string
+    employee_code: string | null
+    department_name: string
+    period_month: string
+    scheme: string
+    amount: string | number
+  }>
+  const statutoryPeople = new Set(statutoryCoverage.map((line) => `${line.scope}:${line.payroll_row_id}`)).size
+  const statutoryPeriods = Array.from(new Set(statutoryCoverage.map((line) => dayjs(line.period_month).format('MMMM YYYY')))).join(' · ')
 
   // Reassign-GL data (user 2026-08-24: "gl account 放错,我希望approve 了我还
   // 能改"): offer the voucher's actually-POSTED non-bank GL accounts as the
@@ -186,15 +218,15 @@ export default async function PaymentDetailPage({ params }: Props) {
 
   return (
     <div>
-      <Link href="/payments" className="text-sm text-muted hover:text-accent font-sans transition-colors">
-        ← Back to Payments
+      <Link href={canReadTreasury ? '/payments' : '/hr-costing/payment'} className="text-sm text-muted hover:text-accent font-sans transition-colors">
+        ← Back to {canReadTreasury ? 'Payments' : 'HR Payment'}
       </Link>
 
       {/* ── Header ── */}
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> TREASURY · {voucher.direction === 'credit' ? 'OFFICIAL RECEIPT' : 'PAYMENT VOUCHER'}{categoryLabel ? ` · ${categoryLabel.toUpperCase()}` : ''}
+            <em>I.</em> {canReadTreasury ? 'TREASURY' : 'HR COSTING'} · {voucher.direction === 'credit' ? 'OFFICIAL RECEIPT' : 'PAYMENT VOUCHER'}{categoryLabel ? ` · ${categoryLabel.toUpperCase()}` : ''}
           </div>
           <h1 className="page-title">{voucher.voucher_no ?? 'Draft'}</h1>
           <p className="font-serif italic text-graphite text-base mt-3">
@@ -357,6 +389,43 @@ export default async function PaymentDetailPage({ params }: Props) {
         </section>
       ) : null}
 
+      {statutoryCoverage.length > 0 ? (
+        <section className="mb-12" aria-labelledby="statutory-coverage-title">
+          <div className="sect-head">
+            <h2 id="statutory-coverage-title">Statutory contributions on this voucher</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">{statutoryPeople} {statutoryPeople === 1 ? 'PERSON' : 'PEOPLE'} · {statutoryPeriods}</span>
+          </div>
+          <p className="text-sm text-muted mb-4">Employees, departments and amounts recorded when this PV was generated.</p>
+          <div className="overflow-x-auto">
+            <table className="ledger-table" aria-label="Statutory contributions covered by this voucher">
+              <thead>
+                <tr><th scope="col">Employee</th><th scope="col">Department</th><th scope="col">Scheme</th><th scope="col" className="num">Contribution</th></tr>
+              </thead>
+              <tbody>
+                {statutoryCoverage.map((line) => (
+                  <tr key={line.id}>
+                    <td>
+                      <span className="font-serif text-md text-ink">{line.employee_name}</span>
+                      {line.employee_code ? <span className="font-mono text-[11px] text-muted ml-2">{line.employee_code}</span> : null}
+                    </td>
+                    <td className="font-serif text-sm text-graphite">{line.department_name}</td>
+                    <td className="font-mono text-xs text-graphite">{line.scheme}</td>
+                    <td className="num">{formatMoney(Number(line.amount))}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-hairline">
+                  <th scope="row" colSpan={3} className="font-serif italic text-ink font-medium">Total contribution</th>
+                  <td className="num font-semibold">{formatMoney(statutoryCoverage.reduce((sum, line) => sum + Number(line.amount), 0))}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
       {/* ── Audit trail ── */}
       <section className="mb-12">
         <div className="sect-head">
@@ -394,7 +463,7 @@ export default async function PaymentDetailPage({ params }: Props) {
       </section>
 
       {/* ── Attachments ── */}
-      <section className="mb-12">
+      {canReadTreasury ? <section className="mb-12">
         <div className="sect-head">
           <h2>Attachments</h2>
           <span className="rule" aria-hidden />
@@ -406,10 +475,10 @@ export default async function PaymentDetailPage({ params }: Props) {
           canUpload={voucher.status === 'draft' || voucher.status === 'pending_approval'}
         />
         <AttachmentList attachments={(attachments ?? []) as Parameters<typeof AttachmentList>[0]['attachments']} />
-      </section>
+      </section> : null}
 
       {/* ── Actions ── */}
-      <VoucherActions
+      {canReadTreasury ? <VoucherActions
         voucherId={voucher.id}
         status={voucher.status}
         amount={Number(voucher.amount)}
@@ -425,7 +494,7 @@ export default async function PaymentDetailPage({ params }: Props) {
         reversePaidPayment={reversePaidPayment}
         direction={voucher.direction}
         voucherType={voucher.voucher_type}
-      />
+      /> : null}
     </div>
   )
 }

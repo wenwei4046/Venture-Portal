@@ -46,6 +46,8 @@ interface Props {
   companies: { id: string; name: string; short_code: string }[]
   bankAccounts: { id: string; bank_name: string; account_number: string; current_balance: number }[]
   glAccounts: GlAccount[]
+  /** Contribution snapshots lock the financial details of newly generated statutory PVs. */
+  statutoryDetailsLocked?: boolean
 }
 
 const POOL_OPTIONS = [
@@ -86,7 +88,7 @@ const OVERRIDE_TYPES: AccountType[] = [
 
 export default function EditPaymentForm({
   voucher, initialSources, initialCreditAccountCode,
-  companies, bankAccounts, glAccounts,
+  companies, bankAccounts, glAccounts, statutoryDetailsLocked = false,
 }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -116,6 +118,22 @@ export default function EditPaymentForm({
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
+
+    if (statutoryDetailsLocked) {
+      const formData = new FormData()
+      formData.set('id', voucher.id)
+      formData.set('payment_date', paymentDate)
+      formData.set('notes', notes)
+      startTransition(async () => {
+        try {
+          await updatePaymentVoucher(formData)
+        } catch (err) {
+          if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) throw err
+          setError(err instanceof Error ? err.message : 'Save failed')
+        }
+      })
+      return
+    }
 
     const formData = new FormData(e.currentTarget)
     formData.set('id', voucher.id)
@@ -161,6 +179,45 @@ export default function EditPaymentForm({
         setError(err instanceof Error ? err.message : 'Save failed')
       }
     })
+  }
+
+  if (statutoryDetailsLocked) {
+    const bank = bankAccounts.find((account) => account.id === voucher.bank_account_id)
+    return (
+      <form onSubmit={handleSubmit} className="max-w-3xl space-y-6" aria-label="Edit statutory PV date and notes">
+        <div className="border border-hairline bg-surface p-4 rounded-md text-sm">
+          <h2 className="font-medium text-ink">Recorded statutory contributions</h2>
+          <p className="text-muted mt-2">The employees, amounts, payee, bank and source accounts are fixed for this PV. To change them, void this PV and generate a new one from HR Payment.</p>
+          <dl className="grid grid-cols-2 gap-3 mt-4">
+            <div><dt className="text-muted">Pay to</dt><dd>{voucher.payee_name}</dd></div>
+            <div><dt className="text-muted">Amount</dt><dd className="font-mono">RM {voucher.amount.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd></div>
+            <div><dt className="text-muted">Bank</dt><dd>{bank ? `${bank.bank_name} · ${bank.account_number}` : 'Recorded on voucher'}</dd></div>
+            <div><dt className="text-muted">Payment method</dt><dd>{voucher.payment_method?.replace(/_/g, ' ') ?? '—'}</dd></div>
+          </dl>
+          <div className="mt-4 overflow-x-auto">
+            <table className="ledger-table" aria-label="Recorded source accounts">
+              <thead><tr><th scope="col">Pool</th><th scope="col">Account</th><th scope="col" className="num">Amount · RM</th></tr></thead>
+              <tbody>{initialSources.map((source, index) => <tr key={index}>
+                <td>{POOL_OPTIONS.find((pool) => pool.value === source.pool)?.label ?? source.pool}</td>
+                <td>{source.account_code}</td><td className="num">{Number(source.amount).toFixed(2)}</td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+          <p className="text-muted mt-4 whitespace-pre-wrap">{voucher.description}</p>
+        </div>
+        <label className="block text-sm text-graphite">Payment date
+          <input type="date" required value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} disabled={isPending} className="block mt-2 border border-hairline bg-paper rounded-md px-3 py-2 text-ink" />
+        </label>
+        <label className="block text-sm text-graphite">Notes
+          <textarea rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} disabled={isPending} className="block w-full mt-2 border border-hairline bg-paper rounded-md px-3 py-2 text-ink" />
+        </label>
+        {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
+        <div className="flex gap-4 items-center">
+          <button type="submit" disabled={isPending || !paymentDate} className="bg-accent text-white rounded-md px-4 py-2 text-sm disabled:opacity-50">{isPending ? 'Saving…' : 'Save date and notes'}</button>
+          <Link href={`/payments/${voucher.id}`} className="text-sm text-muted hover:text-ink">Cancel</Link>
+        </div>
+      </form>
+    )
   }
 
   return (

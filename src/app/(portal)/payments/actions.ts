@@ -959,12 +959,49 @@ export async function updatePaymentVoucher(formData: FormData) {
   // Load current voucher to validate state + lock direction/voucher_type
   const { data: current } = await supabase
     .from('payment_vouchers')
-    .select('id, status, direction, voucher_type, fund_source_id, loan_id, repayment_breakdown, invoice_id')
+    .select('id, status, direction, voucher_type, fund_source_id, loan_id, repayment_breakdown, invoice_id, reference_type')
     .eq('id', id)
     .single()
   if (!current) throw new Error('Voucher not found')
   if (current.status !== 'pending_approval' && current.status !== 'draft') {
     throw new Error(`Cannot edit voucher in status "${current.status}" — only pending_approval / draft are editable`)
+  }
+
+  if (current.reference_type === 'payroll_statutory') {
+    // These amounts and sources are backed by immutable employee contribution
+    // snapshots. Editing the payment date/notes must not replace source rows.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: coverage, error: coverageError } = await (supabase as any)
+      .from('payroll_statutory_voucher_lines').select('id').eq('voucher_id', id).limit(1)
+    if (coverageError) throw new Error('Unable to verify the recorded statutory contributions. Please refresh and try again.')
+    if (coverage?.length) {
+      const allowed = new Set(['id', 'payment_date', 'notes'])
+      if (Array.from(formData.keys()).some((key) => !allowed.has(key))) {
+        throw new Error('This statutory PV has recorded employee contributions. Only its payment date and notes can be edited. To change people, amounts, payee, bank or source accounts, void it and generate a new PV from HR Payment.')
+      }
+      const updates: { payment_date?: string; notes?: string | null; updated_at: string } = { updated_at: new Date().toISOString() }
+      if (formData.has('payment_date')) {
+        const date = String(formData.get('payment_date') ?? '').trim()
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`)) || new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date) {
+          throw new Error('Choose a valid payment date')
+        }
+        updates.payment_date = date
+      }
+      if (formData.has('notes')) updates.notes = String(formData.get('notes') ?? '').trim() || null
+      const { data: updated, error: updateError } = await supabase.from('payment_vouchers')
+        .update(updates).eq('id', id).in('status', ['pending_approval', 'draft']).select('id')
+      if (updateError) throw new Error(`Failed to update statutory PV: ${updateError.message}`)
+      if (!updated?.length) throw new Error('Voucher status changed mid-edit (already approved or voided) — refresh and try again')
+      await supabase.from('access_log').insert({
+        user_id: user.id, action: 'update_payment_voucher', resource_type: 'payment_voucher', resource_id: id,
+        metadata: { status_at_edit: current.status, voucher_type: current.voucher_type, statutory_details_preserved: true },
+      }).then(() => { /* best-effort audit */ }, () => { /* do not block the completed edit */ })
+      revalidatePath(`/payments/${id}`)
+      revalidatePath('/payments')
+      revalidatePath('/approvals')
+      revalidatePath('/hr-costing/payment')
+      redirect(`/payments/${id}`)
+    }
   }
 
   const amount = parseFloat((formData.get('amount') as string) ?? '0')

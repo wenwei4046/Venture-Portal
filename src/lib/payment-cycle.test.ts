@@ -439,7 +439,7 @@ describe('cycleHeadline (Personio status word + countdown)', () => {
     expect(h.word).toBe('Salaries paid')
     expect(h.due).toEqual({ label: 'Statutory due', date: '2026-09-15', days: 5 })
     expect(h.action.kind).toBe('generate-statutory')
-    expect(h.action.label).toBe('Generate statutory · 5 PVs')
+    expect(h.action.label).toBe('Generate statutory')
     expect(h.segments.map((s) => s.state)).toEqual(['done', 'done', 'done', 'now'])
     c.statutory_vouchers = ['KWSP', 'PERKESO (SOCSO)', 'PERKESO (EIS)', 'LHDN', 'SKBBK'].map((payee, i) => ({
       id: `s${i}`, no: `HV-PV-${i}`, payee, status: 'paid' as const, amount: 1, payment_date: '2026-09-14', description: `${payee} — Aug 2026 payroll (staff + directors)`, created_at: null, approved_at: null,

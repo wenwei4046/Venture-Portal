@@ -4,22 +4,25 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { formatMoneyBare } from '@/lib/utils'
 import {
-  isNotableMove,
+  round2,
   shortDate,
-  varianceLabel,
+  type ContributionTotals,
   type CycleTotals,
+  type DeptGroup,
   type Headline,
   type Milestone,
+  type StatutoryRow,
   type VarianceSummary,
 } from '@/lib/payment-cycle'
+import ContribBand from './ContribBand'
 
-/** The numbers behind BambooHR's four explained figures. Computed on the server. */
+/** Funding and payroll facts supplied by the period's server read. */
 export interface Facts {
   ctc: number
+  fundedAmount: number
   fundedAll: boolean
   fundedDate: string | null
   fundingPvs: string[]
-  /** What the funding is waiting on when it is not complete. */
   fundingWord: string
   poolBalance: number
   staffNet: number
@@ -46,64 +49,48 @@ interface Props {
   milestones: Milestone[]
   variances: VarianceSummary
   totals: CycleTotals
+  band: ContributionTotals
+  rows: StatutoryRow[]
+  groups: DeptGroup[]
   facts: Facts
   bankLabel: string
-  /** The CTA for a `generate-salary` / `generate-statutory` headline; links render themselves. */
   actionLabel: string
   actionDisabled: boolean
   actionTitle?: string
   onAction: () => void
-  /** The funding-request control (RequestPayrollPaymentButton) for the pre-funding phases. */
   fundingSlot: ReactNode
-  /** The confirm bar, when the CTA has been pressed. */
   confirm: ReactNode
   onOpenGroup: (key: string) => void
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const MARK: Record<Milestone['state'], string> = { done: 'Done', next: 'Next', upcoming: 'Planned', late: 'Overdue', none: 'Not set' }
 
-function DateChip({ date }: { date: string | null }) {
-  if (!date) {
-    return (
-      <div className="dc">
-        <b>—</b>
-        <i>tbd</i>
-      </div>
-    )
+/** Reporting totals use the paid rows, including partly paid departments. */
+export function paymentStatementAmounts(groups: DeptGroup[], rows: StatutoryRow[], poolBalance: number) {
+  const people = groups.flatMap((group) => group.people)
+  const salaryPaid = round2(people.reduce((sum, person) => sum + (person.voucher?.status === 'paid' ? person.net : 0), 0))
+  const salaryOutstanding = round2(people.reduce((sum, person) => sum + (person.voucher?.status === 'paid' ? 0 : Math.max(0, person.net)), 0))
+  const statutoryOutstanding = round2(rows.reduce((sum, row) => sum + Math.max(0, row.total - row.paidAmount), 0))
+  const poolAfterSalary = round2(poolBalance - salaryOutstanding)
+  return {
+    salaryPaid,
+    salaryOutstanding,
+    statutoryOutstanding,
+    poolAfterSalary,
+    fundingGap: salaryOutstanding + statutoryOutstanding > 0
+      ? round2(Math.max(0, statutoryOutstanding - poolAfterSalary))
+      : 0,
   }
-  return (
-    <div className="dc">
-      <b>{Number(date.slice(8, 10))}</b>
-      <i>{MONTHS[Number(date.slice(5, 7)) - 1]}</i>
-    </div>
-  )
 }
 
-const MARK: Record<Milestone['state'], string> = { done: '✓ done', next: 'next', upcoming: '', late: 'late', none: '' }
-
-function datedFact(date: string | null): string {
-  if (!date) return '—'
-  const weekday = new Date(`${date.slice(0, 10)}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' })
-  return `${weekday} ${shortDate(date)}`
-}
-
-function FactMark({ done, label }: { done: boolean; label?: string }) {
-  return <span className={`fact-mark ${done ? 'done' : 'pending'}`} aria-hidden="true">{done ? '✓' : label ?? '●'}</span>
-}
-
-/**
- * Selected mockup B: a white payroll review with dated facts in the header,
- * a warm grey net-pay hero, explained checklist figures, and the current
- * action beside the footer's step trail. The side cards keep their layout.
- */
 export default function Overview({
   periodLabel,
-  periodRange,
-  prevMonthName,
   headline: h,
   milestones,
-  variances,
   totals,
+  band,
+  rows,
+  groups,
   facts: f,
   bankLabel,
   actionLabel,
@@ -112,226 +99,127 @@ export default function Overview({
   onAction,
   fundingSlot,
   confirm,
-  onOpenGroup,
 }: Props) {
-  const days = h.due.days
-  const statusTone = h.word === 'Salaries paid' ? 'ledger' : h.tone
-  const countdown = days == null ? '' : days < 0 ? `${-days} ${days === -1 ? 'day' : 'days'} overdue` : days === 0 ? 'today' : `${days} ${days === 1 ? 'day' : 'days'}`
-  const dueTone = days == null ? '' : days < 0 ? 'danger' : days <= 7 ? 'alert' : 'accent'
-  const payDate = f.staffCount > 0 ? f.staffDate : f.dirDate
-  const separatePayDates = f.staffCount > 0 && f.dirCount > 0 && f.staffDate !== f.dirDate
-  const fundingDates = milestones.filter((m) => m.key.startsWith('funded-') && m.state === 'done' && m.date).map((m) => m.date as string).sort()
-  const fundedDate = f.fundedAll ? fundingDates[fundingDates.length - 1] ?? f.fundedDate : null
-  const totalDelta = totals.prevNet == null ? null : { abs: Math.round((totals.net - totals.prevNet) * 100) / 100, pct: totals.prevNet === 0 ? null : Math.round(((totals.net - totals.prevNet) / totals.prevNet) * 10000) / 100, dir: (Math.abs(totals.net - totals.prevNet) < 0.005 ? 'flat' : totals.net > totals.prevNet ? 'up' : 'down') as 'flat' | 'up' | 'down' }
-
-  const cta = (() => {
+  const amounts = paymentStatementAmounts(groups, rows, f.poolBalance)
+  const salaryComplete = totals.people > 0 && amounts.salaryOutstanding < 0.005
+  const statutoryComplete = rows.some((row) => row.total > 0) && amounts.statutoryOutstanding < 0.005
+  const unpaidRows = rows.filter((row) => row.total - row.paidAmount > 0.005)
+  const unpaidBodies = new Set(unpaidRows.map((row) => row.body)).size
+  const nextStatutoryDue = unpaidRows.map((row) => row.due).sort()[0]
+  const paidSalaryDates = groups.flatMap((group) => group.people)
+    .filter((person) => person.voucher?.status === 'paid' && person.voucher.payment_date)
+    .map((person) => person.voucher!.payment_date!).sort()
+  const fundingDates = milestones.filter((m) => m.key.startsWith('funded-') && m.state === 'done' && m.date)
+    .map((m) => m.date!).sort()
+  const fundedDate = fundingDates.at(-1) ?? f.fundedDate
+  const salaryDate = paidSalaryDates.at(-1)
+  const otherDeductions = round2(band.cost - totals.net - totals.statutory)
+  const paymentDates = milestones.filter((m) => m.state !== 'none').map((m) => {
+    const scope = m.key === 'pay-staff' ? 'staff' : m.key === 'pay-dirs' ? 'directors' : null
+    if (!scope) return { ...m, mark: MARK[m.state], dateNote: null }
+    const payable = groups.filter((group) => group.scope === scope).flatMap((group) => group.people).filter((person) => person.net > 0)
+    const paidPeople = payable.filter((person) => person.voucher?.status === 'paid')
+    const dates = [...new Set(payable.map((person) => person.voucher?.payment_date).filter((date): date is string => !!date))].sort()
+    return {
+      ...m,
+      date: dates.at(-1) ?? m.date,
+      label: `${scope === 'staff' ? 'Staff' : 'Director'} ${dates.length > 1 ? 'payment dates' : 'pay date'}`,
+      mark: paidPeople.length > 0 && paidPeople.length < payable.length ? `${paidPeople.length}/${payable.length} paid` : MARK[m.state],
+      dateNote: dates.length > 1 ? dates.map((date) => shortDate(date)).join(' · ') : null,
+    }
+  })
+  const action = (() => {
     switch (h.action.kind) {
       case 'payroll':
       case 'approvals':
-        return (
-          <Link href={h.action.href ?? '/approvals'} className="pay-cta" title={h.detail}>
-            {h.action.label}
-          </Link>
-        )
+        return <Link href={h.action.href ?? '/approvals'} className="pay-cta">{h.action.label}</Link>
       case 'funding':
         return fundingSlot
       case 'generate-salary':
       case 'generate-statutory':
-        return (
-          <button type="button" className="pay-cta" onClick={onAction} disabled={actionDisabled} title={actionTitle}>
-            {actionLabel}
-          </button>
-        )
+        return <button type="button" className="pay-cta" onClick={onAction} disabled={actionDisabled} title={actionTitle}>{actionLabel}</button>
       default:
         return null
     }
   })()
+
   return (
-    <div className="pay-over">
-      <section className="pay-status pay-panel" aria-label={`${periodLabel} payroll review`}>
-        <div className="top">
-          <div className="review-heading">
-            <div className="eyebrow">Pay cycle · {periodRange}</div>
-            <div className="review-title">
-              <h2>{periodLabel.replace(/\s+\d{4}$/, '')} payroll</h2>
-              <span className={`word ${statusTone}`} title={h.detail}>
-                <span aria-hidden="true">{statusTone === 'ledger' ? '✓' : '●'}</span> {h.word}
-              </span>
-            </div>
+    <div className="payment-overview">
+      <section className="payment-summary" aria-label={`${periodLabel} payment totals`}>
+        <div>
+          <div className="payment-label">Total payroll cost</div>
+          <div className="payment-amount"><small>RM</small>{formatMoneyBare(band.cost)}</div>
+          <div className="payment-under">
+            {f.fundedAll ? `Funded${fundedDate ? ` ${shortDate(fundedDate)}` : ''}` : f.fundingWord} · {totals.people} people
           </div>
-          <dl className="review-dates">
-            <div>
-              <dt>{h.due.label}</dt>
-              <dd className={dueTone}>{datedFact(h.due.date)}{countdown ? ` · ${countdown}` : ''}</dd>
-            </div>
-            <div>
-              <dt>{separatePayDates ? 'Staff pay date' : 'Pay date'}</dt>
-              <dd>{datedFact(payDate)}</dd>
-            </div>
-            <div>
-              <dt>Funded</dt>
-              <dd>{f.fundedAll ? datedFact(fundedDate) : 'Pending'}</dd>
-            </div>
-          </dl>
         </div>
-        {h.word !== 'Salaries paid' ? <p className="detail">{h.detail}</p> : null}
-
-        <div className={`facts${totals.people === 0 ? ' empty' : ''}`}>
-          <div className="hero">
-            <div className="amt">
-              <small>RM</small>
-              {formatMoneyBare(totals.net)}
-            </div>
-            <div className="lab">
-              Total net payroll · {totals.staffCount} staff + {totals.directorCount} directors
-            </div>
-            <div className="say">
-              {totalDelta ? (
-                  <span className={isNotableMove(totalDelta) ? 'pay-delta notable' : 'pay-delta'}>
-                    {varianceLabel(totalDelta, prevMonthName)}
-                  </span>
-              ) : (
-                <> No {prevMonthName} figures to compare.</>
-              )}
-            </div>
+        <div>
+          <div className="payment-label">Salary paid</div>
+          <div className="payment-amount">{formatMoneyBare(amounts.salaryPaid)}</div>
+          <div className={`payment-under${salaryComplete ? ' good' : ''}`}>
+            {salaryComplete
+              ? `All salary PVs paid${salaryDate ? ` · ${shortDate(salaryDate)}` : ''}`
+              : amounts.salaryOutstanding > 0
+                ? `RM ${formatMoneyBare(amounts.salaryOutstanding)} still to pay`
+                : 'No salary payable'}
           </div>
-          {totals.people === 0 ? null : (
-          <div className="list">
-            <div className="f">
-              <FactMark done={f.fundedAll} />
-              <span className="v">{formatMoneyBare(f.ctc)}</span>
-              <span className="s">
-                {f.fundedAll ? (
-                  <>
-                    <b>Funded by Finance</b> {fundedDate ? `on ${shortDate(fundedDate)}` : ''} · {f.fundingPvs.filter(Boolean).join(' · ') || 'funding PV'}. The HR pool holds RM {formatMoneyBare(f.poolBalance)} now.
-                  </>
-                ) : (
-                  <>
-                    <b>To be funded by Finance</b> · {f.fundingWord} · HR pool holds RM {formatMoneyBare(f.poolBalance)} now.
-                  </>
-                )}
-              </span>
-            </div>
-            <div className="f">
-              <FactMark done={f.staffPaid} />
-              <span className="v">{formatMoneyBare(f.staffNet)}</span>
-              <span className="s">
-                <b>Staff</b> · {f.staffCount} people ·{' '}
-                {f.staffPaid ? (
-                  <>
-                    left {bankLabel}{f.staffDate ? ` on ${shortDate(f.staffDate)}` : ''}.
-                  </>
-                ) : (
-                  <>
-                    leaves {bankLabel} on {f.staffDate ? shortDate(f.staffDate) : 'the pay date'}.
-                  </>
-                )}
-              </span>
-            </div>
-            {f.dirCount > 0 ? (
-              <div className="f">
-                <FactMark done={f.dirPaid} />
-                <span className="v">{formatMoneyBare(f.dirNet)}</span>
-                <span className="s">
-                  <b>Directors</b> · {f.dirCount} · own batch ·{' '}
-                  {f.dirPaid ? (
-                    <>
-                      paid{f.dirDate ? ` ${shortDate(f.dirDate)}` : ''}.
-                    </>
-                  ) : f.dirFunded ? (
-                    <>on {f.dirDate ? shortDate(f.dirDate) : 'their pay date'}.</>
-                  ) : (
-                    <>waiting for their own funding request.</>
-                  )}
-                </span>
-              </div>
-            ) : null}
-            <div className="f">
-              <FactMark done={f.statDone} label="4" />
-              <span className="v">{formatMoneyBare(f.statutory)}</span>
-              <span className="s">
-                <b>Statutory</b> · 4 bodies ·{' '}
-                {f.statDone ? (
-                  <>
-                    all paid {shortDate(f.statPaidDate)}.
-                  </>
-                ) : (
-                  <>
-                    due {shortDate(f.statDue)}. Pool after salaries RM {formatMoneyBare(f.poolAfterSalary)} —{' '}
-                    {f.poolAfterSalary >= f.statutory ? (
-                      <span className="ok">covers it</span>
-                    ) : (
-                      <span className="short">short RM {formatMoneyBare(Math.round((f.statutory - f.poolAfterSalary) * 100) / 100)}</span>
-                    )}
-                    .
-                  </>
-                )}
-              </span>
-            </div>
-          </div>
-          )}
         </div>
+        <div>
+          <div className="payment-label">Statutory outstanding</div>
+          <div className="payment-amount">{formatMoneyBare(amounts.statutoryOutstanding)}</div>
+          <div className={`payment-under${statutoryComplete ? ' good' : amounts.statutoryOutstanding > 0 ? ' pending' : ''}`}>
+            {statutoryComplete ? 'All statutory PVs paid'
+              : nextStatutoryDue ? `Due ${shortDate(nextStatutoryDue)} · ${unpaidBodies} ${unpaidBodies === 1 ? 'body' : 'bodies'}`
+                : 'No statutory amounts payable'}
+          </div>
+        </div>
+      </section>
 
-        <div className="act">
-          <ol className="pay-trail" aria-label="Payroll progress">
-            {h.segments.map((s) => (
-              <li key={s.key} className={s.state} title={`${s.label}: ${s.note}`} aria-current={s.state === 'now' || s.state === 'late' ? 'step' : undefined}>
-                <span aria-hidden="true">{s.state === 'done' ? '✓' : s.state === 'late' ? '!' : s.state === 'now' ? '●' : '○'}</span>
-                {s.label}<span className="sr-only">: {s.state}, {s.note}</span>
+      <section className="payment-allocation" aria-label="Payroll reconciliation, funding and payment dates">
+        <div className="payment-reconciliation">
+          <h3>Payroll reconciliation</h3>
+          <div className="payment-metric"><span>Gross salary</span><span>{formatMoneyBare(band.gross)}</span></div>
+          <div className="payment-metric"><span>Employee deductions</span><span>−{formatMoneyBare(band.employee.total)}</span></div>
+          <div className="payment-metric"><span>Net salary</span><span>{formatMoneyBare(totals.net)}</span></div>
+          <div className="payment-metric"><span>Statutory remittances</span><span>{formatMoneyBare(totals.statutory)}</span></div>
+          {Math.abs(otherDeductions) >= 0.005 ? <div className="payment-metric"><span>{otherDeductions > 0 ? 'Other deductions retained' : 'Other payroll adjustments'}</span><span>{formatMoneyBare(otherDeductions)}</span></div> : null}
+          <div className="payment-metric total"><span>Total payroll cost · CTC</span><span>{formatMoneyBare(band.cost)}</span></div>
+          <details className="payment-contributions">
+            <summary>Contribution breakdown</summary>
+            <ContribBand band={band} />
+          </details>
+          <div className="payment-funding-received">
+            <div className="payment-metric"><span>Funding received from Finance</span><span>{formatMoneyBare(f.fundedAmount)}</span></div>
+            {f.fundingPvs.length > 0 ? <p>{f.fundingPvs.join(' · ')}</p> : null}
+          </div>
+        </div>
+        <div>
+          <div className={`payment-funding${amounts.fundingGap > 0 ? ' gap' : ''}`}>
+            <h3>{amounts.fundingGap > 0 ? (amounts.salaryOutstanding > 0 ? 'Payment funding gap' : 'Statutory funding gap') : 'Payment funding'}</h3>
+            <div className="payment-metric"><span>Current HR pool</span><span>{formatMoneyBare(f.poolBalance)}</span></div>
+            {amounts.salaryOutstanding > 0 ? <>
+              <div className="payment-metric"><span>Salary still to pay</span><span>{formatMoneyBare(amounts.salaryOutstanding)}</span></div>
+              <div className="payment-metric"><span>Pool after remaining salaries</span><span>{formatMoneyBare(amounts.poolAfterSalary)}</span></div>
+            </> : null}
+            <div className="payment-metric"><span>Statutory still to pay</span><span>{formatMoneyBare(amounts.statutoryOutstanding)}</span></div>
+            {amounts.fundingGap > 0
+              ? <div className="payment-metric total"><span>Additional funding needed</span><strong>{formatMoneyBare(amounts.fundingGap)}</strong></div>
+              : <p className="payment-under good">{amounts.salaryOutstanding + amounts.statutoryOutstanding > 0 ? 'Current pool covers the remaining payments.' : 'No remaining payments for this month.'}</p>}
+          </div>
+          <h3>Payment dates</h3>
+          <ol className="payment-dates">
+            {paymentDates.map((m) => (
+              <li key={m.key} className={m.state}>
+                {m.date ? <time dateTime={m.date} title={m.dateNote ?? undefined}>{m.dateNote ? 'Multiple' : shortDate(m.date)}</time> : <span className="payment-date-empty">—</span>}
+                <span>{m.label}{m.dateNote ? <span className="block text-muted text-xs">{m.dateNote}</span> : null}</span><span className="payment-date-state">{m.mark}</span>
               </li>
             ))}
           </ol>
-          {cta}
+          <p className="payment-bank">Payments from {bankLabel}</p>
         </div>
-        {confirm ? <div className="review-confirm">{confirm}</div> : null}
       </section>
-
-      <aside className="pay-side">
-        <div className="pay-panel">
-          <h3>
-            Due dates
-            <span className="chip">{milestones.filter((m) => m.state !== 'none').length}</span>
-          </h3>
-          <div className="pay-ms">
-            {milestones.map((m) => (
-              <div key={m.key} className={`m ${m.state}`}>
-                <DateChip date={m.date} />
-                <div className="t">{m.label}</div>
-                <div className="k">{MARK[m.state]}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="pay-panel">
-          <h3>
-            Pay variances
-            <span className={`chip${variances.notable > 0 ? ' alert' : ''}`}>{variances.changed}</span>
-          </h3>
-          {variances.top.length ? (
-            <div className="pay-var">
-              {variances.top.map((v) => {
-                const pct = v.d.pct == null ? `RM ${formatMoneyBare(Math.abs(v.d.abs))}` : `${v.d.dir === 'up' ? '+' : '−'}${Math.abs(v.d.pct).toFixed(0)}%`
-                return (
-                  <div key={v.row_id} className="r">
-                    <button type="button" onClick={() => onOpenGroup(v.key)} title={`${v.dept} · open`}>
-                      {v.name}
-                    </button>
-                    <span className="pv2">
-                      {formatMoneyBare(v.prev)} → {formatMoneyBare(v.now)}
-                    </span>
-                    <span className={`pc ${v.d.dir}${isNotableMove(v.d) ? ' notable' : ''}`}>{pct}</span>
-                  </div>
-                )
-              })}
-            </div>
-          ) : null}
-          <div className="foot">
-            {variances.compared === 0
-              ? `No ${prevMonthName} figures to compare.`
-              : `${variances.changed} of ${variances.compared} moved vs ${prevMonthName}${variances.joiners ? ` · ${variances.joiners} new` : ''}${variances.notable ? ` · ${variances.notable} by 20% or more` : ''}.`}
-          </div>
-        </div>
-      </aside>
+      {action ? <div className="payment-next-action"><div><strong>{h.word}</strong><p>{h.detail}</p></div>{action}</div> : null}
+      {confirm ? <div className="payment-report-confirm">{confirm}</div> : null}
     </div>
   )
 }

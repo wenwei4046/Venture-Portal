@@ -71,6 +71,15 @@ export interface CycleStatutoryVoucher {
   approved_at: string | null
 }
 
+/** A live PV's exact contribution coverage. Voided PVs never cover a row. */
+export interface StatutoryCoverage {
+  row_id: string
+  scope: Scope
+  scheme: Scheme
+  voucher_id: string
+  amount: number
+}
+
 export interface PaymentCycle {
   period: string
   run: {
@@ -87,6 +96,9 @@ export interface PaymentCycle {
   funding: { staff: CycleFunding | null; directors: CycleFunding | null }
   people: CyclePerson[]
   statutory_vouchers: CycleStatutoryVoucher[]
+  /** Absent only on an older server; [] means no contributions are covered. */
+  statutory_coverage?: StatutoryCoverage[]
+  statutory_completion?: Array<{ period: string; complete: boolean }>
 }
 
 const n = (v: unknown): number => {
@@ -171,6 +183,15 @@ export function normaliseCycle(raw: unknown): PaymentCycle {
     payout_bank: r.payout_bank && r.payout_bank.name ? { name: String(r.payout_bank.name), last4: String(r.payout_bank.last4 ?? '') } : null,
     funding: { staff: funding(r.funding?.staff), directors: funding(r.funding?.directors) },
     people,
+    statutory_completion: Array.isArray(r.statutory_completion)
+      ? r.statutory_completion.map((c: { period: string; complete: boolean }) => ({ period: String(c.period), complete: c.complete === true }))
+      : undefined,
+    statutory_coverage: Array.isArray(r.statutory_coverage)
+      ? r.statutory_coverage.map((c: StatutoryCoverage) => ({
+          row_id: String(c.row_id), scope: c.scope === 'directors' ? 'directors' : 'staff',
+          scheme: c.scheme, voucher_id: String(c.voucher_id), amount: n(c.amount),
+        }))
+      : undefined,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     statutory_vouchers: ((r.statutory_vouchers ?? []) as any[]).map((v) => ({
       id: String(v.id),
@@ -403,7 +424,7 @@ export function statutoryDue(period: string, scheme: Scheme): string {
   return d.toISOString().slice(0, 10)
 }
 
-export type StatStage = 'not_generated' | 'pending' | 'paid'
+export type StatStage = 'not_generated' | 'partial' | 'pending' | 'approved' | 'paid'
 
 export interface StatutoryRow {
   scheme: Scheme
@@ -421,23 +442,48 @@ export interface StatutoryRow {
   topup: CycleStatutoryVoucher | null
   directorsCovered: boolean
   stage: StatStage
+  vouchers: CycleStatutoryVoucher[]
+  generatedAmount: number
+  remainingAmount: number
+  paidAmount: number
   byDepartment: Array<{ key: string; name: string; amount: number }>
 }
 
 const carriesDirectors = (v: CycleStatutoryVoucher) => /directors\)\s*$/.test(String(v.description ?? ''))
 const isDirectorOnly = (v: CycleStatutoryVoucher) => /\(directors\)\s*$/.test(String(v.description ?? ''))
 
+/** Compatibility for old responses; the current RPC uses sources and exact lines. */
+export function statutoryCoverage(cycle: PaymentCycle): StatutoryCoverage[] {
+  const live = cycle.statutory_vouchers.filter(v => v.status !== 'voided')
+  if (cycle.statutory_coverage) {
+    const ids = new Set(live.map(v => v.id))
+    return cycle.statutory_coverage.filter(c => ids.has(c.voucher_id))
+  }
+  return live.flatMap(v => {
+    const scheme = SCHEMES.find(s => s.payee === v.payee)?.scheme
+    if (!scheme) return []
+    return cycle.people.filter(p => schemeAmount(p, scheme) > 0 && (
+      p.scope === 'directors' ? carriesDirectors(v) : !isDirectorOnly(v)
+    )).map(p => ({ row_id: p.row_id, scope: p.scope, scheme, voucher_id: v.id, amount: round2(schemeAmount(p, scheme)) }))
+  })
+}
+
 export function statutoryRows(cycle: PaymentCycle, groups: DeptGroup[]): StatutoryRow[] {
   const staff = cycle.people.filter((p) => p.scope === 'staff')
-  const dirs = cycle.people.filter((p) => p.scope === 'directors' && p.net > 0)
+  const dirs = cycle.people.filter((p) => p.scope === 'directors')
+  const coverage = statutoryCoverage(cycle)
   return SCHEMES.map((s) => {
-    const forPayee = cycle.statutory_vouchers.filter((v) => v.payee === s.payee)
+    const forPayee = cycle.statutory_vouchers.filter((v) => v.payee === s.payee && v.status !== 'voided')
     const pv = forPayee.find((v) => !isDirectorOnly(v)) ?? forPayee.find(isDirectorOnly) ?? null
     const topup = forPayee.find((v) => isDirectorOnly(v) && v.id !== pv?.id) ?? null
     const staffAmt = round2(staff.reduce((t, p) => t + schemeAmount(p, s.scheme), 0))
     const dirAmt = round2(dirs.reduce((t, p) => t + schemeAmount(p, s.scheme), 0))
-    const paid = (v: CycleStatutoryVoucher | null) => v != null && (v.status === 'paid' || v.status === 'approved')
-    const stage: StatStage = !pv ? 'not_generated' : paid(pv) && (!topup || paid(topup)) ? 'paid' : 'pending'
+    const covered = new Set(coverage.filter(c => c.scheme === s.scheme).map(c => `${c.scope}:${c.row_id}`))
+    const remainingAmount = round2(cycle.people.filter(p => !covered.has(`${p.scope}:${p.row_id}`))
+      .reduce((t, p) => t + Math.max(0, schemeAmount(p, s.scheme)), 0))
+    const stage: StatStage = !forPayee.length ? 'not_generated' : remainingAmount > 0 ? 'partial'
+      : forPayee.every(v => v.status === 'paid') ? 'paid'
+      : forPayee.every(v => v.status === 'paid' || v.status === 'approved') ? 'approved' : 'pending'
     return {
       scheme: s.scheme,
       body: s.body,
@@ -451,8 +497,12 @@ export function statutoryRows(cycle: PaymentCycle, groups: DeptGroup[]): Statuto
       due: statutoryDue(cycle.period, s.scheme),
       pv,
       topup,
-      directorsCovered: !!topup || (pv ? carriesDirectors(pv) : false),
+      directorsCovered: dirAmt > 0 && dirs.filter(p => schemeAmount(p, s.scheme) > 0).every(p => covered.has(`directors:${p.row_id}`)),
       stage,
+      vouchers: forPayee,
+      generatedAmount: round2(forPayee.reduce((t, v) => t + v.amount, 0)),
+      remainingAmount,
+      paidAmount: round2(forPayee.filter(v => v.status === 'paid').reduce((t, v) => t + v.amount, 0)),
       byDepartment: groups.map((g) => ({
         key: g.key,
         name: g.name,
@@ -732,6 +782,9 @@ interface Progress {
   statGenerated: number
   statPending: number
   statPaid: number
+  statApproved: number
+  statRemaining: number
+  statRemainingAmount: number
   statDone: boolean
   nextStatDue: string | null
   lastStatPaid: string | null
@@ -755,15 +808,16 @@ function progressOf(groups: DeptGroup[], rows: StatutoryRow[]): Progress {
     .filter((x): x is string => !!x)
     .sort()
   const openRows = rows.filter((r) => r.total > 0)
-  const statPaid = openRows.filter((r) => r.stage === 'paid').length
-  const statPending = openRows.filter((r) => r.stage === 'pending').length
+  const statutoryVouchers = Array.from(new Map(openRows.flatMap(r => r.vouchers).map(v => [v.id, v])).values())
+  const statPaid = statutoryVouchers.filter(v => v.status === 'paid').length
+  const statPending = statutoryVouchers.filter(v => v.status === 'pending_approval' || v.status === 'draft').length
   const unpaidDue = openRows
     .filter((r) => r.stage !== 'paid')
     .map((r) => r.due)
     .sort()
-  const paidStat = openRows
-    .filter((r) => r.stage === 'paid')
-    .map((r) => r.pv?.payment_date)
+  const paidStat = statutoryVouchers
+    .filter(v => v.status === 'paid')
+    .map(v => v.payment_date)
     .filter((x): x is string => !!x)
     .sort()
   return {
@@ -776,10 +830,13 @@ function progressOf(groups: DeptGroup[], rows: StatutoryRow[]): Progress {
     pendingGroupId: pendingV?.group_id ?? null,
     firstCreated: created[0] ?? null,
     statTotal: openRows.length,
-    statGenerated: openRows.filter((r) => r.pv != null).length,
+    statGenerated: statutoryVouchers.length,
     statPending,
     statPaid,
-    statDone: openRows.length > 0 && statPaid === openRows.length,
+    statApproved: statutoryVouchers.filter(v => v.status === 'approved').length,
+    statRemaining: openRows.filter(r => r.remainingAmount > 0).length,
+    statRemainingAmount: round2(openRows.reduce((t, r) => t + r.remainingAmount, 0)),
+    statDone: openRows.length > 0 && openRows.every(r => r.stage === 'paid'),
     nextStatDue: unpaidDue[0] ?? null,
     lastStatPaid: paidStat[paidStat.length - 1] ?? null,
   }
@@ -887,30 +944,40 @@ export function cycleHeadline(i: HeadlineInput): Headline {
     if (p.statGenerated === 0) {
       return {
         word: late ? 'Statutory overdue' : 'Salaries paid',
-        detail: `Paid ${shortDate(p.salaryPayDate)} · statutory for ${p.statTotal} PVs not generated yet.`,
+        detail: `Paid ${shortDate(p.salaryPayDate)} · statutory for ${p.statTotal} schemes not generated yet.`,
         tone: late ? 'danger' : 'accent',
         due: { label: 'Statutory due', date: due, days: days(due) },
         segments: seg(['done', 'done', 'done', late ? 'late' : 'now']),
-        action: { kind: 'generate-statutory', label: `Generate statutory · ${p.statTotal} PVs` },
+        action: { kind: 'generate-statutory', label: 'Generate statutory' },
       }
     }
     if (p.statPending > 0) {
       return {
         word: 'Statutory with Principal',
-        detail: `${p.statPending} of ${p.statTotal} statutory PVs awaiting approval · ${p.statPaid} paid.`,
+        detail: `${p.statPending} of ${p.statGenerated} statutory PVs awaiting approval · ${p.statPaid} paid.${p.statRemaining > 0 ? ` RM ${p.statRemainingAmount.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} still to generate.` : ''}`,
         tone: late ? 'danger' : 'alert',
         due: { label: 'Statutory due', date: due, days: days(due) },
         segments: seg(['done', 'done', 'done', late ? 'late' : 'now']),
         action: { kind: 'approvals', label: 'Open Approvals →', href: '/approvals' },
       }
     }
+    if (p.statApproved > 0) {
+      return {
+        word: 'Statutory ready to pay',
+        detail: `${p.statApproved} statutory PVs approved · ${p.statPaid} paid.${p.statRemaining > 0 ? ` ${p.statRemaining} schemes still have contributions to generate.` : ''}`,
+        tone: late ? 'danger' : 'accent',
+        due: { label: 'Statutory due', date: due, days: days(due) },
+        segments: seg(['done', 'done', 'done', late ? 'late' : 'now']),
+        action: { kind: 'approvals', label: 'Open payment vouchers →', href: '/payments' },
+      }
+    }
     return {
       word: 'Statutory partly paid',
-      detail: `${p.statPaid} of ${p.statTotal} bodies paid · ${p.statTotal - p.statGenerated} still to generate.`,
+      detail: `${p.statPaid} statutory PVs paid · ${p.statRemaining} schemes still have contributions to generate.`,
       tone: late ? 'danger' : 'accent',
       due: { label: 'Statutory due', date: due, days: days(due) },
       segments: seg(['done', 'done', 'done', late ? 'late' : 'now']),
-      action: { kind: 'generate-statutory', label: `Generate the rest · ${p.statTotal - p.statGenerated} PVs` },
+      action: { kind: 'generate-statutory', label: 'Generate remaining contributions' },
     }
   }
   return {
@@ -1065,6 +1132,7 @@ export function monthRail(
   funding: Array<{ payroll_run_id: string; status: string }> = [],
   before = 4,
   after = 1,
+  completion?: Array<{ period: string; complete: boolean }>,
 ): RailMonth[] {
   const [y, m] = period.split('-').map(Number)
   const out: RailMonth[] = []
@@ -1077,7 +1145,9 @@ export function monthRail(
       const funded = run.status === 'paid' || funding.some((f) => f.payroll_run_id === run.id && f.status === 'completed')
       if (funded) {
         const vs = statutory.filter((v) => v.reference_id === run.id && v.status !== 'voided')
-        const allPaid = vs.length >= 5 && vs.every((v) => v.status === 'paid' || v.status === 'approved')
+        const allPaid = completion
+          ? completion.some(c => c.period === p && c.complete)
+          : vs.length >= 5 && vs.every((v) => v.status === 'paid' || v.status === 'approved')
         state = allPaid ? 'closed' : 'funded'
       } else if (run.status === 'approved') state = 'submitted'
       else state = 'drafts'
