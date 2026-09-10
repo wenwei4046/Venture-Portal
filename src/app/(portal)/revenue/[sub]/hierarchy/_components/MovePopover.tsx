@@ -3,9 +3,13 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
+  enrolPlan,
   forbiddenTargets,
   refusalLabel,
   treeGroups,
+  type EnrolChoice,
+  type EnrolPlan,
+  type EnrolStep,
   type MoveSubject,
   type RefusalKind,
 } from '@/lib/commission/chart-moves'
@@ -29,13 +33,19 @@ export interface MovePopoverProps {
   layoutGraph: OrgNodeInput[]
   anchor: PopAnchor
   /**
-   * A target already chosen by a drop. The popover then only confirms the
-   * rank — an unplaced person dropped on a manager still has to be given
-   * one, because `comm_hierarchy.rank_id` is NOT NULL and no rank can be
-   * invented for them.
+   * A target already chosen by a drop. The popover then skips the list and
+   * only confirms: the rank an unplaced mover is to be given, because
+   * `comm_hierarchy.rank_id` is NOT NULL and no rank can be invented for
+   * them — and, when the target holds no position either, who goes on the
+   * ladder first and at what rank.
    */
   placeUnder?: string | null
-  onPick: (uplineStaffId: string | null, rankId: string) => void
+  /**
+   * `enrol` is present only when the pick puts somebody else on the ladder
+   * on the way — the target, and whoever above them on the reporting line
+   * was not on it yet (`enrolPlan`), each with the rank the reader chose.
+   */
+  onPick: (uplineStaffId: string | null, rankId: string, enrol?: EnrolChoice[]) => void
   onClose: () => void
 }
 
@@ -47,6 +57,7 @@ export function subjectOf(p: OrgPerson): MoveSubject {
     rankLabel: p.rankLabel,
     placed: p.rankId !== null,
     canRecruit: p.canRecruit,
+    reportsTo: p.reportsTo,
   }
 }
 
@@ -64,6 +75,19 @@ export function defaultRankFor(ranks: readonly OrgRank[], titleId: string | null
   return ordered[0] ?? null
 }
 
+/** "A, B and C" — for a sentence about who goes on the ladder first. */
+function listNames(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? ''
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
+/** The button that does it: one person, or the whole line. */
+function placeLabel(count: number): string {
+  if (count <= 1) return 'Place'
+  if (count === 2) return 'Place both'
+  return `Place all ${count}`
+}
+
 /**
  * The button the chart never had.
  *
@@ -73,6 +97,14 @@ export function defaultRankFor(ranks: readonly OrgRank[], titleId: string | null
  * a drop is judged by (`chart-moves.ts`), so the two can never disagree. The
  * last row, "Top of their own tree", is the detach that used to live in a
  * text link above the canvas.
+ *
+ * An upline who holds no position yet is NOT greyed (2026-09-10). Their row
+ * says "placed first", and picking it turns the list into the plan: them on
+ * the ladder, at their title's rank, and whoever above them on the reporting
+ * line was not on it either — then the mover under them. Every rank is a
+ * select, and one button does all of it, so what used to be a refusal and a
+ * trip through two other popovers is one confirmed gesture that shows every
+ * position it is about to open.
  *
  * Rendered through a portal so the React Flow viewport's transform and
  * overflow cannot clip it; positioned below the anchor, or above when the
@@ -96,12 +128,20 @@ export default function MovePopover({
   const [rankId, setRankId] = useState<string>(
     () => mover.rankId ?? defaultRankFor(ranks, mover.titleId)?.id ?? '',
   )
+  /** The upline picked from the list (or handed in by a drop), awaiting the plan's confirmation. */
+  const [chosen, setChosen] = useState<string | null>(placeUnder)
+  /** Ranks chosen for the people the plan puts on the ladder; the default is read when absent. */
+  const [enrolRanks, setEnrolRanks] = useState<Record<string, string>>({})
 
   const byId = useMemo(() => new Map(people.map(p => [p.staffId, p])), [people])
   const subjects = useMemo(() => people.map(subjectOf), [people])
   const forbidden = useMemo(
     () => forbiddenTargets(graph, subjects, mover.staffId),
     [graph, subjects, mover.staffId],
+  )
+  const plans = useMemo(
+    () => new Map<string, EnrolPlan>(people.map(p => [p.staffId, enrolPlan(subjects, p.staffId)])),
+    [people, subjects],
   )
   const groups = useMemo(() => treeGroups(layoutGraph), [layoutGraph])
   const listed = useMemo(() => new Set(groups.flatMap(g => g.members.map(m => m.id))), [groups])
@@ -114,6 +154,7 @@ export default function MovePopover({
         .sort((a, b) => a.name.localeCompare(b.name)),
     [people, listed],
   )
+  const sortedRanks = useMemo(() => [...ranks].sort((a, b) => a.sortOrder - b.sortOrder), [ranks])
 
   const needle = q.trim().toLowerCase()
   const matches = (p: OrgPerson) => !needle || p.name.toLowerCase().includes(needle)
@@ -121,16 +162,20 @@ export default function MovePopover({
   // Placed under nobody already, on purpose — the detach row has nothing to do.
   const atTop = !unplaced && mover.uplineStaffId === null
 
+  const target = chosen ? (byId.get(chosen) ?? null) : null
+  const steps: EnrolStep[] = target ? (plans.get(target.staffId)?.steps ?? []) : []
+  const wide = target !== null
+
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
-    const w = 300
+    const w = wide ? 392 : 300
     const h = el.offsetHeight
     const left = Math.max(12, Math.min(anchor.left, window.innerWidth - w - 12))
     let top = anchor.bottom + 6
     if (top + h > window.innerHeight - 12) top = Math.max(12, anchor.top - h - 6)
     setPos({ left, top })
-  }, [anchor, q, placeUnder])
+  }, [anchor, q, chosen, wide])
 
   useEffect(() => {
     const onDown = (e: PointerEvent) => {
@@ -166,33 +211,57 @@ export default function MovePopover({
     el?.focus()
   }, [pos])
 
+  const rankOf = (s: EnrolStep): string =>
+    enrolRanks[s.staffId] ?? defaultRankFor(ranks, byId.get(s.staffId)?.titleId ?? null)?.id ?? ''
+
   const pick = (uplineStaffId: string | null) => {
     if (!rankId) return
     onPick(uplineStaffId, rankId)
   }
 
-  const rankRow = unplaced ? (
-    <label className="prank">
-      <span>Place as</span>
-      <select value={rankId} onChange={e => setRankId(e.target.value)} aria-label="Rank to place them at">
-        {[...ranks]
-          .sort((a, b) => a.sortOrder - b.sortOrder)
-          .map(r => (
-            <option key={r.id} value={r.id}>
-              {r.label}
-              {r.titleId === mover.titleId ? ' · their title' : ''}
-            </option>
-          ))}
-      </select>
-    </label>
-  ) : null
+  /** A row was chosen: straight through when nobody else needs placing, else the plan. */
+  const choose = (staffId: string) => {
+    if ((plans.get(staffId)?.steps.length ?? 0) > 0) setChosen(staffId)
+    else pick(staffId)
+  }
 
-  const target = placeUnder ? byId.get(placeUnder) : null
+  const canPlace = !!rankId && steps.every(s => rankOf(s) !== '')
+  const confirm = () => {
+    if (!target || !canPlace) return
+    if (steps.length === 0) {
+      onPick(target.staffId, rankId)
+      return
+    }
+    onPick(
+      target.staffId,
+      rankId,
+      steps.map(s => ({ ...s, rankId: rankOf(s) })),
+    )
+  }
+
+  const rankOptions = (titleId: string | null) =>
+    sortedRanks.map(r => (
+      <option key={r.id} value={r.id}>
+        {r.label}
+        {r.titleId === titleId ? ' · their title' : ''}
+      </option>
+    ))
+
+  const rankRow =
+    unplaced && !target ? (
+      <label className="prank">
+        <span>Place as</span>
+        <select value={rankId} onChange={e => setRankId(e.target.value)} aria-label="Rank to place them at">
+          {rankOptions(mover.titleId)}
+        </select>
+      </label>
+    ) : null
 
   const row = (p: OrgPerson, depth: number) => {
     if (!matches(p)) return null
     const kind: RefusalKind | undefined = forbidden.get(p.staffId)
     const current = !unplaced && mover.uplineStaffId === p.staffId
+    const first = !kind && !current && (plans.get(p.staffId)?.steps.length ?? 0) > 0
     return (
       <button
         key={p.staffId}
@@ -200,7 +269,7 @@ export default function MovePopover({
         role="option"
         aria-selected={current}
         disabled={!!kind || current}
-        onClick={() => pick(p.staffId)}
+        onClick={() => choose(p.staffId)}
         className="row"
         style={{ paddingLeft: 12 + depth * 12 }}
       >
@@ -213,19 +282,93 @@ export default function MovePopover({
           <span className="cur">current</span>
         ) : kind ? (
           <span className="why">{refusalLabel(kind)}</span>
+        ) : first ? (
+          <span className="pre">placed first</span>
         ) : null}
       </button>
     )
   }
 
+  /**
+   * The sentence above the plan: who goes on the ladder first, and where the
+   * line puts them. Absent when only the mover is being placed.
+   */
+  const lead = (() => {
+    if (steps.length === 0) return null
+    const names = steps.map(s => byId.get(s.staffId)?.name ?? '?')
+    if (steps.length === 1) {
+      const anchorId = steps[0].uplineStaffId
+      const where = anchorId
+        ? `under ${byId.get(anchorId)?.name ?? 'their manager'}, where they already report`
+        : 'at the top of their own tree'
+      return `${names[0]} holds no position yet, so they go on the ladder first, ${where}.`
+    }
+    return `${listNames(names)} hold no position yet, so they go on the ladder first, along the line they already report on.`
+  })()
+
   const body = target ? (
-    <div className="pact">
-      <button type="button" className="border border-hairline rounded-control px-3 py-1.5 text-xs font-sans text-graphite hover:text-ink bg-surface" onClick={onClose}>
-        Cancel
-      </button>
-      <button type="button" className="primary-act rounded-control px-3 py-1.5 text-xs font-sans text-band-ink bg-walnut hover:opacity-90 disabled:opacity-45" disabled={!rankId} onClick={() => pick(target.staffId)}>
-        Place
-      </button>
+    <div className="pplan">
+      {lead ? <p className="plead">{lead}</p> : null}
+      <ol className="psteps">
+        {steps.map((s, i) => {
+          const p = byId.get(s.staffId)
+          if (!p) return null
+          const under = s.uplineStaffId
+            ? `under ${byId.get(s.uplineStaffId)?.name ?? '?'}`
+            : 'top of own tree'
+          return (
+            <li key={s.staffId}>
+              <span className="n">{i + 1}</span>
+              <span className="who">
+                <span className="nm">{p.name}</span>
+                <span className="tt">
+                  {p.titleName ?? 'no title'} · {under}
+                </span>
+              </span>
+              <select
+                value={rankOf(s)}
+                onChange={e => setEnrolRanks(r => ({ ...r, [s.staffId]: e.target.value }))}
+                aria-label={`Rank to place ${p.name} at`}
+              >
+                {rankOptions(p.titleId)}
+              </select>
+            </li>
+          )
+        })}
+        <li>
+          <span className="n">{steps.length + 1}</span>
+          <span className="who">
+            <span className="nm">{mover.name}</span>
+            <span className="tt">
+              {mover.titleName ?? 'no title'} · under {target.name}
+            </span>
+          </span>
+          {unplaced ? (
+            <select value={rankId} onChange={e => setRankId(e.target.value)} aria-label="Rank to place them at">
+              {rankOptions(mover.titleId)}
+            </select>
+          ) : (
+            <span className="kept">{(mover.rankLabel ?? '').replace(/^rank\s+/i, '')} · kept</span>
+          )}
+        </li>
+      </ol>
+      <div className="pact">
+        <button
+          type="button"
+          className="border border-hairline rounded-control px-3 py-1.5 text-xs font-sans text-graphite hover:text-ink bg-surface"
+          onClick={placeUnder ? onClose : () => setChosen(null)}
+        >
+          {placeUnder ? 'Cancel' : 'Back'}
+        </button>
+        <button
+          type="button"
+          className="primary-act rounded-control px-3 py-1.5 text-xs font-sans text-band-ink bg-walnut hover:opacity-90 disabled:opacity-45"
+          disabled={!canPlace}
+          onClick={confirm}
+        >
+          {placeLabel(steps.length + 1)}
+        </button>
+      </div>
     </div>
   ) : (
     <>
@@ -290,7 +433,7 @@ export default function MovePopover({
       ref={ref}
       role="dialog"
       aria-label={`${unplaced ? 'Place' : 'Move'} ${mover.name}`}
-      className="org-pop font-sans"
+      className={`org-pop font-sans${wide ? ' wide' : ''}`}
       style={pos ? { left: pos.left, top: pos.top } : { left: -9999, top: 0, visibility: 'hidden' }}
     >
       <div className="ph">

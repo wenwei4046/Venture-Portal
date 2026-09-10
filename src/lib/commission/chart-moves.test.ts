@@ -1,11 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import {
+  enrolPlan,
   forbiddenTargets,
   moveRefusal,
   refusalLabel,
   refusalSentence,
+  sameSteps,
   shelfIds,
   treeGroups,
+  type EnrolPlan,
   type MoveSubject,
 } from './chart-moves'
 import type { OrgNodeInput } from '@/lib/org-layout'
@@ -16,6 +19,7 @@ const subject = (over: Partial<MoveSubject> & { staffId: string }): MoveSubject 
   rankLabel: 'Rank A · 10%',
   placed: true,
   canRecruit: true,
+  reportsTo: null,
   ...over,
 })
 
@@ -26,6 +30,8 @@ const graph: OrgNodeInput[] = [
   { id: 'zack', parentId: 'howard', label: 'ZACK' },
   { id: 'luis', parentId: null, label: 'LUIS TEO' },
   { id: 'yuny', parentId: null, label: 'YUNY' },
+  { id: 'chea', parentId: null, label: 'CHEA HUAN' },
+  { id: 'kj', parentId: null, label: 'KAR JUN' },
 ]
 const people: MoveSubject[] = [
   subject({ staffId: 'anthony' }),
@@ -33,49 +39,162 @@ const people: MoveSubject[] = [
   subject({ staffId: 'zack', titleName: 'Revenue Specialist', rankLabel: 'Rank C · 6%', canRecruit: false }),
   subject({ staffId: 'luis', titleName: 'Senior Revenue Specialist', rankLabel: 'Rank B · 8%' }),
   subject({ staffId: 'yuny', titleName: 'Team Assistant', rankLabel: null, placed: false, canRecruit: false }),
+  // A leader with no position yet, and a report of theirs with none either.
+  subject({ staffId: 'chea', name: 'CHEA HUAN', rankLabel: null, placed: false }),
+  subject({
+    staffId: 'kj',
+    name: 'KAR JUN',
+    titleName: 'Senior Revenue Specialist',
+    rankLabel: null,
+    placed: false,
+    reportsTo: 'chea',
+  }),
 ]
+const none = new Set<string>()
+const direct: EnrolPlan = { steps: [], blocked: null }
+const planFor = (id: string) => enrolPlan(people, id)
+
+describe('enrolPlan', () => {
+  it('has nothing to do for somebody who holds a position', () => {
+    expect(planFor('anthony')).toEqual({ steps: [], blocked: null })
+  })
+
+  it('puts an unplaced leader who reports to nobody at the top of their own tree', () => {
+    expect(planFor('chea')).toEqual({ steps: [{ staffId: 'chea', uplineStaffId: null }], blocked: null })
+  })
+
+  it('follows the reporting line up, top-down, until it ends', () => {
+    expect(planFor('kj')).toEqual({
+      steps: [
+        { staffId: 'chea', uplineStaffId: null },
+        { staffId: 'kj', uplineStaffId: 'chea' },
+      ],
+      blocked: null,
+    })
+  })
+
+  it('hangs the line from the first placed manager it meets', () => {
+    const roster = [...people, subject({ staffId: 'mei', rankLabel: null, placed: false, reportsTo: 'howard' })]
+    expect(enrolPlan(roster, 'mei')).toEqual({
+      steps: [{ staffId: 'mei', uplineStaffId: 'howard' }],
+      blocked: null,
+    })
+  })
+
+  it('is blocked by an ancestor whose title may not hold downlines — the placed one included', () => {
+    const roster = [
+      ...people,
+      subject({ staffId: 'mei', rankLabel: null, placed: false, reportsTo: 'zack' }),
+      subject({ staffId: 'raj', rankLabel: null, placed: false, reportsTo: 'sam' }),
+      subject({ staffId: 'sam', rankLabel: null, placed: false, canRecruit: false, reportsTo: null }),
+    ]
+    expect(enrolPlan(roster, 'mei')).toEqual({
+      steps: [],
+      blocked: 'MEI reports up to ZACK, whose title cannot hold downlines',
+    })
+    expect(enrolPlan(roster, 'raj')).toEqual({
+      steps: [],
+      blocked: 'RAJ reports up to SAM, whose title cannot hold downlines',
+    })
+    // The target's OWN title is not this plan's business: `moveRefusal` says
+    // "no downlines" for them, in their own caption.
+    expect(enrolPlan(roster, 'sam').blocked).toBeNull()
+  })
+
+  it('is blocked by a line that leaves the chart, or loops', () => {
+    const roster = [
+      ...people,
+      subject({ staffId: 'out', rankLabel: null, placed: false, reportsTo: 'somebody-elsewhere' }),
+      subject({ staffId: 'p', rankLabel: null, placed: false, reportsTo: 'q' }),
+      subject({ staffId: 'q', rankLabel: null, placed: false, reportsTo: 'p' }),
+    ]
+    expect(enrolPlan(roster, 'out').blocked).toBe('OUT reports to somebody who is not on this chart')
+    expect(enrolPlan(roster, 'p').blocked).toBe('P’s reporting line loops back on itself')
+  })
+
+  it('is empty for somebody who is not on the chart', () => {
+    expect(planFor('ghost')).toEqual({ steps: [], blocked: null })
+  })
+})
+
+describe('sameSteps', () => {
+  it('compares people, uplines and order', () => {
+    const a = planFor('kj').steps
+    expect(sameSteps(a, [...a])).toBe(true)
+    expect(sameSteps(a, [...a].reverse())).toBe(false)
+    expect(sameSteps(a, a.slice(1))).toBe(false)
+    expect(sameSteps(a, [a[0], { ...a[1], uplineStaffId: null }])).toBe(false)
+  })
+})
 
 describe('moveRefusal', () => {
-  const none = new Set<string>()
-
   it('lets somebody go under a placed title that may recruit', () => {
-    expect(moveRefusal(people[3], people[0], none)).toBeNull()
+    expect(moveRefusal(people[3], people[0], none, direct)).toBeNull()
+  })
+
+  it('lets somebody go under an unplaced title that may recruit — the plan places them first', () => {
+    expect(moveRefusal(people[3], people[5], none, planFor('chea'))).toBeNull()
+    expect(moveRefusal(people[3], people[6], none, planFor('kj'))).toBeNull()
   })
 
   it('refuses their own card first, whatever else is true', () => {
-    expect(moveRefusal(people[0], people[0], none)).toBe('self')
+    expect(moveRefusal(people[0], people[0], none, direct)).toBe('self')
   })
 
   it('refuses their own downline before anything about the target', () => {
     const downlines = new Set(['howard', 'zack'])
-    expect(moveRefusal(people[0], people[1], downlines)).toBe('downline')
+    expect(moveRefusal(people[0], people[1], downlines, direct)).toBe('downline')
     // A downline who could not recruit anyway still reads as "their downline":
     // that is the reason that would survive promoting them.
-    expect(moveRefusal(people[0], people[2], downlines)).toBe('downline')
+    expect(moveRefusal(people[0], people[2], downlines, direct)).toBe('downline')
   })
 
-  it('refuses somebody with no position, then a title that may not recruit', () => {
-    expect(moveRefusal(people[3], people[4], none)).toBe('not-placed')
-    expect(moveRefusal(people[3], people[2], none)).toBe('no-downlines')
+  it('refuses a line that runs through the mover, or hangs from somebody below them', () => {
+    // CHEA HUAN under KAR JUN: KAR JUN’s line is CHEA HUAN → KAR JUN.
+    expect(moveRefusal(people[5], people[6], none, planFor('kj'))).toBe('downline')
+    // ANTHONY under MEI, who reports to HOWARD, who is ANTHONY’s downline.
+    const mei = subject({ staffId: 'mei', rankLabel: null, placed: false, reportsTo: 'howard' })
+    const plan = enrolPlan([...people, mei], 'mei')
+    expect(moveRefusal(people[0], mei, new Set(['howard', 'zack']), plan)).toBe('downline')
+    // HOWARD under MEI directly: the line hangs from HOWARD himself.
+    expect(moveRefusal(people[1], mei, none, plan)).toBe('downline')
+  })
+
+  it('refuses a title that may not recruit before saying anything about placement', () => {
+    expect(moveRefusal(people[3], people[2], none, direct)).toBe('no-downlines')
+    // YUNY holds no position AND may not recruit: placing them would change
+    // nothing, so the title is the reason given.
+    expect(moveRefusal(people[3], people[4], none, planFor('yuny'))).toBe('no-downlines')
+  })
+
+  it('refuses somebody with no position only when no plan can place them', () => {
+    const blocked: EnrolPlan = { steps: [], blocked: 'CHEA HUAN reports to somebody who is not on this chart' }
+    expect(moveRefusal(people[3], people[5], none, blocked)).toBe('not-placed')
   })
 })
 
 describe('forbiddenTargets', () => {
-  it('greys the mover, their commission downlines, the unplaced and the non-recruiters', () => {
+  it('greys the mover, their commission downlines, the non-recruiters and the unplaceable', () => {
     const out = forbiddenTargets(graph, people, 'anthony')
     expect(out.get('anthony')).toBe('self')
     expect(out.get('howard')).toBe('downline')
     expect(out.get('zack')).toBe('downline')
-    expect(out.get('yuny')).toBe('not-placed')
+    expect(out.get('yuny')).toBe('no-downlines')
     expect(out.has('luis')).toBe(false)
+    // Unplaced, but their line can be placed: not greyed.
+    expect(out.has('chea')).toBe(false)
+    expect(out.has('kj')).toBe(false)
   })
 
   it('does not treat a borrowed reporting line as a downline', () => {
-    // YUNY is drawn under ANTHONY on the reporting line, but the commission
-    // graph knows nothing of it — so ANTHONY may still be dropped elsewhere
-    // freely, and YUNY is greyed for being unplaced, not for being a downline.
-    const out = forbiddenTargets(graph, people, 'anthony')
-    expect(out.get('yuny')).toBe('not-placed')
+    // KAR JUN is drawn under CHEA HUAN on the reporting line, but the
+    // commission graph knows nothing of it — so CHEA HUAN may still be
+    // dropped elsewhere freely, and only KAR JUN is refused, for the loop
+    // their own line would close.
+    const out = forbiddenTargets(graph, people, 'chea')
+    expect(out.get('kj')).toBe('downline')
+    expect(out.has('anthony')).toBe(false)
+    expect(out.has('luis')).toBe(false)
   })
 
   it('is empty for somebody who is not on the chart', () => {
@@ -104,6 +223,14 @@ describe('refusal copy', () => {
     )
     expect(refusalSentence('not-placed', people[3], people[4])).toBe(
       'YUNY holds no position yet — place them first.',
+    )
+  })
+
+  it('says why a plan could not be built, when it could not', () => {
+    expect(
+      refusalSentence('not-placed', people[3], people[5], 'CHEA HUAN reports to somebody who is not on this chart'),
+    ).toBe(
+      'CHEA HUAN holds no position yet and cannot be placed from here — CHEA HUAN reports to somebody who is not on this chart. Place them first.',
     )
   })
 })

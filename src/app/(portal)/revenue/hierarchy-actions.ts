@@ -5,6 +5,15 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { promotesTo, titleCanRecruit, type LadderRung } from '@/lib/commission/titles'
+import {
+  enrolPlan,
+  moveRefusal,
+  refusalSentence,
+  sameSteps,
+  type EnrolChoice,
+  type MoveSubject,
+} from '@/lib/commission/chart-moves'
+import { descendantsOf, type OrgNodeInput } from '@/lib/org-layout'
 import { canAccessTeam } from '@/lib/roles'
 import { boundaryRefusal, type BoundaryPerson } from '@/lib/hierarchy-boundary'
 import type { PermissionHolder } from '@/lib/permissions'
@@ -445,6 +454,224 @@ async function mirrorToReportsTo(
     return { mirrored: true, note: null }
   } catch (e) {
     return mirrorFailed('reporting line', e instanceof Error ? e.message : String(e))
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Placing somebody under an upline who holds no position yet
+ *
+ * `setPosition` refuses an upline with no open position, and rightly:
+ * `comm_hierarchy.upline_staff_id` has to point at a position the override
+ * engine can pay. But on a chart where most people are not placed yet, that
+ * refusal was most of the chart (user 2026-09-10: "why i cant park yau wei
+ * under chea huan tree?"). The gesture was never "move under an unplaced
+ * person"; it was "put this person on that tree", and the tree already has a
+ * shape — the reporting line the chart draws it from, which inside a
+ * commission department IS the commission upline (2026-09-08).
+ *
+ * So the popover shows the plan (`enrolPlan`): the upline on the ladder at a
+ * rank the reader picks, anybody above them on the reporting line who is not
+ * on it either, then the mover. This action is the far end of that confirm.
+ * ------------------------------------------------------------------ */
+
+export interface EnrolAndPlaceInput {
+  schemeId: string
+  /**
+   * Top-down: who the chosen upline's line puts on the ladder on the way,
+   * each with the rank the reader chose. The plan the popover showed —
+   * re-derived here from the database and compared, never trusted.
+   */
+  enrol: EnrolChoice[]
+  /** The move that asked for all of it. `uplineStaffId` is the last step. */
+  mover: PositionInput
+}
+
+export interface EnrolAndPlaceResult {
+  /** Who was put on the ladder, in order — everyone in `enrol` when nothing went wrong. */
+  placed: string[]
+  /** The mover's own write, or null when it was never reached. */
+  outcome: MirrorOutcome | null
+  /**
+   * What stopped it, when something did. Everybody in `placed` STAYS placed:
+   * each step is a position somebody would have made by hand on this chart,
+   * and unmaking one here would mean deleting a row a month could be paid
+   * from. Returned rather than thrown, because Next redacts a thrown Server
+   * Action message in production and this sentence has to reach the reader.
+   */
+  failed: { staffId: string; reason: string } | null
+}
+
+interface ChartStaffRow {
+  id: string
+  employee_name: string
+  reports_to: string | null
+  title_id: string | null
+  titles: { name: string } | { name: string }[] | null
+}
+
+interface ChartOpenRow {
+  staff_id: string
+  scheme_id: string
+  upline_staff_id: string | null
+  comm_ranks: { label: string; can_recruit: boolean } | { label: string; can_recruit: boolean }[] | null
+}
+
+/**
+ * The chart as the rules read it, built the way the page builds it
+ * (`loadTeam` + `page.tsx`): the active people of every commission
+ * department, minus anybody placed under another sub-department's scheme,
+ * each judged for recruiting by their TITLE and only by their rank when the
+ * ladder does not carry the title.
+ */
+async function loadChart(
+  supabase: SupabaseClient,
+  schemeId: string,
+  ladder: LadderRow[],
+): Promise<{ subjects: MoveSubject[]; graph: OrgNodeInput[] }> {
+  const [{ data: staff, error: staffError }, { data: open, error: openError }] = await Promise.all([
+    supabase
+      .from('hr_staff_costs')
+      .select('id, employee_name, reports_to, title_id, titles (name), departments!inner (payroll_source)')
+      .eq('status', 'active')
+      .eq('departments.payroll_source', 'commission'),
+    supabase
+      .from('comm_hierarchy')
+      .select('staff_id, scheme_id, upline_staff_id, comm_ranks (label, can_recruit)')
+      .is('effective_to', null),
+  ])
+  if (staffError) throw new Error(`Could not read the roster: ${staffError.message}`)
+  if (openError) throw new Error(`Could not read the commission positions: ${openError.message}`)
+
+  const positions = new Map(
+    ((open ?? []) as unknown as ChartOpenRow[]).map(r => [r.staff_id, r]),
+  )
+  const subjects: MoveSubject[] = []
+  const graph: OrgNodeInput[] = []
+  for (const s of (staff ?? []) as unknown as ChartStaffRow[]) {
+    const pos = positions.get(s.id)
+    if (pos && pos.scheme_id !== schemeId) continue
+    const rank = one(pos?.comm_ranks)
+    subjects.push({
+      staffId: s.id,
+      name: s.employee_name,
+      titleName: one(s.titles)?.name ?? null,
+      rankLabel: rank?.label ?? null,
+      placed: !!pos,
+      canRecruit: titleCanRecruit(rungs(ladder), s.title_id) ?? rank?.can_recruit ?? false,
+      reportsTo: s.reports_to,
+    })
+    graph.push({ id: s.id, parentId: pos?.upline_staff_id ?? null, label: s.employee_name })
+  }
+  return { subjects, graph }
+}
+
+/**
+ * `redirect()` and `notFound()` travel as thrown errors carrying a `digest`;
+ * a catch that swallowed one would turn a redirect into a sentence about the
+ * database. The same guard the Team page's actions keep.
+ */
+function isControlFlow(e: unknown): boolean {
+  const digest = (e as { digest?: unknown } | null)?.digest
+  return typeof digest === 'string' && /^NEXT_(REDIRECT|NOT_FOUND)/.test(digest)
+}
+
+/**
+ * What a caught `setPosition` failure may be shown as.
+ *
+ * Its refusals written for a reader — "That upline has no active position",
+ * "… is not allowed to hold downlines" — travel unchanged. Its "Could not …"
+ * wrappers carry the RAW PostgREST message, which a thrown error would have
+ * had redacted by Next in production and a returned value would print
+ * verbatim to whoever pressed the button; those stay in the server log.
+ */
+function safeRefusal(e: unknown): string {
+  const raw = (e instanceof Error ? e.message : String(e)).replace(/[\s.]+$/, '')
+  if (!/^Could not /.test(raw)) return raw
+  console.error('[enrolAndPlace] a placement write failed', e)
+  return 'the database refused the write — the detail is in the server log'
+}
+
+/**
+ * Put the chosen upline (and whoever their line needs) on the ladder, then
+ * place the mover under them.
+ *
+ * Every precondition is re-read from the database and runs BEFORE anything
+ * commits: the client's plan came from a page render that may be minutes
+ * old, and every step is a position a month is paid from. The plan is
+ * rebuilt here with the same pure rule the popover used and compared with
+ * what was confirmed; a chart that has moved on refuses the whole thing
+ * with nothing written.
+ *
+ * Each step then commits through `setPosition` — the one path in the app
+ * that may create a position row, and the one that asks whether the rank
+ * belongs to the ladder, whether the upline may recruit, whether the
+ * placement closes a loop, and which month it starts in. It mirrors each
+ * placement into `reports_to` as it goes; because the steps FOLLOW the
+ * reporting line, those mirrors rewrite the value already there, and only
+ * the mover's line actually moves. A step that lands stays landed; the first
+ * that does not stops everything after it and is reported with what came
+ * before it.
+ */
+export async function enrolAndPlace(input: EnrolAndPlaceInput): Promise<EnrolAndPlaceResult> {
+  await requirePermission('revenue')
+  const supabase = await client()
+
+  const schemeId = input.schemeId?.trim() ?? ''
+  const mover = input.mover
+  const enrol = input.enrol ?? []
+  if (!schemeId || !mover?.staffId || !mover.rankId) throw new Error('Which person, and at what rank?')
+  if (!mover.uplineStaffId) throw new Error('Under whom?')
+  if (enrol.length === 0) throw new Error('Nobody to put on the ladder first — place them directly')
+
+  const refuse = (staffId: string, reason: string): EnrolAndPlaceResult => ({
+    placed: [],
+    outcome: null,
+    failed: { staffId, reason },
+  })
+
+  const ladder = await loadLadder(supabase, schemeId)
+  for (const e of [...enrol, mover]) {
+    if (!ladder.some(r => r.id === e.rankId)) {
+      return refuse(e.staffId, 'that rank belongs to another sub-department’s scheme')
+    }
+  }
+
+  const { subjects, graph } = await loadChart(supabase, schemeId, ladder)
+  const me = subjects.find(s => s.staffId === mover.staffId)
+  const target = subjects.find(s => s.staffId === mover.uplineStaffId)
+  if (!me) return refuse(mover.staffId, 'they are not on this chart')
+  if (!target) return refuse(mover.uplineStaffId, 'they are not on this chart')
+
+  const plan = enrolPlan(subjects, target.staffId)
+  const kind = moveRefusal(me, target, descendantsOf(graph, me.staffId), plan)
+  if (kind) return refuse(target.staffId, refusalSentence(kind, me, target, plan.blocked))
+  if (!sameSteps(plan.steps, enrol)) {
+    return refuse(mover.staffId, 'the chart changed since this was offered, so nothing was changed — try the move again')
+  }
+
+  const placed: string[] = []
+  for (const step of enrol) {
+    try {
+      await setPosition({
+        staffId: step.staffId,
+        schemeId,
+        rankId: step.rankId,
+        uplineStaffId: step.uplineStaffId,
+        rateMode: null,
+      })
+    } catch (e) {
+      if (isControlFlow(e)) throw e
+      return { placed, outcome: null, failed: { staffId: step.staffId, reason: safeRefusal(e) } }
+    }
+    placed.push(step.staffId)
+  }
+
+  try {
+    const outcome = await setPosition({ ...mover, schemeId })
+    return { placed, outcome, failed: null }
+  } catch (e) {
+    if (isControlFlow(e)) throw e
+    return { placed, outcome: null, failed: { staffId: mover.staffId, reason: safeRefusal(e) } }
   }
 }
 

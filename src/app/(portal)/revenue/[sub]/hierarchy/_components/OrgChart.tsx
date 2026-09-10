@@ -41,11 +41,13 @@ import {
 } from '@/lib/org-layout'
 import { layoutParent, isBorrowed } from '@/lib/commission/chart-shape'
 import {
+  enrolPlan,
   forbiddenTargets,
   moveRefusal,
   refusalLabel,
   refusalSentence,
   shelfIds,
+  type EnrolChoice,
   type RefusalKind,
 } from '@/lib/commission/chart-moves'
 import {
@@ -54,7 +56,8 @@ import {
   type ManualLayout,
   type XY,
 } from '@/lib/commission/chart-layout-store'
-import { setPosition } from '../../../hierarchy-actions'
+import type { MirrorOutcome } from '@/lib/hierarchy-mirror'
+import { enrolAndPlace, setPosition } from '../../../hierarchy-actions'
 import MovePopover, { subjectOf, type PopAnchor } from './MovePopover'
 
 export interface OrgRank {
@@ -464,18 +467,40 @@ function Chart({
     return out
   }, [people, byId, fresh])
 
+  /** Where a popover about `staffId` hangs from: their card's Upline row, or mid-screen. */
+  const anchorOf = useCallback((staffId: string): PopAnchor => {
+    const el = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${staffId}"] .oc-up`)
+    const r = el?.getBoundingClientRect()
+    return r
+      ? { left: r.left, top: r.top, bottom: r.bottom }
+      : { left: window.innerWidth / 2 - 150, top: 160, bottom: 190 }
+  }, [])
+
+  const rankLabelOf = useCallback(
+    (rankId: string | null | undefined) => ranks.find(r => r.id === rankId)?.label ?? 'their rank',
+    [ranks],
+  )
+
+  /**
+   * The write. `enrol` is the plan the popover confirmed when the upline
+   * holds no position yet — who goes on the ladder first, at what rank —
+   * and it is never inferred here: a move onto an unplaced upline without
+   * one opens the popover to ask, because every step is a position a month
+   * is paid from and nobody should discover one they did not see.
+   */
   const move = useCallback(
-    (childId: string, parentId: string | null, rankId?: string | null) => {
+    (childId: string, parentId: string | null, rankId?: string | null, enrol?: EnrolChoice[]) => {
       const child = byId.get(childId)
       if (!child) return
       const rank = rankId ?? child.rankId
+      const plan = parentId ? enrolPlan(subjects, parentId) : { steps: [], blocked: null }
 
       if (parentId) {
         const parent = byId.get(parentId)
         if (!parent) return
-        const kind = moveRefusal(subjectOf(child), subjectOf(parent), descendantsOf(graph, childId))
+        const kind = moveRefusal(subjectOf(child), subjectOf(parent), descendantsOf(graph, childId), plan)
         if (kind) {
-          setError(refusalSentence(kind, subjectOf(child), subjectOf(parent)))
+          setError(refusalSentence(kind, subjectOf(child), subjectOf(parent), plan.blocked))
           return
         }
       }
@@ -483,7 +508,11 @@ function Chart({
         setError(`${child.name} has no rank yet — pick one to place them.`)
         return
       }
-      if (child.uplineStaffId === parentId && child.rankId === rank) {
+      if (plan.steps.length > 0 && !enrol?.length) {
+        setPop({ moverId: childId, placeUnder: parentId, anchor: anchorOf(parentId!) })
+        return
+      }
+      if (!enrol?.length && child.uplineStaffId === parentId && child.rankId === rank) {
         setError(null)
         setNote(
           parentId
@@ -496,20 +525,46 @@ function Chart({
       setError(null)
       setPop(null)
       const wasPlaced = child.rankId !== null
-      const rankLabel = ranks.find(r => r.id === rank)?.label
+      const rankLabel = rankLabelOf(rank)
+      const nameOf = (id: string) => byId.get(id)?.name ?? 'somebody'
+      const input = {
+        staffId: childId,
+        schemeId,
+        rankId: rank,
+        uplineStaffId: parentId,
+        rateMode: child.rateMode,
+      }
       startTransition(async () => {
         try {
-          const outcome = await setPosition({
-            staffId: childId,
-            schemeId,
-            rankId: rank,
-            uplineStaffId: parentId,
-            rateMode: child.rateMode,
-          })
+          let outcome: MirrorOutcome
+          let first = ''
+          if (enrol?.length) {
+            const res = await enrolAndPlace({ schemeId, enrol, mover: input })
+            const done = res.placed.map(id => {
+              const step = enrol.find(e => e.staffId === id)
+              const where = step?.uplineStaffId ? ` under ${nameOf(step.uplineStaffId)}` : ', top of their own tree'
+              return `${nameOf(id)} placed as ${rankLabelOf(step?.rankId)}${where}`
+            })
+            if (res.failed || !res.outcome) {
+              const who = res.failed ? nameOf(res.failed.staffId) : child.name
+              const why = res.failed?.reason ?? 'the move did not go through'
+              const before = done.length ? `${done.join('; ')} — but ` : ''
+              setError(`${before}${who} could not be placed: ${why}`)
+              // Whatever did land is on the chart now; show it.
+              if (done.length) router.refresh()
+              const home = targetsFor().get(childId)
+              if (home) glide(new Map([[childId, home]]))
+              return
+            }
+            outcome = res.outcome
+            first = done.length ? `${done.join('; ')}. ` : ''
+          } else {
+            outcome = await setPosition(input)
+          }
           const moved = parentId
-            ? `${child.name} now reports to ${byId.get(parentId)!.name}.`
+            ? `${child.name} now reports to ${nameOf(parentId)}.`
             : `${child.name} is now top of their own tree.`
-          const placed = !wasPlaced && rankLabel ? ` Placed as ${rankLabel}.` : ''
+          const placed = !wasPlaced ? ` Placed as ${rankLabel}.` : ''
           // The reporting-line half of the write. A skip or a failure means the
           // org chart and this one now draw different managers for the same
           // person, which is exactly the thing nobody notices until payroll.
@@ -520,7 +575,7 @@ function Chart({
                 ? ' Their reporting line moved with them.'
                 : ' Their reporting line was cleared with them.'
               : ''
-          setNote(`${moved}${placed}${mirror}`)
+          setNote(`${first}${moved}${placed}${mirror}`)
           // A moved tree has a new shape; the arrangement described the old one.
           manualRef.current = new Map()
           writeManualLayout(storage(), schemeId, manualRef.current)
@@ -535,32 +590,38 @@ function Chart({
         }
       })
     },
-    [byId, graph, ranks, router, schemeId, targetsFor, glide],
+    [byId, subjects, graph, rankLabelOf, router, schemeId, targetsFor, glide, anchorOf],
   )
 
   /**
-   * A drop or a drawn line landing on `targetId`. Somebody with no position
-   * yet cannot simply be moved — `comm_hierarchy.rank_id` is NOT NULL — so
-   * the popover opens on the target to ask for the rank, and places them.
+   * A drop or a drawn line landing on `targetId`. Two things make the
+   * popover ask before anything is written, and the caller is told when it
+   * did (true) so a dropped card can go home while the question is open:
+   * somebody with no position yet cannot simply be moved —
+   * `comm_hierarchy.rank_id` is NOT NULL — so their rank is asked for; and a
+   * target with no position is put on the ladder first, which the reader
+   * confirms (`enrolPlan`). A refused target is refused here, in the
+   * sentence the popover would have captioned.
    */
-  const anchorOf = useCallback((staffId: string): PopAnchor => {
-    const el = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${staffId}"] .oc-up`)
-    const r = el?.getBoundingClientRect()
-    return r
-      ? { left: r.left, top: r.top, bottom: r.bottom }
-      : { left: window.innerWidth / 2 - 150, top: 160, bottom: 190 }
-  }, [])
   const place = useCallback(
-    (moverId: string, targetId: string) => {
+    (moverId: string, targetId: string): boolean => {
       const mover = byId.get(moverId)
-      if (!mover) return
-      if (mover.rankId === null) {
+      const target = byId.get(targetId)
+      if (!mover || !target) return false
+      const plan = enrolPlan(subjects, targetId)
+      const kind = moveRefusal(subjectOf(mover), subjectOf(target), descendantsOf(graph, moverId), plan)
+      if (kind) {
+        setError(refusalSentence(kind, subjectOf(mover), subjectOf(target), plan.blocked))
+        return false
+      }
+      if (mover.rankId === null || plan.steps.length > 0) {
         setPop({ moverId, placeUnder: targetId, anchor: anchorOf(targetId) })
-        return
+        return true
       }
       move(moverId, targetId)
+      return false
     },
-    [byId, move, anchorOf],
+    [byId, subjects, graph, move, anchorOf],
   )
 
   const dragRef = useRef<{ id: string; from: XY; hover: string | null } | null>(null)
@@ -610,7 +671,13 @@ function Chart({
       if (id) {
         const t = byId.get(id)!
         lbl.hidden = false
-        lbl.textContent = kind ? `✕ ${t.name} · ${refusalLabel(kind)}` : `→ under ${t.name}`
+        // An upline with no position yet is put on the ladder on the way —
+        // said while the card is still in the air, not sprung afterwards.
+        lbl.textContent = kind
+          ? `✕ ${t.name} · ${refusalLabel(kind)}`
+          : t.rankId === null
+            ? `→ under ${t.name} · placed first`
+            : `→ under ${t.name}`
         lbl.classList.toggle('bad', !!kind)
         lbl.style.left = `${client.x + 14}px`
         lbl.style.top = `${client.y + 16}px`
@@ -636,12 +703,13 @@ function Chart({
         const target = byId.get(d.hover)!
         const kind = forbidden.get(d.hover)
         if (kind) {
-          setError(refusalSentence(kind, subjectOf(mover), subjectOf(target)))
+          setError(refusalSentence(kind, subjectOf(mover), subjectOf(target), enrolPlan(subjects, d.hover).blocked))
           glide(new Map([[node.id, d.from]]))
           return
         }
-        if (mover.rankId === null) glide(new Map([[node.id, d.from]]))
-        place(node.id, d.hover)
+        // Asked first — a rank to give, or an upline to put on the ladder:
+        // the card goes home while the popover has the question.
+        if (place(node.id, d.hover)) glide(new Map([[node.id, d.from]]))
         return
       }
 
@@ -649,7 +717,7 @@ function Chart({
       manualRef.current.set(node.id, { ...node.position })
       writeManualLayout(storage(), schemeId, manualRef.current)
     },
-    [byId, forbidden, glide, place, schemeId],
+    [byId, subjects, forbidden, glide, place, schemeId],
   )
 
   const onConnect = useCallback(
@@ -935,10 +1003,10 @@ function Chart({
           layoutGraph={layoutGraph}
           anchor={pop.anchor}
           placeUnder={pop.placeUnder}
-          onPick={(upline, rankId) => {
+          onPick={(upline, rankId, enrol) => {
             const id = pop.moverId
             setPop(null)
-            move(id, upline, rankId)
+            move(id, upline, rankId, enrol)
           }}
           onClose={() => setPop(null)}
         />
