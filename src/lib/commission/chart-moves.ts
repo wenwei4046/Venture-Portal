@@ -1,4 +1,5 @@
 import { descendantsOf, type OrgNodeInput } from '@/lib/org-layout'
+import { ladderAllows, ladderRefusal } from '@/lib/ladder'
 
 /**
  * The rules of a move on the commission chart, said before the round trip.
@@ -9,31 +10,38 @@ import { descendantsOf, type OrgNodeInput } from '@/lib/org-layout'
  * row it lists — greyed, and with the reason beside the name. One place, so
  * a drop and a pick can never disagree about who may sit under whom.
  *
- * The server still checks all of it (`setPosition`); this is the sentence
- * the reader gets instantly, in the words the server would have used.
+ * Since 2026-09-10 the chart moves ONE line — `hr_staff_costs.reports_to`,
+ * the same line People draws — and the commission position follows it in
+ * the database. So the rules here are the rules of a reporting line inside
+ * a commission department: not under yourself, not under your own report,
+ * only under a title that may hold downlines, and never under a title the
+ * ladder ranks below yours. The database refuses all four again
+ * (`hr_staff_reports_to_no_cycle`, `hr_staff_commission_line`,
+ * `hr_staff_respects_ladder`); this is the sentence the reader gets
+ * instantly, in the words the server would have used.
  */
 
-/** The four facts a refusal needs about somebody on the chart. */
+/** The facts a refusal needs about somebody on the chart. */
 export interface MoveSubject {
   staffId: string
   name: string
   titleName: string | null
-  rankLabel: string | null
-  /** Holds an open position — `comm_hierarchy.rank_id` is NOT NULL, so no rank means no position. */
-  placed: boolean
-  /** Decided by the title they hold, not the rank of the month. */
+  /** May their title hold downlines — a Revenue Specialist's may not. */
   canRecruit: boolean
+  /** Where their title stands on the company ladder; null = not on it. */
+  levelRank: number | null
+  levelName: string | null
 }
 
-export type RefusalKind = 'self' | 'downline' | 'not-placed' | 'no-downlines'
+export type RefusalKind = 'self' | 'downline' | 'no-downlines' | 'lower-title'
 
 /**
  * Why `target` may not become `mover`'s upline — or null when they may.
  *
- * `downlines` is the mover's commission descendants, computed once by the
- * caller (`forbiddenTargets` does), because a popover asks this for every
- * person on the chart and walking the tree per row is what made the old
- * canvas hit-test slow enough to notice.
+ * `downlines` is the mover's descendants, computed once by the caller
+ * (`forbiddenTargets` does), because a popover asks this for every person on
+ * the chart and walking the tree per row is what made the old canvas
+ * hit-test slow enough to notice.
  */
 export function moveRefusal(
   mover: MoveSubject,
@@ -42,8 +50,8 @@ export function moveRefusal(
 ): RefusalKind | null {
   if (target.staffId === mover.staffId) return 'self'
   if (downlines.has(target.staffId)) return 'downline'
-  if (!target.placed) return 'not-placed'
   if (!target.canRecruit) return 'no-downlines'
+  if (!ladderAllows(mover.levelRank, target.levelRank)) return 'lower-title'
   return null
 }
 
@@ -54,10 +62,10 @@ export function refusalLabel(kind: RefusalKind): string {
       return 'that is them'
     case 'downline':
       return 'their downline'
-    case 'not-placed':
-      return 'not placed'
     case 'no-downlines':
       return 'no downlines'
+    case 'lower-title':
+      return 'lower title'
   }
 }
 
@@ -68,20 +76,19 @@ export function refusalSentence(kind: RefusalKind, mover: MoveSubject, target: M
       return `${mover.name} cannot be their own upline.`
     case 'downline':
       return `That would put ${mover.name} under their own downline.`
-    case 'not-placed':
-      return `${target.name} holds no position yet — place them first.`
     case 'no-downlines':
-      return `${target.name} is a ${target.titleName ?? target.rankLabel ?? 'rank'} — that ${
-        target.titleName ? 'title' : 'rank'
-      } cannot hold downlines.`
+      return target.titleName
+        ? `${target.name} is a ${target.titleName} — that title cannot hold downlines.`
+        : `${target.name} holds no title on the commission ladder — nobody can earn under them.`
+    case 'lower-title':
+      return ladderRefusal(
+        { name: mover.name, title: mover.titleName, level: mover.levelName },
+        { name: target.name, title: target.titleName, level: target.levelName },
+      )
   }
 }
 
-/**
- * Everyone the mover may not be dropped on, keyed by the reason. The commission
- * graph (`upline_staff_id`) decides the downlines — a borrowed reporting line
- * is not a money relationship and must not forbid a legal placement.
- */
+/** Everyone the mover may not be dropped on, keyed by the reason. */
 export function forbiddenTargets(
   graph: OrgNodeInput[],
   people: readonly MoveSubject[],
@@ -101,24 +108,26 @@ export function forbiddenTargets(
 /** What the shelf rule needs: is somebody standing on any line at all? */
 export interface ShelfSubject {
   staffId: string
-  placed: boolean
-  /** Where the chart draws them — their upline, or the manager they borrow. */
-  layoutParentId: string | null
+  /** Who they report to — the line the chart draws. */
+  parentId: string | null
+  /** May their title hold downlines? A leader with an empty team is a tree of one. */
+  canRecruit: boolean
 }
 
 /**
- * People with no line at all: not placed, drawn under nobody, with nobody drawn
- * under them. They used to stand in the leaders' row at the top of the chart,
- * which read as five team leaders where there were three; now they wait on a
- * shelf at the canvas's right edge. A placed root — a leader whose team is
- * still empty — is a tree of one and stays where the trees are.
+ * People with no line at all: reporting to nobody, with nobody reporting to
+ * them, and a title that cannot lead anyone. They used to stand in the
+ * leaders' row at the top of the chart, which read as five team leaders where
+ * there were three; now they wait on a shelf at the canvas's right edge. A
+ * leader whose team is still empty is a tree of one and stays where the trees
+ * are.
  */
 export function shelfIds(people: readonly ShelfSubject[]): Set<string> {
   const heads = new Set<string>()
-  for (const p of people) if (p.layoutParentId) heads.add(p.layoutParentId)
+  for (const p of people) if (p.parentId) heads.add(p.parentId)
   const out = new Set<string>()
   for (const p of people) {
-    if (!p.placed && !p.layoutParentId && !heads.has(p.staffId)) out.add(p.staffId)
+    if (!p.parentId && !heads.has(p.staffId) && !p.canRecruit) out.add(p.staffId)
   }
   return out
 }
@@ -135,11 +144,9 @@ export interface TreeGroup {
 }
 
 /**
- * Every tree on the chart, in the shape the Move popover lists them. Built on
- * the LAYOUT graph so a borrowed member shows up under the manager the chart
- * draws them under — the popover is a picture of the chart, not of the money.
- * A parent that is missing makes a root of its own, and a loop is cut rather
- * than walked forever, the same two rules `layoutTree` lives by.
+ * Every tree on the chart, in the shape the Move popover lists them. A parent
+ * that is missing makes a root of its own, and a loop is cut rather than
+ * walked forever, the same two rules `layoutTree` lives by.
  */
 export function treeGroups(nodes: readonly OrgNodeInput[]): TreeGroup[] {
   const byId = new Map(nodes.map(n => [n.id, n]))

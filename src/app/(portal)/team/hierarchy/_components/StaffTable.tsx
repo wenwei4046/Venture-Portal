@@ -3,14 +3,11 @@
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { compareByLadder, ladderAllows, ladderRefusal } from '@/lib/ladder'
-import { boundaryRefusal } from '@/lib/hierarchy-boundary'
+import { lineRefusal } from '@/lib/hierarchy-boundary'
 import { ErrorNote } from '@/components/RowForm'
 import LedgerRow from '@/components/LedgerRow'
-import type { MirrorOutcome } from '@/lib/hierarchy-mirror'
 import { setReportsTo, undoHierarchyMove, type UndoMoveInput } from '../actions'
 import type { ChartPerson } from './TeamOrgChart'
-import type { RankOption, SalesPerson } from './HierarchyPanel'
-import MirrorOfferPrompt, { nextOffer, offerKey, type OfferState } from './MirrorOfferPrompt'
 
 /** No filter on this facet. */
 const ALL = '__all__'
@@ -21,10 +18,11 @@ const NONE = '__none__'
  * The chart, as rows.
  *
  * The user asked for the hierarchy to be toggleable between the graph and a
- * staff list (2026-09-07), and for a change made in either to write both
- * hierarchies. So this is not a read-only mirror of the canvas — it edits the
- * same fact the canvas does, through the same action: `setReportsTo`, which
- * also moves somebody's commission upline with them.
+ * staff list (2026-09-07). This is not a read-only mirror of the canvas — it
+ * edits the same fact the canvas does, through the same action:
+ * `setReportsTo`. Since 2026-09-10 that fact is the only line there is:
+ * inside a commission department who somebody reports to is who earns the
+ * override on their sales, and the position follows in the database.
  *
  * It used to edit a second one. A Rank column set what a month pays somebody
  * from, and it went on 2026-09-08 with the rest of the commission display on
@@ -32,8 +30,7 @@ const NONE = '__none__'
  * their monthly quota earns at a different rate from the one their rank
  * implies, so a row reading "Rank B · 8%" was true only in the months quota
  * was hit. Ranks are set on `/revenue/[sub]/hierarchy`, where a period is in
- * scope. The one place a rate still appears here is the enrol offer's picker,
- * which is a choice being MADE rather than a caption on somebody.
+ * scope.
  *
  * Why a table at all, when the graph exists: a canvas answers "what does this
  * tree look like" and is the wrong shape for "give the eleven people with no
@@ -46,34 +43,19 @@ const NONE = '__none__'
  * refusal the user cannot trigger is a refusal they never have to read.
  *
  * Search and the two facet filters narrow the ROWS only. Everything the edit
- * controls read — the manager options, the descendant walk, the commission
- * positions — still runs over the whole `people` prop, because hiding a row is
- * a statement about what the reader wants to look at, not about who exists.
+ * controls read — the manager options, the descendant walk — still runs over
+ * the whole `people` prop, because hiding a row is a statement about what the
+ * reader wants to look at, not about who exists.
  * Filtering to Marketing and finding their Head of Department gone from every
  * Reports-to picker would be a different, and wrong, table.
  */
-export default function StaffTable({
-  people,
-  salespeople,
-  ranksByScheme,
-}: {
-  people: ChartPerson[]
-  /** Open commission positions. Read for ONE thing: the scheme an enrol
-   *  offer defaults its picker to. Nothing here is rendered as a row. */
-  salespeople: SalesPerson[]
-  /** Empty for an account with no `revenue` permission, which turns the
-   *  enrol offer's rank picker into a plain refusal rather than a form. */
-  ranksByScheme: Record<string, RankOption[]>
-}) {
+export default function StaffTable({ people }: { people: ChartPerson[] }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
-  // A refusal the reader can act on, and whether the last thing they did left
-  // the two lines still disagreeing. `warn` only changes the banner's TONE —
-  // the note is rendered either way, because both offer actions report on a
-  // money write even when it succeeded.
-  const [offer, setOffer] = useState<OfferState | null>(null)
+  // Whether the last thing they did was refused or half-done: the banner's
+  // TONE, and nothing else.
   const [warn, setWarn] = useState(false)
   /**
    * The way back from the move just made, or null.
@@ -91,10 +73,6 @@ export default function StaffTable({
   const [title, setTitle] = useState(ALL)
 
   const byId = useMemo(() => new Map(people.map(p => [p.id, p])), [people])
-  const position = useMemo(
-    () => new Map(salespeople.map(s => [s.staffId, s])),
-    [salespeople],
-  )
 
   // The two dropdowns' options come out of the roster itself rather than a
   // constant, so a department added on People Management shows up here without
@@ -156,7 +134,6 @@ export default function StaffTable({
   function run(id: string, work: () => Promise<string>) {
     setError(null)
     setNote(null)
-    setOffer(null)
     setWarn(false)
     setUndo(null)
     setBusy(id)
@@ -173,12 +150,7 @@ export default function StaffTable({
   }
 
   function changeManager(person: ChartPerson, managerId: string | null) {
-    // Only when there is genuinely nothing to do — the reporting line already
-    // points there AND so does the commission line. A reports-to no-op over a
-    // commission upline that disagrees still has to make the round trip: the
-    // server is the only thing that can raise the offer to clear it, and this
-    // page has no other gesture that reaches a commission line.
-    if (person.reportsTo === managerId && person.commUplineId === managerId) return
+    if (person.reportsTo === managerId) return
     const manager = managerId ? byId.get(managerId) : null
     if (manager && !ladderAllows(person.levelRank, manager.levelRank)) {
       setError(
@@ -191,68 +163,28 @@ export default function StaffTable({
     }
     // The manager they already have stays in the list even when a rule now
     // refuses them — a controlled <select> whose value matches no option lies
-    // about who somebody reports to. So a crossing line CAN be re-picked here,
+    // about who somebody reports to. So a refused line CAN be re-picked here,
     // and this is where it is caught rather than sent to the server.
-    const crossing = manager ? boundaryRefusal(person, manager) : null
-    if (crossing) {
-      setError(crossing)
+    const refused = manager ? lineRefusal(person, manager) : null
+    if (refused) {
+      setError(refused)
       return
     }
-    const was = { reportsTo: person.reportsTo, commUplineId: person.commUplineId }
+    const was = person.reportsTo
     run(person.id, async () => {
-      const outcome = await setReportsTo(person.id, managerId)
-      // Whether the mirror ran decides how much an undo may put back. A
-      // commission upline the move never wrote is not this button's to move.
-      setUndo({
-        staffId: person.id,
-        reportsTo: was.reportsTo,
-        commUplineId: was.commUplineId,
-        mirrored: outcome.mirrored,
-        movedTo: managerId,
-      })
-      // The refusal may arrive with a way out attached. `offer` is only ever
-      // built by a server that checked for `revenue` first, so its presence is
-      // the permission gate — but the rank picker under it is NOT, which is why
-      // the options come from the `seesMoney`-gated prop rather than from here.
-      if (outcome.offer) setOffer({ offer: outcome.offer, moverId: person.id })
+      const result = await setReportsTo(person.id, managerId)
+      if (!result.ok) throw new Error(result.reason)
+      setUndo({ staffId: person.id, reportsTo: was, movedTo: managerId })
       const moved = manager
         ? `${person.name} now reports to ${manager.name}.`
         : `${person.name} now reports to nobody.`
-      // The commission half. Silent when there was nothing to mirror; loud
-      // when the two lines have been left disagreeing.
-      return outcome.note
-        ? `${moved} ${outcome.note}`
-        : outcome.mirrored
-          ? manager
-            ? `${moved} Their commission upline moved with them.`
-            // See TeamOrgChart: a cleared upline is a money change, not a move.
-            : `${moved} Their commission upline was cleared with them, so nobody earns an override on their sales now.`
-          : moved
+      // Inside a commission department the line IS the override, so a detach
+      // there is a money change and is said in full.
+      if (!person.commissionDept) return moved
+      return manager
+        ? `${moved} The override on their sales goes to ${manager.name} from this month.`
+        : `${moved} Nobody earns an override on their sales from this month.`
     })
-  }
-
-  /**
-   * What came back from accepting an offer.
-   *
-   * The note is shown whether or not the write landed — unlike `setReportsTo`,
-   * where a clean mirror says nothing, these two ARE the write the reader
-   * asked for, and a silent success on a money write started by a one-click
-   * offer is the silence this feature exists to kill. `mirrored` picks the
-   * tone and nothing else.
-   */
-  function acceptOutcome(outcome: MirrorOutcome) {
-    setError(null)
-    setNote(outcome.note)
-    setWarn(!outcome.mirrored)
-    // The offer wrote the commission half the move could not, so the
-    // snapshot taken before that move no longer describes what is there.
-    setUndo(null)
-    setOffer(current => {
-      if (!current) return null
-      const next = nextOffer(current.offer, outcome)
-      return next ? { offer: next, moverId: current.moverId } : null
-    })
-    router.refresh()
   }
 
   function undoLastMove() {
@@ -271,7 +203,7 @@ export default function StaffTable({
   return (
     <div className="mb-12">
       <ErrorNote error={error} />
-      {note || offer ? (
+      {note ? (
         <div
           className={`rounded-md p-3 mb-4 text-sm font-sans border ${
             warn
@@ -289,22 +221,6 @@ export default function StaffTable({
             >
               Undo
             </button>
-          ) : null}
-          {/* Inside the banner on purpose: the prompt answers the sentence
-              above it, and anything that opened below the filter bar would
-              push every row down under the cursor that just used one. */}
-          {offer ? (
-            <MirrorOfferPrompt
-              key={offerKey(offer)}
-              state={offer}
-              ranksByScheme={Object.keys(ranksByScheme).length > 0 ? ranksByScheme : null}
-              preferredSchemeId={position.get(offer.moverId)?.schemeId ?? null}
-              onOutcome={acceptOutcome}
-              onError={message => {
-                setError(message)
-                setNote(null)
-              }}
-            />
           ) : null}
         </div>
       ) : null}
@@ -454,13 +370,11 @@ export default function StaffTable({
                               // every broken row claim to report to nobody —
                               // directly under a warning saying the opposite.
                               (m.id === p.reportsTo ||
-                                // Two rules, one exemption. The second is the
-                                // department boundary: a commission
-                                // department's reporting line is also its
-                                // commission upline, so it may not leave —
-                                // `lib/hierarchy-boundary.ts`.
-                                (ladderAllows(p.levelRank, m.levelRank) &&
-                                  m.commissionDept === p.commissionDept)),
+                                // Three rules, one exemption: the ladder, the
+                                // department boundary, and — inside a commission
+                                // department — a title that may hold downlines.
+                                // `lib/hierarchy-boundary.ts` has the last two.
+                                (ladderAllows(p.levelRank, m.levelRank) && !lineRefusal(p, m))),
                           )
                           .sort((a, b) => a.name.localeCompare(b.name))
                           .map(m => (
@@ -486,11 +400,10 @@ export default function StaffTable({
 
       <p className="mt-3 font-serif italic text-muted text-xs max-w-3xl leading-relaxed">
         The rows read the ladder top down — the most senior title first, the same title together,
-        names A→Z. Changing <em>Reports to</em> moves their commission upline with them where this
-        account may write both; where it may not, the row says so. When the new manager holds no
-        commission position, the banner offers to put them on the ladder and finish the move in one
-        step — a rank belongs to a scheme, so it asks for both. What a month actually pays somebody
-        is not a column here: it belongs to a run, and it is read on Revenue.
+        names A→Z. <em>Reports to</em> is the one line: inside Revenue it is also who earns the
+        override on their sales, and the picker offers only titles that may hold downlines. What a
+        month actually pays somebody is not a column here: it belongs to a run, and it is read on
+        Revenue.
       </p>
     </div>
   )

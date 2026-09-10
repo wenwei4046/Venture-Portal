@@ -13,13 +13,13 @@ import type { OrgNodeInput } from '@/lib/org-layout'
 const subject = (over: Partial<MoveSubject> & { staffId: string }): MoveSubject => ({
   name: over.staffId.toUpperCase(),
   titleName: 'Team Leader',
-  rankLabel: 'Rank A · 10%',
-  placed: true,
   canRecruit: true,
+  levelRank: 5,
+  levelName: 'Manager',
   ...over,
 })
 
-// ANTHONY → HOWARD → ZACK, and LUIS placed under nobody.
+// ANTHONY → HOWARD → ZACK, LUIS under nobody, YUNY under nobody.
 const graph: OrgNodeInput[] = [
   { id: 'anthony', parentId: null, label: 'ANTHONY' },
   { id: 'howard', parentId: 'anthony', label: 'HOWARD' },
@@ -29,17 +29,18 @@ const graph: OrgNodeInput[] = [
 ]
 const people: MoveSubject[] = [
   subject({ staffId: 'anthony' }),
-  subject({ staffId: 'howard', titleName: 'Senior Revenue Specialist', rankLabel: 'Rank B · 8%' }),
-  subject({ staffId: 'zack', titleName: 'Revenue Specialist', rankLabel: 'Rank C · 6%', canRecruit: false }),
-  subject({ staffId: 'luis', titleName: 'Senior Revenue Specialist', rankLabel: 'Rank B · 8%' }),
-  subject({ staffId: 'yuny', titleName: 'Team Assistant', rankLabel: null, placed: false, canRecruit: false }),
+  subject({ staffId: 'howard', titleName: 'Senior Revenue Specialist', levelRank: 3, levelName: 'Senior Executive' }),
+  subject({ staffId: 'zack', titleName: 'Revenue Specialist', canRecruit: false, levelRank: 2, levelName: 'Executive' }),
+  subject({ staffId: 'luis', titleName: 'Senior Revenue Specialist', levelRank: 3, levelName: 'Senior Executive' }),
+  subject({ staffId: 'yuny', titleName: null, canRecruit: false, levelRank: null, levelName: null }),
 ]
+const none = new Set<string>()
 
 describe('moveRefusal', () => {
-  const none = new Set<string>()
-
-  it('lets somebody go under a placed title that may recruit', () => {
+  it('lets somebody go under a title that may recruit and stands at or above theirs', () => {
     expect(moveRefusal(people[3], people[0], none)).toBeNull()
+    // Same level is fine: a senior can lead other seniors.
+    expect(moveRefusal(people[3], people[1], none)).toBeNull()
   })
 
   it('refuses their own card first, whatever else is true', () => {
@@ -54,28 +55,32 @@ describe('moveRefusal', () => {
     expect(moveRefusal(people[0], people[2], downlines)).toBe('downline')
   })
 
-  it('refuses somebody with no position, then a title that may not recruit', () => {
-    expect(moveRefusal(people[3], people[4], none)).toBe('not-placed')
+  it('refuses a title that may not recruit — an RS cannot lead anyone', () => {
     expect(moveRefusal(people[3], people[2], none)).toBe('no-downlines')
+    expect(moveRefusal(people[3], people[4], none)).toBe('no-downlines')
+  })
+
+  it('refuses a title the ladder ranks below the mover’s', () => {
+    // ANTHONY (Manager) under HOWARD (Senior Executive).
+    expect(moveRefusal(people[0], people[1], none)).toBe('lower-title')
   })
 })
 
 describe('forbiddenTargets', () => {
-  it('greys the mover, their commission downlines, the unplaced and the non-recruiters', () => {
+  it('greys the mover, their downlines, the non-recruiters and the lower titles', () => {
     const out = forbiddenTargets(graph, people, 'anthony')
     expect(out.get('anthony')).toBe('self')
     expect(out.get('howard')).toBe('downline')
     expect(out.get('zack')).toBe('downline')
-    expect(out.get('yuny')).toBe('not-placed')
-    expect(out.has('luis')).toBe(false)
+    expect(out.get('yuny')).toBe('no-downlines')
+    expect(out.get('luis')).toBe('lower-title')
   })
 
-  it('does not treat a borrowed reporting line as a downline', () => {
-    // YUNY is drawn under ANTHONY on the reporting line, but the commission
-    // graph knows nothing of it — so ANTHONY may still be dropped elsewhere
-    // freely, and YUNY is greyed for being unplaced, not for being a downline.
-    const out = forbiddenTargets(graph, people, 'anthony')
-    expect(out.get('yuny')).toBe('not-placed')
+  it('offers a senior every leader and senior, and nobody below', () => {
+    const out = forbiddenTargets(graph, people, 'luis')
+    expect(out.has('anthony')).toBe(false)
+    expect(out.has('howard')).toBe(false)
+    expect(out.get('zack')).toBe('no-downlines')
   })
 
   it('is empty for somebody who is not on the chart', () => {
@@ -87,46 +92,45 @@ describe('refusal copy', () => {
   it('captions each kind in two words', () => {
     expect(refusalLabel('self')).toBe('that is them')
     expect(refusalLabel('downline')).toBe('their downline')
-    expect(refusalLabel('not-placed')).toBe('not placed')
     expect(refusalLabel('no-downlines')).toBe('no downlines')
+    expect(refusalLabel('lower-title')).toBe('lower title')
   })
 
-  it('names the title when the target holds one, else the rank', () => {
+  it('names the title, or says there is none', () => {
     expect(refusalSentence('no-downlines', people[3], people[2])).toBe(
       'ZACK is a Revenue Specialist — that title cannot hold downlines.',
     )
-    const untitled = subject({ staffId: 'zack', titleName: null, rankLabel: 'Rank C · 6%', canRecruit: false })
-    expect(refusalSentence('no-downlines', people[3], untitled)).toBe(
-      'ZACK is a Rank C · 6% — that rank cannot hold downlines.',
+    expect(refusalSentence('no-downlines', people[3], people[4])).toBe(
+      'YUNY holds no title on the commission ladder — nobody can earn under them.',
     )
     expect(refusalSentence('downline', people[0], people[1])).toBe(
       'That would put ANTHONY under their own downline.',
     )
-    expect(refusalSentence('not-placed', people[3], people[4])).toBe(
-      'YUNY holds no position yet — place them first.',
+    expect(refusalSentence('lower-title', people[0], people[1])).toBe(
+      'ANTHONY cannot report to HOWARD: Team Leader (Manager) stands above Senior Revenue Specialist (Senior Executive) on the ladder',
     )
   })
 })
 
 describe('shelfIds', () => {
-  it('shelves the unplaced who stand under nobody with nobody under them', () => {
+  it('shelves those on no line whose title cannot lead', () => {
     const out = shelfIds([
-      { staffId: 'anthony', placed: true, layoutParentId: null },
-      { staffId: 'yuny', placed: false, layoutParentId: 'anthony' },
-      { staffId: 'mei', placed: false, layoutParentId: null },
+      { staffId: 'anthony', parentId: null, canRecruit: true },
+      { staffId: 'yuny', parentId: 'anthony', canRecruit: false },
+      { staffId: 'mei', parentId: null, canRecruit: false },
     ])
     expect([...out]).toEqual(['mei'])
   })
 
-  it('keeps a placed leader with an empty team where the trees are', () => {
-    const out = shelfIds([{ staffId: 'lawrence', placed: true, layoutParentId: null }])
+  it('keeps a leader with an empty team where the trees are', () => {
+    const out = shelfIds([{ staffId: 'lawrence', parentId: null, canRecruit: true }])
     expect(out.size).toBe(0)
   })
 
-  it('keeps an unplaced manager who has somebody drawn under them', () => {
+  it('keeps somebody who has a report, whatever their title says', () => {
     const out = shelfIds([
-      { staffId: 'boss', placed: false, layoutParentId: null },
-      { staffId: 'report', placed: false, layoutParentId: 'boss' },
+      { staffId: 'boss', parentId: null, canRecruit: false },
+      { staffId: 'report', parentId: 'boss', canRecruit: false },
     ])
     expect(out.size).toBe(0)
   })

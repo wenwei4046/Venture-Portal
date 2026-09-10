@@ -77,7 +77,7 @@ function baseRows(overrides: Partial<RunSourceRows> = {}): RunSourceRows {
         staff_id: 'staff-a',
         upline_staff_id: null,
         rate_mode: null,
-        comm_ranks: { rank_key: 'rs_5' }, hr_staff_costs: null,
+        comm_ranks: { rank_key: 'rs_5' }, title_id: null,
       },
     ],
     orders: [],
@@ -139,7 +139,7 @@ describe('toEngineInput', () => {
             upline_staff_id: null,
             rate_mode: null,
             comm_ranks: { rank_key: 'rs_5' },
-            hr_staff_costs: { title_id: 'title-ta' },
+            title_id: 'title-ta',
           },
         ],
       }),
@@ -181,7 +181,7 @@ describe('toEngineInput', () => {
             staff_id: 'staff-a',
             upline_staff_id: null,
             rate_mode: null,
-            comm_ranks: [{ rank_key: 'rs_6' }], hr_staff_costs: null,
+            comm_ranks: [{ rank_key: 'rs_6' }], title_id: null,
           },
         ],
       }),
@@ -200,7 +200,7 @@ describe('toEngineInput', () => {
             staff_id: 'staff-a',
             upline_staff_id: null,
             rate_mode: 'fixed',
-            comm_ranks: { rank_key: 'rs_5' }, hr_staff_costs: null,
+            comm_ranks: { rank_key: 'rs_5' }, title_id: null,
           },
         ],
       }),
@@ -212,7 +212,7 @@ describe('toEngineInput', () => {
     const input = toEngineInput(
       baseRows({
         hierarchy: [
-          { staff_id: 'staff-a', upline_staff_id: null, rate_mode: null, comm_ranks: null, hr_staff_costs: null },
+          { staff_id: 'staff-a', upline_staff_id: null, rate_mode: null, comm_ranks: null, title_id: null },
         ],
       }),
     )
@@ -351,8 +351,8 @@ describe('toRunPayload', () => {
   it('drops a statement for someone with no sales and nothing earned', () => {
     const rows = baseRows({
       hierarchy: [
-        { staff_id: 'staff-a', upline_staff_id: null, rate_mode: null, comm_ranks: { rank_key: 'rs_6' }, hr_staff_costs: null },
-        { staff_id: 'staff-idle', upline_staff_id: 'staff-a', rate_mode: null, comm_ranks: { rank_key: 'rs_5' }, hr_staff_costs: null },
+        { staff_id: 'staff-a', upline_staff_id: null, rate_mode: null, comm_ranks: { rank_key: 'rs_6' }, title_id: null },
+        { staff_id: 'staff-idle', upline_staff_id: 'staff-a', rate_mode: null, comm_ranks: { rank_key: 'rs_5' }, title_id: null },
       ],
       orders: [order()],
     })

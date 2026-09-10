@@ -4,8 +4,6 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { validateStaffForm, designationForTitle, payFieldsForUpdate } from '@/lib/staff-form'
-import { canAccessRevenue } from '@/lib/roles'
-import { syncRankToTitle } from '@/lib/hierarchy-writes'
 
 function trimOrNull(v: FormDataEntryValue | null): string | null {
   if (typeof v !== 'string') return null
@@ -91,7 +89,7 @@ export async function addStaff(formData: FormData) {
 }
 
 export async function updateStaff(id: string, formData: FormData) {
-  const user = await requirePermission('team')
+  await requirePermission('team')
   const supabase = await createClient()
 
   const hireDate = (formData.get('hire_date') as string) || null
@@ -171,24 +169,10 @@ export async function updateStaff(id: string, formData: FormData) {
     throw new Error(`Failed to update: ${error.message}`)
   }
 
-  // A title assigns the rank (user, 2026-09-07). Only when the title actually
-  // moved: re-saving somebody's bank details is not a promotion, and running
-  // the sync anyway would fork an effective-dated position row on every edit.
-  // Gated on `revenue` because it writes the commission tables — a `team`-only
-  // account saves the title and leaves the rank where it was.
-  if ('title_id' in titleChange && canAccessRevenue(user)) {
-    try {
-      await syncRankToTitle(supabase, user.id, id, titleChange.title_id)
-    } catch (e) {
-      // The title is saved. A rank that could not follow it is a mismatch to
-      // fix on Staff Hierarchy, not a reason to tell the user their edit
-      // failed — it did not. This form redirects on success and has no channel
-      // to carry a note, so the miss goes to the server log; the Hierarchy
-      // table is where it becomes visible, as a rank that disagrees with the
-      // title beside it. `promoteStaff` DOES report it — see `rankNote` there.
-      console.error('[updateStaff] rank did not follow the title', id, e)
-    }
-  }
+  // A title assigns the rank (user, 2026-09-07), and since 2026-09-10 the
+  // database does the assigning: `hr_staff_costs_one_line_sync` raises the
+  // commission rank to the new title's floor (never lowers it) in the same
+  // statement as the title write. Nothing to call, nothing to report.
 
   revalidatePath('/hr-costing')
   revalidatePath(`/team/people/${id}/edit`)

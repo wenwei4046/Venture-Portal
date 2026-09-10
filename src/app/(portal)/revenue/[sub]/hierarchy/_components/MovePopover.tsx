@@ -10,7 +10,7 @@ import {
   type RefusalKind,
 } from '@/lib/commission/chart-moves'
 import type { OrgNodeInput } from '@/lib/org-layout'
-import type { OrgPerson, OrgRank } from './OrgChart'
+import type { OrgPerson } from './OrgChart'
 
 /** Where the popover hangs from — the card's Upline row, or the selection bar's button. */
 export interface PopAnchor {
@@ -22,20 +22,11 @@ export interface PopAnchor {
 export interface MovePopoverProps {
   mover: OrgPerson
   people: OrgPerson[]
-  ranks: OrgRank[]
-  /** The commission graph: decides who is a downline. */
+  /** The one line: who reports to whom. Decides the trees AND who is a downline. */
   graph: OrgNodeInput[]
-  /** The layout graph: decides which tree a row is listed under. */
-  layoutGraph: OrgNodeInput[]
   anchor: PopAnchor
-  /**
-   * A target already chosen by a drop. The popover then only confirms the
-   * rank — an unplaced person dropped on a manager still has to be given
-   * one, because `comm_hierarchy.rank_id` is NOT NULL and no rank can be
-   * invented for them.
-   */
-  placeUnder?: string | null
-  onPick: (uplineStaffId: string | null, rankId: string) => void
+  /** Null = the top of their own tree. */
+  onPick: (uplineStaffId: string | null) => void
   onClose: () => void
 }
 
@@ -44,24 +35,10 @@ export function subjectOf(p: OrgPerson): MoveSubject {
     staffId: p.staffId,
     name: p.name,
     titleName: p.titleName,
-    rankLabel: p.rankLabel,
-    placed: p.rankId !== null,
     canRecruit: p.canRecruit,
+    levelRank: p.levelRank,
+    levelName: p.levelName,
   }
-}
-
-/**
- * The rank an unplaced person is offered first: the lowest rung of the title
- * they hold — the same answer `titlePosition` gives — or the ladder's bottom
- * rung when their title is not on it.
- */
-export function defaultRankFor(ranks: readonly OrgRank[], titleId: string | null): OrgRank | null {
-  const ordered = [...ranks].sort((a, b) => a.sortOrder - b.sortOrder)
-  if (titleId) {
-    const own = ordered.find(r => r.titleId === titleId)
-    if (own) return own
-  }
-  return ordered[0] ?? null
 }
 
 /**
@@ -71,31 +48,19 @@ export function defaultRankFor(ranks: readonly OrgRank[], titleId: string | null
  * the chart, grouped by tree, the current upline marked, and anybody who may
  * not take the mover greyed with the reason beside the name — the same rule
  * a drop is judged by (`chart-moves.ts`), so the two can never disagree. The
- * last row, "Top of their own tree", is the detach that used to live in a
- * text link above the canvas.
+ * last row, "Top of their own tree", is the detach.
+ *
+ * Nothing about a rank is asked here (2026-09-10): the line is the reporting
+ * line, the rank follows the title, and the Team tab is where a rank is set.
  *
  * Rendered through a portal so the React Flow viewport's transform and
  * overflow cannot clip it; positioned below the anchor, or above when the
  * window has no room below.
  */
-export default function MovePopover({
-  mover,
-  people,
-  ranks,
-  graph,
-  layoutGraph,
-  anchor,
-  placeUnder = null,
-  onPick,
-  onClose,
-}: MovePopoverProps) {
+export default function MovePopover({ mover, people, graph, anchor, onPick, onClose }: MovePopoverProps) {
   const ref = useRef<HTMLDivElement>(null)
   const [q, setQ] = useState('')
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
-  const unplaced = mover.rankId === null
-  const [rankId, setRankId] = useState<string>(
-    () => mover.rankId ?? defaultRankFor(ranks, mover.titleId)?.id ?? '',
-  )
 
   const byId = useMemo(() => new Map(people.map(p => [p.staffId, p])), [people])
   const subjects = useMemo(() => people.map(subjectOf), [people])
@@ -103,10 +68,10 @@ export default function MovePopover({
     () => forbiddenTargets(graph, subjects, mover.staffId),
     [graph, subjects, mover.staffId],
   )
-  const groups = useMemo(() => treeGroups(layoutGraph), [layoutGraph])
+  const groups = useMemo(() => treeGroups(graph), [graph])
   const listed = useMemo(() => new Set(groups.flatMap(g => g.members.map(m => m.id))), [groups])
-  // Anybody the layout graph does not carry (the shelf) is still somebody
-  // the reader may look for — listed last, under their own heading.
+  // Anybody the graph does not carry (the shelf) is still somebody the reader
+  // may look for — listed last, under their own heading.
   const shelf = useMemo(
     () =>
       people
@@ -118,8 +83,8 @@ export default function MovePopover({
   const needle = q.trim().toLowerCase()
   const matches = (p: OrgPerson) => !needle || p.name.toLowerCase().includes(needle)
 
-  // Placed under nobody already, on purpose — the detach row has nothing to do.
-  const atTop = !unplaced && mover.uplineStaffId === null
+  // Reporting to nobody already — the detach row has nothing to do.
+  const atTop = mover.uplineStaffId === null
 
   useLayoutEffect(() => {
     const el = ref.current
@@ -130,7 +95,7 @@ export default function MovePopover({
     let top = anchor.bottom + 6
     if (top + h > window.innerHeight - 12) top = Math.max(12, anchor.top - h - 6)
     setPos({ left, top })
-  }, [anchor, q, placeUnder])
+  }, [anchor, q])
 
   useEffect(() => {
     const onDown = (e: PointerEvent) => {
@@ -162,37 +127,13 @@ export default function MovePopover({
   // while the popover measures itself; focus it once it has a place.
   useEffect(() => {
     if (!pos) return
-    const el = ref.current?.querySelector<HTMLElement>('input.ps, button.primary-act')
-    el?.focus()
+    ref.current?.querySelector<HTMLElement>('input.ps')?.focus()
   }, [pos])
-
-  const pick = (uplineStaffId: string | null) => {
-    if (!rankId) return
-    onPick(uplineStaffId, rankId)
-  }
-
-  const rankRow = unplaced ? (
-    <label className="prank">
-      <span>Place as</span>
-      <select value={rankId} onChange={e => setRankId(e.target.value)} aria-label="Rank to place them at">
-        {[...ranks]
-          .sort((a, b) => a.sortOrder - b.sortOrder)
-          .map(r => (
-            <option key={r.id} value={r.id}>
-              {r.label}
-              {r.titleId === mover.titleId ? ' · their title' : ''}
-            </option>
-          ))}
-      </select>
-    </label>
-  ) : null
-
-  const target = placeUnder ? byId.get(placeUnder) : null
 
   const row = (p: OrgPerson, depth: number) => {
     if (!matches(p)) return null
     const kind: RefusalKind | undefined = forbidden.get(p.staffId)
-    const current = !unplaced && mover.uplineStaffId === p.staffId
+    const current = mover.uplineStaffId === p.staffId
     return (
       <button
         key={p.staffId}
@@ -200,7 +141,7 @@ export default function MovePopover({
         role="option"
         aria-selected={current}
         disabled={!!kind || current}
-        onClick={() => pick(p.staffId)}
+        onClick={() => onPick(p.staffId)}
         className="row"
         style={{ paddingLeft: 12 + depth * 12 }}
       >
@@ -218,17 +159,17 @@ export default function MovePopover({
     )
   }
 
-  const body = target ? (
-    <div className="pact">
-      <button type="button" className="border border-hairline rounded-control px-3 py-1.5 text-xs font-sans text-graphite hover:text-ink bg-surface" onClick={onClose}>
-        Cancel
-      </button>
-      <button type="button" className="primary-act rounded-control px-3 py-1.5 text-xs font-sans text-band-ink bg-walnut hover:opacity-90 disabled:opacity-45" disabled={!rankId} onClick={() => pick(target.staffId)}>
-        Place
-      </button>
-    </div>
-  ) : (
-    <>
+  const node = (
+    <div
+      ref={ref}
+      role="dialog"
+      aria-label={`Move ${mover.name}`}
+      className="org-pop font-sans"
+      style={pos ? { left: pos.left, top: pos.top } : { left: -9999, top: 0, visibility: 'hidden' }}
+    >
+      <div className="ph">
+        Move <b>{mover.name}</b> under…
+      </div>
       <input
         type="search"
         className="ps"
@@ -261,7 +202,7 @@ export default function MovePopover({
         })}
         {shelf.some(matches) ? (
           <>
-            <div className="grp">Not placed</div>
+            <div className="grp">On no line</div>
             {shelf.map(p => row(p, 0))}
           </>
         ) : null}
@@ -271,7 +212,7 @@ export default function MovePopover({
             role="option"
             aria-selected={atTop}
             disabled={atTop}
-            onClick={() => pick(null)}
+            onClick={() => onPick(null)}
             className="row topr"
           >
             <span className="nm">Top of their own tree</span>
@@ -282,29 +223,6 @@ export default function MovePopover({
           <p className="pnone">Nobody on the chart matches that.</p>
         ) : null}
       </div>
-    </>
-  )
-
-  const node = (
-    <div
-      ref={ref}
-      role="dialog"
-      aria-label={`${unplaced ? 'Place' : 'Move'} ${mover.name}`}
-      className="org-pop font-sans"
-      style={pos ? { left: pos.left, top: pos.top } : { left: -9999, top: 0, visibility: 'hidden' }}
-    >
-      <div className="ph">
-        {unplaced ? 'Place' : 'Move'} <b>{mover.name}</b>{' '}
-        {target ? (
-          <>
-            under <b>{target.name}</b>
-          </>
-        ) : (
-          'under…'
-        )}
-      </div>
-      {rankRow}
-      {body}
     </div>
   )
 

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { boundaryRefusal, type BoundaryPerson } from './hierarchy-boundary'
+import {
+  boundaryRefusal,
+  lineRefusal,
+  recruitRefusal,
+  type BoundaryPerson,
+  type LineManager,
+} from './hierarchy-boundary'
 
 const rev = (name: string): BoundaryPerson => ({
   name,
@@ -10,6 +16,12 @@ const fin = (name: string): BoundaryPerson => ({
   name,
   commissionDept: false,
   department: 'Finance',
+})
+const leader = (name: string, over: Partial<LineManager> = {}): LineManager => ({
+  ...rev(name),
+  title: 'Team Leader',
+  canRecruit: true,
+  ...over,
 })
 
 describe('boundaryRefusal', () => {
@@ -59,5 +71,49 @@ describe('boundaryRefusal', () => {
     })
     expect(note).toContain('no department')
     expect(note).not.toContain('null')
+  })
+})
+
+describe('recruitRefusal', () => {
+  it('allows a manager whose title may hold downlines', () => {
+    expect(recruitRefusal(rev('Ali'), leader('Ben'))).toBeNull()
+  })
+
+  it('refuses a title that cannot hold downlines — an RS under an RS is not a line', () => {
+    const note = recruitRefusal(rev('Ali'), leader('Ben', { title: 'Revenue Specialist', canRecruit: false }))
+    expect(note).toBe(
+      'Ali cannot report to Ben: a Revenue Specialist cannot hold downlines. Inside a commission department the reporting line is also the commission upline, so pick somebody whose title may recruit.',
+    )
+  })
+
+  it('reads a title the ladder does not carry as "no", and says so for no title at all', () => {
+    expect(recruitRefusal(rev('Ali'), leader('Ben', { title: 'Consultant', canRecruit: null }))).toContain(
+      'a Consultant cannot hold downlines',
+    )
+    expect(recruitRefusal(rev('Ali'), leader('Ben', { title: null, canRecruit: null }))).toContain(
+      'holds no title on the commission ladder',
+    )
+  })
+
+  it('says nothing outside a commission department, and nothing about a detach', () => {
+    expect(recruitRefusal(fin('Farah'), { ...leader('Hana'), commissionDept: false, canRecruit: false })).toBeNull()
+    expect(recruitRefusal(rev('Ali'), null)).toBeNull()
+  })
+})
+
+describe('lineRefusal', () => {
+  it('applies the boundary before the recruit rule', () => {
+    // An outsider is refused for being outside, not for a title the Revenue
+    // ladder does not carry.
+    const note = lineRefusal(rev('Ali'), { ...fin('Farah'), title: 'Manager', canRecruit: null })
+    expect(note).toContain('Finance')
+    expect(note).not.toContain('cannot hold downlines')
+  })
+
+  it('then the recruit rule, then nothing', () => {
+    expect(lineRefusal(rev('Ali'), leader('Ben', { title: 'Revenue Specialist', canRecruit: false }))).toContain(
+      'cannot hold downlines',
+    )
+    expect(lineRefusal(rev('Ali'), leader('Ben'))).toBeNull()
   })
 })

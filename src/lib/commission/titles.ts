@@ -140,13 +140,15 @@ export function rankForTitle<R extends AssignableRung>(
  * The rank somebody should be moved to when their TITLE changes — or `null`
  * when nothing should move.
  *
- * A RATCHET, the exact mirror of the title ratchet in `hierarchy-actions.ts`:
- * placing somebody at a rank whose title stands above theirs raises the title;
- * giving somebody a title whose floor stands above their rank now raises the
- * rank. Neither ever lowers the other, which is what stops the two from
- * oscillating — a promotion cannot claw back a rank somebody was deliberately
- * placed above, and a high placement cannot be undone by re-saving the title
- * that placement earned them.
+ * A RATCHET: giving somebody a title whose floor stands above their rank
+ * raises the rank, and nothing ever lowers it — a promotion cannot claw back a
+ * rank somebody was deliberately placed above, and a high placement cannot be
+ * undone by re-saving the title that placement earned them.
+ *
+ * Since 2026-09-10 the database applies this rule itself, in the same
+ * statement as the title write (`comm_sync_position`, migration
+ * 20260910120000). This is the same decision in TypeScript, kept for the
+ * engine's previews and for the tests that pin the rule down.
  *
  * Returns null, not the current rank, when there is nothing to do: the caller
  * writes only when it gets an id back, so an unchanged rank is not an

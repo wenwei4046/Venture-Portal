@@ -27,11 +27,8 @@ import {
   type OrgNodeInput,
 } from '@/lib/org-layout'
 import { ladderAllows, ladderRefusal } from '@/lib/ladder'
-import { boundaryRefusal } from '@/lib/hierarchy-boundary'
-import type { MirrorOutcome } from '@/lib/hierarchy-mirror'
+import { lineRefusal } from '@/lib/hierarchy-boundary'
 import { setReportsTo, undoHierarchyMove, type UndoMoveInput } from '../actions'
-import MirrorOfferPrompt, { nextOffer, offerKey, type OfferState } from './MirrorOfferPrompt'
-import type { RankOption, SalesPerson } from './HierarchyPanel'
 
 export interface ChartPerson {
   id: string
@@ -42,20 +39,15 @@ export interface ChartPerson {
   /** True in a department the commission engine pays. The reporting line may
    *  not cross that department's edge — `lib/hierarchy-boundary.ts`. */
   commissionDept: boolean
+  /** Inside a commission department: may their title hold downlines? Null
+   *  when the department's ladder does not carry the title, or the department
+   *  is not paid by commission (the rule then says nothing). */
+  canRecruit: boolean | null
   /** Where their title stands on the ladder. Null when it is not placed —
    *  the ladder then has nothing to say about them. */
   levelRank: number | null
   levelName: string | null
   reportsTo: string | null
-  /**
-   * Their Revenue upline, if they have one. CARRIED, NEVER DRAWN.
-   *
-   * The dashed edge this used to paint went away with the rest of the
-   * commission drawing on 2026-09-08. The value stays because an undo has
-   * to be able to put back the line a move changed, and after the write
-   * this page holds no other copy of what it used to be.
-   */
-  commUplineId: string | null
 }
 
 interface CardData extends Record<string, unknown> {
@@ -84,10 +76,12 @@ export const ALL_DEPARTMENTS = '__all__'
  * The ladder is a rule about titles, not a second chart: it says how high,
  * never where. Moving a person between departments is still a drag here.
  *
- * Since 2026-09-07 a drag writes BOTH lines. The dashed commission upline used
- * to be drawn here and changed somewhere else, which let the two drift apart in
- * silence; `setReportsTo` now moves it too, and the banner says so — including
- * when it could not, which is the case that matters.
+ * Since 2026-09-10 there is ONE line. Inside a commission department who
+ * somebody reports to is who earns the override on their sales, and the
+ * commission position follows this column in the database — so a drag here
+ * is the whole move, and two rules of that department apply to it: the line
+ * may not cross the department's edge, and it may only go to a title that
+ * may hold downlines (`lib/hierarchy-boundary.ts`).
  */
 export default function TeamOrgChart(props: {
   people: ChartPerson[]
@@ -97,13 +91,6 @@ export default function TeamOrgChart(props: {
    *  scrolls the chart to them, clicking a card highlights the name. */
   focused: string | null
   onFocus: (staffId: string | null) => void
-  /** Ranks per scheme, for the enrol offer's picker. `{}` for an account
-   *  without `revenue` — which is the same account the offer is never made
-   *  to, so an empty map here is correct rather than a missing prop. */
-  ranksByScheme: Record<string, RankOption[]>
-  /** The commission positions, carried only so an enrol offer can default its
-   *  scheme picker to the MOVER's own. Nothing here is drawn. */
-  salespeople: SalesPerson[]
   /** The department in focus, or ALL_DEPARTMENTS. Owned by the page: the chips
    *  filter the rail beside this canvas as well, and two copies of one choice
    *  is how the two halves of a view drift apart. */
@@ -122,8 +109,6 @@ function Chart({
   commissionHref,
   focused,
   onFocus,
-  ranksByScheme,
-  salespeople,
   focusDept,
   onFocusDept,
 }: {
@@ -131,8 +116,6 @@ function Chart({
   commissionHref: string | null
   focused: string | null
   onFocus: (staffId: string | null) => void
-  ranksByScheme: Record<string, RankOption[]>
-  salespeople: SalesPerson[]
   focusDept: string
   onFocusDept: (department: string) => void
 }) {
@@ -141,16 +124,6 @@ function Chart({
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
-  /**
-   * The way out attached to a refusal, whichever kind it is.
-   *
-   * This used to keep DETACH offers and drop enrol ones, because the rank
-   * options were built on the page behind a `seesMoney` gate and handed to the
-   * table alone — so on this tab the enrol refusal was a sentence with the
-   * button silently thrown away. The options are threaded here now, and an
-   * offer discarded is a way out the reader never learns exists.
-   */
-  const [offer, setOffer] = useState<OfferState | null>(null)
   const [warn, setWarn] = useState(false)
   /**
    * The way back from the move just made, or null.
@@ -184,15 +157,6 @@ function Chart({
   const selected = focused
 
   const byId = useMemo(() => new Map(people.map(p => [p.id, p])), [people])
-
-  // Which scheme somebody earns under. An enrol offer defaults its picker to
-  // the MOVER's, not to whichever scheme sorts first: an override belongs to
-  // one scheme, so a manager enrolled into a different one is refused by the
-  // very mirror the offer is trying to complete.
-  const schemeOf = useMemo(
-    () => new Map(salespeople.map(s => [s.staffId, s.schemeId])),
-    [salespeople],
-  )
 
   const matches = useMemo(() => {
     const q = find.trim().toLowerCase()
@@ -246,12 +210,11 @@ function Chart({
   const layout = useMemo(() => layoutTree(graph), [graph])
 
   /** Everything the person being dragged may not be dropped on: their own
-   *  reports, anybody the ladder ranks below them, and — since 2026-09-08 —
-   *  everybody on the other side of a commission department's edge. The
-   *  boundary is checked here as well as on the server because it is the only
-   *  one of the three with no database trigger behind it: a card that cannot
-   *  be dropped on is a rule explained before it is broken, and the server
-   *  message is what somebody gets when they got past this. */
+   *  reports, anybody the ladder ranks below them, everybody on the other side
+   *  of a commission department's edge, and — inside such a department —
+   *  anybody whose title cannot hold downlines. A card that cannot be dropped
+   *  on is a rule explained before it is broken; the database refuses all
+   *  four again, and its sentence is what somebody gets who got past this. */
   const forbidden = useMemo(() => {
     if (!dragging) return new Set<string>()
     const out = descendantsOf(graph, dragging)
@@ -260,7 +223,7 @@ function Chart({
     if (mover) {
       for (const p of visible) {
         if (mover.levelRank !== null && !ladderAllows(mover.levelRank, p.levelRank)) out.add(p.id)
-        if (p.commissionDept !== mover.commissionDept) out.add(p.id)
+        if (lineRefusal(mover, p)) out.add(p.id)
       }
     }
     return out
@@ -311,13 +274,7 @@ function Chart({
     (childId: string, parentId: string | null) => {
       const child = byId.get(childId)
       if (!child) return
-      // Genuinely nothing to do: the reporting line already points there AND so
-      // does the commission line. When only the first is true the round trip is
-      // the whole point — somebody already reporting to nobody while still
-      // earning under a manager has no other gesture on this page that can
-      // clear that, and the detach offer is raised by the server or not at all.
-      // Returning early there is how that state became unreachable.
-      if (child.reportsTo === parentId && child.commUplineId === parentId) return
+      if (child.reportsTo === parentId) return
 
       if (parentId) {
         const parent = byId.get(parentId)
@@ -339,56 +296,39 @@ function Chart({
         // gesture arrived by some other route — the table's picker, a keyboard
         // drop, a page held open across a department change. Said in full
         // rather than swallowed: the same sentence the server would return.
-        const crossing = boundaryRefusal(child, parent)
-        if (crossing) {
-          setError(crossing)
+        const refused = lineRefusal(child, parent)
+        if (refused) {
+          setError(refused)
           return
         }
       }
 
       setError(null)
-      setOffer(null)
       setWarn(false)
       setUndo(null)
-      // Both lines as the card the drop was aimed at still has them. `child`
-      // is a snapshot from that render rather than a live view, so it keeps
-      // the pre-move values even after `router.refresh()` replaces `people`.
-      const was = { reportsTo: child.reportsTo, commUplineId: child.commUplineId }
+      // The line as the card the drop was aimed at still has it. `child` is a
+      // snapshot from that render rather than a live view, so it keeps the
+      // pre-move value even after `router.refresh()` replaces `people`.
+      const was = child.reportsTo
       startTransition(async () => {
         try {
-          const outcome = await setReportsTo(childId, parentId)
-          // Whether the mirror ran decides how much of this an undo may put
-          // back — restoring a commission upline the move never wrote would be
-          // a NEW money decision wearing an undo button's clothes.
-          setUndo({
-            staffId: childId,
-            reportsTo: was.reportsTo,
-            commUplineId: was.commUplineId,
-            mirrored: outcome.mirrored,
-            movedTo: parentId,
-          })
-          // Whatever the server attached — a detach the commission tree did not
-          // follow, or a manager who is not on the ladder. Never taken for them
-          // either way: the two trees hold different people, and acting on an
-          // absence in one is bug B7.
-          setOffer(outcome.offer ? { offer: outcome.offer, moverId: childId } : null)
+          const result = await setReportsTo(childId, parentId)
+          if (!result.ok) {
+            setError(result.reason)
+            return
+          }
+          setUndo({ staffId: childId, reportsTo: was, movedTo: parentId })
           const moved = parentId
             ? `${child.name} now reports to ${byId.get(parentId)!.name}.`
             : `${child.name} now reports to nobody.`
-          // The commission half of the write speaks for itself when it has
-          // something to say — a skipped or failed mirror means the two lines
-          // now disagree, and this banner is the only place that is visible.
+          // Inside a commission department the line IS the override, so a
+          // detach there is a money change and is said in full.
           setNote(
-            outcome.note
-              ? `${moved} ${outcome.note}`
-              : outcome.mirrored
-                ? parentId
-                  ? `${moved} Their commission upline moved with them.`
-                  // A detach inside a commission department clears the
-                  // commission upline too, and that is a MONEY change: said in
-                  // full, because "moved with them" would understate it.
-                  : `${moved} Their commission upline was cleared with them, so nobody earns an override on their sales now.`
-                : moved,
+            child.commissionDept
+              ? parentId
+                ? `${moved} The override on their sales goes to ${byId.get(parentId)!.name} from this month.`
+                : `${moved} Nobody earns an override on their sales from this month.`
+              : moved,
           )
           router.refresh()
         } catch (err) {
@@ -397,33 +337,6 @@ function Chart({
       })
     },
     [byId, graph, router],
-  )
-
-  /**
-   * What came back from accepting an offer.
-   *
-   * The note is rendered whether or not the write landed: `detachCommissionUpline`
-   * reports on a money write even when it succeeded, and `mirrored` picks the
-   * banner's tone rather than whether it speaks at all.
-   */
-  const acceptOutcome = useCallback(
-    (outcome: MirrorOutcome) => {
-      setError(null)
-      setNote(outcome.note)
-      setWarn(!outcome.mirrored)
-      // Accepting an offer writes the commission half the move could not, so
-      // the snapshot taken before that move no longer describes what is there.
-      // Undoing on the strength of it would put the reporting line back and
-      // leave the override pointing at the new manager, reported as a success.
-      setUndo(null)
-      setOffer(current => {
-        if (!current) return null
-        const next = nextOffer(current.offer, outcome)
-        return next ? { offer: next, moverId: current.moverId } : null
-      })
-      router.refresh()
-    },
-    [router],
   )
 
   const onNodeDragStop: OnNodeDrag<Node<CardData>> = useCallback(
@@ -511,19 +424,14 @@ function Chart({
           {error}
         </div>
       ) : null}
-      {/* The note still yields to an error, as it always has — but the OFFER
-          outlives one. A throw here leaves the reporting line already written,
-          so the gesture that raised the offer cannot raise it again: repeating
-          a detach that has already happened is a no-op, and losing the button
-          would be a dead end rather than a fresh start. */}
-      {(note && !error) || offer ? (
+      {note && !error ? (
         <div
           className={`rounded-md p-3 mb-4 text-sm font-sans border ${
             warn ? 'bg-alert-bg border-alert/40 text-alert' : 'bg-surface-2 border-hairline text-ink'
           }`}
         >
-          {error ? null : note}
-          {undo && !error ? (
+          {note}
+          {undo ? (
             <button
               type="button"
               disabled={pending}
@@ -533,7 +441,6 @@ function Chart({
                 // second undo, and the button is gone before it can be pressed.
                 setUndo(null)
                 setError(null)
-                setOffer(null)
                 startTransition(async () => {
                   try {
                     const outcome = await undoHierarchyMove(was)
@@ -552,22 +459,6 @@ function Chart({
             >
               Undo
             </button>
-          ) : null}
-          {/* Inside the banner, above the canvas: an affordance that opened
-              between the cards would move the tree under the cursor that just
-              dropped one. */}
-          {offer ? (
-            <MirrorOfferPrompt
-              key={offerKey(offer)}
-              state={offer}
-              ranksByScheme={ranksByScheme}
-              preferredSchemeId={schemeOf.get(offer.moverId) ?? null}
-              onOutcome={acceptOutcome}
-              onError={message => {
-                setError(message)
-                setNote(null)
-              }}
-            />
           ) : null}
         </div>
       ) : null}
@@ -690,7 +581,6 @@ function Chart({
           nodeTypes={nodeTypes}
           onNodeDragStart={(_e, node) => {
             setNote(null)
-            setOffer(null)
             setWarn(false)
             setUndo(null)
             setDragging(node.id)
@@ -736,8 +626,8 @@ function Chart({
             </Link>
           </span>
         ) : null}
-        {/* The commission tree is not drawn here any more, but a move still
-            writes it — so the page keeps the one way to go and look at it. */}
+        {/* The rank each Revenue person is paid from is read on their own
+            chart, where a period is in scope; this is the way there. */}
         {commissionHref ? (
           <Link
             href={commissionHref}
@@ -750,12 +640,12 @@ function Chart({
 
       <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
         A greyed card cannot take the person being dragged — it is one of their
-        own reports, the ladder ranks its title below theirs, or they stand on
-        the other side of a commission department&rsquo;s edge. A red line is one
-        the ladder would refuse today: move the line, or change the ladder from
-        the Levels tab. Moving somebody still moves their commission upline with
-        them where this account may write both — that line is not drawn here any
-        more, and the banner says so whenever it could not follow.
+        own reports, the ladder ranks its title below theirs, they stand on the
+        other side of a commission department&rsquo;s edge, or their title cannot
+        hold downlines there. A red line is one the ladder would refuse today:
+        move the line, or change the ladder from the Levels tab. Inside Revenue
+        this line is also who earns the override on their sales, so a move here
+        is the whole move.
       </p>
     </div>
   )

@@ -11,12 +11,14 @@ export type HierarchyTab = 'chart' | 'team'
 /**
  * Staff Hierarchy's two tabs, on the header's rule: the chart, and the Team
  * table that was Rules IX until 2026-09-05 (user: "移去 staff hierarchy 那边
- * … 这个写 team"). They are two views of one position row, and the split of
- * what each may change is the point of putting them side by side:
+ * … 这个写 team"). They are two views of one line, and the split of what
+ * each may change is the point of putting them side by side:
  *
- *   chart  moves people between trees freely — drag, or draw a line;
+ *   chart  moves people between trees freely — drag, or draw a line. The
+ *          line is `reports_to`, the same one People draws (2026-09-10), and
+ *          the commission position follows it in the database;
  *   table  changes nothing but the RANK (and the rate mode that rides with
- *          it); the upline column is what the chart drew, read-only.
+ *          it); the upline column is who they report to, read-only.
  *
  * The tab is `?tab=team`, pushed with the browser's own history so Next
  * syncs `useSearchParams` without a round trip.
@@ -27,7 +29,7 @@ export default function HierarchyTabs({
   chart,
   team,
 }: {
-  subDept: { name: string; slug: string }
+  subDept: { name: string; slug: string; isHome: boolean }
   schemeId: string
   chart: { people: OrgPerson[]; ranks: OrgRank[] }
   team: TeamData
@@ -58,16 +60,32 @@ export default function HierarchyTabs({
           <h1 className="page-title">Staff Hierarchy</h1>
           <p className="font-serif italic text-graphite text-base mt-3 max-w-2xl">
             {tab === 'team' ? (
+              subDept.isHome ? (
+                <>
+                  Everyone on {subDept.name}: the title they hold, the rank they are paid from, and
+                  who they report to. Only the <em>rank</em> is set here — a title gives its rank
+                  on its own, and who somebody reports to is moved on the chart.
+                </>
+              ) : (
+                <>
+                  Who is in {subDept.name}, the title each holds <em>here</em>, the rank they are
+                  paid from, and who they earn under. Titles, ranks and membership are set here;
+                  who earns under whom is moved on the chart. None of it touches People.
+                </>
+              )
+            ) : subDept.isHome ? (
               <>
-                Everyone on {subDept.name}: the title they hold, the rank they are paid from, and
-                who they report to. Only the <em>rank</em> is set here — where somebody sits in a
-                tree is moved on the chart, and this table follows it.
+                Every card names who they report to — the same line People draws. Change it
+                there, or drag the card onto somebody; the rank they are paid from follows their
+                title and is set on the Team tab. Cards stay where you put them; Tidy lines them up
+                again. A month already computed keeps the chart it was computed against.
               </>
             ) : (
               <>
-                Every card names its upline — change it there, or drag the card onto somebody.
-                Cards stay where you put them; Tidy lines them up again. Every move writes a new
-                dated position — a month already computed keeps the chart it was computed against.
+                {subDept.name}&rsquo;s own tree: every card names who they earn under here, which
+                may differ from the company chart. Change it there, or drag the card onto
+                somebody; the rank follows the title held here, set on the Team tab. A month
+                already computed keeps the chart it was computed against.
               </>
             )}
           </p>
@@ -77,23 +95,32 @@ export default function HierarchyTabs({
       <SlidingTabs items={tabs} active={tab} onTabChange={goTo} variant="control" />
 
       {tab === 'team' ? (
-        <TeamTable people={team.people} ranks={team.ranks} schemeId={schemeId} />
+        <TeamTable
+          people={team.people}
+          ranks={team.ranks}
+          titles={team.titles}
+          candidates={team.candidates}
+          schemeId={schemeId}
+          subDeptName={subDept.name}
+          isHome={subDept.isHome}
+        />
       ) : chart.people.length === 0 ? (
-        <NobodyYet />
+        <NobodyYet isHome={subDept.isHome} />
       ) : (
-        <OrgChart people={chart.people} ranks={chart.ranks} schemeId={schemeId} />
+        <OrgChart people={chart.people} ranks={chart.ranks} schemeId={schemeId} isHome={subDept.isHome} />
       )}
     </div>
   )
 }
 
-function NobodyYet() {
+function NobodyYet({ isHome }: { isHome: boolean }) {
   return (
     <div className="py-16 text-center border border-hairline rounded-card bg-surface">
       <p className="font-serif text-2xl text-ink mb-3">Nobody to chart yet.</p>
       <p className="font-serif italic text-muted text-sm max-w-md mx-auto">
-        Add salespeople under People Management with a commission department, then give them a
-        rank on the Team tab.
+        {isHome
+          ? 'Add salespeople under People Management with a commission department and a ladder title; they appear here with the rank their title gives.'
+          : 'Add members on the Team tab — anybody in the department, with the title they hold here.'}
       </p>
     </div>
   )

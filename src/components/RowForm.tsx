@@ -146,8 +146,8 @@ export function RowForm({
    * Called after a successful save, with whatever the action returned.
    *
    * The argument matters for actions that report something they could NOT do
-   * without failing — `setPosition` returns a `MirrorOutcome` whose `note`
-   * says the second hierarchy was left disagreeing with the first. That is a
+   * without failing — `setStaffRank` returns a `RankOutcome` whose `note`
+   * says the rank now sits above the title, or why it was not set. That is a
    * return value, not a throw, so the `catch` below never sees it; before this
    * argument existed the row showed a clean save and the note was discarded.
    */
@@ -178,7 +178,16 @@ export function RowForm({
                 setError(null)
                 startTransition(async () => {
                   try {
-                    onDone?.(await action(fd))
+                    // Two statements, deliberately (2026-09-10). Written as
+                    // one — `onDone?.(await action(fd))` — the optional call
+                    // short-circuits when there is no onDone, and JavaScript
+                    // then never evaluates its argument: the action was not
+                    // called at all. No row passes an onDone, so for three
+                    // days every Save and Add on every RowForm table flickered
+                    // "Saving…", wrote nothing and reported nothing.
+                    // RowForm.test.tsx pins this.
+                    const result = await action(fd)
+                    onDone?.(result)
                   } catch (err) {
                     setError(err instanceof Error ? err.message : 'Something went wrong')
                   }

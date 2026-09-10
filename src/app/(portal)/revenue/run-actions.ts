@@ -183,11 +183,12 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
       .select('band_key, label, kind, margin_pct, commission_multiplier, monthly_incentive, comm_brands (code)')
       .eq('scheme_id', scheme.id)
       .order('sort_order'),
-    // The title they HOLD rides along: it decides who may recruit and whether
-    // this month's rank would raise it (the ratchet — titles.ts).
+    // The title they hold HERE rides along: it decides who may recruit and
+    // whether this month's rank would raise it (the ratchet — titles.ts). It
+    // is the membership's own title since 2026-09-10, not the company one.
     supabase
       .from('comm_hierarchy')
-      .select('staff_id, upline_staff_id, rate_mode, comm_ranks (rank_key), hr_staff_costs!comm_hierarchy_staff_id_fkey (title_id)')
+      .select('staff_id, upline_staff_id, rate_mode, title_id, comm_ranks (rank_key)')
       .eq('scheme_id', scheme.id)
       .lte('effective_from', asAt)
       .or(`effective_to.is.null,effective_to.gte.${asAt}`),

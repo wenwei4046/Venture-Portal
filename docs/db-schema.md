@@ -512,11 +512,68 @@ the only use of `lib/supabase/admin.ts`), then `public.users`, then the
 fails. Phone lives on the person (`contact_number`), not on the account, so
 there is one source of truth for it.
 
-`reports_to` is the org chart: current state, no history, every department. It is
-NOT `comm_hierarchy`, which is effective-dated because it drives override
-commission — the Team canvas draws that line but never writes it. Guarded by
-`hr_staff_costs_reports_to_not_self` (CHECK) and the
+`reports_to` is the org chart: current state, no history, every department.
+Guarded by `hr_staff_costs_reports_to_not_self` (CHECK) and the
 `hr_staff_reports_to_no_cycle` trigger.
+
+**One line (2026-09-10, migration `20260910120000`).** Inside a commission
+department (`departments.payroll_source = 'commission'`) `reports_to` is also
+who earns the override on the person's sales, so `comm_hierarchy` — the
+effective-dated position the engine reads — is DERIVED from it by trigger and
+never written as an upline by the app:
+
+- `hr_staff_costs_one_line_sync` (AFTER INSERT OR UPDATE OF reports_to,
+  title_id, department_id, status) calls `comm_sync_position(staff_id,
+  actor)`: upline = `reports_to`; scheme = the department's live scheme
+  (`comm_scheme_for_department`, oldest active sub-department — a person →
+  sub-department column is owed the day a department has two); rank = the
+  title's floor rung (`comm_floor_rank`) when a position is first opened,
+  raised to a new title's floor when that stands higher, never lowered. A
+  position that started this period (`comm_period_start()`, Malaysian time)
+  is edited in place; an older one is closed at the end of last month and
+  reopened. Leaving the commission department closes the position; going
+  inactive leaves it alone (the month they left in is payroll's call). A title
+  with no rung = "no rank yet" = no position. Security definer; not callable
+  by clients.
+- `hr_staff_costs_commission_line` (BEFORE INSERT OR UPDATE OF reports_to,
+  title_id, department_id) refuses, with a sentence: a line across the
+  department's edge in either direction, or a department change that would
+  leave reports on the other side (`23BND`); inside the department a manager
+  whose title may not hold downlines (`comm_title_can_recruit` — SRS and
+  above on Fair), or a title change to one that may not while somebody
+  reports to them (`23REC`). The app says the same sentences first
+  (`lib/hierarchy-boundary.ts`).
+
+The only `comm_hierarchy` write left in the app for the home sub-department is
+the rank (Team tab, `setMembershipRank`).
+
+**Memberships per sub-department (2026-09-10, migration `20260910160000`).**
+A sub-department is a world of its own, so a person holds one `comm_hierarchy`
+row per (scheme, person) — `one_position_per_scheme` replaced
+`one_position_at_a_time` — and every row carries the `title_id` held IN THAT
+SUB-DEPARTMENT:
+
+- `comm_hierarchy_rank_follows_title` (BEFORE INSERT OR UPDATE OF title_id):
+  a membership opened with a title and no rank gets the title's floor rung on
+  that scheme; a title raised to one whose floor stands higher raises the
+  rank; nothing lowers one. A title with no rung on that ladder cannot open a
+  membership (`23RNK`).
+- `comm_sync_position` now derives only the HOME sub-department's membership
+  (`comm_scheme_for_department` = the department's oldest active
+  sub-department), title included; other memberships are the app's
+  (`openMembership` / `closeMembership` / `moveMembership` /
+  `setMembershipTitle` in `lib/hierarchy-writes.ts`). Leaving the commission
+  department closes every membership.
+- `comm_title_can_recruit(department, title)` asks the HOME ladder only;
+  `comm_title_can_recruit_in(scheme, title)` asks one scheme.
+- `apply_commission_run` raises the MEMBERSHIP's title, and the company title
+  as well only when the run is the home sub-department's;
+  `hr_monthly_payroll.commission_amount` = the SUM of every applied run's
+  statement for that person and month (a re-apply replaces its own share).
+  `reopen_commission_run` gives back only its own share rather than zeroing.
+- Still owed: `sales_import_batches` has no `sub_department_id`, so a period
+  has one batch for the whole department — the IR feed needs that column
+  before its orders exist (TODOS).
 
 Job titles as controlled rows, replacing the free-text `hr_staff_costs.designation`
 (20 hand-typed spellings, backfilled into 20 titles). RLS: read = any signed-in

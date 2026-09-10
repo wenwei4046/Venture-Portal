@@ -14,6 +14,22 @@ complete. QA audit on 2026-04-11. See `.gstack/qa-reports/qa-report-phase3-2026-
 
 ---
 
+## Owed — one line (2026-09-10)
+
+- ~~Person → sub-department column~~ — done 2026-09-10 the other way round:
+  memberships per sub-department (`comm_hierarchy` one row per scheme, with
+  its own title). The oldest sub-department is HOME (`reports_to` drives it).
+- **Orders per sub-department.** `sales_import_batches` has one committed
+  batch per period for the whole department, and `sales_orders` has no
+  sub-department. Fair's orders come from the ERP feed; IR's will come from
+  another API. Before IR's orders exist: add `sales_import_batches.sub_department_id`
+  (backfill = Fair), make the unique "one committed batch per period" index
+  per sub-department, have the ERP ingest stamp Fair's, and make `computeRun`
+  read its own sub-department's batches (plus its own carry-forward).
+- **Positions of inactive staff.** Deactivation leaves the open position as
+  it is (payroll decides the leaving month). One inactive test row ("testing")
+  still holds a position; harmless, nobody points at it.
+
 ## ✅ Completed (Phase 2)
 
 - **M2: cancelLoan orphan fix** — shipped in Phase 2 Step 2 via

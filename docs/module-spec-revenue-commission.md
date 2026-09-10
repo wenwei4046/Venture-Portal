@@ -93,14 +93,28 @@ departments (Revenue Department)
 
 The Rules page gets a **Generate New Sub-Department** action. Creating one
 either **clones** an existing sub-department's scheme (every rule row copied,
-with `cloned_from_scheme_id` recorded) or starts empty for a bespoke ruleset.
-Because each component can be switched off at scheme level
-(`enable_product_revenue` / `enable_kpi` / `enable_open_bill` /
-`enable_override`), a sub-department that only pays a flat percentage reuses the
-same engine instead of getting a bespoke one.
+with `cloned_from_scheme_id` recorded) or starts **blank** for a bespoke ruleset.
+Blank means blank (2026-09-10): the new scheme is written with every component
+switch OFF and no deposit gate — `lib/commission/scheme-defaults.ts` — so
+nothing pays until somebody switches a component on and writes its rules. (The
+`comm_schemes` column defaults are all TRUE, for schemes inserted by scripts;
+before this a blank sub-department opened on a Scheme rules tab with every box
+ticked, as if Fair's had been copied.) Because each component can be switched
+off at scheme level (`enable_product_revenue` / `enable_kpi` /
+`enable_open_bill` / `enable_override` / `enable_margin_penalty` /
+`enable_margin_incentive`), a sub-department that only pays a flat percentage
+reuses the same engine instead of getting a bespoke one.
 
-`comm_hierarchy` enforces **one position per person at a time** across all
-schemes, so nobody can sit in two sub-departments and be paid twice.
+`comm_hierarchy` holds **one position per person per scheme**
+(`one_position_per_scheme`, 2026-09-10): a person may be a member of several
+sub-departments, each membership with its own title, upline and rank — Lucas
+reports to Stanley in Fair and may lead Stanley in IR. The HOME sub-department
+(the department's oldest) is **derived from `hr_staff_costs.reports_to` and the
+company title by trigger** — one line: who somebody reports to is who earns the
+override on their sales, the rank comes from the title (raised, never lowered),
+and the app writes only the rank. Every other sub-department's memberships are
+the app's own writes (§3.0, Team tab; `docs/db-schema.md` "One line" and
+"Memberships").
 
 ### 3.0 Where it lives in the portal
 
@@ -1047,32 +1061,46 @@ The deferred-orders list is a section on the run dashboard rather than a page
 of its own: it is read once, alongside the total it is holding back.
 
 **Org chart.** A tree diagram with n8n-style connector lines where a salesperson
-can be **dragged onto another team member** to re-parent them. Recommended
-library: **`@xyflow/react`** — n8n's own canvas is Vue Flow, the sibling port of
-the same project, so this is the closest match to the reference. Every drop
-writes a new effective-dated `comm_hierarchy` row; the cycle trigger rejects an
-illegal drop, and a drop under a `can_recruit = false` rank is refused in the UI.
+can be **dragged onto another team member** to re-parent them. Library:
+**`@xyflow/react`**. **One line (2026-09-10):** a drop writes
+`hr_staff_costs.reports_to` — the same line People draws — through
+`moveReportingLine`, and the database derives the effective-dated
+`comm_hierarchy` position from it (upline = reports_to; rank = the title's floor
+when first opened, ratcheted up). Refused before the round trip and again by
+trigger: under yourself, under your own report, under a title the ladder
+ranks below yours, across the department's edge, or under a title that cannot
+hold downlines (SRS and above may; an RS reporting to an RS is not a line that
+exists).
 
 **Team tab** (2026-09-05, was Rules IX). One row per salesperson: name, the
 title they hold, their rank, rate mode, upline, Withholding Tax. The user's
 line between the two tabs: "Hierarchy table 那边 … 是可以随意调动的; Team
 table 那边 … 只可以换它的 rank 罢了" — so the chart moves people between
 trees freely, and the table changes **nothing but the rank** (with the rate
-mode, which is the rank's own setting). Its Upline column is text, what the
-chart last drew; the row's form carries that upline as a hidden value so a
-rank change never moves anyone. Both tabs read one `loadTeam` — the same
-`comm_hierarchy` rows — so a move on the chart is what the table shows the
-moment it re-renders. Withholding Tax stays editable here because it is a
-payroll fact of the person with no other home in the module. **Title** is
-read-only: the ratchet (§3.1.1), raised by an applied run or by a rank above
-it set here, lowered only on People.
+mode, which is the rank's own setting; `setStaffRank`). Its Upline column is
+text — who they earn under here. A title gives its rank on its own (the floor
+rung, by trigger), so the table only ever raises one. Both tabs read one
+`loadTeam`, so a move on the chart is what the table shows the moment it
+re-renders. Withholding Tax stays editable here because it is a payroll fact of
+the person with no other home in the module.
+
+Two shapes since 2026-09-10 (memberships per sub-department): on the **home**
+sub-department (the department's oldest — Fair) the rows are the whole
+department, **Title** is the company title (read-only: the ratchet, §3.1.1,
+raised by an applied run, lowered only on People), and somebody whose title
+has no rung reads `no rank yet`. On every **other** sub-department (IR) the
+rows are its members: an **Add to IR** row above the table (a person from the
+department + the title they hold here, which needs a rung on IR's ladder), a
+Title picker per row with the company title in small print beneath when it
+differs, and a **Remove** on the row once nobody earns under them. Nothing on
+an IR row touches People.
 
 ```
 NAME            TITLE                 RANK              RATE MODE        UPLINE                 WITHHOLDING
 YUNY            Team Leader           [Rank A · 9%  ▾]  [Manual       ▾] top of a tree             [✓] 2.00 %
 TAN KAR JIUN    Team Assistant        [Rank D · 6%  ▾]  [Scheme target▾] YUNY  since 2026-09-01     [✓] 2.00 %
 LUCAS           Senior Rev Specialist [Rank D · 6%  ▾]  [Scheme target▾] YUNY  since 2026-09-01     [ ]
-SALLY           Revenue Specialist    [— pick a rank ▾] [scheme default▾] not placed               [✓] 2.00 %
+SALLY           Revenue Specialist    [Rank E · 5%  ▾]  [scheme default▾] SHAWN since 2026-09-01    [✓] 2.00 %
 ```
 
 **Payroll grid change** (`PayrollRow.tsx`, built): for staff in a

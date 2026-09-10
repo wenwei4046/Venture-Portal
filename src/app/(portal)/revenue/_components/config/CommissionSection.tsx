@@ -149,7 +149,7 @@ export default function CommissionSection({
             <em>{subDept.name}</em> alone — the sidebar is what switches between them. A new
             sub-department can <em>follow</em> an existing one&apos;s rules — every rank, item group,
             KPI item, threshold, Open Bill rate, brand and margin band is copied — or start blank for
-            a ruleset of its own.
+            a ruleset of its own, with every switch off and every table empty until you write it.
           </Hint>
           <NewSubDepartmentForm data={data} onDone={() => setShowNewSub(false)} />
         </section>
@@ -189,7 +189,8 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
       <Hint>
         Which components this sub-department pays at all. Switching one off makes the engine
         skip it entirely, so a sub-department that only pays a flat percentage of revenue
-        reuses the same engine rather than getting a bespoke one.
+        reuses the same engine rather than getting a bespoke one. A sub-department that started
+        blank has every switch off until you turn it on here.
       </Hint>
       <ActionForm action={updateScheme}>
         {({ pending }) => (

@@ -18,9 +18,15 @@ function untypedRows<T>(data: unknown): T[] {
  */
 interface OpenPosition {
   staff_id: string
+  scheme_id: string
   comm_ranks:
     | { label: string; product_rate: number | string }
     | { label: string; product_rate: number | string }[]
+    | null
+  /** The sub-department's age decides which position the roster shows: the oldest is home. */
+  comm_schemes:
+    | { comm_sub_departments: { created_at: string } | { created_at: string }[] | null }
+    | Array<{ comm_sub_departments: { created_at: string } | { created_at: string }[] | null }>
     | null
 }
 
@@ -61,7 +67,7 @@ export default async function PeopleManagementPage() {
     // and nothing else: every row reads a dash.
     (supabase as unknown as SupabaseClient)
       .from('comm_hierarchy')
-      .select('staff_id, comm_ranks (label, product_rate)')
+      .select('staff_id, scheme_id, comm_ranks (label, product_rate), comm_schemes (comm_sub_departments (created_at))')
       .is('effective_to', null)
       .then(
         r => r.data,
@@ -73,11 +79,22 @@ export default async function PeopleManagementPage() {
     ((levels ?? []) as Array<{ id: string; rank: number; name: string }>).map(l => [l.id, l]),
   )
 
-  // One open position per person is the rule `comm_hierarchy` already enforces,
-  // so a plain map is enough. `product_rate` comes out of Postgres as numeric-
-  // as-string; Number() it here so nothing downstream has to wonder.
+  // A person may hold one position per sub-department (2026-09-10). The roster
+  // shows the HOME one — the department's oldest sub-department, the one the
+  // company title belongs to — so the rows are sorted by that sub-department's
+  // age and the first position per person wins. `product_rate` comes out of
+  // Postgres as numeric-as-string; Number() it here so nothing downstream has
+  // to wonder.
   const rankByStaff = new Map<string, { label: string; rate: number }>()
-  for (const pos of untypedRows<OpenPosition>(positions)) {
+  const createdAt = (pos: OpenPosition): string => {
+    const scheme = Array.isArray(pos.comm_schemes) ? (pos.comm_schemes[0] ?? null) : pos.comm_schemes
+    const sub = Array.isArray(scheme?.comm_sub_departments)
+      ? (scheme?.comm_sub_departments[0] ?? null)
+      : (scheme?.comm_sub_departments ?? null)
+    return sub?.created_at ?? '9999'
+  }
+  for (const pos of [...untypedRows<OpenPosition>(positions)].sort((a, b) => createdAt(a).localeCompare(createdAt(b)))) {
+    if (rankByStaff.has(pos.staff_id)) continue
     const rank = Array.isArray(pos.comm_ranks) ? (pos.comm_ranks[0] ?? null) : pos.comm_ranks
     if (rank) {
       rankByStaff.set(pos.staff_id, { label: rank.label, rate: Number(rank.product_rate) })

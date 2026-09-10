@@ -18,10 +18,12 @@ interface PageProps {
  * Both are one `loadTeam` read, so a move on the chart is what the table
  * shows and a rank set on the table is what the chart draws.
  *
- * Deliberately separate from `hr_staff_costs.department_id` and from any
- * app-role hierarchy — this exists only to answer "who is under who, at what
- * rank, in which month", and it is what the override differential is computed
- * from.
+ * MEMBERSHIPS (user, 2026-09-10): a sub-department is a world of its own —
+ * its own tree, and its own title and rank per person. The HOME
+ * sub-department (the department's oldest) is the company chart itself: its
+ * line is `reports_to`, its titles are the company titles, and the database
+ * keeps its memberships in step with the roster. Every other sub-department
+ * is drawn and edited here, member by member.
  */
 export default async function StaffHierarchyPage({ params }: PageProps) {
   await requirePermission('revenue')
@@ -32,7 +34,7 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
   // a scheme's row, and a position points at one.
   if (!subDept.schemeId) return <NoScheme subDept={subDept} />
 
-  const team = await loadTeam(subDept.schemeId)
+  const team = await loadTeam(subDept.schemeId, { isHome: subDept.isHome })
 
   // A rank is its rate, lettered from the top of the Rank tab's catalogue —
   // the rung's label is a trigger-kept copy of its rank's (comm_rank_defs,
@@ -59,14 +61,16 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
       code: p.employee_code,
       titleName: p.title_name,
       titleId: p.title_id,
+      levelRank: p.title_level_rank,
+      levelName: p.title_level_name,
       uplineStaffId: p.upline_staff_id,
-      reportsTo: p.reports_to,
       rankId: p.rank_id,
       rankLabel: rank ? (shortLabel.get(rank.id) ?? null) : null,
       productRate: rank?.productRate ?? null,
-      // Who may hold downlines follows the TITLE they hold (user 2026-09-03);
-      // only somebody with no title yet is judged by the rank they sit at.
-      canRecruit: titleCanRecruit(ranks, p.title_id) ?? rank?.canRecruit ?? false,
+      // Who may hold downlines follows the TITLE held here (user 2026-09-03):
+      // a Team Assistant back on 5% for a month keeps their team. A title the
+      // ladder does not carry cannot lead anyone here.
+      canRecruit: titleCanRecruit(ranks, p.title_id) ?? false,
       rateMode: p.rate_mode,
       placedSince: p.placed_since,
     }
@@ -74,7 +78,7 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
 
   return (
     <HierarchyTabs
-      subDept={{ name: subDept.name, slug: subDept.slug }}
+      subDept={{ name: subDept.name, slug: subDept.slug, isHome: subDept.isHome }}
       schemeId={subDept.schemeId}
       chart={{ people, ranks }}
       team={team}

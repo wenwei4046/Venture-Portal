@@ -143,28 +143,32 @@ export interface PromotionRuleRow {
 }
 
 /**
- * A salesperson's live position, joined for the Team table and the org chart
- * (Staff Hierarchy, both tabs — the two read one load so they never disagree).
+ * One person's MEMBERSHIP of a sub-department, joined for the Team table and
+ * the org chart (Staff Hierarchy, both tabs — the two read one load so they
+ * never disagree).
+ *
+ * Since 2026-09-10 a sub-department is a world of its own: the title, the
+ * upline and the rank here are the ones held IN THIS SUB-DEPARTMENT. On the
+ * home sub-department (the department's oldest) they mirror the company
+ * roster — the database keeps them in step; everywhere else they are this
+ * chart's own facts.
  */
 export interface SalespersonRow {
   staff_id: string
   employee_name: string
   employee_code: string | null
-  /** The title they HOLD — the ratchet; may sit above the rank they are paid. */
+  /** The title held HERE — the ratchet; may sit above the rank they are paid. */
   title_id: string | null
   title_name: string | null
   /** Where that title stands on the company ladder (`title_levels`); null = not placed. */
   title_level_rank: number | null
   title_level_name: string | null
+  /** The company title, for the row's small print when it differs from the one held here. */
+  company_title_name: string | null
   hierarchy_id: string | null
+  /** Who they earn under HERE. On the home sub-department this is `reports_to`. */
   upline_staff_id: string | null
-  /**
-   * Who they report to on the company chart — `hr_staff_costs.reports_to`.
-   *
-   * Not a commission fact, and never written from here. It is carried so the
-   * chart can borrow the company’s shape for somebody who has no shape of
-   * their own yet, rather than stranding them at the top level.
-   */
+  /** Who they report to on the company chart — `hr_staff_costs.reports_to`. */
   reports_to: string | null
   rank_id: string | null
   rank_key: string | null
@@ -176,10 +180,22 @@ export interface SalespersonRow {
   withholding_rate: number
 }
 
-/** Staff Hierarchy's load: the ladder to pick from, and everyone on it or not yet placed. */
+/** Somebody in the department who is not a member of this sub-department yet. */
+export interface MemberCandidate {
+  staff_id: string
+  employee_name: string
+  employee_code: string | null
+  company_title_name: string | null
+}
+
+/** Staff Hierarchy's load: the ladder, the members, and who could still join. */
 export interface TeamData {
   ranks: RankRow[]
   people: SalespersonRow[]
+  /** Titles a membership may hold — the commission departments' rows of `titles`. */
+  titles: TitleRow[]
+  /** Empty on the home sub-department: everybody in the department is a member there. */
+  candidates: MemberCandidate[]
 }
 
 export interface ProductRow {

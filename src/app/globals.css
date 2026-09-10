@@ -1726,7 +1726,6 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   --cv-chip: 238 242 246;
   --cv-chip-border: 211 220 229;
   --cv-line: 91 111 132;
-  --cv-borrow: 135 152 170;
   --cv-target: 214 228 243;
   --cv-shelf: 104 122 140;
   --cv-lift: 15 25 35;
@@ -1743,7 +1742,6 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   --cv-chip: 52 65 78;
   --cv-chip-border: 70 86 101;
   --cv-line: 143 163 183;
-  --cv-borrow: 105 123 141;
   --cv-target: 44 70 98;
   --cv-shelf: 143 163 183;
   --cv-lift: 0 0 0;
@@ -1761,7 +1759,6 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
     --cv-chip: 52 65 78;
     --cv-chip-border: 70 86 101;
     --cv-line: 143 163 183;
-    --cv-borrow: 105 123 141;
     --cv-target: 44 70 98;
     --cv-shelf: 143 163 183;
     --cv-lift: 0 0 0;
@@ -1785,18 +1782,12 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 .org-canvas .react-flow__attribution { background: rgb(var(--cv-ground) / 0.8); color: rgb(var(--cv-muted)); }
 .org-canvas .react-flow__attribution a { color: rgb(var(--cv-muted)); }
 
-/* Edges — a money relationship solid, a borrowed reporting line dashed. */
+/* Edges — the one line, who reports to whom. */
 .org-canvas .react-flow__edge-path {
   stroke: rgb(var(--cv-line));
   stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-.org-canvas .react-flow__edge.borrow .react-flow__edge-path {
-  stroke: rgb(var(--cv-borrow));
-  stroke-width: 1.25;
-  stroke-dasharray: 5 4;
-  opacity: 0.75;
 }
 /* The line a move just made draws itself down from the upline. The path
    carries pathLength="1" so the dash is the whole line whatever its length. */
@@ -1963,9 +1954,8 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   color: rgb(var(--cv-muted));
 }
 .org-card .oc-up .v { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.org-card .oc-up .v.top, .org-card .oc-up .v.borrow { font-weight: 400; color: rgb(var(--cv-graphite)); }
+.org-card .oc-up .v.top { font-weight: 400; color: rgb(var(--cv-graphite)); }
 .org-card .oc-up .v.top { font-style: italic; }
-.org-card .oc-up .v.borrow svg { vertical-align: middle; margin-left: 6px; opacity: 0.8; }
 .org-card .oc-up .chev { flex: none; width: 9px; height: 9px; color: rgb(var(--accent)); }
 
 /* The shelf at the canvas's right edge, for people on no line at all. */
@@ -2031,18 +2021,6 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 @keyframes org-popin { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
 .org-pop .ph { padding: 10px 12px 9px; font-size: 12.5px; color: rgb(var(--graphite)); border-bottom: 1px solid rgb(var(--hairline)); }
 .org-pop .ph b { color: rgb(var(--ink)); font-weight: 600; }
-.org-pop .prank { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid rgb(var(--hairline)); font-size: 12px; color: rgb(var(--graphite)); }
-.org-pop .prank select {
-  flex: 1;
-  min-width: 0;
-  font: inherit;
-  font-size: 12.5px;
-  color: rgb(var(--ink));
-  background: rgb(var(--paper));
-  border: 1px solid rgb(var(--hairline));
-  border-radius: 6px;
-  padding: 5px 8px;
-}
 .org-pop .ps {
   display: block;
   width: 100%;
@@ -2105,7 +2083,6 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 .org-pop .row .why { color: rgb(var(--muted)); }
 .org-pop .row .cur { color: rgb(var(--accent)); }
 .org-pop .row.topr { border-top: 1px solid rgb(var(--hairline)); margin-top: 4px; padding-top: 9px; font-style: italic; color: rgb(var(--graphite)); }
-.org-pop .pact { display: flex; gap: 8px; justify-content: flex-end; padding: 10px 12px; border-top: 1px solid rgb(var(--hairline)); }
 .org-pop .pnone { padding: 14px 12px; font-size: 12.5px; font-style: italic; color: rgb(var(--muted)); }
 
 @media (prefers-reduced-motion: reduce) {
