@@ -84,7 +84,7 @@ export default function MovePopover({ mover, people, graph, anchor, onPick, onCl
   const matches = (p: OrgPerson) => !needle || p.name.toLowerCase().includes(needle)
 
   // Reporting to nobody already — the detach row has nothing to do.
-  const atTop = mover.reportsTo === null
+  const atTop = mover.uplineStaffId === null
 
   useLayoutEffect(() => {
     const el = ref.current
@@ -133,7 +133,7 @@ export default function MovePopover({ mover, people, graph, anchor, onPick, onCl
   const row = (p: OrgPerson, depth: number) => {
     if (!matches(p)) return null
     const kind: RefusalKind | undefined = forbidden.get(p.staffId)
-    const current = mover.reportsTo === p.staffId
+    const current = mover.uplineStaffId === p.staffId
     return (
       <button
         key={p.staffId}

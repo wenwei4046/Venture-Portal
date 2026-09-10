@@ -99,12 +99,16 @@ Because each component can be switched off at scheme level
 `enable_override`), a sub-department that only pays a flat percentage reuses the
 same engine instead of getting a bespoke one.
 
-`comm_hierarchy` enforces **one position per person at a time** across all
-schemes, so nobody can sit in two sub-departments and be paid twice. Since
-2026-09-10 it is **derived from `hr_staff_costs.reports_to` by trigger** — one
-line: who somebody reports to is who earns the override on their sales, the
-rank comes from the title (raised, never lowered), and the app writes only the
-rank (§3.0, Team tab; `docs/db-schema.md` "One line").
+`comm_hierarchy` holds **one position per person per scheme**
+(`one_position_per_scheme`, 2026-09-10): a person may be a member of several
+sub-departments, each membership with its own title, upline and rank — Lucas
+reports to Stanley in Fair and may lead Stanley in IR. The HOME sub-department
+(the department's oldest) is **derived from `hr_staff_costs.reports_to` and the
+company title by trigger** — one line: who somebody reports to is who earns the
+override on their sales, the rank comes from the title (raised, never lowered),
+and the app writes only the rank. Every other sub-department's memberships are
+the app's own writes (§3.0, Team tab; `docs/db-schema.md` "One line" and
+"Memberships").
 
 ### 3.0 Where it lives in the portal
 
@@ -1068,14 +1072,22 @@ line between the two tabs: "Hierarchy table 那边 … 是可以随意调动的;
 table 那边 … 只可以换它的 rank 罢了" — so the chart moves people between
 trees freely, and the table changes **nothing but the rank** (with the rate
 mode, which is the rank's own setting; `setStaffRank`). Its Upline column is
-text — who they report to. A title gives its rank on its own (the floor rung,
-by trigger), so the table only ever raises one. Both tabs read one `loadTeam`,
-so a move on the chart is what the table shows the moment it re-renders.
-Withholding Tax stays editable here because it is a payroll fact of the person
-with no other home in the module. **Title** is read-only: the ratchet
-(§3.1.1), raised by an applied run, lowered only on People. Somebody whose
-title has no rung on the ladder reads `no rank yet`: on the tree, but nothing
-for the engine to pay them from.
+text — who they earn under here. A title gives its rank on its own (the floor
+rung, by trigger), so the table only ever raises one. Both tabs read one
+`loadTeam`, so a move on the chart is what the table shows the moment it
+re-renders. Withholding Tax stays editable here because it is a payroll fact of
+the person with no other home in the module.
+
+Two shapes since 2026-09-10 (memberships per sub-department): on the **home**
+sub-department (the department's oldest — Fair) the rows are the whole
+department, **Title** is the company title (read-only: the ratchet, §3.1.1,
+raised by an applied run, lowered only on People), and somebody whose title
+has no rung reads `no rank yet`. On every **other** sub-department (IR) the
+rows are its members: an **Add to IR** row above the table (a person from the
+department + the title they hold here, which needs a rung on IR's ladder), a
+Title picker per row with the company title in small print beneath when it
+differs, and a **Remove** on the row once nobody earns under them. Nothing on
+an IR row touches People.
 
 ```
 NAME            TITLE                 RANK              RATE MODE        UPLINE                 WITHHOLDING

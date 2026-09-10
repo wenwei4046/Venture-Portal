@@ -11,7 +11,7 @@ const person = (over: Partial<OrgPerson> & { staffId: string; name: string }): O
   titleId: 't-tl',
   levelRank: 5,
   levelName: 'Manager',
-  reportsTo: null,
+  uplineStaffId: null,
   rankId: 'r-a',
   rankLabel: 'Rank A',
   productRate: 0.1,
@@ -27,17 +27,17 @@ const rs = { titleName: 'Revenue Specialist', titleId: 't-rs', levelRank: 2, lev
 const people: OrgPerson[] = [
   person({ staffId: 'anthony', name: 'ANTHONY' }),
   person({ staffId: 'cheahuan', name: 'CHEA HUAN' }),
-  person({ staffId: 'howard', name: 'HOWARD', ...srs, reportsTo: 'cheahuan' }),
-  person({ staffId: 'zack', name: 'ZACK', ...rs, reportsTo: 'howard' }),
-  person({ staffId: 'luis', name: 'LUIS TEO', ...srs, reportsTo: 'anthony' }),
+  person({ staffId: 'howard', name: 'HOWARD', ...srs, uplineStaffId: 'cheahuan' }),
+  person({ staffId: 'zack', name: 'ZACK', ...rs, uplineStaffId: 'howard' }),
+  person({ staffId: 'luis', name: 'LUIS TEO', ...srs, uplineStaffId: 'anthony' }),
   // A title with no rung on this ladder: no rank yet, and nobody may earn under them.
-  person({ staffId: 'yuny', name: 'YUNY', titleName: 'Team Assistant', titleId: 't-ta', levelRank: 4, levelName: 'Senior', reportsTo: 'anthony', canRecruit: false, rankId: null, rankLabel: null, productRate: null, rateMode: null, placedSince: null }),
+  person({ staffId: 'yuny', name: 'YUNY', titleName: 'Team Assistant', titleId: 't-ta', levelRank: 4, levelName: 'Senior', uplineStaffId: 'anthony', canRecruit: false, rankId: null, rankLabel: null, productRate: null, rateMode: null, placedSince: null }),
   // On no line at all: reports to nobody, nobody under them, cannot lead.
-  person({ staffId: 'mei', name: 'MEI TING', ...rs, reportsTo: null }),
+  person({ staffId: 'mei', name: 'MEI TING', ...rs, uplineStaffId: null }),
 ]
-const graph: OrgNodeInput[] = people.map(p => ({ id: p.staffId, parentId: p.reportsTo, label: p.name }))
+const graph: OrgNodeInput[] = people.map(p => ({ id: p.staffId, parentId: p.uplineStaffId, label: p.name }))
 // As the chart builds it: the shelf is not in the graph the popover lists by tree.
-const shelf = shelfIds(people.map(p => ({ staffId: p.staffId, parentId: p.reportsTo, canRecruit: p.canRecruit })))
+const shelf = shelfIds(people.map(p => ({ staffId: p.staffId, parentId: p.uplineStaffId, canRecruit: p.canRecruit })))
 const treeGraph = graph.filter(n => !shelf.has(n.id))
 const anchor = { left: 100, top: 100, bottom: 130 }
 

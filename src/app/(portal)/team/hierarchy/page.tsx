@@ -54,11 +54,12 @@ export default async function TeamHierarchyPage() {
         .select('id, name, department_id, level_id, is_active, departments (name)')
         .order('name'),
       // Who may hold downlines, per commission department and title — the
-      // recruit rule, asked the way the database asks it. The comm_* tables
-      // postdate database.types.ts, hence the cast.
+      // recruit rule, asked the way the database asks it: on the department's
+      // HOME sub-department's ladder (its oldest). The comm_* tables postdate
+      // database.types.ts, hence the cast.
       (supabase as unknown as import('@supabase/supabase-js').SupabaseClient)
         .from('comm_ranks')
-        .select('title_id, can_recruit, comm_schemes!inner (comm_sub_departments!inner (department_id))'),
+        .select('title_id, can_recruit, comm_schemes!inner (sub_department_id, comm_sub_departments!inner (department_id))'),
       listSubDepartments(),
     ])
 
@@ -67,13 +68,18 @@ export default async function TeamHierarchyPage() {
   )
   const rungById = new Map(rungs.map(r => [r.id, r]))
 
+  const homeSubs = new Set(subDepts.filter(s => s.isHome).map(s => s.id))
   const recruit = new Map<string, boolean>()
   for (const r of (rungRows ?? []) as unknown as Array<{
     title_id: string
     can_recruit: boolean
-    comm_schemes: { comm_sub_departments: { department_id: string } | { department_id: string }[] } | null
+    comm_schemes: {
+      sub_department_id: string
+      comm_sub_departments: { department_id: string } | { department_id: string }[]
+    } | null
   }>) {
-    const sub = r.comm_schemes?.comm_sub_departments
+    if (!r.comm_schemes || !homeSubs.has(r.comm_schemes.sub_department_id)) continue
+    const sub = r.comm_schemes.comm_sub_departments
     const dept = Array.isArray(sub) ? sub[0]?.department_id : sub?.department_id
     if (!dept) continue
     const key = `${dept}:${r.title_id}`

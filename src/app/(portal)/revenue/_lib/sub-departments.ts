@@ -2,7 +2,7 @@ import 'server-only'
 import { notFound } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { subDeptSlug } from '@/lib/revenue'
+import { pickHomeSubDepartments, subDeptSlug } from '@/lib/revenue'
 
 /**
  * Reading the Revenue Department's sub-departments.
@@ -15,6 +15,14 @@ import { subDeptSlug } from '@/lib/revenue'
  * sub-department. Resolving the slug to its scheme once, here, is what keeps
  * Fair's ladder off IR's page when the second one is created.
  *
+ * HOME (2026-09-10). A department's oldest active sub-department is the one
+ * the company chart describes: `reports_to` and the company title drive its
+ * memberships (database trigger, migration 20260910160000). Every other
+ * sub-department is a world of its own — its own tree, and its own title per
+ * person — drawn and edited on its own chart. The database answers the same
+ * question with `comm_scheme_for_department`; `pickHomeSubDepartments` is the
+ * same rule in TypeScript.
+ *
  * comm_* postdates the generated database.types.ts — untyped-client
  * convention, same as ba_* and bank_recon_*.
  */
@@ -23,8 +31,11 @@ export interface SubDepartment {
   id: string
   name: string
   slug: string
+  departmentId: string
   /** The live scheme every rule row hangs off. Null only mid-setup. */
   schemeId: string | null
+  /** The department's oldest active sub-department — the one the company chart describes. */
+  isHome: boolean
 }
 
 async function client(): Promise<SupabaseClient> {
@@ -38,7 +49,7 @@ export async function listSubDepartments(): Promise<SubDepartment[]> {
   const [{ data: subs }, { data: schemes }] = await Promise.all([
     supabase
       .from('comm_sub_departments')
-      .select('id, name')
+      .select('id, name, department_id, created_at')
       .eq('is_active', true)
       .order('name'),
     supabase
@@ -55,11 +66,23 @@ export async function listSubDepartments(): Promise<SubDepartment[]> {
     ]),
   )
 
-  return ((subs ?? []) as Array<{ id: string; name: string }>).map(s => ({
+  const rows = (subs ?? []) as Array<{
+    id: string
+    name: string
+    department_id: string
+    created_at: string
+  }>
+  const home = pickHomeSubDepartments(
+    rows.map(s => ({ id: s.id, departmentId: s.department_id, createdAt: s.created_at })),
+  )
+
+  return rows.map(s => ({
     id: s.id,
     name: s.name,
     slug: subDeptSlug(s.name),
+    departmentId: s.department_id,
     schemeId: schemeBySub.get(s.id) ?? null,
+    isHome: home.has(s.id),
   }))
 }
 

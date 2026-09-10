@@ -6,35 +6,37 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { promotesTo, type LadderRung } from '@/lib/commission/titles'
 import {
+  closeMembership,
   loadOpenPositions,
+  loadRungs,
+  moveMembership,
   moveReportingLine,
-  movePositionRank,
+  openMembership,
   safeReason,
+  setMembership,
   type LineResult,
 } from '@/lib/hierarchy-writes'
+import { listSubDepartments, type SubDepartment } from './_lib/sub-departments'
 
 /**
  * The payroll-purpose org chart: who is under who, at what rank, on which rate
- * mode. Shared by Staff Hierarchy's two tabs — the canvas, which moves people
- * between trees, and the Team table, which sets nothing but the rank.
+ * mode — per SUB-DEPARTMENT. Shared by Staff Hierarchy's two tabs: the
+ * canvas, which moves people between trees, and the Team table, which sets
+ * the rank (and, away from home, the title and the membership itself).
  *
- * ONE LINE (user, 2026-09-10). The chart moves `hr_staff_costs.reports_to` —
- * the same line People draws — and the commission position follows it in the
- * database (trigger `hr_staff_costs_one_line_sync`). So `moveOnChart` writes
- * one column and returns; the position's upline, its rank when first opened
- * (the title's floor), and the effective dating are the trigger's. The one
- * hierarchy fact still entered by hand is the RANK, and `setStaffRank` is the
- * only writer of it left.
+ * Two kinds of sub-department, one set of actions (user, 2026-09-10):
  *
- * The rule that shapes the rank write: **a position is never mutated in place
- * once a month has closed over it.** Changing the rank writes a NEW
+ *   home    the department's oldest. Its tree IS the company reporting line,
+ *           its titles ARE the company titles, and the database derives the
+ *           membership from the roster. A move here writes `reports_to`; the
+ *           title is changed on People; nobody joins or leaves by hand.
+ *   other   a world of its own. Its chart writes the membership row directly:
+ *           who earns under whom here, the title held here, who is in it.
+ *
+ * The rule that shapes every membership write: **a position is never mutated
+ * in place once a month has closed over it.** A change writes a NEW
  * effective-dated `comm_hierarchy` row and closes the old one the day before,
  * so a run already computed keeps the chart it was computed against.
- *
- * A position carries the RANK (the floor a month pays from). It does NOT carry
- * the TITLE. A title rises the month a run is APPLIED whose paid rank outranks
- * it (user 2026-09-02, migration 20260903030000), and a human records one on
- * People. Setting a rank here only SAYS it has outgrown the title — `titleGap`.
  *
  * comm_* postdates database.types.ts — untyped-client convention.
  */
@@ -44,8 +46,13 @@ async function client(): Promise<SupabaseClient> {
 
 function refresh() {
   revalidatePath('/revenue', 'layout')
-  // Both charts draw the same line.
+  // The home chart is the company chart.
   revalidatePath('/team', 'layout')
+}
+
+/** The sub-department a scheme belongs to, or null when no active one carries it. */
+async function subDepartmentOf(schemeId: string): Promise<SubDepartment | null> {
+  return (await listSubDepartments()).find(s => s.schemeId === schemeId) ?? null
 }
 
 interface LadderRow {
@@ -91,64 +98,64 @@ function isControlFlow(e: unknown): boolean {
 }
 
 /**
- * Does the rank they were just set to carry a title above the one they hold?
- *
- * This used to RAISE the title here, and does not any more (user 2026-09-07):
- * a title GRANTS PERMISSIONS, and the rule is that a title rises the month a
- * run is APPLIED whose paid rank belongs to a higher title. So a rank change
- * reports that a promotion may be owed, and a human with `team` records it on
- * People, where every other title write in this app already lives.
+ * Does the rank they were just set to carry a title above the one they hold
+ * here? A rank change reports that a promotion may be owed; on the home
+ * sub-department a human records it on People (a title grants permissions),
+ * elsewhere the Team tab's own Title column is where it is set.
  */
-async function titleGap(
-  supabase: SupabaseClient,
-  ladder: LadderRow[],
-  staffId: string,
-  rankId: string,
-): Promise<string | null> {
+function titleGap(ladder: LadderRow[], currentTitleId: string | null, rankId: string, isHome: boolean): string | null {
   const rank = ladder.find(r => r.id === rankId)
   if (!rank) return null
-
-  const { data: staff, error } = await supabase
-    .from('hr_staff_costs')
-    .select('title_id')
-    .eq('id', staffId)
-    .maybeSingle()
-  if (error) {
-    console.error('[titleGap] could not read their title', staffId, error.message)
-    return null
-  }
-
-  const current = (staff as { title_id: string | null } | null)?.title_id ?? null
-  const to = promotesTo(rungs(ladder), current, rank.title_id)
+  const to = promotesTo(rungs(ladder), currentTitleId, rank.title_id)
   if (!to) return null
-
-  return `Their rank now sits above their title. If that is a real promotion, set them to ${titleName(ladder, to) ?? 'the matching title'} on People — a rank change does not raise a title on its own.`
+  const name = titleName(ladder, to) ?? 'the matching title'
+  return isHome
+    ? `Their rank now sits above their title. If that is a real promotion, set them to ${name} on People — a rank change does not raise a title on its own.`
+    : `Their rank now sits above the title they hold here. If that is a real promotion, set their title here to ${name}.`
 }
 
 /**
- * Move somebody on the chart: who they report to, which is who earns the
- * override on their sales. Gated on `revenue` — the money side of the one
- * line — and written through the same function the People chart uses, so
- * the two surfaces can never disagree about who may sit under whom.
+ * Move somebody on a sub-department's chart: who they earn under there.
+ *
+ * On the home sub-department that is the company reporting line, written
+ * through the same function the People chart uses; elsewhere it is the
+ * membership row. Gated on `revenue` either way — the money side of the line.
  */
-export async function moveOnChart(staffId: string, reportsToId: string | null): Promise<LineResult> {
-  await requirePermission('revenue')
+export async function moveOnChart(
+  schemeId: string,
+  staffId: string,
+  uplineStaffId: string | null,
+): Promise<LineResult | { ok: true } | { ok: false; reason: string }> {
+  const user = await requirePermission('revenue')
   const supabase = await client()
-  const result = await moveReportingLine(supabase, staffId?.trim() ?? '', reportsToId?.trim() || null)
-  if (result.ok) refresh()
-  return result
+  const sub = await subDepartmentOf(schemeId?.trim() ?? '')
+  if (!sub) return { ok: false, reason: 'That sub-department has no active scheme.' }
+
+  const mover = staffId?.trim() ?? ''
+  const upline = uplineStaffId?.trim() || null
+
+  if (sub.isHome) {
+    const result = await moveReportingLine(supabase, mover, upline)
+    if (result.ok) refresh()
+    return result
+  }
+
+  const result = await moveMembership(supabase, user.id, sub.schemeId!, mover, upline)
+  if (!result.ok) return result
+  refresh()
+  return { ok: true }
 }
 
-/** What a rank edit came back with. `note` is rendered either way. */
+/** What a Team-tab save came back with. `note` is rendered either way. */
 export interface RankOutcome {
   ok: boolean
   note: string | null
 }
 
 /**
- * The Team table's one write: the rank a month pays somebody from, and the
- * rate mode that rides with it. The upline is not an input any more — it is
- * their reporting line, and the position already carries it.
+ * The Team table's row save: the rank a month pays somebody from here, the
+ * rate mode that rides with it, and — away from home — the title held here.
+ * The upline is not an input: it is the chart's.
  *
  * Refusals are RETURNED: Next redacts a thrown Server Action message in
  * production, and the reason is the whole point of one.
@@ -160,9 +167,13 @@ export async function setStaffRank(formData: FormData): Promise<RankOutcome> {
   const staffId = ((formData.get('staff_id') as string) ?? '').trim()
   const schemeId = ((formData.get('scheme_id') as string) ?? '').trim()
   const rankId = ((formData.get('rank_id') as string) ?? '').trim()
+  const titleId = ((formData.get('title_id') as string) ?? '').trim() || null
   const rawMode = ((formData.get('rate_mode') as string) ?? '').trim()
   const rateMode = rawMode === 'fixed' || rawMode === 'variable' ? rawMode : null
   if (!staffId || !schemeId || !rankId) throw new Error('Which person, and which rank?')
+
+  const sub = await subDepartmentOf(schemeId)
+  if (!sub) return { ok: false, note: 'That sub-department has no active scheme.' }
 
   // `scheme_id` and `rank_id` both arrive from the browser, and nothing in the
   // schema ties one to the other — `comm_hierarchy.rank_id` is a bare FK to
@@ -174,27 +185,78 @@ export async function setStaffRank(formData: FormData): Promise<RankOutcome> {
     return { ok: false, note: 'That rank belongs to another sub-department’s scheme.' }
   }
 
-  const position = (await loadOpenPositions(supabase)).get(staffId)
+  const position = (await loadOpenPositions(supabase, schemeId)).get(staffId)
   if (!position) {
     return {
       ok: false,
-      note: 'They hold no position yet — their title has no rung on this ladder, so there is no rank to set. Give them a ladder title on People first.',
+      note: sub.isHome
+        ? 'They hold no position yet — their title has no rung on this ladder, so there is no rank to set. Give them a ladder title on People first.'
+        : 'They are not a member of this sub-department.',
     }
   }
-  if (position.schemeId !== schemeId) {
-    return { ok: false, note: 'They earn under another sub-department’s scheme.' }
-  }
 
+  // The title held here may only change on a non-home chart: the home
+  // membership's title is the company title and is changed on People.
+  const nextTitle = !sub.isHome && titleId ? titleId : undefined
+  const rungs = await loadRungs(supabase, schemeId)
   try {
-    await movePositionRank(supabase, user.id, position, rankId, rateMode)
+    await setMembership(supabase, user.id, position, { titleId: nextTitle, rankId, rateMode }, rungs)
   } catch (e) {
     if (isControlFlow(e)) throw e
     return { ok: false, note: e instanceof Error ? e.message : 'Could not set their rank' }
   }
 
-  const gap = await titleGap(supabase, ladder, staffId, rankId)
+  const after = (await loadOpenPositions(supabase, schemeId)).get(staffId)
+  const gap = titleGap(ladder, after?.titleId ?? position.titleId, after?.rankId ?? rankId, sub.isHome)
   refresh()
   return { ok: true, note: gap }
+}
+
+/**
+ * Add somebody from the department to a non-home sub-department, with the
+ * title they hold there. They start at the top of their own tree at that
+ * title's floor rung; the chart moves them from there.
+ */
+export async function addMember(formData: FormData): Promise<RankOutcome> {
+  const user = await requirePermission('revenue')
+  const supabase = await client()
+
+  const staffId = ((formData.get('staff_id') as string) ?? '').trim()
+  const schemeId = ((formData.get('scheme_id') as string) ?? '').trim()
+  const titleId = ((formData.get('title_id') as string) ?? '').trim()
+  if (!staffId || !schemeId || !titleId) return { ok: false, note: 'Pick a person and the title they hold here.' }
+
+  const sub = await subDepartmentOf(schemeId)
+  if (!sub) return { ok: false, note: 'That sub-department has no active scheme.' }
+  if (sub.isHome) {
+    return { ok: false, note: 'Everybody in the department is on the home sub-department already — add people under People Management.' }
+  }
+
+  const result = await openMembership(supabase, user.id, schemeId, staffId, titleId)
+  if (!result.ok) return { ok: false, note: result.reason }
+  refresh()
+  return { ok: true, note: null }
+}
+
+/** Take somebody out of a non-home sub-department. */
+export async function removeMember(formData: FormData): Promise<RankOutcome> {
+  await requirePermission('revenue')
+  const supabase = await client()
+
+  const staffId = ((formData.get('staff_id') as string) ?? '').trim()
+  const schemeId = ((formData.get('scheme_id') as string) ?? '').trim()
+  if (!staffId || !schemeId) return { ok: false, note: 'Which person?' }
+
+  const sub = await subDepartmentOf(schemeId)
+  if (!sub) return { ok: false, note: 'That sub-department has no active scheme.' }
+  if (sub.isHome) {
+    return { ok: false, note: 'The home sub-department is the roster — deactivate or move the person under People Management instead.' }
+  }
+
+  const result = await closeMembership(supabase, schemeId, staffId)
+  if (!result.ok) return { ok: false, note: result.reason }
+  refresh()
+  return { ok: true, note: null }
 }
 
 /**

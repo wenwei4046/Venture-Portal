@@ -66,22 +66,21 @@ export default async function OpenBillPage({ params }: PageProps) {
 
   // The batch is the whole department's, but the rates below the title are
   // THIS scheme's — so the board has to be this sub-department's people, or it
-  // would price another team's bills at rules that never touch them. Anybody
-  // not yet placed is shown, because they may be placed here before the run.
+  // would price another team's bills at rules that never touch them. Since
+  // 2026-09-10 a person may be a member of several sub-departments, so the
+  // question is membership HERE; somebody who is a member nowhere is shown,
+  // because they may join before the run.
   const { data: positionRows } = await supabase
     .from('comm_hierarchy')
     .select('staff_id, scheme_id')
     .is('effective_to', null)
-  const schemeOf = new Map(
-    ((positionRows ?? []) as Array<{ staff_id: string; scheme_id: string }>).map(p => [
-      p.staff_id,
-      p.scheme_id,
-    ]),
-  )
-  const rawOrders = allOrders.filter(o => {
-    const placed = schemeOf.get(o.staff_id)
-    return placed === undefined || placed === subDept.schemeId
-  })
+  const memberHere = new Set<string>()
+  const memberElsewhere = new Set<string>()
+  for (const p of (positionRows ?? []) as Array<{ staff_id: string; scheme_id: string }>) {
+    if (p.scheme_id === subDept.schemeId) memberHere.add(p.staff_id)
+    else memberElsewhere.add(p.staff_id)
+  }
+  const rawOrders = allOrders.filter(o => memberHere.has(o.staff_id) || !memberElsewhere.has(o.staff_id))
 
   const ids = rawOrders.map(o => o.id)
   const { data: tagRows } = ids.length

@@ -138,8 +138,12 @@ export interface HierarchyRow {
   upline_staff_id: string | null
   rate_mode: RateMode | null
   comm_ranks: { rank_key: string } | { rank_key: string }[] | null
-  /** Embedded `hr_staff_costs (title_id)` — the title they hold, the ratchet. */
-  hr_staff_costs: { title_id: string | null } | { title_id: string | null }[] | null
+  /**
+   * The title held IN THIS SUB-DEPARTMENT — the ratchet the run climbs
+   * (`comm_hierarchy.title_id`, 2026-09-10). The company title on
+   * `hr_staff_costs` may differ on a sub-department that is not the home one.
+   */
+  title_id: string | null
 }
 
 export interface SalesLineRow {
@@ -290,7 +294,7 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
         uplineStaffId: h.upline_staff_id,
         baseRankKey: rank.rank_key,
         rateMode: h.rate_mode ?? rows.scheme.default_rate_mode,
-        titleId: one(h.hr_staff_costs)?.title_id ?? null,
+        titleId: h.title_id ?? null,
       },
     ]
   })
