@@ -30,9 +30,6 @@
 .payment-statement .pay-employee-changes { margin-top:12px; }
 .payment-statement .pay-employee-changes summary { cursor:pointer; font-size:12px; color:rgb(var(--graphite)); padding:5px 0; }
 .payment-statement .pay-employee-changes table { margin-top:10px; }
-.payment-statement .pay-generation { border-top:2px solid rgb(var(--ink)); border-bottom:1px solid rgb(var(--hairline)); background:rgb(var(--surface-2)); padding:20px; margin-top:22px; }
-.payment-statement .pay-generation .pay-section-toolbar { align-items:flex-start; }
-.payment-statement .pay-generation h3 { margin:0 0 5px; }
 .payment-statement .pay-generation-grid { display:grid; grid-template-columns:150px minmax(0,1fr); gap:20px; }
 .payment-statement .pay-department-picker { display:flex; flex-direction:column; gap:2px; }
 .payment-statement .pay-department-picker button { border:0; background:transparent; text-align:left; padding:9px; font:inherit; font-size:12px; cursor:pointer; }
@@ -42,11 +39,10 @@
 .payment-statement .pay-generation-fields { display:flex; gap:20px; align-items:flex-start; justify-content:space-between; font-size:12px; margin-bottom:14px; flex-wrap:wrap; }
 .payment-statement .pay-generation-fields label, .payment-statement .pay-generation-fields strong { display:flex; flex-direction:column; gap:4px; }
 .payment-statement .pay-generation-fields strong { margin-top:4px; font-weight:500; }
-.payment-statement .pay-generation table { background:rgb(var(--surface)); }
-.payment-statement .pay-generation table td { padding:11px 9px; }
+.payment-statement .pay-generation-window table td { padding:11px 9px; }
 .payment-statement input[type="checkbox"] { accent-color:rgb(var(--accent)); width:16px; height:16px; cursor:pointer; }
 .payment-statement input[type="checkbox"]:disabled { cursor:default; }
-.payment-statement .pay-generation-footer { border-top:1px solid rgb(var(--hairline)); margin-top:15px; padding-top:15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; font-size:12px; }
+.payment-statement .pay-generation-footer { width:100%; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; font-size:12px; }
 .payment-statement .pay-generation-footer strong { display:block; font-variant-numeric:tabular-nums; font-size:22px; font-weight:500; margin-top:3px; }
 .payment-statement .pay-generation-result { padding:10px 0; }
 .payment-statement .pay-generation-result p { margin:8px 0 15px; }
@@ -54,14 +50,32 @@
 .payment-statement .pay-win .wh { background:rgb(var(--surface-2)); }
 .payment-statement .pay-win .tiles .tile { border-radius:2px; }
 .payment-statement .pay-win .pay-people-table .state-cell, .payment-statement .pay-win .pay-state { white-space:nowrap; }
+.payment-statement .pay-win.pay-generation-window { inset:0; margin:auto; width:min(1120px,calc(100vw - 48px)); max-width:none; height:fit-content; max-height:min(840px,calc(100dvh - 48px)); padding:0; color:rgb(var(--ink)); border-radius:8px; }
+.payment-statement .pay-generation-window:not([open]) { display:none; }
+.payment-statement .pay-generation-window::backdrop { background:rgb(var(--scrim) / .45); }
+.payment-statement .pay-generation-window .wh, .payment-statement .pay-generation-window .wf { flex-shrink:0; }
+.payment-statement .pay-generation-window .wh h3 { margin:0 0 6px; font-size:18px; font-weight:500; }
+.payment-statement .pay-generation-window .wh p { margin:0; }
+.payment-statement .pay-generation-window .x { min-width:36px; min-height:36px; }
+.payment-statement .pay-generation-window .x:disabled { opacity:.5; cursor:wait; }
+.payment-statement .pay-generation-window .wb { min-height:0; padding:20px; overscroll-behavior:contain; scrollbar-gutter:stable; }
+.payment-statement .pay-generation-window .wb h3 { margin:0; }
+.payment-statement .pay-generation-window .wf { flex-direction:column; align-items:stretch; gap:6px; }
+.payment-statement .pay-generation-window .wf > .pay-muted { margin:0; font-size:11px; }
+.payment-statement .pay-generation-window .pay-department-picker { align-self:start; position:sticky; top:0; }
+.payment-statement .pay-generation-window .pay-statement-table { min-width:520px; }
 @media(max-width:700px) {
-  .payment-statement .pay-generation { padding:14px; }
   .payment-statement .pay-generation-grid { grid-template-columns:minmax(0,1fr); gap:14px; }
   .payment-statement .pay-department-picker { flex-direction:row; flex-wrap:wrap; }
   .payment-statement .pay-win { width:100vw; }
+  .payment-statement .pay-win.pay-generation-window { width:calc(100vw - 16px); max-height:calc(100dvh - 16px); }
+  .payment-statement .pay-generation-window .wh, .payment-statement .pay-generation-window .wf { padding:12px 14px; }
+  .payment-statement .pay-generation-window .wb { padding:14px; }
+  .payment-statement .pay-generation-window .pay-department-picker { position:static; }
   .payment-statement .pay-generation-footer { align-items:flex-start; }
 }
 @media(pointer:coarse) {
   .payment-statement .payment-tabs button, .payment-statement .pay-row-actions button, .payment-statement .pay-department-picker button { min-height:44px; }
   .payment-statement .pay-date { font-size:16px; min-height:44px; }
+  .payment-statement .pay-generation-window .x { min-width:44px; min-height:44px; }
 }
