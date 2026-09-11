@@ -1035,6 +1035,7 @@ export default function MemberQuoteBuilder({
               {product.color ? " · " + product.color : ""}
             </p>
           </div>
+          {sizes.some(Boolean) && (
           <fieldset className={s.sizeOptions}>
             <legend>Select size</legend>
             {sizes.map((size) => {
@@ -1059,6 +1060,7 @@ export default function MemberQuoteBuilder({
               );
             })}
           </fieldset>
+          )}
           <div className={s.productOptions}>
             {colors.some((p) => p.color) && (
               <label className={s.field}>

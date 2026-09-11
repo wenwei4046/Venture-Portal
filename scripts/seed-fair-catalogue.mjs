@@ -58,9 +58,16 @@ const { data: principal } = await supabase.from('users').select('id').eq('role',
 const updatedBy = principal?.id ?? null
 
 // ── existing products, by normalised code ────────────────────────────────
-const { data: existing, error: readError } = await supabase.from('comm_products').select('id, item_code')
-if (readError) throw new Error(readError.message)
-const byCode = new Map((existing ?? []).map(p => [norm(p.item_code), p.id]))
+// PostgREST caps a read at 1,000 rows: page, or a second run would try to
+// insert every product past the first thousand again.
+const existing = []
+for (let from = 0; ; from += 1000) {
+  const { data, error: readError } = await supabase.from('comm_products').select('id, item_code').order('id').range(from, from + 999)
+  if (readError) throw new Error(readError.message)
+  existing.push(...(data ?? []))
+  if (!data || data.length < 1000) break
+}
+const byCode = new Map(existing.map(p => [norm(p.item_code), p.id]))
 
 const now = new Date().toISOString()
 const productRow = r => ({
