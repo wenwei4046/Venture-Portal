@@ -16,7 +16,15 @@ interface Props {
   period: string
 }
 
-export default function DirectorImportWizard({ period }: Props) {
+// One wizard instance per month — see CTCInputGrid for the why. The rows and
+// preview held in state were parsed and previewed FOR a period; if the picker
+// moves the month while a preview is up, Apply would write those rows under
+// the new period. Keying on the period drops the stale preview instead.
+export default function DirectorImportWizard(props: Props) {
+  return <DirectorImportWizardBody key={props.period} {...props} />
+}
+
+function DirectorImportWizardBody({ period }: Props) {
   const router = useRouter()
   const [stage, setStage] = useState<'upload' | 'preview' | 'done'>('upload')
   const [fileName, setFileName] = useState<string | null>(null)

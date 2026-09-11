@@ -8,7 +8,17 @@ interface Props {
   currentPeriod: string
 }
 
-export default function PeriodSelector({ currentPeriod }: Props) {
+// One selector instance per month. Changing the month is a query-string
+// navigation (/billing?period= → /statements?period=), which re-runs the
+// Server Components but keeps this client subtree mounted — so the local
+// `period` below only ever tracked the arrows, not the URL, and drifted after
+// browser Back/Forward. Keyed on the month the server rendered, it restarts
+// in sync. Same pattern as director-salary's CTCInputGrid (2026-09-11).
+export default function PeriodSelector(props: Props) {
+  return <PeriodSelectorBody key={props.currentPeriod} {...props} />
+}
+
+function PeriodSelectorBody({ currentPeriod }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [period, setPeriod] = useState(currentPeriod)

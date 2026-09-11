@@ -49,7 +49,14 @@ function groupTotal(components: ConsolidatedCompanyPreview['groups'][number]['co
   )
 }
 
-export default function GenerateConsolidatedInvoicesButton({ currentPeriod, categories = [] }: Props) {
+// One instance per month — see CreateInvoiceButton. The preview effect keys
+// off the local `period`, which was seeded once; a ?period= navigation keeps
+// this mounted, so the modal previewed and generated for the old month.
+export default function GenerateConsolidatedInvoicesButton(props: Props) {
+  return <GenerateConsolidatedInvoicesButtonBody key={props.currentPeriod} {...props} />
+}
+
+function GenerateConsolidatedInvoicesButtonBody({ currentPeriod, categories = [] }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [period, setPeriod] = useState(dayjs(currentPeriod).format('YYYY-MM'))

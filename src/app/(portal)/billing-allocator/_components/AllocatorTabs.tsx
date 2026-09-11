@@ -17,7 +17,17 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]['key']
 
+// One workspace per month. The month input navigates by ?period= only, which
+// keeps this client subtree mounted — so the landing tab (seeded from the
+// month's records), a record being corrected and a half-typed Calculate draft
+// all carried over into the next month. Keyed on the month the server
+// rendered, the workspace starts fresh for it (a draft typed for one month is
+// dropped rather than filed under another).
 export default function AllocatorTabs({ data }: { data: AllocatorData }) {
+  return <AllocatorTabsBody key={data.period} data={data} />
+}
+
+function AllocatorTabsBody({ data }: { data: AllocatorData }) {
   const router = useRouter()
   const pathname = usePathname()
   const [tab, setTab] = useState<TabKey>(data.txns.length > 0 ? 'records' : 'calc')

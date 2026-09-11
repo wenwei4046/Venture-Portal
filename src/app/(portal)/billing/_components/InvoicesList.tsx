@@ -138,6 +138,16 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  // The selection belongs to the month on screen. A ?period= navigation keeps
+  // this list mounted, so a selection made in one month used to leak into the
+  // next — hidden from the checkboxes, but 打印所选 printed the old ids. Reset
+  // it when the period prop moves. The 跨月 toggle below is a view preference
+  // and deliberately survives the move.
+  const [selectionPeriod, setSelectionPeriod] = useState(period)
+  if (selectionPeriod !== period) {
+    setSelectionPeriod(period)
+    setSelectedIds(new Set())
+  }
   // code → account name, labels the detail modal's line categories.
   const catLabelByCode: Record<string, string> = Object.fromEntries(
     categories.map((c) => [c.code, c.label]),

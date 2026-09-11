@@ -48,7 +48,12 @@ function groupTotal(c: Components): number {
   return Math.round((c.salary + c.allowance + c.epf + c.socso + c.eis) * 100) / 100
 }
 
-export default function GenerateOwnShareInvoiceButton({ currentPeriod, categories = [] }: Props) {
+// One instance per month — see CreateInvoiceButton.
+export default function GenerateOwnShareInvoiceButton(props: Props) {
+  return <GenerateOwnShareInvoiceButtonBody key={props.currentPeriod} {...props} />
+}
+
+function GenerateOwnShareInvoiceButtonBody({ currentPeriod, categories = [] }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [period, setPeriod] = useState(dayjs(currentPeriod).format('YYYY-MM'))

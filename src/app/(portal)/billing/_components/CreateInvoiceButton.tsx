@@ -98,7 +98,17 @@ function fmt(n: number): string {
   return n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-export default function CreateInvoiceButton({
+// One instance per month. The page changes month through ?period= only, which
+// keeps this client subtree mounted — so `period` / `invoiceDate` below stayed
+// seeded from the month opened FIRST, and an invoice created after moving the
+// picker (and its issue JE) landed in the previous month. reset() only runs
+// after a successful submit, never on open. Keyed on the month the server
+// rendered, the modal re-seeds whenever the page's month moves.
+export default function CreateInvoiceButton(props: Props) {
+  return <CreateInvoiceButtonBody key={props.currentPeriod} {...props} />
+}
+
+function CreateInvoiceButtonBody({
   companies,
   currentPeriod,
   prefillMode = 'hr_attribution',

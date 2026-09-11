@@ -76,7 +76,13 @@ function fmt(n: number): string {
   return n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-export default function CreateMultiLineInvoiceButton({
+// One instance per month — see CreateInvoiceButton. `period` below is seeded
+// once from currentPeriod, and a ?period= navigation keeps this mounted.
+export default function CreateMultiLineInvoiceButton(props: Props) {
+  return <CreateMultiLineInvoiceButtonBody key={props.currentPeriod} {...props} />
+}
+
+function CreateMultiLineInvoiceButtonBody({
   companies,
   currentPeriod,
   departments = [],
