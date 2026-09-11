@@ -553,6 +553,46 @@ file's verbatim statutory with recomputed JADUAL values — **31 of the 38 live
 rows move** if anyone runs a bulk `UPDATE hr_monthly_payroll SET x = x`. Do not
 do that without accounting for it.
 
+## SESSION 2026-09-10/11 — Venture Pool void filter · director payout segment → hr
+
+**Void pairs in Venture Pool gross (commit 824597a)**: /venture-pool, /dept-pool
+Venture row, fund-summary page+export read corporate/treasury bank lines with
+NO is_reversed filter — balances fine (pairs net), but gross In/Out, the
+12-month trend and the recent-lines list counted both legs (Jul ~136k, Aug
+~87k inflated each side). All four now `.eq('journal_entries.is_reversed',
+false)`.
+
+**Director payout segment (commit 6f51519, mig 20260911010000)** — user's
+Daily Bank question "director alliance 为什么 negative 那么多 / hr HLBB negative
+/ alliance positive". Root cause: since 2026-08-07 director funding is full
+custody on the POOL side (dept_pool_director expense_out → dept_pool_hr np_in,
+payout PVs source_pool=dept_pool_hr) and the Sept staging JE is hr-tagged, but
+`derive_journal_segment` still returned 'director' for director payouts (rule
+from mig 20260720140000, premise "directors spend their own staged cash" — no
+longer true). So Alliance: +64,976.20 in HR's column, −42,802.05 in Director's
+→ Director (41,879.58); today-fold-in plugs the difference into HLB (Director
++111,431.26 / HR (46,887.83)). Totals were always right (= pool balances).
+- Fix: both payout scopes → 'hr'. JE-202609-0636..0639 re-tagged in place
+  (Dr 4070/Cr 3010, balance-sheet only) + access_log row `mig_20260911010000`.
+  Alliance Director now 922.47 (old residue), HR 35,474.95.
+- Cash Flow custody bridge (lib/inter-billing-cash-flow.ts) fundRows now ALSO
+  matches 'PV HV-PV-%: Director salary bank transfer%' so Director's cash-out
+  is its bridged drain (−64,976.20 Sept) like every staff dept; HR nets to the
+  custody remainder (ties to dept_pool_hr 31,389.17).
+- **Legacy carve-out**: Jul-2026 director round HV-PV-202608-0255 is custody on
+  the pool side but its GL (JE-202608-0441 staging same-bank + 0464..0467
+  payouts from HLB) is still director-tagged. Excluded from bridge pairing via
+  `LEGACY_DIRECTOR_GL_ROUNDS`. Re-tagging it would move August Director cash
+  flow from −43,135.67 (net pay) to −65,309.67 (full employer cost, = pool) —
+  arguably more correct but changes a closed month → NOT done, user to decide.
+  Jun-2026 rounds (PV 0184/0185) are pre-custody, no park, untouched.
+- ⚠ **Cross-session**: mig 20260910151626 (other session, "payment PV by
+  department") rewrote derive_journal_segment the same day keeping
+  'directors → director'. My mig re-issues the whole function with hr. If that
+  session regenerates it again, keep the hr branches. Only dept_manager live is
+  Marketing — no Director manager loses JE visibility.
+- Verified: tsc ✓, 1204 tests ✓, build ✓, deploy Ready.
+
 ## SESSION 2026-09-04 (night) — Daily Bank row-total bug (client-blind dynamic columns)
 
 User screenshot: HLB Available row TOTAL footed 80,824.49 while the columns
