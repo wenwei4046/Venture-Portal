@@ -739,6 +739,11 @@ These categorical surfaces are the approved hierarchy-specific treatment.
 Within a card, a subdued title badge pairs the full title with a small mnemonic;
 rank and pay chips stay neutral. Title styling follows that membership's title,
 including when the same person holds different titles in different regions.
+The approved title colors are purple for Team Leader (including Senior Team
+Leader), red for Team Assistant (including Senior Team Assistant), orange for
+Senior Revenue Specialist, and yellow for Revenue Specialist. Use pale tinted
+badge fills and readable dark text; yellow uses dark ochre text. Dark mode keeps
+the same color families with lighter text.
 
 Dragging into blank space arranges a card; its team and department boundaries
 follow. Hold over a specific person for 450ms to arm a reporting-line change,

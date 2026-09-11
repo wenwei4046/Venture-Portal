@@ -2549,10 +2549,14 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 /* Hierarchy titles: a quiet categorical tag inside the existing member card.
    Department borders and pay ranks keep their own, independent treatment. */
 .space-person {
-  --title-leader: 63 99 128;
-  --title-assistant: 70 110 93;
-  --title-senior-specialist: 135 104 57;
-  --title-specialist: 88 105 117;
+  --title-leader: 109 62 157;
+  --title-assistant: 159 54 63;
+  --title-senior-specialist: 157 75 25;
+  --title-specialist: 124 98 16;
+  --title-leader-fill: 145 83 209;
+  --title-assistant-fill: 205 65 82;
+  --title-senior-specialist-fill: 222 120 34;
+  --title-specialist-fill: 231 192 44;
   --title-head: 112 90 129;
   padding-bottom: 32px;
 }
@@ -2571,30 +2575,31 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 }
 .space-person .oc-title-badge {
   --title-tone: var(--cv-graphite);
+  --title-fill: var(--title-tone);
   display: inline-flex;
   align-items: center;
   gap: 5px;
   max-width: 100%;
   padding: 3px 6px 3px 4px;
-  border: 1px solid rgb(var(--title-tone) / .16);
+  border: 1px solid rgb(var(--title-fill) / .25);
   border-radius: 5px;
-  background: rgb(var(--title-tone) / .065);
+  background: rgb(var(--title-fill) / .13);
   color: rgb(var(--title-tone));
   font-size: 10px;
   line-height: 1.35;
   font-weight: 500;
 }
-.space-person .oc-title-badge[data-title-tone="leader"] { --title-tone: var(--title-leader); }
-.space-person .oc-title-badge[data-title-tone="assistant"] { --title-tone: var(--title-assistant); }
-.space-person .oc-title-badge[data-title-tone="senior-specialist"] { --title-tone: var(--title-senior-specialist); }
-.space-person .oc-title-badge[data-title-tone="specialist"] { --title-tone: var(--title-specialist); }
+.space-person .oc-title-badge[data-title-tone="leader"] { --title-tone: var(--title-leader); --title-fill: var(--title-leader-fill); }
+.space-person .oc-title-badge[data-title-tone="assistant"] { --title-tone: var(--title-assistant); --title-fill: var(--title-assistant-fill); }
+.space-person .oc-title-badge[data-title-tone="senior-specialist"] { --title-tone: var(--title-senior-specialist); --title-fill: var(--title-senior-specialist-fill); }
+.space-person .oc-title-badge[data-title-tone="specialist"] { --title-tone: var(--title-specialist); --title-fill: var(--title-specialist-fill); }
 .space-person .oc-title-badge[data-title-tone="head"] { --title-tone: var(--title-head); }
 .space-person .oc-title-marker {
   flex: none;
   min-width: 20px;
   padding: 2px 3px;
   border-radius: 3px;
-  background: rgb(var(--title-tone) / .09);
+  background: rgb(var(--title-fill) / .13);
   font: 600 8px/1 var(--font-mono), 'Chivo Mono', Menlo, monospace;
   letter-spacing: .01em;
   text-align: center;
@@ -2605,18 +2610,18 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   font: 400 8.5px/1.35 var(--font-mono), 'Chivo Mono', Menlo, monospace;
 }
 [data-theme="dark"] .space-person {
-  --title-leader: 166 197 220;
-  --title-assistant: 171 207 186;
-  --title-senior-specialist: 219 195 153;
-  --title-specialist: 183 200 210;
+  --title-leader: 203 170 238;
+  --title-assistant: 241 153 159;
+  --title-senior-specialist: 239 177 126;
+  --title-specialist: 233 214 133;
   --title-head: 203 182 222;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .space-person {
-    --title-leader: 166 197 220;
-    --title-assistant: 171 207 186;
-    --title-senior-specialist: 219 195 153;
-    --title-specialist: 183 200 210;
+    --title-leader: 203 170 238;
+    --title-assistant: 241 153 159;
+    --title-senior-specialist: 239 177 126;
+    --title-specialist: 233 214 133;
     --title-head: 203 182 222;
   }
 }
