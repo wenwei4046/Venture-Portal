@@ -129,6 +129,9 @@ export default function PayrollGrid({ rows, period }: Props) {
   const revenueRows = visibleRows.filter(r => r.revenue_payroll ?? r.source === 'commission')
   const showRevenueSplit = revenueRows.length > 0
   const splitTotals = columnTotals(revenueRows.map(calculateRevenuePayrollSplit), ['basicPay', 'commissionBalance'])
+  const grossCommissionTotal = columnTotals(revenueRows, ['commission_amount']).commission_amount
+  const displayedCommissionTotal = splitTotals.commissionBalance
+    + columnTotals(visibleRows.filter(r => !(r.revenue_payroll ?? r.source === 'commission')), ['commission_amount']).commission_amount
   // Display order — what ‹ › in the paycheck window step through.
   const order = useMemo(() => visibleRows.map(r => r.id), [visibleRows])
   const totals = useMemo(() => columnTotals(visibleRows, TOTAL_KEYS), [visibleRows])
@@ -230,7 +233,8 @@ export default function PayrollGrid({ rows, period }: Props) {
       </div>
       {showRevenueSplit && (
         <p className="text-xs text-graphite mb-3">
-          Revenue payout: Net basic + Commission balance = Net to bank.
+          Revenue: Gross Commission is the total before allocations; Balance under Earnings is the remaining commission payment.
+          {' '}Net basic + Balance = Net to bank.
           {' '}Basic follows normal payroll deductions; both employee and employer statutory are funded from the commission total.
           {' '}Open a paycheck for the allocation and editable PCB. Historical rows retain their saved split.
         </p>
@@ -338,14 +342,14 @@ export default function PayrollGrid({ rows, period }: Props) {
                 {showRevenueSplit && (
                   <>
                     <th className="num g1">{visibleRows.filter(row => row.source === 'commission').every(row => row.payout_split_version === 2) ? 'Net basic' : 'Basic pay'}</th>
-                    <th className="num" title="Remaining commission after basic and statutory allocations; open the paycheck for the calculation">Comm. balance</th>
+                    <th className="num" title="Commission total from Revenue before basic and statutory allocations">Gross Commission</th>
                   </>
                 )}
                 <th className="num g1 col-basic">Basic</th>
                 <th className="num col-stat">Stat.</th>
                 <th className="num col-ns">Non-stat.</th>
                 <th className="num col-ot">OT</th>
-                <th className="num col-comm">Comm.</th>
+                <th className="num col-comm" title={showRevenueSplit ? 'Remaining commission payment for Revenue; regular commission for other departments' : undefined}>{showRevenueSplit ? 'Balance' : 'Comm.'}</th>
                 <th className="num g1 col-unpaid">
                   Unpaid <i>days</i>
                 </th>
@@ -367,6 +371,9 @@ export default function PayrollGrid({ rows, period }: Props) {
                 const filteredOut = !!department && g.dept !== department
                 const groupRevenueRows = g.rows.filter(r => r.revenue_payroll ?? r.source === 'commission')
                 const groupSplit = columnTotals(groupRevenueRows.map(calculateRevenuePayrollSplit), ['basicPay', 'commissionBalance'])
+                const groupGrossCommission = columnTotals(groupRevenueRows, ['commission_amount']).commission_amount
+                const groupDisplayedCommission = groupSplit.commissionBalance
+                  + columnTotals(g.rows.filter(r => !(r.revenue_payroll ?? r.source === 'commission')), ['commission_amount']).commission_amount
                 return (
                   <Fragment key={g.dept}>
                     <tr className="pg-band" hidden={filteredOut}>
@@ -392,10 +399,12 @@ export default function PayrollGrid({ rows, period }: Props) {
                       {showRevenueSplit && (
                         <>
                           <td className="num g1 sub">{groupRevenueRows.length ? formatMoneyBare(groupSplit.basicPay) : '—'}</td>
-                          <td className="num sub">{groupRevenueRows.length ? formatMoneyBare(groupSplit.commissionBalance) : '—'}</td>
+                          <td className="num sub">{groupRevenueRows.length ? formatMoneyBare(groupGrossCommission) : '—'}</td>
                         </>
                       )}
-                      <td colSpan={11} />
+                      <td colSpan={4} />
+                      <td className="num sub">{formatMoneyBare(groupDisplayedCommission)}</td>
+                      <td colSpan={6} />
                     </tr>
                     {g.rows.map((r, i) => (
                       <PayrollRow
@@ -434,14 +443,14 @@ export default function PayrollGrid({ rows, period }: Props) {
                 {showRevenueSplit && (
                   <>
                     <td className="num g1">{formatMoneyBare(splitTotals.basicPay)}</td>
-                    <td className="num">{formatMoneyBare(splitTotals.commissionBalance)}</td>
+                    <td className="num">{formatMoneyBare(grossCommissionTotal)}</td>
                   </>
                 )}
                 <td className="num g1">{formatMoneyBare(totals.basic_salary)}</td>
                 <td className="num sub">{formatMoneyBare(totals.statutory_allowance)}</td>
                 <td className="num sub">{formatMoneyBare(totals.non_statutory_allowance)}</td>
                 <td className="num sub">{formatMoneyBare(totals.ot_amount)}</td>
-                <td className="num sub">{formatMoneyBare(totals.commission_amount)}</td>
+                <td className="num sub">{formatMoneyBare(displayedCommissionTotal)}</td>
                 <td className="num g1 sub">{formatAmount(totals.unpaid_leave_days, 1)}</td>
                 <td className="num sub">{formatMoneyBare(totals.deduction_amount)}</td>
                 <td className="num sub">{formatMoneyBare(totals.skbbk_amount)}</td>

@@ -163,6 +163,25 @@ export default function PayrollRow({
     <td className={cn('num', value === 0 && 'zero', extra)}>{formatMoneyBare(value)}</td>
   )
 
+  const grossCommission = (row.commission_statements?.length ?? 0) > 1 ? (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="text-accent underline decoration-dotted underline-offset-4"
+      title="Open paycheck to view all commission statements behind this gross commission"
+    >
+      {formatMoneyBare(row.commission_amount)}
+    </button>
+  ) : statementHref ? (
+    <a href={statementHref} title="Gross commission from the commission run — open the source statement">
+      {formatMoneyBare(row.commission_amount)}
+    </a>
+  ) : (
+    <span title="Gross commission before basic and statutory allocations">
+      {formatMoneyBare(row.commission_amount)}
+    </span>
+  )
+
   return (
     <>
       <tr
@@ -228,11 +247,10 @@ export default function PayrollRow({
               {split ? formatMoneyBare(split.basicPay) : '—'}
             </td>
             <td
-              className={cn('num', split?.commissionBalance === 0 && 'zero')}
-              data-label="Commission balance"
-              title={split ? (row.payout_split_version === 2 ? 'Commission remaining after net basic and all employee/employer statutory. Recomputed when saved.' : 'Historical saved commission split') : undefined}
+              className={cn('num', split && row.commission_is_derived && 'derived', split && row.commission_amount === 0 && 'zero')}
+              data-label="Gross Commission"
             >
-              {split ? <span className={split.shortfall > 0 ? 'neg' : undefined}>{formatMoneyBare(split.commissionBalance)}</span> : '—'}
+              {split ? grossCommission : '—'}
             </td>
           </>
         )}
@@ -240,29 +258,17 @@ export default function PayrollRow({
         <td className="pg-ed">{cell('statutory_allowance')}</td>
         <td className="pg-ed">{cell('non_statutory_allowance')}</td>
         <td className="pg-ed">{cell('ot_amount')}</td>
-        {row.commission_is_derived ? (
+        {split ? (
+          <td
+            className={cn('num', split.commissionBalance === 0 && 'zero', split.shortfall > 0 && 'neg')}
+            data-label="Balance"
+            title={row.payout_split_version === 2 ? 'Commission remaining after net basic and all employee/employer statutory. Recomputed when saved.' : 'Historical saved commission split'}
+          >
+            {formatMoneyBare(split.commissionBalance)}
+          </td>
+        ) : row.commission_is_derived ? (
           <td className={cn('num derived', row.commission_amount === 0 && 'zero')}>
-            {(row.commission_statements?.length ?? 0) > 1 ? (
-              <button
-                type="button"
-                onClick={onOpen}
-                className="text-accent underline decoration-dotted underline-offset-4"
-                title="Open paycheck to view all commission statements behind this figure"
-              >
-                {formatMoneyBare(row.commission_amount)}
-              </button>
-            ) : statementHref ? (
-              <a
-                href={statementHref}
-                title="This figure comes from the commission run — open the statement behind it"
-              >
-                {formatMoneyBare(row.commission_amount)}
-              </a>
-            ) : (
-              <span title="Compute the commission run for this month to fill this in">
-                {formatMoneyBare(row.commission_amount)}
-              </span>
-            )}
+            {grossCommission}
           </td>
         ) : (
           <td className="pg-ed">{cell('commission_amount')}</td>
