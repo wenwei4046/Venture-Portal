@@ -10,6 +10,7 @@ import { calculateQuote, cents, customerQuote } from "./calculator";
 import { isCompatibleGift, productImageUrl, quoteLineKey } from "./catalog";
 import { principalReadContext } from "./read-access";
 import type {
+  CostCell,
   MemberBand,
   MemberData,
   MemberInsight,
@@ -177,12 +178,23 @@ function publicProduct(
     id: p.id,
     code: p.code,
     name: p.name,
-    brand: p.brand,
+    brand: p.brand ?? null,
     category: p.category,
     size: p.size,
     color: p.color,
     available: p.available,
     gift: p.gift,
+    // The grid's choices only — never a cost.
+    options: Array.isArray(p.options)
+      ? p.options.flatMap((option) =>
+          option &&
+          typeof option === "object" &&
+          typeof option.height === "string" &&
+          typeof option.tier === "string"
+            ? [{ height: option.height, tier: option.tier }]
+            : [],
+        )
+      : undefined,
     imageUrl: productImageUrl(
       p.imageUrl ??
         p.image_url ??
@@ -347,6 +359,7 @@ interface CostRow {
   unit_cost: number | string | null;
   is_active: boolean;
   updated_at: string;
+  cost_grid?: unknown;
   member_product_options:
     | {
         category: string;
@@ -405,8 +418,9 @@ export async function calculateMemberQuote(
       throw new Error("Enter a valid amount with up to two decimal places.");
     const user = await getUser();
     const principalView = !!user && isPrincipalAccount(user);
+    const build = quoteBuild(input.build);
     const client = await session("member_quote", principalView);
-    const context = await rpc<{ bands: MemberBand[] }>(
+    const context = await rpc<{ bands: MemberBand[]; costDivisor?: number | string | null }>(
       client,
       principalView ? "member_principal_quote_context" : "member_quote_context",
       { p_scheme: input.schemeId },
@@ -414,9 +428,17 @@ export async function calculateMemberQuote(
     const brands = [...new Set(context.bands.map((b) => b.brand))];
     if (!brands.length)
       throw new Error("Margin rules have not been configured for Fair.");
+    const costDivisor = Number(context.costDivisor ?? 1);
+    if (!Number.isFinite(costDivisor) || costDivisor <= 0)
+      throw new Error("The cost rule for this department is not configured.");
     const admin = adminClient() as unknown as SupabaseClient;
     const projection =
-      "id,item_code,product_name,brand_code,unit_cost,is_active,updated_at,member_product_options!inner(category,size,color,gift,available,updated_at)";
+      "id,item_code,product_name,brand_code,unit_cost,cost_grid,is_active,updated_at,member_product_options!inner(category,size,color,gift,available,updated_at)";
+    // The brands this scheme sells, plus riders (bed frames and accessories
+    // carry no brand and ride any cart — user 2026-09-12).
+    const brandFilter = `brand_code.is.null,brand_code.in.(${brands
+      .map((brand) => `"${brand.replace(/["\\,()]/g, "")}"`)
+      .join(",")})`;
     // Fetch only selected products plus eligible pillow suggestions, never a
     // whole cost catalogue. Both reads follow successful session authorization.
     const [chosen, gifts] = await Promise.all([
@@ -424,11 +446,11 @@ export async function calculateMemberQuote(
         .from("comm_products")
         .select(projection)
         .in("id", ids)
-        .in("brand_code", brands),
+        .or(brandFilter),
       admin
         .from("comm_products")
         .select(projection)
-        .in("brand_code", brands)
+        .or(brandFilter)
         .eq("is_active", true)
         .eq("member_product_options.gift", true)
         .eq("member_product_options.available", true)
@@ -453,19 +475,22 @@ export async function calculateMemberQuote(
       const option = Array.isArray(row.member_product_options)
         ? row.member_product_options[0]
         : row.member_product_options;
-      if (!option || !row.brand_code) return [];
+      if (!option) return [];
+      const costGrid = costGridOf(row.cost_grid);
       return [
         {
           id: row.id,
           code: row.item_code,
           name: row.product_name ?? row.item_code,
-          brand: row.brand_code,
+          brand: row.brand_code ?? null,
           category: option.category,
           size: option.size,
           color: option.color,
           available: row.is_active && option.available,
           gift: option.gift,
           cost: row.unit_cost === null ? null : Number(row.unit_cost),
+          costGrid,
+          options: costGrid.map(({ height, tier }) => ({ height, tier })),
           version: `${row.updated_at}:${option.updated_at}`,
         },
       ];
@@ -499,10 +524,42 @@ export async function calculateMemberQuote(
       throw new Error(
         "A free gift size does not match a product in this cart. Please select a matching size.",
       );
-    const result = calculateQuote(input, products, context.bands);
+    const checked: QuoteInput = { ...input, build };
+    const result = calculateQuote(checked, products, context.bands, { costDivisor });
     if (!result.valid)
       throw new Error(result.error ?? "The quote could not be calculated.");
-    return { ...result, customerText: customerQuote(input, products, result) };
+    return { ...result, customerText: customerQuote(checked, products, result) };
+  });
+}
+
+/** The cart's sofa build, validated: short plain strings or nothing. */
+function quoteBuild(raw: unknown): QuoteInput["build"] {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw !== "object") throw new Error("The sofa build is invalid.");
+  const { height, tier } = raw as { height?: unknown; tier?: unknown };
+  const text = (value: unknown, label: string): string | undefined => {
+    if (value === undefined || value === null || value === "") return undefined;
+    if (typeof value !== "string" || value.length > 20 || /[^\w .\-/]/.test(value))
+      throw new Error(`The sofa ${label} is invalid.`);
+    return value;
+  };
+  return { height: text(height, "seat height"), tier: text(tier, "fabric tier") };
+}
+
+/** Only well-formed grid cells enter the engine; anything else is ignored. */
+function costGridOf(raw: unknown): CostCell[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((cell) => {
+    if (!cell || typeof cell !== "object") return [];
+    const { height, tier, cost } = cell as Record<string, unknown>;
+    const value = typeof cost === "string" ? Number(cost) : cost;
+    if (
+      typeof height !== "string" || !height || height.length > 20 ||
+      typeof tier !== "string" || !tier || tier.length > 20 ||
+      typeof value !== "number" || !Number.isFinite(value) || value < 0
+    )
+      return [];
+    return [{ height, tier, cost: value }];
   });
 }
 

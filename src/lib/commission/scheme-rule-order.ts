@@ -28,6 +28,7 @@ export type SchemeRuleKey =
   | 'group_incentive'
   | 'margin_incentive'
   | 'deposit_gate'
+  | 'cost_divisor'
   | 'default_rate_mode'
 
 /** What the order reads from `comm_schemes`. */
@@ -64,6 +65,9 @@ export function orderSchemeRules(scheme: SchemeRuleState): SchemeRuleKey[] {
     ...IR_PARAMETERS,
     ...SWITCHES.filter(w => w.on(scheme)).map(w => w.key),
     ...SWITCHES.filter(w => !w.on(scheme)).map(w => w.key),
+    // Neither a switch nor IR's: the cost basis every margin rule reads
+    // (2026-09-12), then the rate mode, close the table.
+    'cost_divisor',
     'default_rate_mode',
   ]
 }

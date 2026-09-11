@@ -75,6 +75,8 @@ export interface SchemeRow {
   enable_group_incentive?: boolean
   group_sales_depth?: number | null
   override_depth?: number | null
+  /** Revenue Team cost = cost ÷ this (Fair 0.7, 2026-09-12). Absent = 1. */
+  revenue_cost_divisor?: Num
 }
 
 export interface RankRow {
@@ -351,6 +353,7 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
       itemGroups,
       depositThresholdPct: numOrNull(rows.scheme.deposit_threshold_pct),
       defaultRateMode: rows.scheme.default_rate_mode,
+      costDivisor: numOrNull(rows.scheme.revenue_cost_divisor) ?? 1,
     },
     ranks,
     orders,

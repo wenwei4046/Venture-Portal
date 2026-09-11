@@ -527,6 +527,8 @@ Finance CANNOT see individual employee salaries — only department lump sum
 Finance CANNOT access the Director Salary module or Director Pool at all. (Director Pool v2 2026-07-21: the old aggregate-bucket view Finance used was replaced by the standalone calculator — Principal + HR only.)
 HR CAN access Director Pool v2 (standalone calculator — full per-director detail; granted by user 2026-07-21)
 Only HR and Principal can see individual salary details
+Member catalogue & margin cost basis (2026-09-12)
+The member Quote page reads `comm_products` ⋈ `member_product_options` (two Principal-only steps: Revenue › Product List, then People › Member Services › Product options; seed: `scripts/seed-fair-catalogue.mjs`). **Riders**: bed frames and accessories carry NO brand (`brand_code` NULL) — they join any cart, their cost counts in the one margin, and the mattress or sofa's brand decides the ladder (`lib/member/calculator.ts`, engine `marginBase`). Sofas are ZANOTTI and costed the ERP way: `comm_products.cost_grid` = [{height, tier PRICE_1/2/3, cost}] per module, summed for the cart's seat height + fabric tier (`resolveUnitCost`, mirrors ERP `resolveSeatHeightSen`). **Cost basis**: Revenue Team cost = cost ÷ `comm_schemes.revenue_cost_divisor` (Fair 0.7; Rules › Scheme rules) in the calculator, the snapshot order margins and the run alike. Margin = (price − cost) ÷ price; the price for threshold t is cost ÷ (1 − t), never cost × (1 + t). Mig `20260915060000`.
 Development Phases
 Phase 1 (✅ Shipped 2026-04-10): Treasury Core
 Dashboard (dashboard_summary RPC), Fund IN, Fund OUT, Overdue & Netting,

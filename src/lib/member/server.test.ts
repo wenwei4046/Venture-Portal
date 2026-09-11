@@ -39,8 +39,8 @@ beforeEach(() => {
   mocks.rpc.mockResolvedValue({ data: snapshot(), error: null })
   mocks.adminFrom.mockImplementation(() => {
     const response = Promise.resolve({ data: [privateProduct], error: null })
-    const query = { select: vi.fn(), in: vi.fn(), eq: vi.fn(), limit: vi.fn(), then: response.then.bind(response) }
-    for (const method of [query.select, query.in, query.eq, query.limit]) method.mockReturnValue(query)
+    const query = { select: vi.fn(), in: vi.fn(), or: vi.fn(), eq: vi.fn(), limit: vi.fn(), then: response.then.bind(response) }
+    for (const method of [query.select, query.in, query.or, query.eq, query.limit]) method.mockReturnValue(query)
     return query
   })
   mocks.adminClient.mockReturnValue({ from: mocks.adminFrom })
@@ -131,6 +131,40 @@ describe('Principal Revenue View server boundary', () => {
     mocks.rpc.mockResolvedValue({ data: { bands: [band] }, error: null })
     expect((await calculateMemberQuote(quote)).ok).toBe(true)
     expect(mocks.rpc).toHaveBeenCalledWith('member_quote_context', { p_scheme: schemeId })
+  })
+
+  // Revenue Team cost = unit cost ÷ the scheme's divisor (Fair 0.7): the RM2,000
+  // mattress is judged as RM2,857.14, so RM5,000 is a 42.86% margin, not 60%.
+  it('judges the margin on the Revenue Team cost the context hands back', async () => {
+    mocks.rpc.mockResolvedValue({ data: { bands: [band], costDivisor: '0.7000' }, error: null })
+    const result = await calculateMemberQuote(quote)
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error(result.error)
+    expect(result.data.margin).toBeCloseTo(42.8572, 3)
+    expect(result.data.label).toBe('Tier 1 threshold')
+    expect(JSON.stringify(result.data)).not.toContain('2857')
+  })
+
+  it('lets a brand-less rider ride the mattress and costs it into the same margin', async () => {
+    const riderId = '10000000-0000-4000-8000-000000000004'
+    const rider = {
+      ...privateProduct, id: riderId, item_code: 'NB-KHJ50 (Q)', product_name: 'Fenrir bed frame', brand_code: null, unit_cost: 500,
+      member_product_options: { ...privateProduct.member_product_options, category: 'bed frame' },
+    }
+    mocks.adminFrom.mockImplementation(() => {
+      const response = Promise.resolve({ data: [privateProduct, rider], error: null })
+      const query = { select: vi.fn(), in: vi.fn(), or: vi.fn(), eq: vi.fn(), limit: vi.fn(), then: response.then.bind(response) }
+      for (const method of [query.select, query.in, query.or, query.eq, query.limit]) method.mockReturnValue(query)
+      return query
+    })
+    mocks.rpc.mockResolvedValue({ data: { bands: [band], costDivisor: 1 }, error: null })
+    const result = await calculateMemberQuote({ ...quote, lines: [...quote.lines, { productId: riderId, quantity: 1, gift: false }] })
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error(result.error)
+    // (5,000 − 2,500) ÷ 5,000 — the rider's cost counts, Akemi's ladder judges it.
+    expect(result.data.margin).toBe(50)
+    expect(result.data.label).toBe('Tier 1 threshold')
+    expect(result.data.customerText).toContain('Fenrir bed frame')
   })
 
   it('never reads private costs if the database rejects Principal access', async () => {

@@ -33,6 +33,8 @@ export interface SchemeRow {
   direct_line_limit?: number | null
   deposit_threshold_pct: number | null
   default_rate_mode: 'fixed' | 'variable'
+  /** Revenue Team cost = unit cost ÷ this (Fair 0.7). 1 = cost as keyed. */
+  revenue_cost_divisor?: number | string | null
 }
 
 /**
@@ -239,6 +241,13 @@ export interface ProductRow {
   brand_code: string | null
   item_group: string | null
   unit_cost: number | null
+  /**
+   * Sofa modules: [{height, tier, cost}] — the ERP seat_height_prices shape.
+   * The member calculator costs a module from it for the cart's chosen seat
+   * height and fabric tier; unit_cost is the flat fallback. Loaded by the
+   * catalogue seed; read-only on the page for now.
+   */
+  cost_grid: { height: string; tier: string; cost: number }[] | null
   is_active: boolean
   updated_at: string | null
 }

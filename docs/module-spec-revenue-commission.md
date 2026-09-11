@@ -738,6 +738,32 @@ are not commissionable either. **Free bundled KPI items ARE included**: a
 giveaway pillow has real cost and no revenue, which is exactly how giving them
 away is supposed to hurt the margin.
 
+**The Revenue Team cost basis (2026-09-12).** `marginCost` is not the cost as
+keyed: every line's cost is first divided by the scheme's
+`comm_schemes.revenue_cost_divisor` (Fair **0.7** — "cost / 0.7 = revenue fair
+department team cost"). RM 1,000 of supplier cost is judged as RM 1,428.57.
+The member calculator (`lib/member/calculator.ts`), the members' order
+margins in the snapshot RPCs and the engine (`marginBase`) all divide by the
+same figure, so a salesperson's "36% margin" at the fair is the 36% the run
+pays on. Set on Rules › Scheme rules; 1 keeps the cost as keyed. A hand-keyed
+`manual_margin_pct` is already a team-basis margin and is not divided again.
+
+The price that reaches a threshold *t* is **cost ÷ (1 − t)**, never
+cost × (1 + t): 33% on RM 1,000 of team cost is RM 1,492.54, 67% is
+RM 3,030.30 (user 2026-09-12). `nextPrice` in the calculator is that division,
+rounded up to the cent.
+
+**Riders and the brand of a bill (2026-09-12).** Bed frames and accessories
+carry **no brand** in `comm_products` (`brand_code` NULL): they ride any cart
+or bill, their cost counts in the one margin, and the mattress or sofa decides
+which brand's ladder judges it. In the engine a brand-less line never enters
+`byBrand`, so it never decides the bill's brand; in the calculator a cart must
+hold at most one branded product family, riders aside. Sofas are all
+**Zanotti** (the house brand, as the ERP labels them) and are costed the ERP
+way — per module, from `comm_products.cost_grid` at the cart's chosen seat
+height and fabric tier (PRICE_1 / PRICE_2 / PRICE_3, shown as Tier 1 / 2 / 3),
+summed over the modules; `unit_cost` is the flat fallback for everything else.
+
 **What the penalty scales.** The bill's own product commission, its Open Bill
 bonus, **and every upline's override on it** (user decision 2026-08-31). It is
 implemented as a *penalty-weighted revenue*: each bill contributes

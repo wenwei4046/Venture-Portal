@@ -10,11 +10,14 @@ import {
   addCartLines,
   categoryKey,
   categoryLabel,
+  compareHeights,
   isAccessoryProduct,
   isCompatibleGift,
   productImageUrl,
   pruneIncompatibleGifts,
   quoteLineKey,
+  TIERS,
+  tierLabel,
 } from "@/lib/member/catalog";
 import type {
   MemberData,
@@ -42,7 +45,8 @@ type BundleDraft = { productId: string; quantity: number; gifts: QuoteLine[] };
 type Family = {
   key: string;
   name: string;
-  brand: string;
+  /** null = a rider (bed frame, accessory): no brand, joins any cart. */
+  brand: string | null;
   category: string;
   section: string;
   gift: boolean;
@@ -284,7 +288,7 @@ function GiftPicker({
       p.gift &&
       isAccessoryProduct(p) &&
       p.available &&
-      p.brand === product.brand &&
+      (!p.brand || p.brand === product.brand) &&
       isCompatibleGift(p, [product]),
   );
   const categories = [...new Set(gifts.map((p) => categoryKey(p.category)))];
@@ -425,7 +429,10 @@ export default function MemberQuoteBuilder({
 }: BuilderProps) {
   const [view, setView] = useState<"catalog" | "calculator">("catalog");
   const [models, setModels] = useState<Record<string, string>>({});
-  const [categoryBrands, setCategoryBrands] = useState<Record<string, string>>({});
+  // The brand picked per section; null = the rider section's "no brand".
+  const [categoryBrands, setCategoryBrands] = useState<
+    Record<string, string | null>
+  >({});
   const [drafts, setDrafts] = useState<Record<string, BundleDraft>>({});
   const [openCartRow, setOpenCartRow] = useState<string | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
@@ -485,7 +492,19 @@ export default function MemberQuoteBuilder({
     const p = data.products.find((p) => p.id === l.productId);
     return p ? [p] : [];
   });
-  const cartBrand = cartProducts[0]?.brand;
+  // The branded product in the cart decides the ladder; riders never do.
+  const cartBrand = cartProducts.find((p) => p.brand)?.brand ?? null;
+  // Sofa modules carry a seat height × fabric tier grid; the cart picks one build for all of them.
+  const buildChoices = useMemo(() => {
+    const options = cartProducts.flatMap((p) => p.options ?? []);
+    const heights = [...new Set(options.map((o) => o.height))].sort(compareHeights);
+    const tiers = [...new Set(options.map((o) => o.tier))].sort(
+      (a, b) =>
+        ((TIERS as readonly string[]).indexOf(a) + 1 || 99) -
+        ((TIERS as readonly string[]).indexOf(b) + 1 || 99),
+    );
+    return { heights, tiers };
+  }, [cartProducts]);
   const mainItems = input.lines
     .filter((l) => !l.gift)
     .reduce((sum, l) => sum + l.quantity, 0);
@@ -627,7 +646,7 @@ export default function MemberQuoteBuilder({
         return (
           gift?.available &&
           isAccessoryProduct(gift) &&
-          gift.brand === product.brand &&
+          (!gift.brand || gift.brand === product.brand) &&
           isCompatibleGift(gift, [product])
         );
       }),
@@ -636,25 +655,23 @@ export default function MemberQuoteBuilder({
   function setDraft(family: Family, draft: BundleDraft) {
     setDrafts((old) => ({ ...old, [family.key]: draft }));
   }
-  function brandsFor(section: string) {
+  /** Brands sold in a section; a rider section (bed frames, accessories) has one entry, null. */
+  function brandsFor(section: string): (string | null)[] {
     return [
       ...new Set(
         families.filter((f) => f.section === section).map((f) => f.brand),
       ),
     ];
   }
-  function selectedBrand(section: string) {
+  function selectedBrand(section: string): string | null {
     const brands = brandsFor(section);
     const saved = categoryBrands[section];
-    return (
-      (brands.includes(saved) ? saved : undefined) ??
-      (cartBrand && brands.includes(cartBrand) ? cartBrand : undefined) ??
-      families.find(
-        (f) => f.section === section && f.products.some((p) => p.available),
-      )?.brand ??
-      brands[0] ??
-      ""
+    if (saved !== undefined && brands.includes(saved)) return saved;
+    if (cartBrand && brands.includes(cartBrand)) return cartBrand;
+    const available = families.find(
+      (f) => f.section === section && f.products.some((p) => p.available),
     );
+    return available ? available.brand : (brands[0] ?? null);
   }
   function selectedFamily(section: string) {
     const activeBrand = selectedBrand(section);
@@ -662,12 +679,12 @@ export default function MemberQuoteBuilder({
       (f) => f.brand === activeBrand && f.section === section,
     );
     return (
-      choices.find((f) => f.key === models[`${activeBrand}:${section}`]) ??
+      choices.find((f) => f.key === models[`${activeBrand ?? ""}:${section}`]) ??
       choices.find((f) => f.products.some((p) => p.available)) ??
       choices[0]
     );
   }
-  function selectBrand(section: string, brand: string) {
+  function selectBrand(section: string, brand: string | null) {
     if (brand === selectedBrand(section) || !brandsFor(section).includes(brand))
       return;
     const previous = selectedFamily(section);
@@ -680,7 +697,7 @@ export default function MemberQuoteBuilder({
     const next =
       choices.find(
         (f) =>
-          f.key === models[`${brand}:${section}`] &&
+          f.key === models[`${brand ?? ""}:${section}`] &&
           f.products.some((p) => p.available),
       ) ??
       choices.find((f) => f.products.some((p) => p.available)) ??
@@ -701,7 +718,7 @@ export default function MemberQuoteBuilder({
       next.products[0];
     setAdded(null);
     setCategoryBrands((old) => ({ ...old, [section]: brand }));
-    setModels((old) => ({ ...old, [`${brand}:${section}`]: next.key }));
+    setModels((old) => ({ ...old, [`${brand ?? ""}:${section}`]: next.key }));
     setDraft(next, { productId: preferred.id, quantity: 1, gifts: [] });
   }
   function selectModel(section: string, key: string) {
@@ -725,7 +742,7 @@ export default function MemberQuoteBuilder({
       );
     if (!drafts[next.key] && preferred)
       setDraft(next, { productId: preferred.id, quantity: 1, gifts: [] });
-    setModels((old) => ({ ...old, [`${activeBrand}:${section}`]: key }));
+    setModels((old) => ({ ...old, [`${activeBrand ?? ""}:${section}`]: key }));
   }
   function selectVariant(family: Family, product: MemberProduct) {
     setAdded(null);
@@ -760,7 +777,8 @@ export default function MemberQuoteBuilder({
     const draft = draftFor(family);
     try {
       const product = family.products.find((p) => p.id === draft.productId)!;
-      if (cartBrand && product.brand !== cartBrand)
+      // Riders (no brand) join any cart; a second brand does not.
+      if (cartBrand && product.brand && product.brand !== cartBrand)
         throw new Error(
           `Your cart contains ${cartBrand} products. Quote ${product.brand} separately to use the correct margin tiers.`,
         );
@@ -816,6 +834,25 @@ export default function MemberQuoteBuilder({
     setInput((q) => ({ ...q, price }));
     setUndo(null);
   }
+  function setBuild(patch: { height?: string; tier?: string }) {
+    setInput((q) => ({ ...q, build: { ...q.build, ...patch } }));
+    setUndo(null);
+  }
+  useEffect(() => {
+    // A cart with sofa modules always carries a build: the first seat height
+    // and the cheapest tier until the member picks otherwise.
+    if (!buildChoices.heights.length) return;
+    const height =
+      input.build?.height && buildChoices.heights.includes(input.build.height)
+        ? input.build.height
+        : buildChoices.heights[0];
+    const tier =
+      input.build?.tier && buildChoices.tiers.includes(input.build.tier)
+        ? input.build.tier
+        : buildChoices.tiers[0];
+    if (height !== input.build?.height || tier !== input.build?.tier)
+      setInput((q) => ({ ...q, build: { height, tier } }));
+  }, [buildChoices, input.build, setInput]);
   const hasQuote =
     input.lines.length > 0 || input.price !== "" || Number(input.delivery) !== 0;
   function clearQuote() {
@@ -918,7 +955,9 @@ export default function MemberQuoteBuilder({
     const colors = family.products.filter((p) => p.size === product.size);
     const giftCount = draft.gifts.reduce((sum, line) => sum + line.quantity, 0);
     const unavailable = !product.available;
-    const differentCartBrand = !!cartBrand && product.brand !== cartBrand;
+    const differentCartBrand =
+      !!cartBrand && !!product.brand && product.brand !== cartBrand;
+    const riderSection = brands.every((brand) => !brand);
     const label = categoryLabel(section);
     const justAdded =
       added?.key === family.key && added.productId === product.id;
@@ -957,32 +996,40 @@ export default function MemberQuoteBuilder({
                   ))}
                 </select>
               </label>
-              <label className={s.field + " " + catalogStyles.selector}>
-                <span>Brand</span>
-                <select
-                  aria-label={label + " brand"}
-                  value={activeBrand}
-                  onChange={(e) => selectBrand(section, e.target.value)}
-                >
-                  {brands.map((brand) => (
-                    <option
-                      key={brand}
-                      value={brand}
-                      disabled={
-                        !families.some(
-                          (f) =>
-                            f.section === section &&
-                            f.brand === brand &&
-                            f.products.some((p) => p.available),
-                        )
-                      }
-                    >
-                      {brand}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {!riderSection && (
+                <label className={s.field + " " + catalogStyles.selector}>
+                  <span>Brand</span>
+                  <select
+                    aria-label={label + " brand"}
+                    value={activeBrand ?? ""}
+                    onChange={(e) => selectBrand(section, e.target.value || null)}
+                  >
+                    {brands.map((brand) => (
+                      <option
+                        key={brand ?? ""}
+                        value={brand ?? ""}
+                        disabled={
+                          !families.some(
+                            (f) =>
+                              f.section === section &&
+                              f.brand === brand &&
+                              f.products.some((p) => p.available),
+                          )
+                        }
+                      >
+                        {brand ?? "Any brand"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
             </div>
+            {riderSection && (
+              <p className={s.caption} style={{ marginTop: 8 }}>
+                Joins any cart. Its cost counts in the one margin, judged by the
+                mattress or sofa brand&apos;s rules.
+              </p>
+            )}
             <p className={s.caption} style={{ marginTop: 8 }}>
               {product.code}
               {product.color ? " · " + product.color : ""}
@@ -1140,6 +1187,9 @@ export default function MemberQuoteBuilder({
             <span className={s.caption}>
               {mainItems} product{mainItems === 1 ? "" : "s"} · {giftItems} free
               gift{giftItems === 1 ? "" : "s"}
+              {buildChoices.heights.length > 0 && input.build?.height && input.build?.tier
+                ? ` · sofa ${input.build.height} · ${tierLabel(input.build.tier)}`
+                : ""}
             </span>
           </span>
           <svg
@@ -1420,6 +1470,45 @@ export default function MemberQuoteBuilder({
                 </div>
               </div>
             </section>
+            {buildChoices.heights.length > 0 && (
+              <section className={s.stack} aria-label="Sofa build">
+                <p className={s.eyebrow}>SOFA BUILD</p>
+                <div className={catalogStyles.selectors}>
+                  <label className={s.field + " " + catalogStyles.selector}>
+                    <span>Seat height</span>
+                    <select
+                      aria-label="Seat height"
+                      value={input.build?.height ?? ""}
+                      onChange={(e) => setBuild({ height: e.target.value })}
+                    >
+                      {buildChoices.heights.map((height) => (
+                        <option key={height} value={height}>
+                          {height}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className={s.field + " " + catalogStyles.selector}>
+                    <span>Fabric tier</span>
+                    <select
+                      aria-label="Fabric tier"
+                      value={input.build?.tier ?? ""}
+                      onChange={(e) => setBuild({ tier: e.target.value })}
+                    >
+                      {buildChoices.tiers.map((tier) => (
+                        <option key={tier} value={tier}>
+                          {tierLabel(tier)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <p className={s.caption}>
+                  Every sofa module in the cart is costed at this seat height
+                  and fabric tier, the way the ERP prices a sofa.
+                </p>
+              </section>
+            )}
             {error && (
               <p className={s.error} role="alert">
                 {error}

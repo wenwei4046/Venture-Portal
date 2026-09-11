@@ -3,8 +3,16 @@ import type {
   MemberProduct,
   QuoteInput,
   QuoteResult,
+  QuoteRules,
 } from "./types";
-import { categoryKey, isAccessoryProduct, isCompatibleGift, quoteLineKey } from "./catalog";
+import {
+  categoryKey,
+  isAccessoryProduct,
+  isCompatibleGift,
+  quoteLineKey,
+  resolveUnitCost,
+  tierLabel,
+} from "./catalog";
 
 /** Decimal money enters the engine as integer cents; tier comparisons use unrounded ratios. */
 export function cents(raw: string): number | null {
@@ -14,17 +22,24 @@ export function cents(raw: string): number | null {
   return Number.isSafeInteger(value) && value <= 99999999900 ? value : null;
 }
 
+/** The cost as keyed (or the grid cell), in cents, at the Revenue Team's basis. */
+export function teamCostCents(unitCost: number, costDivisor: number): number {
+  return Math.round((unitCost / costDivisor) * 100);
+}
+
 /** Binds a calculation to its inputs; contains no costs and is not an authorization token. */
 function quoteInputKey(input: QuoteInput): string {
   const lines = input.lines
     .map((line) => [quoteLineKey(line), line.quantity] as const)
     .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
   return JSON.stringify([
-    "quote-input-v2",
+    "quote-input-v3",
     input.schemeId,
     lines,
     cents(input.price),
     cents(input.delivery || "0"),
+    input.build?.height ?? null,
+    input.build?.tier ?? null,
   ]);
 }
 
@@ -33,6 +48,10 @@ function productVersions(products: MemberProduct[]): string {
     .map((product) => `${product.id}:${product.version}`)
     .sort()
     .join("|");
+}
+
+function hasGrid(product: MemberProduct): boolean {
+  return (product.costGrid?.length ?? 0) > 0 || (product.options?.length ?? 0) > 0;
 }
 
 export function bandFor(margin: number | null, bands: MemberBand[]) {
@@ -63,10 +82,19 @@ export function bandFor(margin: number | null, bands: MemberBand[]) {
     multiplier: 1,
   };
 }
+export const DEFAULT_RULES: QuoteRules = { costDivisor: 1 };
+
+/**
+ * Margin = (price − cost) ÷ price, where cost is every line's unit cost ÷
+ * the department's divisor. The price that reaches a threshold t is
+ * cost ÷ (1 − t) — never cost × (1 + t) (user 2026-09-12: 33% on 1,000 is
+ * 1,000 ÷ 0.67 = 1,492.54, not 1,330).
+ */
 export function calculateQuote(
   input: QuoteInput,
   products: MemberProduct[],
   allBands: MemberBand[],
+  rules: QuoteRules = DEFAULT_RULES,
 ): QuoteResult {
   const invalid = (error: string): QuoteResult => ({
     valid: false,
@@ -84,6 +112,9 @@ export function calculateQuote(
     inputKey: "",
     suggestions: [],
   });
+  const divisor = rules.costDivisor;
+  if (!Number.isFinite(divisor) || divisor <= 0)
+    return invalid("The cost rule for this department is not configured.");
   const price = cents(input.price),
     delivery = cents(input.delivery || "0");
   if (price === null || price <= 0)
@@ -140,7 +171,10 @@ export function calculateQuote(
     quantityByProduct.set(line.productId, quantity);
     if (line.gift) giftQuantityByProduct.set(line.productId, line.quantity);
   }
-  if (new Set(selected.map(({ product }) => product!.brand)).size !== 1)
+  // Riders (bed frames, accessories) carry no brand and join any cart; the
+  // branded products decide the ladder and must agree on one brand.
+  const branded = selected.filter(({ product }) => product!.brand);
+  if (new Set(branded.map(({ product }) => product!.brand)).size > 1)
     return invalid("Use products from the same brand in each quote.");
   const paidProducts = selected
     .filter(({ line }) => !line.gift)
@@ -149,32 +183,51 @@ export function calculateQuote(
     return invalid(
       "A free gift size does not match any product in this cart. Please select a matching size.",
     );
+  const brand = branded[0]?.product!.brand ?? null,
+    bands = brand ? allBands.filter((b) => b.brand === brand) : [];
+  if (brand && !bands.length)
+    return invalid(
+      "Margin thresholds have not been configured for this brand.",
+    );
   if (
-    selected.some(
-      ({ product }) =>
-        product!.cost == null ||
-        !Number.isFinite(product!.cost) ||
-        product!.cost! < 0,
+    selected.some(({ product }) => hasGrid(product!)) &&
+    (!input.build?.height || !input.build?.tier)
+  )
+    return invalid(
+      "Choose the sofa's seat height and fabric tier to cost its modules.",
+    );
+  const costed = selected.map(({ line, product }) => ({
+    line,
+    product: product!,
+    unit: resolveUnitCost(product!, input.build),
+  }));
+  if (costed.some(({ product, unit }) => hasGrid(product) && unit.height === null))
+    return invalid(
+      "That seat height is not available for a sofa module in the cart. Pick another height.",
+    );
+  if (
+    costed.some(
+      ({ unit }) =>
+        unit.cost == null || !Number.isFinite(unit.cost) || unit.cost < 0,
     )
   )
     return invalid(
       "Product cost is pending a Principal update. Margin cannot be confirmed yet.",
     );
-  const brand = selected[0].product!.brand,
-    bands = allBands.filter((b) => b.brand === brand);
-  if (!bands.length)
-    return invalid(
-      "Margin thresholds have not been configured for this brand.",
-    );
-  const cost = selected.reduce(
-    (sum, { line, product }) =>
-      sum + Math.round(product!.cost! * 100) * line.quantity,
+  const cost = costed.reduce(
+    (sum, { line, unit }) => sum + teamCostCents(unit.cost!, divisor) * line.quantity,
     0,
   );
   if (!Number.isSafeInteger(cost))
     return invalid("The cart amount is outside the supported range.");
   const margin = ((price - cost) / price) * 100,
-    band = bandFor(margin, bands);
+    band = brand
+      ? bandFor(margin, bands)
+      : {
+          label: margin < 0 ? "Below cost" : "No brand rules",
+          tone: margin < 0 ? ("danger" as const) : ("neutral" as const),
+          multiplier: 1,
+        };
   const next = bands
     .filter((b) => b.kind === "incentive" && b.threshold > margin + 1e-10)
     .sort((a, b) => a.threshold - b.threshold)[0];
@@ -190,9 +243,10 @@ export function calculateQuote(
     ? products
         .filter(
           (p) =>
-            p.brand === brand &&
+            (p.brand === brand || !p.brand) &&
             p.gift &&
             p.available &&
+            !hasGrid(p) &&
             p.cost != null &&
             p.cost! >= 0 &&
             isAccessoryProduct(p) &&
@@ -202,7 +256,8 @@ export function calculateQuote(
         .map((p) => ({
           productId: p.id,
           name: p.name,
-          margin: ((price - cost - Math.round(p.cost! * 100)) / price) * 100,
+          margin:
+            ((price - cost - teamCostCents(p.cost!, divisor)) / price) * 100,
           label: target.key,
         }))
         .filter(
@@ -254,11 +309,17 @@ export function customerQuote(
     );
   const lines = input.lines.map((l, index) => {
     const p = selected[index];
-    return `${l.gift ? "Free gift" : "Product"} · ${p.brand} ${p.name} / ${p.size}${p.color ? " / " + p.color : ""} × ${l.quantity}`;
+    const name = [p.brand, p.name].filter(Boolean).join(" ");
+    return `${l.gift ? "Free gift" : "Product"} · ${name} / ${p.size}${p.color ? " / " + p.color : ""} × ${l.quantity}`;
   });
+  const build =
+    input.build?.height && input.build?.tier && selected.some(hasGrid)
+      ? [`Sofa build: seat height ${input.build.height} · ${tierLabel(input.build.tier)} fabric`]
+      : [];
   return [
     "HOUZS VENTURE · Product quotation",
     ...lines,
+    ...build,
     `Selling price: RM ${result.price.toFixed(2)}`,
     `Additional charges: RM ${result.delivery.toFixed(2)}`,
     `Total: RM ${(result.price + result.delivery).toFixed(2)}`,
