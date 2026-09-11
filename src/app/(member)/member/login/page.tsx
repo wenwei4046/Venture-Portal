@@ -19,14 +19,14 @@ export default async function MemberLogin({
       return { error: "The email or password is incorrect. Please try again." };
     const { data: profile } = await supabase
       .from("users")
-      .select("is_active")
+      .select("is_active, role")
       .eq("id", data.user.id)
       .maybeSingle();
     if (!profile?.is_active) {
       await supabase.auth.signOut();
       return { error: "Your account is not active. Please contact HR." };
     }
-    redirect("/member");
+    redirect(profile.role === "revenue_member" ? "/member" : "/dashboard");
   }
   return (
     <MemberLoginScreen action={signIn} initialError={error} />
