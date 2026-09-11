@@ -215,7 +215,7 @@ export default function PaycheckWindow({
               </span>
             </Field>
             {row.commission_is_derived ? (
-              <Field label={revenuePayroll ? 'Gross commission' : 'Commission'} sub="from Revenue commission calculation">
+              <Field label={revenuePayroll ? 'Gross commission' : 'Commission'} sub={revenuePayroll ? 'synced commission + payroll adjustment' : 'from Revenue commission calculation'}>
                 {statementHref && statements.length <= 1 ? (
                   <a
                     className="ro num link"
@@ -227,7 +227,7 @@ export default function PaycheckWindow({
                 ) : (
                   <span
                     className={cn('ro num', row.commission_amount === 0 && 'zero')}
-                    title={statements.length > 1 ? 'Combined amount from the commission statements below' : 'Compute the commission run for this month to fill this in'}
+                    title={revenuePayroll ? 'Synced commission plus the saved payroll adjustment' : statements.length > 1 ? 'Combined amount from the commission statements below' : 'Compute the commission run for this month to fill this in'}
                   >
                     {formatMoneyBare(row.commission_amount)}
                   </span>

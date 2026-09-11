@@ -4060,6 +4060,11 @@ export type Database = {
         Row: {
           basic_salary: number
           commission_amount: number
+          commission_synced_amount: number | null
+          commission_adjustment_amount: number
+          commission_adjustment_reason: string | null
+          commission_adjusted_at: string | null
+          commission_adjusted_by: string | null
           commission_balance: number | null
           payout_split_version: number | null
           basic_pay_net: number | null
@@ -4097,6 +4102,11 @@ export type Database = {
         Insert: {
           basic_salary?: number
           commission_amount?: number
+          commission_synced_amount?: number | null
+          commission_adjustment_amount?: number
+          commission_adjustment_reason?: string | null
+          commission_adjusted_at?: string | null
+          commission_adjusted_by?: string | null
           commission_balance?: number | null
           payout_split_version?: number | null
           basic_pay_net?: number | null
@@ -4134,6 +4144,11 @@ export type Database = {
         Update: {
           basic_salary?: number
           commission_amount?: number
+          commission_synced_amount?: number | null
+          commission_adjustment_amount?: number
+          commission_adjustment_reason?: string | null
+          commission_adjusted_at?: string | null
+          commission_adjusted_by?: string | null
           commission_balance?: number | null
           payout_split_version?: number | null
           basic_pay_net?: number | null
@@ -5588,6 +5603,57 @@ export type Database = {
           },
         ]
       }
+      revenue_payroll_commission_adjustments: {
+        Row: {
+          id: string
+          payroll_row_id: string
+          staff_id: string
+          period_month: string
+          old_synced_amount: number | null
+          synced_amount: number
+          old_adjustment_amount: number
+          adjustment_amount: number
+          old_gross: number
+          gross: number
+          reason: string
+          adjusted_by: string
+          adjusted_at: string
+        }
+        Insert: {
+          id?: string
+          payroll_row_id: string
+          staff_id: string
+          period_month: string
+          old_synced_amount?: number | null
+          synced_amount: number
+          old_adjustment_amount: number
+          adjustment_amount: number
+          old_gross: number
+          gross: number
+          reason: string
+          adjusted_by: string
+          adjusted_at?: string
+        }
+        Update: {
+          id?: string
+          payroll_row_id?: string
+          staff_id?: string
+          period_month?: string
+          old_synced_amount?: number | null
+          synced_amount?: number
+          old_adjustment_amount?: number
+          adjustment_amount?: number
+          old_gross?: number
+          gross?: number
+          reason?: string
+          adjusted_by?: string
+          adjusted_at?: string
+        }
+        Relationships: [
+          { foreignKeyName: "revenue_payroll_commission_adjustments_staff_id_fkey"; columns: ["staff_id"]; isOneToOne: false; referencedRelation: "hr_staff_costs"; referencedColumns: ["id"] },
+          { foreignKeyName: "revenue_payroll_commission_adjustments_adjusted_by_fkey"; columns: ["adjusted_by"]; isOneToOne: false; referencedRelation: "users"; referencedColumns: ["id"] },
+        ]
+      }
       payroll_payment_requests: {
         Row: {
           amount: number
@@ -7010,6 +7076,20 @@ export type Database = {
       amend_loan_repayment: {
         Args: { p_new_amount: number; p_reason: string; p_repayment_id: string }
         Returns: Json
+      }
+      adjust_revenue_payroll_commission: { Args: { p_payroll_id: string; p_gross: number; p_expected_synced: number; p_expected_adjustment: number; p_reason: string }; Returns: Json }
+      revenue_payroll_adjustments: {
+        Args: { p_sub_department_id: string; p_period: string; p_staff_id?: string | null }
+        Returns: {
+          staff_id: string
+          commission_synced_amount: number | null
+          commission_adjustment_amount: number
+          commission_adjustment_reason: string | null
+          commission_amount: number
+          status: string
+          commission_adjusted_at: string | null
+          source_run_count: number
+        }[]
       }
       apply_commission_run: { Args: { p_run_id: string }; Returns: Json }
       apply_pool_adjustment: {

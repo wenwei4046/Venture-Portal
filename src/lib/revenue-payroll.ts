@@ -42,6 +42,9 @@ export function computeRevenuePayrollSplit(input: RevenuePayrollSplitInput): Rev
 
 export interface RevenuePayrollRow {
   commission_amount: number
+  commission_synced_amount?: number | null
+  commission_adjustment_amount?: number
+  commission_adjustment_reason?: string | null
   basic_salary: number
   prorata_days_worked: number
   prorata_days_in_month: number

@@ -17,6 +17,8 @@ import { updatePayrollRow } from '../actions'
 import { usePayrollDraft } from './PayrollDraftContext'
 import AmountInput from './AmountInput'
 import PaycheckWindow from './PaycheckWindow'
+import RevenueCommissionEditor from './RevenueCommissionEditor'
+import { adjustRevenueCommission, type RevenueCommissionAdjustmentInput } from '../commission-actions'
 import type { PayrollRowData } from './PayrollGrid'
 
 interface Props {
@@ -76,6 +78,7 @@ export default function PayrollRow({
   const dirty = dirtyList.length > 0
   const revenuePayroll = row.revenue_payroll ?? row.source === 'commission'
   const split = revenuePayroll ? calculateRevenuePayrollSplit(row) : null
+  const reviewedCommissionSource = row.commission_confirmed_amount ?? row.commission_synced_amount
   const statementHref = row.commission_statements?.[0]?.href ?? row.commission_statement_href
   const sourceLinked = row.source === 'commission' && Boolean(row.commission_statements?.length || row.commission_statement_href)
 
@@ -139,6 +142,11 @@ export default function PayrollRow({
         setError(err instanceof Error ? err.message : 'Save failed')
       }
     })
+  }
+
+  async function handleCommissionAdjustment(input: RevenueCommissionAdjustmentInput) {
+    await adjustRevenueCommission(row.id, input)
+    router.refresh()
   }
 
   // An editable figure — a field on a draft row, a bare figure once the
@@ -250,7 +258,26 @@ export default function PayrollRow({
               className={cn('num', split && row.commission_is_derived && 'derived', split && row.commission_amount === 0 && 'zero')}
               data-label="Gross Commission"
             >
-              {split ? grossCommission : '—'}
+              {split ? row.payout_split_version === 2 && reviewedCommissionSource != null ? (
+                <div className="flex flex-col items-end gap-1" title={dirty ? 'Save other row changes before adjusting commission' : row.commission_adjustment_reason ?? undefined}>
+                  <RevenueCommissionEditor
+                    baseAmount={reviewedCommissionSource}
+                    currentAdjustment={row.commission_adjustment_amount ?? 0}
+                    currentGross={row.commission_amount}
+                    staffName={row.staff_name}
+                    disabled={locked || dirty || isPending}
+                    onSave={handleCommissionAdjustment}
+                  />
+                  {statementHref && (
+                    (row.commission_statements?.length ?? 0) > 1 ? (
+                      <button type="button" onClick={onOpen} className="text-xs text-accent underline" title="View source commission statements">Sources ↗</button>
+                    ) : <a href={statementHref} className="text-xs text-accent underline" title="View the Revenue source commission">Source ↗</a>
+                  )}
+                </div>
+              ) : <>
+                {grossCommission}
+                {row.payout_split_version === 2 && !locked && <span className="block text-xs text-muted" title="Confirm or sync the Revenue source before recording a payroll adjustment">Source needed</span>}
+              </> : '—'}
             </td>
           </>
         )}
