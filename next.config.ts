@@ -13,11 +13,15 @@ const nextConfig: NextConfig = {
     },
   },
 
-  // Two moves on 2026-09-01, each leaving live bookmarks behind. Temporary
-  // rather than permanent: a 308 is cached by the browser forever, and
-  // either path may yet be reused.
+  // Resolve old bookmarks before rendering any page.
   async redirects() {
     return [
+      // There is only one login page; no legacy page component is needed.
+      {
+        source: '/member/login',
+        destination: '/login',
+        permanent: true,
+      },
       // Staff moved out of HR Costing into the Team module. Deep links to a
       // person, the edit form and the InfoTech import were all in use, so the
       // old tree keeps resolving.

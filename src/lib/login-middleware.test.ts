@@ -21,7 +21,7 @@ describe('canonical login middleware', () => {
     mocks.eq.mockReturnValue({ maybeSingle: mocks.profile })
   })
 
-  it.each(['/member', '/member?page=quote', '/dashboard'])('sends an anonymous %s request to the single login', async path => {
+  it.each(['/member', '/member?page=quote', '/dashboard', '/member/login'])('sends an anonymous %s request to the single login', async path => {
     const response = await middleware(new NextRequest(`https://portal.example${path}`))
     expect(response.status).toBe(307)
     expect(new URL(response.headers.get('location')!).pathname).toBe('/login')
@@ -29,8 +29,8 @@ describe('canonical login middleware', () => {
     expect(mocks.profile).not.toHaveBeenCalled()
   })
 
-  it.each(['/login', '/member/login'])('allows the anonymous %s page to render or redirect', async path => {
-    const response = await middleware(new NextRequest(`https://portal.example${path}`))
+  it('allows the only anonymous login page to render', async () => {
+    const response = await middleware(new NextRequest('https://portal.example/login'))
     expect(response.headers.get('x-middleware-next')).toBe('1')
     expect(response.headers.get('location')).toBeNull()
   })
