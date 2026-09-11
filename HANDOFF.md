@@ -1,4 +1,83 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-09-11 · IR release PR #82)
+# HOUZS Venture Portal — Session Handoff (checkpoint 2026-09-12 · Director Line → design A)
+
+## ═══ CHECKPOINT 2026-09-12 — read this first ═══
+
+**Where things stand.** PR #106 (Revenue Director layer, below) is MERGED and
+LIVE (`620bfca`; main has since taken #107, #108, #109 and is `02b3cd7`). What
+shipped draws each director INSIDE every sub-department frame they direct — a
+reserved row under the frame header — with one dashed line per team leader.
+The user rejected that drawing on 2026-09-12 (two screenshots): the lines fan
+through the team frames (11 teams × 2 directors = 22 lines on Fair, and Tidy
+cannot fix it because lines are not in its collision model — it packs frames
+only), the director cards should be "out of the box", each drawn once, and
+PETER's line should be pulled all the way to IR ("那个线应该是整个拉过去的").
+
+**Decision: design A.** Five drawings were discussed on the artifact
+https://claude.ai/code/artifact/30e9796b-8aa8-4b10-b39c-9e605723c28b — A rail
++ one line per frame; B rail + spine + a bus per row; C = A + B using the
+frame's own header rule and left border as the wire; B in a single row; D a
+radial hub with the directors inside. The user's last word: "算了吧，算了吧，
+走回 A 吧". **Nothing of A is implemented yet** — that session's context was
+full. Build it in a fresh worktree from `origin/main`.
+
+**What A is — build exactly this:**
+
+1. **A rail of director cards ABOVE all sub-department frames.** Every
+   director once (deduped across departments by `staffId`, sorted A→Z), the
+   same `.org-card.space-person.space-director` card as today, last row
+   `Directs · Fair · IR` (every sub-department they direct). Rail label
+   `REVENUE DIRECTORS · REPORTING ONLY` in the canvas's mono caps. One row,
+   y = top of the highest frame − 48 − 92 (card height), cards 24 px apart,
+   centred over the union of the frames (stable while frames are dragged).
+   HTML in the `ViewportPortal` like the headings — not React Flow nodes.
+2. **One dashed line per (director, directed sub-department), landing on the
+   frame's TOP EDGE.** From the card's bottom-centre down to a bus y (rail
+   bottom + 24), across to the frame's top-centre x, down to the frame's top;
+   a dot (r 3.5, `--cv-line`) at the landing. A frame with two directors gets
+   ONE bus bar joining both drops and ONE landing. PETER's second line runs to
+   IR the same way (exit ~50 px to the right of his card centre so it clears
+   Fair's bar). Reuse `.space-director-line`.
+3. **Nothing is drawn inside the frame for the directors.** Delete the
+   per-leader `.space-director-line` paths and the per-frame director cards in
+   `HierarchySpaces.tsx`; delete `directorRowHeight`, `SpaceDepartment
+   .directors`, `SpaceDepartmentGeometry.directors` and `contentTop` in
+   `src/lib/hierarchy-space-layout.ts` (frames go back to content-only bounds;
+   `interpolateGeometry` loses its directors branch). Keep the DATA
+   (`OrgDepartment.directors`, `directorKey`, `loadTeam`'s `directors`, the
+   Team tab's Reports-to section, `lib/department-heads.ts`).
+4. **Frame header** gains `Reports to KRIS · PETER` (a third span on
+   `.space-department-heading`, from `headsLabel`). Leader cards keep
+   `Reports to · KRIS · PETER` (`HierarchyPersonCard`); the popover's detach
+   row, the footer and the move note keep their "reports to …" wording.
+5. **Tests.** Replace the "director row" describe in
+   `src/lib/hierarchy-space-layout.test.ts` with tests for a pure rail helper
+   (recommended: `directorRail(directors, departmentBounds)` → card positions
+   + line routes, so the maths is testable). In `HierarchySpaces.test.tsx`
+   the "directors" describe becomes: 2 director cards (KRIS, PETER — deduped),
+   3 lines (KRIS→Fair and PETER→Fair joined on one bar, PETER→IR), leaders
+   still read "Reports to", the popover row still says
+   "reports to KRIS · PETER · no override".
+6. **Docs.** DESIGN.md: rewrite the `.space-director` row (rail, not a row
+   inside the frame) and add a change-log entry; commission spec §10
+   "Reports to" paragraph's last sentence; CLAUDE.md tree paragraph ("drawn
+   above every tree" → "a rail above the frames, one line per frame").
+   `db-schema.md` unchanged — no schema change.
+7. **Out of scope unless the user raises it:** People › Hierarchy still hangs
+   every Revenue root under KRIS with a dashed line to PETER (its own fan); the
+   CEO layer; FAA; the person card on People Management.
+
+**Repo state to know.** Main checkout on `main` at `02b3cd7`, clean except
+Codex's untracked `.next-member-preview/`. Codex's old uncommitted snapshot of
+the main checkout is parked on local branch `wip/codex-main-checkout-2026-09-12`
+(`2f23ede`): 18 of its 125 files never reached main (member preview page,
+MemberLoginClub, `tools/*-member-share.mjs`, `tests/member-sql/validate-revenue-
+payroll*.mjs`, `docs/member-phone-preview.md`, …) — the user has not said
+whether to keep it. Other worktrees (`payment-pv-redesign`,
+`loadphase-performance-b017be`, `payment-employee-selection`, `tmp/*`) belong to
+other sessions. Migration `20260915020000_revenue_directors.sql` is applied
+live under MCP's own version stamp; the file is idempotent. Live data: Fair ←
+KRIS, PETER; IR ← PETER; `titles.is_department_head` is true only on Revenue
+Director. Test login: `principal@venture.my` / `111111`.
 
 ## ═══ 2026-09-11 (evening) — Revenue Director layer ═══
 
