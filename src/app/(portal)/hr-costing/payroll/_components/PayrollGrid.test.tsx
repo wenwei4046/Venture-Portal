@@ -2,15 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import PayrollGrid, { type PayrollRowData } from './PayrollGrid'
 import { PayrollDraftProvider, usePayrollDraft } from './PayrollDraftContext'
+import SaveAllButton from './SaveAllButton'
 
-const { updatePayrollRow, deletePayrollRows, adjustRevenueCommission, refresh } = vi.hoisted(() => ({
+const { updatePayrollRow, updatePayrollRows, deletePayrollRows, adjustRevenueCommission, refresh } = vi.hoisted(() => ({
   updatePayrollRow: vi.fn().mockResolvedValue(undefined),
+  updatePayrollRows: vi.fn().mockResolvedValue({ saved: 1 }),
   deletePayrollRows: vi.fn().mockResolvedValue(undefined),
   adjustRevenueCommission: vi.fn().mockResolvedValue(undefined),
   refresh: vi.fn(),
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
-vi.mock('../actions', () => ({ updatePayrollRow, deletePayrollRows }))
+vi.mock('../actions', () => ({ updatePayrollRow, updatePayrollRows, deletePayrollRows }))
 vi.mock('../commission-actions', () => ({ adjustRevenueCommission }))
 
 function makeRow(overrides: Partial<PayrollRowData>): PayrollRowData {
@@ -37,8 +39,8 @@ const basicRevenue = makeRow({
 })
 
 function DraftState() {
-  const { edits } = usePayrollDraft()
-  return <output aria-label="Pending edits">{JSON.stringify(edits)}</output>
+  const { edits, dirtyCount } = usePayrollDraft()
+  return <><output aria-label="Pending edits">{JSON.stringify(edits)}</output><output aria-label="Dirty rows">{dirtyCount}</output></>
 }
 
 function grid(rows: PayrollRowData[]) {
@@ -54,6 +56,17 @@ function personRow(name: string) {
   return screen.getByRole('button', { name }).closest('tr')!
 }
 
+function enterAmount(label: string, value: string) {
+  const field = screen.getByLabelText(label)
+  fireEvent.focus(field)
+  fireEvent.change(field, { target: { value } })
+  fireEvent.blur(field)
+}
+
+const adjustableRevenue = makeRow({ ...basicRevenue, basic_salary: 0, commission_amount: 13000,
+  commission_synced_amount: 13000, commission_adjustment_amount: 0,
+  payout_split_version: 2, basic_pay_net: 0, commission_balance: 13000, gross: 13000, net: 13000 })
+
 beforeEach(() => {
   vi.clearAllMocks()
   Element.prototype.scrollIntoView = vi.fn()
@@ -63,26 +76,28 @@ describe('PayrollGrid Revenue integration', () => {
   it('reviews confirmed Revenue source when the payroll sync baseline is missing', () => {
     render(grid([makeRow({ ...basicRevenue, payout_split_version: 2, basic_pay_net: 4302.7,
       commission_synced_amount: null, commission_confirmed_amount: 13000, commission_adjustment_amount: 0 })]))
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Gross Commission — Revenue basic' }))
+    enterAmount('Gross Commission — Revenue basic', '14000')
+    fireEvent.click(within(personRow('Revenue basic')).getByRole('button', { name: 'Save' }))
     expect(screen.getByRole('row', { name: 'Synced from Revenue 13,000.00' })).toBeVisible()
     expect(screen.getByRole('row', { name: 'Current Gross Commission 10,000.00' })).toBeVisible()
   })
 
   it('saves a gross adjustment through its own action and waits for refreshed payout values', async () => {
-    const row = makeRow({ ...basicRevenue, basic_salary: 0, commission_amount: 13000,
-      commission_synced_amount: 13000, commission_adjustment_amount: 0,
-      payout_split_version: 2, basic_pay_net: 0, commission_balance: 13000, gross: 13000, net: 13000 })
+    const row = adjustableRevenue
     const { rerender } = render(grid([row]))
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Gross Commission — Revenue basic' }))
-    const requested = screen.getByLabelText('Requested Gross Commission')
-    fireEvent.focus(requested)
-    fireEvent.change(requested, { target: { value: '14000' } })
-    fireEvent.blur(requested)
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
+    expect(screen.queryByText('Adj.')).toBeNull()
+    enterAmount('Gross Commission — Revenue basic', '14000')
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByLabelText('Dirty rows')).toHaveTextContent('1')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.getByLabelText('Requested Gross Commission')).toHaveValue('14,000.00')
+    expect(screen.getByRole('row', { name: 'Payroll adjustment to Revenue source +1,000.00' })).toBeVisible()
     fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'Month-end correction' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save adjustment' }))
     await waitFor(() => expect(adjustRevenueCommission).toHaveBeenCalledWith(row.id, {
       gross: 14000, expectedSynced: 13000, expectedAdjustment: 0, reason: 'Month-end correction',
-    }))
+    }, {}))
     expect(updatePayrollRow).not.toHaveBeenCalled()
     expect(refresh).toHaveBeenCalled()
     expect(personRow('Revenue basic').querySelector('[data-label="Balance"]')).toHaveTextContent('13,000.00')
@@ -90,12 +105,68 @@ describe('PayrollGrid Revenue integration', () => {
     rerender(grid([{ ...row, commission_amount: 14000, commission_adjustment_amount: 1000,
       commission_balance: 14000, gross: 14000, net: 14000 }]))
     expect(personRow('Revenue basic').querySelector('[data-label="Balance"]')).toHaveTextContent('14,000.00')
-    expect(screen.getByLabelText('Current commission adjustment')).toHaveTextContent('+1,000.00')
+    const marker = screen.getByRole('button', { name: 'Commission adjustment +RM 1,000.00 — Revenue basic. Open details' })
+    expect(marker).toHaveAttribute('title', expect.stringContaining('+RM 1,000.00'))
+    expect(marker).toHaveTextContent('')
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
     const basic = screen.getByLabelText('Basic salary — Revenue basic')
     fireEvent.focus(basic)
     fireEvent.change(basic, { target: { value: '2000' } })
     fireEvent.blur(basic)
-    expect(screen.getByRole('button', { name: 'Edit Gross Commission — Revenue basic' })).toBeDisabled()
+    expect(screen.getByLabelText('Gross Commission — Revenue basic')).toBeEnabled()
+  })
+
+  it('keeps the inline draft after cancel and saves mixed edits only after confirmation', async () => {
+    render(grid([adjustableRevenue]))
+    enterAmount('Basic salary — Revenue basic', '2500')
+    enterAmount('Gross Commission — Revenue basic', '12000')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.getByRole('row', { name: 'Payroll adjustment to Revenue source -1,000.00' })).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByLabelText('Gross Commission — Revenue basic')).toHaveValue('12,000.00')
+    expect(screen.getByLabelText('Basic salary — Revenue basic')).toHaveValue('2,500.00')
+    expect(updatePayrollRow).not.toHaveBeenCalled()
+    expect(adjustRevenueCommission).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'Dropped sale' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save adjustment' }))
+    await waitFor(() => expect(adjustRevenueCommission).toHaveBeenCalledWith(adjustableRevenue.id,
+      { gross: 12000, expectedSynced: 13000, expectedAdjustment: 0, reason: 'Dropped sale' }, { basic_salary: 2500 }))
+    expect(updatePayrollRow).not.toHaveBeenCalled()
+  })
+
+  it('preserves unsaved commission across refresh and reviews the latest source before saving', () => {
+    const { rerender } = render(grid([adjustableRevenue]))
+    enterAmount('Gross Commission — Revenue basic', '14000')
+    rerender(grid([{ ...adjustableRevenue, commission_synced_amount: 13500, commission_amount: 13500 }]))
+    expect(screen.getByLabelText('Gross Commission — Revenue basic')).toHaveValue('14,000.00')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.getByRole('row', { name: 'Synced from Revenue 13,500.00' })).toBeVisible()
+    expect(screen.getByRole('row', { name: 'Payroll adjustment to Revenue source +500.00' })).toBeVisible()
+  })
+
+  it('header Save opens the review and never sends commission or mixed fields to the generic batch', async () => {
+    render(<PayrollDraftProvider><SaveAllButton /><PayrollGrid rows={[adjustableRevenue]} period="2026-09-01" /></PayrollDraftProvider>)
+    enterAmount('Basic salary — Revenue basic', '2500')
+    enterAmount('Gross Commission — Revenue basic', '14000')
+    fireEvent.click(screen.getByRole('button', { name: 'Save 1 row' }))
+    expect(await screen.findByRole('dialog')).toBeVisible()
+    expect(updatePayrollRows).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save 1 row' })).toBeEnabled())
+    expect(adjustRevenueCommission).not.toHaveBeenCalled()
+    expect(updatePayrollRows).not.toHaveBeenCalled()
+  })
+
+  it('invalid inline text cannot silently save the last valid commission', () => {
+    render(grid([adjustableRevenue]))
+    enterAmount('Gross Commission — Revenue basic', '14000')
+    enterAmount('Gross Commission — Revenue basic', 'invalid')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(adjustRevenueCommission).not.toHaveBeenCalled()
+    expect(updatePayrollRow).not.toHaveBeenCalled()
   })
 
   it('filters department rows and totals while preserving unsaved edits', () => {
