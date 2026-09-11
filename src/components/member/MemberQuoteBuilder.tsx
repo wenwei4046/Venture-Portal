@@ -1304,6 +1304,7 @@ export default function MemberQuoteBuilder({
       </div>
       {view === "catalog" ? (
         <>
+          {categories.length > 0 && <>
           <div className={s.catalogToolbar}>
             <div className={s.catalogCategories} aria-label="Product category">
               {categories.map((c) => (
@@ -1329,8 +1330,10 @@ export default function MemberQuoteBuilder({
           <div className={s.categoryGrid}>
             {categories.map(renderCategoryCard)}
           </div>
+          </>}
           {!families.length && (
-            <div className={s.empty}>
+            <div className={`${s.empty} ${catalogStyles.emptyCatalog}`}>
+              <span className={catalogStyles.emptyCatalogIcon} aria-hidden="true"><Symbol name="cart" size={24} /></span>
               <h2>Your product collection is on its way</h2>
               <p className={s.sub}>
                 Products will appear here when the catalogue is ready.

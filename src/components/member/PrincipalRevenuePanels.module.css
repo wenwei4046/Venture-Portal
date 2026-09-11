@@ -1,8 +1,53 @@
-.toolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:12px 28px 0; }
-.toolbar > div { min-width:0; }
-.toolbar label { display:flex; align-items:center; gap:10px; font-size:13px; }
-.toolbar select { min-width:0; max-width:100%; border:1px solid var(--m-border); border-radius:12px; background:var(--m-card); color:var(--m-text); padding:10px 12px; min-height:44px; font:inherit; }
-.toolbar form { max-width:100%; }
+.toolbar {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--m-border);
+  border-radius: 14px;
+  background: var(--m-card);
+}
+.toolbar form { flex: 1; min-width: 0; }
+.toolbar form > span { display: none; }
+.toolbar label {
+  position: relative;
+  display: flex;
+  flex: 0 0 96px;
+  min-width: 0;
+}
+.toolbar label::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 1px;
+  background: var(--m-border);
+  pointer-events: none;
+}
+.toolbar select {
+  appearance: none;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 46px;
+  padding: 10px 32px 10px 14px;
+  border: 0;
+  border-radius: 12px;
+  color: var(--m-text);
+  background-color: transparent;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2382776a' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  font-size: 16px;
+  line-height: 24px;
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+.toolbar select:hover { background-color: var(--m-soft); }
+.toolbar select:disabled { cursor: wait; }
+.toolbar select option { color: var(--m-text); background: var(--m-card); }
 .period { max-width:260px; margin-bottom:20px; }
 .section { margin-top:24px; margin-bottom:24px; }
 .tree { margin-top:20px; }
@@ -11,5 +56,3 @@
 .orderAmount { text-align:right; }
 .status { text-transform:capitalize; }
 .progress { width:100%; height:8px; margin-top:12px; accent-color:rgb(var(--accent)); }
-@media(max-width:600px) { .toolbar { padding:12px 20px 0; gap:8px; } .toolbar label { gap:6px; } .toolbar select { max-width:170px; font-size:14px; } }
-@media(max-width:360px) { .toolbar { padding-inline:16px; } .toolbar label { flex-direction:column; align-items:flex-start; gap:3px; } }
