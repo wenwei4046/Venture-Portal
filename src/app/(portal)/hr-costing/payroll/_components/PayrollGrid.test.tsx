@@ -73,25 +73,38 @@ describe('PayrollGrid Revenue integration', () => {
 
     fireEvent.change(screen.getByLabelText('Department'), { target: { value: 'Finance' } })
     expect(screen.getByLabelText('Basic salary — Finance employee')).toHaveValue('3,200.00')
-    expect(screen.queryByRole('columnheader', { name: 'Comm. balance' })).toBeNull()
+    expect(screen.queryByRole('columnheader', { name: 'Gross Commission' })).toBeNull()
+    expect(screen.getByRole('columnheader', { name: 'Comm.' })).toBeVisible()
     fireEvent.change(screen.getByLabelText('Department'), { target: { value: '' } })
     expect(screen.getByText('Total · 2 staff')).toBeVisible()
   })
 
-  it('shows basic and commission balance for Revenue, including full commission', () => {
+  it('shows gross commission beside net basic and the saved balance under Earnings', () => {
+    const revenue = { ...basicRevenue, payout_split_version: 2, basic_pay_net: 4302.7, commission_balance: 4253.45, gross: 9253.45, net: 8556.15 }
     const fullCommission = makeRow({
-      ...basicRevenue, id: 'revenue-full', staff_id: 'staff-revenue-full',
+      ...revenue, id: 'revenue-full', staff_id: 'staff-revenue-full',
       staff_name: 'Revenue full commission', basic_salary: 0, epf_er: 0, epf_ee: 0,
-      gross: 10000, net: 10000,
+      gross: 10000, net: 10000, basic_pay_net: 0, commission_balance: 10000,
     })
-    render(grid([makeRow({}), basicRevenue, fullCommission]))
+    render(grid([makeRow({}), revenue, fullCommission]))
     fireEvent.change(screen.getByLabelText('Department'), { target: { value: 'Revenue' } })
     const basic = personRow('Revenue basic')
-    expect(basic.querySelector('[data-label="Basic pay"]')).toHaveTextContent('5,000.00')
-    expect(basic.querySelector('[data-label="Commission balance"]')).toHaveTextContent('3,800.00')
+    expect(screen.getByRole('columnheader', { name: 'Gross Commission' })).toBeVisible()
+    expect(screen.getByRole('columnheader', { name: 'Balance' })).toBeVisible()
+    expect(basic.querySelector('[data-label="Basic pay"]')).toHaveTextContent('4,302.70')
+    expect(basic.querySelector('[data-label="Gross Commission"]')).toHaveTextContent('10,000.00')
+    expect(basic.querySelector('[data-label="Balance"]')).toHaveTextContent('4,253.45')
+    expect(within(basic).queryByLabelText('Commission — Revenue basic')).toBeNull()
     const full = personRow('Revenue full commission')
     expect(full.querySelector('[data-label="Basic pay"]')).toHaveTextContent('0.00')
-    expect(full.querySelector('[data-label="Commission balance"]')).toHaveTextContent('10,000.00')
+    expect(full.querySelector('[data-label="Gross Commission"]')).toHaveTextContent('10,000.00')
+    expect(full.querySelector('[data-label="Balance"]')).toHaveTextContent('10,000.00')
+    const footer = screen.getByText('Total · 2 staff').closest('tr')!
+    expect(footer.cells[5]).toHaveTextContent('20,000.00')
+    expect(footer.cells[10]).toHaveTextContent('14,253.45')
+    const department = screen.getByRole('button', { name: 'Revenue, 2 staff' }).closest('tr')!
+    expect(department.cells[5]).toHaveTextContent('20,000.00')
+    expect(department.cells[7]).toHaveTextContent('14,253.45')
     expect(within(basic).getByLabelText('Select Revenue basic')).toBeDisabled()
     expect(screen.getByLabelText('Select all draft rows')).toBeDisabled()
     expect(within(basic).getByRole('link', { name: '10,000.00' })).toHaveAttribute('href', basicRevenue.commission_statements![0].href)
@@ -102,12 +115,16 @@ describe('PayrollGrid Revenue integration', () => {
     render(grid([basicRevenue, imported]))
     const ordinary = personRow('Finance employee')
     expect(ordinary.querySelector('[data-label="Basic pay"]')).toHaveTextContent('—')
-    expect(ordinary.querySelector('[data-label="Commission balance"]')).toHaveTextContent('—')
+    expect(ordinary.querySelector('[data-label="Gross Commission"]')).toHaveTextContent('—')
+    expect(ordinary.querySelector('[data-label="Balance"]')).toBeNull()
     expect(within(ordinary).getByLabelText('Commission — Finance employee')).toHaveValue('120.00')
     expect(within(ordinary).getByLabelText('Select Finance employee')).toBeEnabled()
     fireEvent.click(screen.getByLabelText('Select all draft rows'))
     expect(within(ordinary).getByLabelText('Select Finance employee')).toBeChecked()
     expect(screen.getByLabelText('Select Revenue basic')).not.toBeChecked()
+    const footer = screen.getByText('Total · 2 staff').closest('tr')!
+    expect(footer.cells[5]).toHaveTextContent('10,000.00')
+    expect(footer.cells[10]).toHaveTextContent('3,920.00')
   })
 
   it('allows deleting an unlinked Revenue draft while protecting linked zero-amount rows', async () => {
@@ -141,7 +158,7 @@ describe('PayrollGrid Revenue integration', () => {
 
   it('does not reinterpret a historical commission row without the new settlement formula', () => {
     render(grid([{ ...basicRevenue, revenue_payroll: false, status: 'paid', gross: 15000, net: 14450 }]))
-    expect(screen.queryByRole('columnheader', { name: 'Comm. balance' })).toBeNull()
+    expect(screen.queryByRole('columnheader', { name: 'Gross Commission' })).toBeNull()
     expect(personRow('Revenue basic').querySelector('.pg-gross')).toHaveTextContent('15,000.00')
     fireEvent.click(screen.getByRole('button', { name: 'Revenue basic' }))
     expect(screen.queryByRole('region', { name: 'Revenue payout split' })).toBeNull()
