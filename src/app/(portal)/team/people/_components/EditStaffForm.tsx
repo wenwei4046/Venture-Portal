@@ -29,6 +29,8 @@ export interface StaffRow {
   employment_type: string
   bank_name: string | null
   bank_account_no: string | null
+  bank_name_2?: string | null
+  bank_account_no_2?: string | null
   nric: string | null
   contact_number: string | null
   email: string | null
@@ -359,26 +361,56 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
       )}
 
       {/* Section 4 — Bank account (Spec 5) */}
-      <h3 className="font-serif text-lg text-ink mb-4">Bank account</h3>
+      <h3 className="font-serif text-lg text-ink mb-4">Account 1 <span className="text-xs text-muted font-normal">Default receiving bank account</span></h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Bank <span className="text-xs text-muted ml-1 font-normal">(e.g. Maybank, Hong Leong)</span>
+          <label htmlFor="edit-staff-bank" className="block text-sm font-sans font-medium text-graphite mb-1.5">
+            Account 1 bank <span className="text-xs text-muted ml-1 font-normal">(e.g. Maybank, Hong Leong)</span>
           </label>
           <input
             name="bank_name"
+            id="edit-staff-bank"
             defaultValue={staff.bank_name ?? ''}
             placeholder="Maybank"
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
           />
         </div>
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Account No <span className="text-xs text-muted ml-1 font-normal">(digits only)</span>
+          <label htmlFor="edit-staff-bank-account" className="block text-sm font-sans font-medium text-graphite mb-1.5">
+            Account 1 number <span className="text-xs text-muted ml-1 font-normal">(digits only)</span>
           </label>
           <input
             name="bank_account_no"
+            id="edit-staff-bank-account"
             defaultValue={staff.bank_account_no ?? ''}
+            placeholder="1234567890"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+          />
+        </div>
+      </div>
+
+      <h3 className="font-serif text-lg text-ink mb-1">Account 2 <span className="text-xs text-muted font-normal">Optional</span></h3>
+      <p className="text-xs text-muted mb-4">Enter both the bank and account number, or leave both blank.</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <div>
+          <label htmlFor="edit-staff-bank-2" className="block text-sm font-sans font-medium text-graphite mb-1.5">Account 2 bank</label>
+          <input
+            id="edit-staff-bank-2"
+            name="bank_name_2"
+            defaultValue={staff.bank_name_2 ?? ''}
+            autoComplete="off"
+            placeholder="Maybank"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+          />
+        </div>
+        <div>
+          <label htmlFor="edit-staff-bank-account-2" className="block text-sm font-sans font-medium text-graphite mb-1.5">Account 2 number <span className="text-xs text-muted ml-1 font-normal">(digits only)</span></label>
+          <input
+            id="edit-staff-bank-account-2"
+            name="bank_account_no_2"
+            defaultValue={staff.bank_account_no_2 ?? ''}
+            inputMode="numeric"
+            autoComplete="off"
             placeholder="1234567890"
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
           />

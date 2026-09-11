@@ -69,6 +69,7 @@ export default function EditableStatLine({ payrollId, field, value, readOnly }: 
         <input
           ref={inputRef}
           type="text"
+          aria-label={`Override ${field.toUpperCase()}`}
           inputMode="decimal"
           value={draft}
           onChange={(e) => setDraft(e.target.value.replace(/[^\d.]/g, ''))}
@@ -78,6 +79,7 @@ export default function EditableStatLine({ payrollId, field, value, readOnly }: 
               e.preventDefault()
               commit()
             } else if (e.key === 'Escape') {
+              e.stopPropagation()
               setDraft(value.toFixed(2))
               setEditing(false)
               setError(null)
@@ -96,6 +98,7 @@ export default function EditableStatLine({ payrollId, field, value, readOnly }: 
   return (
     <button
       type="button"
+      aria-label={`Edit ${field.toUpperCase()}`}
       onClick={() => setEditing(true)}
       title="Click to override"
       className="num hover:text-accent hover:bg-accent/5 rounded px-1 -mx-1 transition-colors cursor-text"

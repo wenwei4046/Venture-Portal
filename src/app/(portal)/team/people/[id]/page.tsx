@@ -164,9 +164,11 @@ export default async function StaffDetailPage({ params }: PageProps) {
           <Field label="Phone" value={staff.emergency_contact_phone} mono />
         </Section>
 
-        <Section title="Bank Account">
-          <Field label="Bank" value={staff.bank_name} />
-          <Field label="Account No" value={staff.bank_account_no} mono />
+        <Section title="Bank Accounts">
+          <Field label="Account 1 bank" value={staff.bank_name} />
+          <Field label="Account 1 number" value={staff.bank_account_no} mono />
+          <Field label="Account 2 bank" value={staff.bank_name_2} />
+          <Field label="Account 2 number" value={staff.bank_account_no_2} mono />
         </Section>
 
         {fullCommission ? (

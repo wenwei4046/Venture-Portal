@@ -62,7 +62,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
       .select(`
         id, staff_id, period_month, status, source,
         basic_salary, statutory_allowance, non_statutory_allowance,
-        ot_hours, ot_amount, commission_amount, commission_balance, unpaid_leave_days,
+        ot_hours, ot_amount, commission_amount, commission_balance, payout_split_version, basic_pay_net, pcb_override_amount, unpaid_leave_days,
         deduction_amount, skbbk_amount,
         prorata_days_worked, prorata_days_in_month,
         epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb, withholding_tax,
@@ -218,6 +218,9 @@ export default async function PayrollGridPage({ params }: PageProps) {
       ot_amount: Number(r.ot_amount),
       commission_amount: Number(r.commission_amount),
       commission_balance: r.commission_balance == null ? null : Number(r.commission_balance),
+      payout_split_version: r.payout_split_version,
+      basic_pay_net: r.basic_pay_net == null ? null : Number(r.basic_pay_net),
+      pcb_override_amount: r.pcb_override_amount == null ? null : Number(r.pcb_override_amount),
       unpaid_leave_days: Number(r.unpaid_leave_days),
       deduction_amount: Number(r.deduction_amount),
       skbbk_amount: Number(r.skbbk_amount ?? 0),

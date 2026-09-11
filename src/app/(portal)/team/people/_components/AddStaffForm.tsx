@@ -274,13 +274,13 @@ export default function AddStaffForm({ departments, titles }: Props) {
       <div className="border-t border-hairline my-6" />
 
       <h3 className="font-serif text-md text-ink mb-1">
-        Bank account{' '}
-        <span className={hintBase}>optional, but payroll cannot pay them without it</span>
+        Account 1{' '}
+        <span className={hintBase}>default receiving bank account</span>
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
         <div>
           <label htmlFor="staff-bank" className={labelBase}>
-            Bank
+            Account 1 bank
           </label>
           <input
             id="staff-bank"
@@ -298,7 +298,7 @@ export default function AddStaffForm({ departments, titles }: Props) {
         </div>
         <div>
           <label htmlFor="staff-bank-account" className={labelBase}>
-            Account No <span className={hintBase}>digits only</span>
+            Account 1 number <span className={hintBase}>digits only</span>
           </label>
           <input
             id="staff-bank-account"
@@ -308,6 +308,21 @@ export default function AddStaffForm({ departments, titles }: Props) {
             placeholder="1234567890"
             className={monoInput}
           />
+        </div>
+      </div>
+
+      <div className="border-t border-hairline my-6" />
+
+      <h3 className="font-serif text-md text-ink mb-1">Account 2 <span className={hintBase}>optional</span></h3>
+      <p className="text-xs text-muted">Enter both the bank and account number, or leave both blank.</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+        <div>
+          <label htmlFor="staff-bank-2" className={labelBase}>Account 2 bank</label>
+          <input id="staff-bank-2" name="bank_name_2" list="staff-bank-names" autoComplete="off" placeholder="Maybank" className={textInput} />
+        </div>
+        <div>
+          <label htmlFor="staff-bank-account-2" className={labelBase}>Account 2 number <span className={hintBase}>digits only</span></label>
+          <input id="staff-bank-account-2" name="bank_account_no_2" inputMode="numeric" autoComplete="off" placeholder="1234567890" className={monoInput} />
         </div>
       </div>
 

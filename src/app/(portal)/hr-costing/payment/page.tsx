@@ -14,6 +14,7 @@ import {
   normaliseCycle,
   payVariances,
   round2,
+  salaryPaidAmount,
   statutoryRows,
   type HeadlineInput,
 } from '@/lib/payment-cycle'
@@ -108,7 +109,7 @@ export default async function HRPaymentPage({ searchParams }: { searchParams: Pr
   const staffPaid = staffGroups.length > 0 && staffGroups.every((g) => g.stage === 'paid')
   const dirPaid = dirGroups.length > 0 && dirGroups.every((g) => g.stage === 'paid')
   const salaryDone = totals.people > 0 && groups.every((g) => g.stage === 'paid' || g.headcount === 0)
-  const paidNet = groups.reduce((s, g) => s + g.people.filter((p) => p.voucher?.status === 'paid').reduce((t, p) => t + p.net, 0), 0)
+  const paidNet = groups.reduce((s, g) => s + g.people.reduce((t, p) => t + salaryPaidAmount(p), 0), 0)
   const statDone = rows.length > 0 && rows.every((r) => r.stage === 'paid')
   const facts: Facts = {
     ctc: band.cost,

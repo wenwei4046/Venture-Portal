@@ -967,17 +967,22 @@ export async function updatePaymentVoucher(formData: FormData) {
     throw new Error(`Cannot edit voucher in status "${current.status}" — only pending_approval / draft are editable`)
   }
 
-  if (current.reference_type === 'payroll_statutory') {
-    // These amounts and sources are backed by immutable employee contribution
-    // snapshots. Editing the payment date/notes must not replace source rows.
+  if (current.reference_type === 'payroll_statutory' || current.reference_type === 'payroll_disbursement') {
+    // Snapshot-backed payroll PVs retain every financial detail, including
+    // salary components and receiving accounts. Metadata edits never replace sources.
+    const salaryPayment = current.reference_type === 'payroll_disbursement'
+    const snapshotTable = salaryPayment ? 'payroll_voucher_lines' : 'payroll_statutory_voucher_lines'
+    const detailsLabel = salaryPayment ? 'salary payment details' : 'statutory contributions'
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: coverage, error: coverageError } = await (supabase as any)
-      .from('payroll_statutory_voucher_lines').select('id').eq('voucher_id', id).limit(1)
-    if (coverageError) throw new Error('Unable to verify the recorded statutory contributions. Please refresh and try again.')
+      .from(snapshotTable).select('id').eq('voucher_id', id).limit(1)
+    if (coverageError) throw new Error(`Unable to verify the recorded ${detailsLabel}. Please refresh and try again.`)
     if (coverage?.length) {
       const allowed = new Set(['id', 'payment_date', 'notes'])
       if (Array.from(formData.keys()).some((key) => !allowed.has(key))) {
-        throw new Error('This statutory PV has recorded employee contributions. Only its payment date and notes can be edited. To change people, amounts, payee, bank or source accounts, void it and generate a new PV from HR Payment.')
+        throw new Error(salaryPayment
+          ? 'This salary PV has recorded employee payments and receiving accounts. Only its payment date and notes can be edited. To change people, salary components, amounts, payee, banks or source accounts, void it and generate a new PV from HR Payment.'
+          : 'This statutory PV has recorded employee contributions. Only its payment date and notes can be edited. To change people, amounts, payee, bank or source accounts, void it and generate a new PV from HR Payment.')
       }
       const updates: { payment_date?: string; notes?: string | null; updated_at: string } = { updated_at: new Date().toISOString() }
       if (formData.has('payment_date')) {
@@ -990,11 +995,11 @@ export async function updatePaymentVoucher(formData: FormData) {
       if (formData.has('notes')) updates.notes = String(formData.get('notes') ?? '').trim() || null
       const { data: updated, error: updateError } = await supabase.from('payment_vouchers')
         .update(updates).eq('id', id).in('status', ['pending_approval', 'draft']).select('id')
-      if (updateError) throw new Error(`Failed to update statutory PV: ${updateError.message}`)
+      if (updateError) throw new Error(`Failed to update ${salaryPayment ? 'salary' : 'statutory'} PV: ${updateError.message}`)
       if (!updated?.length) throw new Error('Voucher status changed mid-edit (already approved or voided) — refresh and try again')
       await supabase.from('access_log').insert({
         user_id: user.id, action: 'update_payment_voucher', resource_type: 'payment_voucher', resource_id: id,
-        metadata: { status_at_edit: current.status, voucher_type: current.voucher_type, statutory_details_preserved: true },
+        metadata: { status_at_edit: current.status, voucher_type: current.voucher_type, ...(salaryPayment ? { salary_details_preserved: true } : { statutory_details_preserved: true }) },
       }).then(() => { /* best-effort audit */ }, () => { /* do not block the completed edit */ })
       revalidatePath(`/payments/${id}`)
       revalidatePath('/payments')
@@ -1462,7 +1467,10 @@ export async function reversePaidPayment(formData: FormData) {
   if (v.voucher_type === 'loan_repayment' && v.loan_id) {
     throw new Error('Loan-repayment vouchers tied to a loan can’t be reversed here — void and recreate.')
   }
-  if (v.voucher_type === 'payroll_bank_transfer' || v.voucher_type === 'salary_payout') {
+  // Salary component status updates also reconcile payroll coverage. This
+  // multi-request reversal cannot atomically unwind that lifecycle: reject
+  // before changing bank/GL/pools, including salary PVs typed as 'other'.
+  if (v.voucher_type === 'payroll_bank_transfer' || v.voucher_type === 'salary_payout' || v.reference_type === 'payroll_disbursement') {
     throw new Error('Payroll / salary payments must be reversed through the payroll flow.')
   }
   if (v.reference_type === 'dept_payment_request') {

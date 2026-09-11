@@ -398,7 +398,8 @@ function Details({ person }: { person: PersonCardData }) {
         />
       </Section>
       <Section title="Payroll">
-        <Field label="Bank" value={[s.bank_name, s.bank_account_no].filter(Boolean).join(' · ') || null} />
+        <Field label="Account 1" value={[s.bank_name, s.bank_account_no].filter(Boolean).join(' · ') || null} />
+        <Field label="Account 2" value={[s.bank_name_2, s.bank_account_no_2].filter(Boolean).join(' · ') || null} />
         {isFullyCommissionBased(s) ? (
           // No basic, no allowance, statutory at 0 — the one line says it all.
           <Field label="Pay basis" value="Fully commission based" />

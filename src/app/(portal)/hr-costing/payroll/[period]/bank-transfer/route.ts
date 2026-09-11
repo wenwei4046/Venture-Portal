@@ -1,21 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import { generateAllianceBankCsv, type PayslipPayee } from '@/lib/bank-transfer/alliance-bank'
+import { generateAllianceBankCsv } from '@/lib/bank-transfer/alliance-bank'
+import { salaryBankPayees, type SalaryBankLine } from '@/lib/bank-transfer/payroll-voucher-payees'
 
-/**
- * GET /hr-costing/payroll/[period]/bank-transfer?format=alliance
- *
- * Streams an Alliance Bank bulk-payment CSV for every staff row in the
- * period. Two-step salary flow (corrected 2026-04-17):
- *   1. Finance moves the lump sum HL Bank → Alliance Bank (Spec 4
- *      payroll_bank_transfer voucher).
- *   2. HR downloads THIS CSV, uploads it to the Alliance Bank portal,
- *      and triggers the bulk payout.
- *
- * Allowed by the Read-only file downloads exception in CLAUDE.md
- * (Spec 5a). Requires principal / finance / hr — HR is the primary
- * operator but Finance and Principal can regenerate for oversight.
+/** Download the selected generated salary PVs using their recipient snapshots.
+ * Approval is the existing system's paid event, so paid PVs remain exportable.
+ * A download does not initiate or record a second bank transfer.
  */
 export async function GET(
   request: Request,
@@ -47,20 +38,25 @@ export async function GET(
     return NextResponse.json({ error: 'invalid department' }, { status: 400 })
   }
 
+  const voucherParam = url.searchParams.get('vouchers')
+  const voucherIds = voucherParam === null ? null : voucherParam.split(',')
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (voucherIds && (!voucherIds.length || voucherIds.length > 500 || voucherIds.some(id => !uuid.test(id)) || new Set(voucherIds).size !== voucherIds.length)) {
+    return NextResponse.json({ error: 'Invalid salary PV selection' }, { status: 400 })
+  }
   const supabase = await createClient()
-
-  let query = supabase
-    .from('hr_monthly_payroll')
-    .select(`
-      net, status,
-      hr_staff_costs!inner (employee_name, employee_code, bank_name, bank_account_no, department_id)
-    `)
-    .eq('period_month', period)
-  if (department) query = query.eq('hr_staff_costs.department_id', department)
+  let query = supabase.from('payroll_voucher_lines').select(`
+    payroll_row_id, employee_name, employee_code, net, salary_component, bank_name, bank_account_no,
+    payment_vouchers!inner(id, voucher_no, status, payment_date)
+  `).eq('period_month', period).eq('scope', 'staff')
+    .in('payment_vouchers.status', ['pending_approval', 'approved', 'paid'])
+  if (department) query = query.eq('department_id', department)
+  if (voucherIds) query = query.in('voucher_id', voucherIds)
   const { data: rows, error } = await query
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const lines = (rows ?? []) as unknown as SalaryBankLine[]
+  if (voucherIds && new Set(lines.map(line => line.payment_vouchers.id)).size !== voucherIds.length) {
+    return NextResponse.json({ error: 'Selected salary PVs changed or are outside this payroll group' }, { status: 409 })
   }
 
   const periodDate = new Date(period + 'T00:00:00Z')
@@ -70,27 +66,13 @@ export async function GET(
     timeZone: 'UTC',
   })
 
-  const payees: PayslipPayee[] = (rows ?? []).map(r => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const staff = (r as any).hr_staff_costs
-    return {
-      employeeName: staff?.employee_name ?? 'Unknown',
-      employeeCode: staff?.employee_code ?? null,
-      bankName: staff?.bank_name ?? null,
-      bankAccountNo: staff?.bank_account_no ?? null,
-      amount: Number(r.net),
-      voucherNo: null, // voucher_no wiring can come once payroll_runs.id is threaded in
-      periodLabel,
-    }
-  })
-
-  // Default payment date = end of the period's month so the value
-  // reaches employees the same month. HR can change inside the bank portal.
-  const paymentDate = new Date(
-    Date.UTC(periodDate.getUTCFullYear(), periodDate.getUTCMonth() + 1, 0),
-  )
-
-  const result = generateAllianceBankCsv(payees, paymentDate)
+  let result
+  try {
+    const payees = salaryBankPayees(lines, periodLabel)
+    result = generateAllianceBankCsv(payees, periodDate)
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Cannot export these salary PVs' }, { status: 409 })
+  }
 
   const filename = `alliance-bank-payroll-${period.slice(0, 7)}${department ? '-dept' : ''}.csv`
 

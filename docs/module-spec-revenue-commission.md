@@ -15,7 +15,48 @@ cross-apply the two programmes.
 
 ---
 
-## Payroll integration — 2026-09-11 amendment
+## Net basic, statutory and commission payments — 2026-09-11 clarification
+
+This clarification replaces the earlier EPF-only split below for newly computed
+Revenue payroll. Basic follows the ordinary payroll deduction process. Its
+salary PV pays **net basic**. The gross commission funds net basic, employee
+contributions/tax, employer contributions, and the remaining commission PV.
+
+```text
+actual basic       = basic salary × saved pro-rata ratio, rounded to cents
+net basic          = actual basic − EPF EE − SOCSO EE − EIS EE − PCB
+employer statutory = EPF ER + SOCSO ER + EIS ER
+payroll gross      = gross commission − employer statutory + other earnings − deduction
+payroll net        = payroll gross − employee statutory − PCB/WHT − SKBBK
+commission balance = payroll net − net basic
+```
+
+PCB for this Revenue arrangement uses actual basic less employee EPF, with the
+employee's existing category/children lookup. HR can override PCB; that amount
+persists through recomputation until Reset to JADUAL. This is the user's payroll
+configuration, not a general tax calculation for imported departments.
+
+Example: gross commission RM10,000; basic RM5,000; employee EPF/SOCSO/EIS
+RM584.65; PCB RM112.65; employer EPF/SOCSO/EIS RM746.55. Basic salary PV is
+RM4,302.70 and commission salary PV is RM4,253.45. Institution PVs separately
+pay RM697.30 employee contributions/tax and RM746.55 employer contributions.
+All four allocations total RM10,000. Ordinary additional payroll adjustments
+remain in the commission portion; negative components stay visible and prevent
+submission/payment.
+
+Account 1 retains the existing employee bank fields. Account 2 is optional and
+requires a complete bank/account pair. Each basic or commission salary payment
+selects its own receiving account. PVs retain the selected bank snapshot; later
+profile edits never change an existing voucher. Component coverage prevents
+duplicate basic or commission payments, and a payroll row is fully paid only
+when all positive components are paid. Historical whole-net vouchers cover the
+whole row. Voiding restores only the affected component's availability.
+
+`payout_split_version = 2` identifies this model. Existing imported and finalized
+payroll is not recalculated by deployment. Refreshing an open commission draft
+adopts the model. The legacy amendment below documents the preceding release.
+
+## Payroll integration — earlier 2026-09-11 amendment
 
 This amendment supersedes the older Apply step and the basic-plus-commission
 formula described below. Revenue's **Compute & sync payroll** saves a clean

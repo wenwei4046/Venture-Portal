@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { validateStaffForm, designationForTitle, payFieldsForUpdate } from '@/lib/staff-form'
+import { validateSecondaryStaffBankAccount } from '@/lib/staff-bank-accounts'
 
 function trimOrNull(v: FormDataEntryValue | null): string | null {
   if (typeof v !== 'string') return null
@@ -41,6 +42,8 @@ export async function addStaff(formData: FormData) {
     nonStatutoryAllowance: str(formData, 'non_statutory_allowance'),
     bankName: str(formData, 'bank_name'),
     bankAccountNo: str(formData, 'bank_account_no'),
+    bankName2: str(formData, 'bank_name_2'),
+    bankAccountNo2: str(formData, 'bank_account_no_2'),
     contactNumber: str(formData, 'contact_number'),
     email: str(formData, 'email'),
     address: str(formData, 'address'),
@@ -70,6 +73,8 @@ export async function addStaff(formData: FormData) {
     non_statutory_allowance: form.nonStatutoryAllowance,
     bank_name: form.bankName,
     bank_account_no: form.bankAccountNo,
+    bank_name_2: form.bankName2,
+    bank_account_no_2: form.bankAccountNo2,
     contact_number: form.contactNumber,
     email: form.email,
     address: form.address,
@@ -97,6 +102,14 @@ export async function updateStaff(id: string, formData: FormData) {
   const employeeCode = ((formData.get('employee_code') as string) || '').trim() || null
   const bankName = ((formData.get('bank_name') as string) || '').trim() || null
   const bankAccountNo = ((formData.get('bank_account_no') as string) || '').trim() || null
+  // Older clients and imports that only carry Account 1 must not clear Account 2.
+  const secondBank = formData.has('bank_name_2') || formData.has('bank_account_no_2')
+    ? validateSecondaryStaffBankAccount({
+        bankName, bankAccountNo,
+        bankName2: str(formData, 'bank_name_2'),
+        bankAccountNo2: str(formData, 'bank_account_no_2'),
+      })
+    : null
   const nric = ((formData.get('nric') as string) || '').replace(/[-\s]/g, '') || null
 
   // Pay and statutory. lib/staff-form.ts decides what a save writes: the
@@ -154,6 +167,7 @@ export async function updateStaff(id: string, formData: FormData) {
       resignation_date: resignDate,
       bank_name: bankName,
       bank_account_no: bankAccountNo,
+      ...(secondBank ? { bank_name_2: secondBank.bankName2, bank_account_no_2: secondBank.bankAccountNo2 } : {}),
       nric: nric,
       contact_number: trimOrNull(formData.get('contact_number')),
       email: trimOrNull(formData.get('email')),

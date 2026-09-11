@@ -8,6 +8,7 @@ import { round2 } from '@/lib/payroll-funding'
 import PrintButton from './_components/PrintButton'
 import EditableStatLine from './_components/EditableStatLine'
 import ResetStaffStatutoryButton from './_components/ResetStaffStatutoryButton'
+import RevenuePayoutBreakdown from '../../../_components/RevenuePayoutBreakdown'
 
 interface PageProps {
   params: Promise<{ period: string; staffId: string }>
@@ -34,7 +35,7 @@ export default async function PayslipPage({ params }: PageProps) {
     .select(`
       id, staff_id, period_month, source,
       basic_salary, statutory_allowance, non_statutory_allowance,
-      ot_hours, ot_amount, commission_amount, commission_balance, unpaid_leave_days,
+      ot_hours, ot_amount, commission_amount, commission_balance, payout_split_version, basic_pay_net, pcb_override_amount, unpaid_leave_days,
       deduction_amount, skbbk_amount,
       prorata_days_worked, prorata_days_in_month,
       epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb, withholding_tax,
@@ -55,6 +56,7 @@ export default async function PayslipPage({ params }: PageProps) {
   const deptName = staff?.departments?.name ?? '—'
   const ratio = row.prorata_days_in_month > 0 ? roundProrataRatio(row.prorata_days_worked / row.prorata_days_in_month) : 0
   const split = row.source === 'commission' && row.commission_balance != null ? calculateRevenuePayrollSplit(row) : null
+  const netBasicSplit = row.payout_split_version === 2
 
   // PCB and Withholding Tax are mutually exclusive — whichever the staff record
   // selects applies and the other is 0 — but both belong in the total, or a
@@ -116,11 +118,13 @@ export default async function PayslipPage({ params }: PageProps) {
             Earnings
           </div>
           <div className="space-y-1 text-sm">
-            <Line label="Basic Salary" value={split ? split.basicPay : row.basic_salary} />
+            <Line label="Basic Salary" value={split ? split.basicGross : row.basic_salary} />
             <Line label="Statutory Allowance" value={split ? round2(Number(row.statutory_allowance) * ratio) : row.statutory_allowance} />
             <Line label="Non-Statutory Allowance" value={row.non_statutory_allowance} />
             <Line label={`OT (${row.ot_hours} hrs)`} value={split ? round2(Number(row.ot_amount) * ratio) : row.ot_amount} />
-            <Line label={split ? 'Commission after basic and employer EPF' : 'Commission'} value={split ? round2(split.commissionBalance + Number(row.epf_ee)) : row.commission_amount} />
+            <Line label={netBasicSplit ? 'Commission after basic and employer statutory' : split ? 'Commission after basic and employer EPF' : 'Commission'} value={netBasicSplit && split
+              ? round2(Number(row.commission_amount) - split.basicGross - totalEr)
+              : split ? round2(split.commissionBalance + Number(row.epf_ee)) : row.commission_amount} />
             {Number(row.unpaid_leave_days) > 0 && (
               <Line label={`Unpaid Leave (${row.unpaid_leave_days} days)`} value={0} muted />
             )}
@@ -139,14 +143,16 @@ export default async function PayslipPage({ params }: PageProps) {
             <h2 className="font-serif text-ink mb-2">Revenue pay split</h2>
             <div className="space-y-1 text-sm">
               <Line label="Gross commission · Commission Calculation" value={row.commission_amount} />
-              <Line label="Basic pay" value={split.basicPay} />
+              <Line label={netBasicSplit ? 'Net basic · salary PV' : 'Basic pay'} value={split.basicPay} />
               <Line label="Commission balance" value={split.commissionBalance} />
+              {netBasicSplit && <Line label="Total to employee" value={split.totalPayout} />}
             </div>
-            <p className="text-xs text-muted mt-3">
+            {netBasicSplit ? <RevenuePayoutBreakdown row={row} /> : <p className="text-xs text-muted mt-3">
               Commission balance = gross commission − basic pay − employer EPF − employee EPF.
               Employee EPF is included in this split once. Other allowances, deductions and tax are reflected in Net Pay below.
-            </p>
+            </p>}
             {split.shortfall > 0 && <p className="text-danger text-xs mt-2">Commission shortfall: {formatMoney(split.shortfall)}. Resolve before submitting payroll.</p>}
+            {split.basicShortfall > 0 && <p className="text-danger text-xs mt-2">Basic deductions exceed basic salary: {formatMoney(split.basicShortfall)}. Resolve before submitting payroll.</p>}
           </section>
         )}
 

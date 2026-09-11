@@ -14,6 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      payroll_voucher_lines: {
+        Row: {
+          id: string
+          voucher_id: string
+          scope: string
+          payroll_row_id: string
+          period_month: string
+          employee_name: string
+          employee_code: string | null
+          department_id: string | null
+          department_name: string | null
+          net: number
+          salary_component: string
+          recipient_account: string | null
+          bank_name: string | null
+          bank_account_no: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          voucher_id: string
+          scope: string
+          payroll_row_id: string
+          period_month: string
+          employee_name: string
+          employee_code?: string | null
+          department_id?: string | null
+          department_name?: string | null
+          net: number
+          salary_component?: string
+          recipient_account?: string | null
+          bank_name?: string | null
+          bank_account_no?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          voucher_id?: string
+          scope?: string
+          payroll_row_id?: string
+          period_month?: string
+          employee_name?: string
+          employee_code?: string | null
+          department_id?: string | null
+          department_name?: string | null
+          net?: number
+          salary_component?: string
+          recipient_account?: string | null
+          bank_name?: string | null
+          bank_account_no?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          { foreignKeyName: "payroll_voucher_lines_voucher_id_fkey"; columns: ["voucher_id"]; isOneToOne: false; referencedRelation: "payment_vouchers"; referencedColumns: ["id"] },
+          { foreignKeyName: "payroll_voucher_lines_department_id_fkey"; columns: ["department_id"]; isOneToOne: false; referencedRelation: "departments"; referencedColumns: ["id"] },
+        ]
+      }
       payroll_statutory_voucher_lines: {
         Row: {
           id: string
@@ -4004,6 +4061,9 @@ export type Database = {
           basic_salary: number
           commission_amount: number
           commission_balance: number | null
+          payout_split_version: number | null
+          basic_pay_net: number | null
+          pcb_override_amount: number | null
           created_at: string
           created_by: string | null
           deduction_amount: number
@@ -4038,6 +4098,9 @@ export type Database = {
           basic_salary?: number
           commission_amount?: number
           commission_balance?: number | null
+          payout_split_version?: number | null
+          basic_pay_net?: number | null
+          pcb_override_amount?: number | null
           created_at?: string
           created_by?: string | null
           deduction_amount?: number
@@ -4072,6 +4135,9 @@ export type Database = {
           basic_salary?: number
           commission_amount?: number
           commission_balance?: number | null
+          payout_split_version?: number | null
+          basic_pay_net?: number | null
+          pcb_override_amount?: number | null
           created_at?: string
           created_by?: string | null
           deduction_amount?: number
@@ -4235,6 +4301,8 @@ export type Database = {
           address: string | null
           allowances: number
           bank_account_no: string | null
+          bank_name_2: string | null
+          bank_account_no_2: string | null
           bank_name: string | null
           basic_salary: number
           children_count: number
@@ -4275,6 +4343,8 @@ export type Database = {
           address?: string | null
           allowances?: number
           bank_account_no?: string | null
+          bank_name_2?: string | null
+          bank_account_no_2?: string | null
           bank_name?: string | null
           basic_salary: number
           children_count?: number
@@ -4315,6 +4385,8 @@ export type Database = {
           address?: string | null
           allowances?: number
           bank_account_no?: string | null
+          bank_name_2?: string | null
+          bank_account_no_2?: string | null
           bank_name?: string | null
           basic_salary?: number
           children_count?: number
@@ -7099,6 +7171,7 @@ export type Database = {
           p_granularity?: string
           p_department_id?: string | null
           p_payroll_row_ids?: string[] | null
+          p_component_selections?: Json | null
         }
         Returns: Json
       }

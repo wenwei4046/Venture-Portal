@@ -12,6 +12,9 @@ import {
   type PayrollEditField,
 } from '@/lib/payroll-grid'
 import AmountInput from './AmountInput'
+import RevenuePayoutBreakdown from './RevenuePayoutBreakdown'
+import EditableStatLine from '../[period]/[staffId]/payslip/_components/EditableStatLine'
+import ResetStaffStatutoryButton from '../[period]/[staffId]/payslip/_components/ResetStaffStatutoryButton'
 import type { PayrollRowData } from './PayrollGrid'
 
 interface Props {
@@ -75,6 +78,7 @@ export default function PaycheckWindow({
   const dirty = dirtyList.length > 0
   const revenuePayroll = row.revenue_payroll ?? row.source === 'commission'
   const split = revenuePayroll ? calculateRevenuePayrollSplit(row) : null
+  const netBasicSplit = row.payout_split_version === 2
   const statements = row.commission_statements ?? []
   const statementHref = statements[0]?.href ?? row.commission_statement_href
   const ctc = row.gross + row.epf_er + row.socso_er + row.eis_er
@@ -169,7 +173,7 @@ export default function PaycheckWindow({
               <h4>Revenue payout <span>{split.basicPay === 0 ? 'Full commission · RM' : 'RM'}</span></h4>
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>
-                  <p className="text-xs text-graphite mb-1">Basic pay</p>
+                  <p className="text-xs text-graphite mb-1">{netBasicSplit ? 'Net basic · salary PV' : 'Basic pay'}</p>
                   <p className="statement-amount compact text-num-ink">{formatMoneyBare(split.basicPay)}</p>
                 </div>
                 <div>
@@ -179,21 +183,22 @@ export default function PaycheckWindow({
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-graphite mb-1">Total before other adjustments</p>
-                  <p className="statement-amount compact text-num-ink">{formatMoneyBare(split.totalPayBeforeOtherDeductions)}</p>
+                  <p className="text-xs text-graphite mb-1">{netBasicSplit ? 'Total to employee' : 'Total before other adjustments'}</p>
+                  <p className="statement-amount compact text-num-ink">{formatMoneyBare(split.totalPayout)}</p>
                 </div>
               </div>
-              <p className="text-xs text-graphite mt-3">
+              {netBasicSplit ? <RevenuePayoutBreakdown row={row} /> : <p className="text-xs text-graphite mt-3">
                 Gross commission {formatMoneyBare(row.commission_amount)} − basic pay {formatMoneyBare(split.basicPay)}
                 {' '}− EPF ER {formatMoneyBare(row.epf_er)} − EPF EE {formatMoneyBare(row.epf_ee)}
                 {' '}= commission balance {formatMoneyBare(split.commissionBalance)}.
                 {' '}Basic pay is paid in full; both EPF shares are taken from the commission balance.
                 {' '}Allowances, other deductions and tax are reflected in Net to bank.
-              </p>
+              </p>}
               {dirty && <p className="text-xs text-alert mt-2">These are saved amounts. Save changes to recalculate the payout and statutory contributions.</p>}
               {split.shortfall > 0 && (
                 <p className="text-xs text-danger mt-2">Commission is short by RM {formatMoneyBare(split.shortfall)}. Review the basic pay before settlement.</p>
               )}
+              {split.basicShortfall > 0 && <p className="text-xs text-danger mt-2">Basic deductions exceed the basic salary by RM {formatMoneyBare(split.basicShortfall)}. Review before settlement.</p>}
             </section>
           )}
           <section>
@@ -272,7 +277,13 @@ export default function PaycheckWindow({
             {kv('EIS', `${formatMoneyBare(row.eis_er)} / ${formatMoneyBare(row.eis_ee)}`, {
               zero: row.eis_er === 0 && row.eis_ee === 0,
             })}
-            {kv(tax[0], formatMoneyBare(tax[1]), { zero: tax[1] === 0 })}
+            {kv(tax[0], netBasicSplit && row.withholding_tax === 0
+              ? <EditableStatLine payrollId={row.id} field="pcb" value={row.pcb} readOnly={locked || dirty || isPending} />
+              : formatMoneyBare(tax[1]), { zero: tax[1] === 0 })}
+            {netBasicSplit && row.pcb_override_amount != null && <div className="text-xs text-graphite mt-2">
+              Manual PCB amount
+              {!locked && !dirty && !isPending && <ResetStaffStatutoryButton payrollId={row.id} overridden />}
+            </div>}
             {kv('Cost to company', formatMoneyBare(ctc), { sub: 'gross + employer' })}
             {kv('Gross', formatMoneyBare(row.gross), { big: true })}
             {kv('Net to bank', formatMoneyBare(row.net), { big: true })}

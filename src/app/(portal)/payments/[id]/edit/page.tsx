@@ -43,6 +43,12 @@ export default async function EditPaymentPage({ params }: Props) {
     : { data: [], error: null }
   if (coverageError) throw new Error('Unable to verify the recorded statutory contributions. Please refresh and try again.')
   const statutoryDetailsLocked = (statutoryCoverage?.length ?? 0) > 0
+  const { data: salaryCoverage, error: salaryCoverageError } = voucher.reference_type === 'payroll_disbursement'
+    ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from('payroll_voucher_lines').select('id').eq('voucher_id', id).limit(1)
+    : { data: [], error: null }
+  if (salaryCoverageError) throw new Error('Unable to verify the recorded salary payment details. Please refresh and try again.')
+  const salaryDetailsLocked = (salaryCoverage?.length ?? 0) > 0
 
   const [
     { data: sources },
@@ -90,13 +96,16 @@ export default async function EditPaymentPage({ params }: Props) {
           </div>
           <h1 className="page-title">Edit {voucher.voucher_no ?? 'draft'}</h1>
           <p className="font-serif italic text-graphite text-sm mt-2">
-            Editing locked once Principal approves. Voucher type, direction, voucher number, and any linked invoice / loan / fund source are immutable.
+            {statutoryDetailsLocked || salaryDetailsLocked
+              ? 'Only payment date and notes can be edited. Payment details are recorded with this voucher.'
+              : 'Editing locked once Principal approves. Voucher type, direction, voucher number, and any linked invoice / loan / fund source are immutable.'}
           </p>
         </div>
       </div>
 
       <EditPaymentForm
         statutoryDetailsLocked={statutoryDetailsLocked}
+        salaryDetailsLocked={salaryDetailsLocked}
         voucher={{
           id: voucher.id,
           voucher_no: voucher.voucher_no,

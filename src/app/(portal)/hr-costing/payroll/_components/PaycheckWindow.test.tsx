@@ -1,8 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import PaycheckWindow from './PaycheckWindow'
 import { editFromRow } from '@/lib/payroll-grid'
 import type { PayrollRowData } from './PayrollGrid'
+
+const { updateStaffStatutory, refresh } = vi.hoisted(() => ({ updateStaffStatutory: vi.fn().mockResolvedValue(undefined), refresh: vi.fn() }))
+vi.mock('../actions', () => ({ updateStaffStatutory, resetStaffStatutoryToLookup: vi.fn() }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
 
 const row: PayrollRowData = {
   id: 'r1',
@@ -59,6 +63,28 @@ function setup(over: Partial<React.ComponentProps<typeof PaycheckWindow>> = {}) 
 }
 
 describe('PaycheckWindow', () => {
+  it('reconciles net basic, statutory PVs and commission and lets HR edit PCB', async () => {
+    setup({ row: {
+      ...row, source: 'commission', revenue_payroll: true, payout_split_version: 2,
+      basic_salary: 5000, commission_amount: 10000, basic_pay_net: 4302.70, commission_balance: 4253.45,
+      statutory_allowance: 0, non_statutory_allowance: 0, skbbk_amount: 0,
+      epf_er: 650, epf_ee: 550, socso_er: 86.65, socso_ee: 24.75, eis_er: 9.9, eis_ee: 9.9,
+      pcb: 112.65, gross: 9253.45, net: 8556.15,
+    } })
+    const split = screen.getByRole('region', { name: 'Revenue payout split' })
+    expect(within(split).getAllByText('4,302.70').length).toBeGreaterThan(0)
+    expect(within(split).getAllByText('4,253.45').length).toBeGreaterThan(0)
+    expect(within(split).getByText('8,556.15')).toBeVisible()
+    const allocation = within(split).getByRole('table', { name: 'Commission allocation breakdown' })
+    expect(allocation).toHaveTextContent('584.65')
+    expect(allocation).toHaveTextContent('746.55')
+    expect(allocation).toHaveTextContent('112.65')
+    fireEvent.click(screen.getByRole('button', { name: 'Edit PCB' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Override PCB' }), { target: { value: '200' } })
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Override PCB' }), { key: 'Enter' })
+    await waitFor(() => expect(updateStaffStatutory).toHaveBeenCalledWith('r1', { pcb: 200 }))
+    await waitFor(() => expect(refresh).toHaveBeenCalled())
+  })
   it('names the person, the month and the place in the list', () => {
     setup()
     const dialog = screen.getByRole('dialog')

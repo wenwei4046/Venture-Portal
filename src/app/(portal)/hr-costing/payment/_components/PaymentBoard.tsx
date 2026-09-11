@@ -2,7 +2,8 @@
 
 import { useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { payrollSelection } from '@/lib/payroll-selection'
+import { payrollComponentSelection, type SalaryComponentSelection } from '@/lib/payroll-selection'
+import type { BankAccountSelection } from '@/lib/staff-bank-accounts'
 import {
   type BodyKey, type ContributionTotals, type CycleTotals, type DeptGroup,
   type Granularity, type Headline, type Milestone, type StatutoryCoverage, type Phase,
@@ -42,7 +43,7 @@ export interface BoardProps {
 }
 
 type WindowState = { kind: 'dept'; key: string; mode: Granularity | 'view' } | { kind: 'body'; key: BodyKey } | null
-type SalaryReview = { key: string; rowIds: string[]; granularity: Granularity; date: string }
+type SalaryReview = { key: string; rowIds: string[]; selectionKeys: string[]; components: SalaryComponentSelection[]; accounts: Record<string, BankAccountSelection>; group: DeptGroup; granularity: Granularity; date: string }
 
 export default function PaymentBoard({ period, periodLabel, periodRange, prevMonthName, groups, rows, statutoryCoverage = [], totals, band, headline, milestones, variances, facts, phase, staffFunded, directorsFunded, payoutBank, today, defaultDate, fundingSlot }: BoardProps) {
   const router = useRouter()
@@ -51,6 +52,7 @@ export default function PaymentBoard({ period, periodLabel, periodRange, prevMon
   const [dates, setDates] = useState({ staff: defaultDate, directors: defaultDate })
   const [win, setWin] = useState<WindowState>(null)
   const [selections, setSelections] = useState<Record<string, string[]>>({})
+  const [accounts, setAccounts] = useState<Record<string, BankAccountSelection>>({})
   const [review, setReview] = useState<SalaryReview | null>(null)
   const [generator, setGenerator] = useState<{ body: BodyKey; mode: Granularity } | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -84,16 +86,16 @@ export default function PaymentBoard({ period, periodLabel, periodRange, prevMon
   }
 
   function askSalary(g: DeptGroup, granularity: Granularity) {
-    const selection = payrollSelection(g.people, granularity === 'department' ? null : selections[g.key] ?? [], granularity)
-    if (!selection.count) return
-    setReview({ key: g.key, rowIds: selection.rowIds, granularity, date: dates[g.scope] })
+    const selection = payrollComponentSelection(g.people, granularity === 'department' ? null : selections[g.key] ?? [], granularity, accounts)
+    if (!selection.count || selection.missingAccounts.length || selection.negativeComponents.length) return
+    setReview({ key: g.key, rowIds: selection.rowIds, selectionKeys: selection.selectionKeys, components: selection.componentSelections, accounts: { ...accounts }, group: g, granularity, date: dates[g.scope] })
   }
 
   function confirmSalary(g: DeptGroup) {
     if (!review || review.key !== g.key) return
     const snapshot = review
     void run(`gen:${g.key}`, async () => {
-      await createPayrollDisbursement(period, g.scope, snapshot.date, snapshot.granularity, g.scope === 'staff' ? g.dept_id : null, snapshot.rowIds)
+      await createPayrollDisbursement(period, g.scope, snapshot.date, snapshot.granularity, g.scope === 'staff' ? g.dept_id : null, snapshot.rowIds, snapshot.components)
       setSelections(current => ({ ...current, [g.key]: [] }))
     })
   }
@@ -171,10 +173,11 @@ export default function PaymentBoard({ period, periodLabel, periodRange, prevMon
         mode={generator.mode} groups={groups} rows={rows} coverage={statutoryCoverage}
         fundedFor={fundedFor} onClose={() => setGenerator(null)} /> : null}
     </> : null}
-    {openGroup ? <DeptWindow key={`${openGroup.key}:${openMode}`} group={openGroup} period={period} periodLabel={periodLabel}
+    {openGroup ? <DeptWindow key={`${openGroup.key}:${openMode}`} group={openReview?.group ?? openGroup} period={period} periodLabel={periodLabel}
       prevMonthName={prevMonthName} gran={openReview?.granularity ?? (openMode === 'department' ? 'department' : 'employee')}
-      readOnly={openMode === 'view'} selectedIds={openReview?.rowIds ?? (openMode === 'department' ? null : selections[openGroup.key] ?? [])}
-      onSelection={ids => setSelections(current => ({ ...current, [openGroup.key]: ids ?? payrollSelection(openGroup.people, null, 'employee').rowIds }))}
+      readOnly={openMode === 'view'} selectedIds={openReview?.selectionKeys ?? (openMode === 'department' ? null : selections[openGroup.key] ?? [])}
+      onSelection={ids => setSelections(current => ({ ...current, [openGroup.key]: ids ?? payrollComponentSelection(openGroup.people, null, 'employee').selectionKeys }))}
+      accounts={openReview?.accounts ?? accounts} onAccount={(key, account) => setAccounts(current => ({ ...current, [key]: account }))}
       date={openReview?.date ?? dates[openGroup.scope]} onDate={date => setDates(current => ({ ...current, [openGroup.scope]: date }))}
       funded={fundedFor(openGroup)} busy={busy} error={error} confirming={!!openReview}
       onAskGenerate={() => askSalary(openGroup, openMode === 'department' ? 'department' : 'employee')}

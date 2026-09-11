@@ -176,7 +176,101 @@ try {
   check(await one('SELECT total_amount::text FROM payroll_runs WHERE id=$1', [importedRun]), '15336.00')
   check((await money('2026-07-01')).net, '12345.00')
 
-  console.log(`Revenue payroll SQL: ${checks} checks passed (disposable local PGlite).`)
+  // Preserve every imported/finalized row and an existing draft v1 snapshot.
+  await q(`INSERT INTO hr_monthly_payroll(staff_id,period_month,basic_salary,commission_amount,source)
+    VALUES ($1,'2026-06-01',5000,10000,'commission')`, [staff])
+  const beforeV2 = await one('SELECT jsonb_agg(to_jsonb(h) ORDER BY id) FROM hr_monthly_payroll h')
+  await db.exec(await readFile(new URL('../../supabase/migrations/20260914010000_revenue_payroll_all_statutory.sql', import.meta.url), 'utf8'))
+  check(await one(`SELECT jsonb_agg(to_jsonb(h)-ARRAY['payout_split_version','basic_pay_net','pcb_override_amount'] ORDER BY id)
+    FROM hr_monthly_payroll h`), beforeV2)
+  check(await one('SELECT bool_and(payout_split_version IS NULL AND basic_pay_net IS NULL) FROM hr_monthly_payroll'))
+  await reject("UPDATE hr_monthly_payroll SET epf_er=1 WHERE period_month='2026-09-01'", /Finalized Revenue payroll/)
+  await reject("UPDATE hr_monthly_payroll SET basic_salary=1 WHERE period_month='2026-08-01'", /Finalized Revenue payroll/)
+  await q("UPDATE hr_monthly_payroll SET status='paid' WHERE period_month='2026-08-01'")
+  check(await one("SELECT payout_split_version IS NULL FROM hr_monthly_payroll WHERE period_month='2026-08-01'"))
+
+  // Statutory fixture: the 5,000 / 4,450 PCB band uses the actual live example.
+  // Other bands deliberately remain synthetic so this is not a rates catalogue.
+  await db.exec(`CREATE OR REPLACE FUNCTION lookup_socso(numeric,text)
+    RETURNS TABLE(employer numeric,employee numeric) LANGUAGE sql AS $$SELECT 86.65::numeric,24.75::numeric$$;
+    CREATE OR REPLACE FUNCTION lookup_eis(numeric)
+    RETURNS TABLE(employer numeric,employee numeric) LANGUAGE sql AS $$SELECT 9.90::numeric,9.90::numeric$$;
+    CREATE OR REPLACE FUNCTION lookup_pcb(numeric,text,integer) RETURNS numeric LANGUAGE sql AS $$
+      SELECT CASE WHEN $1=4450 THEN 112.65 ELSE round(greatest($1,0)*0.1,2) END$$;`)
+  await q("UPDATE hr_staff_costs SET tax_mode='pcb' WHERE id=$1", [staff])
+  await q(`INSERT INTO hr_monthly_payroll(staff_id,period_month,basic_salary,commission_amount,source)
+    VALUES ($1,'2026-10-01',5000,10000,'commission')`, [staff])
+  const v2Money = async () => one(`SELECT jsonb_build_object('basic',basic_pay_net,'commission',commission_balance,
+    'gross',gross,'net',net,'pcb',pcb,'override',pcb_override_amount,'version',payout_split_version)
+    FROM hr_monthly_payroll WHERE period_month='2026-10-01'`)
+  check(await v2Money(), { basic:4302.70,commission:4253.45,gross:9253.45,net:8556.15,pcb:112.65,override:null,version:2 })
+  check(await one(`SELECT net+epf_ee+socso_ee+eis_ee+pcb+epf_er+socso_er+eis_er=commission_amount
+    FROM hr_monthly_payroll WHERE period_month='2026-10-01'`))
+
+  // A larger commission does not change PCB, which is now basic-only.
+  await q("UPDATE hr_monthly_payroll SET commission_amount=12000 WHERE period_month='2026-10-01'")
+  check((await v2Money()).pcb,112.65)
+  check((await v2Money()).basic,4302.70)
+  check((await v2Money()).commission,6253.45)
+
+  // PCB editing changes the basic payment, never the residual commission twice.
+  await q("UPDATE hr_monthly_payroll SET pcb=200,pcb_override_amount=200 WHERE period_month='2026-10-01'")
+  check((await v2Money()).basic,4215.35)
+  check((await v2Money()).commission,6253.45)
+  await q("UPDATE hr_monthly_payroll SET commission_amount=10000,basic_salary=4500 WHERE period_month='2026-10-01'")
+  check((await v2Money()).pcb,200)
+  check((await v2Money()).override,200)
+  await q("UPDATE hr_monthly_payroll SET basic_salary=5000,pcb_override_amount=NULL WHERE period_month='2026-10-01'")
+  check((await v2Money()).pcb,112.65)
+  check((await v2Money()).override,null)
+  await q("UPDATE hr_monthly_payroll SET pcb=150 WHERE period_month='2026-10-01'")
+  check((await v2Money()).override,150)
+  await q("UPDATE hr_monthly_payroll SET commission_amount=10001 WHERE period_month='2026-10-01'")
+  check((await v2Money()).pcb,150)
+  await q("UPDATE hr_monthly_payroll SET commission_amount=10000,pcb_override_amount=NULL WHERE period_month='2026-10-01'")
+  check((await v2Money()).pcb,112.65)
+
+  // Employer SOCSO/EIS overrides are borne by commission; EE stays in basic.
+  await q("UPDATE hr_monthly_payroll SET socso_er=100,eis_er=20 WHERE period_month='2026-10-01'")
+  check((await v2Money()).commission,4230)
+  check((await v2Money()).basic,4302.70)
+  await q("UPDATE hr_monthly_payroll SET basic_salary=basic_salary WHERE period_month='2026-10-01'")
+
+  // Allowances/OT, no-pay RM, withholding and SKBBK reconcile in the residual.
+  await q("UPDATE hr_staff_costs SET tax_mode='withholding' WHERE id=$1", [staff])
+  await q(`UPDATE hr_monthly_payroll SET statutory_allowance=100,non_statutory_allowance=50,
+    ot_amount=20,deduction_amount=10,skbbk_amount=30 WHERE period_month='2026-10-01'`)
+  check(await one(`SELECT basic_pay_net+commission_balance=net AND pcb=0 AND withholding_tax>0
+    AND commission_balance=round(commission_amount-basic_salary-epf_er-socso_er-eis_er
+      +statutory_allowance+non_statutory_allowance+ot_amount-deduction_amount-withholding_tax-skbbk_amount,2)
+    FROM hr_monthly_payroll WHERE period_month='2026-10-01'`))
+  await q("UPDATE hr_staff_costs SET tax_mode='pcb' WHERE id=$1", [staff])
+  await q(`UPDATE hr_monthly_payroll SET statutory_allowance=0,non_statutory_allowance=0,
+    ot_amount=0,deduction_amount=0,skbbk_amount=0,basic_salary=0 WHERE period_month='2026-10-01'`)
+  check(await v2Money(), { basic:0,commission:10000,gross:10000,net:10000,pcb:0,override:null,version:2 })
+
+  const v2Run = '50000000-0000-0000-0000-000000000002'
+  await q("INSERT INTO comm_runs VALUES($1,$2,'2026-10-01','applied')", [v2Run,subdept])
+  await q('INSERT INTO comm_statements VALUES($1,$2,10000)', [v2Run,staff])
+  const submitV2 = `SELECT submit_payroll_to_principal('2026-10-01','${principal}')`
+  await q("UPDATE hr_monthly_payroll SET basic_salary=10000 WHERE period_month='2026-10-01'")
+  check((await v2Money()).commission,-1396.55)
+  await reject(submitV2,/cannot fund the selected gross basic/)
+  await q("UPDATE hr_monthly_payroll SET basic_salary=5000,pcb_override_amount=6000 WHERE period_month='2026-10-01'")
+  check((await v2Money()).basic,-1584.65)
+  await reject(submitV2,/net basic.*negative/)
+  await q("UPDATE hr_monthly_payroll SET pcb_override_amount=NULL WHERE period_month='2026-10-01'")
+  const v2Funding = await one(submitV2)
+  check(Number(await one('SELECT total_amount FROM payroll_runs WHERE id=$1',[v2Funding])),10000)
+  check(Number(await one('SELECT amount FROM payroll_payment_requests WHERE payroll_run_id=$1',[v2Funding])),10000)
+
+  // An old draft cannot be submitted using the former payout interpretation.
+  const legacyRun = '50000000-0000-0000-0000-000000000003'
+  await q("INSERT INTO comm_runs VALUES($1,$2,'2026-06-01','applied')", [legacyRun,subdept])
+  await q('INSERT INTO comm_statements VALUES($1,$2,10000)', [legacyRun,staff])
+  await reject(`SELECT submit_payroll_to_principal('2026-06-01','${principal}')`,/does not match the synced commission calculation/)
+
+  console.log(`Revenue payroll SQL: ${checks} checks passed (legacy + v2, disposable local PGlite).`)
 } finally {
   await db.close()
 }
