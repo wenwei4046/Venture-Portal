@@ -2083,13 +2083,14 @@ export default function MemberWorkspace({
           </div>
         </aside>
         <div className={s.shell}>
-          {principalView && <div className={principalStyles.toolbar}>
-            <PortalViewSwitcher value="revenue_member" />
-            <label><span>Department</span><select aria-label="Revenue department" value={member?.id ?? ""} onChange={event => changeDepartment(event.target.value)}>
-              {data.memberships.map(membership => <option key={membership.id} value={membership.id}>{membership.name}</option>)}
-            </select></label>
-          </div>}
-          <header className={s.topbar}>
+          <header className={`${s.topbar} ${principalView ? s.principalTopbar : ""}`}>
+            {principalView && <div className={principalStyles.toolbar} role="group" aria-label="Workspace view and department">
+              <PortalViewSwitcher value="revenue_member" />
+              <label title="Revenue department"><span className={s.srOnly}>Department</span><select aria-label="Revenue department" value={member?.id ?? ""} onChange={event => changeDepartment(event.target.value)}>
+                {data.memberships.map(membership => <option key={membership.id} value={membership.id}>{membership.name}</option>)}
+              </select></label>
+            </div>}
+            <div className={s.workspaceTools}>
             {backTarget && (
               <button
                 type="button"
@@ -2124,6 +2125,7 @@ export default function MemberWorkspace({
                 <span className={s.notificationDot} aria-hidden="true" />
               )}
             </button>
+            </div>
           </header>
           <main
             className={`${s.main} ${page === "quote" ? s.quoteMain : ""}`}

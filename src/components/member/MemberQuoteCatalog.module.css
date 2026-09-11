@@ -72,3 +72,27 @@
 .emptyCart p {
   margin-top: 4px;
 }
+
+.emptyCatalog {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 220px;
+  padding: 32px 24px;
+  background: var(--m-card);
+  border-style: solid;
+}
+.emptyCatalogIcon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 8px;
+  border-radius: 14px;
+  background: var(--m-soft);
+  color: var(--m-sub);
+}
+.emptyCatalog h2 { max-width: 420px; font-size: 20px; line-height: 1.35; }
+.emptyCatalog p { max-width: 360px; font-size: 14px; line-height: 1.6; }

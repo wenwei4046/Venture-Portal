@@ -2125,15 +2125,25 @@
   }
 }
 
-/* One natural navigation row: back, search, notifications. */
+/* Keep workspace controls on the same content grid as the page. */
 .workspace .topbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  max-width: 1280px;
+  margin-inline: auto;
   height: auto;
-  min-height: 76px;
+  min-height: 72px;
   padding: 16px 20px 8px;
-  justify-content: flex-start;
-  gap: 8px;
+  gap: 12px;
   border: 0;
   background: transparent;
+}
+.workspaceTools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 .workspaceSearch {
   display: flex;
@@ -2142,9 +2152,10 @@
   flex: 1;
   min-width: 0;
   min-height: 48px;
+  height: 48px;
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--m-border) 55%, transparent);
-  border-radius: 16px;
+  border-radius: 14px;
   background: var(--m-card);
   color: var(--m-sub);
   text-align: left;
@@ -2205,17 +2216,15 @@
   padding-top: 18px;
   border-top: 1px solid var(--m-border);
 }
-@media (max-width: 767px) {
-  .workspace .topbar + .main {
-    padding-top: 20px;
-  }
+.workspace .topbar + .main {
+  padding-top: 24px;
 }
 @media (max-width: 380px) {
   .workspace .topbar {
     padding-left: 16px;
     padding-right: 16px;
-    gap: 4px;
   }
+  .workspaceTools { gap: 4px; }
   .workspaceSearch {
     padding-left: 12px;
     padding-right: 12px;
@@ -2226,11 +2235,11 @@
   .workspace .topbar {
     padding: 20px 28px 8px;
   }
-  .workspaceSearch {
-    max-width: 520px;
-  }
-  .workspaceNotifications {
-    margin-left: auto;
+}
+@media (min-width: 980px) {
+  .workspace .principalTopbar {
+    grid-template-columns: 284px minmax(0, 1fr);
+    column-gap: 16px;
   }
 }
 @media (min-width: 1100px) {
