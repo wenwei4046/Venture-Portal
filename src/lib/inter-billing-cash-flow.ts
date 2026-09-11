@@ -240,11 +240,17 @@ export async function fetchInterBillingCashFlow(
         .eq('transaction_type', 'np_in')
         .like('description', '%payroll fund → %'),
       // Payroll funding drains — each department's typed contribution.
+      // Director rounds too (2026-09-11): since 2026-08-07 director funding
+      // drains dept_pool_director into HR custody exactly like staff, and
+      // from Sept the payout JEs are hr-segment (mig 20260911010000), so the
+      // Director segment's cash-out exists ONLY as this bridged drain.
       supabase
         .from('dept_pools')
         .select('amount, created_at, description, departments!inner(name)')
         .eq('transaction_type', 'expense_out')
-        .like('description', 'PV HV-PV-%: Payroll bank transfer%'),
+        .or(
+          'description.like.PV HV-PV-%: Payroll bank transfer%,description.like.PV HV-PV-%: Director salary bank transfer%',
+        ),
       // Voiding a paid voucher REVERSES its pool rows with new void_in/void_out
       // rows — the originals stay for audit. Skip both sides of any voided
       // voucher's round, otherwise the bridge counts the original leg while the
@@ -347,21 +353,29 @@ export async function fetchInterBillingCashFlow(
     // without a custody twin is left alone). Voided rounds are skipped on both
     // sides — their pool effect is already nulled by the void_in/void_out rows.
     // Pairing is SYMMETRIC (2026-08-20): a custody receipt only bridges when a
-    // drain shares its ref too — the broadened marker match above would
-    // otherwise pull in director-salary custody parks, whose GL already pays
-    // under the director segment (double count).
+    // drain shares its ref too, so a park without a typed drain (the pre-
+    // custody Jun-2026 director rounds) is left alone.
+    // Director drains now match too (2026-09-11) — with ONE legacy carve-out:
+    // the Jul-2026 director round was custody on the pool side but its GL
+    // (staging + payouts, JE-202608-0441/0464..0467) is still director-
+    // tagged, so Director's cash-out for that month is already in the GL.
+    // Bridging it would double count. Re-tagging that month is a separate
+    // decision; until then it stays excluded here.
+    const LEGACY_DIRECTOR_GL_ROUNDS = new Set(['HV-PV-202608-0255'])
     const pvrefPv = (d: string | null): string | null => d?.match(PVREF_PV)?.[0] ?? null
     const custodyRefs = new Set([
       ...(custodyRows
         .map((r) => pvrefPv(r.description))
-        .filter((ref) => ref && !voided.has(ref)) as string[]),
+        .filter((ref) => ref && !voided.has(ref) && !LEGACY_DIRECTOR_GL_ROUNDS.has(ref)) as string[]),
       // RLS-proof pairing set (already excludes voided server-side).
-      ...(Array.isArray(flags.payroll_refs) ? flags.payroll_refs : []),
+      ...(Array.isArray(flags.payroll_refs) ? flags.payroll_refs : []).filter(
+        (ref: string) => !LEGACY_DIRECTOR_GL_ROUNDS.has(ref),
+      ),
     ])
     const drainRefs = new Set(
       fundRows
         .map((r) => pvrefPv(r.description))
-        .filter((ref) => ref && !voided.has(ref)) as string[],
+        .filter((ref) => ref && !voided.has(ref) && !LEGACY_DIRECTOR_GL_ROUNDS.has(ref)) as string[],
     )
     for (const r of fundRows) {
       const ref = pvrefPv(r.description)
