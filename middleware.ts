@@ -55,7 +55,9 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user && isLoginPage) {
-    const { data: profile } = await supabase.from('users').select('role, is_active').eq('id', user.id).maybeSingle()
+    // `user` is the verified JWT's claims, so the account id is `sub` — there
+    // is no `id` on it (that was the shape `getUser()` returned).
+    const { data: profile } = await supabase.from('users').select('role, is_active').eq('id', user.sub).maybeSingle()
     if (!profile?.is_active) {
       await supabase.auth.signOut()
       return supabaseResponse
