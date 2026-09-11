@@ -21,7 +21,7 @@ export default async function RolesPage() {
   const [{ data: titles }, { data: departments }, { data: staff }] = await Promise.all([
     supabase
       .from('titles')
-      .select('id, name, department_id, is_active, departments (name)')
+      .select('id, name, department_id, is_active, is_department_head, departments (name)')
       .order('name'),
     supabase.from('departments').select('id, name').order('name'),
     // Active people: the headcount per title.
@@ -43,6 +43,7 @@ export default async function RolesPage() {
       departmentId: r.department_id ?? null,
       departmentName: r.departments?.name ?? null,
       isActive: r.is_active,
+      isDepartmentHead: r.is_department_head === true,
       people: headcount.get(r.id) ?? 0,
     }
   })

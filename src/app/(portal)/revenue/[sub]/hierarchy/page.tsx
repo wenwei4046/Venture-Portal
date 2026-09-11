@@ -6,6 +6,7 @@ import { titleCanRecruit } from '@/lib/commission/titles'
 import { rankLabelOf, rankPayLabelOf } from '@/lib/commission/ranks'
 import HierarchyTabs from './_components/HierarchyTabs'
 import type { OrgDepartment, OrgPerson, OrgRank } from './_components/OrgChart'
+import type { OrgDirector } from './_components/org-chart-types'
 import { loadTeam } from '../../_components/config/load'
 import type { TeamData } from '../../_components/config/types'
 import { listSubDepartments, type SubDepartment } from '../../_lib/sub-departments'
@@ -26,6 +27,12 @@ interface PageProps {
  * line is `reports_to`, its titles are the company titles, and the database
  * keeps its memberships in step with the roster. Every other sub-department
  * is drawn and edited here, member by member.
+ *
+ * REVENUE DIRECTOR (user, 2026-09-11): a department head stands above every
+ * tree of the sub-departments they direct — a row of cards under the frame's
+ * header with a line down to each team leader and each standalone member.
+ * A reporting line only: a head holds no rank and no override reaches them,
+ * so they are never among the `people` and the Team tab lists them apart.
  */
 export default async function StaffHierarchyPage({ params }: PageProps) {
   await requirePermission('revenue')
@@ -44,13 +51,13 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
     (department): department is SubDepartment & { schemeId: string } =>
       department.departmentId === subDept.departmentId && department.schemeId !== null,
   )
-  const currentTeam = loadTeam(subDept.schemeId, { isHome: subDept.isHome })
+  const currentTeam = loadTeam(subDept.schemeId, { isHome: subDept.isHome, subDepartmentId: subDept.id })
   const [team, departments] = await Promise.all([
     currentTeam,
     Promise.all(siblings.map(async (department): Promise<OrgDepartment> => {
       const membership = department.id === subDept.id
         ? await currentTeam
-        : await loadTeam(department.schemeId, { isHome: department.isHome })
+        : await loadTeam(department.schemeId, { isHome: department.isHome, subDepartmentId: department.id })
       return {
         id: department.id,
         name: department.name,
@@ -73,7 +80,7 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
 }
 
 /** Convert one scheme at a time: staff IDs may recur with different roles. */
-function chartData(team: TeamData): { people: OrgPerson[]; ranks: OrgRank[] } {
+function chartData(team: TeamData): { people: OrgPerson[]; ranks: OrgRank[]; directors: OrgDirector[] } {
   // A rank is its rate, lettered from the top of the Rank tab's catalogue —
   // the rung's label is a trigger-kept copy of its rank's (comm_rank_defs,
   // 2026-09-05) — so the chart and the table say "Rank B · 8%", never the
@@ -122,7 +129,16 @@ function chartData(team: TeamData): { people: OrgPerson[]; ranks: OrgRank[] } {
     }
   })
 
-  return { people, ranks }
+  // The heads the sub-department reports to, drawn above every tree. Reporting
+  // only — they hold no rank and are never among `people`.
+  const directors: OrgDirector[] = team.directors.map(d => ({
+    staffId: d.staff_id,
+    name: d.employee_name,
+    code: d.employee_code,
+    titleName: d.title_name,
+  }))
+
+  return { people, ranks, directors }
 }
 
 function NoScheme({ subDept }: { subDept: SubDepartment }) {

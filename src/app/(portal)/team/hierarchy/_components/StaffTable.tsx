@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { compareByLadder, ladderAllows, ladderRefusal } from '@/lib/ladder'
 import { lineRefusal } from '@/lib/hierarchy-boundary'
+import { headsLabel, reportsToHeads } from '@/lib/department-heads'
 import { ErrorNote } from '@/components/RowForm'
 import LedgerRow from '@/components/LedgerRow'
 import { setReportsTo, undoHierarchyMove, type UndoMoveInput } from '../actions'
@@ -174,15 +175,23 @@ export default function StaffTable({ people }: { people: ChartPerson[] }) {
     run(person.id, async () => {
       const result = await setReportsTo(person.id, managerId)
       if (!result.ok) throw new Error(result.reason)
-      setUndo({ staffId: person.id, reportsTo: was, movedTo: managerId })
-      const moved = manager
-        ? `${person.name} now reports to ${manager.name}.`
-        : `${person.name} now reports to nobody.`
+      // What the column now holds — null when a director was picked, whose
+      // line is derived rather than written (`moveReportingLine`).
+      const landed = result.reportsTo
+      if (was !== landed) setUndo({ staffId: person.id, reportsTo: was, movedTo: landed })
+      const heads = headsLabel(
+        person.leadIds.map(id => byId.get(id)?.name).filter((name): name is string => !!name),
+      )
+      const moved = landed
+        ? `${person.name} now reports to ${byId.get(landed)?.name ?? manager?.name ?? 'their manager'}.`
+        : heads
+          ? `${person.name} now stands at the top of a tree, reporting to ${heads} — the department's director.`
+          : `${person.name} now reports to nobody.`
       // Inside a commission department the line IS the override, so a detach
       // there is a money change and is said in full.
       if (!person.commissionDept) return moved
-      return manager
-        ? `${moved} The override on their sales goes to ${manager.name} from this month.`
+      return landed
+        ? `${moved} The override on their sales goes to ${byId.get(landed)?.name ?? manager?.name ?? 'their manager'} from this month.`
         : `${moved} Nobody earns an override on their sales from this month.`
     })
   }
@@ -387,6 +396,14 @@ export default function StaffTable({ people }: { people: ChartPerson[] }) {
                       {broken ? (
                         <div className="mt-1 font-serif italic text-[11px] text-danger">
                           the ladder would refuse this line
+                        </div>
+                      ) : null}
+                      {reportsToHeads(p) ? (
+                        <div
+                          className="mt-1 font-serif italic text-[11px] text-muted"
+                          title="The top of a tree reports to the sub-department's Revenue Director — set on Revenue, a reporting line only, no override."
+                        >
+                          reports to {headsLabel(p.leadIds.map(id => byId.get(id)?.name).filter((name): name is string => !!name))} · the department&rsquo;s director
                         </div>
                       ) : null}
                     </td>

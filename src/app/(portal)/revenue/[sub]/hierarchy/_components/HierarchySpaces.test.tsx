@@ -366,6 +366,73 @@ describe('HierarchySpaces layout gestures', () => {
   })
 })
 
+describe('HierarchySpaces directors (Revenue Director, 2026-09-11)', () => {
+  function directed(): OrgDepartment[] {
+    const [fair, ir] = departments()
+    return [
+      { ...fair, directors: [
+        { staffId: 'peter', name: 'PETER', code: null, titleName: 'Revenue Director' },
+        { staffId: 'kris', name: 'KRIS', code: null, titleName: 'Revenue Director' },
+      ] },
+      { ...ir, directors: [{ staffId: 'peter', name: 'PETER', code: null, titleName: 'Revenue Director' }] },
+    ]
+  }
+
+  it('draws a director card per sub-department they direct, above its teams, and never as a node', () => {
+    render(<HierarchySpaces departments={directed()} />)
+    const cards = document.querySelectorAll('.space-director')
+    expect(cards).toHaveLength(3)
+    expect(screen.getByRole('img', { name: 'PETER, Revenue Director, directs Fair' })).toBeTruthy()
+    expect(screen.getByRole('img', { name: 'PETER, Revenue Director, directs IR' })).toBeTruthy()
+    expect(screen.getByRole('img', { name: 'KRIS, Revenue Director, directs Fair' })).toBeTruthy()
+    expect(flow().nodes!.some(node => node.id.includes('peter') || node.id.includes('kris'))).toBe(false)
+    // Every director stands above the first team of their frame.
+    const fairFrame = document.querySelector<SVGRectElement>('.space-department[data-department-id="fa"]')!
+    const frameTop = Number(fairFrame.getAttribute('y'))
+    for (const card of document.querySelectorAll<HTMLElement>('.space-director[data-director="peter"]')) {
+      expect(parseFloat(card.style.top)).toBeGreaterThan(frameTop)
+    }
+    const anthonyTop = position('fa-scheme:anthony').y
+    const fairPeter = [...document.querySelectorAll<HTMLElement>('.space-director')]
+      .find(card => card.getAttribute('aria-label')?.includes('directs Fair') && card.dataset.director === 'peter')!
+    expect(parseFloat(fairPeter.style.top) + NODE_HEIGHT).toBeLessThan(anthonyTop)
+  })
+
+  it('draws a dashed reporting line from each director to every team leader, and none to a member with an upline', () => {
+    render(<HierarchySpaces departments={directed()} />)
+    const lines = [...document.querySelectorAll<SVGPathElement>('.space-director-line')]
+    const targets = lines.map(line => line.dataset.directorLine)
+    // Fair: Anthony and Chea Huan lead two teams, two directors each = 4; IR: two teams, one director = 2.
+    expect(lines).toHaveLength(6)
+    expect(targets.filter(id => id === 'fa-scheme:anthony')).toHaveLength(2)
+    expect(targets.filter(id => id === 'fa-scheme:chea')).toHaveLength(2)
+    expect(targets).not.toContain('fa-scheme:yuny')
+    expect(targets).not.toContain('fa-scheme:howard')
+    expect(flow().edges).toHaveLength(3)
+  })
+
+  it('names the directors on a team leader’s last row and in the popover’s detach row, but keeps Upline for a member', () => {
+    render(<HierarchySpaces departments={directed()} />)
+    const anthony = within(screen.getByTestId('node:fa-scheme:anthony'))
+    expect(anthony.getByText('Reports to')).toBeTruthy()
+    expect(anthony.getByText('KRIS · PETER')).toBeTruthy()
+    const yuny = within(screen.getByTestId('node:fa-scheme:yuny'))
+    expect(yuny.getByText('Upline')).toBeTruthy()
+    expect(yuny.getByText('Anthony')).toBeTruthy()
+    fireEvent.click(yuny.getByRole('button', { name: 'Change upline of Yuny in Fair' }))
+    expect(screen.getByText('reports to KRIS · PETER · no override')).toBeTruthy()
+  })
+
+  it('reports where the top of a tree now reports to after a detach', async () => {
+    render(<HierarchySpaces departments={directed()} />)
+    const yuny = within(screen.getByTestId('node:fa-scheme:yuny'))
+    fireEvent.click(yuny.getByRole('button', { name: 'Change upline of Yuny in Fair' }))
+    fireEvent.click(screen.getByRole('option', { name: /Top of their own tree/ }))
+    await waitFor(() => expect(adapters.move).toHaveBeenCalledWith('fa-scheme', 'yuny', null))
+    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('reporting to KRIS · PETER — no override'))
+  })
+})
+
 describe('HierarchySpaces explicit upline edits', () => {
   it('sends raw staff IDs and the target membership scheme for a same-department connector', async () => {
     render(<HierarchySpaces departments={departments()} />)

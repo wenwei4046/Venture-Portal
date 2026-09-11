@@ -243,6 +243,22 @@ and the app writes only the rank. Every other sub-department's memberships are
 the app's own writes (§3.0, Team tab; `docs/db-schema.md` "One line" and
 "Memberships").
 
+**The Revenue Director (user, 2026-09-11)** stands above all of it. A title
+may *head* its department (`titles.is_department_head`, set under People ›
+Roles): it is on no ladder and holds no rank — "Revenue Director 本身不会进入
+任何 Rank，也不会出现在该 Department 的 Title Ladder 里面" — and no override
+climbs to it. Which director(s) a sub-department reports to is a fact of the
+sub-department (`comm_sub_department_directors`, set on the Team tab's
+**Reports to** section): Fair reports to Peter and Kris, IR to Peter, so the
+whole department reports to a Revenue Director directly — every team leader
+and every standalone member is drawn under the director(s) of the
+sub-department they are on. That line is DERIVED, never written per person:
+two directors do not fit in one `reports_to`, and a new team leader reports
+to them the day their tree begins. In the database the commission line stops
+below a head: reporting to one leaves `comm_hierarchy.upline_staff_id` null,
+so the engine's tree ends at the leader (§4.5). Above the directors sits the
+CEO — a later step.
+
 ### 3.0 Where it lives in the portal
 
 **Moved 2026-09-01.** Commission was a page under **HR Costing**, beside
@@ -656,6 +672,13 @@ Worked example — a full chain, downline sells RM10,000:
 
 Two equal rates compress to zero automatically, which is exactly the brief's
 *"reaching 6% lets you override the 5%s"*.
+
+The chain stops below the **Revenue Director** (2026-09-11): the Team Leader
+reports to the director on both charts, but the director holds no rank and is
+never a `comm_hierarchy` row, so the roll-up ends at the top of the leader's
+tree and nothing reaches the director — "该 Hierarchy 仅用于 reporting，不用于
+commission overriding". `comm_sync_position` writes a null upline for anybody
+whose `reports_to` heads the department (§3).
 
 ### 4.6 Margin — the per-bill penalty and the monthly incentive
 
@@ -1303,6 +1326,17 @@ TAN KAR JIUN    Team Assistant        [Rank D · 6%  ▾]  [Scheme target▾] YU
 LUCAS           Senior Rev Specialist [Rank D · 6%  ▾]  [Scheme target▾] YUNY  since 2026-09-01     [ ]
 SALLY           Revenue Specialist    [Rank E · 5%  ▾]  [scheme default▾] SHAWN since 2026-09-01    [✓] 2.00 %
 ```
+
+**Reports to** (2026-09-11) opens the Team tab, above the members: the
+sub-department's Revenue Director(s) as chips with a Remove each, and an add
+row offering the department's heads (titles with *Heads the department* under
+People › Roles) not yet directing it. Both write `comm_sub_department_directors`
+(`addDirector` / `removeDirector`) and come back with a note; a director is
+never a row of the Team table. A member at the top of a tree reads
+`top of a tree · reports to KRIS · PETER` in the Upline column. On the chart the
+director stands in a row of their own under the frame's header with a dashed
+line to every team leader (DESIGN.md `.space-director`); People › Hierarchy
+draws the same dashed line from the home sub-department's directors.
 
 **Payroll grid change** (`PayrollRow.tsx`, built): for staff in a
 `payroll_source = 'commission'` department the Commission cell is **read-only**
