@@ -7866,7 +7866,7 @@ export type Database = {
         | "director"
         | "revenue_department"
         | "it"
-      hr_employment_type: "salaried" | "commission_eligible"
+      hr_employment_type: "salaried" | "commission_eligible" | "variable"
       hr_monthly_payroll_source:
         | "imported"
         | "manual"
@@ -7927,7 +7927,7 @@ export type Database = {
       statement_direction: "receivable" | "payable"
       statement_line_type: "invoice" | "contra"
       statement_status: "draft" | "issued" | "paid" | "partial" | "overdue"
-      user_role: "principal" | "finance" | "hr" | "dept_manager"
+      user_role: "principal" | "finance" | "hr" | "dept_manager" | "revenue_member"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -8181,7 +8181,7 @@ export const Constants = {
         "revenue_department",
         "it",
       ],
-      hr_employment_type: ["salaried", "commission_eligible"],
+      hr_employment_type: ["salaried", "commission_eligible", "variable"],
       hr_monthly_payroll_source: [
         "imported",
         "manual",
@@ -8249,7 +8249,7 @@ export const Constants = {
       statement_direction: ["receivable", "payable"],
       statement_line_type: ["invoice", "contra"],
       statement_status: ["draft", "issued", "paid", "partial", "overdue"],
-      user_role: ["principal", "finance", "hr", "dept_manager"],
+      user_role: ["principal", "finance", "hr", "dept_manager", "revenue_member"],
     },
   },
 } as const

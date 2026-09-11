@@ -23,7 +23,13 @@ export default async function LoginPage({
       redirect('/login?error=' + encodeURIComponent(authError.message))
     }
 
-    redirect('/dashboard')
+    const { data: authData } = await supabase.auth.getUser()
+    const { data: profile } = await supabase.from('users').select('role, is_active').eq('id', authData.user!.id).maybeSingle()
+    if (!profile?.is_active) {
+      await supabase.auth.signOut()
+      redirect('/login?error=' + encodeURIComponent('Account unavailable. Contact your administrator.'))
+    }
+    redirect(profile.role === 'revenue_member' ? '/member' : '/dashboard')
   }
 
   return (

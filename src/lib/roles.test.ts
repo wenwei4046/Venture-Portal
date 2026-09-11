@@ -20,6 +20,7 @@ import type { UserRole } from '@/types'
 // still reproduces what the four roles could do before 2026-09-01 — which is
 // the whole argument for why that cutover changed nobody's access.
 const ROLE_DEFAULTS: Record<UserRole, string[]> = {
+  revenue_member: ['member_portal', 'member_quote', 'member_requests', 'member_memos'],
   principal: [
     'dashboard', 'approvals', 'treasury', 'billing', 'categories', 'hr_costing',
     'revenue', 'product_list', 'director_salary', 'director_pool', 'team',
@@ -39,7 +40,7 @@ const ROLE_DEFAULTS: Record<UserRole, string[]> = {
   dept_manager: ['dashboard', 'dept_pool', 'opex', 'my_billing', 'claims', 'dept_reports'],
 }
 
-const ALL_ROLES: UserRole[] = ['principal', 'finance', 'hr', 'dept_manager']
+const ALL_ROLES: UserRole[] = ['principal', 'finance', 'hr', 'dept_manager', 'revenue_member']
 const as = (role: UserRole) => ({ permissions: ROLE_DEFAULTS[role] })
 
 /** Assert exactly which roles a gate lets through, so a widening is a failure. */

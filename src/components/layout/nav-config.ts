@@ -7,7 +7,7 @@
 // the definition has to live in one place or the three drift apart.
 
 import type { UserRole } from '@/types'
-import type { PermissionHolder } from '@/lib/permissions'
+import { can, type PermissionHolder } from '@/lib/permissions'
 import { PRODUCT_LIST_PATH, revenuePath } from '@/lib/revenue'
 import {
   canAccessAuditLog,
@@ -293,6 +293,7 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     // sat on Roles for two days and moved to Hierarchy on 2026-09-05, as a
     // second tab beside the chart that obeys it.
     { href: '/team/people', label: 'People Management', section: 'People', visible: isHRorPrincipal },
+    { href: '/member-admin', label: 'Member Services', section: 'People', visible: v => v.role === 'principal' || can(v, 'member_requests_manage') || can(v, 'member_memos_manage') },
     { href: '/team/hierarchy', label: 'Hierarchy', section: 'People', visible: isHRorPrincipal },
     { href: '/team/roles', label: 'Roles', section: 'People', visible: isHRorPrincipal },
     { href: '/team/permissions', label: 'Permissions', section: 'People', visible: isHRorPrincipal },
@@ -425,6 +426,9 @@ export interface TabDef {
 }
 
 const TABS_BY_ROLE: Record<UserRole, TabDef[]> = {
+  revenue_member: [
+    { href: '/member', label: 'My account', icon: 'home' },
+  ],
   // The daily money loop. Invoice / Fund In-Out / reports / settings are all
   // one tap away under More.
   principal: [

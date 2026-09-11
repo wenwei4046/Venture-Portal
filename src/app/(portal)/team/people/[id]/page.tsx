@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import { canAccessAuditLog, canManagePermissions } from '@/lib/roles'
-import { isFullyCommissionBased } from '@/lib/staff-form'
+import { isFullyCommissionBased, isVariablePay } from '@/lib/staff-form'
 import ActivityLog from '../../_components/ActivityLog'
 import PersonPermissions, {
   type PersonPermissionRow,
@@ -53,6 +53,9 @@ export default async function StaffDetailPage({ params }: PageProps) {
     employment_type: row.employment_type,
     commission_dept: row.departments?.payroll_source === 'commission',
   })
+  // Variable pay (Director department): no fixed figure on the record — the
+  // month's is keyed on payroll — but the statutory categories still apply.
+  const variablePay = isVariablePay(row)
   const account = row.users as
     | { id: string; name: string; email: string; role: string; is_active: boolean }
     | null
@@ -143,9 +146,11 @@ export default async function StaffDetailPage({ params }: PageProps) {
             value={
               fullCommission
                 ? 'Fully commission based'
-                : staff.employment_type === 'commission_eligible'
-                  ? 'Commission-eligible'
-                  : 'Salaried'
+                : variablePay
+                  ? 'Variable pay'
+                  : staff.employment_type === 'commission_eligible'
+                    ? 'Commission-eligible'
+                    : 'Salaried'
             }
           />
           <Field label="Hire Date" value={staff.hire_date} />
@@ -179,13 +184,25 @@ export default async function StaffDetailPage({ params }: PageProps) {
         ) : (
           <>
             <Section title="Salary">
-              <Field label="Basic" value={formatMoney(Number(staff.basic_salary))} mono />
-              <Field label="Statutory Allowance" value={formatMoney(Number(staff.allowances))} mono />
-              <Field
-                label="Non-Statutory Allowance"
-                value={formatMoney(Number(staff.non_statutory_allowance ?? 0))}
-                mono
-              />
+              {variablePay ? (
+                <>
+                  <Field label="Pay basis" value="Variable pay — keyed monthly" />
+                  <Field
+                    label="Basic"
+                    value="None — worked out each month by the Director Salary engine"
+                  />
+                </>
+              ) : (
+                <>
+                  <Field label="Basic" value={formatMoney(Number(staff.basic_salary))} mono />
+                  <Field label="Statutory Allowance" value={formatMoney(Number(staff.allowances))} mono />
+                  <Field
+                    label="Non-Statutory Allowance"
+                    value={formatMoney(Number(staff.non_statutory_allowance ?? 0))}
+                    mono
+                  />
+                </>
+              )}
             </Section>
 
             <Section title="Statutory">

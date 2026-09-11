@@ -1,0 +1,56 @@
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  width: 140px;
+  max-width: 100%;
+  min-height: 46px;
+  vertical-align: middle;
+  color: var(--m-text);
+  background: var(--m-card);
+  border: 1px solid var(--m-border);
+  border-radius: 12px;
+  box-sizing: border-box;
+}
+
+.button {
+  display: grid;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  place-items: center;
+  color: var(--m-link);
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  touch-action: manipulation;
+}
+
+.button span {
+  font-size: 23px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.button:not(:disabled):hover {
+  background: var(--m-soft);
+}
+
+.button:disabled {
+  color: var(--m-sub);
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.count {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 2px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}

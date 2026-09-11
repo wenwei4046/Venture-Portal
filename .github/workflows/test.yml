@@ -29,6 +29,11 @@ jobs:
       - name: Run unit tests
         run: npm run test:ci
 
+      - name: Verify member database permissions and workflows
+        run: |
+          npm ci --prefix tests/member-sql
+          npm test --prefix tests/member-sql
+
       - name: Verify Revenue payroll SQL integration
         run: |
           npm ci --prefix tests/revenue-payroll-sql

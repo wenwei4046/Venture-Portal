@@ -8,7 +8,7 @@ vi.mock('../actions', () => ({ addStaff: vi.fn(), updateStaff: vi.fn() }))
 
 const staff: StaffRow = {
   id: 'staff', employee_name: 'Test Staff', designation: null, department_id: 'revenue',
-  department_name: 'Revenue', commission_dept: true, title_id: null,
+  department_name: 'Revenue', commission_dept: true, director_dept: false, title_id: null,
   basic_salary: 0, allowances: 0, non_statutory_allowance: 0, employee_code: 'TEST',
   hire_date: null, resignation_date: null, epf_category: 'A', socso_category: 'first',
   is_epf_exempt: false, pcb_category: 'KA1', children_count: 0, employment_type: 'commission_eligible',

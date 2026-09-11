@@ -4,6 +4,8 @@ import {
   titlesForDepartment,
   designationForTitle,
   isFullyCommissionBased,
+  isVariablePay,
+  offersVariablePay,
   payFieldsForUpdate,
   type RawStaffForm,
   type RawPayFields,
@@ -119,6 +121,29 @@ describe('validateStaffForm', () => {
     expect(validateStaffForm({ ...ok, fullCommission: false }).employmentType).toBe('salaried')
   })
 
+  it('variable pay zeroes every pay field and files them as variable', () => {
+    // A director: the month's figure is keyed on payroll, so whatever the
+    // (disabled) fields still held is discarded, not checked.
+    const out = validateStaffForm({
+      ...ok,
+      departmentId: 'dept-director',
+      variablePay: true,
+      basicSalary: '14400',
+      allowances: '300',
+      nonStatutoryAllowance: '-7',
+    })
+    expect(out.employmentType).toBe('variable')
+    expect(out.basicSalary).toBe(0)
+    expect(out.allowances).toBe(0)
+    expect(out.nonStatutoryAllowance).toBe(0)
+  })
+
+  it('full commission outranks variable pay should both ticks arrive', () => {
+    expect(
+      validateStaffForm({ ...ok, fullCommission: true, variablePay: true }).employmentType,
+    ).toBe('commission_eligible')
+  })
+
   it('keeps only the digits of an account number', () => {
     expect(validateStaffForm({ ...ok, bankAccountNo: ' 1234-5678-90 ' }).bankAccountNo).toBe(
       '1234567890',
@@ -181,6 +206,24 @@ describe('isFullyCommissionBased', () => {
   })
 })
 
+describe('offersVariablePay', () => {
+  it('is the Director department, by segment, and nobody else', () => {
+    expect(offersVariablePay({ segment_key: 'director' })).toBe(true)
+    expect(offersVariablePay({ segment_key: 'director_office' })).toBe(false)
+    expect(offersVariablePay({ segment_key: 'revenue_department' })).toBe(false)
+    expect(offersVariablePay({ segment_key: null })).toBe(false)
+    expect(offersVariablePay(null)).toBe(false)
+  })
+})
+
+describe('isVariablePay', () => {
+  it('reads the employment type alone', () => {
+    expect(isVariablePay({ employment_type: 'variable' })).toBe(true)
+    expect(isVariablePay({ employment_type: 'salaried' })).toBe(false)
+    expect(isVariablePay({ employment_type: 'commission_eligible' })).toBe(false)
+  })
+})
+
 describe('payFieldsForUpdate', () => {
   const salaried: RawPayFields = {
     fullCommission: false,
@@ -217,6 +260,28 @@ describe('payFieldsForUpdate', () => {
       pcb_category: 'KA1',
       children_count: 2,
     })
+  })
+
+  it('variable pay writes zero pay and the statutory categories with it', () => {
+    // The month's keyed figure still attracts statutory, so the categories
+    // stay on the form and are written — unlike fully commission based.
+    expect(payFieldsForUpdate({ ...salaried, variablePay: true, basicSalary: '14400' })).toEqual({
+      employment_type: 'variable',
+      basic_salary: 0,
+      allowances: 0,
+      non_statutory_allowance: 0,
+      epf_category: 'A',
+      socso_category: 'first',
+      is_epf_exempt: false,
+      pcb_category: 'KA1',
+      children_count: 2,
+    })
+  })
+
+  it('variable pay still checks the statutory categories', () => {
+    expect(() => payFieldsForUpdate({ ...salaried, variablePay: true, epfCategory: 'Z' })).toThrow(
+      /EPF category is not a valid choice/,
+    )
   })
 
   it('reads a missing Employment Type select as salaried', () => {
