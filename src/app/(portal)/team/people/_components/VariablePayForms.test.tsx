@@ -30,7 +30,7 @@ const director: StaffRow = {
  */
 describe('Add Staff — Variable pay', () => {
   it('offers the tick for the Director department only, on by default, locking the pay fields', () => {
-    const { container } = render(<AddStaffForm departments={departments} titles={[]} />)
+    const { container } = render(<AddStaffForm departments={departments} titles={[]} nextCode={null} />)
     const form = container.querySelector('form')!
     const dept = screen.getByLabelText('Department')
 
@@ -66,7 +66,7 @@ describe('Add Staff — Variable pay', () => {
   })
 
   it('switching from the Director department to a commission one swaps the tick, not stacks it', () => {
-    render(<AddStaffForm departments={departments} titles={[]} />)
+    render(<AddStaffForm departments={departments} titles={[]} nextCode={null} />)
     const dept = screen.getByLabelText('Department')
     fireEvent.change(dept, { target: { value: 'd-director' } })
     fireEvent.change(dept, { target: { value: 'd-revenue' } })

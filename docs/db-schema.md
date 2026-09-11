@@ -631,6 +631,8 @@ hr_staff_costs (
     title_id        uuid FK → titles NULL            -- ON DELETE SET NULL (2026-09-01)
     user_id         uuid FK → users NULL             -- 登录账号，唯一，多数人为 NULL
     reports_to      uuid FK → hr_staff_costs NULL    -- 直属上司，全公司（2026-09-01）
+    employee_code   text NULL                        -- HV001, HV002 …（2026-09-12）：trigger 发号 = 全表最大号 + 1（inactive 也算），
+                                                     --   一旦有了就不会被清空；partial UNIQUE (employee_code) WHERE status = 'active'
     basic_salary    decimal(15,2) NOT NULL
     allowances      decimal(15,2) DEFAULT 0
     employment_type enum ('salaried','commission_eligible','variable') DEFAULT 'salaried'
@@ -647,6 +649,26 @@ hr_staff_costs (
     updated_at      timestamptz DEFAULT now()
 )
 ```
+**Employee codes (2026-09-12, migration `20260915040000_staff_code_sequence`).**
+`employee_code` is `HV` + at least three digits, and the database hands it
+out: `hr_staff_costs_assign_code` (BEFORE INSERT OR UPDATE OF employee_code)
+gives a row saved without one `next_staff_code()` — `format_staff_code(max(
+staff_code_number(employee_code)) + 1)` over EVERY row, inactive included, so
+a number once used is never used again; a code once held is never cleared (a
+blank on the Edit form keeps it). A code given in the write (the InfoTech
+import's, a hand-typed one) is kept verbatim. Concurrent inserts are
+serialised on an advisory lock. `next_staff_code()` is security definer (the
+max is over the whole table, not the caller's RLS view) and callable by any
+signed-in user — the Add Staff form shows it as the number the person will
+get. The roster was renumbered once by the same migration, from the highest
+position to the lowest: the Director department first (CEO = HV001, then the
+directors A→Z), then `compareByLadder`'s order across the company (rung top
+down, title A→Z, name A→Z, unplaced titles after, no title last), everybody
+active before the three who had left, who keep HV059–HV061; the `TEST-SEP26-*`
+rows kept their codes. The InfoTech payroll import and the EmpList import both
+match on this column, so a file exported before the renumbering no longer
+names the same people.
+
 5.3 hr_staff_allocation
 ```sql
 hr_staff_allocation (

@@ -19,6 +19,13 @@ export interface AddStaffDepartment {
 interface Props {
   departments: AddStaffDepartment[]
   titles: TitleOption[]
+  /**
+   * The employee code the person will get — `next_staff_code()`, HV + the
+   * largest number on the roster + 1. The database hands it out when the row
+   * is saved, so the form only shows it; null when the preview could not be
+   * read, in which case the field says as much.
+   */
+  nextCode: string | null
 }
 
 const ZERO = '0.00'
@@ -27,6 +34,8 @@ const textInput =
   'w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border'
 const monoInput =
   'w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border'
+const readOnlyMono =
+  'w-full px-3 py-2 bg-surface-2 border border-hairline rounded-md text-sm font-mono text-muted'
 const moneyInput =
   'w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border disabled:bg-surface-2 disabled:text-muted disabled:cursor-not-allowed'
 const labelBase = 'block text-sm font-sans font-medium text-graphite mb-1.5'
@@ -48,8 +57,13 @@ const rmPrefix =
  * "Variable pay" the same way: a director's figure is worked out every month
  * by the Director Salary engine and keyed in for that month, so there is no
  * basic to file — the record is saved as `employment_type = 'variable'`.
+ *
+ * The employee code is not asked for (2026-09-12): the database numbers the
+ * roster from the top of the ladder and gives a new person the largest HV
+ * number plus one. The form shows which that will be and nothing more — a
+ * disabled input is not submitted, which is the point.
  */
-export default function AddStaffForm({ departments, titles }: Props) {
+export default function AddStaffForm({ departments, titles, nextCode }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -201,6 +215,24 @@ export default function AddStaffForm({ departments, titles }: Props) {
               .
             </p>
           ) : null}
+        </div>
+        <div>
+          <label htmlFor="staff-code" className={labelBase}>
+            Employee code <span className={hintBase}>assigned on save</span>
+          </label>
+          <input
+            id="staff-code"
+            value={nextCode ?? 'HV…'}
+            readOnly
+            disabled
+            aria-describedby="staff-code-hint"
+            className={readOnlyMono}
+          />
+          <p id="staff-code-hint" className="font-serif italic text-muted text-xs mt-1">
+            {nextCode
+              ? 'The next number after the highest on the roster.'
+              : 'HV + the next number after the highest on the roster.'}
+          </p>
         </div>
       </div>
 

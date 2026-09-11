@@ -58,7 +58,17 @@ src/
 │   │   │                              one and still EDITED on Revenue. Clicking
 │   │   │                              a card in either centres the other.
 │   │   │                              Permissions = the matrix, split off
-│   │   │                              2026-09-03.
+│   │   │                              2026-09-03. **Employee codes
+│   │   │                              (2026-09-12):** `employee_code` = HV001,
+│   │   │                              HV002 … numbered from the top of the
+│   │   │                              ladder (CEO = HV001) and, from then on,
+│   │   │                              handed out by trigger
+│   │   │                              `hr_staff_costs_assign_code` = the
+│   │   │                              largest HV number on the table + 1
+│   │   │                              (inactive rows count; a code is never
+│   │   │                              cleared). Add Staff has no code field —
+│   │   │                              it shows `next_staff_code()`. Mig
+│   │   │                              `20260915040000`.
 │   │   ├── director-salary/         (Phase 3)
 │   │   ├── hr-costing/              (Phase 3 — staff directory moved to team/)
 │   │   │                              payment/ = monthly Payment statement
