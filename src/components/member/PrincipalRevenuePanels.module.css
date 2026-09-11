@@ -1,0 +1,15 @@
+.toolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:12px 28px 0; }
+.toolbar > div { min-width:0; }
+.toolbar label { display:flex; align-items:center; gap:10px; font-size:13px; }
+.toolbar select { min-width:0; max-width:100%; border:1px solid var(--m-border); border-radius:12px; background:var(--m-card); color:var(--m-text); padding:10px 12px; min-height:44px; font:inherit; }
+.toolbar form { max-width:100%; }
+.period { max-width:260px; margin-bottom:20px; }
+.section { margin-top:24px; margin-bottom:24px; }
+.tree { margin-top:20px; }
+.person { margin-bottom:12px; overflow-wrap:anywhere; }
+.branch { margin-left:8px; padding-left:12px; border-left:1px solid var(--m-border); }
+.orderAmount { text-align:right; }
+.status { text-transform:capitalize; }
+.progress { width:100%; height:8px; margin-top:12px; accent-color:rgb(var(--accent)); }
+@media(max-width:600px) { .toolbar { padding:12px 20px 0; gap:8px; } .toolbar label { gap:6px; } .toolbar select { max-width:170px; font-size:14px; } }
+@media(max-width:360px) { .toolbar { padding-inline:16px; } .toolbar label { flex-direction:column; align-items:flex-start; gap:3px; } }

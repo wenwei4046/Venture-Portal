@@ -13,6 +13,10 @@ describe('isViewAsRole', () => {
     }
   })
 
+  it('includes the neutral Revenue View mask', () => {
+    expect(isViewAsRole('revenue_member')).toBe(true)
+  })
+
   it('rejects principal — switching back clears the cookie instead', () => {
     expect(isViewAsRole('principal')).toBe(false)
   })
@@ -41,5 +45,11 @@ describe('isPrincipalAccount / isMasked', () => {
     const u = { role: 'hr' as const }
     expect(isPrincipalAccount(u)).toBe(false)
     expect(isMasked(u)).toBe(false)
+  })
+
+  it('distinguishes Principal Revenue View from an actual member account', () => {
+    expect(isPrincipalAccount({ role: 'revenue_member', actualRole: 'principal' })).toBe(true)
+    expect(isMasked({ role: 'revenue_member', actualRole: 'principal' })).toBe(true)
+    expect(isPrincipalAccount({ role: 'revenue_member' })).toBe(false)
   })
 })
