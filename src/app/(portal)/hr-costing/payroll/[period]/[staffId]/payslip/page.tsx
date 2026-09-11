@@ -36,6 +36,7 @@ export default async function PayslipPage({ params }: PageProps) {
       id, staff_id, period_month, source,
       basic_salary, statutory_allowance, non_statutory_allowance,
       ot_hours, ot_amount, commission_amount, commission_balance, payout_split_version, basic_pay_net, pcb_override_amount, unpaid_leave_days,
+      commission_synced_amount, commission_adjustment_amount, commission_adjustment_reason,
       deduction_amount, skbbk_amount,
       prorata_days_worked, prorata_days_in_month,
       epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb, withholding_tax,
@@ -142,7 +143,7 @@ export default async function PayslipPage({ params }: PageProps) {
           <section className="mb-5 border border-hairline p-4">
             <h2 className="font-serif text-ink mb-2">Revenue pay split</h2>
             <div className="space-y-1 text-sm">
-              <Line label="Gross commission · Commission Calculation" value={row.commission_amount} />
+              <Line label="Gross commission · after adjustments" value={row.commission_amount} />
               <Line label={netBasicSplit ? 'Net basic · salary PV' : 'Basic pay'} value={split.basicPay} />
               <Line label="Commission balance" value={split.commissionBalance} />
               {netBasicSplit && <Line label="Total to employee" value={split.totalPayout} />}

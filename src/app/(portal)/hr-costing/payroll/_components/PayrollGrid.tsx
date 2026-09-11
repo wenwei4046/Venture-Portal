@@ -26,6 +26,12 @@ export interface PayrollRowData {
   ot_hours: number
   ot_amount: number
   commission_amount: number
+  commission_synced_amount?: number | null
+  /** Current confirmed source, used to review/repair a missed payroll sync. */
+  commission_confirmed_amount?: number | null
+  commission_adjustment_amount?: number
+  commission_adjustment_reason?: string | null
+  commission_adjusted_at?: string | null
   unpaid_leave_days: number
   deduction_amount: number
   skbbk_amount: number
@@ -43,9 +49,8 @@ export interface PayrollRowData {
   net: number
   /**
    * True for a salesperson in a `payroll_source = 'commission'` department.
-   * Their Commission is DERIVED by the commission run, so the cell is read
-   * only — a hand edit would be overwritten by the next calculation after
-   * diverging from the statement that explains it.
+   * The source commission belongs to the commission run. Gross changes use
+   * the separate adjustment action; ordinary payroll saves cannot replace it.
    */
   commission_is_derived: boolean
   /** Link to this month's statement, when a run has computed one. */

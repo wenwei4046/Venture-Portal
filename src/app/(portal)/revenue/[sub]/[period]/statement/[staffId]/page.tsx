@@ -9,6 +9,8 @@ import { ratePct } from '@/lib/commission/ranks'
 import type { IrGroup } from '@/lib/commission/ir-groups'
 import LedgerRow from '@/components/LedgerRow'
 import { requireSubDepartment } from '../../../../_lib/sub-departments'
+import { readRevenuePayrollAdjustments } from '../../../../_lib/payroll-adjustments'
+import PayrollAdjustmentPanel from '../../../../_components/PayrollAdjustmentPanel'
 
 interface PageProps {
   params: Promise<{ sub: string; period: string; staffId: string }>
@@ -154,7 +156,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
   const s = stmtData as StatementRow | null
   if (!s) notFound()
 
-  const [{ data: lineData }, { data: brandData }] = await Promise.all([
+  const [{ data: lineData }, { data: brandData }, payrollAdjustments] = await Promise.all([
     supabase
       .from('comm_statement_lines')
       .select('id, component, source_order_id, source_staff_id, basis_amount, rate, qty, amount, note')
@@ -164,6 +166,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
       .select('brand_code, revenue, cost, margin_pct, top_band_key')
       .eq('statement_id', s.id)
       .order('brand_code'),
+    readRevenuePayrollAdjustments(supabase, subDept.id, period, staffId),
   ])
   // The statement snapshots the rank KEY; the ladder says what letter it
   // wears today — the rung's label, a trigger-kept copy of its rank's
@@ -242,7 +245,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
       {/* The page's one dark object — .hero-walnut in globals.css. */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
         <div className="lg:col-span-7 hero-walnut px-6 py-6 md:px-8 md:py-7">
-          <div className="font-serif italic text-accent text-base mb-1">Commission earned</div>
+          <div className="font-serif italic text-accent text-base mb-1">Source commission · {subDept.name}</div>
           <div className="statement-amount text-num-ink">
             {formatMoney(total)}
           </div>
@@ -268,6 +271,10 @@ export default async function CommissionStatementPage({ params }: PageProps) {
           ) : null}
         </div>
       </section>
+
+      <PayrollAdjustmentPanel read={payrollAdjustments} periodLabel={label(period)}
+        staffNames={new Map([[staffId, me?.employee_name ?? staffId]])} statement
+        runSynced={run.status === 'applied' || run.status === 'locked'} />
 
       <section className="mb-10">
         <div className="sect-head">
@@ -469,7 +476,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
               <tr>
                 <td>
                   <strong className="font-serif text-ink text-[15px]">
-                    Into {label(period)} payroll
+                    Source commission · {subDept.name}
                   </strong>
                 </td>
                 <td className="num font-semibold text-lg">{formatMoney(total)}</td>
@@ -478,8 +485,9 @@ export default async function CommissionStatementPage({ params }: PageProps) {
           </table>
         </div>
         <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
-          Cash commission is added to this month&apos;s payroll. Withholding Tax, where applicable,
-          is deducted there. Any car/property subsidy is handled separately through Claims.
+          This sub-department&apos;s source commission forms part of the monthly payroll total.
+          Any payroll adjustment is shown in the monthly reconciliation above. Payroll deductions
+          are calculated there. Any car/property subsidy is handled separately through Claims.
         </p>
       </section>
     </div>
