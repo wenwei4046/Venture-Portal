@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type KeyboardEvent, type PointerEvent } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   Background, BackgroundVariant, ReactFlow, ReactFlowProvider, ViewportPortal,
   applyNodeChanges, useReactFlow, useViewport,
@@ -44,11 +43,12 @@ export default function HierarchySpaces(props: Props) {
 }
 
 function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Props) {
-  const router = useRouter()
   const { fitBounds, setCenter, getZoom, zoomIn, zoomOut, screenToFlowPosition } = useReactFlow()
   const camera = useHierarchyCamera()
   const { interrupt: interruptCamera, makeRoom, followTransfer } = camera
-  // A successful write can be shown immediately; the next server snapshot is authoritative.
+  // A successful write can be shown immediately; the next server snapshot is
+  // authoritative — and it arrives with the action's own response, since the
+  // action revalidates the route (no router.refresh() on top, 2026-09-11).
   const [savedMoves, setSavedMoves] = useState<Map<string, { source: OrgDepartment[]; parentId: string | null }>>(new Map())
   const departments = useMemo(() => serverDepartments.map(department => ({ ...department,
     people: department.people.map(person => {
@@ -530,13 +530,15 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
         setNote(`${child.person.name} · ${child.department.name}: ${parent ? `now under ${parent.person.name}` : 'now at the top of their own team'}.`)
         setSelected(childId)
         if (priorTeam && afterTeam) followTransfer(priorTeam.bounds, afterTeam.bounds, cameraToken)
-        router.refresh()
+        // No router.refresh(): the action's response already carries the
+        // re-rendered page. Refreshing as well was a second full render — auth,
+        // sub-departments, every team — that "Saving upline…" sat through.
       } catch (failure) {
         setError(failure instanceof Error ? failure.message : 'Could not change their upline.')
         restore()
       } finally { writing.current = false }
     })
-  }, [byId, pending, router, glide, arrange, cancelAnimation, measuredMembers, camera.generation, serverDepartments, followTransfer, storageKey, scheduleArrange])
+  }, [byId, pending, glide, arrange, cancelAnimation, measuredMembers, camera.generation, serverDepartments, followTransfer, storageKey, scheduleArrange])
   moveRef.current = move
   const onConnect = useCallback((connection: Connection) => {
     if (connection.source && connection.target) move(connection.target, connection.source)

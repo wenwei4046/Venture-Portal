@@ -17,13 +17,27 @@ export const getUser = cache(async (): Promise<User | null> => {
 
   if (!authUser) return null
 
-  const [{ data }, { data: perms }] = await Promise.all([
+  // View-as mask (unified portal 2026-07-16): a Principal may flip the
+  // app-layer role via the TopBar switcher. Every gate and role-driven UI
+  // follows the masked role. auth.uid() (RLS, audit authorship) stays the
+  // Principal — which is why the masked permissions have to be looked up here
+  // rather than taken from current_permissions(), whose answer is about the
+  // real account. The cookie is read first so that lookup shares the round
+  // trip below instead of being a third one behind it (2026-09-11); it is
+  // honoured only once the row proves a Principal.
+  const viewAsCookie = (await cookies()).get(VIEW_AS_COOKIE)?.value ?? ''
+  const viewAs = isViewAsRole(viewAsCookie) ? viewAsCookie : null
+
+  const [{ data }, { data: perms }, masked] = await Promise.all([
     supabase.from('users').select('*').eq('id', authUser.id).single(),
     // Resolved in the database because that is where the answer lives: an
     // explicit per-person row, then the holder's title, then their role's
     // defaults. RLS derives its scopes from the same set, so the page and its
     // queries cannot disagree.
     supabase.rpc('current_permissions'),
+    viewAs
+      ? supabase.from('role_default_permissions').select('permission_key').eq('role', viewAs)
+      : null,
   ])
 
   const row = data as (Omit<User, 'permissions'> | null)
@@ -31,25 +45,12 @@ export const getUser = cache(async (): Promise<User | null> => {
 
   const user: User = { ...row, permissions: (perms as string[] | null) ?? [] }
 
-  // View-as mask (unified portal 2026-07-16): a Principal may flip the
-  // app-layer role via the TopBar switcher. Every gate and role-driven UI
-  // follows the masked role. auth.uid() (RLS, audit authorship) stays the
-  // Principal — which is why the masked permissions have to be looked up here
-  // rather than taken from current_permissions(), whose answer is about the
-  // real account.
-  if (user.role === 'principal') {
-    const viewAs = (await cookies()).get(VIEW_AS_COOKIE)?.value ?? ''
-    if (isViewAsRole(viewAs)) {
-      const { data: masked } = await supabase
-        .from('role_default_permissions')
-        .select('permission_key')
-        .eq('role', viewAs)
-      return {
-        ...user,
-        role: viewAs,
-        actualRole: 'principal',
-        permissions: (masked ?? []).map(r => (r as { permission_key: string }).permission_key),
-      }
+  if (user.role === 'principal' && viewAs && masked) {
+    return {
+      ...user,
+      role: viewAs,
+      actualRole: 'principal',
+      permissions: (masked.data ?? []).map(r => (r as { permission_key: string }).permission_key),
     }
   }
 
