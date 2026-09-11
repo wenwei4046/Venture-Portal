@@ -635,6 +635,14 @@ interaction; lock the portal's scrolling `main` and restore its position and the
 trigger's focus on close. Close, Escape and backdrop dismiss the window, except
 while generation is in flight. Only explicit confirmation creates PVs.
 
+Inside that window, separate the department rail from the employee workspace:
+the grid uses `surface-2` behind the full-height rail, with a `surface` employee
+pane and a `hairline` divider. A `paper` body frames the bordered workspace and
+tables; the fixed footer uses solid `surface-2`. Use subtle alternating rows and
+`accent-bg` plus an inset accent rule for checked employees and the active
+department. On phones the rail becomes a horizontal strip above the employee
+pane, separated by a bottom rule. Keep the existing typography and amounts.
+
 There is no independent PV-format toggle. Existing coverage cannot be selected
 again. Review freezes the selected people, count, amount and payment date before
 confirmation; changing the selection requires returning to the form. Statutory
