@@ -33,7 +33,8 @@ import {
   Tick,
   toPct,
 } from '@/components/RowForm'
-import { SlidingTabs, type TabItem } from '@/components/motion/SlidingTabs'
+import { SlidingTabs } from '@/components/motion/SlidingTabs'
+import { resolveRulesTab, visibleRulesTabs, type RulesTab } from '@/lib/commission/rules-tabs'
 import type { CommissionSettingsData, SchemeRow } from './types'
 
 /**
@@ -41,39 +42,6 @@ import type { CommissionSettingsData, SchemeRow } from './types'
  * uppercased, so no brand can ever collide with it.
  */
 const NEW_BRAND = '+new'
-
-/**
- * The Rules page's nine tabs — one per section, in ladder order, the Ranks
- * catalogue last (section IX, the number the salespeople held before they
- * moved to Staff Hierarchy). The key is what `?tab=` carries, so a link can
- * open the page on the ladder.
- */
-export type RulesTab =
-  | 'scheme'
-  | 'ladder'
-  | 'groups'
-  | 'kpi'
-  | 'thresholds'
-  | 'open-bill'
-  | 'brands'
-  | 'promotion'
-  | 'ranks'
-
-const RULES_TABS: Array<TabItem & { key: RulesTab }> = [
-  { key: 'scheme', label: 'Scheme rules' },
-  { key: 'ladder', label: 'Title ladder' },
-  { key: 'groups', label: 'Item groups' },
-  { key: 'kpi', label: 'KPI items' },
-  { key: 'thresholds', label: 'KPI threshold ladder' },
-  { key: 'open-bill', label: 'Open Bill rates' },
-  { key: 'brands', label: 'Brands & margin bands' },
-  { key: 'promotion', label: 'Promotion criteria' },
-  { key: 'ranks', label: 'Ranks' },
-]
-
-export function isRulesTab(s: string | null | undefined): s is RulesTab {
-  return !!s && RULES_TABS.some(t => t.key === s)
-}
 
 /**
  * One sub-department's Rules page.
@@ -86,6 +54,13 @@ export function isRulesTab(s: string | null | undefined): s is RulesTab {
  * tables end to end were a scroll, not a page. The tab is `?tab=`, pushed with the
  * browser's own history so switching costs nothing and Back steps through
  * them; Next syncs `useSearchParams` from it.
+ *
+ * Since 2026-09-11 the rail shows only the tabs the scheme USES: Scheme
+ * rules, the Title ladder and Ranks always, and every other table only while
+ * the switch that reads it is on — IR, which pays nothing per item, gets
+ * three tabs where Fair gets nine (`lib/commission/rules-tabs.ts` says which
+ * switch owns which tab). A `?tab=` naming a hidden one opens Scheme rules,
+ * where its switch is.
  *
  * Which sub-department is the ROUTE's answer, not a picker's (2026-09-01) —
  * `/revenue/fair/rules` loads Fair's scheme and nothing else, so there is no
@@ -105,11 +80,16 @@ export default function CommissionSection({
   subDept: { name: string; slug: string }
 }) {
   const searchParams = useSearchParams()
-  const raw = searchParams.get('tab')
-  const tab: RulesTab = isRulesTab(raw) ? raw : 'scheme'
   const [showNewSub, setShowNewSub] = useState(false)
 
   const scheme = data.scheme
+  const tabs = scheme
+    ? visibleRulesTabs(scheme, {
+        itemGroups: data.itemGroups.length,
+        promotionRules: data.promotionRules.length,
+      })
+    : []
+  const tab: RulesTab = resolveRulesTab(searchParams.get('tab'), tabs)
 
   function goTo(key: string) {
     const params = new URLSearchParams(searchParams.toString())
@@ -139,7 +119,7 @@ export default function CommissionSection({
         </button>
       </div>
 
-      {scheme ? <SlidingTabs items={RULES_TABS} active={tab} onTabChange={goTo} variant="control" /> : null}
+      {scheme ? <SlidingTabs items={tabs} active={tab} onTabChange={goTo} variant="control" /> : null}
 
       {showNewSub ? (
         <section className="mb-12">
@@ -181,6 +161,27 @@ export default function CommissionSection({
 }
 
 // ─── I. Scheme rules ─────────────────────────────────────────────────────────
+
+/**
+ * The ON cell of the three group-package parameters — Group sales layers,
+ * Override layers, Direct-line limit. They are not switches: `updateScheme`
+ * requires them at 2 / 2 / 3 whenever Group incentive package is on, and
+ * blank means "every layer" for a percentage-only scheme like Fair. The cell
+ * used to hold a dash, which read as a switch that cannot be turned on (user
+ * 2026-09-11: "那种 dash 就是它不能 on 的 … 应该把那个 dash 换成 IR，这样就知道它是
+ * 属于 IR"). So it names the programme the parameters belong to instead — IR,
+ * spec §15 — on every sub-department's page, Fair's included.
+ */
+function IrParameter() {
+  return (
+    <span
+      className="chip whitespace-nowrap"
+      title="An IR programme parameter, not a switch — it is set together with Group incentive package"
+    >
+      IR
+    </span>
+  )
+}
 
 function SchemeRules({ scheme }: { scheme: SchemeRow }) {
   return (
@@ -260,7 +261,7 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
                 </tr>
                 <tr>
                   <td>Group sales layers</td>
-                  <td className="text-muted">—</td>
+                  <td><IrParameter /></td>
                   <td className="font-sans text-xs text-graphite">
                     <Field name="group_sales_depth" type="number" step="1" width="w-20" defaultValue={scheme.group_sales_depth ?? ''} ariaLabel="Group sales layers" />
                     <span className="ml-2">2 = directs and their directs; blank = all layers</span>
@@ -268,7 +269,7 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
                 </tr>
                 <tr>
                   <td>Override layers</td>
-                  <td className="text-muted">—</td>
+                  <td><IrParameter /></td>
                   <td className="font-sans text-xs text-graphite">
                     <Field name="override_depth" type="number" step="1" width="w-20" defaultValue={scheme.override_depth ?? ''} ariaLabel="Override layers" />
                     <span className="ml-2">2 = at most two layers; blank = all layers</span>
@@ -276,7 +277,7 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
                 </tr>
                 <tr>
                   <td>Direct-line limit</td>
-                  <td className="text-muted">—</td>
+                  <td><IrParameter /></td>
                   <td className="font-sans text-xs text-graphite">
                     <Field name="direct_line_limit" type="number" step="1" width="w-20" defaultValue={scheme.direct_line_limit ?? ''} ariaLabel="Direct-line limit" />
                     <span className="ml-2">Base 3 for group packages. Full Spec permits a fourth line that month. Each further line requires all existing groups to qualify in its opening month. Opened slots are retained; unused permission expires.</span>
