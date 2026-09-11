@@ -193,6 +193,48 @@ src/
 │   │   │                              repeated-own target and fixed package.
 │   │   ├── reports/                 (Phase 3)
 │   │   └── settings/                ← 8 tabs: treasury / overdue / splits / directors / companies / banks / periods / simulator
+│   ├── (member)/member/            ← the Revenue member app: one phone-shaped
+│   │                                  workspace for a salesperson, NOT the portal.
+│   │                                  Its own design language (warm editorial,
+│   │                                  `components/member/member.module.css`), its
+│   │                                  own nav: Today / **Insight** / Income /
+│   │                                  Quote / Team / Account. `preview/` renders
+│   │                                  it in a phone frame on demo data
+│   │                                  (`lib/member/demo*.ts`); dev-only, and
+│   │                                  Principal/HR in production.
+│   │                                  **INSIGHT (2026-09-16)** answers "how am I
+│   │                                  doing" from COMMITTED ORDERS, not from the
+│   │                                  month's statement — a run happens once a
+│   │                                  month, so the statement is last month's
+│   │                                  answer for most of it. Three views:
+│   │                                  My sales (own revenue, KPI units, the gap
+│   │                                  to the next rung's gate, blended margin,
+│   │                                  every order in its margin band), Ranking
+│   │                                  (everybody, split by sub-department) and
+│   │                                  Downline (each leg of the caller's team).
+│   │                                  It counts the way `engine.ts` counts:
+│   │                                  commissionable lines only, the DEPOSIT GATE
+│   │                                  applied (held revenue reported separately,
+│   │                                  never inside sales), carry-forward honoured
+│   │                                  via `comm_order_releases`, and an order with
+│   │                                  no usable margin counted in sales but left
+│   │                                  out of the blended margin. SALES AND MARGIN
+│   │                                  ONLY — no commission, rate or salary of
+│   │                                  anybody, including the caller's own on a
+│   │                                  board. Gated by the `member_insight`
+│   │                                  permission, which the neutral member
+│   │                                  allowlist in `current_permissions()` had to
+│   │                                  learn (mig 20260916010000). Arithmetic in
+│   │                                  `lib/member/insight.ts`, data in
+│   │                                  `member_insight_snapshot()`.
+│   │                                  **TEAM** is a mapping map, not an indented
+│   │                                  list: every sub-department as a frame, its
+│   │                                  directors above it, one card per MEMBERSHIP,
+│   │                                  drag to pan. Placed by the same `layoutTree`
+│   │                                  the portal's charts use, via
+│   │                                  `lib/member/org-map-layout.ts`, on
+│   │                                  `member_org_map()`. Names, titles and
+│   │                                  reporting lines only.
 │   └── api/erp/v1/                 ← the ONE machine endpoint: the Houzs ERP live
 │                                      feed's receiver (sales-orders POST + health
 │                                      GET). The only POST route handler in the app —

@@ -5,6 +5,8 @@ import type { QuoteInput } from "@/lib/member/types";
 export type { AdminMemberInput, AdminMemberData } from "@/lib/member/server";
 import {
   loadMemberData,
+  loadMemberInsight,
+  loadMemberOrgMap,
   calculateMemberQuote as calculate,
   submitMemberRequest as submit,
   acknowledgeMemberMemo as acknowledge,
@@ -21,6 +23,12 @@ export async function refreshMemberData() {
         error:
           data.message ?? "Your member profile has not been configured yet.",
       };
+}
+export async function fetchMemberInsight(period?: string) {
+  return loadMemberInsight(period);
+}
+export async function fetchMemberOrgMap() {
+  return loadMemberOrgMap();
 }
 export async function calculateMemberQuote(input: QuoteInput) {
   return calculate(input);

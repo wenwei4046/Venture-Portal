@@ -1,0 +1,199 @@
+import { notFound } from "next/navigation";
+import { getUser } from "@/lib/auth";
+import { memberDemo } from "@/lib/member/demo";
+import MemberWorkspace from "@/components/member/MemberWorkspace";
+import MemberAdmin from "@/components/member/MemberAdmin";
+import MemberLoginScreen from "@/components/member/MemberLoginScreen";
+import type { AdminMemberData } from "@/lib/member/server";
+
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Revenue · Mobile & Desktop Preview" };
+
+export default async function MemberPreview({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    admin?: string;
+    device?: string;
+    width?: string;
+    height?: string;
+    page?: string;
+    quoteView?: string;
+  }>;
+}) {
+  if (process.env.NODE_ENV !== "development") {
+    const user = await getUser();
+    if (!user || !["principal", "hr"].includes(user.role)) notFound();
+  }
+  const params = await searchParams;
+  if (params.device === "phone") {
+    const phoneWidth =
+      params.width && ["320", "375", "390", "430"].includes(params.width)
+        ? Number(params.width)
+        : 390;
+    const phoneHeight =
+      params.height && ["568", "667", "844"].includes(params.height)
+        ? Number(params.height)
+        : "min(844px, calc(100dvh - 145px))";
+    const viewParams = new URLSearchParams();
+    if (
+      params.page &&
+      [
+        "today",
+        "insight",
+        "income",
+        "quote",
+        "team",
+        "requests",
+        "memos",
+        "account",
+        "login",
+      ].includes(params.page)
+    )
+      viewParams.set("page", params.page);
+    if (params.quoteView === "catalog" || params.quoteView === "calculator")
+      viewParams.set("quoteView", params.quoteView);
+    const previewPath = `/member/preview${viewParams.size ? `?${viewParams}` : ""}`;
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          padding: "16px 12px",
+          background: "#ded8ce",
+          color: "#2b1f17",
+        }}
+      >
+        <div
+          style={{ maxWidth: 560, margin: "0 auto 12px", textAlign: "center" }}
+        >
+          <p style={{ fontSize: 10, letterSpacing: 2, marginBottom: 4 }}>
+            HOUZS VENTURE · DESIGN PREVIEW
+          </p>
+          <h1 style={{ fontSize: 22, fontWeight: 600 }}>Mobile workspace</h1>
+          <a
+            href={previewPath}
+            style={{
+              display: "inline-block",
+              padding: "10px 12px",
+              color: "#2e5c8a",
+            }}
+          >
+            Desktop preview →
+          </a>
+          <a
+            href="/member/preview?admin=1"
+            style={{
+              display: "inline-block",
+              padding: "10px 12px",
+              color: "#2e5c8a",
+            }}
+          >
+            HR admin preview →
+          </a>
+        </div>
+        <iframe
+          title="Revenue mobile workspace · Interactive preview"
+          src={previewPath}
+          allow="clipboard-write"
+          style={{
+            display: "block",
+            width: phoneWidth,
+            boxSizing: "content-box",
+            maxWidth: "100%",
+            height: phoneHeight,
+            minHeight: 420,
+            margin: "0 auto",
+            border: "1px solid #bfb1a2",
+            borderRadius: 24,
+            background: "#f2efea",
+            boxShadow: "0 16px 48px #2b1f1720",
+          }}
+        />
+      </main>
+    );
+  }
+  if (params.page === "login")
+    return (
+      <MemberLoginScreen
+        preview
+        previewHref="/member/preview?page=today"
+      />
+    );
+  const data = memberDemo();
+  if (params.admin === "1") {
+    const admin: AdminMemberData = {
+      canManageRequests: true,
+      canPublishMemos: true,
+      canConfigureProducts: true,
+      requests: [
+        ...data.requests,
+        {
+          id: "demo-reserved",
+          kind: "waiting",
+          title: "Amelia · Waiting list request",
+          status: "reserved",
+          createdAt: data.refreshedAt,
+          detail: {
+            newPerson: "Amelia Tan",
+            subDepartmentId: "fair",
+            targetDepartmentId: "fair",
+            department: "Fair",
+            signature: "Amelia Tan",
+            start: "2026-09-11",
+          },
+        },
+        {
+          id: "demo-replacement",
+          kind: "replacement",
+          title: "Marcus · Replacement",
+          status: "approved",
+          createdAt: data.refreshedAt,
+          detail: {
+            originalStaffId: "marcus",
+            subDepartmentId: "fair",
+            newPerson: "Ryan Tan",
+            destination: "member_exit",
+            effective: "2026-09-10",
+          },
+        },
+      ],
+      departments: (data.departments ?? []).map((d) => ({
+        ...d,
+        occupied: 27,
+        reserved: d.id === "fair" ? 1 : 0,
+      })),
+      memos: data.memos,
+      products: data.products.map((product) => ({
+        ...product,
+        cost: undefined,
+      })),
+      candidates: [
+        {
+          id: "candidate-1",
+          name: "Ryan Tan",
+          departmentId: "fair",
+          titleId: "specialist",
+        },
+      ],
+      titles: [
+        {
+          id: "specialist",
+          name: "Revenue Specialist",
+          departmentId: "revenue",
+          subDepartmentIds: ["fair", "ir"],
+        },
+      ],
+      uplines: [
+        {
+          id: "jia",
+          name: "Jia En",
+          subDepartmentId: "fair",
+          titleId: "leader",
+        },
+      ],
+      events: [],
+    };
+    return <MemberAdmin initialData={admin} demo />;
+  }
+  return <MemberWorkspace initialData={data} />;
+}

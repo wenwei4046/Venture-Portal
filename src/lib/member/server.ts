@@ -11,7 +11,9 @@ import { isCompatibleGift, productImageUrl, quoteLineKey } from "./catalog";
 import type {
   MemberBand,
   MemberData,
+  MemberInsight,
   MemberMemo,
+  MemberOrgMap,
   MemberProduct,
   MemberRequest,
   QuoteInput,
@@ -266,6 +268,64 @@ export async function loadMemberData(): Promise<MemberData> {
   } catch (error) {
     return { ...empty, message: message(error) };
   }
+}
+
+/**
+ * Insight — live performance, fetched on demand rather than folded into the
+ * member snapshot. The board spans a whole department, so making Today pay
+ * for it on every load would slow the page most people open most often.
+ */
+export async function loadMemberInsight(
+  period?: string,
+): Promise<MemberOutcome<MemberInsight>> {
+  return outcome(async () => {
+    const client = await session("member_insight");
+    const data = await rpc<MemberInsight>(client, "member_insight_snapshot", {
+      p_period: /^\d{4}-\d{2}$/.test(period ?? "") ? period : null,
+    });
+    if (!data || !Array.isArray(data.blocks))
+      throw new Error("Performance information is temporarily unavailable.");
+    return {
+      ...data,
+      blocks: data.blocks.map((block) => ({
+        ...block,
+        title: legacyLabel(block.title),
+        rank: legacyLabel(block.rank),
+        boards: (block.boards ?? []).map((board) => ({
+          ...board,
+          rows: (board.rows ?? []).map((row) => ({
+            ...row,
+            title: legacyLabel(row.title),
+          })),
+        })),
+        downline: (block.downline ?? []).map((row) => ({
+          ...row,
+          title: legacyLabel(row.title),
+        })),
+        orders: (block.orders ?? []).map((order) => ({
+          ...order,
+          brand: legacyLabel(order.brand),
+        })),
+      })),
+    };
+  });
+}
+
+/** The mapping map behind My team. Names, titles and reporting lines; no pay. */
+export async function loadMemberOrgMap(): Promise<MemberOutcome<MemberOrgMap>> {
+  return outcome(async () => {
+    const client = await session("member_portal");
+    const data = await rpc<MemberOrgMap>(client, "member_org_map");
+    if (!data || !Array.isArray(data.people))
+      throw new Error("The team map is temporarily unavailable.");
+    return {
+      ...data,
+      people: data.people.map((person) => ({
+        ...person,
+        title: legacyLabel(person.title),
+      })),
+    };
+  });
 }
 
 interface CostRow {

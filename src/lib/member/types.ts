@@ -1,5 +1,6 @@
 export type MemberPage =
   | "today"
+  | "insight"
   | "income"
   | "quote"
   | "team"
@@ -177,4 +178,124 @@ export interface QuoteResult {
     margin: number;
     label: string;
   }[];
+}
+
+/**
+ * Insight — live performance, read straight from the committed sales orders
+ * rather than from the month's statement. Sales and margin only: another
+ * member's commission, rate and salary never travel in these shapes.
+ */
+export interface MemberScore {
+  staffId: string;
+  /** Deposit-cleared commissionable revenue. What will actually pay. */
+  sales: number;
+  /** Commissionable revenue the deposit gate is still holding back. */
+  held: number;
+  orders: number;
+  kpiQty: number;
+  /** Revenue of the orders that HAVE a usable margin, and their cost. */
+  marginRevenue: number;
+  marginCost: number;
+  /** Cleared orders with neither a line cost nor a keyed-in margin. */
+  blindOrders: number;
+  lastOrder: string | null;
+}
+export interface MemberBoardRow extends MemberScore {
+  name: string;
+  title: string;
+  self: boolean;
+}
+export interface MemberBoard {
+  departmentId: string;
+  department: string;
+  /** The caller's own sub-department. Listed first. */
+  own: boolean;
+  rows: MemberBoardRow[];
+}
+export interface MemberDownlineRow extends MemberScore {
+  name: string;
+  title: string;
+  uplineId: string | null;
+  /** 1 = a direct report. The caller themselves is never in this list. */
+  depth: number;
+}
+export interface MemberStreakMonth {
+  period: string;
+  sales: number;
+  /** This month, still moving. Earlier months come from applied statements. */
+  live: boolean;
+  met: boolean;
+}
+export interface MemberTarget {
+  rank: string;
+  /** Own sales needed every month of the streak. Null when this rung has no personal gate. */
+  personal: number | null;
+  months: number | null;
+  /** Own + downline sales needed this month. Null when this rung has no group gate. */
+  group: number | null;
+  streak: MemberStreakMonth[] | null;
+}
+export interface MemberInsightOrder {
+  id: string;
+  number: string;
+  brand: string;
+  revenue: number;
+  margin: number | null;
+  date: string;
+  manual: boolean;
+  /** Deposit met. An order that has not cleared pays nothing yet. */
+  cleared: boolean;
+  kpiQty: number;
+  /** Written in an earlier month, paying in this one. */
+  carried: boolean;
+}
+export interface MemberInsightBlock {
+  membershipId: string;
+  schemeId: string;
+  department: string;
+  title: string;
+  rank: string;
+  rankSort: number;
+  me: MemberScore & { name: string };
+  target: MemberTarget | null;
+  boards: MemberBoard[];
+  downline: MemberDownlineRow[];
+  orders: MemberInsightOrder[];
+}
+export interface MemberInsight {
+  period: string;
+  asOf: string;
+  /** The period is the current month, so the numbers are still moving. */
+  live: boolean;
+  blocks: MemberInsightBlock[];
+}
+
+/** The mapping map behind My team: everybody, and which department they are in. */
+export interface MemberOrgPerson {
+  /** Scheme-scoped: one node per MEMBERSHIP, not per person. */
+  id: string;
+  staffId: string;
+  departmentId: string;
+  schemeId: string;
+  name: string;
+  code: string | null;
+  title: string;
+  parentId: string | null;
+  self: boolean;
+  /** In a sub-department the caller also belongs to. */
+  mine: boolean;
+}
+export interface MemberOrgDepartment {
+  id: string;
+  schemeId: string;
+  name: string;
+  code: string;
+  capacity: number | null;
+  mine: boolean;
+  directors: { id: string; name: string }[];
+}
+export interface MemberOrgMap {
+  asOf: string;
+  departments: MemberOrgDepartment[];
+  people: MemberOrgPerson[];
 }
