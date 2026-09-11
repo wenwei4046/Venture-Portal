@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import { formatMoney, formatMoneyBare } from '@/lib/utils'
+import { formatMoneyBare } from '@/lib/utils'
 import {
   updateDirectorPayrollRow,
   deleteDirectorPayrollRows,
@@ -151,32 +151,32 @@ export default function DirectorPayrollActualGrid({ rows, period }: Props) {
   return (
     <div>
       {/* Summary band — same anatomy as the HR payroll page */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-6 mb-6 border-y border-hairline py-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-6 mb-6 border-y border-hairline py-6">
         <div>
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total CTC</div>
-          <div className="statement-amount text-num-ink mt-1">{formatMoney(totalCtc)}</div>
+          <div className="statement-amount compact whitespace-nowrap text-num-ink mt-1"><span className="unit">RM</span>{' '}{formatMoneyBare(totalCtc)}</div>
         </div>
         <div>
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total Gross</div>
-          <div className="statement-amount compact text-graphite mt-1">{formatMoney(totals.gross)}</div>
+          <div className="statement-amount compact whitespace-nowrap text-graphite mt-1"><span className="unit">RM</span>{' '}{formatMoneyBare(totals.gross)}</div>
         </div>
         <div>
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total Net</div>
-          <div className="statement-amount compact text-graphite mt-1">{formatMoney(totals.net)}</div>
+          <div className="statement-amount compact whitespace-nowrap text-graphite mt-1"><span className="unit">RM</span>{' '}{formatMoneyBare(totals.net)}</div>
         </div>
         <div>
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">EPF ER</div>
-          <div className="statement-amount compact text-graphite mt-1">{formatMoney(totals.epf_er)}</div>
+          <div className="statement-amount compact whitespace-nowrap text-graphite mt-1"><span className="unit">RM</span>{' '}{formatMoneyBare(totals.epf_er)}</div>
         </div>
         <div>
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">SOCSO+EIS ER</div>
-          <div className="statement-amount compact text-graphite mt-1">
-            {formatMoney(totals.socso_er + totals.eis_er)}
+          <div className="statement-amount compact whitespace-nowrap text-graphite mt-1">
+            <span className="unit">RM</span>{' '}{formatMoneyBare(totals.socso_er + totals.eis_er)}
           </div>
         </div>
         <div>
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total PCB</div>
-          <div className="statement-amount compact text-graphite mt-1">{formatMoney(totals.pcb)}</div>
+          <div className="statement-amount compact whitespace-nowrap text-graphite mt-1"><span className="unit">RM</span>{' '}{formatMoneyBare(totals.pcb)}</div>
         </div>
       </div>
 
