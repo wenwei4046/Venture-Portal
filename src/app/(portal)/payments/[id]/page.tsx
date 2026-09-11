@@ -11,6 +11,8 @@ import CopyVoucherButton from './_components/CopyVoucherButton'
 import ReassignGlAccountButton from './_components/ReassignGlAccountButton'
 import AttachmentUploader from './_components/AttachmentUploader'
 import AttachmentList from '@/components/voucher/AttachmentList'
+import LedgerRow from '@/components/LedgerRow'
+import { recipientAccountLabel, salaryPaymentLabel } from '@/lib/payroll-voucher-display'
 
 const POOL_LABELS: Record<string, string> = {
   venture_pool: 'Venture Pool',
@@ -120,21 +122,31 @@ export default async function PaymentDetailPage({ params }: Props) {
   // one line for a per-person PV, N lines for a department PV.
   // database.types.ts not regenerated for the new table (same escape hatch as
   // the payroll RPCs).
-  const { data: payrollLines } =
+  const { data: payrollLines, error: payrollLinesError } =
     voucher.reference_type === 'payroll_disbursement'
       ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (supabase as any)
           .from('payroll_voucher_lines')
-          .select('employee_name, employee_code, department_name, net')
+          .select('id, scope, payroll_row_id, employee_name, employee_code, department_name, net, salary_component, recipient_account, bank_name, bank_account_no')
           .eq('voucher_id', id)
           .order('employee_name')
-      : { data: null }
+          .order('salary_component')
+      : { data: null, error: null }
+  if (payrollLinesError) throw new Error('Unable to load the recorded salary payment details. Please try again.')
   const peopleOnVoucher = ((payrollLines ?? []) as unknown) as Array<{
+    id: string
+    scope: string
+    payroll_row_id: string
     employee_name: string
     employee_code: string | null
     department_name: string | null
     net: string | number
+    salary_component: string | null
+    recipient_account: string | null
+    bank_name: string | null
+    bank_account_no: string | null
   }>
+  const salaryPeople = new Set(peopleOnVoucher.map(line => `${line.scope}:${line.payroll_row_id}`)).size
 
   // Read the contribution snapshots written with this PV. Current payroll or
   // department membership must never change the people an existing PV covers.
@@ -352,35 +364,51 @@ export default async function PaymentDetailPage({ params }: Props) {
             <h2>People on this voucher</h2>
             <span className="rule" aria-hidden />
             <span className="count">
-              {peopleOnVoucher.length} {peopleOnVoucher.length === 1 ? 'PERSON' : 'PEOPLE'} · NET
+              {salaryPeople} {salaryPeople === 1 ? 'PERSON' : 'PEOPLE'} · {peopleOnVoucher.length} {peopleOnVoucher.length === 1 ? 'PAYMENT' : 'PAYMENTS'}
             </span>
           </div>
+          <p className="text-sm text-muted mb-4">Payment amounts and receiving accounts recorded when this PV was generated.</p>
           <div className="overflow-x-auto">
-            <table className="ledger-table">
+            <table className="ledger-table" aria-label="Salary payments on this voucher">
               <thead>
                 <tr>
                   <th>Employee</th>
-                  <th>Department</th>
-                  <th className="num">Net</th>
+                  <th className="m-hide">Department</th>
+                  <th className="m-hide">Payment</th>
+                  <th className="m-hide">Receiving account</th>
+                  <th className="num">Amount</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
                 {peopleOnVoucher.map((p, i) => (
-                  <tr key={i}>
+                  <LedgerRow key={p.id ?? i}>
                     <td>
                       <span className="font-serif text-md text-ink">{p.employee_name}</span>
                       {p.employee_code ? <span className="font-mono text-[11px] text-muted ml-2">{p.employee_code}</span> : null}
                     </td>
-                    <td className="font-serif text-sm text-graphite">{p.department_name ?? '—'}</td>
+                    <td className="m-hide font-serif text-sm text-graphite" data-label="Department">{p.department_name ?? '—'}</td>
+                    <td className="m-hide text-sm text-graphite" data-label="Payment">{salaryPaymentLabel(p.salary_component)}</td>
+                    <td className="m-hide text-sm text-graphite" data-label="Receiving account">
+                      {recipientAccountLabel(p.recipient_account) && <div className="text-xs text-muted">{recipientAccountLabel(p.recipient_account)}</div>}
+                      {p.bank_name && p.bank_account_no ? (
+                        <>
+                          <div>{p.bank_name}</div>
+                          <div className="font-mono text-xs">{p.bank_account_no}</div>
+                        </>
+                      ) : <span className="text-muted">Bank details not recorded</span>}
+                    </td>
                     <td className="num">{formatMoney(Number(p.net))}</td>
-                  </tr>
+                  </LedgerRow>
                 ))}
               </tbody>
               {peopleOnVoucher.length > 1 ? (
                 <tfoot>
                   <tr className="border-t-2 border-hairline">
-                    <td className="font-serif italic text-ink font-medium" colSpan={2}>Total</td>
+                    <td className="font-serif italic text-ink font-medium">Total</td>
+                    <td className="m-hide" colSpan={3} />
                     <td className="num font-semibold">{formatMoney(peopleOnVoucher.reduce((s, p) => s + Number(p.net), 0))}</td>
+                    <td className="lt-toggle" />
                   </tr>
                 </tfoot>
               ) : null}

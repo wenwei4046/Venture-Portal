@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import type { SalaryComponentSelection } from '@/lib/payment-cycle'
 
 export interface DisbursementResult {
   group_id: string
@@ -67,6 +68,7 @@ export async function createPayrollDisbursement(
   granularity: PayrollGranularity = 'employee',
   departmentId: string | null = null,
   payrollRowIds: string[] | null = null,
+  componentSelections: SalaryComponentSelection[] | null = null,
 ): Promise<DisbursementResult> {
   await requirePermission('hr_costing')
   const supabase = await createClient()
@@ -90,6 +92,16 @@ export async function createPayrollDisbursement(
     }
   }
 
+  if (componentSelections !== null) {
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!Array.isArray(componentSelections) || !componentSelections.length || componentSelections.some(c =>
+      !c || !uuid.test(c.payroll_row_id) || !['net', 'basic', 'commission'].includes(c.component) || !['account_1', 'account_2'].includes(c.account)
+      || (c.expected_amount !== undefined && (!Number.isFinite(c.expected_amount) || c.expected_amount <= 0)))
+      || new Set(componentSelections.map(c => `${c.payroll_row_id.toLowerCase()}:${c.component}`)).size !== componentSelections.length) {
+      throw new Error('Select each valid salary payment and recipient account once')
+    }
+  }
+
   const { data, error } = await supabase.rpc(
     'create_payroll_disbursement_vouchers',
     {
@@ -99,6 +111,7 @@ export async function createPayrollDisbursement(
       p_granularity: granularity,
       p_department_id: departmentId,
       p_payroll_row_ids: payrollRowIds,
+      p_component_selections: componentSelections === null ? null : componentSelections.map(c => ({ ...c })),
     },
   )
 

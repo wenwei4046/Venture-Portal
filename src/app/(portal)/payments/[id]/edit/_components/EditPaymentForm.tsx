@@ -48,6 +48,8 @@ interface Props {
   glAccounts: GlAccount[]
   /** Contribution snapshots lock the financial details of newly generated statutory PVs. */
   statutoryDetailsLocked?: boolean
+  /** Salary snapshots preserve the component amounts and chosen receiving accounts. */
+  salaryDetailsLocked?: boolean
 }
 
 const POOL_OPTIONS = [
@@ -88,12 +90,13 @@ const OVERRIDE_TYPES: AccountType[] = [
 
 export default function EditPaymentForm({
   voucher, initialSources, initialCreditAccountCode,
-  companies, bankAccounts, glAccounts, statutoryDetailsLocked = false,
+  companies, bankAccounts, glAccounts, statutoryDetailsLocked = false, salaryDetailsLocked = false,
 }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
   const isDebit = voucher.direction === 'debit'
+  const paymentDetailsLocked = statutoryDetailsLocked || salaryDetailsLocked
   const amountLocked = !!voucher.repayment_breakdown && (voucher.fund_source_id || voucher.loan_id)
 
   const [amount, setAmount] = useState(voucher.amount.toFixed(2))
@@ -119,7 +122,7 @@ export default function EditPaymentForm({
     e.preventDefault()
     setError(null)
 
-    if (statutoryDetailsLocked) {
+    if (paymentDetailsLocked) {
       const formData = new FormData()
       formData.set('id', voucher.id)
       formData.set('payment_date', paymentDate)
@@ -181,17 +184,23 @@ export default function EditPaymentForm({
     })
   }
 
-  if (statutoryDetailsLocked) {
+  if (paymentDetailsLocked) {
     const bank = bankAccounts.find((account) => account.id === voucher.bank_account_id)
     return (
-      <form onSubmit={handleSubmit} className="max-w-3xl space-y-6" aria-label="Edit statutory PV date and notes">
+      <form onSubmit={handleSubmit} className="max-w-3xl space-y-6" aria-label={`Edit ${salaryDetailsLocked ? 'salary' : 'statutory'} PV date and notes`}>
         <div className="border border-hairline bg-surface p-4 rounded-md text-sm">
-          <h2 className="font-medium text-ink">Recorded statutory contributions</h2>
-          <p className="text-muted mt-2">The employees, amounts, payee, bank and source accounts are fixed for this PV. To change them, void this PV and generate a new one from HR Payment.</p>
+          <h2 className="font-medium text-ink">{salaryDetailsLocked ? 'Recorded salary payments' : 'Recorded statutory contributions'}</h2>
+          <p className="text-muted mt-2">
+            {salaryDetailsLocked
+              ? 'The employees, salary components, amounts, payee, funding bank, receiving accounts and source accounts are fixed for this PV.'
+              : 'The employees, amounts, payee, bank and source accounts are fixed for this PV.'}
+            {' '}To change them, void this PV and generate a new one from HR Payment.
+          </p>
+          {salaryDetailsLocked && <Link href={`/payments/${voucher.id}`} className="inline-block mt-2 text-accent underline underline-offset-2">View recorded salary payments and receiving accounts</Link>}
           <dl className="grid grid-cols-2 gap-3 mt-4">
             <div><dt className="text-muted">Pay to</dt><dd>{voucher.payee_name}</dd></div>
             <div><dt className="text-muted">Amount</dt><dd className="font-mono">RM {voucher.amount.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd></div>
-            <div><dt className="text-muted">Bank</dt><dd>{bank ? `${bank.bank_name} · ${bank.account_number}` : 'Recorded on voucher'}</dd></div>
+            <div><dt className="text-muted">Pay from</dt><dd>{bank ? `${bank.bank_name} · ${bank.account_number}` : 'Recorded on voucher'}</dd></div>
             <div><dt className="text-muted">Payment method</dt><dd>{voucher.payment_method?.replace(/_/g, ' ') ?? '—'}</dd></div>
           </dl>
           <div className="mt-4 overflow-x-auto">

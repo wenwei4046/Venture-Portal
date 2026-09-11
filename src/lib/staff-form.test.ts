@@ -39,6 +39,8 @@ describe('validateStaffForm', () => {
       nonStatutoryAllowance: 0,
       bankName: 'Maybank',
       bankAccountNo: '1234567890',
+      bankName2: null,
+      bankAccountNo2: null,
       contactNumber: '012-345 6789',
       email: 'mei@example.com',
       address: 'Street, city',

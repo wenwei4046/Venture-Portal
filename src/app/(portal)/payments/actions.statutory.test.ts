@@ -20,7 +20,7 @@ function database(options: { covered?: boolean; reference?: string | null; statu
       update: vi.fn((values: unknown) => { operation = 'update'; writes.push({ table, operation, values }); return query }),
       insert: vi.fn((values: unknown) => { operation = 'insert'; writes.push({ table, operation, values }); return query }),
       delete: vi.fn(() => { operation = 'delete'; writes.push({ table, operation }); return query }),
-      then: (resolve: (value: unknown) => unknown) => Promise.resolve(resolve(table === 'payroll_statutory_voucher_lines'
+      then: (resolve: (value: unknown) => unknown) => Promise.resolve(resolve(table === 'payroll_statutory_voucher_lines' || table === 'payroll_voucher_lines'
         ? { data: options.covered === false ? [] : [{ id: 'line' }], error: options.coverageError ? { message: 'database failure' } : null }
         : table === 'payment_vouchers' && operation === 'update' ? { data: options.race ? [] : [{ id: 'pv' }], error: null }
           : { data: [], count: 0, error: null })),
@@ -41,6 +41,46 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.requirePermission.mockResolvedValue({ id: 'finance-user', role: 'finance', permissions: ['treasury'] })
   mocks.redirect.mockImplementation(() => { throw new Error('NEXT_REDIRECT') })
+})
+
+describe('recorded salary PV edits', () => {
+  it('updates only date and notes without changing recipient or funding snapshots', async () => {
+    const { writes, filters, from } = database({ reference: 'payroll_disbursement' })
+    await expect(updatePaymentVoucher(editForm())).rejects.toThrow('NEXT_REDIRECT')
+    expect(writes.filter(write => write.table === 'payment_vouchers')).toEqual([
+      { table: 'payment_vouchers', operation: 'update', values: { payment_date: '2026-09-16', notes: 'Payment date updated', updated_at: expect.any(String) } },
+    ])
+    expect(from).toHaveBeenCalledWith('payroll_voucher_lines')
+    expect(from).not.toHaveBeenCalledWith('payroll_statutory_voucher_lines')
+    expect(from).not.toHaveBeenCalledWith('payment_voucher_sources')
+    expect(writes.find(write => write.table === 'access_log')?.values).toMatchObject({ metadata: { salary_details_preserved: true } })
+    expect(filters).toContainEqual({ table: 'payment_vouchers', column: 'status', values: ['pending_approval', 'draft'] })
+  })
+
+  it.each(['amount', 'payee_name', 'payee_company_id', 'bank_account_id', 'salary_component', 'recipient_account', 'bank_name', 'bank_account_no', 'source_rows[0][pool]', 'source_rows[0][amount]', 'source_rows[0][account_code]', 'payment_method', 'description', 'reference_type', 'reference_id'])('rejects a crafted %s change before writing', async field => {
+    const { writes } = database({ reference: 'payroll_disbursement' })
+    await expect(updatePaymentVoucher(editForm({ [field]: 'changed' }))).rejects.toThrow('Only its payment date and notes can be edited')
+    expect(writes).toEqual([])
+  })
+
+  it('fails closed when snapshot verification fails or approval wins the race', async () => {
+    let state = database({ reference: 'payroll_disbursement', coverageError: true })
+    await expect(updatePaymentVoucher(editForm())).rejects.toThrow('Unable to verify the recorded salary payment details')
+    expect(state.writes).toEqual([])
+    state = database({ reference: 'payroll_disbursement', race: true })
+    await expect(updatePaymentVoucher(editForm())).rejects.toThrow('Voucher status changed mid-edit')
+    expect(state.writes).toHaveLength(1)
+    expect(state.from).not.toHaveBeenCalledWith('payment_voucher_sources')
+  })
+
+  it('rejects an invalid date while preserving a legacy salary voucher with no snapshot lines', async () => {
+    const protectedState = database({ reference: 'payroll_disbursement' })
+    await expect(updatePaymentVoucher(editForm({ payment_date: '2026-02-30' }))).rejects.toThrow('Choose a valid payment date')
+    expect(protectedState.writes).toEqual([])
+    const legacy = database({ reference: 'payroll_disbursement', covered: false })
+    await expect(updatePaymentVoucher(editForm())).rejects.toThrow('Amount must be greater than 0')
+    expect(legacy.from).toHaveBeenCalledWith('payroll_voucher_lines')
+  })
 })
 
 describe('recorded statutory PV edits', () => {

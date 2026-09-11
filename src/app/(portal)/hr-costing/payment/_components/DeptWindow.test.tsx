@@ -210,7 +210,39 @@ describe('DeptWindow fixed generation methods', () => {
     fireEvent.click(save)
     expect(onSaveDates).toHaveBeenCalledTimes(1)
     expect(onConfirmGenerate).not.toHaveBeenCalled()
-    expect(screen.getByText('Alliance file · entire department')).toHaveAttribute('title', expect.stringContaining('every employee'))
+    expect(screen.getByText('All generated PVs · includes paid')).toHaveAttribute('title', expect.stringContaining('saved receiving accounts'))
+    expect(screen.getByRole('link', { name: 'Bank file for HV-PV-pending_approval' })).toHaveAttribute('href', '/hr-costing/payroll/2026-08-01/bank-transfer?format=alliance&vouchers=pv-pending_approval')
+  })
+
+  it.each([
+    { bank_name: null, bank_account_no: null },
+    { bank_name: 'Recorded bank', bank_account_no: null },
+    { bank_name: null, bank_account_no: '0098765432' },
+  ])('marks incomplete historical bank snapshots without offering a profile fix: %j', snapshot => {
+    const pv = voucher('paid')
+    const legacy = person('Legacy', 1000, pv)
+    legacy.components = [{ component: 'net', amount: 1000, voucher: pv, recipient_account: null, ...snapshot }]
+    setup({ readOnly: true, group: groupDepartments([legacy])[0] })
+    const row = screen.getByRole('row', { name: /Legacy/ })
+    expect(within(row).getByText('Bank details not recorded')).toBeVisible()
+    expect(within(row).queryByRole('link', { name: /fix|Complete receiving account/ })).not.toBeInTheDocument()
+    expect(row.querySelector('.bank')).not.toHaveClass('bad')
+    expect(row).not.toHaveTextContent('CIMB')
+    expect(row).not.toHaveTextContent('Account 1')
+  })
+})
+
+describe('DeptWindow salary bank files', () => {
+  it('offers separate downloads for paid Basic and remaining Commission PVs', () => {
+    const employee = person('Amy', 8556.15)
+    employee.components = [
+      { component: 'basic', amount: 4302.7, voucher: { ...voucher('paid'), id: 'basic-pv', no: 'BASIC' }, recipient_account: 'account_1', bank_name: 'CIMB', bank_account_no: '1234567890' },
+      { component: 'commission', amount: 4253.45, voucher: { ...voucher('pending_approval'), id: 'commission-pv', no: 'COMMISSION' }, recipient_account: 'account_2', bank_name: 'Maybank', bank_account_no: '9876543210' },
+    ]
+    setup({ readOnly: true, group: groupDepartments([employee])[0] })
+    expect(screen.getByRole('link', { name: 'Bank file for BASIC' })).toHaveAttribute('href', expect.stringContaining('vouchers=basic-pv'))
+    expect(screen.getByRole('link', { name: 'Bank file for COMMISSION' })).toHaveAttribute('href', expect.stringContaining('vouchers=commission-pv'))
+    expect(screen.getByText('All generated PVs · includes paid')).toBeVisible()
   })
 })
 

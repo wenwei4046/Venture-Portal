@@ -224,13 +224,13 @@ export default function PayrollRow({
 
         {showRevenueSplit && (
           <>
-            <td className={cn('num g1', split?.basicPay === 0 && 'zero')} data-label="Basic pay">
+            <td className={cn('num g1', split?.basicPay === 0 && 'zero', split && split.basicPay < 0 && 'neg')} data-label="Basic pay" title={row.payout_split_version === 2 ? 'Net basic after employee statutory and PCB' : 'Saved basic payout'}>
               {split ? formatMoneyBare(split.basicPay) : '—'}
             </td>
             <td
               className={cn('num', split?.commissionBalance === 0 && 'zero')}
               data-label="Commission balance"
-              title={split ? 'Gross commission less basic pay, employer EPF and employee EPF. Recomputed when saved.' : undefined}
+              title={split ? (row.payout_split_version === 2 ? 'Commission remaining after net basic and all employee/employer statutory. Recomputed when saved.' : 'Historical saved commission split') : undefined}
             >
               {split ? <span className={split.shortfall > 0 ? 'neg' : undefined}>{formatMoneyBare(split.commissionBalance)}</span> : '—'}
             </td>

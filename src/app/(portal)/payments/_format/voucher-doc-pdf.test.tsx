@@ -5,7 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import PDFParser, { type Output } from 'pdf2json'
 import { renderPdfBuffer } from '@/lib/export/pdf'
-import { VoucherDocPdf, type StatutoryCoverageData, type VoucherDocData } from './voucher-doc-pdf'
+import { VoucherDocPdf, type SalaryPaymentData, type StatutoryCoverageData, type VoucherDocData } from './voucher-doc-pdf'
 
 function line(index: number, longName = false): StatutoryCoverageData {
   return {
@@ -93,5 +93,68 @@ describe('statutory coverage PDF layout', () => {
     expect(content).toContain('PAYMENT VOUCHER')
     expect(content).toContain('125.00')
     expect(content).not.toContain('Statutory contribution details')
+  })
+})
+
+describe('salary receiving account PDF snapshots', () => {
+  let salaryDocument: Output
+  const salaryLine = (index: number, override: Partial<SalaryPaymentData> = {}): SalaryPaymentData => ({
+    id: `salary-${index}`, scope: 'staff', payroll_row_id: `salary-row-${index}`,
+    employee_name: `Synthetic Salary Employee ${index} With A Long Family Name`, employee_code: `SAL${String(index).padStart(3, '0')}`,
+    department_name: 'Original Revenue Department', period_month: '2026-09-01', net: 100,
+    salary_component: 'commission', recipient_account: 'account_2', bank_name: 'Recorded Hong Leong Bank', bank_account_no: `009876543210${String(index).padStart(2, '0')}`,
+    ...override,
+  })
+  const salaryVoucher = (id: string, lines: SalaryPaymentData[]): VoucherDocData => ({
+    ...voucher(id), payee_name: 'Synthetic Salary Recipients', amount: lines.reduce((sum, item) => sum + item.net, 0), salary_payments: lines,
+    sources: [{ pool_label: 'HR Dept Pool', account_label: 'Salary payable', amount: lines.reduce((sum, item) => sum + item.net, 0) }],
+  })
+
+  beforeAll(async () => {
+    const buffer = await renderPdfBuffer(<VoucherDocPdf vouchers={[
+      salaryVoucher('SPLIT', [
+        salaryLine(0, { payroll_row_id: 'split-person', employee_name: 'Synthetic Split Employee', employee_code: 'SPLIT001', salary_component: 'basic', recipient_account: 'account_1', bank_name: 'Recorded Maybank', bank_account_no: '0012345678', net: 4302.70 }),
+        salaryLine(1, { payroll_row_id: 'split-person', employee_name: 'Synthetic Split Employee', employee_code: 'SPLIT001', bank_name: 'Recorded CIMB', bank_account_no: '0098765432', net: 4253.45 }),
+      ]),
+      salaryVoucher('LARGE-SALARY', Array.from({ length: 60 }, (_, index) => salaryLine(index))),
+      salaryVoucher('LEGACY-SALARY', [salaryLine(99, { salary_component: 'net', recipient_account: null, bank_name: null, bank_account_no: null })]),
+    ]} />)
+    if (process.env.VOUCHER_PDF_QA_DIR) {
+      await mkdir(process.env.VOUCHER_PDF_QA_DIR, { recursive: true })
+      await writeFile(path.join(process.env.VOUCHER_PDF_QA_DIR, 'salary-recipient-snapshots.pdf'), buffer)
+    }
+    salaryDocument = await parse(buffer)
+  }, 30000)
+
+  it('prints both chosen banks, complete account numbers, net basic and commission amounts', () => {
+    const content = text(salaryDocument.Pages[1])
+    for (const expected of ['Salary payment details', '1 person', 'Basic salary (net)', 'Commission', 'Account 1', 'Account 2', 'Recorded Maybank', 'Recorded CIMB', '0012345678', '0098765432', '4,302.70', '4,253.45', '8,556.15']) {
+      expect(content).toContain(expected)
+    }
+  })
+
+  it('paginates compiled salary payments with complete snapshots and repeated headings', () => {
+    const pages = salaryDocument.Pages.filter(page => text(page).includes('TEST-PV-LARGE-SALARY - Salary payment details -'))
+    expect(pages.length).toBeGreaterThan(1)
+    const all = pages.map(text).join(' ')
+    for (let i = 0; i < 60; i++) {
+      expect(all.match(new RegExp(`SAL${String(i).padStart(3, '0')}`, 'g'))).toHaveLength(1)
+      expect(all).toContain(`009876543210${String(i).padStart(2, '0')}`)
+    }
+    expect(all).toContain('6,000.00')
+    for (const page of pages) {
+      expect(text(page)).toContain('RECEIVING ACCOUNT')
+      const footer = page.Texts.find(item => item.R.some(run => decodeURIComponent(run.T).includes('Salary payment details -')))!
+      expect(Math.max(...page.Texts.filter(item => item !== footer).map(item => item.y))).toBeLessThan(footer.y - 0.5)
+    }
+  })
+
+  it('keeps legacy net payments visible without guessing their historical bank', () => {
+    const content = text(salaryDocument.Pages.at(-1)!)
+    expect(content).toContain('Net salary')
+    expect(content).toContain('Bank details not recorded')
+    expect(content).not.toContain('Recorded Hong Leong Bank')
+    expect(content).not.toContain('Account 1')
+    expect(content).not.toContain('Account 2')
   })
 })

@@ -12,12 +12,12 @@ vi.mock('./_components/AttachmentUploader', () => ({ default: () => <div data-te
 vi.mock('@/components/voucher/AttachmentList', () => ({ default: () => <div data-testid="attachment-list" /> }))
 import PaymentDetailPage from './page'
 
-function database(referenceType = 'payroll_statutory') {
+function database(referenceType = 'payroll_statutory', salaryLines: Record<string, unknown>[] = [], salaryError: object | null = null) {
   const voucher = { id: 'stat', voucher_no: 'TEST-STAT-PV', reference_type: referenceType, status: 'pending_approval', amount: 100.10, direction: 'debit', voucher_type: 'salary_payout', payee_name: 'KWSP', payee_company_id: null, bank_account_id: null, source_pool: null, target_pool: null, created_by: 'creator', approved_by: null, approved_at: null, created_at: '2026-09-11T00:00:00Z', updated_at: '2026-09-11T00:00:00Z', executed_at: null, payment_method: 'bank_transfer', description: 'Statutory fixture', notes: null }
   const filters: string[][] = []
   const from = vi.fn((table: string) => {
     let allowedReferences: string[] | null = null
-    const result = { data: table === 'payroll_statutory_voucher_lines' ? [{ id: 'line', scope: 'staff', payroll_row_id: 'row', employee_name: 'Recorded Employee', employee_code: 'TEST001', department_name: 'Original Department', period_month: '2026-08-01', scheme: 'KWSP', amount: '100.10' }] : [], error: null }
+    const result = { data: table === 'payroll_statutory_voucher_lines' ? [{ id: 'line', scope: 'staff', payroll_row_id: 'row', employee_name: 'Recorded Employee', employee_code: 'TEST001', department_name: 'Original Department', period_month: '2026-08-01', scheme: 'KWSP', amount: '100.10' }] : table === 'payroll_voucher_lines' ? salaryLines : [], error: table === 'payroll_voucher_lines' ? salaryError : null }
     const query = {
       select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(),
       in: vi.fn((column: string, values: string[]) => { if (column === 'reference_type') { allowedReferences = values; filters.push(values) } return query }),
@@ -67,5 +67,46 @@ describe('HR payroll voucher detail access', () => {
     expect(screen.getByTestId('voucher-actions')).toBeInTheDocument()
     expect(screen.getByTestId('copy-voucher')).toBeInTheDocument()
     expect(screen.getByTestId('attachment-uploader')).toBeInTheDocument()
+  })
+
+  it('shows net basic and commission with their recorded receiving accounts as one person', async () => {
+    mocks.requirePermission.mockResolvedValue({ role: 'hr', permissions: ['hr_costing'] })
+    const person = { scope: 'staff', payroll_row_id: 'salary-row', employee_name: 'Salary Employee', employee_code: 'SAL001', department_name: 'Original Revenue' }
+    const { from } = database('payroll_disbursement', [
+      { ...person, id: 'basic', salary_component: 'basic', recipient_account: 'account_1', bank_name: 'Recorded Maybank', bank_account_no: '0012345678', net: 4302.70 },
+      { ...person, id: 'commission', salary_component: 'commission', recipient_account: 'account_2', bank_name: 'Recorded CIMB', bank_account_no: '0098765432', net: 4253.45 },
+    ])
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'salary' }) }))
+    const table = screen.getByRole('table', { name: 'Salary payments on this voucher' })
+    const basic = within(table).getByRole('row', { name: /Basic salary \(net\)/ })
+    expect(basic).toHaveTextContent('Account 1')
+    expect(basic).toHaveTextContent('Recorded Maybank')
+    expect(basic).toHaveTextContent('0012345678')
+    expect(basic).toHaveTextContent('4,302.70')
+    const commission = within(table).getByRole('row', { name: /Commission/ })
+    expect(commission).toHaveTextContent('Account 2')
+    expect(commission).toHaveTextContent('Recorded CIMB')
+    expect(commission).toHaveTextContent('0098765432')
+    expect(commission).toHaveTextContent('4,253.45')
+    expect(screen.getByText('1 PERSON · 2 PAYMENTS')).toBeVisible()
+    expect(within(table).getByRole('row', { name: /Total/ })).toHaveTextContent('8,556.15')
+    expect(from).not.toHaveBeenCalledWith('hr_staff_costs')
+  })
+
+  it('labels an old net line without inventing a receiving account', async () => {
+    mocks.requirePermission.mockResolvedValue({ role: 'hr', permissions: ['hr_costing'] })
+    database('payroll_disbursement', [{ id: 'legacy', scope: 'staff', payroll_row_id: 'legacy-row', employee_name: 'Legacy Employee', department_name: 'Revenue', net: 1000, salary_component: 'net', recipient_account: null, bank_name: null, bank_account_no: null }])
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'salary' }) }))
+    const table = screen.getByRole('table', { name: 'Salary payments on this voucher' })
+    expect(table).toHaveTextContent('Net salary')
+    expect(table).toHaveTextContent('Bank details not recorded')
+    expect(table).not.toHaveTextContent('Account 1')
+    expect(table).not.toHaveTextContent('Account 2')
+  })
+
+  it('does not hide a failed salary snapshot query behind an empty table', async () => {
+    mocks.requirePermission.mockResolvedValue({ role: 'hr', permissions: ['hr_costing'] })
+    database('payroll_disbursement', [], { message: 'private database detail' })
+    await expect(PaymentDetailPage({ params: Promise.resolve({ id: 'salary' }) })).rejects.toThrow('Unable to load the recorded salary payment details')
   })
 })

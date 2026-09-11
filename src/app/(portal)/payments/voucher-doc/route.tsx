@@ -9,7 +9,7 @@ import { requirePermission } from '@/lib/auth'
 import { can } from '@/lib/permissions'
 import { exportPdfResponse } from '@/lib/export/response'
 import { formatPoolLabel } from '@/lib/voucher-detail'
-import { VoucherDocPdf, type StatutoryCoverageData, type VoucherDocData } from '../_format/voucher-doc-pdf'
+import { VoucherDocPdf, type SalaryPaymentData, type StatutoryCoverageData, type VoucherDocData } from '../_format/voucher-doc-pdf'
 import dayjs from 'dayjs'
 
 export async function GET(req: Request) {
@@ -46,8 +46,9 @@ export async function GET(req: Request) {
   const companyIds = Array.from(new Set(vouchers.map((v) => v.payee_company_id).filter(Boolean))) as string[]
   const bankIds = Array.from(new Set(vouchers.map((v) => v.bank_account_id).filter(Boolean))) as string[]
   const statutoryIds = vouchers.filter((v) => v.reference_type === 'payroll_statutory').map((v) => v.id as string)
+  const salaryIds = vouchers.filter((v) => v.reference_type === 'payroll_disbursement').map((v) => v.id as string)
 
-  const [{ data: srcs }, { data: companies }, { data: banks }, coverageResult] = await Promise.all([
+  const [{ data: srcs }, { data: companies }, { data: banks }, coverageResult, salaryResult] = await Promise.all([
     supabase
       .from('payment_voucher_sources')
       .select('voucher_id, pool, amount, account_code, chart_of_accounts!pvs_account_code_fk(name)')
@@ -67,9 +68,26 @@ export async function GET(req: Request) {
           .in('voucher_id', statutoryIds)
           .order('department_name').order('employee_name').order('scheme')
       : Promise.resolve({ data: [], error: null }),
+    salaryIds.length > 0
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any).from('payroll_voucher_lines')
+          .select('id, voucher_id, scope, payroll_row_id, employee_name, employee_code, department_name, period_month, net, salary_component, recipient_account, bank_name, bank_account_no')
+          .in('voucher_id', salaryIds)
+          .order('department_name').order('employee_name').order('salary_component')
+      : Promise.resolve({ data: [], error: null }),
   ])
   if (coverageResult.error) {
     return Response.json({ error: 'Unable to load recorded statutory contribution details. Please try again.' }, { status: 500 })
+  }
+  if (salaryResult.error) {
+    return Response.json({ error: 'Unable to load recorded salary payment details. Please try again.' }, { status: 500 })
+  }
+
+  const salaryByVoucher = new Map<string, SalaryPaymentData[]>()
+  for (const line of (salaryResult.data ?? []) as Array<Omit<SalaryPaymentData, 'net'> & { voucher_id: string; net: string | number }>) {
+    const payments = salaryByVoucher.get(line.voucher_id) ?? []
+    payments.push({ ...line, net: Number(line.net) })
+    salaryByVoucher.set(line.voucher_id, payments)
   }
 
   const coverageByVoucher = new Map<string, StatutoryCoverageData[]>()
@@ -112,6 +130,7 @@ export async function GET(req: Request) {
       payment_reference: v.payment_reference as string | null,
       sources: sourcesByVoucher.get(v.id as string) ?? [],
       statutory_coverage: coverageByVoucher.get(v.id as string) ?? [],
+      salary_payments: salaryByVoucher.get(v.id as string) ?? [],
     }
   })
 

@@ -3,6 +3,7 @@
 // Split out of the Server Action so it can be tested on its own, the way
 // `invite.ts` is. Pure: it normalises as well as checks, so the action writes
 // exactly what came back and nothing it re-derives itself.
+import { validateSecondaryStaffBankAccount } from './staff-bank-accounts'
 
 export type StaffEmploymentType = 'salaried' | 'commission_eligible'
 
@@ -21,6 +22,8 @@ export interface RawStaffForm {
   nonStatutoryAllowance?: string | null
   bankName?: string | null
   bankAccountNo?: string | null
+  bankName2?: string | null
+  bankAccountNo2?: string | null
   contactNumber?: string | null
   email?: string | null
   address?: string | null
@@ -39,6 +42,8 @@ export interface ValidStaffForm {
   nonStatutoryAllowance: number
   bankName: string | null
   bankAccountNo: string | null
+  bankName2: string | null
+  bankAccountNo2: string | null
   contactNumber: string | null
   email: string | null
   address: string | null
@@ -99,6 +104,7 @@ export function validateStaffForm(raw: RawStaffForm): ValidStaffForm {
     nonStatutoryAllowance,
     bankName: clean(raw.bankName),
     bankAccountNo,
+    ...validateSecondaryStaffBankAccount(raw),
     contactNumber: clean(raw.contactNumber),
     email: clean(raw.email),
     address: clean(raw.address),

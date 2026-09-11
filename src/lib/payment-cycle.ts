@@ -1,3 +1,5 @@
+import type { BankAccountSelection } from '@/lib/staff-bank-accounts'
+
 // Pure helpers for the HR Payment page (2026-09-10, proposal B: department
 // board + window). The page reads ONE RPC, payment_cycle(period), and every
 // judgement about what it returned lives here so it can be unit-tested
@@ -20,6 +22,24 @@ export interface CycleVoucher {
   group_id: string | null
 }
 
+export type SalaryComponent = 'net' | 'basic' | 'commission'
+export interface CycleSalaryComponent {
+  component: SalaryComponent
+  amount: number
+  voucher: CycleVoucher | null
+  recipient_account: BankAccountSelection | null
+  bank_name: string | null
+  bank_account_no: string | null
+}
+export interface SalaryComponentSelection {
+  payroll_row_id: string
+  component: SalaryComponent
+  account: BankAccountSelection
+  expected_amount?: number
+  expected_bank_name?: string | null
+  expected_bank_account_no?: string | null
+}
+
 export interface CyclePerson {
   row_id: string
   /** hr_staff_costs.id for staff (their People page); null for directors. */
@@ -31,6 +51,11 @@ export interface CyclePerson {
   dept_name: string
   bank_name: string | null
   bank_account_no: string | null
+  bank_name_2?: string | null
+  bank_account_no_2?: string | null
+  source?: string | null
+  payout_split_version?: number | null
+  components?: CycleSalaryComponent[]
   gross: number
   net: number
   epf_er: number
@@ -154,6 +179,14 @@ export function normaliseCycle(raw: unknown): PaymentCycle {
     dept_name: String(p.dept_name ?? 'Unassigned'),
     bank_name: p.bank_name ?? null,
     bank_account_no: p.bank_account_no ?? null,
+    bank_name_2: p.bank_name_2 ?? null,
+    bank_account_no_2: p.bank_account_no_2 ?? null,
+    source: p.source ?? null,
+    payout_split_version: p.payout_split_version == null ? null : n(p.payout_split_version),
+    components: Array.isArray(p.components) ? p.components.map((c: CycleSalaryComponent) => ({
+      component: c.component, amount: n(c.amount), voucher: voucher(c.voucher),
+      recipient_account: c.recipient_account ?? null, bank_name: c.bank_name ?? null, bank_account_no: c.bank_account_no ?? null,
+    })) : undefined,
     gross: n(p.gross),
     net: n(p.net),
     epf_er: n(p.epf_er),
@@ -205,6 +238,30 @@ export function normaliseCycle(raw: unknown): PaymentCycle {
       approved_at: v.approved_at ?? null,
     })),
   }
+}
+
+/** Old cycle responses and historical payroll retain one whole-net payment. */
+export function salaryComponents(person: CyclePerson): CycleSalaryComponent[] {
+  return person.components ?? [{ component: 'net', amount: person.net, voucher: person.voucher,
+    recipient_account: null, bank_name: null, bank_account_no: null }]
+}
+/** Components still eligible for a new PV; pending and paid PVs both cover it. */
+export function unpaidSalaryComponents(person: CyclePerson): CycleSalaryComponent[] {
+  return salaryComponents(person).filter(c => c.amount > 0 && (!c.voucher || c.voucher.status === 'voided'))
+}
+export function salaryPaidAmount(person: CyclePerson): number {
+  return round2(salaryComponents(person).reduce((sum, c) => sum + (c.voucher?.status === 'paid' ? c.amount : 0), 0))
+}
+export function salaryCoveredAmount(person: CyclePerson): number {
+  return round2(salaryComponents(person).reduce((sum, c) => sum + (c.voucher && c.voucher.status !== 'voided' ? c.amount : 0), 0))
+}
+export function salaryFullyCovered(person: CyclePerson): boolean {
+  const due = salaryComponents(person).filter(c => c.amount > 0)
+  return due.length > 0 && due.every(c => c.voucher && c.voucher.status !== 'voided')
+}
+export function salaryFullyPaid(person: CyclePerson): boolean {
+  const due = salaryComponents(person).filter(c => c.amount > 0)
+  return due.length > 0 && due.every(c => c.voucher?.status === 'paid')
 }
 
 // ── Bank details ─────────────────────────────────────────────────────────────
@@ -260,7 +317,7 @@ export interface DeptGroup {
 }
 
 function stageOf(g: Pick<DeptGroup, 'headcount' | 'generated' | 'paid' | 'pending' | 'vouchers'>): DeptStage {
-  if (g.generated === 0) return 'not_generated'
+  if (g.vouchers.length === 0) return 'not_generated'
   if (g.generated < g.headcount) return 'partial'
   if (g.pending > 0) return 'pending'
   if (g.paid === g.headcount) return 'paid'
@@ -319,13 +376,15 @@ export function groupDepartments(people: CyclePerson[]): DeptGroup[] {
     let emp = 0
     let dept = 0
     for (const p of payable) {
-      if (!p.voucher) continue
-      g.generated++
-      if (p.voucher.status === 'paid') g.paid++
-      else if (p.voucher.status === 'pending_approval' || p.voucher.status === 'draft') g.pending++
-      if (p.voucher.granularity === 'department') dept++
-      else emp++
-      if (!seen.has(p.voucher.id)) seen.set(p.voucher.id, p.voucher)
+      if (salaryFullyCovered(p)) g.generated++
+      if (salaryFullyPaid(p)) g.paid++
+      const vouchers = salaryComponents(p).filter(c => c.amount > 0).map(c => c.voucher).filter((v): v is CycleVoucher => !!v && v.status !== 'voided')
+      if (vouchers.some(v => v.status === 'pending_approval' || v.status === 'draft')) g.pending++
+      for (const voucher of vouchers) {
+        if (voucher.granularity === 'department') dept++
+        else emp++
+        seen.set(voucher.id, voucher)
+      }
     }
     g.vouchers = Array.from(seen.values())
     g.mode = emp && dept ? 'mixed' : dept ? 'department' : emp ? 'employee' : 'none'
@@ -909,7 +968,7 @@ export function cycleHeadline(i: HeadlineInput): Headline {
   const fundedSeg: SegState = fundedAll ? 'done' : 'now'
   if (!p.salaryDone) {
     const overdue = staffDate < today
-    if (p.generated === 0) {
+    if (!i.groups.some(group => group.vouchers.length > 0)) {
       return {
         word: overdue ? 'Pay date passed' : 'Ready to generate',
         detail: `Funded ${shortDate(fs?.pv_date)} · ${p.payable} people · nothing generated yet${hasDirectors && !i.directorsFunded ? ' · directors wait for their own funding' : ''}.`,

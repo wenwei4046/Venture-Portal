@@ -191,6 +191,8 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
       employment_type: row.employment_type,
       bank_name: row.bank_name ?? null,
       bank_account_no: row.bank_account_no ?? null,
+      bank_name_2: row.bank_name_2 ?? null,
+      bank_account_no_2: row.bank_account_no_2 ?? null,
       nric: row.nric ?? null,
       contact_number: row.contact_number ?? null,
       email: row.email ?? null,

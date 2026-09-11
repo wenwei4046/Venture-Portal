@@ -41,6 +41,8 @@ export interface PayslipPayee {
   voucherNo: string | null
   /** The period label for the beneficiary's reference, e.g. "Apr 2026" */
   periodLabel: string
+  /** Salary PV date, frozen independently for each component/batch. */
+  paymentDate?: string | null
 }
 
 export interface AllianceBankResult {
@@ -113,7 +115,7 @@ export function generateAllianceBankCsv(
     rowCount++
 
     const cells = [
-      dateStr,
+      p.paymentDate ? formatPaymentDate(new Date(`${p.paymentDate}T00:00:00Z`)) : dateStr,
       'MYR',
       amount,
       csvEscape(p.bankName),

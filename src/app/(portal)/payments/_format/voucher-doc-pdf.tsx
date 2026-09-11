@@ -1,6 +1,7 @@
 import React from 'react'
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 import dayjs from 'dayjs'
+import { recipientAccountLabel, salaryPaymentLabel } from '@/lib/payroll-voucher-display'
 
 // Per-voucher document PDF. Each voucher starts on an A4 portrait page. Mirrors the
 // invoice document layout (HV letterhead + meta + party + per-source table).
@@ -76,6 +77,23 @@ export interface VoucherDocData {
   sources: VoucherSourceData[]
   /** Immutable contribution snapshots for this statutory PV; absent for legacy vouchers. */
   statutory_coverage?: StatutoryCoverageData[]
+  /** Recorded salary components and receiving accounts; legacy bank snapshots may be absent. */
+  salary_payments?: SalaryPaymentData[]
+}
+
+export interface SalaryPaymentData {
+  id: string
+  scope: string
+  payroll_row_id: string
+  employee_name: string
+  employee_code: string | null
+  department_name: string | null
+  period_month: string
+  net: number
+  salary_component: string | null
+  recipient_account: string | null
+  bank_name: string | null
+  bank_account_no: string | null
 }
 
 function fmtMoney(v: number): string {
@@ -229,6 +247,55 @@ function StatutoryCoveragePages({ v }: { v: VoucherDocData }) {
   )
 }
 
+function SalaryPaymentPages({ v }: { v: VoucherDocData }) {
+  const lines = v.salary_payments ?? []
+  const people = new Set(lines.map(line => `${line.scope}:${line.payroll_row_id}`)).size
+  const periods = Array.from(new Set(lines.map(line => dayjs(line.period_month).format('MMMM YYYY')))).join(' / ')
+  return (
+    <Page size="A4" style={styles.page}>
+      <View fixed>
+        <View style={[styles.letterhead, { marginBottom: 16 }]}>
+          <Text style={styles.brand}>HOUZS Venture Holdings Sdn. Bhd.</Text>
+          <Text style={[styles.primary, { marginTop: 12 }]}>Salary payment details</Text>
+          <Text style={styles.sub}>{v.voucher_no ?? v.id.slice(0, 8)} - {periods}</Text>
+          <Text style={[styles.sub, { marginTop: 4 }]}>{people} {people === 1 ? 'person' : 'people'} - receiving accounts recorded when this PV was generated</Text>
+        </View>
+        <View style={[styles.amountRow, { backgroundColor: '#eee', borderTop: '0.5pt solid #aaa', borderBottom: '0.5pt solid #aaa' }]}>
+          <Text style={{ width: '34%', paddingLeft: 4, fontFamily: 'Helvetica-Bold', fontSize: 8 }}>EMPLOYEE / DEPARTMENT</Text>
+          <Text style={{ width: '22%', fontFamily: 'Helvetica-Bold', fontSize: 8 }}>PAYMENT</Text>
+          <Text style={{ width: '27%', fontFamily: 'Helvetica-Bold', fontSize: 8 }}>RECEIVING ACCOUNT</Text>
+          <Text style={{ width: '17%', paddingRight: 4, textAlign: 'right', fontFamily: 'Helvetica-Bold', fontSize: 8 }}>AMOUNT (RM)</Text>
+        </View>
+      </View>
+      {lines.map(line => (
+        <View key={line.id} wrap={false} style={[styles.amountRow, { borderBottom: '0.5pt solid #ddd' }]}>
+          <View style={{ width: '34%', paddingLeft: 4, paddingRight: 8 }}>
+            <Text style={{ fontSize: 9, lineHeight: 1.3 }}>{line.employee_name}</Text>
+            {line.employee_code ? <Text style={{ fontSize: 8, color: '#777', marginTop: 2 }}>{line.employee_code}</Text> : null}
+            <Text style={{ fontSize: 8, color: '#555', marginTop: 2 }}>{line.department_name ?? '-'}</Text>
+          </View>
+          <Text style={{ width: '22%', paddingRight: 8, fontSize: 9, lineHeight: 1.3 }}>{salaryPaymentLabel(line.salary_component)}</Text>
+          <View style={{ width: '27%', paddingRight: 8 }}>
+            {recipientAccountLabel(line.recipient_account) ? <Text style={{ fontSize: 8, color: '#777', marginBottom: 2 }}>{recipientAccountLabel(line.recipient_account)}</Text> : null}
+            {line.bank_name && line.bank_account_no ? (
+              <>
+                <Text style={{ fontSize: 9, lineHeight: 1.3 }}>{line.bank_name}</Text>
+                <Text style={{ fontSize: 8, fontFamily: 'Courier', marginTop: 2 }}>{line.bank_account_no}</Text>
+              </>
+            ) : <Text style={{ fontSize: 8, color: '#777' }}>Bank details not recorded</Text>}
+          </View>
+          <Text style={{ width: '17%', textAlign: 'right', paddingRight: 4, fontFamily: 'Courier', fontSize: 9 }}>{fmtMoney(line.net)}</Text>
+        </View>
+      ))}
+      <View wrap={false} style={styles.totalRow}>
+        <Text style={styles.totalLabel}>TOTAL SALARY PAYMENT (RM)</Text>
+        <Text style={styles.totalValue}>{fmtMoney(lines.reduce((sum, line) => sum + line.net, 0))}</Text>
+      </View>
+      <Text style={styles.pageFooter} fixed render={({ pageNumber, totalPages }) => `${v.voucher_no ?? ''} - Salary payment details - ${pageNumber} / ${totalPages}`} />
+    </Page>
+  )
+}
+
 export function VoucherDocPdf({ vouchers }: { vouchers: VoucherDocData[] }): React.ReactElement {
   return (
     <Document>
@@ -236,6 +303,7 @@ export function VoucherDocPdf({ vouchers }: { vouchers: VoucherDocData[] }): Rea
         <React.Fragment key={v.id}>
           <VoucherPage v={v} />
           {v.statutory_coverage?.length ? <StatutoryCoveragePages v={v} /> : null}
+          {v.salary_payments?.length ? <SalaryPaymentPages v={v} /> : null}
         </React.Fragment>
       ))}
     </Document>

@@ -284,9 +284,7 @@ export async function updateStaffStatutory(
   // overridable statutory field — but it must stay in the formula or overriding
   // any statutory on a Revenue salesperson would quietly hand back their tax.
   const merged = { ...row, ...writes }
-  const gross = Number(row.gross) - (row.source === 'commission'
-    ? Number(merged.epf_er) - Number(row.epf_er)
-    : 0)
+  const gross = Number(row.gross)
   const net = Math.round(
     (gross -
       Number(merged.epf_ee ?? 0) -
@@ -301,8 +299,10 @@ export async function updateStaffStatutory(
     .from('hr_monthly_payroll')
     .update({
       ...writes,
-      gross,
-      net,
+      // Revenue's trigger owns its net-basic/commission reconciliation.
+      ...(row.source === 'commission'
+        ? (writes.pcb !== undefined ? { pcb_override_amount: writes.pcb } : {})
+        : { gross, net }),
       statutory_overridden_at: new Date().toISOString(),
       statutory_overridden_by: user.id,
     })
@@ -336,6 +336,7 @@ export async function resetStaffStatutoryToLookup(id: string): Promise<void> {
     .from('hr_monthly_payroll')
     .update({
       basic_salary: row.basic_salary,
+      pcb_override_amount: null,
       statutory_overridden_at: null,
       statutory_overridden_by: null,
     })

@@ -42,6 +42,56 @@ beforeEach(() => {
 })
 
 describe('Payment statement tabs and confirmation', () => {
+  it('reviews separate net basic and commission with independent, frozen receiving accounts', async () => {
+    const props = boardProps()
+    const person = { ...props.groups[0].people[0], source: 'commission', payout_split_version: 2,
+      gross: 9253.45, net: 8556.15, bank_name_2: 'Maybank', bank_account_no_2: '0098765432',
+      components: [
+        { component: 'basic' as const, amount: 4302.70, voucher: null, recipient_account: null, bank_name: null, bank_account_no: null },
+        { component: 'commission' as const, amount: 4253.45, voucher: null, recipient_account: null, bank_name: null, bank_account_no: null },
+      ] }
+    props.groups = groupDepartments([person])
+    const { rerender } = render(<PaymentBoard {...props} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Manual generate' }))
+    const dialog = screen.getByRole('dialog')
+    for (const part of ['Net basic', 'Commission']) fireEvent.click(within(dialog).getByRole('checkbox', { name: `Select Amy — ${part}` }))
+    fireEvent.change(within(dialog).getByLabelText('Amy — Commission bank account'), { target: { value: 'account_2' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Review PVs' }))
+    const confirmation = within(dialog).getByRole('button', { name: 'Yes, generate' }).parentElement!
+    expect(confirmation).toHaveTextContent('2 PVs')
+    expect(confirmation).toHaveTextContent('Net basic · RM 4,302.70 → Account 1 · CIMB ···7890')
+    expect(confirmation).toHaveTextContent('Commission · RM 4,253.45 → Account 2 · Maybank ···5432')
+    expect(within(dialog).getByLabelText('Amy — Commission bank account')).toBeDisabled()
+    rerender(<PaymentBoard {...props} groups={groupDepartments([{ ...person, bank_account_no_2: '1111111111' }])} />)
+    expect(confirmation).toHaveTextContent('Maybank ···5432')
+    expect(actions.create).not.toHaveBeenCalled()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, generate' }))
+    await waitFor(() => expect(actions.create).toHaveBeenCalledExactlyOnceWith('2026-08-01', 'staff', '2026-09-15', 'employee', 'finance', ['row-Amy'], [
+      { payroll_row_id: 'row-Amy', component: 'basic', account: 'account_1', expected_amount: 4302.70, expected_bank_name: 'CIMB', expected_bank_account_no: '1234567890' },
+      { payroll_row_id: 'row-Amy', component: 'commission', account: 'account_2', expected_amount: 4253.45, expected_bank_name: 'Maybank', expected_bank_account_no: '0098765432' },
+    ]))
+  })
+
+  it('allows the remaining commission after net basic is paid without regenerating basic', async () => {
+    const props = boardProps()
+    props.groups = groupDepartments([{ ...props.groups[0].people[0], source: 'commission', payout_split_version: 2,
+      net: 8556.15, components: [
+        { component: 'basic', amount: 4302.70, voucher: { id: 'basic-pv', no: 'PV-BASIC', status: 'paid', payment_date: '2026-09-05', created_at: null, approved_at: null, granularity: 'employee', group_id: null }, recipient_account: 'account_1', bank_name: 'CIMB', bank_account_no: '1234567890' },
+        { component: 'commission', amount: 4253.45, voucher: null, recipient_account: null, bank_name: null, bank_account_no: null },
+      ] }])
+    render(<PaymentBoard {...props} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Manual generate' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('checkbox', { name: 'Select Amy — Net basic' })).toBeDisabled()
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Select Amy — Commission' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Review PVs' }))
+    expect(within(dialog).getByRole('button', { name: 'Yes, generate' }).parentElement).toHaveTextContent('1 PV')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, generate' }))
+    await waitFor(() => expect(actions.create).toHaveBeenCalledExactlyOnceWith('2026-08-01', 'staff', '2026-09-15', 'employee', 'finance', ['row-Amy'], [
+      { payroll_row_id: 'row-Amy', component: 'commission', account: 'account_1', expected_amount: 4253.45, expected_bank_name: 'CIMB', expected_bank_account_no: '1234567890' },
+    ]))
+  })
+
   it('keeps reporting visible and shows changes only in Salary', () => {
     render(<PaymentBoard {...boardProps()} />)
     expect(screen.getByRole('tab', { name: 'Salary' })).toHaveAttribute('aria-selected', 'true')
@@ -71,7 +121,11 @@ describe('Payment statement tabs and confirmation', () => {
     expect(within(dialog).getByRole('checkbox', { name: 'Select Ben' })).toBeDisabled()
     expect(actions.create).not.toHaveBeenCalled()
     fireEvent.click(confirm)
-    await waitFor(() => expect(actions.create).toHaveBeenCalledExactlyOnceWith('2026-08-01', 'staff', '2026-09-15', 'employee', 'finance', ['row-Amy', 'row-Cara', 'row-Ezra']))
+    await waitFor(() => expect(actions.create).toHaveBeenCalledExactlyOnceWith('2026-08-01', 'staff', '2026-09-15', 'employee', 'finance', ['row-Amy', 'row-Cara', 'row-Ezra'], [
+      { payroll_row_id: 'row-Amy', component: 'net', account: 'account_1', expected_amount: 1000.1, expected_bank_name: 'CIMB', expected_bank_account_no: '1234567890' },
+      { payroll_row_id: 'row-Cara', component: 'net', account: 'account_1', expected_amount: 3000.3, expected_bank_name: 'CIMB', expected_bank_account_no: '1234567890' },
+      { payroll_row_id: 'row-Ezra', component: 'net', account: 'account_1', expected_amount: 5000.5, expected_bank_name: 'CIMB', expected_bank_account_no: '1234567890' },
+    ]))
   })
 
   it('department generation reviews everyone and ignores a saved manual subset', async () => {
@@ -87,7 +141,13 @@ describe('Payment statement tabs and confirmation', () => {
     expect(confirm.parentElement).toHaveTextContent('1 PV')
     expect(confirm.parentElement).toHaveTextContent('RM 15,001.50')
     fireEvent.click(confirm)
-    await waitFor(() => expect(actions.create).toHaveBeenCalledExactlyOnceWith('2026-08-01', 'staff', '2026-09-15', 'department', 'finance', ['row-Amy', 'row-Ben', 'row-Cara', 'row-Devi', 'row-Ezra']))
+    await waitFor(() => expect(actions.create).toHaveBeenCalledExactlyOnceWith('2026-08-01', 'staff', '2026-09-15', 'department', 'finance', ['row-Amy', 'row-Ben', 'row-Cara', 'row-Devi', 'row-Ezra'], [
+      { payroll_row_id: 'row-Amy', component: 'net', account: 'account_1', expected_amount: 1000.1, expected_bank_name: 'CIMB', expected_bank_account_no: '1234567890' },
+      { payroll_row_id: 'row-Ben', component: 'net', account: 'account_1', expected_amount: 2000.2, expected_bank_name: 'CIMB', expected_bank_account_no: '1234567890' },
+      { payroll_row_id: 'row-Cara', component: 'net', account: 'account_1', expected_amount: 3000.3, expected_bank_name: 'CIMB', expected_bank_account_no: '1234567890' },
+      { payroll_row_id: 'row-Devi', component: 'net', account: 'account_1', expected_amount: 4000.4, expected_bank_name: 'CIMB', expected_bank_account_no: '1234567890' },
+      { payroll_row_id: 'row-Ezra', component: 'net', account: 'account_1', expected_amount: 5000.5, expected_bank_name: 'CIMB', expected_bank_account_no: '1234567890' },
+    ]))
   })
 
   it('retains statutory choices by department and payment date when returning from review', async () => {

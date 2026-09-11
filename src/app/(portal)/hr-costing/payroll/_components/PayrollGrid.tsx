@@ -53,6 +53,9 @@ export interface PayrollRowData {
   /** Source-linked Revenue payroll; imported rows retain their own payroll treatment. */
   revenue_payroll?: boolean
   commission_balance?: number | null
+  payout_split_version?: number | null
+  basic_pay_net?: number | null
+  pcb_override_amount?: number | null
   commission_statements?: { label: string; href: string }[]
 }
 
@@ -227,9 +230,9 @@ export default function PayrollGrid({ rows, period }: Props) {
       </div>
       {showRevenueSplit && (
         <p className="text-xs text-graphite mb-3">
-          Revenue payout: Basic pay + Commission balance. Commission balance = gross commission −
-          basic pay − EPF ER − EPF EE. Other payroll adjustments are included in Net.
-          {' '}Revenue rows are managed from the commission calculation.
+          Revenue payout: Net basic + Commission balance = Net to bank.
+          {' '}Basic follows normal payroll deductions; both employee and employer statutory are funded from the commission total.
+          {' '}Open a paycheck for the allocation and editable PCB. Historical rows retain their saved split.
         </p>
       )}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-3 min-h-[1.75rem]">
@@ -334,8 +337,8 @@ export default function PayrollGrid({ rows, period }: Props) {
                 <th className="pg-st l4 col-act" />
                 {showRevenueSplit && (
                   <>
-                    <th className="num g1">Basic pay</th>
-                    <th className="num" title="Gross commission less basic pay, employer EPF and employee EPF">Comm. balance</th>
+                    <th className="num g1">{visibleRows.filter(row => row.source === 'commission').every(row => row.payout_split_version === 2) ? 'Net basic' : 'Basic pay'}</th>
+                    <th className="num" title="Remaining commission after basic and statutory allocations; open the paycheck for the calculation">Comm. balance</th>
                   </>
                 )}
                 <th className="num g1 col-basic">Basic</th>
