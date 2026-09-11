@@ -24,6 +24,8 @@
  * from either side is the same message.
  */
 
+import { staffCodeNumber } from './staff-codes'
+
 /** A rung of the ladder. */
 export interface Rung {
   id: string
@@ -153,14 +155,27 @@ export interface LadderOrderable {
   title: string | null
   /** The rung their title stands on; null = unplaced title, or no title. */
   levelRank: number | null
+  /**
+   * Their employee code, when the caller has it. Inside one title the HV
+   * number is the order (2026-09-12); a caller without codes falls back to
+   * names.
+   */
+  code?: string | null
 }
 
 /**
  * The roster's order inside a department: the ladder, top down (user,
  * 2026-09-05). Higher rung first; on one rung the same title keeps together,
- * A→Z; then names A→Z. Somebody whose title is not on the ladder — or who has
- * no title — comes after everybody who is: the ladder has nothing to say about
+ * A→Z; inside a title the employee code, lowest number first (2026-09-12);
+ * then names A→Z. Somebody whose title is not on the ladder — or who has no
+ * title — comes after everybody who is: the ladder has nothing to say about
  * where they stand, so they stand at the end, no title last of all.
+ *
+ * The code decides inside a title because the numbers were given from the
+ * top of the ladder down and the directors' set by hand — HV002, HV003,
+ * HV004 is the order the user put them in, and names A→Z would show it as
+ * 003, 004, 002. Somebody with no HV number (a TEST row, a legacy code)
+ * reads after those with one.
  */
 export function compareByLadder(a: LadderOrderable, b: LadderOrderable): number {
   if (a.levelRank !== b.levelRank) {
@@ -169,7 +184,16 @@ export function compareByLadder(a: LadderOrderable, b: LadderOrderable): number 
     return b.levelRank - a.levelRank
   }
   if ((a.title === null) !== (b.title === null)) return a.title === null ? 1 : -1
-  return (a.title ?? '').localeCompare(b.title ?? '') || a.name.localeCompare(b.name)
+  const byTitle = (a.title ?? '').localeCompare(b.title ?? '')
+  if (byTitle !== 0) return byTitle
+  const an = staffCodeNumber(a.code)
+  const bn = staffCodeNumber(b.code)
+  if (an !== bn) {
+    if (an === null) return 1
+    if (bn === null) return -1
+    return an - bn
+  }
+  return a.name.localeCompare(b.name)
 }
 
 /** A roster grouping. `rank` is one list; `department` groups first. */

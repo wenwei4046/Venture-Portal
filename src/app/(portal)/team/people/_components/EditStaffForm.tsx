@@ -163,12 +163,15 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
         </div>
         <div>
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Employee Code <span className="text-xs text-muted ml-1 font-normal">(optional, unique)</span>
+            Employee Code <span className="text-xs text-muted ml-1 font-normal">(unique · blank keeps it)</span>
           </label>
+          {/* Numbered by the database (HV + max + 1, 2026-09-12); a blank
+              here keeps the code they have — a code is never cleared, only
+              corrected by typing another. */}
           <input
             name="employee_code"
             defaultValue={staff.employee_code ?? ''}
-            placeholder="e.g. EMP-001"
+            placeholder="HV001"
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
           />
         </div>
