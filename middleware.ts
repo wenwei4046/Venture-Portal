@@ -46,7 +46,7 @@ export async function middleware(request: NextRequest) {
   const { data: verified } = await supabase.auth.getClaims()
   const user = verified?.claims ?? null
 
-  const isLoginPage = request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/member/login'
+  const isLoginPage = request.nextUrl.pathname === '/login'
 
   if (!user && !isLoginPage) {
     const url = request.nextUrl.clone()
