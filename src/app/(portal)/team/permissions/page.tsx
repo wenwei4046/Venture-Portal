@@ -77,7 +77,7 @@ export default async function PermissionsPage() {
     if (list) list.push(row.permission_key)
     else byRole.set(row.role, [row.permission_key])
   }
-  const roleDefaults: RoleDefaults[] = ['principal', 'finance', 'hr', 'dept_manager'].map(
+  const roleDefaults: RoleDefaults[] = ['principal', 'finance', 'hr', 'dept_manager', 'revenue_member'].map(
     role => ({ role, keys: byRole.get(role) ?? [] }),
   )
 

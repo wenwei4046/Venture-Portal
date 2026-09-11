@@ -1,6 +1,6 @@
 // ─── Core ────────────────────────────────────────────────────────────────────
 
-export type UserRole = 'principal' | 'finance' | 'hr' | 'dept_manager'
+export type UserRole = 'principal' | 'finance' | 'hr' | 'dept_manager' | 'revenue_member'
 
 export interface User {
   id: string

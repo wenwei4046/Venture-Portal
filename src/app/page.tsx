@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation'
+import { getUser } from '@/lib/auth'
 
-export default function Home() {
-  redirect('/dashboard')
+export default async function Home() {
+  const user = await getUser()
+  redirect(user?.role === 'revenue_member' ? '/member' : '/dashboard')
 }

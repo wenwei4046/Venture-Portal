@@ -27,7 +27,7 @@ export const getUser = cache(async (): Promise<User | null> => {
   ])
 
   const row = data as (Omit<User, 'permissions'> | null)
-  if (!row) return null
+  if (!row || !row.is_active) return null
 
   const user: User = { ...row, permissions: (perms as string[] | null) ?? [] }
 

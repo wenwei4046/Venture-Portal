@@ -206,6 +206,7 @@ export default function InviteUserForm({
               <option value="finance">Finance — treasury, billing, reports</option>
               <option value="hr">HR — staff costs, payroll, director salary</option>
               <option value="dept_manager">Dept Manager — their own department only</option>
+              <option value="revenue_member">Revenue Member — own account, quotes and requests</option>
             </select>
             <span className="block font-serif italic text-muted text-xs mt-1">
               What the portal lets them touch today. The permission matrix on

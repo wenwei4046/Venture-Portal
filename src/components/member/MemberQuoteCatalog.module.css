@@ -1,0 +1,74 @@
+.selectors {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 8px;
+}
+
+.selector > span {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.selector select {
+  appearance: none;
+  min-width: 0;
+  min-height: 52px;
+  padding: 11px 20px 11px 8px;
+  font-size: 16px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2382776a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  background-size: 10px;
+}
+
+.brandNote {
+  margin: 0;
+  color: var(--m-sub);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.cartActions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.cartActions > button {
+  min-width: 0;
+  padding-right: 12px;
+  padding-left: 12px;
+  white-space: nowrap;
+}
+
+.cartActions .clearAll {
+  color: var(--m-sub);
+  background: transparent;
+}
+
+.clearFeedback {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--m-sub);
+  font-size: 13px;
+  min-height: 44px;
+}
+
+.clearFeedback button {
+  padding: 8px;
+  min-height: 44px;
+}
+
+.emptyCart {
+  padding-top: 18px;
+}
+
+.emptyCart p {
+  margin-top: 4px;
+}

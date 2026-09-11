@@ -35,6 +35,12 @@ export const PERMISSIONS = [
   'settings',
   'override',
   'permissions_manage',
+  'member_portal',
+  'member_quote',
+  'member_requests',
+  'member_memos',
+  'member_requests_manage',
+  'member_memos_manage',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]
