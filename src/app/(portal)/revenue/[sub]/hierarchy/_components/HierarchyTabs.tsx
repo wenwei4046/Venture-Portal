@@ -2,7 +2,7 @@
 
 import { useSearchParams } from 'next/navigation'
 import { SlidingTabs, type TabItem } from '@/components/motion/SlidingTabs'
-import OrgChart, { type OrgPerson, type OrgRank } from './OrgChart'
+import OrgChart, { type OrgDepartment } from './OrgChart'
 import TeamTable from './TeamTable'
 import type { TeamData } from '../../../_components/config/types'
 
@@ -14,9 +14,8 @@ export type HierarchyTab = 'chart' | 'team'
  * … 这个写 team"). They are two views of one line, and the split of what
  * each may change is the point of putting them side by side:
  *
- *   chart  moves people between trees freely — drag, or draw a line. The
- *          line is `reports_to`, the same one People draws (2026-09-10), and
- *          the commission position follows it in the database;
+ *   chart  arranges independent department memberships on one canvas;
+ *          targeted drops, Upline and connector edits change reporting lines;
  *   table  changes nothing but the RANK (and the rate mode that rides with
  *          it); the upline column is who they report to, read-only.
  *
@@ -26,13 +25,13 @@ export type HierarchyTab = 'chart' | 'team'
 export default function HierarchyTabs({
   subDept,
   schemeId,
-  chart,
   team,
+  departments,
 }: {
   subDept: { name: string; slug: string; isHome: boolean }
   schemeId: string
-  chart: { people: OrgPerson[]; ranks: OrgRank[] }
   team: TeamData
+  departments: OrgDepartment[]
 }) {
   const searchParams = useSearchParams()
   const tab: HierarchyTab = searchParams.get('tab') === 'team' ? 'team' : 'chart'
@@ -73,19 +72,12 @@ export default function HierarchyTabs({
                   who earns under whom is moved on the chart. None of it touches People.
                 </>
               )
-            ) : subDept.isHome ? (
-              <>
-                Every card names who they report to — the same line People draws. Change it
-                there, or drag the card onto somebody; the rank they are paid from follows their
-                title and is set on the Team tab. Cards stay where you put them; Tidy lines them up
-                again. A month already computed keeps the chart it was computed against.
-              </>
             ) : (
               <>
-                {subDept.name}&rsquo;s own tree: every card names who they earn under here, which
-                may differ from the company chart. Change it there, or drag the card onto
-                somebody; the rank follows the title held here, set on the Team tab. A month
-                already computed keeps the chart it was computed against.
+                Explore every sub-department in one chart. Drag into open space to arrange,
+                or hold over a person until the transfer prompt appears, then release to
+                change upline. Drag a department heading to move its section. Teams make
+                space as you settle. The Team tab edits {subDept.name}.
               </>
             )}
           </p>
@@ -104,10 +96,10 @@ export default function HierarchyTabs({
           subDeptName={subDept.name}
           isHome={subDept.isHome}
         />
-      ) : chart.people.length === 0 ? (
+      ) : departments.length === 0 ? (
         <NobodyYet isHome={subDept.isHome} />
       ) : (
-        <OrgChart people={chart.people} ranks={chart.ranks} schemeId={schemeId} isHome={subDept.isHome} />
+        <OrgChart departments={departments} initialDepartmentId={departments.find(department => department.schemeId === schemeId)?.id} />
       )}
     </div>
   )

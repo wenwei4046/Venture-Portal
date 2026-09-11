@@ -1,22 +1,24 @@
 import Link from 'next/link'
+import { notFound } from 'next/navigation'
 import { requirePermission } from '@/lib/auth'
 import { revenuePath } from '@/lib/revenue'
 import { titleCanRecruit } from '@/lib/commission/titles'
 import { rankLabelOf, rankPayLabelOf } from '@/lib/commission/ranks'
 import HierarchyTabs from './_components/HierarchyTabs'
-import type { OrgPerson, OrgRank } from './_components/OrgChart'
+import type { OrgDepartment, OrgPerson, OrgRank } from './_components/OrgChart'
 import { loadTeam } from '../../_components/config/load'
-import { requireSubDepartment, type SubDepartment } from '../../_lib/sub-departments'
+import type { TeamData } from '../../_components/config/types'
+import { listSubDepartments, type SubDepartment } from '../../_lib/sub-departments'
 
 interface PageProps {
   params: Promise<{ sub: string }>
 }
 
 /**
- * Staff Hierarchy: who overrides whom, for one sub-department — as a chart
- * and, since 2026-09-05, as a table (the Team tab, which used to be Rules IX).
- * Both are one `loadTeam` read, so a move on the chart is what the table
- * shows and a rank set on the table is what the chart draws.
+ * Staff Hierarchy shows the active sibling sub-departments on one canvas.
+ * Each region keeps its own scheme, memberships and ladder; the Team tab
+ * remains scoped to the route. Its chart region and table share one
+ * `loadTeam` read, so both show the same titles, uplines and ranks.
  *
  * MEMBERSHIPS (user, 2026-09-10): a sub-department is a world of its own —
  * its own tree, and its own title and rank per person. The HOME
@@ -28,14 +30,50 @@ interface PageProps {
 export default async function StaffHierarchyPage({ params }: PageProps) {
   await requirePermission('revenue')
   const { sub } = await params
-  const subDept = await requireSubDepartment(sub)
+  // The same authenticated/RLS-filtered list used by the sidebar. Only
+  // siblings of this route belong on its overview, not another department.
+  const subDepartments = await listSubDepartments()
+  const subDept = subDepartments.find(department => department.slug === sub)
+  if (!subDept) notFound()
 
   // Nothing can be charted against a sub-department with no scheme: a rank is
   // a scheme's row, and a position points at one.
   if (!subDept.schemeId) return <NoScheme subDept={subDept} />
 
-  const team = await loadTeam(subDept.schemeId, { isHome: subDept.isHome })
+  const siblings = subDepartments.filter(
+    (department): department is SubDepartment & { schemeId: string } =>
+      department.departmentId === subDept.departmentId && department.schemeId !== null,
+  )
+  const currentTeam = loadTeam(subDept.schemeId, { isHome: subDept.isHome })
+  const [team, departments] = await Promise.all([
+    currentTeam,
+    Promise.all(siblings.map(async (department): Promise<OrgDepartment> => {
+      const membership = department.id === subDept.id
+        ? await currentTeam
+        : await loadTeam(department.schemeId, { isHome: department.isHome })
+      return {
+        id: department.id,
+        name: department.name,
+        slug: department.slug,
+        schemeId: department.schemeId,
+        isHome: department.isHome,
+        ...chartData(membership),
+      }
+    })),
+  ])
 
+  return (
+    <HierarchyTabs
+      subDept={{ name: subDept.name, slug: subDept.slug, isHome: subDept.isHome }}
+      schemeId={subDept.schemeId}
+      departments={departments}
+      team={team}
+    />
+  )
+}
+
+/** Convert one scheme at a time: staff IDs may recur with different roles. */
+function chartData(team: TeamData): { people: OrgPerson[]; ranks: OrgRank[] } {
   // A rank is its rate, lettered from the top of the Rank tab's catalogue —
   // the rung's label is a trigger-kept copy of its rank's (comm_rank_defs,
   // 2026-09-05) — so the chart and the table say "Rank B · 8%", never the
@@ -84,14 +122,7 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
     }
   })
 
-  return (
-    <HierarchyTabs
-      subDept={{ name: subDept.name, slug: subDept.slug, isHome: subDept.isHome }}
-      schemeId={subDept.schemeId}
-      chart={{ people, ranks }}
-      team={team}
-    />
-  )
+  return { people, ranks }
 }
 
 function NoScheme({ subDept }: { subDept: SubDepartment }) {

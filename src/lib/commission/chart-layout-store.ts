@@ -1,14 +1,17 @@
 /**
- * Where somebody's card was left.
+ * Where the reader arranged cards and department sections, in localStorage.
+ * The combined Revenue canvas uses a namespace for its set of schemes and
+ * identifies each card by scheme plus staff ID, so somebody's positions in
+ * different sub-departments remain independent. Empty sections also store
+ * their own origin.
  *
- * The chart lays a tree out for itself, and until 2026-09-09 that was the only
- * place a card could be: a card dropped on empty ground snapped back, which
- * the user read as the chart refusing to be moved at all ("我并不能自由地拉动
- * 它们"). Now a card stays where it is put, and this is the memory of that —
- * per browser, per scheme, in `localStorage`. It is a reading convenience,
- * not a fact about the company: nothing in the database changes, a Tidy
- * clears it, and so does any move, because a moved tree has a new shape and
- * the old arrangement described the old one.
+ * Blank-space card drops and department-heading drags change this reading
+ * layout. A targeted drop armed by a 450ms hover, an Upline action or a
+ * connector writes the validated reporting line separately. Transfers keep
+ * the subtree's internal arrangement; failed or cancelled transfers restore
+ * its starting positions. Blank-space drops never detach an upline.
+ * On release, overlap resolution shifts teams or departments as whole groups.
+ * Tidy repeats that spacing without resetting or clearing this memory.
  *
  * Kept behind a `StorageLike` so the parsing can be tested with a Map and the
  * component never touches `window` during a server render.
