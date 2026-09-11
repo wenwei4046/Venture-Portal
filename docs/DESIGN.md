@@ -612,6 +612,12 @@ and payment dates. Paid totals use paid vouchers only; excess paid on one scheme
 cannot offset another scheme's outstanding amount. **Changes from the previous
 month belongs only to Salary**, including the employee variance disclosure.
 
+Salary comparisons use `--ledger` green for increases and `--danger` red for
+decreases, for both monetary differences and percentages. Apply the same direction
+colors to department rows, employee movements and department detail windows,
+including notable movements. Flat changes and missing prior-month figures remain
+neutral; statutory due dates and pending approval statuses retain their amber.
+
 Salary shows department totals, people, net salary, status, PV records and the
 Alliance file. Statutory shows the four institutions, contribution amount, due
 date, status and generation actions. SOCSO and EIS are separate schemes under

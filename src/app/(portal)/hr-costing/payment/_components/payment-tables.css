@@ -19,6 +19,8 @@
 .payment-statement .pay-statement-table .pay-status { display:inline-block; overflow:visible; white-space:nowrap; border:0; border-radius:0; margin:0; background:none; font-size:12px; padding:0; color:rgb(var(--graphite)); }
 .payment-statement .pay-statement-table .pay-status.paid { color:rgb(var(--ledger)); }
 .payment-statement .pay-statement-table .pay-status.pending, .payment-statement .pay-change-notable { color:rgb(var(--alert)); }
+.payment-statement .pay-delta.up, .payment-statement .pay-change.up { color:rgb(var(--ledger)); }
+.payment-statement .pay-delta.down, .payment-statement .pay-change.down { color:rgb(var(--danger)); }
 .payment-statement .pay-row-actions { display:flex; align-items:center; justify-content:flex-end; gap:7px; flex-wrap:wrap; }
 .payment-statement .pay-text-button { border:0; background:transparent; color:rgb(var(--accent)); cursor:pointer; padding:2px 0; font:inherit; font-size:12px; text-align:inherit; }
 .payment-statement .pay-text-button:hover { text-decoration:underline; text-underline-offset:3px; }
