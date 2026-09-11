@@ -10,13 +10,13 @@ const actions = vi.hoisted(() => ({ create: vi.fn(), statutory: vi.fn(), refresh
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: actions.refresh }) }))
 vi.mock('../actions', () => ({ createPayrollDisbursement: actions.create, generateStatutorySelection: actions.statutory, setPayrollPvDate: vi.fn() }))
 
-function boardProps(): BoardProps {
+function boardProps(includeHr = false): BoardProps {
   const cycle = normaliseCycle({
     period: '2026-08-01', run: { id: 'run', status: 'paid', total_amount: 15001.5 },
     funding: { staff: { id: 'funding', status: 'completed', amount: 15001.5, pv_date: '2026-09-10' } },
-    people: [['Amy', 1000.1], ['Ben', 2000.2], ['Cara', 3000.3], ['Devi', 4000.4], ['Ezra', 5000.5]].map(([name, net]) => ({
+    people: [['Amy', 1000.1], ['Ben', 2000.2], ['Cara', 3000.3], ['Devi', 4000.4], ['Ezra', 5000.5], ...(includeHr ? [['Faye', 500]] : [])].map(([name, net]) => ({
       row_id: `row-${name}`, staff_id: `staff-${name}`, name, net, gross: net, prev_net: 900,
-      dept_id: 'finance', dept_name: 'Finance', bank_name: 'CIMB', bank_account_no: '1234567890',
+      dept_id: name === 'Faye' ? 'hr' : 'finance', dept_name: name === 'Faye' ? 'HR' : 'Finance', bank_name: 'CIMB', bank_account_no: '1234567890',
       socso_er: 20, socso_ee: 10, eis_er: 2, eis_ee: 2,
     })),
   })
@@ -90,23 +90,81 @@ describe('Payment statement tabs and confirmation', () => {
     await waitFor(() => expect(actions.create).toHaveBeenCalledExactlyOnceWith('2026-08-01', 'staff', '2026-09-15', 'department', 'finance', ['row-Amy', 'row-Ben', 'row-Cara', 'row-Devi', 'row-Ezra']))
   })
 
-  it('retains manual statutory choices across tabs and confirms both schemes atomically', async () => {
-    render(<PaymentBoard {...boardProps()} />)
+  it('retains statutory choices by department and payment date when returning from review', async () => {
+    render(<PaymentBoard {...boardProps(true)} />)
     fireEvent.click(screen.getByRole('tab', { name: 'Statutory' }))
     fireEvent.click(screen.getByRole('button', { name: 'Manual generate' }))
-    let panel = screen.getByRole('region', { name: 'PERKESO Manual generate' })
+    const panel = screen.getByRole('dialog', { name: 'PERKESO Manual generate' })
+    expect(panel).toHaveAttribute('aria-modal', 'true')
+    expect(within(panel).getByRole('button', { name: 'Review PVs →' })).toBeDisabled()
     for (const name of ['Amy', 'Cara', 'Ezra']) fireEvent.click(within(panel).getByRole('checkbox', { name: `Select ${name}` }))
     fireEvent.change(within(panel).getByLabelText('Payment date'), { target: { value: '2026-09-16' } })
-    fireEvent.click(screen.getByRole('tab', { name: 'Salary' }))
-    fireEvent.click(screen.getByRole('tab', { name: 'Statutory' }))
-    panel = screen.getByRole('region', { name: 'PERKESO Manual generate' })
+    fireEvent.click(within(panel).getByRole('button', { name: 'HR 1 remaining' }))
+    expect(within(panel).getByRole('checkbox', { name: 'Select Faye' })).not.toBeChecked()
+    fireEvent.click(within(panel).getByRole('checkbox', { name: 'Select Faye' }))
+    fireEvent.click(within(panel).getByRole('button', { name: 'Finance 5 remaining' }))
     expect(within(panel).getByRole('checkbox', { name: 'Select Cara' })).toBeChecked()
+    expect(within(panel).getByRole('checkbox', { name: 'Select Ben' })).not.toBeChecked()
+    expect(within(panel).getByLabelText('Payment date')).toHaveValue('2026-09-16')
     fireEvent.click(within(panel).getByRole('button', { name: 'Review PVs →' }))
     expect(within(panel).getByRole('heading', { name: 'Review 6 PVs' })).toBeVisible()
     expect(panel).toHaveTextContent('RM 102.00')
+    expect(within(panel).queryByText('Faye')).not.toBeInTheDocument()
+    expect(actions.statutory).not.toHaveBeenCalled()
+    fireEvent.click(within(panel).getByRole('button', { name: 'Back to selection' }))
+    expect(within(panel).getByRole('checkbox', { name: 'Select Amy' })).toBeChecked()
+    expect(within(panel).getByLabelText('Payment date')).toHaveValue('2026-09-16')
+    fireEvent.click(within(panel).getByRole('button', { name: 'HR 1 remaining' }))
+    expect(within(panel).getByRole('checkbox', { name: 'Select Faye' })).toBeChecked()
+    fireEvent.click(within(panel).getByRole('button', { name: 'Finance 5 remaining' }))
+    fireEvent.click(within(panel).getByRole('button', { name: 'Review PVs →' }))
     expect(actions.statutory).not.toHaveBeenCalled()
     fireEvent.click(within(panel).getByRole('button', { name: 'Confirm generation' }))
     await waitFor(() => expect(actions.statutory).toHaveBeenCalledExactlyOnceWith('2026-08-01', ['SOCSO', 'EIS'], 'staff', 'employee', 'finance', ['row-Amy', 'row-Cara', 'row-Ezra'], '2026-09-16', { total: 102, voucherCount: 6 }))
+  })
+
+  it.each(['Close', 'Escape', 'backdrop'] as const)('dismisses the statutory window with %s and returns focus without generating', (method) => {
+    render(<PaymentBoard {...boardProps()} />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Statutory' }))
+    const trigger = screen.getByRole('button', { name: 'Manual generate' })
+    trigger.focus()
+    fireEvent.click(trigger)
+    const dialog = screen.getByRole('dialog', { name: 'PERKESO Manual generate' })
+    expect(within(dialog).getByRole('button', { name: 'Close' })).toHaveFocus()
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Select Amy' }))
+    if (method === 'Close') fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+    else if (method === 'Escape') fireEvent(dialog, new Event('cancel', { cancelable: true }))
+    else fireEvent.click(dialog, { clientX: -1, clientY: -1 })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+    expect(actions.statutory).not.toHaveBeenCalled()
+    expect(actions.create).not.toHaveBeenCalled()
+  })
+
+  it('keeps the statutory review open during generation and prevents another submission', async () => {
+    let finish!: (result: { count: number; people: number; total: number }) => void
+    actions.statutory.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    render(<PaymentBoard {...boardProps()} />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Statutory' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Manual generate' }))
+    const dialog = screen.getByRole('dialog', { name: 'PERKESO Manual generate' })
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Select Amy' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Review PVs →' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm generation' }))
+    expect(within(dialog).getByRole('button', { name: 'Close' })).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: 'Back to selection' })).toBeDisabled()
+    const generating = within(dialog).getByRole('button', { name: 'Generating…' })
+    expect(generating).toBeDisabled()
+    fireEvent.click(generating)
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+    fireEvent.click(dialog, { clientX: -1, clientY: -1 })
+    fireEvent(dialog, new Event('cancel', { cancelable: true }))
+    expect(dialog).toBeVisible()
+    expect(actions.statutory).toHaveBeenCalledExactlyOnceWith('2026-08-01', ['SOCSO', 'EIS'], 'staff', 'employee', 'finance', ['row-Amy'], undefined, { total: 34, voucherCount: 2 })
+    finish({ count: 2, people: 1, total: 34 })
+    await waitFor(() => expect(within(dialog).getByRole('status')).toHaveTextContent('2 PVs generated'))
+    expect(within(dialog).getByRole('button', { name: 'Close' })).toBeEnabled()
+    expect(actions.refresh).toHaveBeenCalledOnce()
   })
 
   it('leaves failed statutory generation reviewable and does not claim success', async () => {
@@ -114,7 +172,7 @@ describe('Payment statement tabs and confirmation', () => {
     render(<PaymentBoard {...boardProps()} />)
     fireEvent.click(screen.getByRole('tab', { name: 'Statutory' }))
     fireEvent.click(screen.getByRole('button', { name: 'Generate by Department' }))
-    const panel = screen.getByRole('region', { name: 'PERKESO Generate by Department' })
+    const panel = screen.getByRole('dialog', { name: 'PERKESO Generate by Department' })
     fireEvent.click(within(panel).getByRole('button', { name: 'Review PVs →' }))
     fireEvent.click(within(panel).getByRole('button', { name: 'Confirm generation' }))
     await waitFor(() => expect(within(panel).getByRole('alert')).toHaveTextContent('Selection changed'))

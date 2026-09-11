@@ -165,11 +165,11 @@ export default function PaymentBoard({ period, periodLabel, periodRange, prevMon
           <div className="pay-section-toolbar"><h2>Statutory PVs</h2><span className="pay-muted">Contributions &amp; deductions · MYR</span></div>
           <StatutoryRows rows={rows} today={today} busy={busy} staffFunded={staffFunded}
             onGenerate={openStatutory} onOpen={body => { setError(null); setWin({ kind: 'body', key: body }) }} />
-          {generator ? <StatutoryGenerator key={`${generator.body}:${generator.mode}`} period={period} body={generator.body}
-            mode={generator.mode} groups={groups} rows={rows} coverage={statutoryCoverage}
-            fundedFor={fundedFor} onClose={() => setGenerator(null)} /> : null}
         </section>
       </div>
+      {generator ? <StatutoryGenerator key={`${generator.body}:${generator.mode}`} period={period} body={generator.body}
+        mode={generator.mode} groups={groups} rows={rows} coverage={statutoryCoverage}
+        fundedFor={fundedFor} onClose={() => setGenerator(null)} /> : null}
     </> : null}
     {openGroup ? <DeptWindow key={`${openGroup.key}:${openMode}`} group={openGroup} period={period} periodLabel={periodLabel}
       prevMonthName={prevMonthName} gran={openReview?.granularity ?? (openMode === 'department' ? 'department' : 'employee')}

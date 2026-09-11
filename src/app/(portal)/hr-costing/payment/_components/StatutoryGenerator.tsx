@@ -6,6 +6,7 @@ import { BODIES, shortDate, type BodyKey, type DeptGroup, type Granularity, type
 import { statutorySelection } from '@/lib/statutory-selection'
 import { formatMoneyBare } from '@/lib/utils'
 import { generateStatutorySelection } from '../actions'
+import GenerationWindow from './GenerationWindow'
 
 type Selection = ReturnType<typeof statutorySelection>
 interface Review { group: DeptGroup; selection: Selection; date: string }
@@ -58,8 +59,19 @@ export default function StatutoryGenerator({ period, body, mode, groups, rows, c
     }
   }
 
-  return <section className="pay-generation" aria-label={`${body} ${mode === 'department' ? 'Generate by Department' : 'Manual generate'}`}>
-    <div className="pay-section-toolbar"><div><h3>{body} · {mode === 'department' ? 'Generate by Department' : 'Manual generate'}</h3><p className="pay-muted">{mode === 'department' ? 'Include everyone in the department who still needs a PV.' : 'Choose the employees to include in this batch.'}</p></div><button type="button" className="pay-text-button" onClick={onClose} disabled={busy}>Close</button></div>
+  const modeLabel = mode === 'department' ? 'Generate by Department' : 'Manual generate'
+  return <GenerationWindow
+    label={`${body} ${modeLabel}`} title={`${body} · ${modeLabel}`}
+    description={mode === 'department' ? 'Include everyone in the department who still needs a PV.' : 'Choose the employees to include in this batch.'}
+    step={result ? 'result' : review ? 'review' : 'selection'}
+    closeDisabled={busy} onClose={() => { if (!inFlight.current) onClose() }}
+    footer={!result ? <>
+      <div className="pay-generation-footer"><div aria-live="polite"><span>{shown.count} people · {shown.voucherCount} PV{shown.voucherCount === 1 ? '' : 's'} · {shownGroup.name}</span><strong>RM {formatMoneyBare(shown.total)}</strong></div><div className="pay-row-actions">
+        {review ? <><button type="button" className="pay-btn sec" disabled={busy} onClick={() => { setReview(null); setError(null) }}>Back to selection</button><button type="button" className="pay-btn pri" disabled={busy} onClick={() => { void submit() }}>{busy ? 'Generating…' : 'Confirm generation'}</button></> : <button type="button" className="pay-btn pri" disabled={busy || !funded || selection.count === 0} onClick={() => setReview({ group, selection, date })}>Review PVs →</button>}
+      </div></div>
+      {rows.filter(row => row.body === body).length > 1 ? <p className="pay-muted">SOCSO and EIS are separate PVs, both payable to PERKESO.</p> : null}
+    </> : <button type="button" className="pay-btn sec" onClick={onClose}>Done</button>}
+  >
     {error ? <p className="pay-err" role="alert">{error}</p> : null}
     {result ? <div role="status" className="pay-generation-result"><h3>{result.count} PV{result.count === 1 ? '' : 's'} generated</h3><p>{result.people} people · RM {formatMoneyBare(result.total)} · Awaiting Principal</p><button type="button" className="pay-btn sec" onClick={() => setResult(null)}>Continue with remaining employees</button></div> : <>
       {review ? <>
@@ -86,10 +98,6 @@ export default function StatutoryGenerator({ period, body, mode, groups, rows, c
           {!funded ? <p className="pay-muted">{group.name} funding is not complete yet.</p> : null}
         </div>
       </div>}
-      <div className="pay-generation-footer"><div aria-live="polite"><span>{shown.count} people · {shown.voucherCount} PV{shown.voucherCount === 1 ? '' : 's'} · {shownGroup.name}</span><strong>RM {formatMoneyBare(shown.total)}</strong></div><div className="pay-row-actions">
-        {review ? <><button type="button" className="pay-btn sec" disabled={busy} onClick={() => { setReview(null); setError(null) }}>Back to selection</button><button type="button" className="pay-btn pri" disabled={busy} onClick={() => { void submit() }}>{busy ? 'Generating…' : 'Confirm generation'}</button></> : <button type="button" className="pay-btn pri" disabled={busy || !funded || selection.count === 0} onClick={() => setReview({ group, selection, date })}>Review PVs →</button>}
-      </div></div>
-      {rows.filter(row => row.body === body).length > 1 ? <p className="pay-muted">SOCSO and EIS are separate PVs, both payable to PERKESO.</p> : null}
     </>}
-  </section>
+  </GenerationWindow>
 }

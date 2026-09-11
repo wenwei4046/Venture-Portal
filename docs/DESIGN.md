@@ -625,6 +625,16 @@ Both tables expose exactly two generation entry points:
 - **Manual generate** opens the department's employee selection and creates one
   PV per selected employee per scheme. Manual selection starts empty.
 
+Statutory generation opens a centered native dialog for both entry points, rather
+than inserting an editor below the table. Department navigation, employee/date
+selection, review and success remain inside that window. The header and totals /
+action footer stay visible while the body scrolls. On phones, department choices
+wrap and the employee table can scroll horizontally inside the dialog. Use the
+existing surface/chrome colors and typography. Native modality blocks background
+interaction; lock the portal's scrolling `main` and restore its position and the
+trigger's focus on close. Close, Escape and backdrop dismiss the window, except
+while generation is in flight. Only explicit confirmation creates PVs.
+
 There is no independent PV-format toggle. Existing coverage cannot be selected
 again. Review freezes the selected people, count, amount and payment date before
 confirmation; changing the selection requires returning to the form. Statutory
