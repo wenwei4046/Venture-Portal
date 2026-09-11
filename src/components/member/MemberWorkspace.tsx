@@ -2141,9 +2141,6 @@ export default function MemberWorkspace({
                   Your income and team become available once your access and
                   appointment are confirmed.
                 </Empty>
-                <Link className={s.link} href="/member/preview">
-                  View design preview <Icon name="arrow" size={16} />
-                </Link>
               </>
             ) : (
               <>
