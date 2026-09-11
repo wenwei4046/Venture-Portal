@@ -53,7 +53,16 @@ interface RowApi {
   save: () => Promise<void>
 }
 
-export default function DirectorPayrollActualGrid({ rows, period }: Props) {
+// One grid instance per month — see CTCInputGrid for the why. A query-string
+// navigation keeps this subtree mounted, so the selection / expanded row /
+// error strip would otherwise carry over from the previous month (the delete
+// action is period-scoped, but "Delete 3" over another month's ids is still
+// wrong on screen).
+export default function DirectorPayrollActualGrid(props: Props) {
+  return <DirectorPayrollActualGridBody key={props.period} {...props} />
+}
+
+function DirectorPayrollActualGridBody({ rows, period }: Props) {
   const router = useRouter()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())

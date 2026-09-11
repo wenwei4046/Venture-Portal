@@ -50,7 +50,21 @@ interface ERBreakdown {
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 
-export default function CTCInputGrid({ directors, companies, existingCTC, period }: Props) {
+const FIELD_LABEL = { basic: 'Basic', kpi: 'KPI', allowance: 'Allowance' } as const
+
+// One grid instance per month. The page reaches another month through
+// ?period= (DirectorPeriodPicker → router.push), and a navigation that only
+// changes the query string re-runs the Server Component with fresh props but
+// keeps this client subtree MOUNTED — so the useState seeds in the body
+// (values / ER / manual flags) stayed on whichever month was opened first
+// until a full reload (2026-09-11: ‹ › moved the header, not the grid).
+// Keying the body on the period remounts it, and it re-seeds from the new
+// existingCTC. Owned here rather than at the call site so no page can forget.
+export default function CTCInputGrid(props: Props) {
+  return <CTCInputGridBody key={props.period} {...props} />
+}
+
+function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -263,6 +277,7 @@ export default function CTCInputGrid({ directors, companies, existingCTC, period
                         type="number"
                         step="0.01"
                         min="0"
+                        aria-label={`${FIELD_LABEL[field]} — ${comp.name}`}
                         value={getValue(comp.id, field) || ''}
                         onChange={e => setValue(comp.id, field, parseFloat(e.target.value) || 0)}
                         placeholder="0.00"
