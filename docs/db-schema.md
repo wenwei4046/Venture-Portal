@@ -576,7 +576,7 @@ SUB-DEPARTMENT:
   has one batch for the whole department — the IR feed needs that column
   before its orders exist (TODOS).
 
-**Revenue Director (2026-09-11, migration `20260914050000_revenue_directors`).**
+**Revenue Director (2026-09-11, migration `20260915020000_revenue_directors`).**
 "Revenue Director 本身不会进入任何 Rank … 整个 Department 都是直接 report to
 Revenue Director … FAIR 会 report 给 Chris 和 Peter 两人". A title may HEAD its
 department (`titles.is_department_head`); which head(s) a sub-department
@@ -633,6 +633,10 @@ hr_staff_costs (
     reports_to      uuid FK → hr_staff_costs NULL    -- 直属上司，全公司（2026-09-01）
     basic_salary    decimal(15,2) NOT NULL
     allowances      decimal(15,2) DEFAULT 0
+    employment_type enum ('salaried','commission_eligible','variable') DEFAULT 'salaried'
+                                                     -- variable (2026-09-11) = Director dept: no fixed basic,
+                                                     --   the month's figure is keyed each month; the
+                                                     --   Add/Edit forms offer it as the "Variable pay" tick
     epf_er          decimal(15,2)                    -- 系统查表
     socso_er        decimal(15,2)
     eis_er          decimal(15,2)

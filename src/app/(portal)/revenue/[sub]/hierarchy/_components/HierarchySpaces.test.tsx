@@ -438,7 +438,10 @@ describe('HierarchySpaces explicit upline edits', () => {
     render(<HierarchySpaces departments={departments()} />)
     connect('fa-scheme:chea', 'fa-scheme:yuny')
     await waitFor(() => expect(adapters.move).toHaveBeenCalledExactlyOnceWith('fa-scheme', 'yuny', 'chea'))
-    await waitFor(() => expect(adapters.router.refresh).toHaveBeenCalledOnce())
+    await waitFor(() => expect(screen.queryByText('Saving upline…')).not.toBeInTheDocument())
+    // The action revalidates the route, so its response carries the fresh
+    // page; a router.refresh() on top would render the whole page twice.
+    expect(adapters.router.refresh).not.toHaveBeenCalled()
   })
 
   it('rejects a connector across departments before any write', () => {
@@ -588,7 +591,7 @@ describe('HierarchySpaces deliberate drag transfers', () => {
     expect(teamFrame('team:ir:ir-scheme:lawrence')).toEqual(oldDestinationFrame)
     await release('ir-scheme:chea', pointer)
     expect(adapters.move).toHaveBeenCalledExactlyOnceWith('ir-scheme', 'chea', 'lawrence')
-    expect(adapters.router.refresh).toHaveBeenCalledOnce()
+    expect(adapters.router.refresh).not.toHaveBeenCalled()
     expect(node('ir-scheme:chea').data.person.uplineStaffId).toBe('lawrence')
     expect(node('fa-scheme:chea').data.person.uplineStaffId).toBe(fairUpline)
     // A real-motion transfer begins at the dropped location and settles

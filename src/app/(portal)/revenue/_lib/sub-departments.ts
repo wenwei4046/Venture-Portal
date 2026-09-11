@@ -1,4 +1,5 @@
 import 'server-only'
+import { cache } from 'react'
 import { notFound } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
@@ -42,8 +43,15 @@ async function client(): Promise<SupabaseClient> {
   return (await createClient()) as unknown as SupabaseClient
 }
 
-/** Active sub-departments, alphabetical — the order the sidebar lists them in. */
-export async function listSubDepartments(): Promise<SubDepartment[]> {
+/**
+ * Active sub-departments, alphabetical — the order the sidebar lists them in.
+ *
+ * Per-request dedup (2026-09-11): the portal layout reads this for the
+ * sidebar and every `/revenue/[sub]` page reads it again to resolve its slug,
+ * so without `cache()` one render paid for the same two queries twice. A
+ * Server Action runs outside the render's cache and still reads fresh.
+ */
+export const listSubDepartments = cache(async (): Promise<SubDepartment[]> => {
   const supabase = await client()
 
   const [{ data: subs }, { data: schemes }] = await Promise.all([
@@ -84,7 +92,7 @@ export async function listSubDepartments(): Promise<SubDepartment[]> {
     schemeId: schemeBySub.get(s.id) ?? null,
     isHome: home.has(s.id),
   }))
-}
+})
 
 /**
  * The sub-department a `/revenue/[sub]` page is about, or a 404.

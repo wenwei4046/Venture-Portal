@@ -3,7 +3,7 @@
 ## ═══ 2026-09-11 (evening) — Revenue Director layer ═══
 
 The user's ruling, verbatim in `docs/module-spec-revenue-commission.md` §3 and
-`supabase/migrations/20260914050000_revenue_directors.sql`: the Revenue
+`supabase/migrations/20260915020000_revenue_directors.sql`: the Revenue
 Director enters no rank and no ladder; appears on the hierarchy chart for
 REPORTING only, never for the override; every team leader and standalone
 member reports to them directly; each director has their own sub-departments

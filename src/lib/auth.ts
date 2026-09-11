@@ -8,22 +8,41 @@ import { can, type Permission } from '@/lib/permissions'
 
 // Per-request dedup. Middleware, layout, and Server Actions all converge
 // on getUser(); wrapping with React.cache() collapses the Supabase calls
-// (auth.getUser + users row + permissions) into one set per HTTP request.
+// (JWT verification + users row + permissions) into one set per HTTP request.
 export const getUser = cache(async (): Promise<User | null> => {
   const supabase = await createClient()
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser()
+  // Who is calling, from the JWT's own claims. `getClaims()` verifies the
+  // token's signature locally against the project's cached public keys (the
+  // tokens are ES256, asymmetric) where `getUser()` asked the auth server on
+  // every request — three times per Server Action: the middleware, the action
+  // and its render (2026-09-11). Everything about the PERSON is still read
+  // fresh below, so a deactivated account or a changed title takes effect on
+  // the next request exactly as before.
+  const { data: verified } = await supabase.auth.getClaims()
+  const authUserId = verified?.claims.sub
+  if (!authUserId) return null
 
-  if (!authUser) return null
+  // View-as mask (unified portal 2026-07-16): a Principal may flip the
+  // app-layer role via the TopBar switcher. Every gate and role-driven UI
+  // follows the masked role. auth.uid() (RLS, audit authorship) stays the
+  // Principal — which is why the masked permissions have to be looked up here
+  // rather than taken from current_permissions(), whose answer is about the
+  // real account. The cookie is read first so that lookup shares the round
+  // trip below instead of being a third one behind it (2026-09-11); it is
+  // honoured only once the row proves a Principal.
+  const viewAsCookie = (await cookies()).get(VIEW_AS_COOKIE)?.value ?? ''
+  const viewAs = isViewAsRole(viewAsCookie) ? viewAsCookie : null
 
-  const [{ data }, { data: perms }] = await Promise.all([
-    supabase.from('users').select('*').eq('id', authUser.id).single(),
+  const [{ data }, { data: perms }, masked] = await Promise.all([
+    supabase.from('users').select('*').eq('id', authUserId).single(),
     // Resolved in the database because that is where the answer lives: an
     // explicit per-person row, then the holder's title, then their role's
     // defaults. RLS derives its scopes from the same set, so the page and its
     // queries cannot disagree.
     supabase.rpc('current_permissions'),
+    viewAs
+      ? supabase.from('role_default_permissions').select('permission_key').eq('role', viewAs)
+      : null,
   ])
 
   const row = data as (Omit<User, 'permissions'> | null)
@@ -31,25 +50,12 @@ export const getUser = cache(async (): Promise<User | null> => {
 
   const user: User = { ...row, permissions: (perms as string[] | null) ?? [] }
 
-  // View-as mask (unified portal 2026-07-16): a Principal may flip the
-  // app-layer role via the TopBar switcher. Every gate and role-driven UI
-  // follows the masked role. auth.uid() (RLS, audit authorship) stays the
-  // Principal — which is why the masked permissions have to be looked up here
-  // rather than taken from current_permissions(), whose answer is about the
-  // real account.
-  if (user.role === 'principal') {
-    const viewAs = (await cookies()).get(VIEW_AS_COOKIE)?.value ?? ''
-    if (isViewAsRole(viewAs)) {
-      const { data: masked } = await supabase
-        .from('role_default_permissions')
-        .select('permission_key')
-        .eq('role', viewAs)
-      return {
-        ...user,
-        role: viewAs,
-        actualRole: 'principal',
-        permissions: (masked ?? []).map(r => (r as { permission_key: string }).permission_key),
-      }
+  if (user.role === 'principal' && viewAs && masked) {
+    return {
+      ...user,
+      role: viewAs,
+      actualRole: 'principal',
+      permissions: (masked.data ?? []).map(r => (r as { permission_key: string }).permission_key),
     }
   }
 

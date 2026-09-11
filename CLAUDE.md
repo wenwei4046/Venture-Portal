@@ -152,7 +152,7 @@ src/
 │   │   │                              `moveReportingLine` writes null when a
 │   │   │                              Revenue person is dropped on one
 │   │   │                              (`LineResult.reportsTo` = what landed).
-│   │   │                              Mig `20260914050000`. CEO layer: later.
+│   │   │                              Mig `20260915020000`. CEO layer: later.
 │   │   │                              **MEMBERSHIPS (2026-09-10, later):** a
 │   │   │                              sub-department is a world of its own —
 │   │   │                              one `comm_hierarchy` row per (person,

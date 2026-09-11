@@ -11,6 +11,7 @@ import {
 } from '@/lib/commission/derived-commission'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { postPayrollAccrualJVs } from '@/lib/payroll-accrual'
+import { seedPayrollRows } from '@/lib/payroll-period'
 
 /**
  * HR submits the month's payroll straight to Finance — NO Principal approval.
@@ -433,7 +434,10 @@ export async function deletePayrollPeriod(period: string): Promise<{ deleted: nu
 /**
  * Create rows for every active staff in the given period.
  * Idempotent — relies on uq_monthly_payroll_staff_period to skip existing.
- * Same behavior as migration 126 backfill, now callable from the UI.
+ * Same behavior as migration 126 backfill, now callable from the UI — except
+ * that variable pay (a director, since 2026-09-11) is left out: their figure
+ * is keyed on the Director Salary page, which submits to Finance on its own.
+ * `seedPayrollRows` in lib/payroll-period.ts owns that rule.
  */
 export async function createPayrollPeriod(period: string): Promise<{ created: number }> {
   await requirePermission('hr_costing')
@@ -442,21 +446,24 @@ export async function createPayrollPeriod(period: string): Promise<{ created: nu
   await assertPeriodOpen(supabase, period)
   const { data: staff, error: staffErr } = await supabase
     .from('hr_staff_costs')
-    .select('id, basic_salary, allowances, departments(payroll_source)')
+    .select('id, basic_salary, allowances, employment_type, departments(payroll_source)')
     .eq('status', 'active')
 
   if (staffErr) throw new Error(`Failed to read staff: ${staffErr.message}`)
   if (!staff || staff.length === 0) return { created: 0 }
 
   // Upsert: insert if not exists, ignore if exists
-  const rows = staff.map(s => ({
-    staff_id: s.id,
-    period_month: period,
-    basic_salary: s.basic_salary,
-    non_statutory_allowance: s.allowances,
-    source: s.departments?.payroll_source === 'commission' ? 'commission' as const : 'carried_forward' as const,
-    status: 'draft' as const,
-  }))
+  const rows = seedPayrollRows(
+    staff.map(s => ({
+      id: s.id,
+      basic_salary: s.basic_salary,
+      allowances: s.allowances,
+      employment_type: s.employment_type,
+      payroll_source: s.departments?.payroll_source ?? null,
+    })),
+    period,
+  )
+  if (rows.length === 0) return { created: 0 }
 
   const { error, count } = await supabase
     .from('hr_monthly_payroll')

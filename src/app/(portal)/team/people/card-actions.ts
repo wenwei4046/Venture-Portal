@@ -7,7 +7,7 @@ import { canAccessAuditLog, canManagePermissions } from '@/lib/roles'
 import { navLabelByPath } from '@/components/layout/nav-config'
 import { describeActivity, type ActivityRow } from '@/lib/activity'
 import { ladderAllows, nextRung, type LadderTitle, type Rung } from '@/lib/ladder'
-import type { TitleRow } from '@/lib/staff-form'
+import { offersVariablePay, type TitleRow } from '@/lib/staff-form'
 import { listSubDepartments } from '../../revenue/_lib/sub-departments'
 import { resolvePersonPermissions } from '../_lib/person-permissions'
 import type { PersonPermissionRow } from '../_components/PersonPermissions'
@@ -75,7 +75,7 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
     supabase
       .from('hr_staff_costs')
       .select(
-        '*, departments(name, payroll_source), titles(id, name, level_id), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active, last_seen_at)',
+        '*, departments(name, payroll_source, segment_key), titles(id, name, level_id), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active, last_seen_at)',
       )
       .eq('id', id)
       .maybeSingle(),
@@ -176,6 +176,7 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
       department_id: row.department_id,
       department_name: deptName ?? '—',
       commission_dept: row.departments?.payroll_source === 'commission',
+      director_dept: offersVariablePay(row.departments),
       title_id: row.title_id ?? null,
       basic_salary: Number(row.basic_salary ?? 0),
       allowances: Number(row.allowances ?? 0),

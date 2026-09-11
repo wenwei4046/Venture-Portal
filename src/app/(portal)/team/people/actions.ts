@@ -20,8 +20,9 @@ const str = (formData: FormData, key: string): string | null =>
  *
  * Shape and rules live in lib/staff-form.ts, where they are unit-tested: the
  * "Full commission" tick (a commission department's staff carry no basic and
- * no statutory allowance), money that has to be a non-negative number, an
- * account number kept to its digits.
+ * no statutory allowance), the "Variable pay" tick (a director's figure is
+ * keyed each month, so no basic either), money that has to be a non-negative
+ * number, an account number kept to its digits.
  *
  * A title is a row (2026-09-01), so the chosen one is read back from the
  * table here — it has to exist, be active and fit the department — and
@@ -37,6 +38,7 @@ export async function addStaff(formData: FormData) {
     departmentId: str(formData, 'department_id'),
     titleId: str(formData, 'title_id'),
     fullCommission: formData.get('full_commission') === 'on',
+    variablePay: formData.get('variable_pay') === 'on',
     basicSalary: str(formData, 'basic_salary'),
     allowances: str(formData, 'allowances'),
     nonStatutoryAllowance: str(formData, 'non_statutory_allowance'),
@@ -114,10 +116,13 @@ export async function updateStaff(id: string, formData: FormData) {
 
   // Pay and statutory. lib/staff-form.ts decides what a save writes: the
   // "Fully commission based" tick writes the four columns that say so and
-  // leaves the categories alone (they were not on the form); otherwise every
-  // field is on the form, and every one is checked before it is written.
+  // leaves the categories alone (they were not on the form); the "Variable
+  // pay" tick writes the three amounts as 0 and the categories with them;
+  // otherwise every field is on the form, and every one is checked before it
+  // is written.
   const pay = payFieldsForUpdate({
     fullCommission: formData.get('full_commission') === 'on',
+    variablePay: formData.get('variable_pay') === 'on',
     employmentType: str(formData, 'employment_type'),
     basicSalary: str(formData, 'basic_salary'),
     allowances: str(formData, 'allowances'),

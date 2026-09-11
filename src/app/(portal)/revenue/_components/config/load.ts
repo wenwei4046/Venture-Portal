@@ -1,4 +1,5 @@
 import 'server-only'
+import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { effectiveDirectLineLimit } from '@/lib/commission/chart-moves'
@@ -37,6 +38,48 @@ function rows<T>(data: unknown): T[] {
   return (data ?? []) as T[]
 }
 
+/**
+ * The reads Staff Hierarchy makes that do not depend on the scheme: the
+ * commission roster, the company ladder and the commission titles. Every
+ * sibling sub-department drawn on the same canvas needs the same three, so
+ * `cache()` dedupes them per request — a page charting Fair and IR reads each
+ * once instead of once per region (2026-09-11).
+ */
+const loadCommissionRoster = cache(async () => {
+  const supabase = await untyped()
+  return supabase
+    .from('hr_staff_costs')
+    .select('id, employee_name, employee_code, reports_to, tax_mode, withholding_rate, title_id, titles (name, level_id, is_department_head), departments!inner (name, payroll_source)')
+    .eq('status', 'active')
+    .eq('departments.payroll_source', 'commission')
+    .order('employee_name')
+})
+
+/** The company ladder: the Team table reads it top down (user, 2026-09-05). */
+const loadTitleLevels = cache(async () => {
+  const supabase = await untyped()
+  return supabase.from('title_levels').select('id, rank, name')
+})
+
+/**
+ * The titles a membership may hold — the commission departments' own, the
+ * ones the Revenue side keeps under Team → Role & Permission. Unscoped: a
+ * sub-department cloned under another commission department needs them too.
+ * Minus the title that heads the department (Revenue Director, 2026-09-11):
+ * it stands above the ladder and can never hold a rung or a membership, so
+ * neither picker offers it; the database refuses it too (23DIR).
+ */
+const loadCommissionTitles = cache(async () => {
+  const supabase = await untyped()
+  return supabase
+    .from('titles')
+    .select('id, name, departments!inner (payroll_source)')
+    .eq('departments.payroll_source', 'commission')
+    .eq('is_active', true)
+    .eq('is_department_head', false)
+    .order('name')
+})
+
 export async function loadCommissionSettings(
   schemeId: string | null,
 ): Promise<CommissionSettingsData> {
@@ -48,19 +91,8 @@ export async function loadCommissionSettings(
     supabase.from('comm_sub_departments').select('id, department_id, name, code, is_active').order('name'),
     supabase.from('comm_schemes').select('id, sub_department_id, scheme_name').eq('is_active', true).is('effective_to', null),
     supabase.from('departments').select('id, name').eq('payroll_source', 'commission').order('name'),
-    // The ladder's Tier column picks from these — the titles the Revenue side
-    // keeps under Team → Role & Permission. Unscoped like the lists above:
-    // a sub-department cloned under another commission department needs them.
-    // A title that heads the department (Revenue Director, 2026-09-11)
-    // stands above the ladder and can never hold a rung, so it is not
-    // offered; the database refuses it too (23DIR).
-    supabase
-      .from('titles')
-      .select('id, name, departments!inner (payroll_source)')
-      .eq('departments.payroll_source', 'commission')
-      .eq('is_active', true)
-      .eq('is_department_head', false)
-      .order('name'),
+    // The ladder's Tier column picks from these.
+    loadCommissionTitles(),
   ])
 
   const shell = {
@@ -154,28 +186,14 @@ export async function loadTeam(
   const [{ data: rankRows }, { data: staffRows }, { data: positions }, { data: levelRows }, { data: titleRows }, capacity, expansions, currentCapacity, { data: directorRows }] =
     await Promise.all([
       supabase.from('comm_ranks').select('*').eq('scheme_id', schemeId).order('sort_order'),
-      supabase
-        .from('hr_staff_costs')
-        .select('id, employee_name, employee_code, reports_to, tax_mode, withholding_rate, title_id, titles (name, level_id, is_department_head), departments!inner (name, payroll_source)')
-        .eq('status', 'active')
-        .eq('departments.payroll_source', 'commission')
-        .order('employee_name'),
+      loadCommissionRoster(),
       supabase
         .from('comm_hierarchy')
         .select('id, staff_id, scheme_id, upline_staff_id, rank_id, rate_mode, effective_from, title_id, titles (name, level_id), comm_ranks (rank_key, label)')
         .eq('scheme_id', schemeId)
         .is('effective_to', null),
-      // The company ladder: the Team table reads it top down (user, 2026-09-05).
-      supabase.from('title_levels').select('id, rank, name'),
-      // The titles a membership may hold: the commission departments' own,
-      // minus the one that heads the department — it has no rung to hold.
-      supabase
-        .from('titles')
-        .select('id, name, departments!inner (payroll_source)')
-        .eq('departments.payroll_source', 'commission')
-        .eq('is_active', true)
-        .eq('is_department_head', false)
-        .order('name'),
+      loadTitleLevels(),
+      loadCommissionTitles(),
       supabase.from('comm_schemes').select('direct_line_limit').eq('id', schemeId).single(),
       supabase.from('comm_direct_line_entitlements')
         .select('staff_id, earned_at, source_period_month').eq('scheme_id', schemeId),
