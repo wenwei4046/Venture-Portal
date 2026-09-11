@@ -1853,6 +1853,15 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 }
 .space-department-heading strong { font: 500 16px/1.3 var(--font-sans), sans-serif; letter-spacing: .3px; }
 .space-department-heading > span { color: rgb(var(--cv-graphite)); font: 400 12px/1.4 var(--font-sans), sans-serif; }
+/* Who the whole sub-department reports to — its directors, on the header (design A, 2026-09-12). */
+.space-department-heading .space-heads { padding-left: 12px; border-left: 1px solid rgb(var(--space-tone) / .3); white-space: nowrap; }
+.space-department-heading .space-heads .k {
+  margin-right: 5px;
+  font: 500 9px/1 var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgb(var(--cv-muted));
+}
 .space-department-heading .space-grip { margin-left: auto; color: rgb(var(--space-tone)); font-size: 22px; opacity: .7; }
 .space-department-heading:hover { background: rgb(var(--space-tone) / .08); }
 .space-department-heading:focus-visible, .space-team-heading:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 3px; }
@@ -2103,11 +2112,13 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 .org-card .oc-up .v.top { font-style: italic; }
 .org-card .oc-up .chev { flex: none; width: 9px; height: 9px; color: rgb(var(--accent)); }
 
-/* The department's head(s) — the Revenue Director layer (2026-09-11). A card
-   of the same family as the members, in a row the layout reserves between a
-   sub-department frame's header and its first team. Not a node: nothing can
-   be dropped on it, it takes no upline, it moves only with its frame. Its
-   last row sits where a member's Upline button sits, and says what it is. */
+/* The department's head(s) — the Revenue Director layer (2026-09-11), drawn
+   since 2026-09-12 as a RAIL above every sub-department frame: each director
+   once, the cards centred over the frames, the label in the canvas's mono
+   caps. A card of the same family as the members, but not a node: nothing
+   can be dropped on it, it takes no upline, it stands where the frames put
+   it. Its last row sits where a member's Upline button sits and names what
+   it directs. */
 .space-director {
   position: absolute;
   z-index: 3;
@@ -2115,7 +2126,18 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   cursor: default;
 }
 .space-canvas .space-director.org-card:hover { transform: none; border-color: rgb(var(--cv-border-hover)); }
-.space-canvas .space-director.space-person { border-top: 2px solid rgb(var(--space-tone)); }
+.space-canvas .space-director.space-person { border-top: 2px solid rgb(var(--title-head)); }
+.space-rail-label {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgb(var(--cv-shelf));
+  white-space: nowrap;
+}
 .org-card .oc-role {
   position: absolute;
   left: 0;
@@ -2138,10 +2160,13 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   color: rgb(var(--cv-muted));
 }
 .org-card .oc-role .v { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-style: italic; }
-/* The line from a director down to a team's leader: the whole sub-department
-   reports to them. Dashed — unlike the solid line inside a team it carries no
-   override. */
-.space-director-line {
+/* The line from the rail down to a sub-department: the whole sub-department
+   reports to them. One drop per director and frame, one bus per frame — the
+   bar joining its drops and the trunk to the frame's top edge — and a dot at
+   the landing. Dashed: unlike the solid line inside a team it carries no
+   override. Nothing of it enters the frame. */
+.space-director-line,
+.space-director-bus {
   fill: none;
   stroke: rgb(var(--cv-line));
   stroke-width: 1.25;
@@ -2149,6 +2174,7 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   stroke-linecap: round;
   opacity: 0.8;
 }
+.space-director-dot { fill: rgb(var(--cv-line)); opacity: 0.9; }
 
 /* The shelf at the canvas's right edge, for people on no line at all. */
 .org-shelf-lbl {

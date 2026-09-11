@@ -366,7 +366,7 @@ describe('HierarchySpaces layout gestures', () => {
   })
 })
 
-describe('HierarchySpaces directors (Revenue Director, 2026-09-11)', () => {
+describe('HierarchySpaces directors (the Revenue Director rail, design A 2026-09-12)', () => {
   function directed(): OrgDepartment[] {
     const [fair, ir] = departments()
     return [
@@ -377,42 +377,54 @@ describe('HierarchySpaces directors (Revenue Director, 2026-09-11)', () => {
       { ...ir, directors: [{ staffId: 'peter', name: 'PETER', code: null, titleName: 'Revenue Director' }] },
     ]
   }
-
-  it('draws a director card per sub-department they direct, above its teams, and never as a node', () => {
-    render(<HierarchySpaces departments={directed()} />)
-    const cards = document.querySelectorAll('.space-director')
-    expect(cards).toHaveLength(3)
-    expect(screen.getByRole('img', { name: 'PETER, Revenue Director, directs Fair' })).toBeTruthy()
-    expect(screen.getByRole('img', { name: 'PETER, Revenue Director, directs IR' })).toBeTruthy()
-    expect(screen.getByRole('img', { name: 'KRIS, Revenue Director, directs Fair' })).toBeTruthy()
-    expect(flow().nodes!.some(node => node.id.includes('peter') || node.id.includes('kris'))).toBe(false)
-    // Every director stands above the first team of their frame.
-    const fairFrame = document.querySelector<SVGRectElement>('.space-department[data-department-id="fa"]')!
-    const frameTop = Number(fairFrame.getAttribute('y'))
-    for (const card of document.querySelectorAll<HTMLElement>('.space-director[data-director="peter"]')) {
-      expect(parseFloat(card.style.top)).toBeGreaterThan(frameTop)
+  function frameOf(departmentId: string) {
+    const frame = document.querySelector<SVGRectElement>(`.space-department[data-department-id="${departmentId}"]`)
+    expect(frame, `frame ${departmentId}`).not.toBeNull()
+    return {
+      x: Number(frame!.getAttribute('x')), y: Number(frame!.getAttribute('y')),
+      width: Number(frame!.getAttribute('width')), height: Number(frame!.getAttribute('height')),
     }
-    const anthonyTop = position('fa-scheme:anthony').y
-    const fairPeter = [...document.querySelectorAll<HTMLElement>('.space-director')]
-      .find(card => card.getAttribute('aria-label')?.includes('directs Fair') && card.dataset.director === 'peter')!
-    expect(parseFloat(fairPeter.style.top) + NODE_HEIGHT).toBeLessThan(anthonyTop)
+  }
+  const cards = () => [...document.querySelectorAll<HTMLElement>('.space-director')]
+  const cardPositions = () => cards().map(card => ({ x: parseFloat(card.style.left), y: parseFloat(card.style.top) }))
+
+  it('draws every director once, A→Z, on a rail above all the frames — never as a node, never inside a frame', () => {
+    render(<HierarchySpaces departments={directed()} />)
+    expect(cards().map(card => card.dataset.director)).toEqual(['kris', 'peter'])
+    expect(screen.getByRole('img', { name: 'KRIS, Revenue Director, directs Fair' })).toBeTruthy()
+    expect(screen.getByRole('img', { name: 'PETER, Revenue Director, directs Fair · IR' })).toBeTruthy()
+    expect(screen.getByText('Revenue Directors · reporting only')).toBeTruthy()
+    expect(flow().nodes!.some(node => node.id.includes('peter') || node.id.includes('kris'))).toBe(false)
+    const [kris, peter] = cardPositions()
+    expect(kris.y).toBe(peter.y)
+    expect(kris.x).toBeLessThan(peter.x)
+    const highest = Math.min(frameOf('fa').y, frameOf('ir').y)
+    for (const card of cardPositions()) expect(card.y + NODE_HEIGHT).toBeLessThan(highest)
+    expect(within(cards()[1]).getByText('Fair · IR')).toBeTruthy()
+    expect(screen.getByText(/2 directors/)).toBeTruthy()
   })
 
-  it('draws a dashed reporting line from each director to every team leader, and none to a member with an upline', () => {
+  it('draws one dashed line per director and sub-department, joined on one bus per frame that lands on its top edge', () => {
     render(<HierarchySpaces departments={directed()} />)
     const lines = [...document.querySelectorAll<SVGPathElement>('.space-director-line')]
-    const targets = lines.map(line => line.dataset.directorLine)
-    // Fair: Anthony and Chea Huan lead two teams, two directors each = 4; IR: two teams, one director = 2.
-    expect(lines).toHaveLength(6)
-    expect(targets.filter(id => id === 'fa-scheme:anthony')).toHaveLength(2)
-    expect(targets.filter(id => id === 'fa-scheme:chea')).toHaveLength(2)
-    expect(targets).not.toContain('fa-scheme:yuny')
-    expect(targets).not.toContain('fa-scheme:howard')
+    expect(lines.map(line => line.dataset.directorLine).sort()).toEqual(['kris:fa', 'peter:fa', 'peter:ir'])
+    expect([...document.querySelectorAll<SVGGElement>('[data-director-bus]')].map(bus => bus.dataset.directorBus)).toEqual(['fa', 'ir'])
+    expect(document.querySelectorAll('.space-director-bus')).toHaveLength(2)
+    // The dot lands on the frame's top edge at its centre; no line points at a member.
+    for (const id of ['fa', 'ir']) {
+      const frame = frameOf(id)
+      const dot = document.querySelector<SVGCircleElement>(`[data-director-bus="${id}"] .space-director-dot`)!
+      expect(Number(dot.getAttribute('cx'))).toBeCloseTo(frame.x + frame.width / 2, 6)
+      expect(Number(dot.getAttribute('cy'))).toBeCloseTo(frame.y, 6)
+    }
+    expect(lines.some(line => line.dataset.directorLine?.includes('scheme'))).toBe(false)
     expect(flow().edges).toHaveLength(3)
   })
 
-  it('names the directors on a team leader’s last row and in the popover’s detach row, but keeps Upline for a member', () => {
+  it('names the directors on the frame header, a team leader’s last row and the popover’s detach row, but keeps Upline for a member', () => {
     render(<HierarchySpaces departments={directed()} />)
+    expect(screen.getByRole('button', { name: 'Fair: drag to move department, click to focus' })).toHaveTextContent('Reports to KRIS · PETER')
+    expect(screen.getByRole('button', { name: 'IR: drag to move department, click to focus' })).toHaveTextContent('Reports to PETER')
     const anthony = within(screen.getByTestId('node:fa-scheme:anthony'))
     expect(anthony.getByText('Reports to')).toBeTruthy()
     expect(anthony.getByText('KRIS · PETER')).toBeTruthy()
@@ -421,6 +433,46 @@ describe('HierarchySpaces directors (Revenue Director, 2026-09-11)', () => {
     expect(yuny.getByText('Anthony')).toBeTruthy()
     fireEvent.click(yuny.getByRole('button', { name: 'Change upline of Yuny in Fair' }))
     expect(screen.getByText('reports to KRIS · PETER · no override')).toBeTruthy()
+  })
+
+  it('keeps the rail centred over the frames when a department is dragged, and follows the highest one', () => {
+    render(<HierarchySpaces departments={directed()} />)
+    const before = cardPositions()
+    const lineBefore = document.querySelector<SVGPathElement>('[data-director-line="peter:ir"]')!.getAttribute('d')
+    // Fair rises and moves left by (240, 120) in world units at 50 % zoom; IR stays.
+    dragGroup(screen.getByRole('button', { name: 'Fair: drag to move department, click to focus' }), -120, -60)
+    const after = cardPositions()
+    after.forEach((point, index) => {
+      // Fair is now the highest frame, 120 higher: the rail followed. Only the
+      // union's left edge moved, so its centre — and the cards — moved half as far.
+      expect(point.y).toBeCloseTo(before[index].y - 120, 6)
+      expect(point.x).toBeCloseTo(before[index].x - 120, 6)
+    })
+    expect(document.querySelector<SVGPathElement>('[data-director-line="peter:ir"]')!.getAttribute('d')).not.toBe(lineBefore)
+    expect(adapters.move).not.toHaveBeenCalled()
+  })
+
+  it('never runs a glide backwards when the first animation frame is stamped before the glide began', async () => {
+    // Chrome hands requestAnimationFrame a frame time that can precede the
+    // performance.now() sampled when the glide was scheduled (a first load in
+    // a background tab). Progress must clamp at 0: extrapolating the frames
+    // backwards gave Fair a negative height, which the rail refuses.
+    vi.useFakeTimers()
+    vi.mocked(window.matchMedia).mockReturnValue({ ...window.matchMedia('(prefers-reduced-motion: reduce)'), matches: false })
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => window.setTimeout(() => callback(performance.now() - 40), 16))
+    render(<HierarchySpaces departments={directed()} />)
+    const start = frameOf('fa')
+    await act(async () => { await vi.advanceTimersByTimeAsync(20) })
+    const early = frameOf('fa')
+    expect(cards()).toHaveLength(2)
+    await act(async () => { await vi.advanceTimersByTimeAsync(700) })
+    const end = frameOf('fa')
+    expect(end).not.toEqual(start)
+    for (const key of ['x', 'y', 'width', 'height'] as const) {
+      expect(early[key]).toBeGreaterThanOrEqual(Math.min(start[key], end[key]))
+      expect(early[key]).toBeLessThanOrEqual(Math.max(start[key], end[key]))
+    }
+    expect(cards()).toHaveLength(2)
   })
 
   it('reports where the top of a tree now reports to after a detach', async () => {

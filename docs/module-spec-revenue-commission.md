@@ -1343,9 +1343,12 @@ People › Roles) not yet directing it. Both write `comm_sub_department_director
 (`addDirector` / `removeDirector`) and come back with a note; a director is
 never a row of the Team table. A member at the top of a tree reads
 `top of a tree · reports to KRIS · PETER` in the Upline column. On the chart the
-director stands in a row of their own under the frame's header with a dashed
-line to every team leader (DESIGN.md `.space-director`); People › Hierarchy
-draws the same dashed line from the home sub-department's directors.
+directors stand on a rail above every sub-department frame, each once, with one
+dashed line per frame they direct landing on the frame's top edge and
+`Reports to KRIS · PETER` on the frame's header — nothing is drawn inside the
+frame (design A, 2026-09-12; DESIGN.md `.space-director`); People › Hierarchy
+still draws its dashed line from the home sub-department's directors to the
+top of every tree.
 
 **Payroll grid change** (`PayrollRow.tsx`, built): for staff in a
 `payroll_source = 'commission'` department the Commission cell is **read-only**
