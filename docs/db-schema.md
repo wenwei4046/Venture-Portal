@@ -467,6 +467,7 @@ titles (
     department_id   uuid FK → departments NULL       -- 该 title 属于哪个部门
     level_id        uuid FK → title_levels NULL      -- 在 ladder 的哪一级；NULL = 还没放上去 (2026-09-03)
     is_active       boolean NOT NULL DEFAULT true
+    is_department_head boolean NOT NULL DEFAULT false -- 部门主管 (Revenue Director, 2026-09-11)：在 commission ladder 之上，没有 rung、没有 rank、没有 override；整个部门直接 report 给它
     sort_order      integer NOT NULL DEFAULT 0
     created_by      uuid FK → users
     created_at      timestamptz DEFAULT now()
@@ -574,6 +575,47 @@ SUB-DEPARTMENT:
 - Still owed: `sales_import_batches` has no `sub_department_id`, so a period
   has one batch for the whole department — the IR feed needs that column
   before its orders exist (TODOS).
+
+**Revenue Director (2026-09-11, migration `20260914050000_revenue_directors`).**
+"Revenue Director 本身不会进入任何 Rank … 整个 Department 都是直接 report to
+Revenue Director … FAIR 会 report 给 Chris 和 Peter 两人". A title may HEAD its
+department (`titles.is_department_head`); which head(s) a sub-department
+reports to is a fact of the sub-department, and the line up to them is derived
+on the charts, never written per person (two directors do not fit in one
+`reports_to`):
+
+```sql
+comm_sub_department_directors (
+    sub_department_id uuid FK → comm_sub_departments ON DELETE CASCADE
+    staff_id          uuid FK → hr_staff_costs ON DELETE CASCADE
+    created_by        uuid FK → users
+    created_at        timestamptz DEFAULT now()
+    PRIMARY KEY (sub_department_id, staff_id)
+)
+-- RLS: hr / admin scope, all. Seeded: Fair ← PETER, KRIS; IR ← PETER.
+```
+
+- `comm_sub_department_directors_guard` (BEFORE INSERT OR UPDATE): the person
+  must be on the roster, in the sub-department's department, and hold a title
+  with `is_department_head` (`23DIR`).
+- `comm_ranks_no_department_head` and `comm_hierarchy_no_department_head`: a
+  head title can hold no rung, and no membership may be opened with a head
+  title or by somebody whose company title heads the department (`23DIR`).
+  Rules › Title ladder and the Team tab's title pickers leave such titles out.
+- `comm_title_can_recruit(department, title)` answers TRUE for a head title
+  without a rung, so everybody may report to a head (`hr_staff_commission_line`
+  and `lib/hierarchy-boundary.ts` both pass).
+- `comm_sync_position`: a head holds no membership (every one they held
+  closes, as on leaving the department); and the commission line STOPS below a
+  head — `upline_staff_id = reports_to` unless that manager heads the
+  department, then null: the leader is the top of the engine's tree and no
+  override climbs past. `hr_staff_one_line_sync` re-derives the direct reports
+  of anybody who becomes or stops being a head, and deletes their director
+  rows when they stop heading that department.
+- The app normalises the write: `moveReportingLine` writes null when a person
+  in a commission department is dropped on a head (`LineResult.reportsTo` is
+  what was written, and an undo restores that). Above the directors sits the
+  CEO — a later step (user: "CEO 部分后续再处理").
 
 Job titles as controlled rows, replacing the free-text `hr_staff_costs.designation`
 (20 hand-typed spellings, backfilled into 20 titles). RLS: read = any signed-in

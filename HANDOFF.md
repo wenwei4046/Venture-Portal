@@ -1,5 +1,23 @@
 # HOUZS Venture Portal — Session Handoff (checkpoint 2026-09-11 · IR release PR #82)
 
+## ═══ 2026-09-11 (evening) — Revenue Director layer ═══
+
+The user's ruling, verbatim in `docs/module-spec-revenue-commission.md` §3 and
+`supabase/migrations/20260914050000_revenue_directors.sql`: the Revenue
+Director enters no rank and no ladder; appears on the hierarchy chart for
+REPORTING only, never for the override; every team leader and standalone
+member reports to them directly; each director has their own sub-departments
+(Fair → Chris/KRIS + Peter, IR → Peter); the CEO above them is a later step.
+
+Shipped on branch `feat/revenue-director` (worktree `revenue-director`):
+`titles.is_department_head` + `comm_sub_department_directors` (migration
+applied live), the commission line stopping below a head in
+`comm_sync_position`, `comm_title_can_recruit` answering true for a head, the
+Team tab's **Reports to** section, the director row on the Revenue chart, the
+dashed director line on both charts, `lib/department-heads.ts`. CLAUDE.md's
+tree paragraph carries the rule; `docs/db-schema.md` the schema; DESIGN.md the
+`.space-director` vocabulary; TODOS the CEO layer, FAA and the person card.
+
 ## ═══ CHECKPOINT 2026-09-11 — read this first (handed to Codex) ═══
 
 **Baseline before this continuation.** The IR branch starts at `0085c8b`

@@ -33,6 +33,17 @@ function readDepartmentId(formData: FormData): string | null {
   return id === '' ? null : id
 }
 
+/**
+ * "Heads the department" (2026-09-11): the title stands above the commission
+ * ladder — no rung, no rank, no override — and is the one everybody in a
+ * commission department may report to. Revenue Director. The database
+ * refuses a rung or a membership on such a title (23DIR) and closes any
+ * membership its new holder had, so ticking it is the whole change.
+ */
+function readDepartmentHead(formData: FormData): boolean {
+  return formData.get('is_department_head') === 'on'
+}
+
 export async function createTitle(formData: FormData): Promise<void> {
   const user = await requirePermission('team')
   const supabase = await createClient()
@@ -40,6 +51,7 @@ export async function createTitle(formData: FormData): Promise<void> {
   const { error } = await supabase.from('titles').insert({
     name: readName(formData),
     department_id: readDepartmentId(formData),
+    is_department_head: readDepartmentHead(formData),
     created_by: user.id,
   })
 
@@ -68,6 +80,7 @@ export async function updateTitle(formData: FormData): Promise<void> {
       name: readName(formData),
       department_id: readDepartmentId(formData),
       is_active: formData.get('is_active') === 'on',
+      is_department_head: readDepartmentHead(formData),
     })
     .eq('id', id)
 
@@ -75,6 +88,9 @@ export async function updateTitle(formData: FormData): Promise<void> {
     if (error.code === '23505') {
       throw new Error('That department already has a title by that name')
     }
+    // 23DIR: the title now heads the department while a rung still points at
+    // it — the trigger's sentence says which, and it is the whole answer.
+    if (error.code === '23DIR') throw new Error(error.message)
     throw new Error(`Could not save the title: ${error.message}`)
   }
 

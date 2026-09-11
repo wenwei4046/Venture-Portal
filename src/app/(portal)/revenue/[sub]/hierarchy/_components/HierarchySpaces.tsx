@@ -11,7 +11,9 @@ import '@xyflow/react/dist/style.css'
 import { descendantsOf, NODE_HEIGHT, NODE_WIDTH } from '@/lib/org-layout'
 import { moveRefusal, refusalSentence } from '@/lib/commission/chart-moves'
 import { readManualLayout, writeManualLayout, type ManualLayout } from '@/lib/commission/chart-layout-store'
+import { headsLabel, sortHeads } from '@/lib/department-heads'
 import { boundsOf, rectanglePoints, type Bounds, type Point } from '@/lib/hierarchy-spaces'
+import { hierarchyTitleAppearance } from '@/lib/hierarchy-title-appearance'
 import { planHierarchyTransfer } from '@/lib/hierarchy-transfer-layout'
 import {
   alignSpaceTeams, buildSpaceTeams, departmentPositionKey, geometryForSpaces, initialSpacePositions,
@@ -20,7 +22,7 @@ import {
 import { moveOnChart } from '../../../hierarchy-actions'
 import MovePopover, { subjectOf, type PopAnchor } from './MovePopover'
 import HierarchyPersonCard, { UplineContext, type PersonNode } from './HierarchyPersonCard'
-import { membershipKey, type OrgDepartment } from './org-chart-types'
+import { directorKey, membershipKey, type OrgDepartment, type OrgDirector } from './org-chart-types'
 import { useHierarchyCamera } from './useHierarchyCamera'
 
 interface Props { departments: OrgDepartment[]; initialDepartmentId?: string }
@@ -85,7 +87,16 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
     id: membershipKey(department.schemeId, person.staffId), person, department, tone: tone % 3,
   }))), [departments])
   const byId = useMemo(() => new Map(records.map(record => [record.id, record])), [records])
-  const departmentDefinitions = useMemo(() => departments.map(({ id, name }) => ({ id, name })), [departments])
+  // The heads a sub-department reports to ride on its definition: the layout
+  // reserves a row for their cards above its teams (2026-09-11). Not members,
+  // not nodes — drawn from the frame's geometry, like its headings.
+  const departmentDefinitions = useMemo(() => departments.map(({ id, name, schemeId, directors }) => ({
+    id, name, directors: sortHeads(directors ?? []).map(director => ({ id: directorKey(schemeId, director.staffId), name: director.name })),
+  })), [departments])
+  const directorsById = useMemo(() => new Map<string, { director: OrgDirector; department: OrgDepartment; tone: number }>(
+    departments.flatMap((department, tone) => (department.directors ?? []).map(director =>
+      [directorKey(department.schemeId, director.staffId), { director, department, tone: tone % 3 }] as const)),
+  ), [departments])
   const members: SpaceMember[] = useMemo(() => records.map(record => ({
     id: record.id,
     departmentId: record.department.id,
@@ -238,6 +249,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
       data: {
         membershipId: record.id, person: record.person, departmentName: record.department.name, tone: record.tone,
         uplineName: record.department.people.find(person => person.staffId === record.person.uplineStaffId)?.name ?? null,
+        directorNames: sortHeads(record.department.directors ?? []).map(director => director.name),
         selected: selectedRef.current === record.id, pending: false,
       },
     }))
@@ -527,7 +539,8 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
         setSavedMoves(current => new Map(current).set(childId, { source: serverDepartments, parentId: uplineId }))
         setFresh(childId)
         setActiveDepartment(child.department.id)
-        setNote(`${child.person.name} · ${child.department.name}: ${parent ? `now under ${parent.person.name}` : 'now at the top of their own team'}.`)
+        const heads = headsLabel(child.department.directors ?? [])
+        setNote(`${child.person.name} · ${child.department.name}: ${parent ? `now under ${parent.person.name}` : heads ? `now at the top of their own team, reporting to ${heads} — no override` : 'now at the top of their own team'}.`)
         setSelected(childId)
         if (priorTeam && afterTeam) followTransfer(priorTeam.bounds, afterTeam.bounds, cameraToken)
         router.refresh()
@@ -566,6 +579,11 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
   const selectedRecord = selected ? byId.get(selected) : undefined
   const mover = popover ? byId.get(popover.id) : undefined
   const distinctPeople = new Set(records.map(record => record.person.staffId)).size
+  const directorCount = departmentDefinitions.reduce((count, department) => count + department.directors.length, 0)
+  // At the top of a tree the footer names who the leader reports to.
+  const selectedReportsTo = selectedRecord && !selectedRecord.person.uplineStaffId
+    ? headsLabel(selectedRecord.department.directors ?? []) : ''
+  const nodeById = new Map(nodes.map(node => [node.id, node]))
   const dropPerson = dropTarget ? byId.get(dropTarget.id) : null
   const carriedCount = dragging ? descendantsOf(members.map(member => ({ id: member.id, parentId: member.parentId, label: member.name })), dragging).size : 0
   const previewParent = dropTarget && !dropTarget.reason ? nodes.find(node => node.id === dropTarget.id) : undefined
@@ -622,7 +640,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
           </div>
         </div>
       </div>
-      <div className="space-overview"><span>{distinctPeople} people · {records.length} memberships · {teams.length} teams</span><span>{pending ? 'Saving upline…' : 'Magnetic layout · Free canvas'}</span></div>
+      <div className="space-overview"><span>{distinctPeople} people · {records.length} memberships · {teams.length} teams{directorCount ? ` · ${directorCount} director${directorCount === 1 ? '' : 's'}` : ''}</span><span>{pending ? 'Saving upline…' : 'Magnetic layout · Free canvas'}</span></div>
       <UplineContext.Provider value={openUpline}>
         <div ref={camera.canvas} onPointerDownCapture={interruptCamera} onWheelCapture={interruptCamera}
           className={`org-canvas space-canvas${movingDepartment || movingTeam ? ' space-dragging' : ''}`}>
@@ -645,6 +663,18 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
                   className={`space-department${activeDepartment === department.id ? ' active' : ''}${movingDepartment === department.id ? ' moving' : ''}`} />)}
                 {geometry.teams.map(team => <rect key={team.id} data-team-id={team.id} {...team.bounds} rx="20" className={`space-team${movingTeam === team.id ? ' moving' : ''}`}
                   data-space-tone={departments.findIndex(item => item.id === team.departmentId) % 3} />)}
+                {/* The reporting line from each director down to every team's
+                    leader: the whole sub-department reports to them. Dashed,
+                    because unlike the solid line inside a team it carries no
+                    override. It follows the leader's card wherever it is. */}
+                {geometry.departments.flatMap(department => department.directors.flatMap(director =>
+                  geometry.teams.filter(team => team.departmentId === department.id).flatMap(team => {
+                    const leader = nodeById.get(team.leaderId)
+                    if (!leader) return []
+                    return [<path key={`${director.id}->${team.leaderId}`} className="space-director-line" data-director-line={team.leaderId}
+                      d={roundedReportingPath(director.x + NODE_WIDTH / 2, director.y + NODE_HEIGHT,
+                        leader.position.x + (leader.measured?.width ?? NODE_WIDTH) / 2, leader.position.y)} />]
+                  })))}
                 {previewParent && previewChild ? <path className="space-preview-line"
                   d={roundedReportingPath(previewParent.position.x + (previewParent.measured?.width ?? NODE_WIDTH) / 2,
                     previewParent.position.y + (previewParent.measured?.height ?? NODE_HEIGHT),
@@ -673,8 +703,30 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
                 onContextMenu={event => event.preventDefault()} onKeyDown={event => groupKey(event, { teamId: team.id, departmentId: team.departmentId })}
                 onClick={() => focusTeam(team.id)}
               ><strong>{team.label}</strong><span>{team.memberIds.length} members</span><span className="space-grip" aria-hidden>⠿</span></button>)}
+              {/* The sub-department's directors, in the row the layout reserved
+                  for them. Cards of the same family as the members, but not
+                  nodes: nobody can be dropped on them, they take no upline,
+                  and they move only with their frame. */}
+              {geometry.departments.flatMap(department => department.directors.map(slot => {
+                const entry = directorsById.get(slot.id)
+                if (!entry) return null
+                const title = hierarchyTitleAppearance(entry.director.titleName)
+                return <div key={slot.id} className="org-card space-person space-director" data-space-tone={entry.tone} data-director={entry.director.staffId}
+                  role="img" aria-label={`${entry.director.name}, ${entry.director.titleName ?? 'department head'}, directs ${entry.department.name}`}
+                  title={`${entry.department.name} reports to ${entry.director.name}. A reporting line only — no rank, no override.`}
+                  style={{ left: slot.x, top: slot.y, width: NODE_WIDTH, minHeight: NODE_HEIGHT }}>
+                  <div className="oc-top"><div className="oc-nm">{entry.director.name}</div><span className="oc-rank none">no rank</span></div>
+                  <div className="oc-tt oc-title-row">
+                    <span className="oc-title-badge" data-title-tone={title.tone}>
+                      <span className="oc-title-marker" aria-hidden="true">{title.marker}</span>
+                      <span className="oc-title-label">{title.label}</span>
+                    </span>
+                  </div>
+                  <div className="oc-role"><span className="k">Directs</span><span className="v">{entry.department.name} · reporting only</span></div>
+                </div>
+              }))}
               {geometry.departments.filter(department => !members.some(member => member.departmentId === department.id)).map(department =>
-                <div key={`empty:${department.id}`} className="space-empty" style={{ left: department.bounds.x + 28, top: department.bounds.y + 90 }}>No members yet</div>)}
+                <div key={`empty:${department.id}`} className="space-empty" style={{ left: department.bounds.x + 28, top: department.contentTop + 18 }}>No members yet</div>)}
             </ViewportPortal>
           </ReactFlow>
           {dropTarget && dropPerson ? <div className={`space-drop-notice${dropTarget.reason ? ' refused' : ''}`} role="status">
@@ -687,7 +739,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
       <div className="space-footer" aria-live="polite">
         <div>
           <strong>{selectedRecord ? `${selectedRecord.person.name} · ${selectedRecord.department.name}` : 'Sub-department → Team → Member'}</strong>
-          <span>{selectedRecord ? `${selectedRecord.person.titleName ?? 'No title'} · ${selectedRecord.person.rankLabel ?? 'No rank yet'}` : 'Drag a team border or heading to move it · Members align inside · Hold over a person to change team'}</span>
+          <span>{selectedRecord ? `${selectedRecord.person.titleName ?? 'No title'} · ${selectedRecord.person.rankLabel ?? 'No rank yet'}${selectedReportsTo ? ` · reports to ${selectedReportsTo}` : ''}` : 'Drag a team border or heading to move it · Members align inside · Hold over a person to change team'}</span>
         </div>
         {selectedRecord ? <div className="space-memberships" aria-label="This person's other memberships">
           {records.filter(record => record.person.staffId === selectedRecord.person.staffId && record.id !== selectedRecord.id).map(record =>
@@ -700,6 +752,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
       </div>
       {popover && mover ? <MovePopover key={popover.id} mover={mover.person} people={mover.department.people}
         graph={mover.department.people.map(person => ({ id: person.staffId, parentId: person.uplineStaffId, label: person.name }))}
+        directorNames={sortHeads(mover.department.directors ?? []).map(director => director.name)}
         anchor={popover.anchor} onClose={() => setPopover(null)}
         onPick={id => move(popover.id, id ? membershipKey(mover.department.schemeId, id) : null)} /> : null}
     </div>
@@ -741,9 +794,19 @@ function interpolateGeometry(from: SpaceGeometry, to: SpaceGeometry, amount: num
         y: (old?.labelPosition.y ?? team.labelPosition.y) + (team.labelPosition.y - (old?.labelPosition.y ?? team.labelPosition.y)) * amount,
       } }
     }),
-    departments: to.departments.map(department => ({ ...department,
-      bounds: between(oldDepartments.get(department.id)?.bounds, department.bounds),
-    })),
+    departments: to.departments.map(department => {
+      const old = oldDepartments.get(department.id)
+      const lerp = (start: number | undefined, end: number) => start === undefined ? end : start + (end - start) * amount
+      return { ...department,
+        bounds: between(old?.bounds, department.bounds),
+        contentTop: lerp(old?.contentTop, department.contentTop),
+        // The director row rides with its frame rather than jumping ahead of it.
+        directors: department.directors.map(slot => {
+          const before = old?.directors.find(item => item.id === slot.id)
+          return { ...slot, x: lerp(before?.x, slot.x), y: lerp(before?.y, slot.y) }
+        }),
+      }
+    }),
   }
 }
 

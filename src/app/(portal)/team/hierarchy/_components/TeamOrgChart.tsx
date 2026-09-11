@@ -28,6 +28,7 @@ import {
 } from '@/lib/org-layout'
 import { ladderAllows, ladderRefusal } from '@/lib/ladder'
 import { lineRefusal } from '@/lib/hierarchy-boundary'
+import { headLines, headsLabel, layoutParent, reportsToHeads } from '@/lib/department-heads'
 import { setReportsTo, undoHierarchyMove, type UndoMoveInput } from '../actions'
 
 export interface ChartPerson {
@@ -41,8 +42,14 @@ export interface ChartPerson {
   commissionDept: boolean
   /** Inside a commission department: may their title hold downlines? Null
    *  when the department's ladder does not carry the title, or the department
-   *  is not paid by commission (the rule then says nothing). */
+   *  is not paid by commission (the rule then says nothing). A head may. */
   canRecruit: boolean | null
+  /** Their title heads the department (Revenue Director, 2026-09-11): above
+   *  the ladder, no rank, and the line to them is derived, not written. */
+  isDepartmentHead: boolean
+  /** The heads the top of their tree reports to, A→Z — `lib/department-heads.ts`.
+   *  Empty outside a commission department, and for a head themselves. */
+  leadIds: string[]
   /** Where their title stands on the ladder. Null when it is not placed —
    *  the ladder then has nothing to say about them. */
   levelRank: number | null
@@ -82,6 +89,13 @@ export const ALL_DEPARTMENTS = '__all__'
  * is the whole move, and two rules of that department apply to it: the line
  * may not cross the department's edge, and it may only go to a title that
  * may hold downlines (`lib/hierarchy-boundary.ts`).
+ *
+ * Since 2026-09-11 the top of every Revenue tree hangs from the department's
+ * head(s) — the Revenue Director(s) the sub-department reports to. That line
+ * is DERIVED (`leadIds`), drawn dashed, and carries no override; with two
+ * directors the layout hangs the tree from the first and draws the second
+ * line across. Dropping somebody on a director makes them the top of a tree:
+ * the server writes null, and the chart draws the director line itself.
  */
 export default function TeamOrgChart(props: {
   people: ChartPerson[]
@@ -197,11 +211,13 @@ function Chart({
   // Sorted by department then name, so unattached people cluster with their
   // own department instead of interleaving across the top row. The label is
   // only ever used for ordering — the card draws the real one.
+  // The top of a Revenue tree hangs from the first of its heads, so the tree
+  // is drawn under the director rather than beside them (`layoutParent`).
   const graph: OrgNodeInput[] = useMemo(
     () =>
       visible.map(p => ({
         id: p.id,
-        parentId: p.reportsTo,
+        parentId: layoutParent(p),
         label: `${p.department ?? 'zzz'} ${p.name}`,
       })),
     [visible],
@@ -267,7 +283,19 @@ function Chart({
             : { stroke: 'var(--hairline-strong, #b9b0a2)', strokeWidth: 1.5 },
         }
       })
-    return reporting
+    // The derived line from each director down to the top of every tree they
+    // direct. Dashed: it is where the reporting line ends and no override
+    // climbs it. Both directors get one when a sub-department has two.
+    const directing: Edge[] = headLines(visible)
+      .filter(line => visibleIds.has(line.headId))
+      .map(line => ({
+        id: `h:${line.headId}->${line.staffId}`,
+        source: line.headId,
+        target: line.staffId,
+        type: 'smoothstep',
+        style: { stroke: 'var(--hairline-strong, #b9b0a2)', strokeWidth: 1.5, strokeDasharray: '5 4' },
+      }))
+    return [...reporting, ...directing]
   }, [visible, visibleIds, byId])
 
   const move = useCallback(
@@ -317,16 +345,25 @@ function Chart({
             setError(result.reason)
             return
           }
-          setUndo({ staffId: childId, reportsTo: was, movedTo: parentId })
-          const moved = parentId
-            ? `${child.name} now reports to ${byId.get(parentId)!.name}.`
-            : `${child.name} now reports to nobody.`
+          // What the column now holds — null when they were dropped on a
+          // director, whose line is derived rather than written. An undo puts
+          // back the value that was written, not the card that was aimed at.
+          const landed = result.reportsTo
+          if (was !== landed) setUndo({ staffId: childId, reportsTo: was, movedTo: landed })
+          const heads = headsLabel(
+            child.leadIds.map(id => byId.get(id)?.name).filter((name): name is string => !!name),
+          )
+          const moved = landed
+            ? `${child.name} now reports to ${byId.get(landed)!.name}.`
+            : heads
+              ? `${child.name} now stands at the top of a tree, reporting to ${heads} — the department's director.`
+              : `${child.name} now reports to nobody.`
           // Inside a commission department the line IS the override, so a
           // detach there is a money change and is said in full.
           setNote(
             child.commissionDept
-              ? parentId
-                ? `${moved} The override on their sales goes to ${byId.get(parentId)!.name} from this month.`
+              ? landed
+                ? `${moved} The override on their sales goes to ${byId.get(landed)!.name} from this month.`
                 : `${moved} Nobody earns an override on their sales from this month.`
               : moved,
           )
@@ -403,8 +440,10 @@ function Chart({
   const nodeTypes = useMemo(() => ({ person: PersonCard }), [])
 
   // Every count describes the canvas, not the company — a line that says
-  // "9 people" over a chart showing 3 is worse than no line at all.
-  const unplaced = visible.filter(p => !p.reportsTo).length
+  // "9 people" over a chart showing 3 is worse than no line at all. The top
+  // of a Revenue tree reports to its director, not to nobody.
+  const unplaced = visible.filter(p => !p.reportsTo && !reportsToHeads(p)).length
+  const directed = visible.filter(p => reportsToHeads(p) && p.leadIds.some(id => visibleIds.has(id))).length
   const broken = visible.filter(
     p =>
       p.reportsTo &&
@@ -541,6 +580,7 @@ function Chart({
         <p className="font-serif italic text-muted text-xs">
           {visible.length} people · {layout.roots.length} tree
           {layout.roots.length === 1 ? '' : 's'} · {unplaced} reporting to nobody
+          {directed > 0 ? ` · ${directed} at the top of a tree under a director` : ''}
           {outside > 0 ? (
             <span className="text-alert">
               {' '}
@@ -611,6 +651,14 @@ function Chart({
           </svg>
           Reports to
         </span>
+        {directed > 0 ? (
+          <span className="inline-flex items-center gap-2 font-serif italic text-xs text-graphite">
+            <svg width="26" height="6" aria-hidden>
+              <line x1="0" y1="3" x2="26" y2="3" stroke="var(--hairline-strong, #b9b0a2)" strokeWidth="1.5" strokeDasharray="5 4" />
+            </svg>
+            Reports to the department&rsquo;s director · no override
+          </span>
+        ) : null}
         {broken > 0 ? (
           <span className="inline-flex items-center gap-2 font-serif italic text-xs text-danger">
             <svg width="26" height="6" aria-hidden>
@@ -645,7 +693,11 @@ function Chart({
         hold downlines there. A red line is one the ladder would refuse today:
         move the line, or change the ladder from the Levels tab. Inside Revenue
         this line is also who earns the override on their sales, so a move here
-        is the whole move.
+        is the whole move — except the dashed line up to the Revenue Director,
+        which every team leader and standalone member has by being at the top
+        of a tree: it is set per sub-department on Revenue, and no override
+        climbs it. Dropping somebody on a director puts them at the top of a
+        tree.
       </p>
     </div>
   )
@@ -683,6 +735,11 @@ function PersonCard({ data }: NodeProps<Node<CardData>>) {
 
       <div className="font-serif italic text-xs text-graphite truncate mt-1.5">
         {person.title ?? 'no title'}
+        {person.isDepartmentHead ? (
+          <span className="ml-1.5 font-mono not-italic text-[0.55rem] uppercase tracking-wide text-accent">
+            · heads the department
+          </span>
+        ) : null}
       </div>
       <div className="flex items-baseline justify-between gap-2 mt-1">
         <span className="font-mono text-[0.55rem] uppercase tracking-wide text-muted truncate">

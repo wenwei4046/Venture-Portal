@@ -32,17 +32,25 @@ import type { BoardTitle } from './_components/LevelsBoard'
  * The chart obeys it — nobody can be dropped under somebody whose title stands
  * lower — and a promotion climbs it. Inside a commission department a second
  * rule joins it: you may only report to a title that may hold downlines.
+ *
+ * REVENUE DIRECTOR (user, 2026-09-11). A title may HEAD its department; the
+ * line to its holder is not a column but a fact of the sub-department they
+ * direct (`comm_sub_department_directors`), so everybody at the top of a
+ * tree in Revenue is drawn under the home sub-department's director(s) —
+ * dashed: a reporting line that carries no override — and `leadIds` says
+ * who. Dropping somebody on a director writes null (`moveReportingLine`).
  */
 export default async function TeamHierarchyPage() {
   await requirePermission('team')
   const supabase = await createClient()
+  const untyped = supabase as unknown as import('@supabase/supabase-js').SupabaseClient
 
-  const [{ data: staffRows }, { data: levels }, { data: titles }, { data: rungRows }, subDepts] =
+  const [{ data: staffRows }, { data: levels }, { data: titles }, { data: rungRows }, subDepts, { data: directorRows }] =
     await Promise.all([
       supabase
         .from('hr_staff_costs')
         .select(
-          'id, employee_name, employee_code, reports_to, designation, title_id, department_id, titles(name, level_id), departments(name, payroll_source)',
+          'id, employee_name, employee_code, reports_to, designation, title_id, department_id, titles(name, level_id, is_department_head), departments(name, payroll_source)',
         )
         .eq('status', 'active')
         .order('employee_name'),
@@ -57,10 +65,14 @@ export default async function TeamHierarchyPage() {
       // recruit rule, asked the way the database asks it: on the department's
       // HOME sub-department's ladder (its oldest). The comm_* tables postdate
       // database.types.ts, hence the cast.
-      (supabase as unknown as import('@supabase/supabase-js').SupabaseClient)
+      untyped
         .from('comm_ranks')
         .select('title_id, can_recruit, comm_schemes!inner (sub_department_id, comm_sub_departments!inner (department_id))'),
       listSubDepartments(),
+      // Who each sub-department reports to (2026-09-11). Only the HOME
+      // sub-department's directors matter here: this is the company chart,
+      // and the home tree is the one `reports_to` draws.
+      untyped.from('comm_sub_department_directors').select('staff_id, sub_department_id'),
     ])
 
   const rungs: Rung[] = ((levels ?? []) as Array<{ id: string; rank: number; name: string }>).map(
@@ -94,13 +106,30 @@ export default async function TeamHierarchyPage() {
     designation: string | null
     title_id: string | null
     department_id: string | null
-    titles: { name: string; level_id: string | null } | null
+    titles: { name: string; level_id: string | null; is_department_head: boolean | null } | null
     departments: { name: string; payroll_source: string } | null
   }>
+  const staffById = new Map(staff.map(s => [s.id, s]))
+
+  // The heads each commission department's HOME sub-department reports to,
+  // A→Z by name — the order the layout hangs a tree from the first of them.
+  // A row pointing at somebody inactive is not drawn; the roster decides.
+  const subById = new Map(subDepts.map(s => [s.id, s]))
+  const headsByDept = new Map<string, Array<{ id: string; name: string }>>()
+  for (const row of (directorRows ?? []) as Array<{ staff_id: string; sub_department_id: string }>) {
+    const sub = subById.get(row.sub_department_id)
+    const head = staffById.get(row.staff_id)
+    if (!sub?.isHome || !head || !head.titles?.is_department_head) continue
+    const list = headsByDept.get(sub.departmentId) ?? []
+    if (!list.some(h => h.id === head.id)) list.push({ id: head.id, name: head.employee_name })
+    headsByDept.set(sub.departmentId, list)
+  }
+  for (const list of headsByDept.values()) list.sort((a, b) => a.name.localeCompare(b.name))
 
   const people: ChartPerson[] = staff.map(s => {
     const rung = s.titles?.level_id ? (rungById.get(s.titles.level_id) ?? null) : null
     const commissionDept = s.departments?.payroll_source === 'commission'
+    const isDepartmentHead = s.titles?.is_department_head === true
     const key = s.department_id && s.title_id ? `${s.department_id}:${s.title_id}` : null
     return {
       id: s.id,
@@ -110,9 +139,15 @@ export default async function TeamHierarchyPage() {
       department: s.departments?.name ?? null,
       // The department facts the chart decides on rather than merely prints:
       // a reporting line may not cross the edge of a commission department,
-      // and inside one it may only go to a title that may hold downlines.
+      // and inside one it may only go to a title that may hold downlines — a
+      // head may hold everybody's, without a rung.
       commissionDept,
-      canRecruit: commissionDept ? (key ? (recruit.get(key) ?? null) : null) : null,
+      canRecruit: commissionDept ? (isDepartmentHead ? true : key ? (recruit.get(key) ?? null) : null) : null,
+      isDepartmentHead,
+      leadIds:
+        commissionDept && !isDepartmentHead && s.department_id
+          ? (headsByDept.get(s.department_id) ?? []).map(h => h.id).filter(id => id !== s.id)
+          : [],
       levelRank: rung?.rank ?? null,
       levelName: rung?.name ?? null,
       reportsTo: s.reports_to,

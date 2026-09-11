@@ -18,9 +18,21 @@ export interface SpaceMember {
   height?: number
 }
 
+/** A department head drawn above the teams: the Revenue Director layer (2026-09-11). */
+export interface SpaceDirector {
+  id: string
+  name: string
+}
+
 export interface SpaceDepartment {
   id: string
   name: string
+  /**
+   * Who this sub-department reports to. They stand in a row of their own
+   * between the frame's header and its first team, and every team's leader
+   * is drawn under each of them — a reporting line only, never an upline.
+   */
+  directors?: readonly SpaceDirector[]
 }
 
 export interface SpaceTeam {
@@ -38,9 +50,23 @@ export interface SpaceTeamGeometry extends SpaceTeam {
   labelPosition: Point
 }
 
+/** A director's card, placed. */
+export interface SpaceDirectorSlot extends SpaceDirector {
+  x: number
+  y: number
+}
+
+export interface SpaceDepartmentGeometry extends SpaceDepartment {
+  bounds: Bounds
+  /** The department's heads, in a row under the header. Empty when it has none. */
+  directors: SpaceDirectorSlot[]
+  /** Where the teams (or the empty notice) begin — below the director row when there is one. */
+  contentTop: number
+}
+
 export interface SpaceGeometry {
   teams: SpaceTeamGeometry[]
-  departments: Array<SpaceDepartment & { bounds: Bounds }>
+  departments: SpaceDepartmentGeometry[]
 }
 
 export interface SpaceAnchor {
@@ -53,9 +79,52 @@ export const SPACE_DEPARTMENT_GAP = 64
 export const SPACE_DEPARTMENT_PADDING = 28
 export const SPACE_DEPARTMENT_HEADER = 44
 export const SPACE_TEAM_HEADER = 38
+/** Between a director card's bottom edge and the first team frame. */
+export const SPACE_DIRECTOR_GAP = 36
+/** Between two director cards standing side by side. */
+export const SPACE_DIRECTOR_X_GAP = 24
 const TEAM_PADDING = 24
 const EMPTY_DEPARTMENT_WIDTH = 400
 const EMPTY_DEPARTMENT_HEIGHT = 220
+
+/** The row a department reserves above its teams for its heads; 0 without any. */
+export function directorRowHeight(department: Pick<SpaceDepartment, 'directors'>): number {
+  return department.directors?.length ? NODE_HEIGHT + SPACE_DIRECTOR_GAP : 0
+}
+
+/**
+ * A department's frame, with its heads placed. `content` is the frame the
+ * teams alone would need (header and padding included); the director row is
+ * added above them, and the frame widens symmetrically when the row of cards
+ * is wider than the teams below it.
+ */
+function departmentGeometry(department: SpaceDepartment, content: Bounds): SpaceDepartmentGeometry {
+  const directors = department.directors ?? []
+  const inner = content.y + SPACE_DEPARTMENT_HEADER + SPACE_DEPARTMENT_PADDING
+  if (!directors.length) return { ...department, bounds: content, directors: [], contentTop: inner }
+
+  const rowWidth = directors.length * NODE_WIDTH + (directors.length - 1) * SPACE_DIRECTOR_X_GAP
+  const row = directorRowHeight(department)
+  const extra = Math.max(0, rowWidth + SPACE_DEPARTMENT_PADDING * 2 - content.width)
+  const bounds: Bounds = {
+    x: content.x - extra / 2,
+    y: content.y - row,
+    width: content.width + extra,
+    height: content.height + row,
+  }
+  const top = bounds.y + SPACE_DEPARTMENT_HEADER + SPACE_DEPARTMENT_PADDING
+  const left = bounds.x + (bounds.width - rowWidth) / 2
+  return {
+    ...department,
+    bounds,
+    directors: directors.map((director, index) => ({
+      ...director,
+      x: left + index * (NODE_WIDTH + SPACE_DIRECTOR_X_GAP),
+      y: top,
+    })),
+    contentTop: top + NODE_HEIGHT + SPACE_DIRECTOR_GAP,
+  }
+}
 
 /** Stored alongside member positions, so an empty department can be dragged too. */
 export function departmentPositionKey(id: string): string {
@@ -163,17 +232,17 @@ export function geometryForSpaces(
         x: (index % 2) * (EMPTY_DEPARTMENT_WIDTH + SPACE_DEPARTMENT_GAP),
         y: Math.floor(index / 2) * (EMPTY_DEPARTMENT_HEIGHT + SPACE_DEPARTMENT_GAP),
       }
-      return { ...department, bounds: {
+      return departmentGeometry(department, {
         ...origin, width: EMPTY_DEPARTMENT_WIDTH, height: EMPTY_DEPARTMENT_HEIGHT,
-      } }
+      })
     }
     const contentBounds = boundsOf(contents.flatMap(team => rectanglePoints(team.bounds)))
-    return { ...department, bounds: {
+    return departmentGeometry(department, {
       x: contentBounds.x - SPACE_DEPARTMENT_PADDING,
       y: contentBounds.y - SPACE_DEPARTMENT_PADDING - SPACE_DEPARTMENT_HEADER,
       width: contentBounds.width + SPACE_DEPARTMENT_PADDING * 2,
       height: contentBounds.height + SPACE_DEPARTMENT_PADDING * 2 + SPACE_DEPARTMENT_HEADER,
-    } }
+    })
   })
   return { teams: teamShapes, departments: departmentShapes }
 }

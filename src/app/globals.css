@@ -2103,6 +2103,53 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 .org-card .oc-up .v.top { font-style: italic; }
 .org-card .oc-up .chev { flex: none; width: 9px; height: 9px; color: rgb(var(--accent)); }
 
+/* The department's head(s) — the Revenue Director layer (2026-09-11). A card
+   of the same family as the members, in a row the layout reserves between a
+   sub-department frame's header and its first team. Not a node: nothing can
+   be dropped on it, it takes no upline, it moves only with its frame. Its
+   last row sits where a member's Upline button sits, and says what it is. */
+.space-director {
+  position: absolute;
+  z-index: 3;
+  pointer-events: auto;
+  cursor: default;
+}
+.space-canvas .space-director.org-card:hover { transform: none; border-color: rgb(var(--cv-border-hover)); }
+.space-canvas .space-director.space-person { border-top: 2px solid rgb(var(--space-tone)); }
+.org-card .oc-role {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-top: 1px solid rgb(var(--cv-border));
+  padding: 6px 11px;
+  font-size: 11px;
+  color: rgb(var(--cv-graphite));
+}
+.org-card .oc-role .k {
+  flex: none;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgb(var(--cv-muted));
+}
+.org-card .oc-role .v { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-style: italic; }
+/* The line from a director down to a team's leader: the whole sub-department
+   reports to them. Dashed — unlike the solid line inside a team it carries no
+   override. */
+.space-director-line {
+  fill: none;
+  stroke: rgb(var(--cv-line));
+  stroke-width: 1.25;
+  stroke-dasharray: 5 4;
+  stroke-linecap: round;
+  opacity: 0.8;
+}
+
 /* The shelf at the canvas's right edge, for people on no line at all. */
 .org-shelf-lbl {
   font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;

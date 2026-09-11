@@ -130,6 +130,29 @@ src/
 │   │   │                              edge, and inside it you may only report
 │   │   │                              to a title that may hold downlines (SRS
 │   │   │                              and above).
+│   │   │                              **REVENUE DIRECTOR (2026-09-11):** a title
+│   │   │                              may HEAD its department
+│   │   │                              (`titles.is_department_head`, the Head
+│   │   │                              tick on People › Roles). It is above the
+│   │   │                              ladder — no rung, no membership, no rank,
+│   │   │                              no override; the DB refuses all three
+│   │   │                              (23DIR) — and everybody may report to it.
+│   │   │                              Which director(s) a sub-department
+│   │   │                              reports to is a row of
+│   │   │                              `comm_sub_department_directors` (Team tab
+│   │   │                              › Reports to; seeded Fair ← PETER + KRIS,
+│   │   │                              IR ← PETER); the line from the top of every
+│   │   │                              tree up to them is DERIVED on both charts
+│   │   │                              (`lib/department-heads.ts`), never written
+│   │   │                              per person — two directors do not fit one
+│   │   │                              `reports_to`. The commission line stops
+│   │   │                              below a head: `comm_sync_position` writes
+│   │   │                              a null upline for anybody whose
+│   │   │                              `reports_to` heads the department, and
+│   │   │                              `moveReportingLine` writes null when a
+│   │   │                              Revenue person is dropped on one
+│   │   │                              (`LineResult.reportsTo` = what landed).
+│   │   │                              Mig `20260914050000`. CEO layer: later.
 │   │   │                              **MEMBERSHIPS (2026-09-10, later):** a
 │   │   │                              sub-department is a world of its own —
 │   │   │                              one `comm_hierarchy` row per (person,

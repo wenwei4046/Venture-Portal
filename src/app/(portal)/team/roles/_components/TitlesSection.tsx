@@ -21,6 +21,8 @@ export interface TitleRow {
   departmentId: string | null
   departmentName: string | null
   isActive: boolean
+  /** Heads its department (Revenue Director): above the ladder, no rank, no override. */
+  isDepartmentHead: boolean
   people: number
 }
 
@@ -87,7 +89,10 @@ export default function TitlesSection({
 
       <Hint>
         A title belongs to one department. Deactivating one keeps the people who
-        hold it and only stops it being offered to the next hire.
+        hold it and only stops it being offered to the next hire. <strong>Head</strong> marks
+        the title that heads its department — the Revenue Director: it stands above the
+        commission ladder with no rank, every team leader and standalone member of the
+        sub-departments it directs reports to it, and no override climbs to it.
         {inactiveCount > 0 ? (
           <>
             {' '}
@@ -138,6 +143,10 @@ export default function TitlesSection({
                   ))}
                 </select>
               </label>
+              <label className="flex items-center gap-2 pb-2 font-sans text-xs text-graphite">
+                <input type="checkbox" name="is_department_head" className="accent-[rgb(var(--accent))]" />
+                Heads the department
+              </label>
               <button
                 type="submit"
                 disabled={pending}
@@ -162,6 +171,7 @@ export default function TitlesSection({
                 <th>Title</th>
                 <th>Department</th>
                 <th className="text-center">Active</th>
+                <th className="text-center" title="Heads its department: above the commission ladder, no rank, no override">Head</th>
                 <th className="text-right">People</th>
                 <th className="text-right">Actions</th>
               </tr>
@@ -170,7 +180,7 @@ export default function TitlesSection({
               {groups.map(group => (
                 <Fragment key={group.dept}>
                   <tr className="bg-surface">
-                    <td colSpan={5}>
+                    <td colSpan={6}>
                       <span className="font-serif italic text-accent text-sm">{group.dept}</span>
                       <span className="font-mono text-[11px] text-muted ml-2">
                         · {group.rows.length}
@@ -208,6 +218,13 @@ export default function TitlesSection({
                               name="is_active"
                               defaultChecked={t.isActive}
                               ariaLabel={`${t.name} is active`}
+                            />
+                          </td>
+                          <td className="text-center">
+                            <Tick
+                              name="is_department_head"
+                              defaultChecked={t.isDepartmentHead}
+                              ariaLabel={`${t.name} heads the department`}
                             />
                           </td>
                           <td className="num">{t.people}</td>

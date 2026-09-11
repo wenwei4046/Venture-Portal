@@ -32,6 +32,17 @@ export interface OrgPerson {
   expansionSourcePeriod?: string | null
 }
 
+/**
+ * A department head this sub-department reports to (2026-09-11). Drawn in a
+ * row above every team; never a member, never an upline.
+ */
+export interface OrgDirector {
+  staffId: string
+  name: string
+  code: string | null
+  titleName: string | null
+}
+
 export interface OrgDepartment {
   id: string
   name: string
@@ -40,8 +51,15 @@ export interface OrgDepartment {
   isHome: boolean
   people: OrgPerson[]
   ranks: OrgRank[]
+  /** Who the sub-department reports to, A→Z. Absent or empty: nobody yet. */
+  directors?: OrgDirector[]
 }
 
 export function membershipKey(schemeId: string, staffId: string): string {
   return `${schemeId}:${staffId}`
+}
+
+/** A director's card on one department's frame. The same person may direct several. */
+export function directorKey(schemeId: string, staffId: string): string {
+  return `director:${schemeId}:${staffId}`
 }

@@ -10,6 +10,7 @@ import {
   type RefusalKind,
 } from '@/lib/commission/chart-moves'
 import type { OrgNodeInput } from '@/lib/org-layout'
+import { headsLabel } from '@/lib/department-heads'
 import type { OrgPerson } from './OrgChart'
 
 /** Where the popover hangs from — the card's Upline row, or the selection bar's button. */
@@ -25,6 +26,11 @@ export interface MovePopoverProps {
   /** The one line: who reports to whom. Decides the trees AND who is a downline. */
   graph: OrgNodeInput[]
   anchor: PopAnchor
+  /**
+   * The sub-department's heads, by name. The top of a tree reports to them
+   * (2026-09-11), so the detach row says so — a reporting line, no override.
+   */
+  directorNames?: readonly string[]
   /** Null = the top of their own tree. */
   onPick: (uplineStaffId: string | null) => void
   onClose: () => void
@@ -60,7 +66,7 @@ export function subjectOf(p: OrgPerson): MoveSubject {
  * overflow cannot clip it; positioned below the anchor, or above when the
  * window has no room below.
  */
-export default function MovePopover({ mover, people, graph, anchor, onPick, onClose }: MovePopoverProps) {
+export default function MovePopover({ mover, people, graph, anchor, directorNames, onPick, onClose }: MovePopoverProps) {
   const ref = useRef<HTMLDivElement>(null)
   const [q, setQ] = useState('')
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
@@ -221,6 +227,9 @@ export default function MovePopover({ mover, people, graph, anchor, onPick, onCl
             className="row topr"
           >
             <span className="nm">Top of their own tree</span>
+            {directorNames?.length ? (
+              <span className="tt">reports to {headsLabel(directorNames)} · no override</span>
+            ) : null}
             {atTop ? <span className="cur">current</span> : <span className="why">detach</span>}
           </button>
         ) : null}

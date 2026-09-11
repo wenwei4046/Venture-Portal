@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { effectiveDirectLineLimit } from '@/lib/commission/chart-moves'
 import type {
   CommissionSettingsData,
+  DirectorRow,
   MemberCandidate,
   ProductRow,
   RankDefRow,
@@ -50,11 +51,15 @@ export async function loadCommissionSettings(
     // The ladder's Tier column picks from these — the titles the Revenue side
     // keeps under Team → Role & Permission. Unscoped like the lists above:
     // a sub-department cloned under another commission department needs them.
+    // A title that heads the department (Revenue Director, 2026-09-11)
+    // stands above the ladder and can never hold a rung, so it is not
+    // offered; the database refuses it too (23DIR).
     supabase
       .from('titles')
       .select('id, name, departments!inner (payroll_source)')
       .eq('departments.payroll_source', 'commission')
       .eq('is_active', true)
+      .eq('is_department_head', false)
       .order('name'),
   ])
 
@@ -133,16 +138,25 @@ export async function loadCommissionSettings(
  *             yet". Nobody can be added or removed by hand — it is the roster.
  *   other     members only, added by hand with a title of their own. Whoever
  *             is in the department but not a member yet is a `candidate`.
+ *
+ * REVENUE DIRECTOR (2026-09-11). Somebody whose title heads the department
+ * is on neither list: they hold no rank and no membership. They are the
+ * sub-department's `directors` (who it reports to — a reporting line only,
+ * drawn above every tree, never an upline) or could be
+ * (`directorCandidates`).
  */
-export async function loadTeam(schemeId: string, opts: { isHome: boolean }): Promise<TeamData> {
+export async function loadTeam(
+  schemeId: string,
+  opts: { isHome: boolean; subDepartmentId: string },
+): Promise<TeamData> {
   const supabase = await untyped()
 
-  const [{ data: rankRows }, { data: staffRows }, { data: positions }, { data: levelRows }, { data: titleRows }, capacity, expansions, currentCapacity] =
+  const [{ data: rankRows }, { data: staffRows }, { data: positions }, { data: levelRows }, { data: titleRows }, capacity, expansions, currentCapacity, { data: directorRows }] =
     await Promise.all([
       supabase.from('comm_ranks').select('*').eq('scheme_id', schemeId).order('sort_order'),
       supabase
         .from('hr_staff_costs')
-        .select('id, employee_name, employee_code, reports_to, tax_mode, withholding_rate, title_id, titles (name, level_id), departments!inner (name, payroll_source)')
+        .select('id, employee_name, employee_code, reports_to, tax_mode, withholding_rate, title_id, titles (name, level_id, is_department_head), departments!inner (name, payroll_source)')
         .eq('status', 'active')
         .eq('departments.payroll_source', 'commission')
         .order('employee_name'),
@@ -153,17 +167,21 @@ export async function loadTeam(schemeId: string, opts: { isHome: boolean }): Pro
         .is('effective_to', null),
       // The company ladder: the Team table reads it top down (user, 2026-09-05).
       supabase.from('title_levels').select('id, rank, name'),
-      // The titles a membership may hold: the commission departments' own.
+      // The titles a membership may hold: the commission departments' own,
+      // minus the one that heads the department — it has no rung to hold.
       supabase
         .from('titles')
         .select('id, name, departments!inner (payroll_source)')
         .eq('departments.payroll_source', 'commission')
         .eq('is_active', true)
+        .eq('is_department_head', false)
         .order('name'),
       supabase.from('comm_schemes').select('direct_line_limit').eq('id', schemeId).single(),
       supabase.from('comm_direct_line_entitlements')
         .select('staff_id, earned_at, source_period_month').eq('scheme_id', schemeId),
       supabase.rpc('comm_effective_direct_line_limits', { p_scheme_id: schemeId }),
+      // Who this sub-department reports to (2026-09-11).
+      supabase.from('comm_sub_department_directors').select('staff_id').eq('sub_department_id', opts.subDepartmentId),
     ])
   if (capacity.error || expansions.error || currentCapacity.error) throw new Error('Could not read the commission direct-line limits')
   const baseLimit = (capacity.data as { direct_line_limit: number | null }).direct_line_limit
@@ -181,6 +199,8 @@ export async function loadTeam(schemeId: string, opts: { isHome: boolean }): Pro
   interface TitleEmbed {
     name: string
     level_id: string | null
+    /** Only the roster's embed carries it; a membership's title never heads anything. */
+    is_department_head?: boolean | null
   }
   const oneTitle = (t: TitleEmbed | TitleEmbed[] | null | undefined): TitleEmbed | null =>
     Array.isArray(t) ? (t[0] ?? null) : (t ?? null)
@@ -219,7 +239,13 @@ export async function loadTeam(schemeId: string, opts: { isHome: boolean }): Pro
     titles: TitleEmbed | TitleEmbed[] | null
   }>(staffRows)
 
-  const people: SalespersonRow[] = staff
+  // A department head (2026-09-11) stands above the ladder: no membership, no
+  // rank, no row among the members. They direct sub-departments instead.
+  const isHead = (s: { titles: TitleEmbed | TitleEmbed[] | null }) => oneTitle(s.titles)?.is_department_head === true
+  const heads = staff.filter(isHead)
+  const members = staff.filter(s => !isHead(s))
+
+  const people: SalespersonRow[] = members
     .filter(s => opts.isHome || positionByStaff.has(s.id))
     .map(s => {
       const pos = positionByStaff.get(s.id)
@@ -259,7 +285,7 @@ export async function loadTeam(schemeId: string, opts: { isHome: boolean }): Pro
 
   const candidates: MemberCandidate[] = opts.isHome
     ? []
-    : staff
+    : members
         .filter(s => !positionByStaff.has(s.id))
         .map(s => ({
           staff_id: s.id,
@@ -268,11 +294,27 @@ export async function loadTeam(schemeId: string, opts: { isHome: boolean }): Pro
           company_title_name: oneTitle(s.titles)?.name ?? null,
         }))
 
+  // The directors: the heads this sub-department reports to, A→Z. A row that
+  // points at somebody no longer active, or no longer a head, is simply not
+  // drawn — the roster decides who a head is, the row only which ones direct.
+  const directing = new Set(rows<{ staff_id: string }>(directorRows).map(d => d.staff_id))
+  const asDirector = (s: (typeof staff)[number]): DirectorRow => ({
+    staff_id: s.id,
+    employee_name: s.employee_name,
+    employee_code: s.employee_code,
+    title_name: oneTitle(s.titles)?.name ?? null,
+  })
+  const directors = heads.filter(s => directing.has(s.id)).map(asDirector)
+  const directorCandidates = heads.filter(s => !directing.has(s.id)).map(asDirector)
+
   return {
+    subDepartmentId: opts.subDepartmentId,
     ranks: rows<RankRow>(rankRows),
     people,
     titles: rows<{ id: string; name: string }>(titleRows).map(t => ({ id: t.id, name: t.name })),
     candidates,
+    directors,
+    directorCandidates,
   }
 }
 
