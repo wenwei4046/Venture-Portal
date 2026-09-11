@@ -63,6 +63,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
         id, staff_id, period_month, status, source,
         basic_salary, statutory_allowance, non_statutory_allowance,
         ot_hours, ot_amount, commission_amount, commission_balance, payout_split_version, basic_pay_net, pcb_override_amount, unpaid_leave_days,
+        commission_synced_amount, commission_adjustment_amount, commission_adjustment_reason, commission_adjusted_at,
         deduction_amount, skbbk_amount,
         prorata_days_worked, prorata_days_in_month,
         epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb, withholding_tax,
@@ -120,11 +121,13 @@ export default async function PayrollGridPage({ params }: PageProps) {
   const { data: commStatementRows } = commRuns.length
     ? await supabase
         .from('comm_statements')
-        .select('staff_id, run_id')
+        .select('staff_id, run_id, total_commission')
         .in('run_id', commRuns.map(r => r.id))
     : { data: null }
   const statementsByStaff = new Map<string, { label: string; href: string }[]>()
-  for (const r of (commStatementRows ?? []) as Array<{ staff_id: string; run_id: string }>) {
+  const confirmedCommissionByStaff = new Map<string, number>()
+  for (const r of (commStatementRows ?? []) as Array<{ staff_id: string; run_id: string; total_commission: number }>) {
+    confirmedCommissionByStaff.set(r.staff_id, round2((confirmedCommissionByStaff.get(r.staff_id) ?? 0) + Number(r.total_commission)))
     const name = subDeptOfRun.get(r.run_id)
     if (name) {
       const statements = statementsByStaff.get(r.staff_id) ?? []
@@ -217,6 +220,11 @@ export default async function PayrollGridPage({ params }: PageProps) {
       ot_hours: Number(r.ot_hours),
       ot_amount: Number(r.ot_amount),
       commission_amount: Number(r.commission_amount),
+      commission_synced_amount: r.commission_synced_amount == null ? null : Number(r.commission_synced_amount),
+      commission_confirmed_amount: confirmedCommissionByStaff.get(r.staff_id) ?? null,
+      commission_adjustment_amount: Number(r.commission_adjustment_amount ?? 0),
+      commission_adjustment_reason: r.commission_adjustment_reason,
+      commission_adjusted_at: r.commission_adjusted_at,
       commission_balance: r.commission_balance == null ? null : Number(r.commission_balance),
       payout_split_version: r.payout_split_version,
       basic_pay_net: r.basic_pay_net == null ? null : Number(r.basic_pay_net),

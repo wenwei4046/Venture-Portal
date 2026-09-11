@@ -9,6 +9,8 @@ import { ratePct } from '@/lib/commission/ranks'
 import RunControls from './_components/RunControls'
 import LedgerRow from '@/components/LedgerRow'
 import { requireSubDepartment } from '../../_lib/sub-departments'
+import { readRevenuePayrollAdjustments } from '../../_lib/payroll-adjustments'
+import PayrollAdjustmentPanel from '../../_components/PayrollAdjustmentPanel'
 
 interface PageProps {
   params: Promise<{ sub: string; period: string }>
@@ -204,9 +206,14 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   // Names for anyone the run mentions but this month's batch does not — an
   // upline who sold nothing themselves still earns an override.
   const staffIds = [...new Set(statements.map(s => s.staff_id))]
-  const { data: staffRows } = staffIds.length
-    ? await supabase.from('hr_staff_costs').select('id, employee_name').in('id', staffIds)
-    : { data: null }
+  const [{ data: staffRows }, payrollAdjustments] = await Promise.all([
+    staffIds.length
+      ? supabase.from('hr_staff_costs').select('id, employee_name').in('id', staffIds)
+      : Promise.resolve({ data: null }),
+    staffIds.length
+      ? readRevenuePayrollAdjustments(supabase, subDept.id, period)
+      : Promise.resolve({ rows: [], unavailable: false }),
+  ])
   const nameOf = new Map(
     ((staffRows ?? []) as Array<{ id: string; employee_name: string }>).map(s => [s.id, s.employee_name]),
   )
@@ -344,7 +351,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
               <div className="lg:col-span-7 hero-walnut px-6 py-6 md:px-8 md:py-7">
                 <div className="font-serif italic text-accent text-base mb-1">
-                  Commission this month
+                  Source commission · {subDept.name}
                 </div>
                 <div className="statement-amount text-num-ink">
                   {formatMoney(runTotal)}
@@ -402,7 +409,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                       <th className="right m-hide">Incentive</th>
                       {statements.some(s => Number(s.group_incentive) > 0) ? <th className="right m-hide">Group incentive</th> : null}
                       {statements.some(s => Number(s.group_subsidy_cap) > 0) ? <th className="right m-hide">Subsidy cap</th> : null}
-                      <th className="right">Total</th>
+                      <th className="right">Source total</th>
                       <th className="lt-toggle" aria-hidden />
                     </tr>
                   </thead>
@@ -461,6 +468,9 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
               below-margin penalty does not reduce it. Commission is what the penalty cuts.
             </p>
           </section>
+
+          <PayrollAdjustmentPanel read={payrollAdjustments} periodLabel={label(period)} staffNames={nameOf}
+            runSynced={run?.status === 'applied' || run?.status === 'locked'} />
 
           {/* ── Penalised bills ─────────────────────────────────────────── */}
           {run && (run.penalised_orders ?? []).length > 0 ? (

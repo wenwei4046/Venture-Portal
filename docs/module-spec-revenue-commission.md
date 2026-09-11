@@ -15,6 +15,40 @@ cross-apply the two programmes.
 
 ---
 
+## Month-end payroll commission adjustments — 2026-09-11
+
+After Revenue commission is confirmed and before payroll is submitted or paid,
+HR or Principal can edit Gross Commission in payroll. The editor shows the
+confirmed source, requested gross and signed adjustment, and requires a reason
+such as a debit note or dropped sale. Saving uses a dedicated audited adjustment
+action, not the ordinary payroll input update.
+
+`payroll gross commission = synced Revenue commission + payroll adjustment`.
+For a source of RM13,000, entering RM14,000 records +RM1,000; entering RM12,000
+records −RM1,000. The source statements, sales, commission rules and upstream
+entitlements retain their calculated values. Payroll Balance, Net, CTC and
+subsequent PV amounts use the adjusted gross. Basic and its saved statutory
+deductions are preserved when only this adjustment changes.
+
+The normal month-end source is already fixed. If Revenue is explicitly reopened
+and synced again, the signed adjustment is retained once: a new source of
+RM15,000 with +RM1,000 produces RM16,000. An editor opened against older source
+or adjustment values must be refreshed before saving. Missing source values
+must not be guessed as zero; otherwise a replacement amount could be counted
+again on the next sync.
+
+If reopening would temporarily make gross commission negative, payroll retains
+its last valid snapshot until the source is synced again. The unconfirmed run
+blocks adjustment and payroll submission throughout that transition. Adjustment
+history also survives deletion of an orphan draft payroll row after a salesperson
+is removed from a reopened calculation.
+
+Revenue calculation pages and each employee's statement show the payroll
+adjustment and reason separately from source results. These are staff/month
+totals across all Revenue sub-departments, not another earning to add to every
+individual sub-department statement. Resetting to the source records a zero
+adjustment with a reason; audit history remains.
+
 ## Net basic, statutory and commission payments — 2026-09-11 clarification
 
 This clarification replaces the earlier EPF-only split below for newly computed
